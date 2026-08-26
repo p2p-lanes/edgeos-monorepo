@@ -3,9 +3,36 @@ import { describe, expect, it, vi } from "vitest"
 import { resolveShopFlowSlug, ShopContent } from "./ShopContent"
 
 const mocks = vi.hoisted(() => ({
-  application: [] as Array<{ id: string; slug: string; name: string }>,
-  direct: [] as Array<{ id: string; slug: string; name: string }>,
-  upsale: [] as Array<{ id: string; slug: string; name: string }>,
+  application: [] as Array<{
+    id: string
+    slug: string
+    name: string
+    price_summary?: {
+      amount: string
+      currency: string
+      kind: "fixed" | "from"
+    } | null
+  }>,
+  direct: [] as Array<{
+    id: string
+    slug: string
+    name: string
+    price_summary?: {
+      amount: string
+      currency: string
+      kind: "fixed" | "from"
+    } | null
+  }>,
+  upsale: [] as Array<{
+    id: string
+    slug: string
+    name: string
+    price_summary?: {
+      amount: string
+      currency: string
+      kind: "fixed" | "from"
+    } | null
+  }>,
   applicationStatus: "accepted" as string | null,
 }))
 
@@ -31,18 +58,31 @@ vi.mock("@/providers/applicationProvider", () => ({
 
 vi.mock("react-i18next", () => ({
   useTranslation: () => ({
-    t: (key: string) =>
-      ({
-        "shop.title": "Shop",
-        "shop.description": "Choose an available option.",
-        "shop.catalog": "Available options",
-        "shop.application": "Application",
-        "shop.direct": "Direct purchase",
-        "shop.upsale": "Available to you",
-        "shop.empty_title": "Nothing available right now",
-        "shop.empty_description": "Check back later for new options.",
-        "shop.open": "View option",
-      })[key] ?? key,
+    t: (key: string, values?: Record<string, string>) => {
+      const translation =
+        {
+          "shop.title": "Shop",
+          "shop.description": "Choose an available option.",
+          "shop.catalog": "Available options",
+          "shop.application": "Application",
+          "shop.direct": "Direct purchase",
+          "shop.upsale": "Available to you",
+          "shop.empty_title": "Nothing available right now",
+          "shop.empty_description": "Check back later for new options.",
+          "shop.open": "View option",
+          "shop.eligibility.application": "Available to approved applicants",
+          "shop.eligibility.direct": "Available to all attendees",
+          "shop.eligibility.upsale": "Available after an eligible purchase",
+          "shop.source": "Source: {{source}}",
+          "shop.price_from": "From {{price}}",
+          "shop.price_unavailable": "Price unavailable",
+        }[key] ?? key
+
+      return Object.entries(values ?? {}).reduce(
+        (result, [name, value]) => result.replace(`{{${name}}}`, value),
+        translation,
+      )
+    },
   }),
 }))
 
@@ -132,5 +172,46 @@ describe("ShopContent", () => {
         })
         .getAttribute("href"),
     ).toBe("/portal/summer-camp/shop/weekend")
+    expect(screen.getByText("Price unavailable")).toBeTruthy()
+  })
+
+  it("renders server-provided fixed, from, and unavailable prices with source eligibility context", () => {
+    mocks.applicationStatus = "accepted"
+    mocks.application = [
+      {
+        id: "application",
+        slug: "volunteer",
+        name: "Volunteer",
+        price_summary: null,
+      },
+    ]
+    mocks.direct = [
+      {
+        id: "direct",
+        slug: "weekend",
+        name: "Weekend Pass",
+        price_summary: { amount: "25.00", currency: "USD", kind: "fixed" },
+      },
+    ]
+    mocks.upsale = [
+      {
+        id: "upsale",
+        slug: "merch-store",
+        name: "Merch Store",
+        price_summary: { amount: "15.00", currency: "USD", kind: "from" },
+      },
+    ]
+
+    render(<ShopContent popupId="popup-1" popupSlug="summer-camp" />)
+
+    expect(screen.getByText("Available to approved applicants")).toBeTruthy()
+    expect(screen.getByText("Available to all attendees")).toBeTruthy()
+    expect(
+      screen.getByText("Available after an eligible purchase"),
+    ).toBeTruthy()
+    expect(screen.getByText("Source: Direct purchase")).toBeTruthy()
+    expect(screen.getByText("USD 25.00")).toBeTruthy()
+    expect(screen.getByText("From USD 15.00")).toBeTruthy()
+    expect(screen.getByText("Price unavailable")).toBeTruthy()
   })
 })

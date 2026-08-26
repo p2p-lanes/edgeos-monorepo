@@ -83,6 +83,14 @@
     "direct": "直接购买",
     "upsale": "为您提供",
     "open": "查看选项",
+    "source": "来源：{{source}}",
+    "eligibility": {
+      "application": "仅向已获批准的申请人提供",
+      "direct": "向所有参与者提供",
+      "upsale": "完成符合条件的购买后可用"
+    },
+    "price_from": "起价 {{price}}",
+    "price_unavailable": "价格暂不可用",
     "empty_title": "目前没有可用选项",
     "empty_description": "请稍后回来查看新选项。",
     "approval_required_title": "需要批准",

@@ -83,6 +83,14 @@
     "direct": "Bein kaup",
     "upsale": "Í boði fyrir þig",
     "open": "Skoða möguleika",
+    "source": "Uppruni: {{source}}",
+    "eligibility": {
+      "application": "Í boði fyrir samþykkta umsækjendur",
+      "direct": "Í boði fyrir alla þátttakendur",
+      "upsale": "Í boði eftir gjaldgeng kaup"
+    },
+    "price_from": "Frá {{price}}",
+    "price_unavailable": "Verð ekki í boði",
     "empty_title": "Ekkert í boði núna",
     "empty_description": "Athugaðu aftur síðar fyrir nýja möguleika.",
     "approval_required_title": "Samþykki er krafist",

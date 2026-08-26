@@ -1,8 +1,9 @@
-export interface ShopFlow {
-  id: string
-  slug: string
-  name: string
-}
+import type { SalesFlowPortalPublic } from "@/client"
+
+export type ShopFlow = Pick<
+  SalesFlowPortalPublic,
+  "id" | "slug" | "name" | "price_summary"
+>
 
 export interface ShopOffer {
   key: "application" | "direct" | "upsale"

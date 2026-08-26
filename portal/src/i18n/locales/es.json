@@ -97,6 +97,14 @@
     "direct": "Compra directa",
     "upsale": "Disponible para usted",
     "open": "Ver opción",
+    "source": "Origen: {{source}}",
+    "eligibility": {
+      "application": "Disponible para solicitantes aprobados",
+      "direct": "Disponible para todos los asistentes",
+      "upsale": "Disponible después de una compra elegible"
+    },
+    "price_from": "Desde {{price}}",
+    "price_unavailable": "Precio no disponible",
     "empty_title": "No hay opciones disponibles por ahora",
     "empty_description": "Vuelva más tarde para consultar nuevas opciones.",
     "approval_required_title": "Se requiere aprobación",

@@ -97,6 +97,14 @@
     "direct": "Direct purchase",
     "upsale": "Available to you",
     "open": "View option",
+    "source": "Source: {{source}}",
+    "eligibility": {
+      "application": "Available to approved applicants",
+      "direct": "Available to all attendees",
+      "upsale": "Available after an eligible purchase"
+    },
+    "price_from": "From {{price}}",
+    "price_unavailable": "Price unavailable",
     "empty_title": "Nothing available right now",
     "empty_description": "Check back later for new options.",
     "approval_required_title": "Approval required",
