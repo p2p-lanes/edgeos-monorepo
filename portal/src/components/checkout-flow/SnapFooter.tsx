@@ -3,8 +3,6 @@
 import { ArrowLeft, ArrowRight, Loader2, ShoppingBag } from "lucide-react"
 import { useState } from "react"
 import { useTranslation } from "react-i18next"
-import { useSidebar } from "@/components/Sidebar/SidebarComponents"
-import { useIsMobile } from "@/hooks/useIsMobile"
 import { cn } from "@/lib/utils"
 import { useCheckout } from "@/providers/checkoutProvider"
 import { useCityProvider } from "@/providers/cityProvider"
@@ -221,16 +219,8 @@ export default function SnapFooter({
   onScrollToStep?: (stepId: string) => void
 }) {
   const { t } = useTranslation()
-  const isMobile = useIsMobile()
-  const { state: sidebarState } = useSidebar()
   const { cart } = useCheckout()
   const [isCartOpen, setIsCartOpen] = useState(false)
-
-  const leftOffset = isMobile
-    ? 0
-    : sidebarState === "expanded"
-      ? "var(--sidebar-width)"
-      : "var(--sidebar-width-icon)"
 
   const itemCount =
     cart.passes.length +
@@ -296,10 +286,7 @@ export default function SnapFooter({
   }[footerDesign]
 
   return (
-    <div
-      className="fixed bottom-0 z-30 transition-[left] duration-200"
-      style={{ left: leftOffset, right: "var(--snap-scrollbar-w, 0px)" }}
-    >
+    <div className="checkout-cart-footer fixed right-[var(--snap-scrollbar-w,0px)] bottom-0 z-30 transition-[left] duration-200">
       <div className="max-w-2xl mx-auto px-4">
         {isCartOpen && (
           <div className="bg-white shadow-2xl rounded-2xl mb-2 relative z-30 max-h-[60vh] overflow-hidden">

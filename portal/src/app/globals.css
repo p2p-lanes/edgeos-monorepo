@@ -437,6 +437,24 @@
   --nav-text-secondary: oklch(0.75 0.025 260);
 }
 
+/* The checkout's nested sidebar has zero width. Position its cart footer
+   against the outer portal sidebar, which owns the available content area. */
+.checkout-cart-footer {
+  left: 0;
+}
+
+@media (min-width: 768px) {
+  .group\/sidebar-wrapper:has(> .peer[data-state="expanded"])
+    .checkout-cart-footer {
+    left: 16rem;
+  }
+
+  .group\/sidebar-wrapper:has(> .peer[data-state="collapsed"])
+    .checkout-cart-footer {
+    left: 3rem;
+  }
+}
+
 @layer base {
   * {
     @apply border-border outline-ring/50;
