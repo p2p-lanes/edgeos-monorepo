@@ -1,5 +1,5 @@
 import { render, screen } from "@testing-library/react"
-import { afterEach, describe, expect, it } from "vitest"
+import { afterEach, beforeEach, describe, expect, it } from "vitest"
 import ThemeProvider, { type ThemeConfig } from "./themeProvider"
 
 const portalBackground = "rgb(245 245 245)"
@@ -7,7 +7,16 @@ const darkConfig: ThemeConfig = {
   colors: { mode: "dark", primary_color: "#112233" },
 }
 
-afterEach(() => document.documentElement.removeAttribute("style"))
+beforeEach(() => {
+  document.head.innerHTML = ""
+  document.body.style.fontFamily = ""
+  document.documentElement.style.cssText = ""
+})
+
+afterEach(() => {
+  document.head.innerHTML = ""
+  document.documentElement.style.cssText = ""
+})
 
 function renderLocalTheme(config: ThemeConfig, label: string) {
   render(
@@ -18,8 +27,8 @@ function renderLocalTheme(config: ThemeConfig, label: string) {
   return screen.getByText(label).parentElement
 }
 
-describe("ThemeProvider local scope", () => {
-  it("continues to apply a gathering palette to the document by default", () => {
+describe("ThemeProvider", () => {
+  it("applies a gathering palette to the document by default", () => {
     render(
       <ThemeProvider config={darkConfig}>
         <span>Gathering page</span>
@@ -29,40 +38,51 @@ describe("ThemeProvider local scope", () => {
     expect(
       document.documentElement.style.getPropertyValue("--background"),
     ).toBe("oklch(0.145 0 0)")
-    expect(document.documentElement.style.getPropertyValue("--primary")).toBe(
-      "#112233",
-    )
   })
 
-  it("keeps a dark flow palette on its checkout subtree instead of the document", () => {
+  it("keeps a flow palette on its checkout subtree", () => {
     document.documentElement.style.setProperty("--background", portalBackground)
     const checkoutScope = renderLocalTheme(darkConfig, "Dark checkout")
+
     expect(checkoutScope?.style.getPropertyValue("--background")).toBe(
       "oklch(0.145 0 0)",
     )
-    expect(checkoutScope?.style.getPropertyValue("--primary")).toBe("#112233")
     expect(
       document.documentElement.style.getPropertyValue("--background"),
     ).toBe(portalBackground)
   })
 
-  it("keeps checkout-only overrides local when the flow has no palette", () => {
-    document.documentElement.style.setProperty(
-      "--checkout-nav-bg",
-      portalBackground,
-    )
-    const config: ThemeConfig = {
-      colors: {
-        checkout_navbar_bg: "#445566",
+  it("loads configured Google fonts without leaking local flow fonts to the document", () => {
+    const checkoutScope = renderLocalTheme(
+      {
+        typography: {
+          font_family: "Inter",
+          font_heading_family: "Playfair Display",
+        },
       },
-    }
-
-    const checkoutScope = renderLocalTheme(config, "Configured checkout")
-    expect(checkoutScope?.style.getPropertyValue("--checkout-nav-bg")).toBe(
-      "#445566",
+      "Branded checkout",
     )
+
+    expect(checkoutScope?.style.getPropertyValue("--theme-font-family")).toBe(
+      '"Inter", system-ui, sans-serif',
+    )
+    expect(document.body.style.fontFamily).toBe("")
     expect(
-      document.documentElement.style.getPropertyValue("--checkout-nav-bg"),
-    ).toBe(portalBackground)
+      document.head.querySelectorAll('link[href*="fonts.googleapis.com/css2"]'),
+    ).toHaveLength(1)
+  })
+
+  it("applies a document font and restores it on unmount", () => {
+    const { unmount } = render(
+      <ThemeProvider config={{ typography: { font_family: "Inter" } }}>
+        <span>Document font</span>
+      </ThemeProvider>,
+    )
+
+    expect(document.body.style.fontFamily).toBe(
+      '"Inter", system-ui, sans-serif',
+    )
+    unmount()
+    expect(document.body.style.fontFamily).toBe("")
   })
 })

@@ -64,6 +64,10 @@ services:
       dockerfile: backoffice/Dockerfile
       args:
         - VITE_API_URL=${BACKEND_URL?Variable not set}
+        # Optional: unset, the backoffice derives the portal root from its own
+        # hostname (app.edgeos.world → edgeos.world). Set it when the two apps
+        # don't sit on sibling subdomains.
+        - VITE_PORTAL_DOMAIN=${VITE_PORTAL_DOMAIN-}
         - NODE_ENV=production
 
   portal:
@@ -73,6 +77,8 @@ services:
       - "3000:3000"
     environment:
       - NEXT_PUBLIC_API_URL=${BACKEND_URL?Variable not set}
+      # The ticketing-step live preview needs nothing here: the backoffice
+      # drives it with an API-minted token, which is what authorizes it.
     build:
       context: .
       dockerfile: portal/Dockerfile

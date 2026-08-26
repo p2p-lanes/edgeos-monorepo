@@ -74,6 +74,9 @@ interface UsePaymentSubmitParams {
    *  submitPayment in open-ticketing mode to ensure cartMetaRef has fresh
    *  cid/restore_token before the purchase body is built (ADR-R8). */
   flushOpenCartSave?: (() => Promise<void>) | null
+  /** Backoffice live preview: the flow is rendered for an operator, not a
+   *  buyer, so checking out must never reach the payment provider. */
+  previewMode?: boolean
 }
 
 interface PaymentSubmitResult {
@@ -111,6 +114,7 @@ export function usePaymentSubmit({
   popupName,
   openCartMetaRef = null,
   flushOpenCartSave = null,
+  previewMode = false,
 }: UsePaymentSubmitParams) {
   const { t, i18n } = useTranslation()
   const queryClient = useQueryClient()
@@ -130,6 +134,13 @@ export function usePaymentSubmit({
   }, [])
 
   const submitPayment = useCallback(async (): Promise<PaymentSubmitResult> => {
+    // The preview renders the real flow, pay button included. Stop here rather
+    // than at the button, so no path through the UI can create a payment for
+    // an event someone is still configuring.
+    if (previewMode) {
+      return { success: false, error: "preview" }
+    }
+
     // Guard against double-submits that bypass the disabled-button state:
     // bfcache restore resets isSubmitting to false, and the post-success
     // reset can race the redirect. Without this, the same checkout can be
@@ -469,6 +480,7 @@ export function usePaymentSubmit({
     i18n.language,
     openCartMetaRef,
     flushOpenCartSave,
+    previewMode,
   ])
 
   return { submitPayment, isSubmitting }

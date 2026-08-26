@@ -28,6 +28,7 @@ vi.mock("@tanstack/react-query", async (importOriginal) => {
 
 vi.mock("next/navigation", () => ({
   useRouter: () => ({
+    push: mockReplace,
     replace: mockReplace,
   }),
 }))
@@ -42,6 +43,10 @@ vi.mock("framer-motion", () => ({
 vi.mock("@/hooks/useApplicationSchema", () => ({
   useApplicationSchema: (popupId: string | undefined) =>
     mockUseApplicationSchema(popupId),
+}))
+
+vi.mock("react-i18next", () => ({
+  useTranslation: () => ({ t: (key: string) => key }),
 }))
 
 vi.mock("../hooks/useCheckoutState", () => ({
@@ -273,5 +278,30 @@ describe("PopupCheckoutContent application schema gating", () => {
     expect(clear).toHaveBeenCalledOnce()
     expect(removeQueries).not.toHaveBeenCalled()
     expect(setCheckoutState).toHaveBeenCalledWith("form")
+  })
+
+  it("keeps products hidden while a manual-approval link is in review", () => {
+    mockUseApplicationSchema.mockReturnValue({
+      data: {
+        base_fields: {},
+        custom_fields: {},
+        sections: [],
+      },
+      isLoading: false,
+    })
+    mockGetRelevantApplication.mockReturnValue({ status: "in review" })
+
+    renderWithClient(
+      <PopupCheckoutContent
+        popup={popup as never}
+        background={{ className: "bg" }}
+        requiresManualApproval
+      />,
+    )
+
+    expect(screen.getByText("checkout.application_pending_title")).toBeTruthy()
+    expect(screen.queryByText("passes-flow")).toBeNull()
+    fireEvent.click(screen.getByRole("button"))
+    expect(mockReplace).toHaveBeenCalledWith("/portal/popup-slug")
   })
 })

@@ -1,7 +1,7 @@
 """Integration tests for the scholarship workflow.
 
 Covers 12 scenarios:
-8.1  Scholarship request on allows_scholarship popup → IN_REVIEW, scholarship_status=None
+8.1  Scholarship request on allows_scholarship popup → IN_REVIEW, scholarship_status=pending
 8.2  Scholarship request BLOCKED on non-scholarship popup → HTTP 422
 8.3  AUTO_ACCEPT gate: scholarship holds application in IN_REVIEW
 8.4  AUTO_ACCEPT no gate: no scholarship → normal auto-accept → ACCEPTED
@@ -163,7 +163,7 @@ class TestScholarshipRequest:
         tenant_a: Tenants,
     ) -> None:
         """Submitting scholarship_request=True on an allows_scholarship popup
-        creates application with IN_REVIEW status and scholarship_status=None.
+        creates application with IN_REVIEW status and scholarship_status=pending.
         """
         popup = _make_popup(
             db, tenant_a, slug_suffix="t81-allows-schol", allows_scholarship=True
@@ -198,8 +198,88 @@ class TestScholarshipRequest:
         # Scholarship gate must hold the application in IN_REVIEW
         assert data["status"] == ApplicationStatus.IN_REVIEW.value
         assert data["scholarship_request"] is True
-        # scholarship_status stays None at submission (admin hasn't decided yet)
-        assert data["scholarship_status"] is None
+        assert data["scholarship_status"] == ScholarshipStatus.PENDING.value
+
+    def test_user_updates_keep_scholarship_status_in_sync(
+        self,
+        client: TestClient,
+        db: Session,
+        tenant_a: Tenants,
+    ) -> None:
+        popup = _make_popup(
+            db, tenant_a, slug_suffix="request-update", allows_scholarship=True
+        )
+        human = _make_human(
+            db,
+            tenant_a,
+            email=f"scholarship-update-{uuid.uuid4().hex[:8]}@test.com",
+        )
+        human_token = create_access_token(subject=human.id, token_type="human")
+        headers = {"Authorization": f"Bearer {human_token}"}
+
+        created = client.post(
+            "/api/v1/applications/my",
+            headers=headers,
+            json={
+                "popup_id": str(popup.id),
+                "first_name": "Scholar",
+                "last_name": "Applicant",
+                "status": "in review",
+                "scholarship_request": False,
+            },
+        )
+        assert created.status_code == 201, created.text
+        assert created.json()["scholarship_status"] is None
+
+        requested = client.patch(
+            f"/api/v1/applications/my/{popup.id}",
+            headers=headers,
+            json={"scholarship_request": True},
+        )
+        assert requested.status_code == 200, requested.text
+        assert requested.json()["scholarship_status"] == ScholarshipStatus.PENDING.value
+
+        withdrawn = client.patch(
+            f"/api/v1/applications/my/{popup.id}",
+            headers=headers,
+            json={"scholarship_request": False},
+        )
+        assert withdrawn.status_code == 200, withdrawn.text
+        assert withdrawn.json()["scholarship_status"] is None
+
+    def test_user_update_preserves_admin_scholarship_decision(
+        self,
+        client: TestClient,
+        db: Session,
+        tenant_a: Tenants,
+        admin_token_tenant_a: str,
+    ) -> None:
+        popup = _make_popup(
+            db, tenant_a, slug_suffix="preserve-decision", allows_scholarship=True
+        )
+        human = _make_human(
+            db,
+            tenant_a,
+            email=f"preserve-decision-{uuid.uuid4().hex[:8]}@test.com",
+        )
+        application = _make_application_in_review(db, tenant_a, popup, human)
+
+        approved = client.patch(
+            f"/api/v1/applications/{application.id}/scholarship",
+            headers=_admin_headers(admin_token_tenant_a, tenant_a),
+            json={"scholarship_status": "approved", "discount_percentage": 50},
+        )
+        assert approved.status_code == 200, approved.text
+
+        human_token = create_access_token(subject=human.id, token_type="human")
+        updated = client.patch(
+            f"/api/v1/applications/my/{popup.id}",
+            headers={"Authorization": f"Bearer {human_token}"},
+            json={"scholarship_details": "Updated supporting information"},
+        )
+
+        assert updated.status_code == 200, updated.text
+        assert updated.json()["scholarship_status"] == ScholarshipStatus.APPROVED.value
 
     def test_8_2_scholarship_request_blocked_on_non_scholarship_popup(
         self,
@@ -516,6 +596,31 @@ class TestScholarshipEndpoint:
             "Application should be ACCEPTED after scholarship approval on AUTO_ACCEPT popup"
         )
         assert data["accepted_at"] is not None
+
+    def test_admin_cannot_set_pending_scholarship_decision(
+        self,
+        client: TestClient,
+        db: Session,
+        tenant_a: Tenants,
+        admin_token_tenant_a: str,
+    ) -> None:
+        popup = _make_popup(
+            db, tenant_a, slug_suffix="pending-decision", allows_scholarship=True
+        )
+        human = _make_human(
+            db,
+            tenant_a,
+            email=f"pending-decision-{uuid.uuid4().hex[:8]}@test.com",
+        )
+        app = _make_application_in_review(db, tenant_a, popup, human)
+
+        response = client.patch(
+            f"/api/v1/applications/{app.id}/scholarship",
+            headers=_admin_headers(admin_token_tenant_a, tenant_a),
+            json={"scholarship_status": "pending"},
+        )
+
+        assert response.status_code == 422, response.text
 
 
 # ---------------------------------------------------------------------------

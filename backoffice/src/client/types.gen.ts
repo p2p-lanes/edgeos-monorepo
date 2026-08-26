@@ -316,6 +316,15 @@ export type ApplicationReviewCreate = {
 };
 
 /**
+ * A reviewer who has submitted at least one review for a popup.
+ */
+export type ApplicationReviewerOption = {
+    id: string;
+    full_name?: (string | null);
+    email?: (string | null);
+};
+
+/**
  * Compact reviewer + decision pair for the applications list.
  */
 export type ApplicationReviewerVote = {
@@ -1192,6 +1201,17 @@ export type CheckoutPreviewResponse = {
 };
 
 export type kind = 'estimate' | 'definitive';
+
+/**
+ * Short-lived token that unlocks the checkout runtime for a live preview.
+ *
+ * Handed to the portal's preview page so it can render a popup that is still
+ * draft. See ``app.utils.checkout_preview``.
+ */
+export type CheckoutPreviewTokenPublic = {
+    token: string;
+    expires_at: string;
+};
 
 /**
  * Public product available in the checkout runtime.
@@ -2139,6 +2159,36 @@ export type FormSectionUpdate = {
 };
 
 /**
+ * A single family, trimmed to what the picker actually renders.
+ *
+ * Google's payload carries a `files` map with one CDN URL per variant, which
+ * is ~80% of the response weight and useless to us — the portal loads fonts
+ * through the `css2` stylesheet endpoint, not the raw files.
+ */
+export type GoogleFont = {
+    family: string;
+    category: 'sans-serif' | 'serif' | 'display' | 'handwriting' | 'monospace';
+    variants: Array<(string)>;
+    subsets: Array<(string)>;
+};
+
+export type category = 'sans-serif' | 'serif' | 'display' | 'handwriting' | 'monospace';
+
+/**
+ * Catalog response.
+ *
+ * `source` lets the backoffice tell a real catalog from the degraded one and
+ * surface a hint to the admin rather than silently offering 40 fonts when
+ * 1800 were expected.
+ */
+export type GoogleFontsCatalog = {
+    source: 'google' | 'fallback';
+    fonts: Array<GoogleFont>;
+};
+
+export type source2 = 'google' | 'fallback';
+
+/**
  * Request body for POST /applications/{id}/credit — manual admin credit grant.
  */
 export type GrantCreditRequest = {
@@ -2706,6 +2756,7 @@ export type InvitePublicPreview = {
     inviter_name?: (string | null);
     is_email_restricted: boolean;
     discount_percentage: string;
+    auto_approve: boolean;
     max_uses?: (number | null);
     current_uses: number;
     expires_at?: (string | null);
@@ -3710,6 +3761,36 @@ export type PreviewResponse = {
 };
 
 /**
+ * One money total, in one currency.
+ *
+ * Payments carry their own currency, so an application's spend can span more
+ * than one. Collapsing them into a single number would misstate the amount.
+ */
+export type PreviousApplicationSpend = {
+    currency: string;
+    amount: string;
+};
+
+/**
+ * One application by the same human, in a different popup.
+ *
+ * Powers the "Previous applications" block of the BO application detail: it
+ * tells a reviewer whether this person already took part in other popups of
+ * the tenant, and how much they bought when they did.
+ */
+export type PreviousApplicationSummary = {
+    id: string;
+    popup_id: string;
+    popup_name?: (string | null);
+    popup_start_date?: (string | null);
+    status: string;
+    tickets_count?: number;
+    spend?: Array<PreviousApplicationSpend>;
+    submitted_at?: (string | null);
+    created_at?: (string | null);
+};
+
+/**
  * Schema for batch product creation.
  */
 export type ProductBatch = {
@@ -4100,6 +4181,18 @@ export type SalesFlowPortalPublic = {
     name: string;
     order: number;
     type: SalesFlowType;
+    price_summary?: (SalesFlowPriceSummary | null);
+};
+
+export type SalesFlowPriceKind = 'fixed' | 'from';
+
+/**
+ * A price display fact that is safe to publish with a Portal flow.
+ */
+export type SalesFlowPriceSummary = {
+    amount: string;
+    currency: string;
+    kind: SalesFlowPriceKind;
 };
 
 /**
@@ -4304,16 +4397,16 @@ export type SavedViewUpdate = {
  * Admin request body for PATCH /applications/{id}/scholarship.
  */
 export type ScholarshipDecisionRequest = {
-    scholarship_status: ScholarshipStatus;
+    scholarship_status: ScholarshipDecisionStatus;
     discount_percentage?: (number | string | null);
     incentive_amount?: (number | string | null);
     incentive_currency?: (string | null);
 };
 
 /**
- * Status of a scholarship request on an application.
+ * Scholarship outcomes an administrator may assign.
  */
-export type ScholarshipStatus = 'pending' | 'approved' | 'rejected';
+export type ScholarshipDecisionStatus = 'approved' | 'rejected';
 
 /**
  * Safe checkout identity for the flow selected by the server.
@@ -5347,6 +5440,13 @@ export type ApplicationsGetApplicationGroupCountsData = {
 
 export type ApplicationsGetApplicationGroupCountsResponse = (Array<ApplicationGroupCount>);
 
+export type ApplicationsListApplicationReviewersData = {
+    popupId: string;
+    xTenantId?: (string | null);
+};
+
+export type ApplicationsListApplicationReviewersResponse = (Array<ApplicationReviewerOption>);
+
 export type ApplicationsGrantTicketsAdminData = {
     requestBody: AdminGrantTicketsRequest;
     xTenantId?: (string | null);
@@ -5360,6 +5460,13 @@ export type ApplicationsGetApplicationData = {
 };
 
 export type ApplicationsGetApplicationResponse = (ApplicationPublic);
+
+export type ApplicationsListPreviousApplicationsData = {
+    applicationId: string;
+    xTenantId?: (string | null);
+};
+
+export type ApplicationsListPreviousApplicationsResponse = (Array<PreviousApplicationSummary>);
 
 export type ApplicationsGrantApplicationCreditData = {
     applicationId: string;
@@ -5865,6 +5972,7 @@ export type CheckoutGetFlowRuntimeData = {
     acceptLanguage?: (string | null);
     flowSlug: string;
     slug: string;
+    xCheckoutPreviewToken?: (string | null);
     xEdgeOsPublishableKey?: (string | null);
     xTenantId?: (string | null);
 };
@@ -6868,6 +6976,8 @@ export type FormSectionsDeleteFormSectionData = {
 
 export type FormSectionsDeleteFormSectionResponse = (void);
 
+export type GoogleFontsListGoogleFontsResponse = (GoogleFontsCatalog);
+
 export type GroupsListGroupsData = {
     /**
      * Maximum number of items to return
@@ -6928,6 +7038,14 @@ export type GroupsRemoveGroupLeaderData = {
 };
 
 export type GroupsRemoveGroupLeaderResponse = (GroupWithMembers);
+
+export type GroupsRemoveGroupMemberAdminData = {
+    groupId: string;
+    humanId: string;
+    xTenantId?: (string | null);
+};
+
+export type GroupsRemoveGroupMemberAdminResponse = (void);
 
 export type GroupsListMyGroupsData = {
     /**
@@ -7472,6 +7590,13 @@ export type PopupsDeletePopupData = {
 };
 
 export type PopupsDeletePopupResponse = (void);
+
+export type PopupsCreateCheckoutPreviewTokenData = {
+    popupId: string;
+    xTenantId?: (string | null);
+};
+
+export type PopupsCreateCheckoutPreviewTokenResponse = (CheckoutPreviewTokenPublic);
 
 export type PopupsListPortalPopupsData = {
     acceptLanguage?: (string | null);

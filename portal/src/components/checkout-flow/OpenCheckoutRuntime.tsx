@@ -47,6 +47,9 @@ interface OpenCheckoutRuntimeProps {
     lastName?: string
   }
   showQuoteStatus?: boolean
+  /** Renders for the backoffice live preview instead of a real buyer: no
+   *  payment, no analytics, no attribution, no favicon takeover. */
+  previewMode?: boolean
 }
 
 function toProductsPass(product: CheckoutRuntimeProduct): ProductsPass {
@@ -145,18 +148,21 @@ export function OpenCheckoutRuntime({
   flowSlug,
   prefilledBuyer,
   showQuoteStatus = false,
+  previewMode = false,
 }: OpenCheckoutRuntimeProps) {
   const { t } = useTranslation()
   const flowScopeStyle = useThemeScopeStyle()
   const searchParams = useSearchParams()
-  const cartCid = searchParams.get("cid")
-  const cartSig = searchParams.get("sig")
+  const cartCid = previewMode ? null : searchParams.get("cid")
+  const cartSig = previewMode ? null : searchParams.get("sig")
 
   // Persist marketing attribution from the entry URL before it is lost across
   // checkout steps; read back at purchase time and forwarded to the webhook.
+  // A preview is nobody's visit, so it must not overwrite a real attribution.
   useEffect(() => {
+    if (previewMode) return
     captureAttribution(searchParams)
-  }, [searchParams])
+  }, [searchParams, previewMode])
   const [discountApplied, setDiscountApplied] = useState<DiscountProps>({
     discount_value: 0,
     discount_type: "percentage",
@@ -197,14 +203,17 @@ export function OpenCheckoutRuntime({
 
   setActiveCurrency(popup.currency ?? "USD")
 
+  // A preview must never pollute the event's marketing funnel with views the
+  // operator generated while configuring it.
   useEffect(() => {
+    if (previewMode) return
     if (trackedViewContentRef.current === popup.id) return
 
     trackMetaViewContent({ popup, products: runtime.products })
     trackGAViewItem({ popup, products: runtime.products })
     trackPortalTelemetry("checkout_opened")
     trackedViewContentRef.current = popup.id
-  }, [popup, runtime.products])
+  }, [popup, runtime.products, previewMode])
 
   const Flow =
     resolveCheckoutShell(popup) === "stepper"
@@ -269,7 +278,7 @@ export function OpenCheckoutRuntime({
                 }
                 cartPersistenceEnabled={false}
                 cartUiEnabled={true}
-                openCartPopupSlug={popupSlug}
+                openCartPopupSlug={previewMode ? null : popupSlug}
                 openCartCid={cartCid}
                 openCartSig={cartSig}
                 validatePromoCodeOverride={async (code) => {
@@ -284,13 +293,16 @@ export function OpenCheckoutRuntime({
                 }}
                 submitMode="open-ticketing"
                 submitPopupSlug={popupSlug}
+                previewMode={previewMode}
               >
-                <FaviconOverride
-                  url={
-                    (popup as { favicon_url?: string | null }).favicon_url ??
-                    null
-                  }
-                />
+                {!previewMode && (
+                  <FaviconOverride
+                    url={
+                      (popup as { favicon_url?: string | null }).favicon_url ??
+                      null
+                    }
+                  />
+                )}
                 <Flow
                   navExtraContent={
                     <div className="flex items-center gap-3">

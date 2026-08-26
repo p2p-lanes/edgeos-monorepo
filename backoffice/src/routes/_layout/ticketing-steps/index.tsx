@@ -9,15 +9,20 @@ import {
 import { arrayMove } from "@dnd-kit/sortable"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { createFileRoute, useNavigate } from "@tanstack/react-router"
-import { Loader2 } from "lucide-react"
+import { Eye, Loader2 } from "lucide-react"
 import { useCallback, useEffect, useMemo, useState } from "react"
 
-import { type TicketingStepPublic, TicketingStepsService } from "@/client"
+import {
+  PopupsService,
+  type TicketingStepPublic,
+  TicketingStepsService,
+} from "@/client"
 import { WorkspaceAlert } from "@/components/Common/WorkspaceAlert"
 import { FlowScopeBar } from "@/components/SalesFlows/FlowScopeBar"
 import { NewStepPanel } from "@/components/ticketing-step-builder/NewStepPanel"
 import { StepCanvas } from "@/components/ticketing-step-builder/StepCanvas"
 import { StepDetailPanel } from "@/components/ticketing-step-builder/StepDetailPanel"
+import { StepPreviewDialog } from "@/components/ticketing-step-builder/step-preview/StepPreviewDialog"
 import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
 import { useWorkspace } from "@/contexts/WorkspaceContext"
@@ -76,6 +81,21 @@ function TicketingStepsContent({ popupId }: { popupId: string }) {
 
   const [adding, setAdding] = useState(false)
   const [displayOrder, setDisplayOrder] = useState<string[]>([])
+  const [previewOpen, setPreviewOpen] = useState(false)
+  // The step currently open in the editor, unsaved changes included, so the
+  // preview can show work that is not saved yet. Only collected while the
+  // preview is open — otherwise every keystroke would re-render this page.
+  const [draftStep, setDraftStep] = useState<TicketingStepPublic | null>(null)
+  const handleDraftChange = useCallback(
+    (next: TicketingStepPublic | null) => setDraftStep(next),
+    [],
+  )
+
+  const { data: popup } = useQuery({
+    queryKey: ["popups", "detail", popupId],
+    queryFn: () => PopupsService.getPopup({ popupId }),
+    enabled: !!popupId,
+  })
 
   // The step list belongs to one flow, and the URL says which. Landing
   // here without a `flow` adopts the remembered or default one and writes
@@ -213,9 +233,10 @@ function TicketingStepsContent({ popupId }: { popupId: string }) {
   }
 
   return (
-    <div className="flex flex-col gap-6 md:flex-row md:items-start">
-      {/* Journey rail */}
-      <div className="flex w-full flex-col gap-4 md:w-80 md:max-w-sm md:shrink-0">
+    <div className="flex flex-col gap-6">
+      {/* Page header. Preview belongs here rather than in a step's editor:
+          it shows the whole checkout, starting where a buyer would. */}
+      <div className="flex items-start justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Ticketing Steps</h1>
           <p className="text-muted-foreground">
@@ -223,7 +244,6 @@ function TicketingStepsContent({ popupId }: { popupId: string }) {
             rename
           </p>
         </div>
-
         <FlowScopeBar
           popupId={popupId}
           flows={flows}
@@ -232,50 +252,76 @@ function TicketingStepsContent({ popupId }: { popupId: string }) {
           isLoading={flowsLoading}
           resource="checkout steps"
         />
-
-        <DndContext
-          sensors={sensors}
-          collisionDetection={closestCenter}
-          onDragEnd={handleDragEnd}
+        <Button
+          variant="outline"
+          onClick={() => setPreviewOpen(true)}
+          className="shrink-0"
         >
-          <StepCanvas
-            steps={orderedSteps}
-            onEdit={(s) => selectStep(s.id)}
-            selectedId={selectedStep?.id}
-          />
-        </DndContext>
-
-        <Button variant="outline" onClick={startAdding}>
-          + Add step
+          <Eye className="mr-2 h-4 w-4" />
+          Preview checkout
         </Button>
       </div>
 
-      {/* Detail pane */}
-      <div className="min-w-0 flex-1">
-        {adding && activeFlowId ? (
-          <NewStepPanel
-            popupId={popupId}
-            // The step is created into the flow being viewed, default or
-            // not. There is no shared tier to omit into, so the panel waits
-            // until the flow list has resolved.
-            salesFlowId={activeFlowId}
-            nextOrder={orderedSteps.length}
-            confirmStepId={steps.find((s) => s.step_type === "confirm")?.id}
-            onCreated={(id) => selectStep(id)}
-            onCancel={clearSelection}
-          />
-        ) : selectedStep ? (
-          <StepDetailPanel
-            key={selectedStep.id}
-            stepId={selectedStep.id}
-            onClose={clearSelection}
-          />
-        ) : (
-          <div className="rounded-lg border border-dashed p-10 text-center text-sm text-muted-foreground">
-            Select a step to configure it, or add a new one
-          </div>
-        )}
+      <div className="flex flex-col gap-6 md:flex-row md:items-start">
+        {/* Journey rail */}
+        <div className="flex w-full flex-col gap-4 md:w-80 md:max-w-sm md:shrink-0">
+          <DndContext
+            sensors={sensors}
+            collisionDetection={closestCenter}
+            onDragEnd={handleDragEnd}
+          >
+            <StepCanvas
+              steps={orderedSteps}
+              onEdit={(s) => selectStep(s.id)}
+              selectedId={selectedStep?.id}
+            />
+          </DndContext>
+
+          <Button variant="outline" onClick={startAdding}>
+            + Add step
+          </Button>
+        </div>
+
+        {/* Detail pane */}
+        <div className="min-w-0 flex-1">
+          {adding && activeFlowId ? (
+            <NewStepPanel
+              popupId={popupId}
+              salesFlowId={activeFlowId}
+              nextOrder={orderedSteps.length}
+              confirmStepId={steps.find((s) => s.step_type === "confirm")?.id}
+              onCreated={(id) => selectStep(id)}
+              onCancel={clearSelection}
+            />
+          ) : selectedStep ? (
+            <StepDetailPanel
+              key={selectedStep.id}
+              stepId={selectedStep.id}
+              onClose={clearSelection}
+              onDraftChange={previewOpen ? handleDraftChange : undefined}
+            />
+          ) : (
+            <div className="rounded-lg border border-dashed p-10 text-center text-sm text-muted-foreground">
+              Select a step to configure it, or add a new one
+            </div>
+          )}
+        </div>
       </div>
+
+      {/* Mounted on demand: the preview resolves the tenant and mints a token,
+          and none of that should happen until someone asks to see it. */}
+      {previewOpen && (
+        <StepPreviewDialog
+          open={previewOpen}
+          onOpenChange={setPreviewOpen}
+          popupId={popupId}
+          popupSlug={popup?.slug}
+          flowSlug={flows.find((flow) => flow.id === activeFlowId)?.slug}
+          supportedLanguages={popup?.supported_languages ?? []}
+          defaultLanguage={popup?.default_language}
+          step={draftStep}
+        />
+      )}
 
       {updateStepMutation.isPending && (
         <div className="fixed bottom-4 right-4 flex items-center gap-2 rounded-lg border bg-background px-3 py-2 shadow-lg text-sm text-muted-foreground">

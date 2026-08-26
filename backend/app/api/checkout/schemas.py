@@ -5,7 +5,7 @@ from datetime import datetime
 from decimal import Decimal
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, EmailStr, Field
+from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
 
 from app.api.attendee_category.schemas import AttendeeCategoryPublic
 from app.api.popup.schemas import PopupPublic
@@ -148,6 +148,11 @@ class BuyerInfo(BaseModel):
     first_name: str
     last_name: str
     form_data: dict[str, Any] = {}
+
+    @field_validator("email", mode="after")
+    @classmethod
+    def normalize_email(cls, value: str) -> str:
+        return value.lower().strip()
 
 
 class Attribution(BaseModel):

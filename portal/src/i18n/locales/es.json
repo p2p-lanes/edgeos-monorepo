@@ -288,6 +288,8 @@
     "processing": "Procesando tu registro",
     "processing_subtitle": "Esto puede tardar unos momentos",
     "success": "¡Registro exitoso!",
+    "application_pending_title": "Aplicación en revisión",
+    "application_pending_description": "Tu aplicación fue enviada. Un organizador debe aprobarla antes de que puedas seleccionar productos.",
     "loading_passes": "Cargando tus pases...",
     "send_code": "Enviar código",
     "verify_code": "Verificar código",

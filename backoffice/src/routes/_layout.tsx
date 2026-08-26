@@ -21,6 +21,8 @@ import {
 } from "@/client"
 import { CommandPalette } from "@/components/Common/CommandPalette"
 import { ShortcutsDialog } from "@/components/Common/ShortcutsDialog"
+import { TourOverlay } from "@/components/onboarding/TourOverlay"
+import { TourProvider } from "@/components/onboarding/TourProvider"
 import AppSidebar from "@/components/Sidebar/AppSidebar"
 import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
@@ -36,7 +38,9 @@ import useGlobalShortcuts from "@/hooks/useGlobalShortcuts"
 export const Route = createFileRoute("/_layout")({
   component: () => (
     <WorkspaceProvider>
-      <Layout />
+      <TourProvider>
+        <Layout />
+      </TourProvider>
     </WorkspaceProvider>
   ),
   beforeLoad: async () => {
@@ -324,6 +328,7 @@ function Layout() {
       <AppSidebar />
       <CommandPalette />
       <ShortcutsDialog open={shortcutsOpen} onOpenChange={setShortcutsOpen} />
+      <TourOverlay />
       <SidebarInset>
         <header className="sticky top-0 z-10 flex h-16 shrink-0 items-center gap-2 border-b bg-background px-4">
           <SidebarTrigger className="-ml-1 text-muted-foreground" />

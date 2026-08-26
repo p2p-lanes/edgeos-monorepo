@@ -85,13 +85,18 @@ def resolve_active_direct_popup_slug(db: Session, tenant_id: uuid.UUID) -> str |
 
 
 def get_open_ticketing_popup(
-    session: Session, slug: str, tenant_id: uuid.UUID
+    session: Session, slug: str, tenant_id: uuid.UUID, preview: bool = False
 ) -> Popups:
     """Resolve an active popup by slug and tenant for open ticketing.
 
+    ``preview=True`` skips the sale-type and status gates so the backoffice can
+    render a live preview of a popup that is still being configured. It is only
+    reachable with a preview token minted for an authenticated operator (see
+    ``app.utils.checkout_preview``) — the popup is never exposed publicly.
+
     Raises:
         404 — popup not found by slug + tenant_id
-        403 — popup is not active
+        403 — popup is not active (unless preview)
     """
     popup = session.exec(
         select(Popups).where(Popups.slug == slug, Popups.tenant_id == tenant_id)
@@ -108,6 +113,8 @@ def get_open_ticketing_popup(
     # the popup turned that door away before its flow was ever resolved. The
     # flow answers for itself: `resolve_flow(require_types=...)` for a named
     # one, `assert_sells_directly` for the default.
+    if preview:
+        return popup
 
     if popup.status != PopupStatus.active.value:
         raise HTTPException(
@@ -148,6 +155,7 @@ def runtime_for_slug(
     flow_slug: str,
     lang: str | None = None,
     current_human: "HumanPublic | None" = None,
+    preview: bool = False,
 ) -> CheckoutRuntimeResponse:
     """Load the public runtime data for an open-ticketing checkout page.
 
@@ -171,6 +179,9 @@ def runtime_for_slug(
     if the requested language equals the popup default (no rows exist), the
     untranslated source is returned unchanged.
 
+    ``preview=True`` (backoffice live preview) serves popups that are not yet
+    active and includes disabled ticketing steps, so an operator can see a step
+    before enabling it. Everything else is identical to the public payload.
     sdd/sales-flows slice 13 (task 13.1/13.2): an upsale-type flow
     additionally requires ``current_human`` to be a portal-authenticated
     human with >=1 APPROVED payment in this popup (design D8, G0 #2/#3) —
@@ -184,10 +195,20 @@ def runtime_for_slug(
     flow is called. Their buyers reach the same checkout through the portal
     already, rendering the same components.
     """
-    popup = _get_popup_by_slug_or_404(session, slug, tenant_id)
-    flow = resolve_checkout_flow(session, popup, flow_slug)
-    assert_upsale_eligible(session, flow, popup.id, tenant_id, current_human)
-    assert_application_flow_eligible(session, flow, tenant_id, current_human)
+    popup = get_open_ticketing_popup(session, slug, tenant_id, preview=preview)
+    if preview:
+        from app.api.sales_flow.crud import sales_flows_crud
+
+        flow = sales_flows_crud.get_by_slug(session, popup.id, flow_slug)
+        if flow is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, detail="Not found"
+            )
+    else:
+        flow = resolve_checkout_flow(session, popup, flow_slug)
+    if not preview:
+        assert_upsale_eligible(session, flow, popup.id, tenant_id, current_human)
+        assert_application_flow_eligible(session, flow, tenant_id, current_human)
 
     # Load active products, then apply catalog-read enforcement (design D5/D6,
     # D3 amendment, sdd/sales-flows slice 12): D3 per-product exclusivity and
@@ -231,7 +252,11 @@ def runtime_for_slug(
     for f in fields:
         fields_by_section.setdefault(f.section_id, []).append(f)
 
-    ticketing_steps = ticketing_steps_crud.find_portal_by_flow(session, flow.id)
+    ticketing_steps = (
+        ticketing_steps_crud.find_by_flow(session, flow.id, limit=1000)[0]
+        if preview
+        else ticketing_steps_crud.find_portal_by_flow(session, flow.id)
+    )
 
     attendee_categories = attendee_categories_crud.list_by_popup(session, popup.id)
 

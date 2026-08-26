@@ -1,8 +1,9 @@
 import uuid
 from datetime import UTC, datetime
 from enum import Enum
+from zoneinfo import available_timezones
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, field_validator
 from sqlalchemy import Column, Text
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlmodel import DateTime, Field, SQLModel
@@ -11,6 +12,21 @@ from sqlmodel import DateTime, Field, SQLModel
 class PublishPermission(str, Enum):
     ADMIN_ONLY = "admin_only"
     EVERYONE = "everyone"
+
+
+def _validate_timezone(value: str) -> str:
+    """Reject a timezone this server cannot resolve.
+
+    Readers degrade an unknown zone to UTC without a word (see
+    ``app.services.event_datetime``), which silently shifts every event time.
+    Catching it on the way in keeps that from ever being stored.
+
+    ``available_timezones`` caches internally, so this is not a per-request
+    directory walk.
+    """
+    if value not in available_timezones():
+        raise ValueError(f"Unknown timezone: {value}")
+    return value
 
 
 class EventSettingsBase(SQLModel):
@@ -82,6 +98,11 @@ class EventSettingsCreate(BaseModel):
     approval_notification_emails: list[str] = []
     placeholder_url: str | None = None
 
+    @field_validator("timezone")
+    @classmethod
+    def check_timezone(cls, value: str) -> str:
+        return _validate_timezone(value)
+
 
 class EventSettingsUpdate(BaseModel):
     """Event settings schema for updates."""
@@ -96,3 +117,10 @@ class EventSettingsUpdate(BaseModel):
     allowed_kinds: list[str] | None = None
     approval_notification_emails: list[str] | None = None
     placeholder_url: str | None = None
+
+    @field_validator("timezone")
+    @classmethod
+    def check_timezone(cls, value: str | None) -> str | None:
+        if value is None:
+            return value
+        return _validate_timezone(value)

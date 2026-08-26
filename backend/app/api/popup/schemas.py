@@ -685,3 +685,14 @@ class PopupAdmin(PopupBase):
     # a gathering actually does instead of echoing a column nothing honours.
     takes_applications: bool = True
     sells_directly: bool = False
+
+
+class CheckoutPreviewTokenPublic(SQLModel):
+    """Short-lived token that unlocks the checkout runtime for a live preview.
+
+    Handed to the portal's preview page so it can render a popup that is still
+    draft. See ``app.utils.checkout_preview``.
+    """
+
+    token: str
+    expires_at: datetime

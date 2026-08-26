@@ -279,10 +279,11 @@ class InvitesCRUD(BaseCRUD[Invites, InviteCreate, InviteUpdate]):
             token=token,
             max_uses=effective_max_uses,
             expires_at=obj_in.expires_at,
-            # Attendee links open the reduced checkout form, and grant no
-            # approval of their own unless an admin turns it on.
+            # Referrals open the reduced checkout form and auto-approve by
+            # default. Administrators can revoke auto-approval when they need
+            # a referral to record attribution without granting purchase access.
             express_checkout=True,
-            auto_approve=False,
+            auto_approve=True,
         )
         session.add(link)
         session.commit()

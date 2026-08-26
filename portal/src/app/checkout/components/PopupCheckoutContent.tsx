@@ -2,9 +2,10 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { AnimatePresence, motion } from "framer-motion"
-import { UserRound } from "lucide-react"
+import { Home, UserRound } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { type CSSProperties, useEffect, useRef, useState } from "react"
+import { useTranslation } from "react-i18next"
 import { ApiError, ApplicationsService, type PopupPublic } from "@/client"
 import ScrollyCheckoutFlow from "@/components/checkout-flow/ScrollyCheckoutFlow"
 import { SidebarProvider } from "@/components/Sidebar/SidebarComponents"
@@ -46,16 +47,19 @@ export const PopupCheckoutContent = ({
   groupId = null,
   inviteId = null,
   referralId = null,
+  requiresManualApproval = false,
 }: {
   popup: PopupPublic
   background: { className: string; style?: CSSProperties }
   groupId?: string | null
   inviteId?: string | null
   referralId?: string | null
+  requiresManualApproval?: boolean
 }) => {
   // Whether this gathering asks anybody to apply. The anonymous checkout only
   // fetches an application schema where that is true.
   const takesApplications = popup.takes_applications !== false
+  const { t } = useTranslation()
   const isAuthenticated = useIsAuthenticated()
   const { data: applicationSchema, isLoading: isLoadingApplicationSchema } =
     useApplicationSchema(
@@ -222,6 +226,10 @@ export const PopupCheckoutContent = ({
       return
     }
 
+    if (requiresManualApproval && existingApplication.status === "in review") {
+      return
+    }
+
     // Existing applicant clicking a group link: persist the group membership on
     // their current application. This both auto-accepts an in-progress
     // application (otherwise payment 403s "Application must be accepted before
@@ -255,6 +263,7 @@ export const PopupCheckoutContent = ({
     participation,
     isCompanion,
     joinGroupAsApplicant,
+    requiresManualApproval,
   ])
 
   const handleFormSubmit = async (
@@ -352,6 +361,30 @@ export const PopupCheckoutContent = ({
           onSwitch={() => detachMutation.mutate()}
           onCancel={handleCompanionCancel}
         />
+      </div>
+    )
+  }
+
+  if (requiresManualApproval && existingApplication?.status === "in review") {
+    return (
+      <div
+        className={`min-h-screen w-full px-6 py-8 flex items-center justify-center ${background.className}`}
+        style={background.style}
+      >
+        <div className="max-w-md rounded-2xl bg-card p-8 text-center shadow-sm">
+          <h1 className="text-2xl font-bold text-foreground">
+            {t("checkout.application_pending_title")}
+          </h1>
+          <p className="mt-3 text-sm text-muted-foreground">
+            {t("checkout.application_pending_description")}
+          </p>
+          <div className="mt-8 flex justify-center">
+            <Button onClick={() => router.push(`/portal/${popup.slug}`)}>
+              <Home className="size-4" />
+              {t("openCheckout.thank_you_cta")}
+            </Button>
+          </div>
+        </div>
       </div>
     )
   }

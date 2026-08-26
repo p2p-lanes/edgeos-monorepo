@@ -428,3 +428,53 @@ def test_abandoned_cart_recomputes_price_and_excludes_paid(
     _, deliver = _run(db, test_engine, now=now)
     assert _sent_to(deliver, buyer.email) == 0
     assert len(_log_rows(db, popup, "abandoned_cart")) == 1
+
+
+def test_reminders_use_tenant_sender(db: Session, test_engine) -> None:
+    """Every reminder leaves from the tenant's own sender, not the platform's."""
+    now = datetime.now(UTC)
+    suffix = uuid.uuid4().hex[:8]
+    tenant = Tenants(
+        name=f"Sender Tenant {suffix}",
+        slug=f"sender-tenant-{suffix}",
+        sender_email=f"hello-{suffix}@tenant.example",
+        sender_name="Tenant Sender",
+    )
+    db.add(tenant)
+    db.commit()
+    db.refresh(tenant)
+
+    popup = _make_popup(
+        db,
+        tenant,
+        purchase_reminder_delay_days=3,
+        abandoned_application_delay_days=4,
+    )
+    accepted_human = _make_human(db, tenant)
+    _make_application(
+        db,
+        tenant,
+        popup,
+        accepted_human,
+        status=ApplicationStatus.ACCEPTED,
+        accepted_days_ago=5,
+        now=now,
+    )
+    draft_human = _make_human(db, tenant)
+    _make_application(
+        db,
+        tenant,
+        popup,
+        draft_human,
+        status=ApplicationStatus.DRAFT,
+        updated_days_ago=6,
+        now=now,
+    )
+
+    _, deliver = _run(db, test_engine, now=now)
+    recipients = {accepted_human.email, draft_human.email}
+    calls = [c for c in deliver.await_args_list if c.kwargs["to"] in recipients]
+    assert len(calls) == 2
+    for call in calls:
+        assert call.kwargs["from_address"] == tenant.sender_email
+        assert call.kwargs["from_name"] == tenant.sender_name

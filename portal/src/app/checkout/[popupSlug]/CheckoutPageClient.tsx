@@ -4,14 +4,10 @@ import Link from "next/link"
 import { useEffect, useState } from "react"
 import { useTranslation } from "react-i18next"
 import { ApiError, type CheckoutRuntimeResponse } from "@/client"
-import { CheckoutBackgroundImage } from "@/components/CheckoutBackgroundImage"
-import { CheckoutBackgroundVideo } from "@/components/CheckoutBackgroundVideo"
 import { OpenCheckoutRuntime } from "@/components/checkout-flow/OpenCheckoutRuntime"
-import { SidebarProvider } from "@/components/Sidebar/SidebarComponents"
 import { Button } from "@/components/ui/button"
 import { Loader } from "@/components/ui/Loader"
 import useAuth from "@/hooks/useAuth"
-import { getCheckoutBackground } from "@/lib/background-image"
 import {
   resolveRequestLanguage,
   subscribeRequestLanguage,
@@ -19,6 +15,7 @@ import {
 import { getAuthRedirectPath } from "@/lib/safe-return-to"
 import ThemeProvider, { type ThemeConfig } from "@/providers/themeProvider"
 import { ApplicationCheckoutRedirect } from "./ApplicationCheckoutRedirect"
+import { CheckoutShell } from "./CheckoutShell"
 import { useCheckoutRuntime } from "./hooks/useCheckoutRuntime"
 
 interface CheckoutPageClientProps {
@@ -141,43 +138,20 @@ export default function CheckoutPageClient({
     )
   }
 
-  const background = getCheckoutBackground(runtime.popup, "checkout")
-
   return (
-    // The flow's own look, not the gathering's. Mounted here because the
-    // flow is only known once the runtime has loaded.
     <ThemeProvider
       config={runtime.theme_config as ThemeConfig | null}
       scope="local"
     >
-      <SidebarProvider
-        defaultOpen={false}
-        className="block min-h-0"
-        style={
-          {
-            "--sidebar-width": "0px",
-            "--sidebar-width-icon": "0px",
-          } as React.CSSProperties
-        }
-      >
-        <main
-          className={`h-svh overflow-y-auto no-scrollbar ${background.type === "none" ? "bg-background" : ""}`.trim()}
-        >
-          {background.type === "image" && (
-            <CheckoutBackgroundImage url={background.url} />
-          )}
-          {background.type === "video" && (
-            <CheckoutBackgroundVideo url={background.url} />
-          )}
-          <OpenCheckoutRuntime
-            runtime={runtime}
-            popupSlug={popupSlug}
-            flowSlug={runtime.selected_flow.slug}
-            prefilledBuyer={prefilledBuyer}
-            showQuoteStatus={showQuoteStatus}
-          />
-        </main>
-      </SidebarProvider>
+      <CheckoutShell popup={runtime.popup}>
+        <OpenCheckoutRuntime
+          runtime={runtime}
+          popupSlug={popupSlug}
+          flowSlug={runtime.selected_flow.slug}
+          prefilledBuyer={prefilledBuyer}
+          showQuoteStatus={showQuoteStatus}
+        />
+      </CheckoutShell>
     </ThemeProvider>
   )
 }

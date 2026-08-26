@@ -55,6 +55,13 @@ class ScholarshipStatus(StrEnum):
     REJECTED = "rejected"
 
 
+class ScholarshipDecisionStatus(StrEnum):
+    """Scholarship outcomes an administrator may assign."""
+
+    APPROVED = "approved"
+    REJECTED = "rejected"
+
+
 class ApplicationBase(SQLModel):
     """Base schema for applications.
 
@@ -161,6 +168,14 @@ class ApplicationReviewerVote(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
+class ApplicationReviewerOption(BaseModel):
+    """A reviewer who has submitted at least one review for a popup."""
+
+    id: uuid.UUID
+    full_name: str | None = None
+    email: str | None = None
+
+
 class ApplicationPublic(BaseModel):
     """Application schema for API responses."""
 
@@ -249,6 +264,39 @@ class ApplicationCommentPublic(BaseModel):
     edited_at: datetime | None = None
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class PreviousApplicationSpend(BaseModel):
+    """One money total, in one currency.
+
+    Payments carry their own currency, so an application's spend can span more
+    than one. Collapsing them into a single number would misstate the amount.
+    """
+
+    currency: str
+    amount: Decimal
+
+
+class PreviousApplicationSummary(BaseModel):
+    """One application by the same human, in a different popup.
+
+    Powers the "Previous applications" block of the BO application detail: it
+    tells a reviewer whether this person already took part in other popups of
+    the tenant, and how much they bought when they did.
+    """
+
+    id: uuid.UUID
+    popup_id: uuid.UUID
+    popup_name: str | None = None
+    popup_start_date: datetime | None = None
+    status: str
+    # Purchased tickets: one attendee_products row per ticket, across every
+    # attendee of the application.
+    tickets_count: int = 0
+    # Approved payments only, grouped by currency.
+    spend: list[PreviousApplicationSpend] = []
+    submitted_at: datetime | None = None
+    created_at: datetime | None = None
 
 
 class ApplicationCreate(BaseModel):
@@ -460,7 +508,9 @@ APPLICATION_FILTER_FIELDS: dict[str, FilterField] = {
         frozenset(s.value for s in ApplicationStatus),
     ),
     "scholarship_request": FilterField("boolean", frozenset({"eq"})),
-    "scholarship_status": FilterField("select", ENUMISH_OPS),
+    "scholarship_status": FilterField(
+        "select", ENUMISH_OPS, frozenset(status.value for status in ScholarshipStatus)
+    ),
     "submitted_at": FilterField("date", DATE_OPS),
     "accepted_at": FilterField("date", DATE_OPS),
     "referral": FilterField("text", TEXT_OPS),
@@ -571,7 +621,7 @@ class ApplicationGroupCount(BaseModel):
 class ScholarshipDecisionRequest(BaseModel):
     """Admin request body for PATCH /applications/{id}/scholarship."""
 
-    scholarship_status: ScholarshipStatus  # required: "approved" | "rejected"
+    scholarship_status: ScholarshipDecisionStatus
     discount_percentage: Decimal | None = None  # 0–100, required when approved
     incentive_amount: Decimal | None = None  # only if popup.allows_incentive
     incentive_currency: str | None = None  # required if incentive_amount set

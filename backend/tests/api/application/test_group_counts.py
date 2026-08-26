@@ -28,6 +28,7 @@ from tests.api.application_review.test_pending_reviews import (
     _auth,
     _make_admin,
     _make_popup,
+    _make_review,
 )
 
 # ---------------------------------------------------------------------------
@@ -195,6 +196,84 @@ class TestApplicationGroupCounts:
             client, admin, tenant_a, popup, "status", parent_group_by="status"
         )
         assert response.status_code == 422
+
+    def test_reviewer_grouping_with_reviewer_filter_returns_422(
+        self, db: Session, tenant_a: Tenants, client: TestClient
+    ) -> None:
+        popup = _make_popup(db, tenant_a)
+        admin = _make_admin(db, tenant_a)
+        reviewer = _make_admin(db, tenant_a)
+
+        response = _group_counts(
+            client,
+            admin,
+            tenant_a,
+            popup,
+            "reviewed_by",
+            filters=_one("reviewed_by", "eq", str(reviewer.id)),
+        )
+
+        assert response.status_code == 422, response.text
+        assert response.json()["detail"] == (
+            "Cannot group by Reviewed by while a Reviewed by filter is active."
+        )
+
+    def test_reviewer_parent_grouping_with_reviewer_filter_returns_422(
+        self, db: Session, tenant_a: Tenants, client: TestClient
+    ) -> None:
+        popup = _make_popup(db, tenant_a)
+        admin = _make_admin(db, tenant_a)
+        reviewer = _make_admin(db, tenant_a)
+
+        response = _group_counts(
+            client,
+            admin,
+            tenant_a,
+            popup,
+            "status",
+            filters=_one("reviewed_by", "eq", str(reviewer.id)),
+            parent_group_by="reviewed_by",
+        )
+
+        assert response.status_code == 422, response.text
+        assert response.json()["detail"] == (
+            "Cannot group by Reviewed by while a Reviewed by filter is active."
+        )
+
+    def test_group_by_reviewer_counts_each_application_once_per_reviewer(
+        self, db: Session, tenant_a: Tenants, client: TestClient
+    ) -> None:
+        popup = _make_popup(db, tenant_a)
+        admin = _make_admin(db, tenant_a)
+        reviewer_a = _make_admin(db, tenant_a)
+        reviewer_b = _make_admin(db, tenant_a)
+        reviewed_by_both = _make_application(db, tenant_a, popup)
+        reviewed_by_a = _make_application(db, tenant_a, popup)
+        unreviewed = _make_application(db, tenant_a, popup)
+        _make_review(db, tenant_a, reviewed_by_both, reviewer_a)
+        _make_review(db, tenant_a, reviewed_by_both, reviewer_b)
+        _make_review(db, tenant_a, reviewed_by_a, reviewer_a)
+
+        response = _group_counts(client, admin, tenant_a, popup, "reviewed_by")
+        assert _buckets(response) == {
+            str(reviewer_a.id): 2,
+            str(reviewer_b.id): 1,
+            None: 1,
+        }
+
+        response = _list(
+            client,
+            admin,
+            tenant_a,
+            popup,
+            group_by="reviewed_by",
+            group_value=str(reviewer_a.id),
+        )
+        assert _ids(response) == {str(reviewed_by_both.id), str(reviewed_by_a.id)}
+        assert response.json()["paging"]["total"] == 2
+
+        response = _list(client, admin, tenant_a, popup, group_by="reviewed_by")
+        assert _ids(response) == {str(unreviewed.id)}
 
 
 class TestApplicationListGroupScope:

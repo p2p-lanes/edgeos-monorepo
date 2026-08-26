@@ -39,6 +39,15 @@ if (typeof window !== "undefined") {
     writable: true,
   })
 
+  // jsdom implements `window.scrollTo` as a no-op stub but leaves
+  // `Element.prototype.scrollTo` undefined entirely, so any component that
+  // scrolls a container (the checkout stepper scrolls its nav to keep the
+  // active pill in view) throws on render rather than in an assertion.
+  Object.defineProperty(Element.prototype, "scrollTo", {
+    value: vi.fn(),
+    writable: true,
+  })
+
   Object.defineProperty(window, "matchMedia", {
     value: vi.fn().mockImplementation((query: string) => ({
       matches: false,

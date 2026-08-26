@@ -24,6 +24,7 @@ import {
 import useCustomToast from "@/hooks/useCustomToast"
 import { cn } from "@/lib/utils"
 import { createErrorHandler } from "@/utils"
+import { GoogleFontPicker } from "./GoogleFontPicker"
 import {
   type CheckoutBackgroundContext,
   type PreviewEvent,
@@ -48,6 +49,10 @@ interface ThemeConfig {
   typography?: {
     font_base_size?: string
     font_heading_scale?: number
+    /** Google Fonts family for body text. Loaded at runtime by the portal. */
+    font_family?: string
+    /** Optional separate family for headings; falls back to `font_family`. */
+    font_heading_family?: string
   }
   radius?: string
   border_radius?: string
@@ -155,6 +160,12 @@ export function ThemeConfigForm({
   const [fontHeadingScale, setFontHeadingScale] = useState(
     themeConfig?.typography?.font_heading_scale?.toString() ?? "",
   )
+  const [fontFamily, setFontFamily] = useState(
+    themeConfig?.typography?.font_family ?? "",
+  )
+  const [fontHeadingFamily, setFontHeadingFamily] = useState(
+    themeConfig?.typography?.font_heading_family ?? "",
+  )
   const [radius, setRadius] = useState(themeConfig?.radius ?? "")
   const [borderRadius, setBorderRadius] = useState(
     themeConfig?.border_radius ?? "",
@@ -241,6 +252,8 @@ export function ThemeConfigForm({
     setColors({})
     setFontBaseSize("")
     setFontHeadingScale("")
+    setFontFamily("")
+    setFontHeadingFamily("")
     setRadius("")
     setBorderRadius("")
     setBackgroundContexts([])
@@ -252,7 +265,8 @@ export function ThemeConfigForm({
 
   const handleSave = () => {
     const hasColors = Object.keys(colors).length > 0
-    const hasTypography = fontBaseSize || fontHeadingScale
+    const hasTypography =
+      fontBaseSize || fontHeadingScale || fontFamily || fontHeadingFamily
     const hasRadius = !!radius
     const hasBorderRadius = !!borderRadius
     const hasBackgroundContexts = backgroundContexts.length > 0
@@ -274,6 +288,10 @@ export function ThemeConfigForm({
                 ...(fontBaseSize && { font_base_size: fontBaseSize }),
                 ...(fontHeadingScale && {
                   font_heading_scale: Number.parseFloat(fontHeadingScale),
+                }),
+                ...(fontFamily && { font_family: fontFamily }),
+                ...(fontHeadingFamily && {
+                  font_heading_family: fontHeadingFamily,
                 }),
               },
             }),
@@ -305,6 +323,9 @@ export function ThemeConfigForm({
     fontBaseSize !== (themeConfig?.typography?.font_base_size ?? "") ||
     fontHeadingScale !==
       (themeConfig?.typography?.font_heading_scale?.toString() ?? "") ||
+    fontFamily !== (themeConfig?.typography?.font_family ?? "") ||
+    fontHeadingFamily !==
+      (themeConfig?.typography?.font_heading_family ?? "") ||
     radius !== (themeConfig?.radius ?? "") ||
     borderRadius !== (themeConfig?.border_radius ?? "") ||
     JSON.stringify(backgroundContexts) !== JSON.stringify(savedContexts) ||
@@ -529,6 +550,10 @@ export function ThemeConfigForm({
 
           {/* Typography */}
           <TypographySection
+            fontFamily={fontFamily}
+            setFontFamily={setFontFamily}
+            fontHeadingFamily={fontHeadingFamily}
+            setFontHeadingFamily={setFontHeadingFamily}
             fontBaseSize={fontBaseSize}
             setFontBaseSize={setFontBaseSize}
             fontHeadingScale={fontHeadingScale}
@@ -1026,6 +1051,10 @@ function ThankYouSection({
 // ─────────────────────────────────────────────────────────────────────────────
 
 interface TypographySectionProps {
+  fontFamily: string
+  setFontFamily: (v: string) => void
+  fontHeadingFamily: string
+  setFontHeadingFamily: (v: string) => void
   fontBaseSize: string
   setFontBaseSize: (v: string) => void
   fontHeadingScale: string
@@ -1040,6 +1069,10 @@ interface TypographySectionProps {
 }
 
 function TypographySection({
+  fontFamily,
+  setFontFamily,
+  fontHeadingFamily,
+  setFontHeadingFamily,
   fontBaseSize,
   setFontBaseSize,
   fontHeadingScale,
@@ -1057,6 +1090,8 @@ function TypographySection({
   const sampleRadius = radius || "0.5rem"
   const sampleBorderRadius = borderRadius || "0.5rem"
   const activeCount = [
+    fontFamily,
+    fontHeadingFamily,
     fontBaseSize,
     fontHeadingScale,
     radius,
@@ -1094,6 +1129,42 @@ function TypographySection({
 
       {expanded && (
         <div className="space-y-3 border-t px-3 pb-3 pt-3">
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex flex-1 flex-col">
+              <Label className="text-xs">Body font</Label>
+              <span className="text-[11px] text-muted-foreground">
+                Any Google Font. Applies to the whole portal.
+              </span>
+            </div>
+            <GoogleFontPicker
+              value={fontFamily}
+              onChange={setFontFamily}
+              disabled={disabled}
+              aria-label="Body font"
+            />
+          </div>
+
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex flex-1 flex-col">
+              <Label className="text-xs">Heading font</Label>
+              <span className="text-[11px] text-muted-foreground">
+                Optional. Falls back to the body font.
+              </span>
+            </div>
+            <GoogleFontPicker
+              value={fontHeadingFamily}
+              onChange={setFontHeadingFamily}
+              placeholder="Same as body"
+              disabled={disabled}
+              aria-label="Heading font"
+            />
+          </div>
+
+          {/* Checkout skins ship their own typography and ignore both
+              pickers — see the `[data-skin-typography]` opt-out in the
+              portal's globals.css. */}
+          <Separator />
+
           <div className="flex items-center justify-between gap-3">
             <div className="flex flex-1 flex-col">
               <Label className="text-xs">Base font size</Label>

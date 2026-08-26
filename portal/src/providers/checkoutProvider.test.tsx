@@ -3,16 +3,23 @@
  * Verifies that the resolver replaces useProductCategories and passes
  * allActiveProducts to cart selection hooks.
  */
-import { renderHook } from "@testing-library/react"
+import { act, renderHook } from "@testing-library/react"
 import type { ComponentProps, ReactNode } from "react"
 import { describe, expect, it, vi } from "vitest"
-import type { TicketingStepPublic } from "@/client"
+import { CheckoutService, type TicketingStepPublic } from "@/client"
 import type { ApplicationFormSchema } from "@/types/form-schema"
 import type { ProductsPass } from "@/types/Products"
 import { CheckoutProvider, useCheckout } from "./checkoutProvider"
 
 const paymentSubmitSpy = vi.hoisted(() =>
-  vi.fn(() => ({ submitPayment: vi.fn(), isSubmitting: false })),
+  vi.fn(({ previewMode }: { previewMode?: boolean }) => ({
+    submitPayment: vi.fn(async () =>
+      previewMode
+        ? { success: false, error: "preview" }
+        : { success: false, error: "empty_cart" },
+    ),
+    isSubmitting: false,
+  })),
 )
 
 // Minimal mocks to avoid network/provider dependencies
@@ -293,5 +300,63 @@ describe("checkoutProvider — public checkout flow propagation", () => {
     expect(paymentSubmitSpy).toHaveBeenLastCalledWith(
       expect.objectContaining({ salesFlowSlug: "merch-store" }),
     )
+  })
+})
+
+// The backoffice live preview renders this exact provider around the real
+// checkout. Nothing an operator clicks there may reach the payment provider.
+describe("checkoutProvider — preview mode", () => {
+  const steps = [
+    makeStep({ id: "s1", step_type: "tickets" }),
+    makeStep({ id: "s2", step_type: "confirm" }),
+  ]
+  const products = [makeProduct({ id: "p1", category: "ticket" })]
+
+  it("makes submitPayment inert without touching the purchase endpoint", async () => {
+    const purchase = vi
+      .spyOn(CheckoutService, "purchaseOpenTicketing")
+      .mockResolvedValue({} as never)
+
+    const { result } = renderHook(() => useCheckout(), {
+      wrapper: makeWrapper(steps, products, {
+        previewMode: true,
+        submitMode: "open-ticketing",
+        submitPopupSlug: "my-event",
+      }),
+    })
+
+    let outcome: Awaited<ReturnType<typeof result.current.submitPayment>>
+    await act(async () => {
+      outcome = await result.current.submitPayment()
+    })
+
+    expect(outcome!).toEqual({ success: false, error: "preview" })
+    expect(purchase).not.toHaveBeenCalled()
+
+    purchase.mockRestore()
+  })
+
+  it("exposes previewMode so the flows can label the CTA", () => {
+    const { result } = renderHook(() => useCheckout(), {
+      wrapper: makeWrapper(steps, products, { previewMode: true }),
+    })
+
+    expect(result.current.previewMode).toBe(true)
+  })
+
+  it("is off by default, so a buyer's checkout is unaffected", async () => {
+    const { result } = renderHook(() => useCheckout(), {
+      wrapper: makeWrapper(steps, products),
+    })
+
+    expect(result.current.previewMode).toBe(false)
+
+    let outcome: Awaited<ReturnType<typeof result.current.submitPayment>>
+    await act(async () => {
+      outcome = await result.current.submitPayment()
+    })
+
+    // Blocked for an ordinary reason (empty cart), never the preview guard.
+    expect(outcome!.error).not.toBe("preview")
   })
 })

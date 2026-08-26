@@ -23,6 +23,7 @@ from app.api.popup.guards import (
 )
 from app.api.popup.models import Popups
 from app.api.popup.schemas import (
+    CheckoutPreviewTokenPublic,
     PopupAdmin,
     PopupCreate,
     PopupPublic,
@@ -50,6 +51,7 @@ from app.core.dependencies.users import (
     TenantSession,
 )
 from app.services.image_ingestion import ImageIngestionService
+from app.utils.checkout_preview import mint_checkout_preview_token
 
 router = APIRouter(prefix="/popups", tags=["popups"])
 
@@ -222,6 +224,34 @@ async def get_popup(
         )
 
     return _with_flow_kinds(db, [popup], [PopupAdmin.model_validate(popup)])[0]
+
+
+@router.post(
+    "/{popup_id}/checkout-preview-token",
+    response_model=CheckoutPreviewTokenPublic,
+)
+async def create_checkout_preview_token(
+    popup_id: uuid.UUID,
+    db: TenantSession,
+    _: CurrentOperator,
+) -> CheckoutPreviewTokenPublic:
+    """Mint a short-lived token that unlocks this popup's checkout runtime.
+
+    The backoffice's ticketing-step live preview embeds the real portal
+    checkout in an iframe; the portal calls the public runtime endpoint with
+    this token so a popup that is still draft renders instead of 403-ing. The
+    token is read-only, scoped to this popup, and expires in 15 minutes.
+    """
+    popup = crud.get(db, popup_id)
+
+    if not popup:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Popup not found",
+        )
+
+    token, expires_at = mint_checkout_preview_token(popup.id)
+    return CheckoutPreviewTokenPublic(token=token, expires_at=expires_at)
 
 
 @router.post("", response_model=PopupAdmin, status_code=status.HTTP_201_CREATED)

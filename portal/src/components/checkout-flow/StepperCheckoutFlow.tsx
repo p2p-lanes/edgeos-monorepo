@@ -42,6 +42,16 @@ const ROOT_CLASSES: Record<CheckoutSkin, string> = {
   amanita: `checkout-amanita ${amanitaFontVars} section-dark relative min-h-dvh`,
 }
 
+/* Skins that ship their own typography and must ignore the popup theme's font
+ * choice. Stamped on the root as `data-skin-typography`, which globals.css
+ * uses to exempt the subtree from the theme heading font — see the
+ * `:not([data-skin-typography] *)` rule there. The body font needs no opt-out:
+ * a skin declaring font-family on this wrapper already beats inheritance. */
+const SKIN_OWNS_TYPOGRAPHY: Record<CheckoutSkin, boolean> = {
+  default: false,
+  amanita: true,
+}
+
 /* The nav is two elements, mirroring BOTTOM_OUTER/BOTTOM_INNER below: a
  * full-bleed bar that paints the background, wrapping a constrained inner
  * <nav> that holds the pills. Putting `max-w-*` on the bar itself would clip
@@ -567,7 +577,11 @@ export default function StepperCheckoutFlow({
   }
 
   return (
-    <div ref={rootRef} className={ROOT_CLASSES[skin]}>
+    <div
+      ref={rootRef}
+      className={ROOT_CLASSES[skin]}
+      data-skin-typography={SKIN_OWNS_TYPOGRAPHY[skin] ? "" : undefined}
+    >
       {isAmanita && <AmanitaBackground />}
 
       {/* pills nav */}

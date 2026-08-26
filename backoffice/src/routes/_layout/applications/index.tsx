@@ -35,6 +35,7 @@ import {
 import {
   type ApiError,
   type ApplicationPublic,
+  type ApplicationReviewerOption,
   type ApplicationReviewerVote,
   ApplicationReviewsService,
   type ApplicationStatus,
@@ -42,7 +43,6 @@ import {
   ApprovalStrategiesService,
   FormFieldsService,
   type HumanRating,
-  PopupReviewersService,
   PopupsService,
   type ReviewDecision,
 } from "@/client"
@@ -59,6 +59,12 @@ import {
   type ApplicationsView,
   ApplicationsViewSwitcher,
 } from "@/components/applications/ApplicationsViewSwitcher"
+import {
+  availableFixedGroupByOptions,
+  FIXED_GROUP_BY_OPTIONS,
+  hasReviewerFilter,
+  normalizeReviewerGrouping,
+} from "@/components/applications/reviewerGrouping"
 import { DataTable, SortableHeader } from "@/components/Common/DataTable"
 import { EmptyState } from "@/components/Common/EmptyState"
 import { QueryErrorBoundary } from "@/components/Common/QueryErrorBoundary"
@@ -288,13 +294,6 @@ interface GroupByField {
   options?: string[]
 }
 
-const FIXED_GROUP_BY_OPTIONS: { value: string; label: string }[] = [
-  { value: "status", label: "Status" },
-  { value: "scholarship_status", label: "Scholarship status" },
-  { value: "gender", label: "Gender" },
-  { value: "age", label: "Age" },
-]
-
 const VALID_GROUP_BY_FIELDS = new Set(
   FIXED_GROUP_BY_OPTIONS.map((option) => option.value),
 )
@@ -328,12 +327,14 @@ function GroupFieldSelect({
   onChange,
   customFields,
   excludeKey,
+  excludeReviewedBy = false,
   placeholder,
 }: {
   value?: string
   onChange: (value: string) => void
   customFields: GroupByField[]
   excludeKey?: string
+  excludeReviewedBy?: boolean
   placeholder: string
 }) {
   return (
@@ -342,13 +343,13 @@ function GroupFieldSelect({
         <SelectValue placeholder={placeholder} />
       </SelectTrigger>
       <SelectContent>
-        {FIXED_GROUP_BY_OPTIONS.filter(
-          (option) => option.value !== excludeKey,
-        ).map((option) => (
-          <SelectItem key={option.value} value={option.value}>
-            {option.label}
-          </SelectItem>
-        ))}
+        {availableFixedGroupByOptions(excludeKey, excludeReviewedBy).map(
+          (option) => (
+            <SelectItem key={option.value} value={option.value}>
+              {option.label}
+            </SelectItem>
+          ),
+        )}
         {customFields.some((field) => field.key !== excludeKey) && (
           <SelectGroup>
             <SelectLabel>Form fields</SelectLabel>
@@ -372,12 +373,14 @@ function GroupByControl({
   onChangeGroupBy,
   onChangeSubGroupBy,
   customFields,
+  hasReviewerFilter,
 }: {
   groupBy?: string
   subGroupBy?: string
   onChangeGroupBy: (value: string | undefined) => void
   onChangeSubGroupBy: (value: string | undefined) => void
   customFields: GroupByField[]
+  hasReviewerFilter: boolean
 }) {
   const activeCount = (groupBy ? 1 : 0) + (subGroupBy ? 1 : 0)
   return (
@@ -401,6 +404,7 @@ function GroupByControl({
               onChange={onChangeGroupBy}
               customFields={customFields}
               excludeKey={subGroupBy}
+              excludeReviewedBy={hasReviewerFilter}
               placeholder="Group by field"
             />
             {groupBy && (
@@ -422,6 +426,7 @@ function GroupByControl({
                 onChange={onChangeSubGroupBy}
                 customFields={customFields}
                 excludeKey={groupBy}
+                excludeReviewedBy={hasReviewerFilter}
                 placeholder="Subgroup field"
               />
               <Button
@@ -442,6 +447,7 @@ function GroupByControl({
                 onChange={onChangeSubGroupBy}
                 customFields={customFields}
                 excludeKey={groupBy}
+                excludeReviewedBy={hasReviewerFilter}
                 placeholder="Add subgroup..."
               />
             </div>
@@ -568,14 +574,23 @@ export const Route = createFileRoute("/_layout/applications/")({
         raw.subGroupBy.startsWith("custom."))
         ? raw.subGroupBy
         : undefined
+    const normalizedGrouping = normalizeReviewerGrouping(
+      filters,
+      groupBy,
+      subGroupBy,
+    )
     return {
       ...validateTableSearch(raw),
       ...(raw.match === "any" && filters.length
         ? { match: "any" as const }
         : {}),
       ...(filters.length ? { filters } : {}),
-      ...(groupBy ? { groupBy } : {}),
-      ...(subGroupBy ? { subGroupBy } : {}),
+      ...(normalizedGrouping.groupBy
+        ? { groupBy: normalizedGrouping.groupBy }
+        : {}),
+      ...(normalizedGrouping.subGroupBy
+        ? { subGroupBy: normalizedGrouping.subGroupBy }
+        : {}),
     }
   },
   head: () => ({
@@ -1155,17 +1170,28 @@ function ApplicationsTableContent({
     (match: FilterMatch, conditions: FilterCondition[]) => {
       navigate({
         to: "/applications",
-        search: (prev: Record<string, unknown>) => ({
-          ...prev,
-          // Scrub the legacy params so validateSearch cannot fold them back
-          // into resurrected conditions after the user edits the filters.
-          status: undefined,
-          reviewerId: undefined,
-          match:
-            match === "any" && conditions.length ? ("any" as const) : undefined,
-          filters: conditions.length ? conditions : undefined,
-          page: 0,
-        }),
+        search: (prev: Record<string, unknown>) => {
+          const normalizedGrouping = normalizeReviewerGrouping(
+            conditions,
+            prev.groupBy as string | undefined,
+            prev.subGroupBy as string | undefined,
+          )
+          return {
+            ...prev,
+            // Scrub the legacy params so validateSearch cannot fold them back
+            // into resurrected conditions after the user edits the filters.
+            status: undefined,
+            reviewerId: undefined,
+            match:
+              match === "any" && conditions.length
+                ? ("any" as const)
+                : undefined,
+            filters: conditions.length ? conditions : undefined,
+            groupBy: normalizedGrouping.groupBy,
+            subGroupBy: normalizedGrouping.subGroupBy,
+            page: 0,
+          }
+        },
         replace: true,
       })
     },
@@ -1205,17 +1231,25 @@ function ApplicationsTableContent({
     (value: string | undefined) => {
       navigate({
         to: "/applications",
-        search: (prev: Record<string, unknown>) => ({
-          ...prev,
-          groupBy: value,
-          // The subgroup only makes sense under a primary group and must
-          // stay a different field.
-          subGroupBy:
-            value && prev.subGroupBy !== value
-              ? (prev.subGroupBy as string | undefined)
-              : undefined,
-          page: 0,
-        }),
+        search: (prev: Record<string, unknown>) => {
+          const normalizedGrouping = normalizeReviewerGrouping(
+            sanitizeFilterConditions(prev.filters),
+            value,
+            prev.subGroupBy as string | undefined,
+          )
+          return {
+            ...prev,
+            groupBy: normalizedGrouping.groupBy,
+            // The subgroup only makes sense under a primary group and must
+            // stay a different field.
+            subGroupBy:
+              normalizedGrouping.groupBy &&
+              normalizedGrouping.subGroupBy !== normalizedGrouping.groupBy
+                ? normalizedGrouping.subGroupBy
+                : undefined,
+            page: 0,
+          }
+        },
         replace: true,
       })
     },
@@ -1226,12 +1260,22 @@ function ApplicationsTableContent({
     (value: string | undefined) => {
       navigate({
         to: "/applications",
-        search: (prev: Record<string, unknown>) => ({
-          ...prev,
-          subGroupBy:
-            prev.groupBy && value !== prev.groupBy ? value : undefined,
-          page: 0,
-        }),
+        search: (prev: Record<string, unknown>) => {
+          const normalizedGrouping = normalizeReviewerGrouping(
+            sanitizeFilterConditions(prev.filters),
+            prev.groupBy as string | undefined,
+            value,
+          )
+          return {
+            ...prev,
+            subGroupBy:
+              normalizedGrouping.groupBy &&
+              normalizedGrouping.subGroupBy !== normalizedGrouping.groupBy
+                ? normalizedGrouping.subGroupBy
+                : undefined,
+            page: 0,
+          }
+        },
         replace: true,
       })
     },
@@ -1307,10 +1351,12 @@ function ApplicationsTableContent({
     enabled: !groupBy,
   })
 
-  const { data: popupReviewers } = useQuery({
-    queryKey: ["popup-reviewers", selectedPopupId],
+  const { data: applicationReviewers } = useQuery({
+    queryKey: ["applications", selectedPopupId, "reviewers"],
     queryFn: () =>
-      PopupReviewersService.listReviewers({ popupId: selectedPopupId! }),
+      ApplicationsService.listApplicationReviewers({
+        popupId: selectedPopupId!,
+      }),
     enabled: !!selectedPopupId,
   })
 
@@ -1354,30 +1400,17 @@ function ApplicationsTableContent({
     setFilters,
   ])
 
-  const reviewers = popupReviewers?.results ?? []
-
-  // Drop reviewer conditions that reference reviewers outside the current
-  // popup (e.g. after switching gatherings).
-  useEffect(() => {
-    if (!popupReviewers) return
-    const isInvalid = (condition: FilterCondition) =>
-      condition.field === "reviewed_by" &&
-      (!selectedPopupId ||
-        !reviewers.some((reviewer) => reviewer.user_id === condition.value))
-    if (filterConditions.some(isInvalid)) {
-      setFilters(
-        filterMatch,
-        filterConditions.filter((condition) => !isInvalid(condition)),
-      )
-    }
-  }, [
-    popupReviewers,
-    reviewers,
-    selectedPopupId,
-    filterConditions,
-    filterMatch,
-    setFilters,
-  ])
+  const reviewers = applicationReviewers ?? []
+  const reviewerLabels = useMemo(
+    () =>
+      Object.fromEntries(
+        reviewers.map((reviewer: ApplicationReviewerOption) => [
+          reviewer.id,
+          reviewer.full_name ?? reviewer.email ?? "Unknown reviewer",
+        ]),
+      ),
+    [reviewers],
+  )
 
   const bulkReviewMutation = useMutation({
     mutationFn: async ({
@@ -1593,10 +1626,13 @@ function ApplicationsTableContent({
         customFields={customFilterFields}
         baseFieldOptions={baseFieldOptions}
         reviewerOptions={reviewers.map((reviewer) => ({
-          value: reviewer.user_id,
-          label:
-            reviewer.user_full_name ?? reviewer.user_email ?? reviewer.user_id,
+          value: reviewer.id,
+          label: reviewer.full_name ?? reviewer.email ?? "Unknown reviewer",
         }))}
+        hideReviewedBy={
+          searchParams.groupBy === "reviewed_by" ||
+          searchParams.subGroupBy === "reviewed_by"
+        }
         match={filterMatch}
         conditions={filterConditions}
         onChange={setFilters}
@@ -1607,6 +1643,7 @@ function ApplicationsTableContent({
         onChangeGroupBy={setGroupBy}
         onChangeSubGroupBy={setSubGroupBy}
         customFields={groupByCustomFields}
+        hasReviewerFilter={hasReviewerFilter(filterConditions)}
       />
       {selectedPopupId && (
         <SavedViewsMenu
@@ -1653,6 +1690,7 @@ function ApplicationsTableContent({
           search={search}
           valueOrder={groupValueOrder}
           subValueOrder={subGroupValueOrder}
+          reviewerLabels={reviewerLabels}
           hiddenOnMobile={hiddenOnMobile}
           columnPrefs={columnPrefs}
         />
