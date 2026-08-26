@@ -79,7 +79,10 @@ export function OrdersContent({
       aria-labelledby="orders-title"
     >
       <div>
-        <h1 id="orders-title" className="text-3xl font-semibold tracking-tight">
+        <h1
+          id="orders-title"
+          className="text-2xl font-semibold tracking-tight text-slate-950 sm:text-3xl"
+        >
           {t("orders.title")}
         </h1>
         <p className="mt-1 text-sm text-muted-foreground">
@@ -88,7 +91,7 @@ export function OrdersContent({
       </div>
 
       {orders.length === 0 ? (
-        <div className="rounded-xl border bg-card px-6 py-10 text-center shadow-sm">
+        <div className="rounded-xl border border-slate-200 bg-white px-6 py-10 text-center shadow-sm">
           <div className="mx-auto grid size-12 place-items-center rounded-full bg-muted">
             <FileText className="size-6 text-muted-foreground" />
           </div>
@@ -102,7 +105,7 @@ export function OrdersContent({
           {orders.map((order) => (
             <article
               key={order.id}
-              className="overflow-hidden rounded-xl border bg-card shadow-sm"
+              className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm"
             >
               <div className="grid gap-4 p-4 sm:grid-cols-[minmax(9rem,0.8fr)_minmax(0,1.5fr)_minmax(9rem,0.8fr)] sm:items-center sm:p-5">
                 <div className="space-y-2">
@@ -123,11 +126,14 @@ export function OrdersContent({
                   )}
                 </div>
 
-                <ul className="divide-y" aria-label={t("orders.lines")}>
+                <ul
+                  className="divide-y divide-slate-100 border-y border-slate-100"
+                  aria-label={t("orders.lines")}
+                >
                   {order.lines.map((line) => (
                     <li
                       key={line.id}
-                      className="flex items-center justify-between gap-4 px-4 py-3 text-sm sm:px-5"
+                      className="flex items-center justify-between gap-4 py-3 text-sm first:pt-0 last:pb-0"
                     >
                       <div>
                         <p className="font-medium">{line.name}</p>
@@ -145,7 +151,7 @@ export function OrdersContent({
                   <p className="text-xs text-muted-foreground">
                     {t("orders.total")}
                   </p>
-                  <p className="text-xl font-semibold tracking-tight">
+                  <p className="text-xl font-semibold tracking-tight text-slate-950">
                     {formattedAmount(order.total, order.currency)}
                   </p>
                   {order.invoiceAvailable && (
