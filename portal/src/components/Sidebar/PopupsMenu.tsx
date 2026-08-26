@@ -116,12 +116,13 @@ const PopupsMenu = () => {
               align="start"
               alignOffset={-4}
               sideOffset={4}
-              className="w-[calc(var(--radix-dropdown-menu-trigger-width)+0.5rem)]"
+              className="portal-sidebar w-[calc(var(--radix-dropdown-menu-trigger-width)+0.5rem)]"
             >
               {popups.map((popup: PopupPublic) => (
                 <DropdownMenuItem
                   key={popup.name}
                   selected={popup.slug === city?.slug}
+                  aria-current={popup.slug === city?.slug ? "page" : undefined}
                   className="cursor-pointer"
                   onClick={() => handleClickCity(popup)}
                 >

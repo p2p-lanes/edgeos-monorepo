@@ -538,7 +538,7 @@
     }
   },
   "attendees": {
-    "title": "Attendee Directory",
+    "title": "Directory",
     "description": "Reach out to your friends to plan dates, find shared housing, or organize activities together. *This directory includes only the information of those who have voluntarily opted in to share their details.",
     "search_placeholder": "Search by name, email, organization...",
     "export_csv": "Export attendees as CSV",
@@ -602,7 +602,7 @@
     "people": "People",
     "tickets_access": "Tickets & Access",
     "passes": "Passes",
-    "attendee_directory": "Attendee Directory",
+    "attendee_directory": "Directory",
     "companion": "Companion",
     "status": "Status",
     "groups": "Groups",
@@ -670,7 +670,7 @@
     "application": "Application",
     "passes": "Passes",
     "buy": "Buy",
-    "attendees": "Attendee Directory",
+    "attendees": "Directory",
     "groups": "Groups",
     "profile": "Profile"
   },

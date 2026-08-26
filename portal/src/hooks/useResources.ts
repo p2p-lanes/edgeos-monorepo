@@ -24,6 +24,28 @@ import { useApplication } from "@/providers/applicationProvider"
 import { useCityProvider } from "@/providers/cityProvider"
 import type { Resource } from "@/types/resources"
 
+export function buildDirectoryResource({
+  t,
+  slug,
+  flowQuery,
+  canSeeAttendees,
+  attendeeDirectoryEnabled,
+}: {
+  t: (key: string) => string
+  slug: string | undefined
+  flowQuery: string
+  canSeeAttendees: boolean
+  attendeeDirectoryEnabled: boolean
+}): Resource {
+  return {
+    name: t("sidebar.attendee_directory"),
+    icon: Users,
+    status: canSeeAttendees && attendeeDirectoryEnabled ? "active" : "hidden",
+    path: `/portal/${slug}/attendees${flowQuery}`,
+    group: "community",
+  }
+}
+
 const useResources = () => {
   const { t } = useTranslation()
   const { getCity } = useCityProvider()
@@ -269,13 +291,13 @@ const useResources = () => {
       path: `/portal/${city?.slug}/orders`,
       group: "commerce",
     },
-    {
-      name: t("sidebar.attendee_directory"),
-      icon: Users,
-      status: canSeeAttendees && attendeeDirectoryEnabled ? "active" : "hidden",
-      path: `/portal/${city?.slug}/attendees${flowQuery}`,
-      group: "community",
-    },
+    buildDirectoryResource({
+      t,
+      slug: city?.slug,
+      flowQuery,
+      canSeeAttendees,
+      attendeeDirectoryEnabled,
+    }),
     {
       name: t("sidebar.events"),
       icon: CalendarDays,

@@ -537,7 +537,7 @@
     }
   },
   "attendees": {
-    "title": "Directorio de Asistentes",
+    "title": "Directorio",
     "description": "Contactá a tus amigos para planificar fechas, encontrar alojamiento compartido u organizar actividades juntos. *Este directorio incluye solo la información de quienes voluntariamente optaron por compartir sus datos.",
     "search_placeholder": "Buscar por nombre, email, organización...",
     "export_csv": "Exportar asistentes como CSV",
@@ -601,7 +601,7 @@
     "people": "Personas",
     "tickets_access": "Entradas y acceso",
     "passes": "Pases",
-    "attendee_directory": "Directorio de Asistentes",
+    "attendee_directory": "Directorio",
     "companion": "Acompañante",
     "status": "Estado",
     "groups": "Grupos",
@@ -668,7 +668,7 @@
     "application": "Aplicación",
     "passes": "Pases",
     "buy": "Comprar",
-    "attendees": "Directorio de Asistentes",
+    "attendees": "Directorio",
     "groups": "Grupos",
     "profile": "Perfil"
   },

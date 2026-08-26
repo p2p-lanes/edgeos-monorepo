@@ -597,6 +597,7 @@ const SidebarMenuButton = React.forwardRef<
           align="center"
           hidden={state !== "collapsed" || isMobile}
           {...tooltip}
+          className={cn("portal-chrome portal-sidebar", tooltip.className)}
         />
       </Tooltip>
     )

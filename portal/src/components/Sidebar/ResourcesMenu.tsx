@@ -58,7 +58,7 @@ const ResourceItem: React.FC<{
         </TooltipTrigger>
         <TooltipContent
           side="right"
-          className="hidden group-data-[collapsible=icon]:block"
+          className="portal-sidebar hidden group-data-[collapsible=icon]:block"
         >
           {resource.name}{" "}
           {resource.status === "soon" ? t("sidebar.coming_soon") : ""}

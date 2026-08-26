@@ -460,7 +460,7 @@
     }
   },
   "attendees": {
-    "title": "Þátttakendaskrá",
+    "title": "Skrá",
     "description": "Hafðu samband við vini þína til að skipuleggja stefnumót, finna sameiginlegt húsnæði eða skipuleggja athafnir saman. *Þessi skrá inniheldur aðeins upplýsingar þeirra sem hafa sjálfviljugir samþykkt að deila upplýsingum sínum.",
     "search_placeholder": "Leita eftir nafni, netfangi, stofnun...",
     "export_csv": "Flytja þátttakendur út sem CSV",
@@ -524,7 +524,7 @@
     "people": "Fólk",
     "tickets_access": "Passar og aðgangur",
     "passes": "Passar",
-    "attendee_directory": "Þátttakendaskrá",
+    "attendee_directory": "Skrá",
     "companion": "Förunautur",
     "status": "Staða",
     "groups": "Hópar",
@@ -587,7 +587,7 @@
     "application": "Umsókn",
     "passes": "Passar",
     "buy": "Kaupa",
-    "attendees": "Þátttakendaskrá",
+    "attendees": "Skrá",
     "groups": "Hópar",
     "profile": "Prófíll"
   },

@@ -470,7 +470,7 @@
     }
   },
   "attendees": {
-    "title": "参与者名录",
+    "title": "名录",
     "description": "联系您的朋友以计划日程、寻找合住住所或一起组织活动。*此名录仅包含自愿选择分享其信息的人的资料。",
     "search_placeholder": "按姓名、邮箱、组织搜索...",
     "export_csv": "导出参与者CSV",
@@ -534,7 +534,7 @@
     "people": "人员",
     "tickets_access": "门票和访问权限",
     "passes": "通行证",
-    "attendee_directory": "参与者名录",
+    "attendee_directory": "名录",
     "companion": "同伴",
     "status": "状态",
     "groups": "团体",
@@ -597,7 +597,7 @@
     "application": "申请",
     "passes": "通行证",
     "buy": "购买",
-    "attendees": "参与者名录",
+    "attendees": "名录",
     "groups": "团体",
     "profile": "个人资料"
   },
