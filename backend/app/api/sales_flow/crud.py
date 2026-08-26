@@ -146,6 +146,69 @@ def _has_flow_of_type(
     )
 
 
+def _application_price_product_ids(
+    session: Session, flow: SalesFlows
+) -> set[uuid.UUID]:
+    """Return paid-ticket candidates explicitly visible to the primary attendee."""
+    from app.api.attendee_category.models import AttendeeCategories  # noqa: PLC0415
+    from app.api.ticketing_step.models import TicketingSteps  # noqa: PLC0415
+
+    primary_category_id = session.exec(
+        select(AttendeeCategories.id)
+        .where(
+            AttendeeCategories.popup_id == flow.popup_id,
+            AttendeeCategories.is_primary == True,  # noqa: E712
+        )
+        .limit(1)
+    ).first()
+    if primary_category_id is None:
+        return set()
+
+    steps = session.exec(
+        select(TicketingSteps).where(
+            TicketingSteps.sales_flow_id == flow.id,
+            TicketingSteps.is_enabled == True,  # noqa: E712
+            TicketingSteps.template == "ticket-select",
+        )
+    ).all()
+
+    product_ids: set[uuid.UUID] = set()
+    for step in steps:
+        template_config = step.template_config
+        if not isinstance(template_config, dict):
+            continue
+        sections = template_config.get("sections")
+        if not isinstance(sections, list):
+            continue
+
+        for section in sections:
+            if not isinstance(section, dict):
+                continue
+            raw_categories = section.get("attendee_categories")
+            if raw_categories is not None:
+                if not isinstance(raw_categories, list):
+                    continue
+                category_ids: set[uuid.UUID] = set()
+                for raw_category_id in raw_categories:
+                    try:
+                        category_ids.add(uuid.UUID(str(raw_category_id)))
+                    except (ValueError, AttributeError, TypeError):
+                        continue
+                if primary_category_id not in category_ids:
+                    continue
+
+            raw_product_ids = section.get("product_ids")
+            if not isinstance(raw_product_ids, list):
+                continue
+            for raw_product_id in raw_product_ids:
+                try:
+                    product_ids.add(uuid.UUID(str(raw_product_id)))
+                except (ValueError, AttributeError, TypeError):
+                    continue
+
+    return product_ids
+
+
 # What a flow leaves behind when it is deleted, and what it may not.
 #
 # The line is not "does anything reference this row" — that was the old
@@ -281,31 +344,53 @@ class SalesFlowsCRUD(BaseCRUD[SalesFlows, SalesFlowCreate, SalesFlowUpdate]):
         """Return the narrowest truthful price fact for a flow's catalog."""
         from app.api.popup.models import Popups  # noqa: PLC0415
         from app.api.product.models import Products  # noqa: PLC0415
-        from app.services.restrictions.offering import (  # noqa: PLC0415
-            flow_offered_product_ids,
-        )
 
-        offered_product_ids = flow_offered_product_ids(session, flow.id, flow.popup_id)
-        if not offered_product_ids:
-            return None
+        if flow.type == SalesFlowType.application:
+            product_ids = _application_price_product_ids(session, flow)
+            if not product_ids:
+                return None
+            prices = list(
+                session.exec(
+                    select(Products.price).where(
+                        Products.id.in_(product_ids),  # type: ignore[attr-defined]
+                        Products.popup_id == flow.popup_id,
+                        Products.category == "ticket",
+                        Products.is_active == True,  # noqa: E712
+                        Products.deleted_at.is_(None),  # type: ignore[attr-defined]
+                        Products.price > 0,
+                    )
+                ).all()
+            )
+        else:
+            from app.services.restrictions.offering import (  # noqa: PLC0415
+                flow_offered_product_ids,
+            )
 
-        products = list(
-            session.exec(
-                select(Products.price, Products.category).where(
-                    Products.id.in_(offered_product_ids),  # type: ignore[attr-defined]
-                    Products.is_active == True,  # noqa: E712
-                    Products.deleted_at.is_(None),  # type: ignore[attr-defined]
-                )
-            ).all()
-        )
-        if not products or any(category == "patreon" for _, category in products):
+            offered_product_ids = flow_offered_product_ids(
+                session, flow.id, flow.popup_id
+            )
+            if not offered_product_ids:
+                return None
+            products = list(
+                session.exec(
+                    select(Products.price, Products.category).where(
+                        Products.id.in_(offered_product_ids),  # type: ignore[attr-defined]
+                        Products.is_active == True,  # noqa: E712
+                        Products.deleted_at.is_(None),  # type: ignore[attr-defined]
+                    )
+                ).all()
+            )
+            if not products or any(category == "patreon" for _, category in products):
+                return None
+            prices = [price for price, _ in products]
+
+        if not prices:
             return None
 
         popup = session.get(Popups, flow.popup_id)
         if popup is None:
             return None
 
-        prices = [price for price, _ in products]
         amount = min(prices)
         return SalesFlowPriceSummary(
             amount=amount,

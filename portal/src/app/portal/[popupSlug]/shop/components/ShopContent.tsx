@@ -24,13 +24,9 @@ export function resolveShopFlowSlug(
 }
 
 function getShopPriceLabel(
-  priceSummary: ShopFlow["price_summary"],
+  priceSummary: NonNullable<ShopFlow["price_summary"]>,
   t: (key: string, values?: Record<string, string>) => string,
 ) {
-  if (!priceSummary) {
-    return t("shop.price_unavailable")
-  }
-
   const price = `${priceSummary.currency} ${priceSummary.amount}`
   return priceSummary.kind === "from" ? t("shop.price_from", { price }) : price
 }
@@ -118,9 +114,11 @@ export function ShopContent({ popupId, popupSlug }: ShopContentProps) {
                       <span className="mt-1 text-xs text-muted-foreground">
                         {t(`shop.eligibility.${key}`)}
                       </span>
-                      <span className="mt-4 text-lg font-semibold text-slate-900">
-                        {getShopPriceLabel(flow.price_summary, t)}
-                      </span>
+                      {flow.price_summary && (
+                        <span className="mt-4 text-lg font-semibold text-slate-900">
+                          {getShopPriceLabel(flow.price_summary, t)}
+                        </span>
+                      )}
                       <span className="mt-5 inline-flex w-fit rounded-md bg-slate-900 px-3 py-1.5 text-sm font-medium text-white">
                         {t("shop.open")}
                       </span>

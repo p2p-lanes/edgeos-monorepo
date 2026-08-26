@@ -172,10 +172,10 @@ describe("ShopContent", () => {
         })
         .getAttribute("href"),
     ).toBe("/portal/summer-camp/shop/weekend")
-    expect(screen.getByText("Price unavailable")).toBeTruthy()
+    expect(screen.queryByText("Price unavailable")).toBeNull()
   })
 
-  it("renders server-provided fixed, from, and unavailable prices with source eligibility context", () => {
+  it("renders server-provided fixed and from prices, but no price UI for an eligible null summary", () => {
     mocks.applicationStatus = "accepted"
     mocks.application = [
       {
@@ -212,6 +212,11 @@ describe("ShopContent", () => {
     expect(screen.getByText("Source: Direct purchase")).toBeTruthy()
     expect(screen.getByText("USD 25.00")).toBeTruthy()
     expect(screen.getByText("From USD 15.00")).toBeTruthy()
-    expect(screen.getByText("Price unavailable")).toBeTruthy()
+    expect(screen.queryByText("Price unavailable")).toBeNull()
+    expect(
+      screen
+        .getByRole("link", { name: "Application Volunteer View option" })
+        .getAttribute("href"),
+    ).toBe("/portal/summer-camp/shop/volunteer")
   })
 })
