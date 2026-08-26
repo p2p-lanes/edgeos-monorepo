@@ -8,6 +8,7 @@ const purchaseOpenTicketing = vi.hoisted(() =>
   vi.fn().mockResolvedValue({ status: "created" }),
 )
 const telemetry = vi.hoisted(() => ({ trackPortalTelemetry: vi.fn() }))
+const queryClient = vi.hoisted(() => ({ invalidateQueries: vi.fn() }))
 
 vi.mock("@/client", () => ({
   ApiError: class ApiError extends Error {},
@@ -15,7 +16,7 @@ vi.mock("@/client", () => ({
   PaymentsService: { createMyPayment: vi.fn() },
 }))
 vi.mock("@tanstack/react-query", () => ({
-  useQueryClient: () => ({ invalidateQueries: vi.fn() }),
+  useQueryClient: () => queryClient,
 }))
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ replace: vi.fn() }),
@@ -116,6 +117,7 @@ describe("usePaymentSubmit public purchase payload", () => {
   beforeEach(() => {
     purchaseOpenTicketing.mockClear()
     telemetry.trackPortalTelemetry.mockClear()
+    queryClient.invalidateQueries.mockClear()
   })
 
   it.each([
@@ -141,6 +143,28 @@ describe("usePaymentSubmit public purchase payload", () => {
         },
       }),
     })
+  })
+
+  it("invalidates the popup upsale catalog after an approved payment", async () => {
+    purchaseOpenTicketing.mockResolvedValueOnce({
+      status: "approved",
+      id: "payment-1",
+    })
+    const { result } = renderPaymentSubmit("merch-store")
+
+    await act(async () => {
+      await result.current.submitPayment()
+    })
+
+    const salesFlowInvalidations = queryClient.invalidateQueries.mock.calls
+      .map(([options]) => options)
+      .filter(({ queryKey }) => queryKey[0] === "sales-flows")
+
+    expect(salesFlowInvalidations).toEqual([
+      {
+        queryKey: ["sales-flows", "portal", "upsale", "popup-1"],
+      },
+    ])
   })
 
   it("records a checkout failure without forwarding the rejected response", async () => {

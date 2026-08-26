@@ -334,6 +334,11 @@ export function usePaymentSubmit({
                 queryKey: queryKeys.attendees.byHumanPopup(popupId),
               })
             : Promise.resolve(),
+          popupId
+            ? queryClient.invalidateQueries({
+                queryKey: queryKeys.salesFlows.portalUpsale(popupId),
+              })
+            : Promise.resolve(),
         ])
         if (popupSlug) {
           // Approved-on-create only happens when the cart was zero-amount and
