@@ -146,7 +146,10 @@ export default function CheckoutPageClient({
   return (
     // The flow's own look, not the gathering's. Mounted here because the
     // flow is only known once the runtime has loaded.
-    <ThemeProvider config={runtime.theme_config as ThemeConfig | null}>
+    <ThemeProvider
+      config={runtime.theme_config as ThemeConfig | null}
+      scope="local"
+    >
       <SidebarProvider
         defaultOpen={false}
         className="block min-h-0"

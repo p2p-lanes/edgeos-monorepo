@@ -1,7 +1,20 @@
 "use client"
 
-import { type ReactNode, useContext, useEffect, useMemo } from "react"
+import {
+  type CSSProperties,
+  createContext,
+  type ReactNode,
+  useContext,
+  useEffect,
+  useMemo,
+} from "react"
 import { CityContext } from "./cityProvider"
+
+const ThemeScopeContext = createContext<CSSProperties | undefined>(undefined)
+
+export function useThemeScopeStyle() {
+  return useContext(ThemeScopeContext)
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Design-token theme system.
@@ -265,6 +278,7 @@ function buildThemeStyles(
 export default function ThemeProvider({
   children,
   config,
+  scope = "document",
 }: {
   children: ReactNode
   /**
@@ -278,6 +292,8 @@ export default function ThemeProvider({
    * effects before parent ones.
    */
   config?: ThemeConfig | null
+  /** Applies flow tokens to the checkout subtree instead of the document. */
+  scope?: "document" | "local"
 }) {
   // The raw context, not `useCityProvider`, which throws when there is no
   // CityProvider above. The checkout mounts this provider with an explicit
@@ -301,6 +317,8 @@ export default function ThemeProvider({
   // them. Cleanup removes the overrides when the provider unmounts or the
   // theme changes, restoring the globals.css defaults.
   useEffect(() => {
+    if (scope !== "document") return
+
     const root = document.documentElement
     const keys = Object.keys(themeStyles)
     if (keys.length === 0) return
@@ -321,7 +339,25 @@ export default function ThemeProvider({
       }
       if (fontSize) root.style.fontSize = previousFontSize
     }
-  }, [themeStyles])
+  }, [scope, themeStyles])
 
-  return <>{children}</>
+  const fontSize = themeStyles["--theme-font-base-size"]
+  const localStyles: CSSProperties = {
+    ...themeStyles,
+    ...(fontSize ? { fontSize } : {}),
+  }
+
+  if (scope === "local") {
+    return (
+      <ThemeScopeContext.Provider value={localStyles}>
+        <div style={localStyles}>{children}</div>
+      </ThemeScopeContext.Provider>
+    )
+  }
+
+  return (
+    <ThemeScopeContext.Provider value={undefined}>
+      {children}
+    </ThemeScopeContext.Provider>
+  )
 }

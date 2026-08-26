@@ -10,6 +10,7 @@ let runtime: {
   buyer_form: never[]
   ticketing_steps: never[]
   flow_type?: string
+  theme_config?: { colors?: { mode?: "dark"; primary_color?: string } }
 } = {
   popup: { id: "popup-1", slug: "festival-2026", name: "Festival" },
   selected_flow: { id: "flow-id", slug: "merch-store" },
@@ -61,6 +62,36 @@ describe("CheckoutPageClient flow propagation", () => {
     )
 
     expect(screen.getByText("selected-flow:merch-store")).toBeTruthy()
+  })
+
+  it("keeps the selected flow theme inside the checkout subtree", () => {
+    document.documentElement.style.setProperty(
+      "--background",
+      "rgb(245 245 245)",
+    )
+    runtime = {
+      ...runtime,
+      theme_config: {
+        colors: {
+          mode: "dark",
+          primary_color: "#112233",
+        },
+      },
+    }
+
+    render(
+      <CheckoutPageClient popupSlug="festival-2026" flowSlug="merch-store" />,
+    )
+
+    const checkoutScope = screen
+      .getByText("selected-flow:merch-store")
+      .closest("[style*='--background']")
+    expect(checkoutScope?.getAttribute("style")).toContain(
+      "--background: oklch(0.145 0 0)",
+    )
+    expect(
+      document.documentElement.style.getPropertyValue("--background"),
+    ).toBe("rgb(245 245 245)")
   })
 
   it("preserves the selected application flow identity for the portal checkout handoff", () => {

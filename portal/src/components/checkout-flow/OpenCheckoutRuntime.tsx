@@ -27,7 +27,7 @@ import { CityContext } from "@/providers/cityProvider"
 import { DiscountContext } from "@/providers/discountProvider"
 import { LanguageProvider } from "@/providers/languageProvider"
 import PassesProvider from "@/providers/passesProvider"
-import ThemeProvider from "@/providers/themeProvider"
+import { useThemeScopeStyle } from "@/providers/themeProvider"
 import type { AttendeePassState } from "@/types/Attendee"
 import { setActiveCurrency } from "@/types/checkout"
 import type { DiscountProps } from "@/types/discounts"
@@ -147,6 +147,7 @@ export function OpenCheckoutRuntime({
   showQuoteStatus = false,
 }: OpenCheckoutRuntimeProps) {
   const { t } = useTranslation()
+  const flowScopeStyle = useThemeScopeStyle()
   const searchParams = useSearchParams()
   const cartCid = searchParams.get("cid")
   const cartSig = searchParams.get("sig")
@@ -219,101 +220,102 @@ export function OpenCheckoutRuntime({
         popupsLoaded: true,
       }}
     >
-      <ThemeProvider>
-        <LanguageProvider>
-          <ApplicationContext.Provider
+      <LanguageProvider>
+        <ApplicationContext.Provider
+          value={{
+            // An anonymous checkout has no application at all, so every
+            // accessor answers empty rather than guessing.
+            applications: null,
+            participation: null,
+            getRelevantApplication: () => null,
+            getApplicationsForPopup: () => [],
+            getAttendees: () => [],
+            updateApplication: () => {},
+          }}
+        >
+          <DiscountContext.Provider
             value={{
-              // An anonymous checkout has no application at all, so every
-              // accessor answers empty rather than guessing.
-              applications: null,
-              participation: null,
-              getRelevantApplication: () => null,
-              getApplicationsForPopup: () => [],
-              getAttendees: () => [],
-              updateApplication: () => {},
+              discountApplied,
+              setDiscount: (discount) => setDiscountApplied(discount),
+              resetDiscount: () =>
+                setDiscountApplied({
+                  discount_value: 0,
+                  discount_type: "percentage",
+                  discount_code: null,
+                  city_id: popup.id,
+                }),
             }}
           >
-            <DiscountContext.Provider
-              value={{
-                discountApplied,
-                setDiscount: (discount) => setDiscountApplied(discount),
-                resetDiscount: () =>
-                  setDiscountApplied({
-                    discount_value: 0,
-                    discount_type: "percentage",
-                    discount_code: null,
-                    city_id: popup.id,
-                  }),
-              }}
+            <PassesProvider
+              attendees={attendees}
+              restoreFromCart={false}
+              productsOverride={products}
+              purchasesOverride={[]}
             >
-              <PassesProvider
-                attendees={attendees}
-                restoreFromCart={false}
+              <CheckoutProvider
+                initialStep="passes"
+                salesFlowId={runtime.selected_flow.id}
+                salesFlowSlug={flowSlug}
+                flowType={runtime.flow_type ?? null}
                 productsOverride={products}
-                purchasesOverride={[]}
+                emptyCatalogReason={runtime.empty_catalog_reason ?? null}
+                configuredStepsOverride={runtime.ticketing_steps}
+                accountCreditOverride={0}
+                buyerFormSchema={buyerFormSchema}
+                initialBuyerValues={
+                  buyerFormSchema
+                    ? buildInitialBuyerValues(buyerFormSchema, prefilledBuyer)
+                    : {}
+                }
+                cartPersistenceEnabled={false}
+                cartUiEnabled={true}
+                openCartPopupSlug={popupSlug}
+                openCartCid={cartCid}
+                openCartSig={cartSig}
+                validatePromoCodeOverride={async (code) => {
+                  const result = await CouponsService.validateCouponPublic({
+                    requestBody: {
+                      popup_slug: popupSlug,
+                      code,
+                      flow_slug: flowSlug,
+                    },
+                  })
+                  return Number(result.discount_value)
+                }}
+                submitMode="open-ticketing"
+                submitPopupSlug={popupSlug}
               >
-                <CheckoutProvider
-                  initialStep="passes"
-                  salesFlowId={runtime.selected_flow.id}
-                  salesFlowSlug={flowSlug}
-                  flowType={runtime.flow_type ?? null}
-                  productsOverride={products}
-                  emptyCatalogReason={runtime.empty_catalog_reason ?? null}
-                  configuredStepsOverride={runtime.ticketing_steps}
-                  accountCreditOverride={0}
-                  buyerFormSchema={buyerFormSchema}
-                  initialBuyerValues={
-                    buyerFormSchema
-                      ? buildInitialBuyerValues(buyerFormSchema, prefilledBuyer)
-                      : {}
+                <FaviconOverride
+                  url={
+                    (popup as { favicon_url?: string | null }).favicon_url ??
+                    null
                   }
-                  cartPersistenceEnabled={false}
-                  cartUiEnabled={true}
-                  openCartPopupSlug={popupSlug}
-                  openCartCid={cartCid}
-                  openCartSig={cartSig}
-                  validatePromoCodeOverride={async (code) => {
-                    const result = await CouponsService.validateCouponPublic({
-                      requestBody: {
-                        popup_slug: popupSlug,
-                        code,
-                        flow_slug: flowSlug,
-                      },
-                    })
-                    return Number(result.discount_value)
-                  }}
-                  submitMode="open-ticketing"
-                  submitPopupSlug={popupSlug}
-                >
-                  <FaviconOverride
-                    url={
-                      (popup as { favicon_url?: string | null }).favicon_url ??
-                      null
-                    }
-                  />
-                  <Flow
-                    navExtraContent={
-                      <div className="flex items-center gap-3">
-                        {showQuoteStatus && (
-                          <OpenCheckoutQuoteStatus
-                            popupSlug={popupSlug}
-                            flowSlug={flowSlug}
-                          />
-                        )}
-                        <LanguageSwitcher compact />
-                      </div>
-                    }
-                    brandLogoUrl={
-                      (popup as { icon_url?: string | null }).icon_url ?? null
-                    }
-                    brandLabel={popup.name}
-                  />
-                </CheckoutProvider>
-              </PassesProvider>
-            </DiscountContext.Provider>
-          </ApplicationContext.Provider>
-        </LanguageProvider>
-      </ThemeProvider>
+                />
+                <Flow
+                  navExtraContent={
+                    <div className="flex items-center gap-3">
+                      {showQuoteStatus && (
+                        <OpenCheckoutQuoteStatus
+                          popupSlug={popupSlug}
+                          flowSlug={flowSlug}
+                        />
+                      )}
+                      <LanguageSwitcher
+                        compact
+                        portalContentStyle={flowScopeStyle}
+                      />
+                    </div>
+                  }
+                  brandLogoUrl={
+                    (popup as { icon_url?: string | null }).icon_url ?? null
+                  }
+                  brandLabel={popup.name}
+                />
+              </CheckoutProvider>
+            </PassesProvider>
+          </DiscountContext.Provider>
+        </ApplicationContext.Provider>
+      </LanguageProvider>
     </CityContext.Provider>
   )
 }
