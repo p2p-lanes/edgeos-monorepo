@@ -68,8 +68,10 @@ vi.mock("@/hooks/useResources", () => ({
   default: () => ({ resources, doorName: null }),
 }))
 
+let isMobile = true
+
 vi.mock("@/hooks/useIsMobile", () => ({
-  useIsMobile: () => true,
+  useIsMobile: () => isMobile,
 }))
 
 vi.mock("./Groups/GroupsResources", () => ({ default: () => null }))
@@ -149,6 +151,7 @@ describe("ResourcesMenu", () => {
   })
 
   it("uses the localized name for the mobile navigation sheet", () => {
+    isMobile = true
     const { Sidebar, SidebarProvider, useSidebar } = SidebarComponents
 
     const OpenMobileSidebar = () => {
@@ -172,5 +175,23 @@ describe("ResourcesMenu", () => {
     )
 
     expect(screen.getByText("Portal navigation menu")).toBeTruthy()
+    expect(screen.getByRole("dialog").className).toContain("portal-chrome")
+  })
+
+  it("scopes the desktop wrapper before sidebar foreground is computed", () => {
+    isMobile = false
+    const { Sidebar, SidebarProvider } = SidebarComponents
+
+    const { container } = render(
+      <SidebarProvider>
+        <Sidebar>
+          <span>Portal content</span>
+        </Sidebar>
+      </SidebarProvider>,
+    )
+
+    expect(container.querySelector("[data-state]")?.className).toContain(
+      "portal-chrome text-sidebar-foreground",
+    )
   })
 })

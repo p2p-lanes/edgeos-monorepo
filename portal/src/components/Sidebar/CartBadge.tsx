@@ -53,7 +53,7 @@ const CartBadge = () => {
           </span>
         </button>
       </PopoverTrigger>
-      <PopoverContent align="end" className="w-64 p-3">
+      <PopoverContent align="end" className="portal-chrome w-64 p-3">
         <p className="mb-2 text-sm font-medium text-foreground">
           {t("cartBadge.title")}
         </p>

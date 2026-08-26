@@ -18,12 +18,15 @@ interface LanguageSwitcherProps {
    *  Used in the checkout header where the switcher is a secondary
    *  affordance and shouldn't compete with the step nav. */
   compact?: boolean
+  /** Class applied to the portaled language menu content. */
+  portalContentClassName?: string
   /** Inline theme variables applied to the portaled language menu content. */
   portalContentStyle?: CSSProperties
 }
 
 export function LanguageSwitcher({
   compact = false,
+  portalContentClassName,
   portalContentStyle,
 }: LanguageSwitcherProps) {
   const { currentLanguage, supportedLanguages, setLanguage } = useLanguage()
@@ -47,7 +50,10 @@ export function LanguageSwitcher({
             entirely in compact mode so the trigger reads as icon-only. */}
         {compact ? null : <SelectValue />}
       </SelectTrigger>
-      <SelectContent style={portalContentStyle}>
+      <SelectContent
+        className={portalContentClassName}
+        style={portalContentStyle}
+      >
         {supportedLanguages.map((code) => {
           const label =
             SUPPORTED_LANGUAGES[code as keyof typeof SUPPORTED_LANGUAGES]

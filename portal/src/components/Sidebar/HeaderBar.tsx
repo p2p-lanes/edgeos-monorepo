@@ -200,7 +200,7 @@ const HeaderBar = () => {
       <div className="ml-auto flex items-center gap-2">
         <MobilePopupSwitcher />
         <CartBadge />
-        <LanguageSwitcher />
+        <LanguageSwitcher portalContentClassName="portal-chrome" />
       </div>
     </header>
   )
