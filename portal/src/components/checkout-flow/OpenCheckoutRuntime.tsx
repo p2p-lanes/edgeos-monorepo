@@ -306,10 +306,6 @@ export function OpenCheckoutRuntime({
                       />
                     </div>
                   }
-                  brandLogoUrl={
-                    (popup as { icon_url?: string | null }).icon_url ?? null
-                  }
-                  brandLabel={popup.name}
                 />
               </CheckoutProvider>
             </PassesProvider>
