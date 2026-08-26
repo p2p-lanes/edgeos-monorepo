@@ -5,6 +5,8 @@ export interface ScannableAccessTicket {
   name: string
   checkInCode: string
   lastScanAt: string | null
+  category: string | null
+  duration: string | null
 }
 
 export interface ScannableAccessHolder {
@@ -24,6 +26,8 @@ export function projectScannableAccess(
         name: product.product_name ?? product.check_in_code,
         checkInCode: product.check_in_code,
         lastScanAt: product.last_scan_at ?? null,
+        category: product.product_category ?? null,
+        duration: product.duration_type ?? null,
       }))
 
     return tickets.length > 0

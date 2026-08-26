@@ -144,6 +144,7 @@
     "active": "Ready for check-in",
     "code_title": "Access code",
     "code_description": "Use this code to check in.",
+    "details_unavailable": "Pass details unavailable",
     "qr_alt": "QR code"
   },
   "auth": {

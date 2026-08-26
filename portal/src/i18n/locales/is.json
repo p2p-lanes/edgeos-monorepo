@@ -130,6 +130,7 @@
     "active": "Tilbúið fyrir innritun",
     "code_title": "Aðgangskóði",
     "code_description": "Notaðu þennan kóða til að innrita þig.",
+    "details_unavailable": "Upplýsingar um passa eru ekki tiltækar",
     "qr_alt": "QR-kóði"
   },
   "auth": {

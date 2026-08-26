@@ -130,6 +130,7 @@
     "active": "可签到",
     "code_title": "访问代码",
     "code_description": "使用此代码签到。",
+    "details_unavailable": "通行证详情不可用",
     "qr_alt": "二维码"
   },
   "auth": {

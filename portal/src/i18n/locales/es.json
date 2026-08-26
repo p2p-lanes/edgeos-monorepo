@@ -144,6 +144,7 @@
     "active": "Listo para registrarse",
     "code_title": "Código de acceso",
     "code_description": "Usa este código para registrarte.",
+    "details_unavailable": "Detalles del pase no disponibles",
     "qr_alt": "Código QR"
   },
   "auth": {
