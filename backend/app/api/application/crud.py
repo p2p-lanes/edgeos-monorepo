@@ -2230,15 +2230,31 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
         EffectiveFlowConfig scoping decision). Add it when a real consumer
         needs it.
         """
+        from app.api.popup.models import Popups
         from app.api.sales_flow.crud import sales_flows_crud
         from app.api.sales_flow.eligibility import is_upsale_eligible
         from app.api.sales_flow.schemas import SalesFlowType
+        from app.services.restrictions.context import build_context
+        from app.services.restrictions.enforcement import restriction_passes
 
         if not is_upsale_eligible(session, human_id, popup_id):
             return []
-        return sales_flows_crud.find_portal_listed(
+
+        popup = session.get(Popups, popup_id)
+        human = session.get(Humans, human_id)
+        if popup is None or human is None:
+            return []
+
+        flows = sales_flows_crud.find_portal_listed(
             session, popup_id, type=SalesFlowType.upsale
         )
+        return [
+            flow
+            for flow in flows
+            if restriction_passes(
+                flow, build_context(session, popup, flow, human=human)
+            )
+        ]
 
     def list_comments(
         self, session: Session, application_id: uuid.UUID

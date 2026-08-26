@@ -135,6 +135,38 @@ class TestPortalUpsaleListing:
         slugs = [f["slug"] for f in response.json()["results"]]
         assert slugs == [flow.slug]
 
+    def test_ticket_holder_without_speaker_credential_cannot_see_vip_dinner(
+        self, client: TestClient, db: Session, tenant_a: Tenants
+    ) -> None:
+        popup = _make_popup(db, tenant_a)
+        speaker_credential = Products(
+            tenant_id=tenant_a.id,
+            popup_id=popup.id,
+            name="Speaker Credential",
+            slug=f"speaker-{uuid.uuid4().hex[:6]}",
+            price=Decimal("0"),
+        )
+        db.add(speaker_credential)
+        db.flush()
+        vip_dinner = _make_upsale_flow(db, popup, slug="vip-dinner")
+        vip_dinner.restriction_rule = {
+            "kind": "has_product",
+            "scope": "product",
+            "value": str(speaker_credential.id),
+        }
+        token, human = _human_token(db, tenant_a)
+        _grant_approved_payment(db, tenant_a, popup, human)
+        db.commit()
+
+        response = client.get(
+            "/api/v1/sales-flows/portal/upsale",
+            params={"popup_id": str(popup.id)},
+            headers={"Authorization": f"Bearer {token}"},
+        )
+
+        assert response.status_code == 200, response.text
+        assert response.json()["results"] == []
+
     def test_ineligible_human_sees_empty_catalog(
         self, client: TestClient, db: Session, tenant_a: Tenants
     ) -> None:
