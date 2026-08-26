@@ -27,14 +27,13 @@ from app.core.security import create_access_token
 from tests._flow_helpers import provision_default_flow
 
 # What a buyer legitimately needs to pick a way in and list them in order,
-# plus `type` — whether this way in asks you to apply or lets you buy, which
-# the screen reveals the moment it renders and which the portal needs to know
-# how the checkout behaves (sdd/sales-flows-rediseno slice 6).
+# plus `type` and an optional price summary — the only display facts needed to
+# select and describe this way in before entering checkout.
 #
 # Every entry here was added on purpose. That is the point of asserting the
 # exact set: the next field to leak has not been added yet, and this test is
 # what makes adding one a decision rather than an accident.
-ALLOWED_KEYS = {"id", "slug", "name", "order", "type"}
+ALLOWED_KEYS = {"id", "slug", "name", "order", "type", "price_summary"}
 
 
 def _popup_with_flows(db: Session, tenant: Tenants) -> Popups:
@@ -85,6 +84,7 @@ class TestPortalFlowListing:
             assert set(flow) == ALLOWED_KEYS, (
                 f"portal listing exposes {set(flow) - ALLOWED_KEYS}"
             )
+            assert flow["price_summary"] is None
 
     def test_the_signing_secret_never_reaches_a_buyer(
         self, client: TestClient, db: Session, tenant_a: Tenants

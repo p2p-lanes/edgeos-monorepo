@@ -8,6 +8,7 @@ from app.api.sales_flow.models import SalesFlows
 from app.api.sales_flow.schemas import (
     SalesFlowCreate,
     SalesFlowIdentityMode,
+    SalesFlowPriceSummary,
     SalesFlowReviewersMode,
     SalesFlowType,
     SalesFlowUpdate,
@@ -273,6 +274,44 @@ class SalesFlowsCRUD(BaseCRUD[SalesFlows, SalesFlowCreate, SalesFlowUpdate]):
             .order_by(SalesFlows.order, SalesFlows.created_at)  # type: ignore[union-attr]
         )
         return list(session.exec(statement).all())
+
+    def resolve_portal_price_summary(
+        self, session: Session, flow: SalesFlows
+    ) -> SalesFlowPriceSummary | None:
+        """Return the narrowest truthful price fact for a flow's catalog."""
+        from app.api.popup.models import Popups  # noqa: PLC0415
+        from app.api.product.models import Products  # noqa: PLC0415
+        from app.services.restrictions.offering import (  # noqa: PLC0415
+            flow_offered_product_ids,
+        )
+
+        offered_product_ids = flow_offered_product_ids(session, flow.id, flow.popup_id)
+        if not offered_product_ids:
+            return None
+
+        products = list(
+            session.exec(
+                select(Products.price, Products.category).where(
+                    Products.id.in_(offered_product_ids),  # type: ignore[attr-defined]
+                    Products.is_active == True,  # noqa: E712
+                    Products.deleted_at.is_(None),  # type: ignore[attr-defined]
+                )
+            ).all()
+        )
+        if not products or any(category == "patreon" for _, category in products):
+            return None
+
+        popup = session.get(Popups, flow.popup_id)
+        if popup is None:
+            return None
+
+        prices = [price for price, _ in products]
+        amount = min(prices)
+        return SalesFlowPriceSummary(
+            amount=amount,
+            currency=popup.currency,
+            kind="fixed" if all(price == amount for price in prices) else "from",
+        )
 
     def find_by_popup(
         self,

@@ -10,14 +10,17 @@ TDD: RED -> GREEN.
 """
 
 import uuid
+from decimal import Decimal
 
 from fastapi.testclient import TestClient
 from sqlmodel import Session
 
 from app.api.popup.models import Popups
+from app.api.product.models import Products
 from app.api.sales_flow.crud import sales_flows_crud
 from app.api.sales_flow.models import SalesFlows
 from app.api.tenant.models import Tenants
+from app.api.ticketing_step.models import TicketingSteps
 
 
 def _make_popup(db: Session, tenant: Tenants) -> Popups:
@@ -72,7 +75,67 @@ def _human_token(db: Session, tenant: Tenants) -> str:
     return create_access_token(subject=human.id, token_type="human")
 
 
+def _make_product(db: Session, popup: Popups, *, price: Decimal) -> Products:
+    product = Products(
+        tenant_id=popup.tenant_id,
+        popup_id=popup.id,
+        name=f"Product {uuid.uuid4().hex[:8]}",
+        slug=f"product-{uuid.uuid4().hex[:8]}",
+        price=price,
+    )
+    db.add(product)
+    db.flush()
+    return product
+
+
+def _offer_products(db: Session, flow: SalesFlows, products: list[Products]) -> None:
+    db.add(
+        TicketingSteps(
+            tenant_id=flow.tenant_id,
+            popup_id=flow.popup_id,
+            sales_flow_id=flow.id,
+            step_type="tickets",
+            title="Tickets",
+            product_category="ticket",
+            template="ticket-select",
+            template_config={
+                "sections": [
+                    {
+                        "key": "tickets",
+                        "label": "Tickets",
+                        "product_ids": [str(product.id) for product in products],
+                    }
+                ]
+            },
+        )
+    )
+
+
 class TestPortalFlowListing:
+    def test_application_listing_reports_a_fixed_price_summary(
+        self, client: TestClient, db: Session, tenant_a: Tenants
+    ) -> None:
+        popup = _make_popup(db, tenant_a)
+        flow = _make_flow(db, popup, slug="priced")
+        _offer_products(db, flow, [_make_product(db, popup, price=Decimal("50"))])
+        db.commit()
+
+        response = client.get(
+            "/api/v1/sales-flows/portal",
+            params={"popup_id": str(popup.id)},
+            headers={"Authorization": f"Bearer {_human_token(db, tenant_a)}"},
+        )
+
+        assert response.status_code == 200, response.text
+        priced_flow = next(
+            item for item in response.json()["results"] if item["slug"] == flow.slug
+        )
+        assert priced_flow["price_summary"] == {
+            "amount": "50.00",
+            "currency": "USD",
+            "kind": "fixed",
+        }
+
     def test_lists_portal_listed_application_flows_ordered(
         self, client: TestClient, db: Session, tenant_a: Tenants
     ) -> None:
@@ -154,6 +217,39 @@ class TestPortalFlowListing:
 
 
 class TestPortalDirectFlowListing:
+    def test_reports_from_and_unavailable_price_summaries(
+        self, client: TestClient, db: Session, tenant_a: Tenants
+    ) -> None:
+        popup = _make_popup(db, tenant_a)
+        variable_flow = _make_flow(db, popup, slug="variable", type="direct", order=1)
+        unavailable_flow = _make_flow(
+            db, popup, slug="unavailable", type="direct", order=2
+        )
+        _offer_products(
+            db,
+            variable_flow,
+            [
+                _make_product(db, popup, price=Decimal("40")),
+                _make_product(db, popup, price=Decimal("90")),
+            ],
+        )
+        db.commit()
+
+        response = client.get(
+            "/api/v1/sales-flows/portal/direct",
+            params={"popup_id": str(popup.id)},
+            headers={"Authorization": f"Bearer {_human_token(db, tenant_a)}"},
+        )
+
+        assert response.status_code == 200, response.text
+        flows = {item["slug"]: item for item in response.json()["results"]}
+        assert flows[variable_flow.slug]["price_summary"] == {
+            "amount": "40.00",
+            "currency": "USD",
+            "kind": "from",
+        }
+        assert flows[unavailable_flow.slug]["price_summary"] is None
+
     def test_lists_only_open_portal_listed_direct_flows_ordered(
         self, client: TestClient, db: Session, tenant_a: Tenants
     ) -> None:

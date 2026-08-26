@@ -37,6 +37,18 @@ from app.services.restrictions.schemas import assert_restriction_rule_allowed_fo
 router = APIRouter(prefix="/sales-flows", tags=["sales-flows"])
 
 
+def _portal_flow_public(db: Session, flow: SalesFlows) -> SalesFlowPortalPublic:
+    """Build the Portal allowlist without exposing sales-flow configuration."""
+    return SalesFlowPortalPublic(
+        id=flow.id,
+        slug=flow.slug,
+        name=flow.name,
+        order=flow.order,
+        type=flow.type,
+        price_summary=crud.sales_flows_crud.resolve_portal_price_summary(db, flow),
+    )
+
+
 @router.get("/portal", response_model=ListModel[SalesFlowPortalPublic])
 async def list_portal_sales_flows(
     db: HumanTenantSession,
@@ -52,7 +64,7 @@ async def list_portal_sales_flows(
     """
     flows = crud.sales_flows_crud.find_portal_listed(db, popup_id)
     return ListModel[SalesFlowPortalPublic](
-        results=[SalesFlowPortalPublic.model_validate(f) for f in flows],
+        results=[_portal_flow_public(db, flow) for flow in flows],
         paging=Paging(offset=0, limit=len(flows), total=len(flows)),
     )
 
@@ -77,7 +89,7 @@ async def list_portal_upsale_flows(
 
     flows = applications_crud.resolve_upsale_catalog(db, current_human.id, popup_id)
     return ListModel[SalesFlowPortalPublic](
-        results=[SalesFlowPortalPublic.model_validate(f) for f in flows],
+        results=[_portal_flow_public(db, flow) for flow in flows],
         paging=Paging(offset=0, limit=len(flows), total=len(flows)),
     )
 
@@ -93,7 +105,7 @@ async def list_portal_direct_sales_flows(
         db, popup_id, type=SalesFlowType.direct
     )
     return ListModel[SalesFlowPortalPublic](
-        results=[SalesFlowPortalPublic.model_validate(f) for f in flows],
+        results=[_portal_flow_public(db, flow) for flow in flows],
         paging=Paging(offset=0, limit=len(flows), total=len(flows)),
     )
 

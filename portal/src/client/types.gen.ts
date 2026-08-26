@@ -4100,6 +4100,18 @@ export type SalesFlowPortalPublic = {
     name: string;
     order: number;
     type: SalesFlowType;
+    price_summary?: (SalesFlowPriceSummary | null);
+};
+
+export type SalesFlowPriceKind = 'fixed' | 'from';
+
+/**
+ * A price display fact that is safe to publish with a Portal flow.
+ */
+export type SalesFlowPriceSummary = {
+    amount: string;
+    currency: string;
+    kind: SalesFlowPriceKind;
 };
 
 /**

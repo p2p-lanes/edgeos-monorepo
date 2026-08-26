@@ -25,6 +25,7 @@ from app.api.product.models import Products
 from app.api.sales_flow.crud import sales_flows_crud
 from app.api.sales_flow.models import SalesFlows
 from app.api.tenant.models import Tenants
+from app.api.ticketing_step.models import TicketingSteps
 from app.core.security import create_access_token
 
 
@@ -116,14 +117,48 @@ def _grant_approved_payment(
     db.flush()
 
 
+def _offer_product(db: Session, flow: SalesFlows, product: Products) -> None:
+    db.add(
+        TicketingSteps(
+            tenant_id=flow.tenant_id,
+            popup_id=flow.popup_id,
+            sales_flow_id=flow.id,
+            step_type="tickets",
+            title="Tickets",
+            product_category="ticket",
+            template="ticket-select",
+            template_config={
+                "sections": [
+                    {
+                        "key": "tickets",
+                        "label": "Tickets",
+                        "product_ids": [str(product.id)],
+                    }
+                ]
+            },
+        )
+    )
+
+
 class TestPortalUpsaleListing:
     def test_eligible_human_sees_upsale_catalog(
         self, client: TestClient, db: Session, tenant_a: Tenants
     ) -> None:
         popup = _make_popup(db, tenant_a)
         flow = _make_upsale_flow(db, popup, slug="addon")
+        flow.open_checkout_signing_secret = "the-key-that-signs-orders"
         token, human = _human_token(db, tenant_a)
         _grant_approved_payment(db, tenant_a, popup, human)
+        product = Products(
+            tenant_id=tenant_a.id,
+            popup_id=popup.id,
+            name="Addon",
+            slug=f"addon-{uuid.uuid4().hex[:6]}",
+            price=Decimal("75"),
+        )
+        db.add(product)
+        db.flush()
+        _offer_product(db, flow, product)
         db.commit()
 
         response = client.get(
@@ -132,8 +167,20 @@ class TestPortalUpsaleListing:
             headers={"Authorization": f"Bearer {token}"},
         )
         assert response.status_code == 200, response.text
-        slugs = [f["slug"] for f in response.json()["results"]]
-        assert slugs == [flow.slug]
+        assert response.json()["results"] == [
+            {
+                "id": str(flow.id),
+                "slug": flow.slug,
+                "name": flow.name,
+                "order": flow.order,
+                "type": flow.type,
+                "price_summary": {
+                    "amount": "75.00",
+                    "currency": "USD",
+                    "kind": "fixed",
+                },
+            }
+        ]
 
     def test_ticket_holder_without_speaker_credential_cannot_see_vip_dinner(
         self, client: TestClient, db: Session, tenant_a: Tenants

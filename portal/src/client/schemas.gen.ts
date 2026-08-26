@@ -19956,6 +19956,16 @@ export const SalesFlowPortalPublicSchema = {
         },
         type: {
             '$ref': '#/components/schemas/SalesFlowType'
+        },
+        price_summary: {
+            anyOf: [
+                {
+                    '$ref': '#/components/schemas/SalesFlowPriceSummary'
+                },
+                {
+                    type: 'null'
+                }
+            ]
         }
     },
     type: 'object',
@@ -19973,6 +19983,33 @@ forge a completed order against that page.
 The portal needs a door's name, its slug and the order to list them in.
 Anything a flow decides about selling is the organiser's business, so it is
 added here one field at a time, on purpose, or not at all.`
+} as const;
+
+export const SalesFlowPriceKindSchema = {
+    type: 'string',
+    enum: ['fixed', 'from'],
+    title: 'SalesFlowPriceKind'
+} as const;
+
+export const SalesFlowPriceSummarySchema = {
+    properties: {
+        amount: {
+            type: 'string',
+            pattern: '^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$',
+            title: 'Amount'
+        },
+        currency: {
+            type: 'string',
+            title: 'Currency'
+        },
+        kind: {
+            '$ref': '#/components/schemas/SalesFlowPriceKind'
+        }
+    },
+    type: 'object',
+    required: ['amount', 'currency', 'kind'],
+    title: 'SalesFlowPriceSummary',
+    description: 'A price display fact that is safe to publish with a Portal flow.'
 } as const;
 
 export const SalesFlowPublicSchema = {

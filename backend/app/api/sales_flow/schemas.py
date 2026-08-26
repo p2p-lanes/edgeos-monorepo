@@ -372,6 +372,19 @@ class SalesFlowPublic(SalesFlowBase):
     model_config = ConfigDict(from_attributes=True)
 
 
+class SalesFlowPriceKind(StrEnum):
+    fixed = "fixed"
+    from_price = "from"
+
+
+class SalesFlowPriceSummary(BaseModel):
+    """A price display fact that is safe to publish with a Portal flow."""
+
+    amount: Decimal
+    currency: str
+    kind: SalesFlowPriceKind
+
+
 class SalesFlowPortalPublic(BaseModel):
     """What a buyer is told about a way in.
 
@@ -395,6 +408,9 @@ class SalesFlowPortalPublic(BaseModel):
     # it is whether this way in asks you to apply or lets you buy, which the
     # screen reveals the moment it renders.
     type: SalesFlowType
+    # The listing deliberately receives a display fact rather than products or
+    # flow configuration. `None` means the server cannot state a price honestly.
+    price_summary: SalesFlowPriceSummary | None = None
 
     model_config = ConfigDict(from_attributes=True)
 
