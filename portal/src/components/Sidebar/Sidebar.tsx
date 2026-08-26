@@ -10,7 +10,7 @@ export function BackofficeSidebar({
   ...props
 }: React.ComponentProps<typeof Sidebar>) {
   return (
-    <Sidebar {...props}>
+    <Sidebar className="portal-chrome" {...props}>
       <PopupsMenu />
       <ResourcesMenu />
       <FooterMenu />

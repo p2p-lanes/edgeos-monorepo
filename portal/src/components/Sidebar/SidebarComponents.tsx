@@ -201,7 +201,10 @@ const Sidebar = React.forwardRef<
             data-sidebar="sidebar"
             data-mobile="true"
             aria-describedby={undefined}
-            className="w-[var(--sidebar-width)] bg-sidebar p-0 text-sidebar-foreground [&>button]:hidden max-w-[90%]"
+            className={cn(
+              "portal-chrome w-[var(--sidebar-width)] max-w-[90%] bg-sidebar p-0 text-sidebar-foreground [&>button]:hidden",
+              className,
+            )}
             style={
               {
                 "--sidebar-width": SIDEBAR_WIDTH_MOBILE,
@@ -221,7 +224,10 @@ const Sidebar = React.forwardRef<
     return (
       <div
         ref={ref}
-        className="group peer hidden md:block text-sidebar-foreground"
+        className={cn(
+          "group peer hidden portal-chrome text-sidebar-foreground md:block",
+          className,
+        )}
         data-state={state}
         data-collapsible={state === "collapsed" ? collapsible : ""}
         data-variant={variant}

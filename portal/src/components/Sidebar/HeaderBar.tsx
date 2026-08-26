@@ -159,7 +159,7 @@ const HeaderBar = () => {
   return (
     <header
       className={cn(
-        "flex h-14 shrink-0 items-center gap-4 border-b bg-sidebar/95 px-6 text-nav-text backdrop-blur transition-[height,transform] duration-300 ease-out",
+        "portal-chrome flex h-14 shrink-0 items-center gap-4 border-b bg-sidebar/95 px-6 text-nav-text backdrop-blur transition-[height,transform] duration-300 ease-out",
         hidden && "h-0 -translate-y-full overflow-hidden border-b-0",
       )}
     >
