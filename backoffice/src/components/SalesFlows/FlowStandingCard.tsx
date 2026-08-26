@@ -18,12 +18,9 @@ import { BLOCKER_TEXT, warningText } from "@/lib/salesFlowReadiness"
 export function FlowStandingCard({
   popupId,
   flowId,
-  flowType,
 }: {
   popupId: string
   flowId: string
-  /** Some warnings mean something different depending on the kind of door. */
-  flowType?: string
 }) {
   const { data: readiness } = useQuery({
     queryKey: ["sales-flows", "readiness", { popupId }],
@@ -35,7 +32,11 @@ export function FlowStandingCard({
   if (!mine) return null
 
   const blockers = mine.blockers ?? []
-  const warnings = mine.warnings ?? []
+  const warnings = (mine.warnings ?? []).filter((code) => code !== "unlisted")
+
+  if (blockers.length === 0 && warnings.length === 0 && mine.warnings?.length) {
+    return null
+  }
 
   if (blockers.length === 0 && warnings.length === 0) {
     return (
@@ -67,7 +68,7 @@ export function FlowStandingCard({
           <li key={code} className="flex items-start gap-3 px-4 py-3">
             <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0 text-warning" />
             <span className="text-sm text-muted-foreground">
-              {warningText(code, flowType)}
+              {warningText(code)}
             </span>
           </li>
         ))}

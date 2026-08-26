@@ -398,15 +398,8 @@ export function SalesFlowForm({
             )}
           </form.Field>
 
-          <form.Subscribe
-            selector={(state) => ({
-              type: state.values.type,
-              visibility: state.values.visibility,
-            })}
-          >
-            {({ type, visibility }) => (
-              <SalesFlowVisibilityNote type={type} visibility={visibility} />
-            )}
+          <form.Subscribe selector={(state) => state.values.type}>
+            {(type) => <SalesFlowVisibilityNote type={type} />}
           </form.Subscribe>
 
           <form.Field name="order">

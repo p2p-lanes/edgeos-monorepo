@@ -55,11 +55,7 @@ function EditSalesFlowContent({ flowId }: { flowId: string }) {
       {salesFlow.status === "closed" ? (
         <FlowClosureCard flow={salesFlow} />
       ) : (
-        <FlowStandingCard
-          popupId={salesFlow.popup_id}
-          flowId={flowId}
-          flowType={salesFlow.type}
-        />
+        <FlowStandingCard popupId={salesFlow.popup_id} flowId={flowId} />
       )}
 
       {/*
