@@ -75,7 +75,7 @@ export function OrdersContent({
 
   return (
     <section
-      className="mx-auto max-w-4xl space-y-6 p-6"
+      className="mx-auto max-w-6xl space-y-6 p-4 sm:p-6"
       aria-labelledby="orders-title"
     >
       <div>
@@ -104,8 +104,8 @@ export function OrdersContent({
               key={order.id}
               className="overflow-hidden rounded-xl border bg-card shadow-sm"
             >
-              <div className="flex flex-wrap items-start justify-between gap-3 border-b bg-muted/30 p-4 sm:p-5">
-                <div>
+              <div className="grid gap-4 p-4 sm:grid-cols-[minmax(9rem,0.8fr)_minmax(0,1.5fr)_minmax(9rem,0.8fr)] sm:items-center sm:p-5">
+                <div className="space-y-2">
                   <div className="flex flex-wrap items-center gap-2">
                     <Badge variant={statusVariant[order.status]}>
                       {t(`orders.status.${order.status}`)}
@@ -122,51 +122,49 @@ export function OrdersContent({
                     </p>
                   )}
                 </div>
-                <div className="text-right">
+
+                <ul className="divide-y" aria-label={t("orders.lines")}>
+                  {order.lines.map((line) => (
+                    <li
+                      key={line.id}
+                      className="flex items-center justify-between gap-4 px-4 py-3 text-sm sm:px-5"
+                    >
+                      <div>
+                        <p className="font-medium">{line.name}</p>
+                        <p className="text-muted-foreground">
+                          {t("orders.line_quantity", { count: line.quantity })}{" "}
+                          · {line.category}
+                        </p>
+                      </div>
+                      <p>{formattedAmount(line.unitPrice, line.currency)}</p>
+                    </li>
+                  ))}
+                </ul>
+
+                <div className="flex items-end justify-between gap-3 sm:flex-col sm:items-end sm:text-right">
                   <p className="text-xs text-muted-foreground">
                     {t("orders.total")}
                   </p>
                   <p className="text-xl font-semibold tracking-tight">
                     {formattedAmount(order.total, order.currency)}
                   </p>
+                  {order.invoiceAvailable && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      disabled={downloadingId === order.id}
+                      onClick={() => downloadInvoice(order.id)}
+                    >
+                      {downloadingId === order.id ? (
+                        <Loader2 className="size-4 animate-spin" />
+                      ) : (
+                        <Download className="size-4" />
+                      )}
+                      {t("orders.invoice")}
+                    </Button>
+                  )}
                 </div>
               </div>
-
-              <ul className="divide-y" aria-label={t("orders.lines")}>
-                {order.lines.map((line) => (
-                  <li
-                    key={line.id}
-                    className="flex items-center justify-between gap-4 px-4 py-3 text-sm sm:px-5"
-                  >
-                    <div>
-                      <p className="font-medium">{line.name}</p>
-                      <p className="text-muted-foreground">
-                        {t("orders.line_quantity", { count: line.quantity })} ·{" "}
-                        {line.category}
-                      </p>
-                    </div>
-                    <p>{formattedAmount(line.unitPrice, line.currency)}</p>
-                  </li>
-                ))}
-              </ul>
-
-              {order.invoiceAvailable && (
-                <div className="border-t bg-muted/20 px-4 py-3 sm:px-5">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    disabled={downloadingId === order.id}
-                    onClick={() => downloadInvoice(order.id)}
-                  >
-                    {downloadingId === order.id ? (
-                      <Loader2 className="size-4 animate-spin" />
-                    ) : (
-                      <Download className="size-4" />
-                    )}
-                    {t("orders.invoice")}
-                  </Button>
-                </div>
-              )}
             </article>
           ))}
         </div>

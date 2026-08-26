@@ -87,4 +87,78 @@ describe("projectOrders", () => {
       },
     ])
   })
+
+  it("sorts valid creation dates newest first while keeping invalid and missing dates stably last", () => {
+    const orders = projectOrders(
+      [
+        {
+          id: "oldest",
+          status: "approved",
+          amount: "10.00",
+          currency: "USD",
+          sales_flow_id: "flow-1",
+          created_at: "2026-01-01T00:00:00Z",
+        },
+        {
+          id: "invalid-first",
+          status: "approved",
+          amount: "10.00",
+          currency: "USD",
+          sales_flow_id: "flow-1",
+          created_at: "not-a-date",
+        },
+        {
+          id: "newest",
+          status: "approved",
+          amount: "10.00",
+          currency: "USD",
+          sales_flow_id: "flow-1",
+          created_at: "2026-08-21T12:00:00Z",
+        },
+        {
+          id: "same-time-first",
+          status: "approved",
+          amount: "10.00",
+          currency: "USD",
+          sales_flow_id: "flow-1",
+          created_at: "2026-03-01T00:00:00Z",
+        },
+        {
+          id: "missing",
+          status: "approved",
+          amount: "10.00",
+          currency: "USD",
+          sales_flow_id: "flow-1",
+          created_at: null,
+        },
+        {
+          id: "same-time-second",
+          status: "approved",
+          amount: "10.00",
+          currency: "USD",
+          sales_flow_id: "flow-1",
+          created_at: "2026-03-01T00:00:00Z",
+        },
+        {
+          id: "invalid-second",
+          status: "approved",
+          amount: "10.00",
+          currency: "USD",
+          sales_flow_id: "flow-1",
+          created_at: "also-not-a-date",
+        },
+      ] as PaymentPublic[],
+      false,
+    )
+
+    expect(orders.map((order) => order.id)).toEqual([
+      "newest",
+      "same-time-first",
+      "same-time-second",
+      "oldest",
+      "invalid-first",
+      "missing",
+      "invalid-second",
+    ])
+  })
 })
