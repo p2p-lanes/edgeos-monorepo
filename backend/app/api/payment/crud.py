@@ -1782,10 +1782,24 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
                 )
                 .exists()
             )
+            application_buyer_match = (
+                select(Applications.id)
+                .join(Humans, Applications.human_id == Humans.id)
+                .where(
+                    Applications.id == Payments.application_id,
+                    or_(
+                        Humans.email.ilike(pattern),
+                        Humans.first_name.ilike(pattern),
+                        Humans.last_name.ilike(pattern),
+                    ),
+                )
+                .exists()
+            )
             statement = statement.where(
                 or_(
                     Payments.external_id.ilike(pattern),
                     attendee_match,
+                    application_buyer_match,
                 )
             )
 

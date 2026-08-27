@@ -77,6 +77,12 @@ class CouponUpdate(BaseModel):
             raise ValueError("discount_value must be between 0 and 100")
         return v
 
+    @field_validator("code")
+    @classmethod
+    def normalize_code(cls, v: str | None) -> str | None:
+        """Coupon codes remain normalized when edited."""
+        return v.strip().upper() if v is not None else None
+
 
 class CouponValidate(BaseModel):
     """Schema for validating a coupon code."""

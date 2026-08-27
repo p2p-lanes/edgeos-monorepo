@@ -97,6 +97,25 @@ async def create_attendee_category(
     return AttendeeCategoryPublic.model_validate(category)
 
 
+@router.get(
+    "/attendee-categories/{category_id}",
+    response_model=AttendeeCategoryPublic,
+)
+async def get_attendee_category(
+    category_id: uuid.UUID,
+    db: TenantSession,
+    _: CurrentUser,
+) -> AttendeeCategoryPublic:
+    """Get one attendee category in the current organization."""
+    category = attendee_categories_crud.get(db, category_id)
+    if not category:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Category not found",
+        )
+    return AttendeeCategoryPublic.model_validate(category)
+
+
 @router.patch(
     "/attendee-categories/{category_id}",
     response_model=AttendeeCategoryPublic,

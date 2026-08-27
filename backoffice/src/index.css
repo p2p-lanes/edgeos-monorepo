@@ -213,3 +213,16 @@
     background-color: var(--ring);
   }
 }
+
+@media (min-width: 1024px) {
+  body[data-ai-panel-open="true"] [data-slot="sidebar-inset"] {
+    margin-right: var(--ai-panel-width);
+    transition: margin-right 200ms ease;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  body[data-ai-panel-open="true"] [data-slot="sidebar-inset"] {
+    transition: none;
+  }
+}
