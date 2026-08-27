@@ -1,4 +1,4 @@
-import type { UIMessage } from "ai"
+import { convertToModelMessages, type UIMessage } from "ai"
 import { beforeEach, describe, expect, it } from "vitest"
 import {
   conversationContextKey,
@@ -81,5 +81,98 @@ describe("assistant conversation store", () => {
         }),
       ]),
     )
+  })
+
+  it("expires prepared files without persisting their plans or arguments", async () => {
+    const messages = [
+      userMessage("user-1", "Export attendee details"),
+      {
+        id: "assistant-1",
+        role: "assistant",
+        parts: [
+          {
+            type: "tool-prepareCustomExport",
+            toolCallId: "export-1",
+            state: "output-available",
+            input: {
+              dataset: "attendees",
+              filters: [
+                {
+                  field: "attendee.email",
+                  operator: "eq",
+                  value: "private@example.com",
+                },
+              ],
+            },
+            output: {
+              title: "Private attendee export",
+              spec: { filename: "private-attendee-export" },
+              fingerprint: "sensitive-fingerprint",
+            },
+          },
+          {
+            type: "tool-executeOperation",
+            toolCallId: "download-1",
+            state: "output-available",
+            input: {
+              operationId: "attendees-export_attendees_csv",
+              arguments: {
+                query: { search: "private-download@example.com" },
+              },
+            },
+            output: {
+              operation: {
+                operationId: "attendees-export_attendees_csv",
+                method: "GET",
+                summary: "Export attendees",
+              },
+              status: 200,
+              download: {
+                filename: "attendees.csv",
+                arguments: {
+                  query: { search: "private-download@example.com" },
+                },
+              },
+            },
+          },
+        ],
+      } as unknown as UIMessage,
+    ]
+
+    saveConversation("tenant:popup", "conversation-1", messages)
+    const restored = loadActiveConversation("tenant:popup")
+    // Re-saving restored history must keep the marker stable rather than
+    // converting it into a generic, permanently loading tool output.
+    if (restored) {
+      saveConversation("tenant:popup", restored.id, restored.messages)
+    }
+
+    const serialized = localStorage.getItem("edgeos-ai-conversations-v1") ?? ""
+    const parts = (loadActiveConversation("tenant:popup")?.messages[1]?.parts ??
+      []) as unknown as Array<Record<string, unknown>>
+
+    expect(serialized).not.toContain("private@example.com")
+    expect(serialized).not.toContain("private-download@example.com")
+    expect(serialized).not.toContain("sensitive-fingerprint")
+    expect(parts[0]).toEqual({
+      type: "data-expired-prepared-file",
+      data: {
+        persistedState: "expired",
+        kind: "custom-export",
+      },
+    })
+    expect(parts[1]).toEqual({
+      type: "data-expired-prepared-file",
+      data: {
+        persistedState: "expired",
+        kind: "download",
+      },
+    })
+
+    const modelMessages = await convertToModelMessages(
+      loadActiveConversation("tenant:popup")?.messages ?? [],
+    )
+    expect(JSON.stringify(modelMessages)).not.toContain("export-1")
+    expect(JSON.stringify(modelMessages)).not.toContain("download-1")
   })
 })

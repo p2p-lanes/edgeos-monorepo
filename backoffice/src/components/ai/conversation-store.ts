@@ -83,6 +83,28 @@ function compactMessages(messages: UIMessage[]) {
       const output = part.output
       if (typeof output !== "object" || output === null) return part
       const record = output as Record<string, unknown>
+      if (part.type === "tool-prepareCustomExport") {
+        return {
+          type: "data-expired-prepared-file",
+          data: {
+            persistedState: "expired",
+            kind: "custom-export",
+          },
+        }
+      }
+      if (
+        part.type === "tool-executeOperation" &&
+        typeof record.download === "object" &&
+        record.download !== null
+      ) {
+        return {
+          type: "data-expired-prepared-file",
+          data: {
+            persistedState: "expired",
+            kind: "download",
+          },
+        }
+      }
       if (part.type === "tool-searchOperations") {
         const count = Array.isArray(record.operations)
           ? record.operations.length

@@ -5,6 +5,7 @@ export type GenericToolPart = {
   toolCallId?: string
   input?: unknown
   output?: unknown
+  data?: unknown
   errorText?: string
   approval?: {
     id: string
@@ -20,6 +21,21 @@ export type ToolRendererProps = {
   onNavigate: () => void
 }
 
+export type ExpiredPreparedFileMarker = {
+  persistedState: "expired"
+  kind: "custom-export" | "download"
+}
+
 export function isObject(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null
+}
+
+export function isExpiredPreparedFileMarker(
+  value: unknown,
+): value is ExpiredPreparedFileMarker {
+  return (
+    isObject(value) &&
+    value.persistedState === "expired" &&
+    (value.kind === "custom-export" || value.kind === "download")
+  )
 }

@@ -68,6 +68,30 @@ describe("AI activity summary", () => {
     expect(screen.getByText("GET · 200")).toBeVisible()
   })
 
+  it("renders restored prepared files as expired cards", () => {
+    const message = {
+      id: "assistant-expired",
+      role: "assistant",
+      parts: [
+        {
+          type: "data-expired-prepared-file",
+          data: { persistedState: "expired", kind: "download" },
+        },
+      ],
+    } as unknown as UIMessage
+
+    render(
+      <MessageParts
+        message={message}
+        onApproval={vi.fn()}
+        onNavigate={vi.fn()}
+      />,
+    )
+
+    expect(screen.getByText("Prepared file expired")).toBeInTheDocument()
+    expect(screen.queryByText("Activity")).not.toBeInTheDocument()
+  })
+
   it("keeps approvals and write results in the main transcript", () => {
     const approval = {
       type: "tool-executeOperation",

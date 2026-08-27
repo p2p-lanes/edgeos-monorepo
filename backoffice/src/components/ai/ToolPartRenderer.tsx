@@ -9,7 +9,8 @@ import { ActivitySummary, isBackgroundToolPart } from "./ActivitySummary"
 import { BusinessResultTool, parseBusinessResults } from "./BusinessResultTool"
 import { CustomExportTool } from "./CustomExportTool"
 import { OperationExecutionTool } from "./OperationExecutionTool"
-import type { GenericToolPart } from "./tool-types"
+import { ExpiredPreparedFileTool } from "./ToolShell"
+import { type GenericToolPart, isExpiredPreparedFileMarker } from "./tool-types"
 
 function AssistantText({ text }: { text: string }) {
   return (
@@ -176,6 +177,17 @@ export function MessageParts({
             <AssistantText
               key={`${message.id}-text-${index}`}
               text={part.text}
+            />
+          )
+        }
+        if (
+          part.type === "data-expired-prepared-file" &&
+          isExpiredPreparedFileMarker(part.data)
+        ) {
+          return (
+            <ExpiredPreparedFileTool
+              key={`${message.id}-expired-file-${index}`}
+              kind={part.data.kind}
             />
           )
         }
