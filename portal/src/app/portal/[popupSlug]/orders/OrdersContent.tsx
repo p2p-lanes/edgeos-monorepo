@@ -101,75 +101,76 @@ export function OrdersContent({
           </p>
         </div>
       ) : (
-        <div className="space-y-4">
+        <div
+          data-testid="orders-ledger"
+          className="divide-y divide-slate-200 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm"
+        >
           {orders.map((order) => (
             <article
               key={order.id}
-              className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm"
+              className="grid gap-4 p-4 sm:grid-cols-[9rem_minmax(0,1fr)_auto] sm:items-start sm:p-5"
             >
-              <div className="grid gap-4 p-4 sm:grid-cols-[minmax(9rem,0.8fr)_minmax(0,1.5fr)_minmax(9rem,0.8fr)] sm:items-center sm:p-5">
-                <div className="space-y-2">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <Badge variant={statusVariant[order.status]}>
-                      {t(`orders.status.${order.status}`)}
+              <div className="space-y-2">
+                <div className="flex flex-wrap items-center gap-2">
+                  <Badge variant={statusVariant[order.status]}>
+                    {t(`orders.status.${order.status}`)}
+                  </Badge>
+                  {order.provenance === "legacy" && (
+                    <Badge variant="outline">
+                      {t("orders.legacy_purchase")}
                     </Badge>
-                    {order.provenance === "legacy" && (
-                      <Badge variant="outline">
-                        {t("orders.legacy_purchase")}
-                      </Badge>
+                  )}
+                </div>
+                {order.createdAt && (
+                  <p className="mt-2 text-sm text-muted-foreground">
+                    {formatDate(order.createdAt)}
+                  </p>
+                )}
+              </div>
+
+              <ul
+                className="divide-y divide-slate-100 border-y border-slate-100"
+                aria-label={t("orders.lines")}
+              >
+                {order.lines.map((line) => (
+                  <li
+                    key={line.id}
+                    className="flex items-center justify-between gap-4 py-3 text-sm first:pt-0 last:pb-0"
+                  >
+                    <div>
+                      <p className="font-medium">{line.name}</p>
+                      <p className="text-muted-foreground">
+                        {t("orders.line_quantity", { count: line.quantity })} ·{" "}
+                        {line.category}
+                      </p>
+                    </div>
+                    <p>{formattedAmount(line.unitPrice, line.currency)}</p>
+                  </li>
+                ))}
+              </ul>
+
+              <div className="flex items-end justify-between gap-3 sm:flex-col sm:items-end sm:text-right">
+                <p className="text-xs text-muted-foreground">
+                  {t("orders.total")}
+                </p>
+                <p className="text-xl font-semibold tracking-tight text-slate-950">
+                  {formattedAmount(order.total, order.currency)}
+                </p>
+                {order.invoiceAvailable && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={downloadingId === order.id}
+                    onClick={() => downloadInvoice(order.id)}
+                  >
+                    {downloadingId === order.id ? (
+                      <Loader2 className="size-4 animate-spin" />
+                    ) : (
+                      <Download className="size-4" />
                     )}
-                  </div>
-                  {order.createdAt && (
-                    <p className="mt-2 text-sm text-muted-foreground">
-                      {formatDate(order.createdAt)}
-                    </p>
-                  )}
-                </div>
-
-                <ul
-                  className="divide-y divide-slate-100 border-y border-slate-100"
-                  aria-label={t("orders.lines")}
-                >
-                  {order.lines.map((line) => (
-                    <li
-                      key={line.id}
-                      className="flex items-center justify-between gap-4 py-3 text-sm first:pt-0 last:pb-0"
-                    >
-                      <div>
-                        <p className="font-medium">{line.name}</p>
-                        <p className="text-muted-foreground">
-                          {t("orders.line_quantity", { count: line.quantity })}{" "}
-                          · {line.category}
-                        </p>
-                      </div>
-                      <p>{formattedAmount(line.unitPrice, line.currency)}</p>
-                    </li>
-                  ))}
-                </ul>
-
-                <div className="flex items-end justify-between gap-3 sm:flex-col sm:items-end sm:text-right">
-                  <p className="text-xs text-muted-foreground">
-                    {t("orders.total")}
-                  </p>
-                  <p className="text-xl font-semibold tracking-tight text-slate-950">
-                    {formattedAmount(order.total, order.currency)}
-                  </p>
-                  {order.invoiceAvailable && (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      disabled={downloadingId === order.id}
-                      onClick={() => downloadInvoice(order.id)}
-                    >
-                      {downloadingId === order.id ? (
-                        <Loader2 className="size-4 animate-spin" />
-                      ) : (
-                        <Download className="size-4" />
-                      )}
-                      {t("orders.invoice")}
-                    </Button>
-                  )}
-                </div>
+                    {t("orders.invoice")}
+                  </Button>
+                )}
               </div>
             </article>
           ))}

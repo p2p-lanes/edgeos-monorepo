@@ -22,6 +22,9 @@
       "slug": "tech-summit-2025",
       "status": "active",
       "allows_coupons": true,
+      "invoice_company_name": "Tech Summit Events LLC",
+      "invoice_company_address": "123 Innovation Way, San Francisco, CA",
+      "invoice_company_email": "billing@techsummit.example",
       "start_date": "2026-06-15T09:00:00Z",
       "end_date": "2026-06-20T18:00:00Z"
     },

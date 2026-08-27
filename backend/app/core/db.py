@@ -109,6 +109,9 @@ def _seed_popups(session: Session, seed_data: dict, tenant_id) -> dict:
                 slug=popup_data["slug"],
                 status=popup_data.get("status", "draft"),
                 allows_coupons=popup_data.get("allows_coupons", False),
+                invoice_company_name=popup_data.get("invoice_company_name"),
+                invoice_company_address=popup_data.get("invoice_company_address"),
+                invoice_company_email=popup_data.get("invoice_company_email"),
                 start_date=(
                     parse_datetime(popup_data["start_date"])
                     if popup_data.get("start_date")
