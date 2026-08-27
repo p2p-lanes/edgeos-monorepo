@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto"
 import { createGoogleGenerativeAI } from "@ai-sdk/google"
 import { createOpenAI } from "@ai-sdk/openai"
 import { serve } from "@hono/node-server"
@@ -29,6 +30,7 @@ import {
 import { SkillRegistry } from "./skills.js"
 import { buildSystemPrompt } from "./system-prompt.js"
 import { createEdgeOSTools } from "./tools.js"
+import { conversationUsageMetadata } from "./usage.js"
 
 const config = loadConfig()
 const contextResolver = new EdgeOSContextResolver(config.backendUrl)
@@ -484,6 +486,7 @@ app.post(
         })
       }
 
+      const usageEventId = randomUUID()
       const result = streamText({
         model,
         system: buildSystemPrompt(
@@ -529,6 +532,15 @@ app.post(
           stream: result.stream,
           tools,
           originalMessages: messages,
+          messageMetadata: ({ part }) =>
+            part.type === "finish"
+              ? conversationUsageMetadata(
+                  usageEventId,
+                  config.provider,
+                  config.model,
+                  part.totalUsage,
+                )
+              : undefined,
           onError: (error) => {
             console.error("AI stream failed", error)
             return "The assistant could not complete this request. Try again."

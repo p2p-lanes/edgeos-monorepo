@@ -150,6 +150,7 @@ export type OperationPreview = {
 const METHODS: HttpMethod[] = ["GET", "POST", "PUT", "PATCH", "DELETE"]
 const EXCLUDED_TAGS = new Set([
   "admin-api-keys",
+  "ai-conversations",
   "ai-executions",
   "api-keys",
   "auth",

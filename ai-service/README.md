@@ -21,7 +21,7 @@ and domain policy remain in FastAPI.
 ## Security model
 
 - The service validates the backoffice JWT with `GET /api/v1/users/me` before
-  using model tokens.
+  using model tokens. Access is limited to superadmins, admins, and operators.
 - It validates the selected organization and active gathering. The active
   gathering is the default operating context; an explicitly requested target
   in the same organization is shown as cross-context rather than silently
@@ -98,5 +98,8 @@ The backoffice proxies `/api/ai/*` to port 3002. The public AI endpoints are
 `POST /api/ai/downloads` used by domain download cards, and authenticated
 `POST /api/ai/custom-exports/download` used by custom CSV/XLSX cards.
 
-Conversation threads and durable run history are not persisted by this service;
-domain state and authorization remain owned by FastAPI.
+FastAPI persists each operator's sanitized conversation threads under tenant
+RLS for 30 days. Prepared files, raw tool results, approval signatures, and
+provider usage payloads are not retained. Normalized token usage and model names
+are stored per completed response. Domain state and authorization remain owned
+by FastAPI.

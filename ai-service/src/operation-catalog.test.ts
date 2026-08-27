@@ -228,6 +228,13 @@ const openapi = {
         responses: { "200": { content: { "application/json": {} } } },
       },
     },
+    "/api/v1/ai-conversations": {
+      get: {
+        operationId: "list_ai_conversations",
+        tags: ["ai-conversations"],
+        responses: { "200": { content: { "application/json": {} } } },
+      },
+    },
   },
 }
 
@@ -265,6 +272,9 @@ describe("EdgeOSOperationCatalog", () => {
       },
     })
     await expect(catalog.get("login")).rejects.toMatchObject({ status: 404 })
+    await expect(catalog.get("list_ai_conversations")).rejects.toMatchObject({
+      status: 404,
+    })
   })
 
   it("prepares and streams declared file downloads without putting bytes in tool output", async () => {
