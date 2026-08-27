@@ -769,16 +769,15 @@ export function AIAssistant() {
         </button>
       )}
       <div className="flex min-h-16 items-center gap-3 border-b px-4">
-        <div className="relative flex size-9 items-center justify-center rounded-lg bg-primary text-primary-foreground">
+        <div className="flex size-9 items-center justify-center rounded-lg bg-primary text-primary-foreground">
           <Sparkles className="size-4" />
-          <span className="absolute -right-0.5 -bottom-0.5 size-2.5 rounded-full border-2 border-background bg-success" />
         </div>
         <div className="min-w-0 flex-1">
           <h2 className="font-display font-semibold tracking-tight">
             EdgeOS Assistant
           </h2>
           <p className="text-[10px] text-muted-foreground">
-            Live workspace · changes require approval
+            Changes require approval
           </p>
         </div>
         <Button

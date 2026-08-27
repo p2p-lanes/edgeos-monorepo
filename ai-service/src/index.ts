@@ -138,16 +138,7 @@ function operationIdFromToolInput(input: unknown) {
   return typeof operationId === "string" ? operationId : undefined
 }
 
-app.get("/health-check", (c) =>
-  c.json({
-    status: "healthy",
-    configured: Boolean(model && config.toolApprovalSecret),
-    provider: config.provider,
-    model: config.model,
-    architecture: "dynamic-operation-broker",
-    autonomy: "supervised",
-  }),
-)
+app.get("/health-check", (c) => c.json({ status: "ok" }))
 
 app.post(
   "/api/ai/feedback",
