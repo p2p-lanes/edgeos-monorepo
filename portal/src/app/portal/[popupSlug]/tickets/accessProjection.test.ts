@@ -64,7 +64,6 @@ describe("projectScannableAccess", () => {
             name: "General Admission",
             checkInCode: "CHECK-IN-1",
             lastScanAt: "2026-08-21T12:00:00Z",
-            category: "General",
             duration: "week",
           },
         ],
@@ -78,7 +77,6 @@ describe("projectScannableAccess", () => {
             name: "Volunteer Access",
             checkInCode: "CHECK-IN-2",
             lastScanAt: null,
-            category: null,
             duration: null,
           },
         ],
@@ -104,5 +102,109 @@ describe("projectScannableAccess", () => {
     ])
 
     expect(access).toEqual([])
+  })
+
+  it("excludes a scannable product nested under a different holder", () => {
+    const access = projectScannableAccess([
+      {
+        id: "holder-1",
+        name: "Alex Morgan",
+        products: [
+          {
+            id: "ticket-alex",
+            attendee_id: "holder-1",
+            product_id: "general-admission",
+            check_in_code: "ALEX-CODE",
+            requires_check_in: true,
+          },
+          {
+            id: "ticket-jamie",
+            attendee_id: "holder-2",
+            product_id: "general-admission",
+            check_in_code: "JAMIE-CODE",
+            requires_check_in: true,
+          },
+        ],
+      } as AttendeeWithOriginPublic,
+    ])
+
+    expect(access).toMatchObject([
+      {
+        holderId: "holder-1",
+        tickets: [{ id: "ticket-alex", checkInCode: "ALEX-CODE" }],
+      },
+    ])
+  })
+
+  it("retains the same product for each of its distinct holders", () => {
+    const access = projectScannableAccess([
+      {
+        id: "holder-1",
+        name: "Alex Morgan",
+        products: [
+          {
+            id: "ticket-alex",
+            attendee_id: "holder-1",
+            product_id: "general-admission",
+            check_in_code: "ALEX-CODE",
+            requires_check_in: true,
+          },
+        ],
+      } as AttendeeWithOriginPublic,
+      {
+        id: "holder-2",
+        name: "Jamie Morgan",
+        products: [
+          {
+            id: "ticket-jamie",
+            attendee_id: "holder-2",
+            product_id: "general-admission",
+            check_in_code: "JAMIE-CODE",
+            requires_check_in: true,
+          },
+        ],
+      } as AttendeeWithOriginPublic,
+    ])
+
+    expect(access).toMatchObject([
+      {
+        holderId: "holder-1",
+        tickets: [{ id: "ticket-alex", checkInCode: "ALEX-CODE" }],
+      },
+      {
+        holderId: "holder-2",
+        tickets: [{ id: "ticket-jamie", checkInCode: "JAMIE-CODE" }],
+      },
+    ])
+  })
+
+  it("retains distinct ticket rows for the same product and holder", () => {
+    const access = projectScannableAccess([
+      {
+        id: "holder-1",
+        name: "Alex Morgan",
+        products: [
+          {
+            id: "ticket-1",
+            attendee_id: "holder-1",
+            product_id: "general-admission",
+            check_in_code: "ALEX-CODE-1",
+            requires_check_in: true,
+          },
+          {
+            id: "ticket-2",
+            attendee_id: "holder-1",
+            product_id: "general-admission",
+            check_in_code: "ALEX-CODE-2",
+            requires_check_in: true,
+          },
+        ],
+      } as AttendeeWithOriginPublic,
+    ])
+
+    expect(access[0]?.tickets).toMatchObject([
+      { id: "ticket-1", checkInCode: "ALEX-CODE-1" },
+      { id: "ticket-2", checkInCode: "ALEX-CODE-2" },
+    ])
   })
 })

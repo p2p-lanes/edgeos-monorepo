@@ -1,11 +1,11 @@
-import { fireEvent, render, screen } from "@testing-library/react"
+import { fireEvent, render, screen, within } from "@testing-library/react"
 import { describe, expect, it, vi } from "vitest"
 import { AccessContent } from "./AccessContent"
 import type { ScannableAccessHolder } from "./accessProjection"
 
 const translations: Record<string, string> = {
   "tickets_access.title": "Tickets & Access",
-  "tickets_access.description": "Your scannable event access.",
+  "tickets_access.description": "Scannable passes grouped by holder.",
   "tickets_access.empty_title": "No tickets yet",
   "tickets_access.empty_description": "Scannable tickets will appear here.",
   "tickets_access.show_code": "Show access code for {{ticket}}",
@@ -13,7 +13,10 @@ const translations: Record<string, string> = {
   "tickets_access.active": "Ready for check-in",
   "tickets_access.code_title": "Access code",
   "tickets_access.code_description": "Use this code to check in.",
-  "tickets_access.details_unavailable": "Pass details unavailable",
+  "tickets_access.duration.day": "Daily event access",
+  "tickets_access.duration.week": "Weekly event access",
+  "tickets_access.duration.month": "Monthly event access",
+  "tickets_access.duration.full": "Full event access",
 }
 
 vi.mock("react-i18next", () => ({
@@ -26,17 +29,19 @@ vi.mock("react-i18next", () => ({
 }))
 
 vi.mock("react-qr-code", () => ({
-  default: () => <svg aria-label="QR code" />,
+  default: ({ size }: { size: number }) => (
+    <svg aria-label="QR code" data-size={size} />
+  ),
 }))
 
 describe("AccessContent", () => {
-  it("shows scan-first ticket metadata under its holder and opens its stable code", () => {
+  it("keeps plain holder headings outside ticket cards with per-holder codes and QR interactions", () => {
     render(
       <AccessContent
         access={
           [
             {
-              holderId: "holder",
+              holderId: "holder-alex",
               holderName: "Alex Morgan",
               tickets: [
                 {
@@ -49,30 +54,80 @@ describe("AccessContent", () => {
                 },
               ],
             },
+            {
+              holderId: "holder-jamie",
+              holderName: "Jamie Morgan",
+              tickets: [
+                {
+                  id: "ticket-jamie",
+                  name: "Volunteer Access",
+                  checkInCode: "CHECK-IN-2",
+                  lastScanAt: null,
+                  category: null,
+                  duration: null,
+                },
+              ],
+            },
           ] as unknown as ScannableAccessHolder[]
         }
       />,
     )
 
-    expect(screen.getByText("Alex Morgan")).toBeTruthy()
+    expect(screen.getByText("Scannable passes grouped by holder.")).toBeTruthy()
+
+    const alexHeading = screen.getByRole("heading", {
+      level: 2,
+      name: "Alex Morgan",
+    })
+    const alexHolder = alexHeading.closest("section")
+    const jamieHeading = screen.getByRole("heading", {
+      level: 2,
+      name: "Jamie Morgan",
+    })
+    const jamieHolder = jamieHeading.closest("section")
+
+    expect(alexHolder?.getAttribute("aria-labelledby")).toBe(alexHeading.id)
+    expect(alexHolder?.querySelector(":scope > h2")).toBe(alexHeading)
+    expect(jamieHolder?.getAttribute("aria-labelledby")).toBe(jamieHeading.id)
+    expect(jamieHolder?.querySelector(":scope > h2")).toBe(jamieHeading)
+    expect(screen.queryByText("AM")).toBeNull()
+    expect(screen.queryByText("JM")).toBeNull()
+    expect(document.querySelector('[data-lucide="users"]')).toBeNull()
+
     expect(screen.getByText("General Admission")).toBeTruthy()
-    expect(screen.getByText("Ready for check-in")).toBeTruthy()
-    expect(screen.getByText("CHECK-IN-1")).toBeTruthy()
-    expect(screen.getByText("General")).toBeTruthy()
-    expect(screen.getByText("week")).toBeTruthy()
-    expect(screen.getAllByLabelText("QR code")).toHaveLength(1)
+    expect(
+      within(alexHolder as HTMLElement).getByText("Ready for check-in"),
+    ).toBeTruthy()
+    expect(
+      within(alexHolder as HTMLElement).getByText("CHECK-IN-1"),
+    ).toBeTruthy()
+    expect(
+      within(jamieHolder as HTMLElement).getByText("CHECK-IN-2"),
+    ).toBeTruthy()
+    expect(
+      within(alexHolder as HTMLElement).getByText("Weekly event access"),
+    ).toBeTruthy()
+    expect(screen.queryByText("General")).toBeNull()
+    expect(screen.queryByText("week")).toBeNull()
+    expect(screen.getAllByLabelText("QR code")).toHaveLength(2)
+    expect(
+      screen.getAllByLabelText("QR code")[0]?.getAttribute("data-size"),
+    ).toBe("96")
 
     fireEvent.click(
       screen.getByRole("button", {
-        name: "Show access code for General Admission",
+        name: "Show access code for Volunteer Access",
       }),
     )
 
-    expect(screen.getAllByText("CHECK-IN-1")).toHaveLength(2)
-    expect(screen.getAllByLabelText("QR code")).toHaveLength(2)
+    expect(screen.getAllByText("CHECK-IN-2")).toHaveLength(2)
+    expect(screen.getAllByLabelText("QR code")).toHaveLength(3)
+    expect(
+      screen.getAllByLabelText("QR code")[2]?.getAttribute("data-size"),
+    ).toBe("200")
   })
 
-  it("uses the localized unavailable fallback without inventing missing pass details", () => {
+  it("omits metadata when no user-facing duration is available", () => {
     render(
       <AccessContent
         access={
@@ -97,7 +152,7 @@ describe("AccessContent", () => {
     )
 
     expect(screen.getByText("Checked in")).toBeTruthy()
-    expect(screen.getByText("Pass details unavailable")).toBeTruthy()
+    expect(screen.queryByText("Pass details unavailable")).toBeNull()
     expect(screen.queryByText("General")).toBeNull()
     expect(screen.queryByText("week")).toBeNull()
     expect(

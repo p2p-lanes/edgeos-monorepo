@@ -5,7 +5,6 @@ export interface ScannableAccessTicket {
   name: string
   checkInCode: string
   lastScanAt: string | null
-  category: string | null
   duration: string | null
 }
 
@@ -20,13 +19,15 @@ export function projectScannableAccess(
 ): ScannableAccessHolder[] {
   return attendees.flatMap((attendee) => {
     const tickets = (attendee.products ?? [])
-      .filter((product) => product.requires_check_in)
+      .filter(
+        (product) =>
+          product.requires_check_in && product.attendee_id === attendee.id,
+      )
       .map((product) => ({
         id: product.id,
         name: product.product_name ?? product.check_in_code,
         checkInCode: product.check_in_code,
         lastScanAt: product.last_scan_at ?? null,
-        category: product.product_category ?? null,
         duration: product.duration_type ?? null,
       }))
 

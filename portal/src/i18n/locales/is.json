@@ -130,7 +130,7 @@
   },
   "tickets_access": {
     "title": "Passar og aðgangur",
-    "description": "Skannanlegur aðgangur þinn að viðburðinum.",
+    "description": "Skannanlegir passar flokkaðir eftir handhafa.",
     "empty_title": "Engir passar enn",
     "empty_description": "Skannanlegir passar birtast hér.",
     "show_code": "Sýna aðgangskóða fyrir {{ticket}}",
@@ -138,7 +138,12 @@
     "active": "Tilbúið fyrir innritun",
     "code_title": "Aðgangskóði",
     "code_description": "Notaðu þennan kóða til að innrita þig.",
-    "details_unavailable": "Upplýsingar um passa eru ekki tiltækar",
+    "duration": {
+      "day": "Daglegur aðgangur að viðburði",
+      "week": "Vikulegur aðgangur að viðburði",
+      "month": "Mánaðarlegur aðgangur að viðburði",
+      "full": "Fullur aðgangur að viðburði"
+    },
     "qr_alt": "QR-kóði"
   },
   "auth": {

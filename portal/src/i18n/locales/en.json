@@ -144,7 +144,7 @@
   },
   "tickets_access": {
     "title": "Tickets & Access",
-    "description": "Your scannable event access.",
+    "description": "Scannable passes grouped by holder.",
     "empty_title": "No tickets yet",
     "empty_description": "Scannable tickets will appear here.",
     "show_code": "Show access code for {{ticket}}",
@@ -152,7 +152,12 @@
     "active": "Ready for check-in",
     "code_title": "Access code",
     "code_description": "Use this code to check in.",
-    "details_unavailable": "Pass details unavailable",
+    "duration": {
+      "day": "Daily event access",
+      "week": "Weekly event access",
+      "month": "Monthly event access",
+      "full": "Full event access"
+    },
     "qr_alt": "QR code"
   },
   "auth": {

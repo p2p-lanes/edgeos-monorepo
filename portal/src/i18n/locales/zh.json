@@ -130,7 +130,7 @@
   },
   "tickets_access": {
     "title": "票券和访问权限",
-    "description": "您的可扫描活动访问权限。",
+    "description": "按持有人分组的可扫描通行证。",
     "empty_title": "暂无票券",
     "empty_description": "可扫描票券将显示在这里。",
     "show_code": "显示 {{ticket}} 的访问代码",
@@ -138,7 +138,12 @@
     "active": "可签到",
     "code_title": "访问代码",
     "code_description": "使用此代码签到。",
-    "details_unavailable": "通行证详情不可用",
+    "duration": {
+      "day": "活动单日通行权限",
+      "week": "活动每周通行权限",
+      "month": "活动每月通行权限",
+      "full": "活动全程通行权限"
+    },
     "qr_alt": "二维码"
   },
   "auth": {

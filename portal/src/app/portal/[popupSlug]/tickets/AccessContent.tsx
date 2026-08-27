@@ -1,6 +1,6 @@
 "use client"
 
-import { CheckCircle2, Ticket, Users } from "lucide-react"
+import { CheckCircle2, Ticket } from "lucide-react"
 import { useState } from "react"
 import { useTranslation } from "react-i18next"
 import QRCodeReact from "react-qr-code"
@@ -18,26 +18,26 @@ import type {
   ScannableAccessTicket,
 } from "./accessProjection"
 
-function TicketMetadata({
-  ticket,
-  unavailableLabel,
-}: {
-  ticket: ScannableAccessTicket
-  unavailableLabel: string
-}) {
-  const metadata = [ticket.category, ticket.duration].filter(
-    (value): value is string => Boolean(value),
-  )
+function TicketDuration({ duration }: { duration: string | null }) {
+  const { t } = useTranslation()
+  const labelKey = (() => {
+    switch (duration) {
+      case "day":
+        return "tickets_access.duration.day"
+      case "week":
+        return "tickets_access.duration.week"
+      case "month":
+        return "tickets_access.duration.month"
+      case "full":
+        return "tickets_access.duration.full"
+      default:
+        return null
+    }
+  })()
 
-  return (
-    <div className="mt-2 flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
-      {metadata.length > 0 ? (
-        metadata.map((value) => <span key={value}>{value}</span>)
-      ) : (
-        <span>{unavailableLabel}</span>
-      )}
-    </div>
-  )
+  return labelKey ? (
+    <p className="mt-1 text-sm text-muted-foreground">{t(labelKey)}</p>
+  ) : null
 }
 
 export function AccessContent({ access }: { access: ScannableAccessHolder[] }) {
@@ -47,7 +47,7 @@ export function AccessContent({ access }: { access: ScannableAccessHolder[] }) {
 
   return (
     <section
-      className="mx-auto max-w-6xl space-y-6 p-4 sm:p-6"
+      className="mx-auto max-w-[1060px] space-y-6 p-4 sm:p-6"
       aria-labelledby="tickets-access-title"
     >
       <div>
@@ -75,79 +75,66 @@ export function AccessContent({ access }: { access: ScannableAccessHolder[] }) {
           </p>
         </div>
       ) : (
-        <div className="space-y-6">
+        <div className="space-y-4">
           {access.map((holder) => (
             <section
               key={holder.holderId}
-              className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm"
-              aria-label={holder.holderName}
+              className="space-y-2"
+              aria-labelledby={`access-holder-${holder.holderId}`}
             >
-              <div className="flex items-center gap-3 border-b border-slate-200 bg-slate-50 px-4 py-3 sm:px-5">
-                <span className="grid size-9 place-items-center rounded-full bg-background text-sm font-semibold text-muted-foreground">
-                  {holder.holderName
-                    .split(" ")
-                    .filter(Boolean)
-                    .slice(0, 2)
-                    .map((part) => part[0])
-                    .join("")
-                    .toUpperCase()}
-                </span>
-                <div>
-                  <Users
-                    className="mb-1 size-3 text-muted-foreground"
-                    aria-hidden="true"
-                  />
-                  <h2 className="font-semibold">{holder.holderName}</h2>
-                </div>
-              </div>
-              <ul className="divide-y">
-                {holder.tickets.map((ticket) => (
-                  <li
-                    key={ticket.id}
-                    className="flex flex-col gap-4 p-4 sm:flex-row sm:items-center sm:p-5"
-                  >
-                    <div className="min-w-0 flex-1">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <Badge
-                          variant={ticket.lastScanAt ? "secondary" : "default"}
-                        >
-                          {ticket.lastScanAt
-                            ? t("tickets_access.checked_in")
-                            : t("tickets_access.active")}
-                        </Badge>
-                        <code className="rounded bg-muted px-2 py-1 text-xs text-muted-foreground">
-                          {ticket.checkInCode}
-                        </code>
-                      </div>
-                      <p className="mt-2 font-medium">{ticket.name}</p>
-                      <TicketMetadata
-                        ticket={ticket}
-                        unavailableLabel={t(
-                          "tickets_access.details_unavailable",
-                        )}
-                      />
-                    </div>
-                    <button
-                      type="button"
-                      className="grid shrink-0 self-start place-items-center rounded-lg border border-slate-200 bg-white p-1.5 text-muted-foreground shadow-sm transition-colors hover:bg-slate-50 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:ml-auto sm:self-auto"
-                      aria-label={t("tickets_access.show_code", {
-                        ticket: ticket.name,
-                      })}
-                      onClick={() => {
-                        trackPortalTelemetry("access_code_opened")
-                        setActiveTicket(ticket)
-                      }}
+              <h2
+                id={`access-holder-${holder.holderId}`}
+                className="text-base font-semibold"
+              >
+                {holder.holderName}
+              </h2>
+              <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+                <ul className="divide-y">
+                  {holder.tickets.map((ticket) => (
+                    <li
+                      key={ticket.id}
+                      className="grid gap-4 p-4 sm:grid-cols-[minmax(0,1fr)_96px] sm:items-center sm:p-5"
                     >
-                      <QRCodeReact
-                        aria-label={t("tickets_access.qr_alt")}
-                        value={JSON.stringify({ code: ticket.checkInCode })}
-                        size={56}
-                        level="H"
-                      />
-                    </button>
-                  </li>
-                ))}
-              </ul>
+                      <div className="min-w-0">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <Badge
+                            variant={
+                              ticket.lastScanAt ? "secondary" : "default"
+                            }
+                          >
+                            {ticket.lastScanAt
+                              ? t("tickets_access.checked_in")
+                              : t("tickets_access.active")}
+                          </Badge>
+                          <code className="rounded bg-muted px-2 py-1 text-xs text-muted-foreground">
+                            {ticket.checkInCode}
+                          </code>
+                        </div>
+                        <p className="mt-2 font-medium">{ticket.name}</p>
+                        <TicketDuration duration={ticket.duration} />
+                      </div>
+                      <button
+                        type="button"
+                        className="grid shrink-0 self-start place-items-center rounded-lg border border-slate-200 bg-white text-muted-foreground shadow-sm transition-colors hover:bg-slate-50 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:ml-auto sm:self-auto"
+                        aria-label={t("tickets_access.show_code", {
+                          ticket: ticket.name,
+                        })}
+                        onClick={() => {
+                          trackPortalTelemetry("access_code_opened")
+                          setActiveTicket(ticket)
+                        }}
+                      >
+                        <QRCodeReact
+                          aria-label={t("tickets_access.qr_alt")}
+                          value={JSON.stringify({ code: ticket.checkInCode })}
+                          size={96}
+                          level="H"
+                        />
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              </div>
             </section>
           ))}
         </div>

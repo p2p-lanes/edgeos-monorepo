@@ -144,7 +144,7 @@
   },
   "tickets_access": {
     "title": "Pases y acceso",
-    "description": "Tu acceso escaneable al evento.",
+    "description": "Pases escaneables agrupados por titular.",
     "empty_title": "Aún no hay pases",
     "empty_description": "Los pases escaneables aparecerán aquí.",
     "show_code": "Mostrar código de acceso para {{ticket}}",
@@ -152,7 +152,12 @@
     "active": "Listo para registrarse",
     "code_title": "Código de acceso",
     "code_description": "Usa este código para registrarte.",
-    "details_unavailable": "Detalles del pase no disponibles",
+    "duration": {
+      "day": "Acceso diario al evento",
+      "week": "Acceso semanal al evento",
+      "month": "Acceso mensual al evento",
+      "full": "Acceso completo al evento"
+    },
     "qr_alt": "Código QR"
   },
   "auth": {
