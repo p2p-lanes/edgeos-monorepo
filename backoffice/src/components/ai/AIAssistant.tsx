@@ -33,6 +33,7 @@ import {
 import { createPortal } from "react-dom"
 import { toast } from "sonner"
 import { PopupsService, TenantsService } from "@/client"
+import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
@@ -851,11 +852,16 @@ export function AIAssistant() {
           <Sparkles className="size-4" />
         </div>
         <div className="min-w-0 flex-1">
-          <h2 className="font-display font-semibold tracking-tight">
-            EdgeOS Assistant
-          </h2>
+          <div className="flex items-center gap-2">
+            <h2 className="font-display font-semibold tracking-tight">
+              EdgeOS Assistant
+            </h2>
+            <Badge variant="secondary" className="px-1.5 py-0 text-[9px]">
+              Beta
+            </Badge>
+          </div>
           <p className="text-[10px] text-muted-foreground">
-            Changes require approval
+            AI can make mistakes. Review important information.
           </p>
         </div>
         <Button
