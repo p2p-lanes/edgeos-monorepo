@@ -19,6 +19,7 @@ import {
   Plus,
   ShieldCheck,
   Sparkles,
+  Trash2,
   X,
 } from "lucide-react"
 import {
@@ -55,10 +56,12 @@ import useAuth from "@/hooks/useAuth"
 import { cn } from "@/lib/utils"
 import { assistantContextForPath } from "./assistant-context"
 import {
+  activeConversationId,
+  clearLegacyConversationStorage,
   conversationContextKey,
   createConversationId,
-  loadActiveConversation,
   loadConversations,
+  removeConversation,
   type StoredConversation,
   saveConversation,
   setActiveConversation,
@@ -69,6 +72,7 @@ const MIN_PANEL_WIDTH = 360
 const MAX_PANEL_WIDTH = 680
 const DEFAULT_PANEL_WIDTH = 480
 const PANEL_WIDTH_KEY = "edgeos-ai-panel-width"
+const EMPTY_CONVERSATIONS: StoredConversation[] = []
 
 type AssistantChat = ReturnType<typeof useChat>
 
@@ -413,7 +417,7 @@ function ConversationChat({
   placeholder: string
   onNavigate: () => void
   onRequestNew: () => void
-  onPersist: (conversations: StoredConversation[]) => void
+  onPersist: (conversation: StoredConversation) => void
   onMessageStateChange: (hasMessages: boolean) => void
 }) {
   const transport = useMemo(
@@ -440,12 +444,28 @@ function ConversationChat({
   })
 
   useEffect(() => {
-    if (!chat.messages.length) return
+    if (
+      !chat.messages.length ||
+      chat.status === "submitted" ||
+      chat.status === "streaming"
+    ) {
+      return
+    }
+    let cancelled = false
     const timer = window.setTimeout(() => {
-      onPersist(saveConversation(contextKey, conversationId, chat.messages))
+      saveConversation(effectiveTenantId, conversationId, chat.messages)
+        .then((conversation) => {
+          if (!cancelled && conversation) onPersist(conversation)
+        })
+        .catch(() => {
+          if (!cancelled) toast.error("Could not save this conversation")
+        })
     }, 400)
-    return () => window.clearTimeout(timer)
-  }, [chat.messages, contextKey, conversationId, onPersist])
+    return () => {
+      cancelled = true
+      window.clearTimeout(timer)
+    }
+  }, [chat.messages, chat.status, conversationId, effectiveTenantId, onPersist])
 
   return (
     <AssistantSession
@@ -479,19 +499,33 @@ function ConversationWorkspace({
   placeholder: string
   onNavigate: () => void
 }) {
-  const active = useMemo(() => loadActiveConversation(contextKey), [contextKey])
-  const [session, setSession] = useState(() => ({
-    id: active?.id ?? createConversationId(),
-    initialMessages: active?.messages ?? [],
-  }))
-  const conversationId = session.id
-  const [conversations, setConversations] = useState(() =>
-    loadConversations(contextKey),
-  )
-  const [hasMessages, setHasMessages] = useState(
-    Boolean(active?.messages.length),
-  )
+  const { data: loadedConversations = EMPTY_CONVERSATIONS, isLoading } =
+    useQuery({
+      queryKey: ["ai-conversations", contextKey],
+      queryFn: () => loadConversations(effectiveTenantId),
+      enabled: Boolean(effectiveTenantId),
+    })
+  const initialized = useRef(false)
+  const [session, setSession] = useState<{
+    id: string
+    initialMessages: UIMessage[]
+  } | null>(null)
+  const [conversations, setConversations] = useState<StoredConversation[]>([])
+  const [hasMessages, setHasMessages] = useState(false)
   const [confirmNewOpen, setConfirmNewOpen] = useState(false)
+
+  useEffect(() => {
+    setConversations(loadedConversations)
+    if (isLoading || initialized.current) return
+    initialized.current = true
+    const activeId = activeConversationId(contextKey)
+    const active = loadedConversations.find((item) => item.id === activeId)
+    const next = active ?? loadedConversations[0]
+    const id = next?.id ?? createConversationId()
+    setActiveConversation(contextKey, id)
+    setHasMessages(Boolean(next?.messages.length))
+    setSession({ id, initialMessages: next?.messages ?? [] })
+  }, [contextKey, isLoading, loadedConversations])
 
   const startNewConversation = () => {
     const id = createConversationId()
@@ -515,13 +549,50 @@ function ConversationWorkspace({
     setHasMessages(Boolean(conversation.messages.length))
   }
 
+  const persistConversation = (conversation: StoredConversation) => {
+    setActiveConversation(contextKey, conversation.id)
+    setConversations((current) =>
+      [conversation, ...current.filter((item) => item.id !== conversation.id)]
+        .sort((left, right) => right.updatedAt.localeCompare(left.updatedAt))
+        .slice(0, 8),
+    )
+  }
+
+  const deleteCurrentConversation = async () => {
+    if (!session) return
+    const current = conversations.find((item) => item.id === session.id)
+    if (!current) return
+    try {
+      await removeConversation(effectiveTenantId, current.id)
+      const remaining = conversations.filter((item) => item.id !== current.id)
+      setConversations(remaining)
+      const next = remaining[0]
+      if (next) openConversation(next)
+      else startNewConversation()
+      toast.success("Conversation deleted")
+    } catch {
+      toast.error("Could not delete this conversation")
+    }
+  }
+
+  if (!session || isLoading) {
+    return (
+      <div className="flex flex-1 items-center justify-center text-muted-foreground">
+        <Loader2 className="size-5 animate-spin" />
+      </div>
+    )
+  }
+
+  const conversationId = session.id
+  const currentSaved = conversations.some((item) => item.id === conversationId)
+
   return (
     <>
       <div className="flex min-h-11 items-center gap-2 border-b bg-muted/20 px-4">
         <div className="min-w-0 flex-1">
           <p className="truncate text-xs font-medium">{contextLabel}</p>
           <p className="text-[10px] text-muted-foreground">
-            Conversation saved in this workspace
+            Conversation saved to your account
           </p>
         </div>
         <DropdownMenu>
@@ -568,6 +639,14 @@ function ConversationWorkspace({
             <DropdownMenuItem onSelect={requestNewConversation}>
               <Plus /> New conversation
             </DropdownMenuItem>
+            {currentSaved && (
+              <DropdownMenuItem
+                variant="destructive"
+                onSelect={() => void deleteCurrentConversation()}
+              >
+                <Trash2 /> Delete current conversation
+              </DropdownMenuItem>
+            )}
           </DropdownMenuContent>
         </DropdownMenu>
         <Button
@@ -593,7 +672,7 @@ function ConversationWorkspace({
         placeholder={placeholder}
         onNavigate={onNavigate}
         onRequestNew={requestNewConversation}
-        onPersist={setConversations}
+        onPersist={persistConversation}
         onMessageStateChange={setHasMessages}
       />
 
@@ -602,8 +681,8 @@ function ConversationWorkspace({
           <DialogHeader>
             <DialogTitle>Start a new conversation?</DialogTitle>
             <DialogDescription>
-              This conversation is already saved in {contextLabel}. You can
-              reopen it later from history.
+              This conversation is already saved to your account. You can reopen
+              it later from history.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
@@ -631,14 +710,9 @@ export function AIAssistant() {
   const { isSuperadmin, user } = useAuth()
   const { selectedPopupId, selectedTenantId, effectiveTenantId } =
     useWorkspace()
-  // Conversation history may contain PII or financial summaries. Scope it to
-  // the authenticated user as well as the workspace so another user signing
-  // into the same browser can never inherit the previous user's thread.
-  const contextKey = conversationContextKey(
-    user?.id,
-    effectiveTenantId,
-    selectedPopupId,
-  )
+  // Conversation history belongs to one user and organization. The active
+  // gathering remains request context and is intentionally not persisted.
+  const contextKey = conversationContextKey(user?.id, effectiveTenantId)
   const pageContext = assistantContextForPath(pathname)
 
   const { data: tenants } = useQuery({
@@ -660,6 +734,10 @@ export function AIAssistant() {
   const contextLabel = [tenantName, popupName, pageContext.pageLabel]
     .filter(Boolean)
     .join(" › ")
+
+  useEffect(() => {
+    clearLegacyConversationStorage()
+  }, [])
 
   useEffect(() => {
     if (wasOpen.current && !open) {

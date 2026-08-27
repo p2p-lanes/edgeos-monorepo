@@ -91,6 +91,36 @@ export type AdminGrantTicketsResponse = {
     granted: Array<GrantedPaymentInfo>;
 };
 
+export type AIConversationPublic = {
+    id: string;
+    title: string;
+    messages: Array<{
+        [key: string]: unknown;
+    }>;
+    schema_version: number;
+    revision: number;
+    created_at: string;
+    updated_at: string;
+    expires_at: string;
+    usage?: AIConversationUsageSummary;
+};
+
+export type AIConversationUpsert = {
+    messages: Array<{
+        [key: string]: unknown;
+    }>;
+};
+
+export type AIConversationUsageSummary = {
+    input_tokens?: number;
+    cached_input_tokens?: number;
+    output_tokens?: number;
+    reasoning_tokens?: number;
+    models?: Array<(string)>;
+    providers?: Array<(string)>;
+    response_count?: number;
+};
+
 export type AIExecutionClaimRequest = {
     fingerprint: string;
 };
@@ -5005,6 +5035,34 @@ export type AdminApiKeysRevokeAdminApiKeyData = {
 };
 
 export type AdminApiKeysRevokeAdminApiKeyResponse = (void);
+
+export type AiConversationsListAiConversationsData = {
+    xTenantId?: (string | null);
+};
+
+export type AiConversationsListAiConversationsResponse = (Array<AIConversationPublic>);
+
+export type AiConversationsGetAiConversationData = {
+    conversationId: string;
+    xTenantId?: (string | null);
+};
+
+export type AiConversationsGetAiConversationResponse = (AIConversationPublic);
+
+export type AiConversationsUpsertAiConversationData = {
+    conversationId: string;
+    requestBody: AIConversationUpsert;
+    xTenantId?: (string | null);
+};
+
+export type AiConversationsUpsertAiConversationResponse = (AIConversationPublic);
+
+export type AiConversationsDeleteAiConversationData = {
+    conversationId: string;
+    xTenantId?: (string | null);
+};
+
+export type AiConversationsDeleteAiConversationResponse = (void);
 
 export type AiExecutionsClaimAiExecutionData = {
     requestBody: AIExecutionClaimRequest;

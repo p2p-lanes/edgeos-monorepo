@@ -1,67 +1,59 @@
 import type { UIMessage } from "ai"
+import {
+  type AIConversationPublic,
+  type AIConversationUsageSummary,
+  AiConversationsService,
+} from "@/client"
 
 export type StoredConversation = {
   id: string
   title: string
   updatedAt: string
+  expiresAt: string
+  revision: number
   messages: UIMessage[]
+  usage: AIConversationUsageSummary
 }
 
-type ContextConversations = {
-  activeId?: string
-  conversations: StoredConversation[]
-}
-
-type ConversationStore = Record<string, ContextConversations>
-
-const STORAGE_KEY = "edgeos-ai-conversations-v1"
-const MAX_CONVERSATIONS = 8
+const ACTIVE_STORAGE_KEY = "edgeos-ai-active-conversation-v1"
+const LEGACY_STORAGE_KEY = "edgeos-ai-conversations-v1"
 const MAX_MESSAGES = 40
 
-export function conversationContextKey(
-  userId: string | undefined,
-  tenantId: string | null,
-  popupId: string | null,
-) {
-  return `${userId ?? "loading"}:${tenantId ?? "none"}:${popupId ?? "none"}`
-}
+type ActiveConversationStore = Record<string, string>
 
-function readStore(): ConversationStore {
+function activeStore(): ActiveConversationStore {
   if (typeof window === "undefined") return {}
   try {
-    const value = JSON.parse(localStorage.getItem(STORAGE_KEY) ?? "{}")
+    const value = JSON.parse(localStorage.getItem(ACTIVE_STORAGE_KEY) ?? "{}")
     return typeof value === "object" && value !== null
-      ? (value as ConversationStore)
+      ? (value as ActiveConversationStore)
       : {}
   } catch {
     return {}
   }
 }
 
-function writeStore(store: ConversationStore) {
+export function conversationContextKey(
+  userId: string | undefined,
+  tenantId: string | null,
+) {
+  return `${userId ?? "loading"}:${tenantId ?? "none"}`
+}
+
+export function activeConversationId(contextKey: string) {
+  return activeStore()[contextKey]
+}
+
+export function setActiveConversation(contextKey: string, id: string) {
   if (typeof window === "undefined") return
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(store))
-  } catch {
-    // Conversations are a convenience cache. A full storage quota must never
-    // interrupt the active chat.
-  }
+  const store = activeStore()
+  store[contextKey] = id
+  localStorage.setItem(ACTIVE_STORAGE_KEY, JSON.stringify(store))
 }
 
-function messageText(message: UIMessage) {
-  return message.parts
-    .filter((part) => part.type === "text")
-    .map((part) => part.text)
-    .join(" ")
-    .trim()
-}
-
-function titleFor(messages: UIMessage[]) {
-  const firstUserMessage = messages.find((message) => message.role === "user")
-  const text = firstUserMessage
-    ? messageText(firstUserMessage)
-    : "New conversation"
-  return text.length > 58 ? `${text.slice(0, 57).trim()}…` : text
+export function clearLegacyConversationStorage() {
+  if (typeof window === "undefined") return
+  localStorage.removeItem(LEGACY_STORAGE_KEY)
 }
 
 function compactMessages(messages: UIMessage[]) {
@@ -69,13 +61,18 @@ function compactMessages(messages: UIMessage[]) {
     ...message,
     parts: message.parts.map((part) => {
       if (!part.type.startsWith("tool-")) return part
-      if ("state" in part && part.state === "approval-requested") {
+      if (
+        "state" in part &&
+        (part.state === "approval-requested" ||
+          part.state === "approval-responded")
+      ) {
         return {
           ...part,
           state: "output-denied",
           approval: {
             ...part.approval,
             approved: false,
+            signature: undefined,
           },
         }
       }
@@ -130,64 +127,54 @@ function compactMessages(messages: UIMessage[]) {
   })) as UIMessage[]
 }
 
+function storedConversation(value: AIConversationPublic): StoredConversation {
+  return {
+    id: value.id,
+    title: value.title,
+    updatedAt: value.updated_at,
+    expiresAt: value.expires_at,
+    revision: value.revision,
+    messages: value.messages as unknown as UIMessage[],
+    usage: value.usage ?? {},
+  }
+}
+
 export function createConversationId() {
-  return `conversation-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+  return crypto.randomUUID()
 }
 
-export function loadConversations(contextKey: string) {
-  return readStore()[contextKey]?.conversations ?? []
+export async function loadConversations(tenantId: string | null) {
+  if (!tenantId) return []
+  const conversations = await AiConversationsService.listAiConversations({
+    xTenantId: tenantId,
+  })
+  return conversations.map(storedConversation)
 }
 
-export function loadActiveConversation(contextKey: string) {
-  const context = readStore()[contextKey]
-  if (!context) return undefined
-  return (
-    context.conversations.find((item) => item.id === context.activeId) ??
-    context.conversations[0]
-  )
-}
-
-export function setActiveConversation(contextKey: string, id: string) {
-  const store = readStore()
-  const context = store[contextKey] ?? { conversations: [] }
-  store[contextKey] = { ...context, activeId: id }
-  writeStore(store)
-}
-
-export function saveConversation(
-  contextKey: string,
+export async function saveConversation(
+  tenantId: string | null,
   id: string,
   messages: UIMessage[],
 ) {
-  if (!messages.length) return loadConversations(contextKey)
-  const store = readStore()
-  const context = store[contextKey] ?? { conversations: [] }
-  const conversation: StoredConversation = {
-    id,
-    title: titleFor(messages),
-    updatedAt: new Date().toISOString(),
-    messages: compactMessages(messages),
-  }
-  const conversations = [
-    conversation,
-    ...context.conversations.filter((item) => item.id !== id),
-  ]
-    .sort((left, right) => right.updatedAt.localeCompare(left.updatedAt))
-    .slice(0, MAX_CONVERSATIONS)
-  store[contextKey] = { activeId: id, conversations }
-  writeStore(store)
-  return conversations
+  if (!tenantId || !messages.length) return undefined
+  const conversation = await AiConversationsService.upsertAiConversation({
+    conversationId: id,
+    xTenantId: tenantId,
+    requestBody: {
+      messages: compactMessages(messages) as unknown as Array<
+        Record<string, unknown>
+      >,
+    },
+  })
+  return storedConversation(conversation)
 }
 
-export function removeConversation(contextKey: string, id: string) {
-  const store = readStore()
-  const context = store[contextKey]
-  if (!context) return []
-  const conversations = context.conversations.filter((item) => item.id !== id)
-  store[contextKey] = {
-    activeId: context.activeId === id ? conversations[0]?.id : context.activeId,
-    conversations,
-  }
-  writeStore(store)
-  return conversations
+export async function removeConversation(tenantId: string | null, id: string) {
+  if (!tenantId) return
+  await AiConversationsService.deleteAiConversation({
+    conversationId: id,
+    xTenantId: tenantId,
+  })
 }
+
+export { compactMessages }
