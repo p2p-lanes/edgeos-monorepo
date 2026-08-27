@@ -48,7 +48,7 @@ const model =
     : config.geminiApiKey
       ? createGoogleGenerativeAI({ apiKey: config.geminiApiKey })(config.model)
       : null
-const app = new Hono()
+export const app = new Hono()
 
 const MAX_MESSAGES = 100
 const MAX_REQUEST_BYTES = 512_000
