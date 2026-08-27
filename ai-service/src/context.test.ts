@@ -1,5 +1,27 @@
 import { describe, expect, it } from "vitest"
-import { approvalSecretForContext } from "./context.js"
+import { approvalSecretForContext, assertCopilotAccess } from "./context.js"
+
+describe("copilot role access", () => {
+  it.each([
+    "superadmin",
+    "admin",
+    "operator",
+  ] as const)("allows %s users", (role) => {
+    expect(() => assertCopilotAccess(role)).not.toThrow()
+  })
+
+  it.each([
+    "viewer",
+    "check_in_controller",
+  ] as const)("rejects %s users", (role) => {
+    try {
+      assertCopilotAccess(role)
+      expect.unreachable("expected copilot access to be rejected")
+    } catch (error) {
+      expect(error).toMatchObject({ status: 403 })
+    }
+  })
+})
 
 const baseContext = {
   tenantId: "tenant-1",

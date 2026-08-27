@@ -45,6 +45,17 @@ export class EdgeOSApiError extends Error {
   }
 }
 
+const COPILOT_ROLES = new Set<UserRole>(["superadmin", "admin", "operator"])
+
+export function assertCopilotAccess(role: UserRole) {
+  if (!COPILOT_ROLES.has(role)) {
+    throw new EdgeOSApiError(
+      "Operator access is required to use the assistant",
+      403,
+    )
+  }
+}
+
 export async function responseError(
   response: Response,
 ): Promise<EdgeOSApiError> {
@@ -95,6 +106,7 @@ export class EdgeOSContextResolver {
     })
     if (!meResponse.ok) throw await responseError(meResponse)
     const user = (await meResponse.json()) as EdgeOSUser
+    assertCopilotAccess(user.role)
 
     let tenantId = user.tenant_id ?? undefined
     if (user.role === "superadmin") {

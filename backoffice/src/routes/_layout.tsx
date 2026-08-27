@@ -318,6 +318,7 @@ function ShortcutsHint() {
 
 function Layout() {
   const [shortcutsOpen, setShortcutsOpen] = useState(false)
+  const { isOperatorOrAbove } = useAuth()
 
   const toggleShortcutsDialog = () => {
     setShortcutsOpen((prev) => !prev)
@@ -339,7 +340,7 @@ function Layout() {
           <div className="ml-auto flex items-center gap-3">
             <ShortcutsHint />
             <WorkspaceIndicator />
-            <AIAssistant />
+            {isOperatorOrAbove && <AIAssistant />}
           </div>
         </header>
         <div className="flex-1 p-6 md:p-8">
