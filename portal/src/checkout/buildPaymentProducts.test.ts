@@ -381,6 +381,76 @@ describe("X.2 S-PAY-C: pass_system 2 attendees — tickets use per-attendee atte
     expect(ticketALine?.attendee_id).not.toBe("attendee-b")
     expect(ticketBLine?.attendee_id).not.toBe("attendee-a")
   })
+
+  it("prefers attendee-scoped passes over duplicate legacy dynamic items", () => {
+    const spouseTicket = createProduct({
+      id: "spouse-ticket",
+      category: "ticket",
+    })
+    const kidTicket = createProduct({ id: "kid-ticket", category: "ticket" })
+    const main = { ...createAttendee([]), id: "main" }
+    const spouse = { ...createAttendee([spouseTicket]), id: "spouse" }
+    const kid = { ...createAttendee([kidTicket]), id: "kid" }
+
+    const result = buildPaymentProducts({
+      attendeePasses: [main, spouse, kid],
+      selectedPasses: [
+        {
+          productId: spouseTicket.id,
+          product: spouseTicket,
+          attendeeId: spouse.id,
+          attendee: spouse,
+          quantity: 1,
+          price: 100,
+        },
+        {
+          productId: kidTicket.id,
+          product: kidTicket,
+          attendeeId: kid.id,
+          attendee: kid,
+          quantity: 1,
+          price: 100,
+        },
+      ],
+      housing: null,
+      merch: [],
+      patron: null,
+      dynamicItems: {
+        tickets: [
+          {
+            productId: spouseTicket.id,
+            product: spouseTicket,
+            quantity: 1,
+            price: 100,
+            stepType: "tickets",
+          },
+          {
+            productId: kidTicket.id,
+            product: kidTicket,
+            quantity: 1,
+            price: 100,
+            stepType: "tickets",
+          },
+        ],
+      },
+      isEditing: false,
+      appCredit: 0,
+      checkoutMode: CHECKOUT_MODE.PASS_SYSTEM,
+    })
+
+    expect(result.products).toEqual([
+      {
+        product_id: "spouse-ticket",
+        attendee_id: "spouse",
+        quantity: 1,
+      },
+      {
+        product_id: "kid-ticket",
+        attendee_id: "kid",
+        quantity: 1,
+      },
+    ])
+  })
 })
 
 // ---------------------------------------------------------------------------

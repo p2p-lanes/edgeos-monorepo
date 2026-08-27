@@ -148,7 +148,9 @@ export function buildPaymentProducts({
     }
 
     // Add selected passes
+    const selectedPassProductIds = new Set<string>()
     for (const pass of selectedPasses) {
+      selectedPassProductIds.add(pass.productId)
       products.push({
         product_id: pass.productId,
         attendee_id: pass.attendeeId,
@@ -193,7 +195,9 @@ export function buildPaymentProducts({
     // Add dynamic step items
     for (const items of Object.values(dynamicItems)) {
       for (const item of items) {
-        if (item.quantity > 0) {
+        // A restored legacy cart can contain the same ticket in dynamicItems
+        // and selectedPasses. Keep the attendee-scoped representation.
+        if (item.quantity > 0 && !selectedPassProductIds.has(item.productId)) {
           products.push({
             product_id: item.productId,
             attendee_id: firstAttendeeId,
