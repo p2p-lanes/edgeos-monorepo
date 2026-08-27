@@ -3,6 +3,7 @@ from fastapi import APIRouter
 from app.api import (
     access,
     admin_api_key,
+    ai_conversation,
     ai_execution,
     api_key,
     application,
@@ -60,6 +61,7 @@ api_router.include_router(trial.router)
 api_router.include_router(human.router)
 api_router.include_router(api_key.router)
 api_router.include_router(admin_api_key.router)
+api_router.include_router(ai_conversation.router)
 api_router.include_router(ai_execution.router)
 # Discovery endpoints (whoami / docs / openapi.json) MUST register BEFORE the
 # admin CRUD router so the static paths win over the /{id} catch-all on the

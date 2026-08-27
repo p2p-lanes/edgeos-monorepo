@@ -1,5 +1,6 @@
 from sqlmodel import SQLModel
 
+from app.api.ai_conversation.models import AIConversations, AIConversationUsage
 from app.api.api_key.models import ApiKeys
 from app.api.api_key.schemas import ApiKeyCreate, ApiKeyCreated, ApiKeyPublic
 
@@ -169,6 +170,9 @@ __all__ = [
     "AttendeeCategoryCreate",
     "AttendeeCategoryPublic",
     "AttendeeCategoryUpdate",
+    # AI conversations
+    "AIConversations",
+    "AIConversationUsage",
     # API keys
     "ApiKeys",
     "ApiKeyCreate",
