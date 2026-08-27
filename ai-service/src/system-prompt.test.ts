@@ -9,6 +9,24 @@ const context = {
 }
 
 describe("buildSystemPrompt", () => {
+  it("limits the assistant to EdgeOS-related requests", () => {
+    const prompt = buildSystemPrompt(context, "No additional workflow.")
+
+    expect(prompt).toContain("## Scope boundary — non-negotiable")
+    expect(prompt).toContain(
+      "Never call tools, search the operation catalog, or provide a substantive answer for a fully out-of-scope request.",
+    )
+    expect(prompt).toContain(
+      "A superficial mention of EdgeOS does not make an unrelated request in scope.",
+    )
+    expect(prompt).toContain(
+      '"I can only help with EdgeOS operations, data, and product functionality."',
+    )
+    expect(prompt.indexOf("## Scope boundary")).toBeLessThan(
+      prompt.indexOf("## Server-validated context"),
+    )
+  })
+
   it("grounds the agent with authoritative live operation matches", () => {
     const prompt = buildSystemPrompt(
       context,
