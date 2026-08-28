@@ -67,11 +67,13 @@ import {
   saveConversation,
   setActiveConversation,
 } from "./conversation-store"
+import {
+  clampAssistantPanelWidth,
+  DEFAULT_PANEL_WIDTH,
+  storedAssistantPanelWidth,
+} from "./panel-width"
 import { MessageParts } from "./ToolPartRenderer"
 
-const MIN_PANEL_WIDTH = 360
-const MAX_PANEL_WIDTH = 680
-const DEFAULT_PANEL_WIDTH = 480
 const PANEL_WIDTH_KEY = "edgeos-ai-panel-width"
 const EMPTY_CONVERSATIONS: StoredConversation[] = []
 
@@ -81,11 +83,11 @@ function useDesktopPanel() {
   const [desktop, setDesktop] = useState(() =>
     typeof window === "undefined"
       ? true
-      : window.matchMedia("(min-width: 1024px)").matches,
+      : window.matchMedia("(min-width: 1280px)").matches,
   )
 
   useEffect(() => {
-    const query = window.matchMedia("(min-width: 1024px)")
+    const query = window.matchMedia("(min-width: 1280px)")
     const update = () => setDesktop(query.matches)
     update()
     query.addEventListener("change", update)
@@ -97,10 +99,21 @@ function useDesktopPanel() {
 
 function safePanelWidth() {
   if (typeof window === "undefined") return DEFAULT_PANEL_WIDTH
-  const stored = Number(localStorage.getItem(PANEL_WIDTH_KEY))
-  return Number.isFinite(stored)
-    ? Math.min(MAX_PANEL_WIDTH, Math.max(MIN_PANEL_WIDTH, stored))
-    : DEFAULT_PANEL_WIDTH
+  return storedAssistantPanelWidth(localStorage.getItem(PANEL_WIDTH_KEY))
+}
+
+function applicationLeftEdge() {
+  const inset = document.querySelector<HTMLElement>(
+    '[data-slot="sidebar-inset"]',
+  )
+  return inset?.getBoundingClientRect().left ?? 0
+}
+
+function clampPanelWidthForCurrentLayout(width: number) {
+  return clampAssistantPanelWidth(width, {
+    viewportWidth: window.innerWidth,
+    applicationLeft: applicationLeftEdge(),
+  })
 }
 
 function formatConversationTime(value: string) {
@@ -701,6 +714,7 @@ function ConversationWorkspace({
 export function AIAssistant() {
   const [open, setOpen] = useState(false)
   const [panelWidth, setPanelWidth] = useState(safePanelWidth)
+  const preferredPanelWidth = useRef(panelWidth)
   const desktop = useDesktopPanel()
   const previousContext = useRef<string | null>(null)
   const wasOpen = useRef(false)
@@ -779,6 +793,33 @@ export function AIAssistant() {
   }, [desktop, open, panelWidth])
 
   useEffect(() => {
+    if (!desktop || !open) return
+
+    const keepApplicationUsable = () => {
+      setPanelWidth(
+        clampPanelWidthForCurrentLayout(preferredPanelWidth.current),
+      )
+    }
+
+    keepApplicationUsable()
+    window.addEventListener("resize", keepApplicationUsable)
+
+    const sidebarGap = document.querySelector<HTMLElement>(
+      '[data-slot="sidebar-gap"]',
+    )
+    const resizeObserver =
+      typeof ResizeObserver === "undefined"
+        ? null
+        : new ResizeObserver(keepApplicationUsable)
+    if (sidebarGap) resizeObserver?.observe(sidebarGap)
+
+    return () => {
+      window.removeEventListener("resize", keepApplicationUsable)
+      resizeObserver?.disconnect()
+    }
+  }, [desktop, open])
+
+  useEffect(() => {
     if (!open) return
     const closeOnEscape = (event: globalThis.KeyboardEvent) => {
       if (event.key === "Escape") setOpen(false)
@@ -793,14 +834,13 @@ export function AIAssistant() {
     const startWidth = panelWidth
     let latestWidth = startWidth
     const move = (moveEvent: PointerEvent) => {
-      const maximum = Math.min(MAX_PANEL_WIDTH, window.innerWidth - 320)
-      latestWidth = Math.min(
-        maximum,
-        Math.max(MIN_PANEL_WIDTH, startWidth + startX - moveEvent.clientX),
+      latestWidth = clampPanelWidthForCurrentLayout(
+        startWidth + startX - moveEvent.clientX,
       )
       setPanelWidth(latestWidth)
     }
     const finish = () => {
+      preferredPanelWidth.current = latestWidth
       localStorage.setItem(PANEL_WIDTH_KEY, String(latestWidth))
       window.removeEventListener("pointermove", move)
       window.removeEventListener("pointerup", finish)
@@ -815,10 +855,8 @@ export function AIAssistant() {
     if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return
     event.preventDefault()
     const delta = event.key === "ArrowLeft" ? 24 : -24
-    const next = Math.min(
-      MAX_PANEL_WIDTH,
-      Math.max(MIN_PANEL_WIDTH, panelWidth + delta),
-    )
+    const next = clampPanelWidthForCurrentLayout(panelWidth + delta)
+    preferredPanelWidth.current = next
     setPanelWidth(next)
     localStorage.setItem(PANEL_WIDTH_KEY, String(next))
   }

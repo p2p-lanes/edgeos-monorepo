@@ -214,7 +214,7 @@
   }
 }
 
-@media (min-width: 1024px) {
+@media (min-width: 1280px) {
   body[data-ai-panel-open="true"] [data-slot="sidebar-inset"] {
     margin-right: var(--ai-panel-width);
     transition: margin-right 200ms ease;
