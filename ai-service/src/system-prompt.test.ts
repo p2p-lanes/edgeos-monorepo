@@ -27,6 +27,12 @@ describe("buildSystemPrompt", () => {
     )
   })
 
+  it("instructs the assistant not to use em dashes in responses", () => {
+    const prompt = buildSystemPrompt(context, "No additional workflow.")
+
+    expect(prompt).toContain("Do not use em dashes in responses.")
+  })
+
   it("grounds the agent with authoritative live operation matches", () => {
     const prompt = buildSystemPrompt(
       context,
