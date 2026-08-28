@@ -23,8 +23,8 @@ export interface ExecutionStore {
 }
 
 /**
- * Backend-owned Redis storage makes approved writes safe across service
- * replicas and restarts. Redis unavailability fails writes closed in FastAPI.
+ * Backend-owned durable storage makes approved writes safe across service
+ * replicas and restarts. Store unavailability fails writes closed in FastAPI.
  */
 export class BackendExecutionStore implements ExecutionStore {
   constructor(private readonly baseUrl: string) {}

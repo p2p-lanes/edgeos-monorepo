@@ -38,10 +38,10 @@ and domain policy remain in FastAPI.
   records, summarize impact, and keep raw arguments behind technical details.
 - Approved write inputs are tied to their tool-call ID and to the current user,
   organization, and active gathering. FastAPI atomically claims each write in
-  Redis before execution and stores its sanitized result afterward, preventing
-  duplicate execution across AI service replicas and restarts. If Redis or the
-  final result store is unavailable, writes fail closed and require state
-  verification instead of an automatic retry.
+  PostgreSQL before execution and stores its sanitized result afterward,
+  preventing duplicate execution across AI service replicas and restarts. If
+  the durable execution store is unavailable, writes fail closed and require
+  state verification instead of an automatic retry.
 - Write targets must resolve to exactly one gathering. Cross-context proposals
   identify both the active and affected gatherings; unresolved or mixed-scope
   writes fail closed. Read results identify their actual gathering context.
@@ -73,7 +73,6 @@ operation discovery. Skills teach domain workflows; they never grant permissions
 | `GEMINI_API_KEY` | When using Google | — |
 | `TOOL_APPROVAL_SECRET` | To use chat | — |
 | `BACKEND_URL` | No | `http://localhost:8000` |
-| `REDIS_URL` | For durable writes (configured by FastAPI) | `redis://redis:6379` locally |
 | `AI_MODEL` | No | `gpt-5.6-terra` or `gemini-2.5-flash` |
 | `PORT` | No | `3002` |
 

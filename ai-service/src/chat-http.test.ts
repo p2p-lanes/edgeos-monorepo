@@ -279,7 +279,7 @@ type DurableExecution = {
 }
 
 describe("supervised operation HTTP flow", () => {
-  let redisAvailable: boolean
+  let executionStoreAvailable: boolean
   let mutationCount: number
   let claimCount: number
   let completeCount: number
@@ -289,7 +289,7 @@ describe("supervised operation HTTP flow", () => {
     vi.spyOn(console, "error").mockImplementation(() => undefined)
     vi.spyOn(console, "info").mockImplementation(() => undefined)
     modelState.proposalCount = 0
-    redisAvailable = true
+    executionStoreAvailable = true
     mutationCount = 0
     claimCount = 0
     completeCount = 0
@@ -316,7 +316,7 @@ describe("supervised operation HTTP flow", () => {
         }
         if (url.includes("/api/v1/ai-executions/") && url.endsWith("/claim")) {
           claimCount += 1
-          if (!redisAvailable) {
+          if (!executionStoreAvailable) {
             return jsonResponse(
               { detail: "Durable AI write protection is unavailable" },
               503,
@@ -421,7 +421,7 @@ describe("supervised operation HTTP flow", () => {
     expect(claimCount).toBe(1)
   })
 
-  it("rejects a signature from another context and fails closed without Redis", async () => {
+  it("rejects a signature from another context and fails closed without the execution store", async () => {
     const firstUser = userMessage("user-signature")
     const proposal = await readAssistantMessage(await postChat([firstUser]))
     const approved = answerApproval(proposal, true)
@@ -450,11 +450,11 @@ describe("supervised operation HTTP flow", () => {
     expect(mutationCount).toBe(0)
     expect(claimCount).toBe(0)
 
-    const secondUser = userMessage("user-redis")
+    const secondUser = userMessage("user-store")
     const secondProposal = await readAssistantMessage(
       await postChat([secondUser]),
     )
-    redisAvailable = false
+    executionStoreAvailable = false
     const unavailableApproval = answerApproval(secondProposal, true)
     const unavailable = await readAssistantMessage(
       await postChat([secondUser, unavailableApproval]),
