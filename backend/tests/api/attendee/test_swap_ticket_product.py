@@ -16,6 +16,7 @@ from sqlmodel import Session, func, select
 from app.api.attendee import crud as attendee_crud
 from app.api.attendee.models import AttendeeProducts, Attendees
 from app.api.human.models import Humans
+from app.api.payment.models import Payments
 from app.api.popup.models import Popups
 from app.api.product.models import Products
 from app.api.tenant.models import Tenants
@@ -31,6 +32,7 @@ def _make_product(
     popup: Popups,
     *,
     stock: int | None = None,
+    fulfillment_type: str | None = "access",
 ) -> Products:
     product = Products(
         id=uuid.uuid4(),
@@ -40,6 +42,7 @@ def _make_product(
         slug=f"swap-prod-{uuid.uuid4().hex[:6]}",
         price=Decimal("10"),
         category="ticket",
+        fulfillment_type=fulfillment_type,
         total_stock_cap=stock,
         total_stock_remaining=stock,
     )
@@ -80,6 +83,8 @@ def _make_ticket(
     tenant: Tenants,
     attendee: Attendees,
     product: Products,
+    *,
+    fulfillment_type: str | None = "access",
 ) -> AttendeeProducts:
     ticket = AttendeeProducts(
         id=uuid.uuid4(),
@@ -87,6 +92,7 @@ def _make_ticket(
         attendee_id=attendee.id,
         product_id=product.id,
         check_in_code=f"SW{uuid.uuid4().hex[:6].upper()}",
+        fulfillment_type=fulfillment_type,
     )
     db.add(ticket)
     db.commit()
@@ -121,6 +127,62 @@ class TestSwapTicketProduct:
 
         assert updated.product_id == new_product.id
         assert updated.check_in_code == original_code
+        assert updated.fulfillment_type == "access"
+
+    def test_swap_classifies_a_legacy_holding_from_the_new_product(
+        self,
+        db: Session,
+        tenant_a: Tenants,
+        popup_tenant_a: Popups,
+    ) -> None:
+        old_product = _make_product(db, tenant_a, popup_tenant_a)
+        new_product = _make_product(db, tenant_a, popup_tenant_a)
+        attendee = _make_attendee(db, tenant_a, popup_tenant_a)
+        ticket = _make_ticket(
+            db, tenant_a, attendee, old_product, fulfillment_type=None
+        )
+
+        updated = attendee_crud.attendees_crud.swap_ticket_product(
+            db, attendee.id, ticket.id, new_product.id
+        )
+
+        assert (updated.product_id, updated.fulfillment_type) == (
+            new_product.id,
+            "access",
+        )
+
+    @pytest.mark.parametrize("fulfillment_type", [None, "participant", "order"])
+    def test_swap_rejects_non_access_product(
+        self,
+        db: Session,
+        tenant_a: Tenants,
+        popup_tenant_a: Popups,
+        fulfillment_type: str | None,
+    ) -> None:
+        old_product = _make_product(db, tenant_a, popup_tenant_a, stock=5)
+        new_product = _make_product(
+            db,
+            tenant_a,
+            popup_tenant_a,
+            stock=5,
+            fulfillment_type=fulfillment_type,
+        )
+        attendee = _make_attendee(db, tenant_a, popup_tenant_a)
+        ticket = _make_ticket(db, tenant_a, attendee, old_product)
+
+        with pytest.raises(HTTPException):
+            attendee_crud.attendees_crud.swap_ticket_product(
+                db, attendee.id, ticket.id, new_product.id
+            )
+
+        db.rollback()
+        db.refresh(ticket)
+        db.refresh(new_product)
+        assert (ticket.product_id, ticket.fulfillment_type) == (
+            old_product.id,
+            "access",
+        )
+        assert new_product.total_stock_remaining == 5
 
     def test_swap_restores_old_and_decrements_new_stock(
         self,
@@ -319,6 +381,10 @@ class TestAddProducts:
         )
 
         assert _ticket_count(db, attendee.id) == 5
+        holdings = db.exec(
+            select(AttendeeProducts).where(AttendeeProducts.attendee_id == attendee.id)
+        ).all()
+        assert {holding.fulfillment_type for holding in holdings} == {"access"}
         db.refresh(prod_a)
         db.refresh(prod_b)
         assert prod_a.total_stock_remaining == 8
@@ -367,3 +433,103 @@ class TestAddProducts:
                 items=[(product.id, 1)],
             )
         assert exc.value.status_code == 422
+
+    @pytest.mark.parametrize("fulfillment_type", [None, "participant", "order"])
+    def test_ticket_batch_rejects_non_access_products_before_writes(
+        self,
+        db: Session,
+        tenant_a: Tenants,
+        popup_tenant_a: Popups,
+        fulfillment_type: str | None,
+    ) -> None:
+        access = _make_product(db, tenant_a, popup_tenant_a, stock=5)
+        invalid = _make_product(
+            db,
+            tenant_a,
+            popup_tenant_a,
+            stock=5,
+            fulfillment_type=fulfillment_type,
+        )
+        attendee = _make_attendee(db, tenant_a, popup_tenant_a)
+
+        with pytest.raises(HTTPException):
+            attendee_crud.attendees_crud.add_products(
+                db, attendee.id, [(access.id, 1), (invalid.id, 1)]
+            )
+
+        db.rollback()
+        assert _ticket_count(db, attendee.id) == 0
+        db.refresh(access)
+        db.refresh(invalid)
+        assert (access.total_stock_remaining, invalid.total_stock_remaining) == (5, 5)
+
+
+@pytest.mark.parametrize("fulfillment_type", ["access", "participant"])
+def test_manual_holding_attachment_snapshots_product_fulfillment_type(
+    db: Session,
+    tenant_a: Tenants,
+    popup_tenant_a: Popups,
+    fulfillment_type: str,
+) -> None:
+    product = _make_product(
+        db, tenant_a, popup_tenant_a, fulfillment_type=fulfillment_type
+    )
+    attendee = _make_attendee(db, tenant_a, popup_tenant_a)
+
+    holding = attendee_crud.attendees_crud.add_product(db, attendee.id, product.id)
+
+    assert (holding.fulfillment_type, holding.payment_id) == (
+        fulfillment_type,
+        None,
+    )
+
+
+@pytest.mark.parametrize("fulfillment_type", [None, "order"])
+def test_manual_holding_attachment_rejects_unholdable_product(
+    db: Session,
+    tenant_a: Tenants,
+    popup_tenant_a: Popups,
+    fulfillment_type: str | None,
+) -> None:
+    product = _make_product(
+        db,
+        tenant_a,
+        popup_tenant_a,
+        stock=5,
+        fulfillment_type=fulfillment_type,
+    )
+    attendee = _make_attendee(db, tenant_a, popup_tenant_a)
+
+    with pytest.raises(HTTPException):
+        attendee_crud.attendees_crud.add_product(db, attendee.id, product.id)
+
+    db.rollback()
+    assert _ticket_count(db, attendee.id) == 0
+    db.refresh(product)
+    assert product.total_stock_remaining == 5
+
+
+def test_manual_holding_attachment_rejects_partial_paid_lineage(
+    db: Session,
+    tenant_a: Tenants,
+    popup_tenant_a: Popups,
+) -> None:
+    product = _make_product(db, tenant_a, popup_tenant_a, stock=5)
+    attendee = _make_attendee(db, tenant_a, popup_tenant_a)
+    payment = Payments(
+        tenant_id=tenant_a.id,
+        popup_id=popup_tenant_a.id,
+        amount=Decimal("0"),
+        currency="USD",
+    )
+    db.add(payment)
+    db.commit()
+
+    with pytest.raises(HTTPException) as exc:
+        attendee_crud.attendees_crud.add_product(
+            db, attendee.id, product.id, payment_id=payment.id
+        )
+
+    assert exc.value.status_code == 422
+    db.rollback()
+    assert _ticket_count(db, attendee.id) == 0

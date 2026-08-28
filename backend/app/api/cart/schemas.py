@@ -1,17 +1,29 @@
 import uuid
 from datetime import datetime
 
-from pydantic import BaseModel, ConfigDict, EmailStr
+from pydantic import BaseModel, ConfigDict, EmailStr, model_validator
+from pydantic import Field as PydanticField
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlmodel import Column, Field, SQLModel
+
+from app.api.payment.schemas import PaymentRecipientRequest
 
 
 class CartItemPass(BaseModel):
     """Pass selection in cart."""
 
-    attendee_id: str
+    attendee_id: str | None = None
+    recipient_key: str | None = PydanticField(
+        default=None, min_length=1, max_length=255
+    )
     product_id: str
     quantity: int = 1
+
+    @model_validator(mode="after")
+    def validate_identity(self) -> "CartItemPass":
+        if self.attendee_id is not None and self.recipient_key is not None:
+            raise ValueError("attendee_id and recipient_key cannot both be set")
+        return self
 
 
 class CartItemHousing(BaseModel):
@@ -59,7 +71,8 @@ class CartItemMealPlan(BaseModel):
 class CartState(BaseModel):
     """Full cart state stored as JSONB."""
 
-    passes: list[CartItemPass] = []
+    passes: list[CartItemPass] = PydanticField(default_factory=list)
+    recipients: list[PaymentRecipientRequest] = PydanticField(default_factory=list)
     housing: CartItemHousing | None = None
     merch: list[CartItemMerch] = []
     patron: CartItemPatron | None = None
@@ -67,6 +80,18 @@ class CartState(BaseModel):
     promo_code: str | None = None
     insurance: bool = False
     current_step: str | None = None
+
+    @model_validator(mode="after")
+    def validate_recipients(self) -> "CartState":
+        keys = [recipient.recipient_key for recipient in self.recipients]
+        if len(keys) != len(set(keys)):
+            raise ValueError("recipient_key values must be unique")
+        referenced = {
+            item.recipient_key for item in self.passes if item.recipient_key is not None
+        }
+        if referenced - set(keys):
+            raise ValueError("Every recipient_key must reference a supplied recipient")
+        return self
 
 
 class CartBase(SQLModel):

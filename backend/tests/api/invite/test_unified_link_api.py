@@ -14,11 +14,14 @@ from decimal import Decimal
 from fastapi.testclient import TestClient
 from sqlmodel import Session
 
+from app.api.application.models import Applications
+from app.api.application.schemas import ApplicationStatus
 from app.api.attendee.models import AttendeeProducts, Attendees
 from app.api.human.models import Humans
 from app.api.invite.models import Invites
 from app.api.popup.models import Popups
 from app.api.product.models import Products
+from app.api.product.schemas import FulfillmentType
 from app.api.tenant.models import Tenants
 from app.api.user.models import Users
 from app.core.security import create_access_token
@@ -64,7 +67,14 @@ def _make_human(db: Session, tenant: Tenants) -> Humans:
     return human
 
 
-def _give_ticket(db: Session, popup: Popups, human: Humans) -> None:
+def _give_ticket(
+    db: Session,
+    popup: Popups,
+    human: Humans,
+    *,
+    fulfillment_type: FulfillmentType = FulfillmentType.ACCESS,
+    managed: bool = False,
+) -> None:
     """Creating a portal link is gated on actually holding a ticket."""
     product = Products(
         tenant_id=popup.tenant_id,
@@ -73,13 +83,15 @@ def _give_ticket(db: Session, popup: Popups, human: Humans) -> None:
         slug=f"tkt-{uuid.uuid4().hex[:8]}",
         price=Decimal("0"),
         category="ticket",
+        fulfillment_type=fulfillment_type.value,
     )
     db.add(product)
     db.flush()
     attendee = Attendees(
         tenant_id=popup.tenant_id,
         popup_id=popup.id,
-        human_id=human.id,
+        human_id=None if managed else human.id,
+        managed_by_human_id=human.id if managed else None,
         name="Uni Fied",
         email=human.email,
     )
@@ -91,6 +103,7 @@ def _give_ticket(db: Session, popup: Popups, human: Humans) -> None:
             attendee_id=attendee.id,
             product_id=product.id,
             check_in_code=uuid.uuid4().hex[:8].upper(),
+            fulfillment_type=fulfillment_type.value,
         )
     )
     db.commit()
@@ -153,6 +166,60 @@ class TestPortalLinkEndpoints:
         )
 
         assert resp.status_code == 403, resp.json()
+
+    def test_portal_link_access_matrix(
+        self, client: TestClient, db: Session, tenant_a: Tenants
+    ) -> None:
+        def create_link(popup: Popups, human: Humans):
+            return client.post(
+                "/api/v1/portal/invites",
+                json={"popup_id": str(popup.id)},
+                headers=_auth(_human_token(human)),
+            )
+
+        accepted_popup = _make_popup(db, tenant_a)
+        accepted_human = _make_human(db, tenant_a)
+        db.add(
+            Applications(
+                tenant_id=tenant_a.id,
+                popup_id=accepted_popup.id,
+                sales_flow_id=invite_flow_id(db, accepted_popup.id),
+                human_id=accepted_human.id,
+                status=ApplicationStatus.ACCEPTED.value,
+            )
+        )
+        db.commit()
+        assert create_link(accepted_popup, accepted_human).status_code == 201
+
+        participant_popup = _make_popup(db, tenant_a)
+        participant_human = _make_human(db, tenant_a)
+        _give_ticket(
+            db,
+            participant_popup,
+            participant_human,
+            fulfillment_type=FulfillmentType.PARTICIPANT,
+        )
+        assert create_link(participant_popup, participant_human).status_code == 403
+
+        managed_popup = _make_popup(db, tenant_a)
+        managed_human = _make_human(db, tenant_a)
+        _give_ticket(db, managed_popup, managed_human, managed=True)
+        assert create_link(managed_popup, managed_human).status_code == 201
+
+        rejected_popup = _make_popup(db, tenant_a)
+        rejected_human = _make_human(db, tenant_a)
+        _give_ticket(db, rejected_popup, rejected_human)
+        db.add(
+            Applications(
+                tenant_id=tenant_a.id,
+                popup_id=rejected_popup.id,
+                sales_flow_id=invite_flow_id(db, rejected_popup.id),
+                human_id=rejected_human.id,
+                status=ApplicationStatus.REJECTED.value,
+            )
+        )
+        db.commit()
+        assert create_link(rejected_popup, rejected_human).status_code == 201
 
     def test_second_link_for_the_same_popup_is_rejected(
         self, client: TestClient, db: Session, tenant_a: Tenants

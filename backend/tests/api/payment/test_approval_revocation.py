@@ -21,8 +21,8 @@ from sqlmodel import Session, select
 from app.api.attendee.models import AttendeeProducts, Attendees
 from app.api.human.models import Humans
 from app.api.payment.crud import payments_crud
-from app.api.payment.models import PaymentProducts, Payments
-from app.api.payment.schemas import PaymentStatus
+from app.api.payment.models import PaymentProducts, PaymentRecipients, Payments
+from app.api.payment.schemas import PaymentStatus, PaymentType
 from app.api.popup.models import Popups
 from app.api.product.models import Products
 from app.api.tenant.models import Tenants
@@ -63,7 +63,11 @@ def _make_attendee(db: Session, popup: Popups) -> Attendees:
     return attendee
 
 
-def _make_product(db: Session, popup: Popups) -> Products:
+def _make_product(
+    db: Session,
+    popup: Popups,
+    fulfillment_type: str | None = None,
+) -> Products:
     product = Products(
         tenant_id=popup.tenant_id,
         popup_id=popup.id,
@@ -71,6 +75,7 @@ def _make_product(db: Session, popup: Popups) -> Products:
         slug=f"prod-{uuid.uuid4().hex[:8]}",
         price=Decimal("10"),
         category="ticket",
+        fulfillment_type=fulfillment_type,
         is_active=True,
     )
     db.add(product)
@@ -175,3 +180,137 @@ def test_another_payments_products_survive(db: Session, tenant_a: Tenants) -> No
 
     remaining = _holdings(db, attendee.id)
     assert [h.product_id for h in remaining] == [second_product.id]
+
+
+def test_cancelling_typed_mixed_payment_preserves_order_and_snapshots(
+    db: Session, tenant_a: Tenants
+) -> None:
+    popup = _make_popup(db, tenant_a)
+    attendee = _make_attendee(db, popup)
+    payment = Payments(
+        tenant_id=popup.tenant_id,
+        popup_id=popup.id,
+        status=PaymentStatus.APPROVED.value,
+        amount=Decimal("40"),
+    )
+    db.add(payment)
+    db.flush()
+    recipient = PaymentRecipients(
+        tenant_id=popup.tenant_id,
+        payment_id=payment.id,
+        recipient_key="typed-recipient",
+        attendee_id=attendee.id,
+        name=attendee.name,
+    )
+    db.add(recipient)
+    db.flush()
+
+    order_holding: AttendeeProducts | None = None
+    for fulfillment_type in ("access", "participant", "order", None):
+        product = _make_product(db, popup, fulfillment_type)
+        line = PaymentProducts(
+            tenant_id=popup.tenant_id,
+            payment_id=payment.id,
+            product_id=product.id,
+            attendee_id=attendee.id if fulfillment_type in ("order", None) else None,
+            payment_recipient_id=(
+                recipient.id if fulfillment_type in ("access", "participant") else None
+            ),
+            product_name=product.name,
+            product_price=product.price,
+            product_category=product.category or "ticket",
+            fulfillment_type=fulfillment_type,
+        )
+        db.add(line)
+        db.flush()
+        holding = AttendeeProducts(
+            tenant_id=popup.tenant_id,
+            attendee_id=attendee.id,
+            product_id=product.id,
+            payment_id=payment.id,
+            payment_product_id=line.id,
+            unit_index=0,
+            check_in_code=f"TYPE-{uuid.uuid4().hex[:8]}",
+            fulfillment_type=fulfillment_type,
+        )
+        db.add(holding)
+        if fulfillment_type == "order":
+            order_holding = holding
+    db.commit()
+
+    payments_crud.update_status(db, payment.id, PaymentStatus.CANCELLED)
+
+    remaining = _holdings(db, attendee.id)
+    assert remaining == [order_holding]
+    assert (
+        len(
+            db.exec(
+                select(PaymentProducts).where(PaymentProducts.payment_id == payment.id)
+            ).all()
+        )
+        == 4
+    )
+    assert db.get(PaymentRecipients, recipient.id) is not None
+    assert db.get(Attendees, attendee.id) is not None
+
+
+def test_cancelling_side_only_order_preserves_snapshot_without_identity(
+    db: Session, tenant_a: Tenants
+) -> None:
+    popup = _make_popup(db, tenant_a)
+    product = _make_product(db, popup, "order")
+    payment = Payments(
+        tenant_id=popup.tenant_id,
+        popup_id=popup.id,
+        status=PaymentStatus.APPROVED.value,
+        amount=product.price,
+    )
+    db.add(payment)
+    db.flush()
+    line = PaymentProducts(
+        tenant_id=popup.tenant_id,
+        payment_id=payment.id,
+        product_id=product.id,
+        product_name=product.name,
+        product_price=product.price,
+        product_category=product.category or "ticket",
+        fulfillment_type="order",
+    )
+    db.add(line)
+    db.commit()
+
+    payments_crud.update_status(db, payment.id, PaymentStatus.CANCELLED)
+
+    assert db.get(PaymentProducts, line.id) is not None
+    assert (
+        db.exec(
+            select(PaymentRecipients).where(PaymentRecipients.payment_id == payment.id)
+        ).all()
+        == []
+    )
+    assert (
+        db.exec(
+            select(AttendeeProducts).where(AttendeeProducts.payment_id == payment.id)
+        ).all()
+        == []
+    )
+
+    fee = Payments(
+        tenant_id=popup.tenant_id,
+        popup_id=popup.id,
+        payment_type=PaymentType.APPLICATION_FEE.value,
+        status=PaymentStatus.APPROVED.value,
+        amount=Decimal("10"),
+    )
+    db.add(fee)
+    db.commit()
+
+    payments_crud.update_status(db, fee.id, PaymentStatus.CANCELLED)
+
+    assert db.exec(select(Attendees).where(Attendees.popup_id == popup.id)).all() == []
+    assert (
+        db.exec(
+            select(AttendeeProducts).where(AttendeeProducts.payment_id == fee.id)
+        ).all()
+        == []
+    )

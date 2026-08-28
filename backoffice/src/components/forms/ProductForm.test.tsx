@@ -61,6 +61,7 @@ const mockListProductCategories = vi.mocked(
   ProductsService.listProductCategories,
 )
 const mockCreateProduct = vi.mocked(ProductsService.createProduct)
+const mockUpdateProduct = vi.mocked(ProductsService.updateProduct)
 const mockListProducts = vi.mocked(ProductsService.listProducts)
 
 const POPUP_BASE = {
@@ -83,6 +84,33 @@ function makeWrapper() {
   )
 }
 
+function editProduct(
+  fulfillmentType: "access" | "participant" | "order" | null,
+) {
+  return {
+    id: `product-${fulfillmentType ?? "legacy"}`,
+    tenant_id: "tenant-1",
+    popup_id: "popup-1",
+    name: "Existing product",
+    slug: "existing-product",
+    price: "50.00",
+    category: "other",
+    fulfillment_type: fulfillmentType,
+    is_active: true,
+    exclusive: false,
+    insurance_eligible: false,
+    requires_check_in: false,
+  } as Parameters<typeof ProductForm>[0]["defaultValues"]
+}
+
+async function chooseFulfillment(option: "Access" | "Participant" | "Order") {
+  const user = userEvent.setup()
+  await user.click(screen.getByRole("combobox", { name: "Fulfillment type" }))
+  await user.click(
+    screen.getByRole("option", { name: new RegExp(`^${option}`) }),
+  )
+}
+
 // RED tests — Phase 8.2: attendee_category removal + requires_check_in toggle
 describe("ProductForm — ticket-as-first-class-entity (Phase 8.2)", () => {
   beforeEach(() => {
@@ -101,6 +129,149 @@ describe("ProductForm — ticket-as-first-class-entity (Phase 8.2)", () => {
 
     mockGetPopup.mockResolvedValue(
       POPUP_BASE as Awaited<ReturnType<typeof PopupsService.getPopup>>,
+    )
+    mockUpdateProduct.mockResolvedValue(
+      editProduct("participant") as Awaited<
+        ReturnType<typeof ProductsService.updateProduct>
+      >,
+    )
+  })
+
+  it("shows the required ownership-neutral fulfillment selector", async () => {
+    render(<ProductForm onSuccess={vi.fn()} />, { wrapper: makeWrapper() })
+
+    const selector = await screen.findByRole("combobox", {
+      name: "Fulfillment type",
+    })
+    expect(selector).toHaveTextContent("Select fulfillment type")
+    expect(
+      screen.getByText("Choose how purchases are owned and fulfilled."),
+    ).toBeInTheDocument()
+
+    await userEvent.click(selector)
+    expect(screen.getByRole("option", { name: /^Access/ })).toHaveTextContent(
+      "Grants event access to one participant.",
+    )
+    expect(
+      screen.getByRole("option", { name: /^Participant/ }),
+    ).toHaveTextContent(
+      "Stores per-participant metadata without granting access.",
+    )
+    expect(screen.getByRole("option", { name: /^Order/ })).toHaveTextContent(
+      "Owned once at the order level.",
+    )
+  })
+
+  it("blocks new product submission until fulfillment is selected", async () => {
+    const user = userEvent.setup()
+    render(<ProductForm onSuccess={vi.fn()} />, { wrapper: makeWrapper() })
+    await user.type(
+      await screen.findByPlaceholderText(/product name/i),
+      "Untyped",
+    )
+    await user.type(screen.getByPlaceholderText("100.00"), "50")
+
+    await user.click(screen.getByRole("button", { name: /create product/i }))
+
+    expect(
+      await screen.findByText("Fulfillment type is required"),
+    ).toBeInTheDocument()
+    expect(mockCreateProduct).not.toHaveBeenCalled()
+  })
+
+  it.each([
+    "Access",
+    "Participant",
+    "Order",
+  ] as const)("submits the selected %s fulfillment type on create", async (option) => {
+    const user = userEvent.setup()
+    render(<ProductForm onSuccess={vi.fn()} />, { wrapper: makeWrapper() })
+    await user.type(
+      await screen.findByPlaceholderText(/product name/i),
+      `${option} item`,
+    )
+    await user.type(screen.getByPlaceholderText("100.00"), "50")
+    await chooseFulfillment(option)
+
+    await user.click(screen.getByRole("button", { name: /create product/i }))
+
+    await waitFor(() =>
+      expect(mockCreateProduct).toHaveBeenCalledWith(
+        expect.objectContaining({
+          requestBody: expect.objectContaining({
+            fulfillment_type: option.toLowerCase(),
+          }),
+        }),
+      ),
+    )
+  })
+
+  it("displays and preserves an existing fulfillment type", async () => {
+    const user = userEvent.setup()
+    render(
+      <ProductForm
+        defaultValues={editProduct("participant")}
+        onSuccess={vi.fn()}
+      />,
+      { wrapper: makeWrapper() },
+    )
+
+    expect(
+      await screen.findByRole("combobox", { name: "Fulfillment type" }),
+    ).toHaveTextContent("Participant")
+    await user.click(screen.getByRole("button", { name: /save changes/i }))
+
+    await waitFor(() =>
+      expect(mockUpdateProduct).toHaveBeenCalledWith(
+        expect.objectContaining({
+          requestBody: expect.objectContaining({
+            fulfillment_type: "participant",
+          }),
+        }),
+      ),
+    )
+  })
+
+  it("omits fulfillment type from unrelated updates to a legacy product", async () => {
+    const user = userEvent.setup()
+    render(
+      <ProductForm defaultValues={editProduct(null)} onSuccess={vi.fn()} />,
+      {
+        wrapper: makeWrapper(),
+      },
+    )
+    await user.type(
+      await screen.findByPlaceholderText(/product name/i),
+      " renamed",
+    )
+
+    await user.click(screen.getByRole("button", { name: /save changes/i }))
+
+    await waitFor(() => expect(mockUpdateProduct).toHaveBeenCalledOnce())
+    expect(mockUpdateProduct.mock.calls[0]?.[0].requestBody).not.toHaveProperty(
+      "fulfillment_type",
+    )
+  })
+
+  it("classifies a legacy product when a fulfillment type is selected", async () => {
+    const user = userEvent.setup()
+    render(
+      <ProductForm defaultValues={editProduct(null)} onSuccess={vi.fn()} />,
+      {
+        wrapper: makeWrapper(),
+      },
+    )
+    await screen.findByPlaceholderText(/product name/i)
+    await chooseFulfillment("Order")
+
+    await user.click(screen.getByRole("button", { name: /save changes/i }))
+
+    await waitFor(() =>
+      expect(mockUpdateProduct).toHaveBeenCalledWith(
+        expect.objectContaining({
+          requestBody: expect.objectContaining({ fulfillment_type: "order" }),
+        }),
+      ),
     )
   })
 
@@ -175,6 +346,8 @@ describe("ProductForm — ticket-as-first-class-entity (Phase 8.2)", () => {
 
     const priceInput = screen.getByPlaceholderText("100.00")
     await user.type(priceInput, "50")
+
+    await chooseFulfillment("Access")
 
     await user.click(screen.getByRole("button", { name: /create product/i }))
 

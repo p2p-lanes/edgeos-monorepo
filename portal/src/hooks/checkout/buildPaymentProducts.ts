@@ -2,7 +2,10 @@ import {
   CHECKOUT_MODE,
   type CheckoutMode,
 } from "@/checkout/popupCheckoutPolicy"
-import type { PaymentProductRequest_Input as PaymentProductRequest } from "@/client"
+import type {
+  PaymentProductRequest_Input as PaymentProductRequest,
+  PaymentRecipientRequest,
+} from "@/client"
 import type { AttendeePassState } from "@/types/Attendee"
 import type {
   SelectedDynamicItem,
@@ -29,6 +32,7 @@ interface BuildPaymentProductsParams {
 
 interface BuildPaymentProductsResult {
   products: PaymentProductRequest[]
+  recipients: PaymentRecipientRequest[]
   isMonthUpgrade: boolean
 }
 
@@ -87,6 +91,68 @@ export function buildPaymentProducts({
     checkoutMode === CHECKOUT_MODE.PASS_SYSTEM &&
     detectMonthUpgrade(attendeePasses)
   const products: PaymentProductRequest[] = []
+  const recipients = new Map<string, PaymentRecipientRequest>()
+  const selectedPassesByIdentity = new Map(
+    selectedPasses.map((pass) => [
+      `${pass.attendeeId}:${pass.productId}`,
+      pass,
+    ]),
+  )
+
+  const recipientForAttendee = (
+    attendee: AttendeePassState,
+  ): PaymentRecipientRequest | undefined =>
+    (attendee as AttendeePassState & { recipient?: PaymentRecipientRequest })
+      .recipient
+
+  const recipientIdentity = (
+    attendeeId: string,
+    recipient?: PaymentRecipientRequest,
+  ): Pick<PaymentProductRequest, "attendee_id" | "recipient_key"> => {
+    if (!recipient) return { attendee_id: attendeeId }
+
+    if (!recipients.has(recipient.recipient_key)) {
+      recipients.set(recipient.recipient_key, recipient)
+    }
+    return { recipient_key: recipient.recipient_key }
+  }
+
+  const passIdentity = (
+    pass: SelectedPassItem,
+  ): Pick<PaymentProductRequest, "attendee_id" | "recipient_key"> => {
+    if (pass.product.fulfillment_type === "order") return {}
+    const attendee = attendeePasses.find(
+      (candidate) => candidate.id === pass.attendeeId,
+    )
+    const embeddedRecipient =
+      pass.product.fulfillment_type === "access" ||
+      pass.product.fulfillment_type === "participant"
+        ? recipientForAttendee(attendee ?? pass.attendee)
+        : undefined
+    return recipientIdentity(
+      pass.attendeeId,
+      pass.recipient ?? embeddedRecipient,
+    )
+  }
+
+  const attendeeProductIdentity = (
+    attendee: AttendeePassState,
+    product: SelectedPassItem["product"],
+    selectedPass?: SelectedPassItem,
+  ): Pick<PaymentProductRequest, "attendee_id" | "recipient_key"> => {
+    if (product.fulfillment_type === "order") return {}
+    if (
+      (product.fulfillment_type === null ||
+        product.fulfillment_type === undefined) &&
+      !selectedPass
+    ) {
+      return { attendee_id: attendee.id }
+    }
+    return recipientIdentity(
+      attendee.id,
+      selectedPass?.recipient ?? recipientForAttendee(attendee),
+    )
+  }
 
   if (isEditing) {
     // Editing mode: send kept + new products
@@ -96,15 +162,18 @@ export function buildPaymentProducts({
         if (product.purchased && !product.edit) {
           products.push({
             product_id: product.id,
-            attendee_id: attendee.id,
+            ...attendeeProductIdentity(attendee, product),
             quantity: product.quantity ?? 1,
           })
         }
         // New: selected and not previously purchased
         if (product.selected && !product.purchased) {
+          const selectedPass = selectedPassesByIdentity.get(
+            `${attendee.id}:${product.id}`,
+          )
           products.push({
             product_id: product.id,
-            attendee_id: attendee.id,
+            ...attendeeProductIdentity(attendee, product, selectedPass),
             quantity:
               product.duration_type === "day"
                 ? (product.quantity ?? 1) - (product.original_quantity ?? 0)
@@ -140,7 +209,7 @@ export function buildPaymentProducts({
 
           products.push({
             product_id: product.id,
-            attendee_id: attendee.id,
+            ...attendeeProductIdentity(attendee, product),
             quantity: product.quantity ?? 1,
           })
         }
@@ -153,21 +222,15 @@ export function buildPaymentProducts({
       selectedPassProductIds.add(pass.productId)
       products.push({
         product_id: pass.productId,
-        attendee_id: pass.attendeeId,
+        ...passIdentity(pass),
         quantity: pass.quantity,
       })
     }
-
-    // When no pass is in selectedPasses (e.g., tickets selected via DynamicProductStep),
-    // attach side-products to the application's first existing attendee instead of "".
-    const firstAttendeeId =
-      selectedPasses[0]?.attendeeId ?? attendeePasses[0]?.id ?? ""
 
     // Add merch
     for (const item of merch) {
       products.push({
         product_id: item.productId,
-        attendee_id: firstAttendeeId,
         quantity: item.quantity,
       })
     }
@@ -177,7 +240,6 @@ export function buildPaymentProducts({
       const baseQty = housing.pricePerDay ? housing.nights : 1
       products.push({
         product_id: housing.productId,
-        attendee_id: firstAttendeeId,
         quantity: baseQty * (housing.quantity ?? 1),
       })
     }
@@ -186,7 +248,6 @@ export function buildPaymentProducts({
     if (patron) {
       products.push({
         product_id: patron.productId,
-        attendee_id: firstAttendeeId,
         quantity: 1,
         unit_price_override: patron.amount,
       })
@@ -200,7 +261,6 @@ export function buildPaymentProducts({
         if (item.quantity > 0 && !selectedPassProductIds.has(item.productId)) {
           products.push({
             product_id: item.productId,
-            attendee_id: firstAttendeeId,
             quantity: item.quantity,
           })
         }
@@ -211,9 +271,15 @@ export function buildPaymentProducts({
     // each carrying the per-purchase metadata blob the backend persists onto
     // AttendeeProducts.purchase_metadata.
     for (const item of selectedMealPlans) {
+      const attendee = attendeePasses.find(
+        (candidate) => candidate.id === item.attendeeId,
+      )
       products.push({
         product_id: item.productId,
-        attendee_id: item.attendeeId,
+        ...recipientIdentity(
+          item.attendeeId,
+          attendee ? recipientForAttendee(attendee) : undefined,
+        ),
         quantity: 1,
         purchase_metadata: {
           daily_choices: item.dailyChoices,
@@ -224,5 +290,5 @@ export function buildPaymentProducts({
     }
   }
 
-  return { products, isMonthUpgrade }
+  return { products, recipients: [...recipients.values()], isMonthUpgrade }
 }

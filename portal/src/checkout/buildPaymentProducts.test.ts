@@ -2,7 +2,11 @@ import { describe, expect, it } from "vitest"
 import { CHECKOUT_MODE } from "@/checkout/popupCheckoutPolicy"
 import { buildPaymentProducts } from "@/hooks/checkout/buildPaymentProducts"
 import type { AttendeePassState } from "@/types/Attendee"
-import type { SelectedPatronItem } from "@/types/checkout"
+import type {
+  CheckoutRecipientDraft,
+  SelectedPassItem,
+  SelectedPatronItem,
+} from "@/types/checkout"
 import type { ProductsPass } from "@/types/Products"
 
 function createProduct(overrides: Partial<ProductsPass>): ProductsPass {
@@ -14,6 +18,7 @@ function createProduct(overrides: Partial<ProductsPass>): ProductsPass {
     popup_id: overrides.popup_id ?? "popup-1",
     attendee_category_id: overrides.attendee_category_id ?? null,
     category: overrides.category ?? "ticket",
+    fulfillment_type: overrides.fulfillment_type,
     duration_type: overrides.duration_type ?? "week",
     is_active: overrides.is_active ?? true,
     price: overrides.price ?? 100,
@@ -43,6 +48,22 @@ function createAttendee(products: ProductsPass[]): AttendeePassState {
     updated_at: null,
     products,
   }
+}
+
+function buildProducts(
+  overrides: Partial<Parameters<typeof buildPaymentProducts>[0]>,
+) {
+  return buildPaymentProducts({
+    attendeePasses: [],
+    selectedPasses: [],
+    housing: null,
+    merch: [],
+    patron: null,
+    dynamicItems: {},
+    isEditing: false,
+    appCredit: 0,
+    ...overrides,
+  })
 }
 
 describe("buildPaymentProducts", () => {
@@ -189,6 +210,199 @@ describe("buildPaymentProducts", () => {
   })
 })
 
+describe("buildPaymentProducts recipient payloads", () => {
+  const linkedRecipient = {
+    recipient_key: "human:human-1",
+    human_id: "human-1",
+    name: "Linked Human",
+    email: "linked@example.com",
+    category_id: "category-main",
+    profile_snapshot: { residence: "Lisbon" },
+  } satisfies CheckoutRecipientDraft
+
+  const managedRecipient = {
+    recipient_key: "managed-spouse",
+    existing_attendee_id: "spouse-attendee",
+    name: "Managed Spouse",
+    email: null,
+    category_id: "category-spouse",
+    profile_snapshot: { category: "spouse", dietary_notes: "vegetarian" },
+  } satisfies CheckoutRecipientDraft
+
+  function recipientPass(
+    productId: string,
+    attendeeId: string,
+    recipient: CheckoutRecipientDraft,
+    productOverrides: Partial<ProductsPass> = {},
+  ): SelectedPassItem {
+    const product = createProduct({ id: productId, ...productOverrides })
+    const attendee = { ...createAttendee([product]), id: attendeeId, recipient }
+    return {
+      productId,
+      product,
+      attendeeId,
+      attendee,
+      recipient,
+      quantity: 1,
+      price: 100,
+    }
+  }
+
+  it("emits linked and managed pass lines with recipient identity only", () => {
+    const linkedPass = recipientPass(
+      "linked-ticket",
+      "linked-attendee",
+      linkedRecipient,
+    )
+    const managedPass = recipientPass(
+      "managed-ticket",
+      "recipient:managed-spouse",
+      managedRecipient,
+    )
+
+    const result = buildPaymentProducts({
+      attendeePasses: [linkedPass.attendee, managedPass.attendee],
+      selectedPasses: [linkedPass, managedPass],
+      housing: null,
+      merch: [],
+      patron: null,
+      dynamicItems: {},
+      isEditing: false,
+      appCredit: 0,
+    })
+
+    expect(result.products).toEqual([
+      {
+        product_id: "linked-ticket",
+        recipient_key: "human:human-1",
+        quantity: 1,
+      },
+      {
+        product_id: "managed-ticket",
+        recipient_key: "managed-spouse",
+        quantity: 1,
+      },
+    ])
+    expect(result.recipients).toEqual([linkedRecipient, managedRecipient])
+  })
+
+  it("deduplicates restored recipients and excludes unreferenced drafts", () => {
+    const first = recipientPass(
+      "spouse-week",
+      "recipient:managed-spouse",
+      managedRecipient,
+    )
+    const second = recipientPass(
+      "spouse-day",
+      "recipient:managed-spouse",
+      managedRecipient,
+    )
+    const unreferenced = {
+      ...createAttendee([]),
+      id: "recipient:managed-kid",
+      recipient: {
+        recipient_key: "managed-kid",
+        name: "Managed Kid",
+        profile_snapshot: { category: "kid" },
+      },
+    }
+
+    const result = buildPaymentProducts({
+      attendeePasses: [first.attendee, second.attendee, unreferenced],
+      selectedPasses: [first, second],
+      housing: null,
+      merch: [],
+      patron: null,
+      dynamicItems: {},
+      isEditing: false,
+      appCredit: 0,
+    })
+
+    expect(result.products.map((line) => line.recipient_key)).toEqual([
+      "managed-spouse",
+      "managed-spouse",
+    ])
+    expect(result.recipients).toEqual([managedRecipient])
+  })
+
+  it("keeps legacy attendee-linked pass lines during rollout", () => {
+    const product = createProduct({ id: "legacy-ticket" })
+    const attendee = { ...createAttendee([product]), id: "legacy-attendee" }
+
+    const result = buildPaymentProducts({
+      attendeePasses: [attendee],
+      selectedPasses: [
+        {
+          productId: product.id,
+          product,
+          attendeeId: attendee.id,
+          attendee,
+          quantity: 1,
+          price: 100,
+        },
+      ],
+      housing: null,
+      merch: [],
+      patron: null,
+      dynamicItems: {},
+      isEditing: false,
+      appCredit: 0,
+    })
+
+    expect(result.products).toEqual([
+      {
+        product_id: "legacy-ticket",
+        attendee_id: "legacy-attendee",
+        quantity: 1,
+      },
+    ])
+    expect(result.recipients).toEqual([])
+  })
+
+  it("routes mixed typed passes by fulfillment ownership", () => {
+    const access = recipientPass(
+      "access-ticket",
+      "recipient:linked",
+      linkedRecipient,
+      { fulfillment_type: "access" },
+    )
+    const participant = recipientPass(
+      "participant-ticket",
+      "recipient:managed-spouse",
+      managedRecipient,
+      { fulfillment_type: "participant" },
+    )
+    const participantFromAttendee = { ...participant, recipient: undefined }
+    const orderRecipient = {
+      ...managedRecipient,
+      recipient_key: "unused-order-recipient",
+    }
+    const order = recipientPass(
+      "order-product",
+      "recipient:unused-order-recipient",
+      orderRecipient,
+      { fulfillment_type: "order" },
+    )
+
+    const result = buildProducts({
+      attendeePasses: [access.attendee, participant.attendee, order.attendee],
+      selectedPasses: [access, participantFromAttendee, order],
+    })
+
+    expect(
+      result.products.map(
+        ({ product_id, attendee_id, recipient_key }) =>
+          [product_id, attendee_id, recipient_key] as const,
+      ),
+    ).toEqual([
+      ["access-ticket", undefined, "human:human-1"],
+      ["participant-ticket", undefined, "managed-spouse"],
+      ["order-product", undefined, undefined],
+    ])
+    expect(result.recipients).toEqual([linkedRecipient, managedRecipient])
+  })
+})
+
 // ---------------------------------------------------------------------------
 // Patron path — unit_price_override contract
 // ---------------------------------------------------------------------------
@@ -246,9 +460,7 @@ describe("buildPaymentProducts — patron path", () => {
   })
 
   it("patron entry is NOT emitted when cart.patron is null", () => {
-    const result = buildPaymentProducts({
-      attendeePasses: [],
-      selectedPasses: [],
+    const result = buildProducts({
       housing: null,
       merch: [],
       patron: null,
@@ -328,14 +540,11 @@ describe("buildPaymentProducts — patron path", () => {
 })
 
 // ---------------------------------------------------------------------------
-// X.2: S-PAY-C — pass_system + 2 attendees → no firstAttendeeId collapse
-// Tickets flow through selectedPasses (per-attendee). The dynamicItems path
-// (firstAttendeeId collapse) must NOT be reached for ticket products on
-// pass_system popups.
+// X.2: S-PAY-C — pass_system + 2 attendees preserve line identity.
 // ---------------------------------------------------------------------------
 
 describe("X.2 S-PAY-C: pass_system 2 attendees — tickets use per-attendee attendee_id", () => {
-  it("each ticket entry carries its own attendeeId, not firstAttendeeId", () => {
+  it("each ticket entry carries its own attendeeId", () => {
     const ticketA = createProduct({ id: "ticket-a", category: "ticket" })
     const ticketB = createProduct({ id: "ticket-b", category: "ticket" })
 
@@ -366,8 +575,6 @@ describe("X.2 S-PAY-C: pass_system 2 attendees — tickets use per-attendee atte
       merch: [],
       patron: null,
       dynamicItems: {},
-      isEditing: false,
-      appCredit: 0,
       checkoutMode: CHECKOUT_MODE.PASS_SYSTEM,
     })
 
@@ -454,11 +661,11 @@ describe("X.2 S-PAY-C: pass_system 2 attendees — tickets use per-attendee atte
 })
 
 // ---------------------------------------------------------------------------
-// X.3: S-PAY-A/B — merch and meal-plan entries unchanged by this change
+// X.3: order-owned side products and recipient-owned meals
 // ---------------------------------------------------------------------------
 
-describe("X.3 S-PAY-A/B: merch and meal-plan entries unaffected", () => {
-  it("S-PAY-A: merch item gets firstAttendeeId (unaffected by ticket changes)", () => {
+describe("X.3 S-PAY-A/B: side products and meal plans", () => {
+  it("emits merch without borrowing the selected attendee identity", () => {
     const ticket = createProduct({ id: "ticket-1", category: "ticket" })
     const attendeeA = { ...createAttendee([ticket]), id: "attendee-a" }
 
@@ -494,15 +701,60 @@ describe("X.3 S-PAY-A/B: merch and meal-plan entries unaffected", () => {
     const ticketLine = result.products.find((p) => p.product_id === "ticket-1")
     const merchLine = result.products.find((p) => p.product_id === "merch-1")
 
-    // Ticket carries correct attendeeId
     expect(ticketLine?.attendee_id).toBe("attendee-a")
-
-    // Merch attaches to firstAttendeeId (driven by selectedPasses[0].attendeeId)
-    expect(merchLine?.attendee_id).toBe("attendee-a")
-    expect(merchLine?.quantity).toBe(2)
+    expect(merchLine).toEqual({ product_id: "merch-1", quantity: 2 })
   })
 
-  it("S-PAY-B: meal plan entries carry their own attendeeId (per-purchase metadata preserved)", () => {
+  it("emits side-only merch, housing, patron, and dynamic lines without identity", () => {
+    const result = buildProducts({
+      housing: {
+        productId: "housing-1",
+        product: createProduct({ id: "housing-1" }),
+        checkIn: "2026-09-01",
+        checkOut: "2026-09-04",
+        nights: 3,
+        pricePerNight: 100,
+        totalPrice: 600,
+        pricePerDay: true,
+        quantity: 2,
+      },
+      merch: [
+        {
+          productId: "merch-1",
+          product: createProduct({ id: "merch-1" }),
+          quantity: 2,
+          unitPrice: 30,
+          totalPrice: 60,
+        },
+      ],
+      patron: makePatronItem({ amount: 2500 }),
+      dynamicItems: {
+        extras: [
+          {
+            productId: "dynamic-1",
+            product: createProduct({ id: "dynamic-1" }),
+            quantity: 4,
+            price: 20,
+            stepType: "extras",
+          },
+        ],
+      },
+    })
+
+    expect(result.products).toEqual([
+      { product_id: "merch-1", quantity: 2 },
+      { product_id: "housing-1", quantity: 6 },
+      {
+        product_id: "patron-prod",
+        quantity: 1,
+        unit_price_override: 2500,
+      },
+      { product_id: "dynamic-1", quantity: 4 },
+    ])
+    expect(result.recipients).toEqual([])
+  })
+
+  it("preserves legacy meal attendee identity and purchase metadata", () => {
     const attendeeB = { ...createAttendee([]), id: "attendee-b" }
 
     const result = buildPaymentProducts({
@@ -538,5 +790,41 @@ describe("X.3 S-PAY-A/B: merch and meal-plan entries unaffected", () => {
       dietary_restriction: "vegan",
       special_request: null,
     })
+  })
+
+  it("routes restored meal plans to their embedded recipient", () => {
+    const recipient = {
+      recipient_key: "managed-meal-recipient",
+      name: "Meal Recipient",
+      profile_snapshot: { dietary_notes: "vegan" },
+    } satisfies CheckoutRecipientDraft
+    const attendee = {
+      ...createAttendee([]),
+      id: "recipient:managed-meal-recipient",
+      recipient,
+    }
+
+    const result = buildProducts({
+      attendeePasses: [attendee],
+      selectedMealPlans: [
+        {
+          productId: "recipient-meal",
+          product: createProduct({
+            id: "recipient-meal",
+            category: "meal_plan",
+          }),
+          attendeeId: attendee.id,
+          dailyChoices: { mon: "vegan" },
+          dietaryRestriction: "vegan",
+          specialRequest: null,
+        },
+      ],
+    })
+
+    expect(result.products[0]?.recipient_key).toBe("managed-meal-recipient")
+    expect(result.products[0]?.purchase_metadata).toMatchObject({
+      dietary_restriction: "vegan",
+    })
+    expect(result.recipients).toEqual([recipient])
   })
 })

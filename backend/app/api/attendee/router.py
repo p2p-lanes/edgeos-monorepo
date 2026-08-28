@@ -208,6 +208,28 @@ def _attendee_response(db, attendee_id: uuid.UUID) -> AttendeeWithOriginPublic:
     return _build_attendee_with_origin(attendee, last_scan_by_ticket)
 
 
+def _get_my_attendee(
+    db,
+    *,
+    attendee_id: uuid.UUID,
+    popup_id: uuid.UUID,
+    current_human,
+):
+    attendee = crud.attendees_crud.get_for_human_popup(
+        db,
+        attendee_id=attendee_id,
+        human_id=current_human.id,
+        popup_id=popup_id,
+        tenant_id=current_human.tenant_id,
+    )
+    if attendee is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Attendee not found",
+        )
+    return attendee
+
+
 # ---------------------------------------------------------------------------
 # Portal human-scoped attendee endpoints (CAP-B, CAP-C)
 # ---------------------------------------------------------------------------
@@ -234,7 +256,12 @@ async def list_my_attendees_by_popup(
     Requires OTP-authenticated Human token.
     """
     attendees, total = crud.attendees_crud.find_by_human_popup(
-        db, human_id=current_human.id, popup_id=popup_id, skip=skip, limit=limit
+        db,
+        human_id=current_human.id,
+        popup_id=popup_id,
+        skip=skip,
+        limit=limit,
+        tenant_id=current_human.tenant_id,
     )
     # Single aggregation across every ticket on the page so the portal can flag
     # already-scanned QR codes without N+1 lookups per attendee.
@@ -270,6 +297,11 @@ async def create_my_attendee_for_popup(
     Returns 422 with code='application_required' if no application exists or
     nobody applies to this gathering at all.
     """
+    raise HTTPException(
+        status_code=status.HTTP_410_GONE,
+        detail="Companion attendees are created after approval",
+    )
+
     from app.api.application.crud import applications_crud
     from app.api.popup.guards import ensure_popup_writable
     from app.api.popup.models import Popups
@@ -336,6 +368,7 @@ async def create_my_attendee_for_popup(
                 human_id=current_human.id,
                 popup_id=popup_id,
                 category_id=category_row.id,
+                tenant_id=current_human.tenant_id,
             )
             if count >= category_row.max_per_application:
                 raise HTTPException(
@@ -416,34 +449,13 @@ async def update_my_attendee_for_popup(
     db: HumanTenantSession,
     current_human: CurrentHuman,
 ) -> AttendeeWithOriginPublic:
-    """Update a companion attendee using the dual-path auth predicate.
-
-    Authorization: attendee.popup_id == popup_id AND (
-        attendee.human_id == current_human.id
-        OR attendee.application.human_id == current_human.id
-    ).
-    Returns 404 if attendee not found, popup_id mismatch, or predicate fails
-    (do not expose existence to unauthorized callers).
-    """
-    from app.api.application.models import Applications
-
-    attendee = crud.attendees_crud.get(db, attendee_id)
-
-    if attendee is None or attendee.popup_id != popup_id:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Attendee not found"
-        )
-
-    # Dual-path auth predicate
-    owned = attendee.human_id == current_human.id
-    if not owned and attendee.application_id is not None:
-        application = db.get(Applications, attendee.application_id)
-        owned = application is not None and application.human_id == current_human.id
-
-    if not owned:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Attendee not found"
-        )
+    """Update a self, explicitly managed, or legacy-owned Attendee."""
+    attendee = _get_my_attendee(
+        db,
+        attendee_id=attendee_id,
+        popup_id=popup_id,
+        current_human=current_human,
+    )
 
     from app.api.popup.crud import popups_crud
     from app.api.popup.guards import ensure_popup_writable
@@ -486,34 +498,19 @@ async def update_my_meal_plan_ticket(
     dietary_restriction, special_request) for a week whose sale window is still
     open. Does not change products, price, stock, or the payment snapshot.
 
-    Authorization: same dual-path predicate as update_my_attendee_for_popup —
-    attendee.popup_id == popup_id AND (attendee.human_id == current_human.id OR
-    attendee.application.human_id == current_human.id). Returns 404 (never 403)
-    on any failure so existence is not leaked to unauthorized callers.
+    Authorization uses the same centralized self-or-manager compatibility
+    predicate as all other portal Attendee operations.
 
     Errors from the CRUD layer: 404 (ticket/product not found), 409
     meal_plan_week_locked (week closed), 422 not_meal_plan_ticket or
     invalid_meal_plan_choice.
     """
-    from app.api.application.models import Applications
-
-    attendee = crud.attendees_crud.get(db, attendee_id)
-
-    if attendee is None or attendee.popup_id != popup_id:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Attendee not found"
-        )
-
-    # Dual-path auth predicate
-    owned = attendee.human_id == current_human.id
-    if not owned and attendee.application_id is not None:
-        application = db.get(Applications, attendee.application_id)
-        owned = application is not None and application.human_id == current_human.id
-
-    if not owned:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Attendee not found"
-        )
+    _get_my_attendee(
+        db,
+        attendee_id=attendee_id,
+        popup_id=popup_id,
+        current_human=current_human,
+    )
 
     from app.api.popup.crud import popups_crud
     from app.api.popup.guards import ensure_popup_writable
@@ -547,25 +544,12 @@ async def delete_my_attendee_for_popup(
     Returns 404 if attendee not found or predicate fails.
     Returns 400 with code='attendee_has_products' if attendee has purchased products.
     """
-    from app.api.application.models import Applications
-
-    attendee = crud.attendees_crud.get(db, attendee_id)
-
-    if attendee is None or attendee.popup_id != popup_id:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Attendee not found"
-        )
-
-    # Dual-path auth predicate
-    owned = attendee.human_id == current_human.id
-    if not owned and attendee.application_id is not None:
-        application = db.get(Applications, attendee.application_id)
-        owned = application is not None and application.human_id == current_human.id
-
-    if not owned:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Attendee not found"
-        )
+    attendee = _get_my_attendee(
+        db,
+        attendee_id=attendee_id,
+        popup_id=popup_id,
+        current_human=current_human,
+    )
 
     from app.api.popup.crud import popups_crud
     from app.api.popup.guards import ensure_popup_writable

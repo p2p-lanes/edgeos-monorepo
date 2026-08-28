@@ -2,7 +2,7 @@ import uuid
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Optional
 
-from sqlalchemy import Index
+from sqlalchemy import CheckConstraint, Index, text
 from sqlalchemy.dialects.postgresql import UUID
 from sqlmodel import Column, DateTime, Field, Relationship, func
 
@@ -22,6 +22,34 @@ class AttendeeProducts(AttendeeProductsBase, table=True):
     """Link table for attendee products with quantity."""
 
     __tablename__ = "attendee_products"
+    __table_args__ = (
+        CheckConstraint(
+            "fulfillment_type IS NULL OR fulfillment_type IN "
+            "('access', 'participant', 'order')",
+            name="ck_attendee_products_fulfillment_type",
+        ),
+        Index(
+            "ix_attendee_products_attendee_fulfillment_type",
+            "attendee_id",
+            "fulfillment_type",
+        ),
+        CheckConstraint(
+            "(payment_product_id IS NULL) = (unit_index IS NULL)",
+            name="ck_attendee_product_lineage_pair",
+        ),
+        CheckConstraint(
+            "unit_index IS NULL OR unit_index >= 0",
+            name="ck_attendee_product_unit_index_nonnegative",
+        ),
+        Index(
+            "ux_attendee_product_payment_product_unit",
+            "payment_product_id",
+            "unit_index",
+            unique=True,
+            postgresql_where=text("payment_product_id IS NOT NULL"),
+        ),
+    )
+    fulfillment_type: str | None = Field(default=None, nullable=True)
 
     # Relationships
     attendee: "Attendees" = Relationship(back_populates="attendee_products")
@@ -43,6 +71,9 @@ class Attendees(AttendeeBase, table=True):
             UUID(as_uuid=True),
             primary_key=True,
         ),
+    )
+    managed_by_human_id: uuid.UUID | None = Field(
+        default=None, foreign_key="humans.id", index=True, nullable=True
     )
 
     created_at: datetime = Field(
@@ -67,7 +98,13 @@ class Attendees(AttendeeBase, table=True):
     popup: "Popups" = Relationship(back_populates="attendees")
     human: "Humans" = Relationship(
         back_populates="attendees",
-        sa_relationship_kwargs={"lazy": "selectin"},
+        sa_relationship_kwargs={
+            "lazy": "selectin",
+            "foreign_keys": "Attendees.human_id",
+        },
+    )
+    manager: Optional["Humans"] = Relationship(
+        sa_relationship_kwargs={"foreign_keys": "Attendees.managed_by_human_id"}
     )
     attendee_products: list["AttendeeProducts"] = Relationship(
         back_populates="attendee",

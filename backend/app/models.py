@@ -116,7 +116,7 @@ from app.api.human.schemas import HumanCreate, HumanPublic, HumanUpdate
 from app.api.invite.models import Invites
 
 # Payment models
-from app.api.payment.models import PaymentProducts, Payments
+from app.api.payment.models import PaymentProducts, PaymentRecipients, Payments
 from app.api.payment.schemas import PaymentCreate, PaymentPublic, PaymentUpdate
 from app.api.popup.models import Popups
 from app.api.popup.schemas import PopupAdmin, PopupCreate, PopupPublic, PopupUpdate
@@ -269,6 +269,7 @@ __all__ = [
     # Payments
     "Payments",
     "PaymentProducts",
+    "PaymentRecipients",
     "PaymentCreate",
     "PaymentPublic",
     "PaymentUpdate",

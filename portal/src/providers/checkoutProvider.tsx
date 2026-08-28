@@ -54,12 +54,14 @@ import { trackMetaAddToCart } from "@/lib/meta-pixel"
 import { queryKeys } from "@/lib/query-keys"
 import { isPassQuantityBased } from "@/strategies/passQuantityHelper"
 import type { AttendeePassState } from "@/types/Attendee"
-import type {
-  CheckoutCartState,
-  CheckoutCartSummary,
-  CheckoutStep,
-  SelectedDynamicItem,
-  SelectedPassItem,
+import {
+  buildCheckoutRecipientDraft,
+  type CheckoutCartState,
+  type CheckoutCartSummary,
+  type CheckoutRecipientPassState,
+  type CheckoutStep,
+  type SelectedDynamicItem,
+  type SelectedPassItem,
 } from "@/types/checkout"
 import type { ApplicationFormSchema } from "@/types/form-schema"
 import type { ProductsPass } from "@/types/Products"
@@ -288,6 +290,7 @@ export function CheckoutProvider({
     isEditing,
     toggleEditing,
     clearSelections,
+    restoreRecipientSelections,
   } = usePassesProvider()
   const { discountApplied, setDiscount, resetDiscount } = useDiscount()
   const { getRelevantApplication } = useApplication()
@@ -507,11 +510,34 @@ export function CheckoutProvider({
                   : 1
 
           if (quantity > 0) {
+            const recipientAttendee = attendee as CheckoutRecipientPassState
+            const isAnonymousBuyer =
+              submitMode === "open-ticketing" &&
+              !recipientAttendee.recipient &&
+              attendee.category === "main"
+            const buyerName = [buyerValues.first_name, buyerValues.last_name]
+              .filter((value): value is string => typeof value === "string")
+              .join(" ")
+              .trim()
+            const recipient = buildCheckoutRecipientDraft(
+              recipientAttendee,
+              isAnonymousBuyer
+                ? {
+                    name: buyerName || attendee.name,
+                    email:
+                      typeof buyerValues.email === "string"
+                        ? buyerValues.email
+                        : attendee.email,
+                    profileSnapshot: buyerValues,
+                  }
+                : {},
+            )
             passes.push({
               productId: product.id,
               product,
               attendeeId: attendee.id,
               attendee,
+              recipient,
               quantity,
               price: product.price * quantity,
               originalPrice: product.original_price
@@ -524,7 +550,13 @@ export function CheckoutProvider({
     }
 
     return passes
-  }, [attendeePasses, checkoutPolicy.checkoutMode, isEditing])
+  }, [
+    attendeePasses,
+    buyerValues,
+    checkoutPolicy.checkoutMode,
+    isEditing,
+    submitMode,
+  ])
 
   // Ref that holds the latest selection state for cart persistence.
   // Initialized with defaults — updated to real values after all hooks run.
@@ -626,6 +658,7 @@ export function CheckoutProvider({
       setInsurance,
       setDynamicItems,
       setPromoCode,
+      restorePassRecipients: restoreRecipientSelections,
     },
     hasRestoredCheckoutRef,
     paymentCompleteRef,

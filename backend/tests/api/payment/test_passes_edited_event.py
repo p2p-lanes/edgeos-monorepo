@@ -123,6 +123,7 @@ def _make_product(
     price: Decimal,
     category: str = "ticket",
     duration_type: str = "week",
+    fulfillment_type: str = "access",
 ) -> Products:
     slug = uuid.uuid4().hex[:8]
     product = Products(
@@ -133,6 +134,7 @@ def _make_product(
         price=price,
         currency="USD",
         category=category,
+        fulfillment_type=fulfillment_type,
         duration_type=duration_type,
         discountable=True,
     )
@@ -146,6 +148,9 @@ def _seed_purchased_product(
     tenant: Tenants,
     attendee: Attendees,
     product: Products,
+    *,
+    fulfillment_type: str | None = None,
+    purchase_metadata: dict | None = None,
 ) -> AttendeeProducts:
     """Simulate a previously purchased product on an attendee (edit_passes context)."""
     ap = AttendeeProducts(
@@ -154,10 +159,43 @@ def _seed_purchased_product(
         product_id=product.id,
         quantity=1,
         check_in_code=generate_check_in_code(),
+        fulfillment_type=fulfillment_type,
+        purchase_metadata=purchase_metadata,
     )
     db.add(ap)
     db.flush()
     return ap
+
+
+def _seed_preserved_non_access_holdings(
+    db: Session,
+    tenant: Tenants,
+    popup: Popups,
+    attendee: Attendees,
+    *,
+    meal_metadata: dict,
+) -> dict[str, tuple[Products, AttendeeProducts]]:
+    preserved = {}
+    for fulfillment_type in ("participant", "order"):
+        product = _make_product(
+            db,
+            tenant,
+            popup,
+            price=Decimal("0"),
+            fulfillment_type=fulfillment_type,
+        )
+        holding = _seed_purchased_product(
+            db,
+            tenant,
+            attendee,
+            product,
+            fulfillment_type=fulfillment_type,
+            purchase_metadata=(
+                meal_metadata if fulfillment_type == "participant" else None
+            ),
+        )
+        preserved[fulfillment_type] = (product, holding)
+    return preserved
 
 
 def _passes_edited_entries(db: Session, human_id: uuid.UUID) -> list[AuditLog]:
@@ -206,7 +244,20 @@ class TestPassesEditedEvent:
 
         # Previously purchased pass being given up
         old_product = _make_product(db, tenant_a, popup, price=Decimal("100"))
-        _seed_purchased_product(db, tenant_a, attendee, old_product)
+        _seed_purchased_product(
+            db, tenant_a, attendee, old_product, fulfillment_type="access"
+        )
+        legacy_product = _make_product(db, tenant_a, popup, price=Decimal("0"))
+        _seed_purchased_product(db, tenant_a, attendee, legacy_product)
+        preserved = _seed_preserved_non_access_holdings(
+            db,
+            tenant_a,
+            popup,
+            attendee,
+            meal_metadata={"meal": "vegan"},
+        )
+        meal_product, meal_holding = preserved["participant"]
+        order_product, order_holding = preserved["order"]
 
         # New (cheaper) product in the edit cart
         new_product = _make_product(db, tenant_a, popup, price=Decimal("30"))
@@ -232,6 +283,17 @@ class TestPassesEditedEvent:
         assert entries[0].entity_type == AuditEntityType.HUMAN
         assert entries[0].entity_id == human.id
         assert entries[0].popup_id == popup.id
+        db.expire_all()
+        holdings = attendee.attendee_products
+        assert {holding.product_id for holding in holdings} == {
+            new_product.id,
+            meal_product.id,
+            order_product.id,
+        }
+        preserved_meal = db.get(AttendeeProducts, meal_holding.id)
+        assert preserved_meal is not None
+        assert preserved_meal.purchase_metadata == {"meal": "vegan"}
+        assert db.get(AttendeeProducts, order_holding.id) is not None
 
     def test_positive_amount_edit_passes_emits_passes_edited(
         self, db: Session, tenant_a: Tenants
@@ -248,6 +310,19 @@ class TestPassesEditedEvent:
         human = _make_human(db, tenant_a)
         application = _make_application(db, tenant_a, popup, human, credit=Decimal("0"))
         attendee = _make_attendee(db, tenant_a, popup, application)
+        old_product = _make_product(db, tenant_a, popup, price=Decimal("10"))
+        old_holding = _seed_purchased_product(
+            db, tenant_a, attendee, old_product, fulfillment_type="access"
+        )
+        preserved = _seed_preserved_non_access_holdings(
+            db,
+            tenant_a,
+            popup,
+            attendee,
+            meal_metadata={"meal": "gluten-free"},
+        )
+        meal_product, meal_holding = preserved["participant"]
+        order_product, order_holding = preserved["order"]
         product = _make_product(db, tenant_a, popup, price=Decimal("150"))
 
         obj = PaymentCreate(
@@ -265,7 +340,10 @@ class TestPassesEditedEvent:
         fake_resp = _fake_simplefi_response()
         with patch("app.services.simplefi.get_simplefi_client") as mock_factory:
             mock_factory.return_value.create_payment.return_value = fake_resp
-            payments_crud.create_payment(db, obj, attribution=None)
+            payment, _ = payments_crud.create_payment(db, obj, attribution=None)
+
+        assert db.get(AttendeeProducts, old_holding.id) is not None
+        payments_crud.approve_payment(db, payment.id)
 
         entries = _passes_edited_entries(db, human.id)
         assert len(entries) == 1, (
@@ -274,6 +352,34 @@ class TestPassesEditedEvent:
         assert entries[0].entity_type == AuditEntityType.HUMAN
         assert entries[0].entity_id == human.id
         assert entries[0].popup_id == popup.id
+        db.expire_all()
+        holdings = attendee.attendee_products
+        assert {holding.product_id for holding in holdings} == {
+            product.id,
+            meal_product.id,
+            order_product.id,
+        }
+        preserved_meal = db.get(AttendeeProducts, meal_holding.id)
+        assert preserved_meal is not None
+        assert preserved_meal.purchase_metadata == {"meal": "gluten-free"}
+        assert db.get(AttendeeProducts, order_holding.id) is not None
+        access_holding = next(
+            holding for holding in holdings if holding.product_id == product.id
+        )
+        stable_access = (access_holding.id, access_holding.check_in_code)
+
+        payments_crud.approve_payment(db, payment.id)
+
+        db.expire_all()
+        replayed_access = db.exec(
+            select(AttendeeProducts).where(
+                AttendeeProducts.attendee_id == attendee.id,
+                AttendeeProducts.product_id == product.id,
+            )
+        ).one()
+        assert (replayed_access.id, replayed_access.check_in_code) == stable_access
+        assert db.get(AttendeeProducts, meal_holding.id) is not None
+        assert db.get(AttendeeProducts, order_holding.id) is not None
 
     def test_non_edit_purchase_emits_no_passes_edited(
         self, db: Session, tenant_a: Tenants

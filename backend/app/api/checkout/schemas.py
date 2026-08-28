@@ -5,9 +5,17 @@ from datetime import datetime
 from decimal import Decimal
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    EmailStr,
+    Field,
+    field_validator,
+    model_validator,
+)
 
 from app.api.attendee_category.schemas import AttendeeCategoryPublic
+from app.api.payment.schemas import PaymentRecipientRequest
 from app.api.popup.schemas import PopupPublic
 from app.api.sales_flow.schemas import SelectedSalesFlow
 from app.api.ticketing_step.schemas import TicketingStepPublic
@@ -139,6 +147,14 @@ class ProductLine(BaseModel):
 
     product_id: uuid.UUID
     quantity: int = Field(ge=1, default=1)
+    attendee_id: uuid.UUID | None = None
+    recipient_key: str | None = Field(default=None, min_length=1, max_length=255)
+
+    @model_validator(mode="after")
+    def validate_identity(self) -> "ProductLine":
+        if self.attendee_id is not None and self.recipient_key is not None:
+            raise ValueError("attendee_id and recipient_key cannot both be set")
+        return self
 
 
 class BuyerInfo(BaseModel):
@@ -177,6 +193,7 @@ class OpenTicketingPurchaseCreate(BaseModel):
     """Request schema for POST /checkout/{slug}/{flow_slug}/purchase."""
 
     products: list[ProductLine] = Field(min_length=1)
+    recipients: list[PaymentRecipientRequest] = Field(default_factory=list)
     buyer: BuyerInfo
     coupon_code: str | None = None
     # Buyer opt-in for the optional insurance fee (mirrors the authenticated
@@ -197,6 +214,20 @@ class OpenTicketingPurchaseCreate(BaseModel):
     cid: uuid.UUID | None = None
     sig: str | None = None
     quote_token: str | None = None
+
+    @model_validator(mode="after")
+    def validate_recipients(self) -> "OpenTicketingPurchaseCreate":
+        keys = [recipient.recipient_key for recipient in self.recipients]
+        if len(keys) != len(set(keys)):
+            raise ValueError("recipient_key values must be unique")
+        referenced = {
+            line.recipient_key
+            for line in self.products
+            if line.recipient_key is not None
+        }
+        if referenced - set(keys):
+            raise ValueError("Every recipient_key must reference a supplied recipient")
+        return self
 
 
 class OpenTicketingPurchaseResponse(BaseModel):
@@ -227,6 +258,7 @@ class CheckoutPreviewRequest(BaseModel):
     coupon_code: str | None = None
     insurance: bool = False
     buyer: BuyerInfo | None = None
+    recipients: list[PaymentRecipientRequest] = Field(default_factory=list)
 
 
 class CheckoutPreviewLine(BaseModel):

@@ -1,18 +1,8 @@
-"""Upsale flow eligibility (sdd/sales-flows design D8, G0 #2/#3, task 13.1).
+"""Live positive-grant eligibility for popup upsale flows.
 
-Eligibility for an upsale-type flow = the calling human has at least one
-product assigned anywhere in the popup OR at least one APPROVED payment
-anywhere in the popup. The products leg is a product-owner amendment
-superseding design G0 #3's payment-only wording: admin-granted attendee
-products (no payment ever created) make a legitimate ticket-holder.
-Neither leg is scoped to a specific flow: `payments.sales_flow_id` stays
-provenance-only per design D7, never a request-path authorization filter.
-
-Evaluated LIVE at both catalog render and purchase time (design D8) — never
-snapshotted. A refund or cancellation must immediately revoke access, so
-this module deliberately has no caching layer of its own; callers that need
-to avoid repeating the query within one request memoize the boolean
-themselves (it is invariant per (human, popup) within a single request).
+Accepted Applications and active self/managed access holdings grant access.
+Application negatives, bare Attendees, other holding types, and Payment
+ancestry do not.
 
 `identity_mode=portal_auth` (schemas.SalesFlowIdentityMode) is the only
 implemented mode in v1 — an upsale flow is unreachable without a portal
@@ -36,21 +26,19 @@ if TYPE_CHECKING:
 def has_popup_products(
     session: Session, human_id: uuid.UUID, popup_id: uuid.UUID
 ) -> bool:
-    """Does `human_id` have >=1 product assigned anywhere in `popup_id`?
+    """Whether an accessible Attendee has an active typed access holding."""
+    from app.api.attendee.crud import attendees_crud
+    from app.api.attendee.models import AttendeeProducts
+    from app.api.product.schemas import FulfillmentType
 
-    Covers admin-granted products: `attendee_products` rows exist without
-    any payment. One lightweight `EXISTS` probe — no full row is loaded.
-    """
-    from app.api.attendee.models import AttendeeProducts, Attendees
+    attendee_ids = attendees_crud._human_accessible_attendee_ids(human_id, popup_id)
 
     product_exists = select(
         sa_exists().where(
             AttendeeProducts.attendee_id.in_(  # type: ignore[union-attr]
-                select(Attendees.id).where(
-                    Attendees.human_id == human_id,
-                    Attendees.popup_id == popup_id,
-                )
-            )
+                select(attendee_ids.c.id)
+            ),
+            AttendeeProducts.fulfillment_type == FulfillmentType.ACCESS.value,
         )
     )
     return session.exec(product_exists).one()
@@ -61,11 +49,7 @@ def has_approved_payment(
 ) -> bool:
     """Does `human_id` have >=1 APPROVED payment anywhere in `popup_id`?
 
-    One of the two `is_upsale_eligible` legs. Mirrors
-    `application/crud.py::resolve_popup_access`'s Step 5 payment
-    predicate (application-leg + direct-sale-leg), narrowed to
-    `status=APPROVED`. Two lightweight `EXISTS` probes, short-circuited —
-    no full row is loaded.
+    Return Payment ancestry for diagnostics; never use it as an access grant.
     """
     from app.api.application.models import Applications
     from app.api.attendee.models import Attendees
@@ -115,13 +99,23 @@ def has_approved_payment(
 def is_upsale_eligible(
     session: Session, human_id: uuid.UUID, popup_id: uuid.UUID
 ) -> bool:
-    """Composed upsale eligibility: products leg OR approved-payment leg.
+    """Composed eligibility: accepted Application OR typed access holding.
 
     Single source of truth consumed by both `assert_upsale_eligible`
     (checkout gate) and `ApplicationsCRUD.resolve_upsale_catalog`
     (passes-page listing), so the two surfaces stay in lockstep.
     """
-    return has_popup_products(session, human_id, popup_id) or has_approved_payment(
+    from app.api.application.models import Applications
+    from app.api.application.schemas import ApplicationStatus
+
+    accepted = select(
+        sa_exists().where(
+            Applications.human_id == human_id,
+            Applications.popup_id == popup_id,
+            Applications.status == ApplicationStatus.ACCEPTED.value,
+        )
+    )
+    return session.exec(accepted).one() or has_popup_products(
         session, human_id, popup_id
     )
 
@@ -141,7 +135,6 @@ def assert_upsale_eligible(
     Anonymous caller (no token, or a non-human token) -> 401: no
     credentials were presented at all, so "sign in" is the correct signal.
     Authenticated but cross-tenant, or not upsale-eligible in the popup
-    (no product assigned AND no approved payment, per `is_upsale_eligible`)
     -> 403: credentials were presented and are valid, they simply do not
     grant access here. Neither response leaks new information about the flow: its
     existence is already URL-addressable (design Threat Matrix), so a

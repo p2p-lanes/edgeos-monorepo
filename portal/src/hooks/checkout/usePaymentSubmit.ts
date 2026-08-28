@@ -6,7 +6,13 @@ import { type MutableRefObject, useCallback, useEffect, useState } from "react"
 import { useTranslation } from "react-i18next"
 import { toast } from "sonner"
 import type { CheckoutMode } from "@/checkout/popupCheckoutPolicy"
-import { ApiError, CheckoutService, PaymentsService } from "@/client"
+import {
+  ApiError,
+  CheckoutService,
+  type PaymentProductRequest_Input as PaymentProductRequest,
+  PaymentsService,
+  type ProductLine,
+} from "@/client"
 import { withCheckoutLocale } from "@/helpers/checkout"
 import { getAttribution } from "@/lib/attribution"
 import { trackGAPurchase } from "@/lib/google-analytics"
@@ -82,6 +88,40 @@ interface UsePaymentSubmitParams {
 interface PaymentSubmitResult {
   success: boolean
   error?: string
+}
+
+function buildOpenTicketingProductLines(
+  products: PaymentProductRequest[],
+): ProductLine[] {
+  const lines = new Map<string, ProductLine>()
+
+  for (const product of products) {
+    const identity = product.recipient_key
+      ? { recipient_key: product.recipient_key }
+      : product.attendee_id
+        ? { attendee_id: product.attendee_id }
+        : {}
+    const identityKey = product.recipient_key
+      ? ["recipient", product.recipient_key]
+      : product.attendee_id
+        ? ["attendee", product.attendee_id]
+        : ["ownerless"]
+    const key = JSON.stringify([product.product_id, ...identityKey])
+    const quantity = product.quantity ?? 1
+    const existing = lines.get(key)
+
+    if (existing) {
+      existing.quantity = (existing.quantity ?? 1) + quantity
+    } else {
+      lines.set(key, {
+        product_id: product.product_id,
+        ...identity,
+        quantity,
+      })
+    }
+  }
+
+  return [...lines.values()]
 }
 
 export function usePaymentSubmit({
@@ -197,21 +237,23 @@ export function usePaymentSubmit({
     }
 
     try {
-      const { products: productsToSend, isMonthUpgrade } = buildPaymentProducts(
-        {
-          attendeePasses,
-          selectedPasses,
-          housing,
-          merch,
-          patron,
-          selectedMealPlans,
-          dynamicItems,
-          isEditing,
-          appCredit,
-          checkoutMode,
-          editPassesEnabled,
-        },
-      )
+      const {
+        products: productsToSend,
+        recipients: recipientsToSend,
+        isMonthUpgrade,
+      } = buildPaymentProducts({
+        attendeePasses,
+        selectedPasses,
+        housing,
+        merch,
+        patron,
+        selectedMealPlans,
+        dynamicItems,
+        isEditing,
+        appCredit,
+        checkoutMode,
+        editPassesEnabled,
+      })
 
       const result =
         submitMode === "open-ticketing"
@@ -224,23 +266,8 @@ export function usePaymentSubmit({
                 ...(Object.keys(getAttribution()).length
                   ? { attribution: getAttribution() }
                   : {}),
-                products: Object.values(
-                  productsToSend.reduce<
-                    Record<string, { product_id: string; quantity: number }>
-                  >((acc, product) => {
-                    const quantity = product.quantity ?? 1
-                    const existing = acc[product.product_id]
-                    if (existing) {
-                      existing.quantity += quantity
-                    } else {
-                      acc[product.product_id] = {
-                        product_id: product.product_id,
-                        quantity,
-                      }
-                    }
-                    return acc
-                  }, {}),
-                ),
+                products: buildOpenTicketingProductLines(productsToSend),
+                recipients: recipientsToSend,
                 buyer: {
                   email: buyerData!.email,
                   first_name: buyerData!.firstName,
@@ -267,6 +294,7 @@ export function usePaymentSubmit({
               requestBody: {
                 application_id: applicationId,
                 products: productsToSend,
+                recipients: recipientsToSend,
                 coupon_code: promoCodeValid ? promoCode : undefined,
                 edit_passes: isEditing || isMonthUpgrade ? true : undefined,
                 insurance: insurance || undefined,

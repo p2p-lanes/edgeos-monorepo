@@ -2,12 +2,12 @@ import uuid
 from decimal import ROUND_HALF_UP, Decimal
 
 from fastapi import APIRouter, Query
-from sqlalchemy import and_, case, func
+from sqlalchemy import and_, case, func, or_
 from sqlmodel import select
 
 from app.api.application.models import Applications
 from app.api.application.schemas import ApplicationStatus
-from app.api.attendee.models import Attendees
+from app.api.attendee.models import AttendeeProducts, Attendees
 from app.api.attendee_category.models import AttendeeCategories
 from app.api.dashboard.schemas import (
     ApplicationFunnel,
@@ -31,7 +31,11 @@ from app.api.payment.models import PaymentProducts, Payments
 from app.api.payment.schemas import PaymentStatus, PaymentType
 from app.api.popup.crud import popups_crud
 from app.api.product.models import Products
-from app.api.product.schemas import CATEGORY_HOUSING, CATEGORY_TICKET
+from app.api.product.schemas import (
+    CATEGORY_HOUSING,
+    CATEGORY_TICKET,
+    FulfillmentType,
+)
 from app.api.sales_flow.models import SalesFlows
 from app.core.dependencies.users import CurrentOperator, TenantSession
 
@@ -222,6 +226,45 @@ TWO_DECIMAL = Decimal("0.01")
 ONE_DECIMAL = Decimal("0.1")
 
 
+def _typed_line_or_legacy_category(fulfillment_type: str, legacy_category: str):
+    """Match a typed snapshot, or an explicitly unclassified legacy line."""
+    return or_(
+        PaymentProducts.fulfillment_type == fulfillment_type,
+        and_(
+            PaymentProducts.fulfillment_type.is_(None),
+            Products.fulfillment_type.is_(None),
+            Products.category == legacy_category,
+        ),
+    )
+
+
+def _fulfilled_access_holding():
+    """Require active holding lineage without accepting typed conflicts."""
+    return and_(
+        _typed_line_or_legacy_category(FulfillmentType.ACCESS.value, CATEGORY_TICKET),
+        or_(
+            AttendeeProducts.fulfillment_type == FulfillmentType.ACCESS.value,
+            AttendeeProducts.fulfillment_type.is_(None),
+        ),
+    )
+
+
+def _order_housing_line():
+    return and_(
+        _typed_line_or_legacy_category(FulfillmentType.ORDER.value, CATEGORY_HOUSING),
+        Products.category == CATEGORY_HOUSING,
+    )
+
+
+def _housing_payment_ids():
+    return (
+        select(PaymentProducts.payment_id)
+        .join(Products, PaymentProducts.product_id == Products.id)
+        .where(_order_housing_line())
+        .correlate(None)
+    )
+
+
 def _get_key_metrics(
     db: TenantSession,
     popup_id: uuid.UUID,
@@ -284,18 +327,21 @@ def _get_accommodation_percentage(
     if total_people == 0:
         return Decimal("0")
 
-    # Count distinct attendees with an approved housing payment product.
-    # Filter by the live product category (consistent with the ticket widgets);
-    # the purchase-time snapshot product_category can be stale.
     housing_attendees = db.exec(
-        select(func.count(func.distinct(PaymentProducts.attendee_id)))
+        select(func.count(func.distinct(AttendeeProducts.attendee_id)))
+        .select_from(AttendeeProducts)
+        .join(
+            PaymentProducts,
+            AttendeeProducts.payment_product_id == PaymentProducts.id,
+        )
         .join(Payments, PaymentProducts.payment_id == Payments.id)
         .join(Products, PaymentProducts.product_id == Products.id)
         .where(
             Payments.popup_id == popup_id,
             Payments.status == PaymentStatus.APPROVED.value,
             Payments.payment_type == PaymentType.PASS_PURCHASE.value,
-            Products.category == CATEGORY_HOUSING,
+            _fulfilled_access_holding(),
+            PaymentProducts.payment_id.in_(_housing_payment_ids()),  # type: ignore[union-attr]
         )
     ).one()
 
@@ -312,12 +358,19 @@ def _get_paying_attendees_count(db: TenantSession, popup_id: uuid.UUID) -> int:
     non-paying attendees (sponsors, guests, comps) don't dilute the average.
     """
     count = db.exec(
-        select(func.count(func.distinct(PaymentProducts.attendee_id)))
+        select(func.count(func.distinct(AttendeeProducts.attendee_id)))
+        .select_from(AttendeeProducts)
+        .join(
+            PaymentProducts,
+            AttendeeProducts.payment_product_id == PaymentProducts.id,
+        )
         .join(Payments, PaymentProducts.payment_id == Payments.id)
+        .join(Products, PaymentProducts.product_id == Products.id)
         .where(
             Payments.popup_id == popup_id,
             Payments.status == PaymentStatus.APPROVED.value,
             Payments.payment_type == PaymentType.PASS_PURCHASE.value,
+            _fulfilled_access_holding(),
         )
     ).one()
     return count or 0
@@ -343,11 +396,9 @@ def _get_cumulative_trends(
             Payments.popup_id == popup_id,
             Payments.status == PaymentStatus.APPROVED.value,
             Payments.payment_type == PaymentType.PASS_PURCHASE.value,
-            # Live product category (same source as the Tickets by Type widget)
-            # so the cumulative count reconciles with it. The purchase-time
-            # snapshot product_category is stale for tickets re-categorised
-            # after sale (e.g. day/week/month folded into ticket + duration).
-            Products.category == CATEGORY_TICKET,
+            _typed_line_or_legacy_category(
+                FulfillmentType.ACCESS.value, CATEGORY_TICKET
+            ),
         )
         .group_by(bucket)
         .order_by(bucket)
@@ -565,7 +616,9 @@ def _get_distribution(db: TenantSession, popup_id: uuid.UUID) -> Distribution:
             Payments.popup_id == popup_id,
             Payments.status == PaymentStatus.APPROVED.value,
             Payments.payment_type == PaymentType.PASS_PURCHASE.value,
-            Products.category == CATEGORY_TICKET,
+            _typed_line_or_legacy_category(
+                FulfillmentType.ACCESS.value, CATEGORY_TICKET
+            ),
         )
         .group_by(Products.duration_type)
     ).all()
@@ -612,7 +665,9 @@ def _get_distribution(db: TenantSession, popup_id: uuid.UUID) -> Distribution:
             Payments.popup_id == popup_id,
             Payments.status == PaymentStatus.APPROVED.value,
             Payments.payment_type == PaymentType.PASS_PURCHASE.value,
-            Products.category == CATEGORY_TICKET,
+            _typed_line_or_legacy_category(
+                FulfillmentType.ACCESS.value, CATEGORY_TICKET
+            ),
         )
         .group_by(AttendeeCategories.key)
     ).all()
@@ -640,8 +695,6 @@ def _get_distribution(db: TenantSession, popup_id: uuid.UUID) -> Distribution:
         for cat, qty in attendee_type_rows
     ]
 
-    # Accommodation by product name. Live product category, consistent with the
-    # other widgets (snapshot product_category can be stale).
     housing_rows = db.exec(
         select(
             PaymentProducts.product_name,
@@ -653,7 +706,7 @@ def _get_distribution(db: TenantSession, popup_id: uuid.UUID) -> Distribution:
             Payments.popup_id == popup_id,
             Payments.status == PaymentStatus.APPROVED.value,
             Payments.payment_type == PaymentType.PASS_PURCHASE.value,
-            Products.category == CATEGORY_HOUSING,
+            _order_housing_line(),
         )
         .group_by(PaymentProducts.product_name)
     ).all()
@@ -687,59 +740,42 @@ def _get_distribution(db: TenantSession, popup_id: uuid.UUID) -> Distribution:
 
 def _get_attach_rate(db: TenantSession, popup_id: uuid.UUID) -> list[AttachRateItem]:
     """Compute accommodation attach rate per ticket duration type."""
-    # Step 1: All attendees with an approved ticket, grouped by duration_type
-    ticket_attendees = db.exec(
+    rows = db.exec(
         select(
             Products.duration_type,
-            func.count(func.distinct(PaymentProducts.attendee_id)),
+            func.count(func.distinct(AttendeeProducts.attendee_id)),
+            func.count(
+                func.distinct(
+                    case(
+                        (
+                            PaymentProducts.payment_id.in_(  # type: ignore[union-attr]
+                                _housing_payment_ids()
+                            ),
+                            AttendeeProducts.attendee_id,
+                        ),
+                        else_=None,
+                    )
+                )
+            ),
         )
-        .join(PaymentProducts, Products.id == PaymentProducts.product_id)
-        .join(Payments, PaymentProducts.payment_id == Payments.id)
-        .where(
-            Payments.popup_id == popup_id,
-            Payments.status == PaymentStatus.APPROVED.value,
-            Payments.payment_type == PaymentType.PASS_PURCHASE.value,
-            Products.category == CATEGORY_TICKET,
+        .select_from(AttendeeProducts)
+        .join(
+            PaymentProducts,
+            AttendeeProducts.payment_product_id == PaymentProducts.id,
         )
-        .group_by(Products.duration_type)
-    ).all()
-
-    if not ticket_attendees:
-        return []
-
-    # Step 2: Of those, which also have housing
-    # Subquery: attendee_ids that have housing
-    housing_attendee_ids = (
-        select(PaymentProducts.attendee_id)
         .join(Payments, PaymentProducts.payment_id == Payments.id)
         .join(Products, PaymentProducts.product_id == Products.id)
         .where(
             Payments.popup_id == popup_id,
             Payments.status == PaymentStatus.APPROVED.value,
             Payments.payment_type == PaymentType.PASS_PURCHASE.value,
-            # Live product category, matching the ticket leg of this metric.
-            Products.category == CATEGORY_HOUSING,
-        )
-    ).correlate(None)
-
-    housing_by_duration = db.exec(
-        select(
-            Products.duration_type,
-            func.count(func.distinct(PaymentProducts.attendee_id)),
-        )
-        .join(PaymentProducts, Products.id == PaymentProducts.product_id)
-        .join(Payments, PaymentProducts.payment_id == Payments.id)
-        .where(
-            Payments.popup_id == popup_id,
-            Payments.status == PaymentStatus.APPROVED.value,
-            Payments.payment_type == PaymentType.PASS_PURCHASE.value,
-            Products.category == CATEGORY_TICKET,
-            PaymentProducts.attendee_id.in_(housing_attendee_ids),  # type: ignore[union-attr]
+            _fulfilled_access_holding(),
         )
         .group_by(Products.duration_type)
     ).all()
 
-    housing_map = dict(housing_by_duration)
+    if not rows:
+        return []
     duration_labels = {
         "day": "Day Pass",
         "week": "Week Pass",
@@ -749,8 +785,7 @@ def _get_attach_rate(db: TenantSession, popup_id: uuid.UUID) -> list[AttachRateI
     }
 
     result: list[AttachRateItem] = []
-    for dur, total in ticket_attendees:
-        with_housing = housing_map.get(dur, 0)
+    for dur, total, with_housing in rows:
         rate = (
             (Decimal(with_housing) / Decimal(total) * 100).quantize(
                 ONE_DECIMAL, ROUND_HALF_UP

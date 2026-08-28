@@ -20,6 +20,7 @@ from app.api.payment.schemas import (
     PaymentSource,
     PaymentStatus,
     PaymentStatusCheck,
+    PaymentType,
     PaymentUpdate,
     PendingReleaseAuthRequest,
     PendingReleaseResponse,
@@ -1006,6 +1007,11 @@ async def _handle_regular_payment(
     )
 
     if payment.status == payment_request_status:
+        if (
+            payment_request_status == PaymentStatus.APPROVED.value
+            and payment.payment_type != PaymentType.APPLICATION_FEE.value
+        ):
+            payments_crud.approve_payment(db, payment.id)
         logger.info(
             "Payment status unchanged (%s). Skipping...", payment_request_status
         )
@@ -1014,8 +1020,6 @@ async def _handle_regular_payment(
     settlement_currency, settlement_rate, source = _extract_settlement_details(payload)
 
     if payment_request_status == "approved":
-        from app.api.payment.schemas import PaymentType
-
         # Recorded before approval so it lands in the same commit.
         payment.amount_charged = _extract_charged_amount(payload.data.payment_request)
 

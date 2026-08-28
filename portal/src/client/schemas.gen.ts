@@ -1070,6 +1070,7 @@ export const ApplicationFeeCreateSchema = {
             title: 'Application Id'
         }
     },
+    additionalProperties: false,
     type: 'object',
     required: ['application_id'],
     title: 'ApplicationFeeCreate',
@@ -4393,8 +4394,28 @@ export const CartItemMerchSchema = {
 export const CartItemPassSchema = {
     properties: {
         attendee_id: {
-            type: 'string',
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
             title: 'Attendee Id'
+        },
+        recipient_key: {
+            anyOf: [
+                {
+                    type: 'string',
+                    maxLength: 255,
+                    minLength: 1
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Recipient Key'
         },
         product_id: {
             type: 'string',
@@ -4407,7 +4428,7 @@ export const CartItemPassSchema = {
         }
     },
     type: 'object',
-    required: ['attendee_id', 'product_id'],
+    required: ['product_id'],
     title: 'CartItemPass',
     description: 'Pass selection in cart.'
 } as const;
@@ -4552,8 +4573,14 @@ export const CartStateSchema = {
                 '$ref': '#/components/schemas/CartItemPass'
             },
             type: 'array',
-            title: 'Passes',
-            default: []
+            title: 'Passes'
+        },
+        recipients: {
+            items: {
+                '$ref': '#/components/schemas/PaymentRecipientRequest'
+            },
+            type: 'array',
+            title: 'Recipients'
         },
         housing: {
             anyOf: [
@@ -5074,6 +5101,13 @@ export const CheckoutPreviewRequestSchema = {
                     type: 'null'
                 }
             ]
+        },
+        recipients: {
+            items: {
+                '$ref': '#/components/schemas/PaymentRecipientRequest'
+            },
+            type: 'array',
+            title: 'Recipients'
         }
     },
     type: 'object',
@@ -10011,6 +10045,12 @@ export const FormSectionUpdateSchema = {
     title: 'FormSectionUpdate'
 } as const;
 
+export const FulfillmentTypeSchema = {
+    type: 'string',
+    enum: ['access', 'participant', 'order'],
+    title: 'FulfillmentType'
+} as const;
+
 export const GoogleFontSchema = {
     properties: {
         family: {
@@ -14098,6 +14138,13 @@ export const OpenTicketingPurchaseCreateSchema = {
             minItems: 1,
             title: 'Products'
         },
+        recipients: {
+            items: {
+                '$ref': '#/components/schemas/PaymentRecipientRequest'
+            },
+            type: 'array',
+            title: 'Recipients'
+        },
         buyer: {
             '$ref': '#/components/schemas/BuyerInfo'
         },
@@ -14311,6 +14358,13 @@ export const PaymentCreateSchema = {
             type: 'array',
             title: 'Products'
         },
+        recipients: {
+            items: {
+                '$ref': '#/components/schemas/PaymentRecipientRequest'
+            },
+            type: 'array',
+            title: 'Recipients'
+        },
         coupon_code: {
             anyOf: [
                 {
@@ -14494,9 +14548,29 @@ export const PaymentProductRequest_InputSchema = {
             title: 'Product Id'
         },
         attendee_id: {
-            type: 'string',
-            format: 'uuid',
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
             title: 'Attendee Id'
+        },
+        recipient_key: {
+            anyOf: [
+                {
+                    type: 'string',
+                    maxLength: 255,
+                    minLength: 1
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Recipient Key'
         },
         quantity: {
             type: 'integer',
@@ -14532,7 +14606,7 @@ export const PaymentProductRequest_InputSchema = {
         }
     },
     type: 'object',
-    required: ['product_id', 'attendee_id'],
+    required: ['product_id'],
     title: 'PaymentProductRequest',
     description: 'Product selection for payment.'
 } as const;
@@ -14545,9 +14619,29 @@ export const PaymentProductRequest_OutputSchema = {
             title: 'Product Id'
         },
         attendee_id: {
-            type: 'string',
-            format: 'uuid',
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
             title: 'Attendee Id'
+        },
+        recipient_key: {
+            anyOf: [
+                {
+                    type: 'string',
+                    maxLength: 255,
+                    minLength: 1
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Recipient Key'
         },
         quantity: {
             type: 'integer',
@@ -14580,7 +14674,7 @@ export const PaymentProductRequest_OutputSchema = {
         }
     },
     type: 'object',
-    required: ['product_id', 'attendee_id'],
+    required: ['product_id'],
     title: 'PaymentProductRequest',
     description: 'Product selection for payment.'
 } as const;
@@ -14593,9 +14687,39 @@ export const PaymentProductResponseSchema = {
             title: 'Product Id'
         },
         attendee_id: {
-            type: 'string',
-            format: 'uuid',
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
             title: 'Attendee Id'
+        },
+        payment_recipient_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Payment Recipient Id'
+        },
+        recipient_key: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Recipient Key'
         },
         quantity: {
             type: 'integer',
@@ -14687,6 +14811,18 @@ export const PaymentPublicSchema = {
             type: 'string',
             format: 'uuid',
             title: 'Popup Id'
+        },
+        buyer_human_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Buyer Human Id'
         },
         sales_flow_id: {
             anyOf: [
@@ -14924,6 +15060,13 @@ export const PaymentPublicSchema = {
             title: 'Products Snapshot',
             default: []
         },
+        recipients: {
+            items: {
+                '$ref': '#/components/schemas/PaymentRecipientResponse'
+            },
+            type: 'array',
+            title: 'Recipients'
+        },
         buyer_email: {
             anyOf: [
                 {
@@ -14975,6 +15118,173 @@ export const PaymentPublicSchema = {
     required: ['tenant_id', 'popup_id', 'id'],
     title: 'PaymentPublic',
     description: 'Payment schema for API responses.'
+} as const;
+
+export const PaymentRecipientRequestSchema = {
+    properties: {
+        recipient_key: {
+            type: 'string',
+            maxLength: 255,
+            minLength: 1,
+            title: 'Recipient Key'
+        },
+        human_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Human Id'
+        },
+        existing_attendee_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Existing Attendee Id'
+        },
+        name: {
+            type: 'string',
+            minLength: 1,
+            title: 'Name'
+        },
+        email: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'email'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Email'
+        },
+        category_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Category Id'
+        },
+        profile_snapshot: {
+            additionalProperties: true,
+            type: 'object',
+            title: 'Profile Snapshot'
+        }
+    },
+    type: 'object',
+    required: ['recipient_key', 'name'],
+    title: 'PaymentRecipientRequest',
+    description: 'Stable recipient identity and profile supplied for one payment attempt.'
+} as const;
+
+export const PaymentRecipientResponseSchema = {
+    properties: {
+        recipient_key: {
+            type: 'string',
+            maxLength: 255,
+            minLength: 1,
+            title: 'Recipient Key'
+        },
+        human_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Human Id'
+        },
+        existing_attendee_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Existing Attendee Id'
+        },
+        name: {
+            type: 'string',
+            minLength: 1,
+            title: 'Name'
+        },
+        email: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'email'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Email'
+        },
+        category_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Category Id'
+        },
+        profile_snapshot: {
+            additionalProperties: true,
+            type: 'object',
+            title: 'Profile Snapshot'
+        },
+        id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Id'
+        },
+        attendee_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Attendee Id'
+        },
+        created_at: {
+            type: 'string',
+            format: 'date-time',
+            title: 'Created At'
+        }
+    },
+    type: 'object',
+    required: ['recipient_key', 'name', 'id', 'created_at'],
+    title: 'PaymentRecipientResponse'
 } as const;
 
 export const PaymentSourceSchema = {
@@ -18031,6 +18341,9 @@ export const ProductBatchItemSchema = {
             type: 'string',
             title: 'Name'
         },
+        fulfillment_type: {
+            '$ref': '#/components/schemas/FulfillmentType'
+        },
         slug: {
             anyOf: [
                 {
@@ -18202,7 +18515,7 @@ export const ProductBatchItemSchema = {
         }
     },
     type: 'object',
-    required: ['name', 'price'],
+    required: ['name', 'fulfillment_type', 'price'],
     title: 'ProductBatchItem',
     description: 'Single product in a batch import (popup_id is top-level).'
 } as const;
@@ -18392,6 +18705,16 @@ export const ProductBatchResultSchema = {
             format: 'uuid',
             title: 'Id'
         },
+        fulfillment_type: {
+            anyOf: [
+                {
+                    '$ref': '#/components/schemas/FulfillmentType'
+                },
+                {
+                    type: 'null'
+                }
+            ]
+        },
         success: {
             type: 'boolean',
             title: 'Success'
@@ -18456,6 +18779,9 @@ export const ProductCreateSchema = {
             type: 'string',
             format: 'uuid',
             title: 'Popup Id'
+        },
+        fulfillment_type: {
+            '$ref': '#/components/schemas/FulfillmentType'
         },
         name: {
             type: 'string',
@@ -18632,7 +18958,7 @@ export const ProductCreateSchema = {
         }
     },
     type: 'object',
-    required: ['popup_id', 'name', 'price'],
+    required: ['popup_id', 'fulfillment_type', 'name', 'price'],
     title: 'ProductCreate',
     description: 'Product schema for creation.'
 } as const;
@@ -18649,6 +18975,31 @@ export const ProductLineSchema = {
             minimum: 1,
             title: 'Quantity',
             default: 1
+        },
+        attendee_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Attendee Id'
+        },
+        recipient_key: {
+            anyOf: [
+                {
+                    type: 'string',
+                    maxLength: 255,
+                    minLength: 1
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Recipient Key'
         }
     },
     type: 'object',
@@ -18841,6 +19192,16 @@ export const ProductPublicSchema = {
             type: 'string',
             format: 'uuid',
             title: 'Id'
+        },
+        fulfillment_type: {
+            anyOf: [
+                {
+                    '$ref': '#/components/schemas/FulfillmentType'
+                },
+                {
+                    type: 'null'
+                }
+            ]
         }
     },
     type: 'object',
@@ -18878,6 +19239,10 @@ export const ProductUpdateSchema = {
                 }
             ],
             title: 'Name'
+        },
+        fulfillment_type: {
+            '$ref': '#/components/schemas/FulfillmentType',
+            title: 'Fulfillment Type'
         },
         slug: {
             anyOf: [
@@ -19284,6 +19649,16 @@ export const ProductWithQuantitySchema = {
             type: 'string',
             format: 'uuid',
             title: 'Id'
+        },
+        fulfillment_type: {
+            anyOf: [
+                {
+                    '$ref': '#/components/schemas/FulfillmentType'
+                },
+                {
+                    type: 'null'
+                }
+            ]
         },
         quantity: {
             type: 'integer',

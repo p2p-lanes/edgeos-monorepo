@@ -12,6 +12,7 @@ from app.api.ticketing_step.schemas import (
     TicketingStepCreate,
     TicketingStepPublic,
     TicketingStepUpdate,
+    validate_template_config,
 )
 from app.api.translation.service import (
     apply_ticketing_step_overlay,
@@ -199,6 +200,36 @@ def _validate_template_config_fk(
         )
 
 
+def _validate_meal_product_references(
+    template: str | None,
+    template_config: dict | None,
+    popup_id: uuid.UUID,
+    db,
+) -> None:
+    if template != "meal-plan-select" or not template_config:
+        return
+
+    product_ids = {
+        uuid.UUID(str(product["product_id"]))
+        for section in template_config.get("sections") or []
+        for product in section.get("products") or []
+    }
+    if not product_ids:
+        return
+
+    from app.api.product.crud import products_crud
+
+    products = products_crud.get_by_ids(db, list(product_ids))
+    if len(products) != len(product_ids) or any(
+        product.popup_id != popup_id or product.fulfillment_type != "participant"
+        for product in products.values()
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="One or more meal plan products are invalid",
+        )
+
+
 @router.post(
     "", response_model=TicketingStepPublic, status_code=status.HTTP_201_CREATED
 )
@@ -231,6 +262,9 @@ async def create_ticketing_step(
 
     # FK existence check for attendee_categories in template_config (Pattern B, ADR-5)
     _validate_template_config_fk(
+        step_in.template, step_in.template_config, step_in.popup_id, db
+    )
+    _validate_meal_product_references(
         step_in.template, step_in.template_config, step_in.popup_id, db
     )
 
@@ -284,12 +318,31 @@ async def update_ticketing_step(
         )
 
     # FK existence check for attendee_categories in template_config (Pattern B, ADR-5)
-    effective_template = step_in.template or step.template
-    effective_config = (
-        step_in.template_config if step_in.template_config is not None else None
+    effective_template = (
+        step_in.template if "template" in step_in.model_fields_set else step.template
     )
+    effective_config = (
+        step_in.template_config
+        if "template_config" in step_in.model_fields_set
+        else step.template_config
+    )
+    if {"template", "template_config"} & step_in.model_fields_set:
+        try:
+            effective_config = validate_template_config(
+                effective_template, effective_config
+            )
+        except ValueError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=str(exc),
+            ) from exc
+        if "template_config" in step_in.model_fields_set:
+            step_in.template_config = effective_config
     if effective_config is not None:
         _validate_template_config_fk(
+            effective_template, effective_config, step.popup_id, db
+        )
+        _validate_meal_product_references(
             effective_template, effective_config, step.popup_id, db
         )
 

@@ -4,6 +4,7 @@ import { type MutableRefObject, useCallback, useEffect, useRef } from "react"
 import { CheckoutService } from "@/client"
 import { getProductAvailability } from "@/lib/product-availability"
 import type {
+  CheckoutRecipientDraft,
   CheckoutStep,
   SelectedDynamicItem,
   SelectedMealPlanItem,
@@ -14,6 +15,7 @@ import type {
   CartSelectionState,
   RestorationSetters,
 } from "./useCartPersistence"
+import { buildPersistedPassSelections } from "./useCartPersistence"
 
 /**
  * What we persist in localStorage per popup slug.
@@ -29,8 +31,12 @@ interface OpenCartLocalStorage {
 }
 
 /** Minimal CartState fields we need for serialization / deserialization. */
-interface CartItemsSnapshot {
-  passes: { attendee_id: string; product_id: string; quantity: number }[]
+export interface CartItemsSnapshot {
+  passes: (
+    | { attendee_id: string; product_id: string; quantity: number }
+    | { recipient_key: string; product_id: string; quantity: number }
+  )[]
+  recipients: CheckoutRecipientDraft[]
   housing: {
     product_id: string
     check_in: string
@@ -182,13 +188,12 @@ function upsertScopedOpenCart(
 }
 
 /** Build a CartItemsSnapshot from the selection state ref. Mirrors useCartPersistence.buildCartState. */
-function buildItemsSnapshot(state: CartSelectionState): CartItemsSnapshot {
+export function buildItemsSnapshot(
+  state: CartSelectionState,
+): CartItemsSnapshot {
+  const recipientSelections = buildPersistedPassSelections(state.selectedPasses)
   return {
-    passes: state.selectedPasses.map((p) => ({
-      attendee_id: p.attendeeId,
-      product_id: p.productId,
-      quantity: p.quantity,
-    })),
+    ...recipientSelections,
     housing: state.housing
       ? {
           product_id: state.housing.productId,
@@ -244,7 +249,7 @@ function hasCartItems(state: CartSelectionState): boolean {
 }
 
 /** Apply a saved CartItemsSnapshot to the UI state, validating product availability. */
-function hydrateFromSnapshot(
+export function hydrateFromSnapshot(
   snapshot: CartItemsSnapshot,
   products: ProductsPass[],
   housingPricePerDay: boolean,
@@ -258,7 +263,12 @@ function hydrateFromSnapshot(
     setInsurance,
     setDynamicItems,
     setPromoCode,
+    restorePassRecipients,
   } = restorationSetters
+
+  if (snapshot.passes.length > 0 && restorePassRecipients) {
+    restorePassRecipients(snapshot.recipients ?? [], snapshot.passes)
+  }
 
   // Restore housing — skip products that are sold_out / ended / upcoming.
   if (snapshot.housing) {

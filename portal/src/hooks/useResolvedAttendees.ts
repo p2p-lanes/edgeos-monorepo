@@ -1,12 +1,39 @@
 "use client"
 
 import { dedupTicketEntries } from "@/app/portal/[popupSlug]/passes/utils/dedupTickets"
-import type { AttendeeWithOriginPublic } from "@/client"
+import type {
+  ApplicationPublic,
+  AttendeeWithOriginPublic,
+  HumanPublic,
+} from "@/client"
 import { sortAttendees } from "@/helpers/filters"
+import { useAttendeeCategories } from "@/hooks/useAttendeeCategories"
 import useAuth from "@/hooks/useAuth"
 import useHumanAttendeesQuery from "@/hooks/useHumanAttendeesQuery"
+import { useApplication } from "@/providers/applicationProvider"
 import { useCityProvider } from "@/providers/cityProvider"
 import type { AttendeePassState } from "@/types/Attendee"
+import {
+  buildCheckoutRecipientDraft,
+  type CheckoutRecipientPassState,
+} from "@/types/checkout"
+
+function buildHumanProfileSnapshot(
+  user: HumanPublic,
+  application: ApplicationPublic | null,
+): Record<string, unknown> {
+  return {
+    ...(application?.custom_fields ?? {}),
+    first_name: user.first_name ?? null,
+    last_name: user.last_name ?? null,
+    telegram: user.telegram ?? null,
+    gender: user.gender ?? null,
+    age: user.age ?? null,
+    residence: user.residence ?? null,
+    picture_url: user.picture_url ?? null,
+    enriched_profile: user.enriched_profile ?? null,
+  }
+}
 
 /**
  * Resolves the attendees list the PassesProvider should drive off.
@@ -30,9 +57,10 @@ import type { AttendeePassState } from "@/types/Attendee"
  * the person from themselves everywhere else — a volunteer looking at their
  * passes saw their spouse and no sign of their own.
  */
-export function useResolvedAttendees(): AttendeePassState[] {
+export function useResolvedAttendees(): CheckoutRecipientPassState[] {
   const { getCity } = useCityProvider()
   const { user } = useAuth()
+  const { getRelevantApplication } = useApplication()
 
   const city = getCity()
   // Not "is this a direct-sale popup" any more: a gathering can take
@@ -46,6 +74,8 @@ export function useResolvedAttendees(): AttendeePassState[] {
   // The hook disables the query when popupId is null/falsy or no human is logged in.
   const popupId = city ? String(city.id) : null
   const { data: humanAttendees } = useHumanAttendeesQuery(popupId)
+  const { categories } = useAttendeeCategories(popupId ?? "")
+  const application = nobodyApplies ? null : getRelevantApplication()
 
   if (!humanAttendees) return []
 
@@ -60,29 +90,46 @@ export function useResolvedAttendees(): AttendeePassState[] {
     return sortAttendees(withTicketEntries)
   }
 
-  if (nobodyApplies && city && user) {
+  const primaryCategory = categories?.find((category) => category.is_primary)
+  const hasUnambiguousApplication =
+    application?.popup_id === city?.id && application?.human_id === user?.id
+
+  if (
+    city &&
+    user &&
+    primaryCategory &&
+    (nobodyApplies || hasUnambiguousApplication)
+  ) {
     const firstName = user.first_name?.trim() ?? ""
     const lastName = user.last_name?.trim() ?? ""
     const fullName = [firstName, lastName].filter(Boolean).join(" ").trim()
     const displayName = fullName || user.email
+    const profileSnapshot = buildHumanProfileSnapshot(user, application)
 
-    const virtualAttendee: AttendeePassState = {
+    const virtualAttendee: CheckoutRecipientPassState = {
       id: user.id,
       tenant_id: user.tenant_id,
       popup_id: city.id,
       human_id: user.id,
-      application_id: null,
+      application_id: application?.id ?? null,
       name: displayName,
-      category: "main",
+      category_id: primaryCategory.id,
+      category: primaryCategory.key,
       email: user.email,
       gender: user.gender ?? null,
       poap_url: null,
+      additional_data: profileSnapshot,
       created_at: null,
       updated_at: null,
       products: [],
     }
 
-    return [virtualAttendee]
+    return [
+      {
+        ...virtualAttendee,
+        recipient: buildCheckoutRecipientDraft(virtualAttendee),
+      },
+    ]
   }
 
   return []

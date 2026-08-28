@@ -11,9 +11,12 @@ Verifies:
 
 import uuid
 
+import pytest
 from fastapi.testclient import TestClient
+from sqlmodel import Session
 
 from app.api.popup.models import Popups
+from app.api.product.models import Products
 
 
 def _admin_headers(token: str) -> dict[str, str]:
@@ -40,6 +43,179 @@ def _base_section(suffix: str = "") -> dict:
         "order": 0,
         "product_ids": [],
     }
+
+
+def _product(db: Session, popup: Popups, fulfillment_type: str | None) -> Products:
+    product = Products(
+        tenant_id=popup.tenant_id,
+        popup_id=popup.id,
+        name=f"{fulfillment_type or 'legacy'} product",
+        slug=f"config-product-{uuid.uuid4().hex[:8]}",
+        price=10,
+        fulfillment_type=fulfillment_type,
+    )
+    db.add(product)
+    db.commit()
+    return product
+
+
+def _meal_config(product_id: uuid.UUID) -> dict:
+    return {
+        "sections": [
+            {
+                "key": "meals",
+                "label": "Meals",
+                "products": [
+                    {
+                        "product_id": str(product_id),
+                        "coverage_start": "2026-08-24",
+                        "coverage_end": "2026-08-30",
+                    }
+                ],
+            }
+        ]
+    }
+
+
+def _step_payload(
+    popup: Popups, flow_id: uuid.UUID, template: str, config: dict
+) -> dict:
+    return {
+        "popup_id": str(popup.id),
+        "sales_flow_id": str(flow_id),
+        "step_type": "products",
+        "title": f"Config {uuid.uuid4().hex[:8]}",
+        "template": template,
+        "template_config": config,
+    }
+
+
+def _post_step(client, token: str, popup: Popups, flow_id, template: str, config: dict):
+    return client.post(
+        "/api/v1/ticketing-steps",
+        headers=_admin_headers(token),
+        json=_step_payload(popup, flow_id, template, config),
+    )
+
+
+def _patch_step(client, token: str, step_id: str, payload: dict):
+    return client.patch(
+        f"/api/v1/ticketing-steps/{step_id}",
+        headers=_admin_headers(token),
+        json=payload,
+    )
+
+
+@pytest.mark.parametrize("template", ["ticket-card", "ticket-select"])
+def test_generic_ticket_templates_accept_every_fulfillment_type_without_inference(
+    template: str,
+    client: TestClient,
+    db: Session,
+    admin_token_tenant_a: str,
+    popup_tenant_a: Popups,
+    default_flow_tenant_a,
+) -> None:
+    products = [
+        _product(db, popup_tenant_a, fulfillment_type)
+        for fulfillment_type in ("access", "participant", "order")
+    ]
+    product_ids = [str(product.id) for product in products]
+    config = {"sections": [{**_base_section(template), "product_ids": product_ids}]}
+    response = _post_step(
+        client,
+        admin_token_tenant_a,
+        popup_tenant_a,
+        default_flow_tenant_a.id,
+        template,
+        config,
+    )
+    assert response.status_code == 201, response.text
+    assert (
+        response.json()["template_config"]["sections"][0]["product_ids"] == product_ids
+    )
+    db.expire_all()
+    assert [product.fulfillment_type for product in products] == [
+        "access",
+        "participant",
+        "order",
+    ]
+
+
+@pytest.mark.parametrize(
+    "kind", ["participant", "access", "order", "null", "missing", "cross-popup"]
+)
+def test_meal_plan_create_validates_product_reference_non_enumeratively(
+    kind: str,
+    client: TestClient,
+    db: Session,
+    admin_token_tenant_a: str,
+    popup_tenant_a: Popups,
+    popup_tenant_b: Popups,
+    default_flow_tenant_a,
+) -> None:
+    if kind == "missing":
+        product_id = uuid.uuid4()
+    elif kind == "cross-popup":
+        product_id = _product(db, popup_tenant_b, "participant").id
+    else:
+        product_id = _product(db, popup_tenant_a, None if kind == "null" else kind).id
+    response = _post_step(
+        client,
+        admin_token_tenant_a,
+        popup_tenant_a,
+        default_flow_tenant_a.id,
+        "meal-plan-select",
+        _meal_config(product_id),
+    )
+    assert response.status_code == (201 if kind == "participant" else 422), (
+        response.text
+    )
+    if kind != "participant":
+        assert response.json()["detail"] == "One or more meal plan products are invalid"
+
+
+@pytest.mark.parametrize(
+    "patch_kind, fulfillment_type, expected_status",
+    [
+        ("config", "participant", 200),
+        ("config", "order", 422),
+        ("switch", "participant", 200),
+        ("switch", "access", 422),
+    ],
+)
+def test_meal_plan_patch_validates_effective_template_and_config(
+    patch_kind: str,
+    fulfillment_type: str,
+    expected_status: int,
+    client: TestClient,
+    db: Session,
+    admin_token_tenant_a: str,
+    popup_tenant_a: Popups,
+    default_flow_tenant_a,
+) -> None:
+    product = _product(db, popup_tenant_a, fulfillment_type)
+    initial_template = "meal-plan-select" if patch_kind == "config" else "ticket-card"
+    initial_config = (
+        {"sections": []} if patch_kind == "config" else _meal_config(product.id)
+    )
+    created = _post_step(
+        client,
+        admin_token_tenant_a,
+        popup_tenant_a,
+        default_flow_tenant_a.id,
+        initial_template,
+        initial_config,
+    )
+    assert created.status_code == 201, created.text
+    payload = (
+        {"template_config": _meal_config(product.id)}
+        if patch_kind == "config"
+        else {"template": "meal-plan-select"}
+    )
+    response = _patch_step(client, admin_token_tenant_a, created.json()["id"], payload)
+    assert response.status_code == expected_status, response.text
+    if expected_status == 422:
+        assert response.json()["detail"] == "One or more meal plan products are invalid"
 
 
 class TestTemplateConfigAttendeeCategories:

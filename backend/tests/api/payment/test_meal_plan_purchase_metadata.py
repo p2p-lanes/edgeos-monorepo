@@ -4,15 +4,12 @@ The meal_plan step ships per-day menu choices, dietary restriction, and
 special request as a single JSONB blob (``purchase_metadata``). Two paths
 materialize ``attendee_products`` rows that must carry it:
 
-1. ``$0 auto-approve`` (cupón 100% off / credits cover cost): products
-   flow directly from the inbound ``PaymentProductRequest`` into
-   ``_add_products_to_attendees``. The snapshot row gets the blob too
-   so a later status-change rebuild still has the data.
+1. ``$0 auto-approve`` (100% coupon / credits cover cost): the payment
+   snapshot is reconciled immediately into ticket-unit lineage.
 
 2. ``SimpleFI paid``: payment is created PENDING, the webhook later
-   approves. ``approve_payment`` rebuilds ``PaymentProductRequest``
-   entries from ``payment.products_snapshot`` — that snapshot must
-   carry ``purchase_metadata`` so the blob survives the async hop.
+   approves. ``approve_payment`` reconciles ``payment.products_snapshot``;
+   that snapshot must carry ``purchase_metadata`` across the async hop.
 
 These tests guard against silent regressions of either path.
 """
@@ -84,6 +81,7 @@ def _meal_plan_product(db: Session, popup: Popups, *, price: str = "75") -> Prod
         slug=f"mp-{uuid.uuid4().hex[:6]}",
         price=Decimal(price),
         category="meal_plan",
+        fulfillment_type="participant",
         is_active=True,
     )
     db.add(p)
@@ -101,6 +99,7 @@ def _ticket_product(db: Session, popup: Popups, *, price: str = "10") -> Product
         slug=f"tkt-{uuid.uuid4().hex[:6]}",
         price=Decimal(price),
         category="ticket",
+        fulfillment_type="access",
         is_active=True,
     )
     db.add(p)
@@ -235,6 +234,7 @@ class TestSimpleFiPaidPath:
                 "approve_payment dropped purchase_metadata when rebuilding from "
                 "products_snapshot (regression of PR-#179 fix)"
             )
+            assert ap.fulfillment_type == "participant"
         finally:
             # Cleanup: attendee_products → payment_products → payment → attendee → app → product
             for ap_row in db.exec(
@@ -298,6 +298,7 @@ class TestZeroAmountAutoApprovePath:
             ).first()
             assert ap is not None
             assert ap.purchase_metadata == SAMPLE_METADATA
+            assert ap.fulfillment_type == "participant"
 
             pp = db.exec(
                 select(PaymentProducts).where(

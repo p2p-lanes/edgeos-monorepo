@@ -515,6 +515,7 @@ async def grant_tickets_admin(
     from app.api.popup.crud import popups_crud
     from app.api.product.crud import products_crud
     from app.api.product.models import Products
+    from app.api.product.schemas import FulfillmentType
 
     popup = popups_crud.get(db, payload.popup_id)
     if not popup:
@@ -550,6 +551,19 @@ async def grant_tickets_admin(
             detail="One or more products are unavailable, inactive, or not in this popup",
         )
     products_map = {p.id: p for p in valid_products}
+    if any(product.fulfillment_type is None for product in valid_products):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Some products are not available or inactive",
+        )
+    if any(
+        product.fulfillment_type != FulfillmentType.ACCESS.value
+        for product in valid_products
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Only access products can be granted as tickets",
+        )
 
     # Aggregate total requested quantity per product across ALL people for the
     # up-front stock cap check. Each person may request a different mix, so
@@ -635,11 +649,22 @@ async def grant_tickets_admin(
             if grant_attendee is None:
                 grant_attendee = attendees_crud.get_main_attendee(db, application.id)
             if grant_attendee is None:
-                # Should be impossible — create_for_admin_grant always inserts
-                # one, and an existing application always has a main attendee.
-                raise HTTPException(
-                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                    detail="Main attendee not found for application",
+                from app.api.attendee_category.crud import attendee_categories_crud
+
+                main_cat = attendee_categories_crud.get_primary_for_popup(
+                    db, payload.popup_id
+                )
+                grant_attendee = attendees_crud.create_internal(
+                    db,
+                    tenant_id=tenant_id,
+                    application_id=application.id,
+                    popup_id=payload.popup_id,
+                    name=human.full_name or human.email,
+                    email=human.email,
+                    gender=human.gender,
+                    human_id=human.id,
+                    category_id=main_cat.id if main_cat else None,
+                    commit=False,
                 )
 
             # Per-product, per-quantity stock decrement. Raises 409 if a
@@ -656,6 +681,7 @@ async def grant_tickets_admin(
                 # the ticket is that person's, not the host application's.
                 application_id=application.id if application is not None else None,
                 popup_id=payload.popup_id,
+                buyer_human_id=human.id,
                 status=PaymentStatus.PENDING.value,
                 amount=Decimal("0"),
                 currency=popup.currency,
@@ -683,6 +709,7 @@ async def grant_tickets_admin(
                     product_category=product.category or "",
                     product_currency=popup.currency,
                     effective_unit_price=Decimal("0") if is_patreon else None,
+                    fulfillment_type=product.fulfillment_type,
                 )
                 db.add(snapshot)
                 finalize_lines.append(
@@ -1071,7 +1098,10 @@ async def get_my_purchases(
     from app.api.product.schemas import ProductWithQuantity
 
     attendees = attendees_crud.find_purchases_by_human_popup(
-        db, human_id=current_human.id, popup_id=popup_id
+        db,
+        human_id=current_human.id,
+        popup_id=popup_id,
+        tenant_id=current_human.tenant_id,
     )
 
     results = []

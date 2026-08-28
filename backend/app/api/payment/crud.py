@@ -28,24 +28,28 @@ if TYPE_CHECKING:
     from app.api.sales_flow.models import SalesFlows
     from app.api.tenant.models import Tenants
 from app.api.application.schemas import ApplicationStatus, ScholarshipStatus
-from app.api.attendee.crud import attendees_crud, generate_check_in_code
+from app.api.attendee.crud import generate_check_in_code
 from app.api.attendee.models import AttendeeProducts, Attendees
+from app.api.attendee_category.models import AttendeeCategories
 from app.api.coupon.crud import coupons_crud
 from app.api.form_section.models import FormSections
 from app.api.human.crud import humans_crud
-from app.api.payment.models import PaymentProducts, Payments
+from app.api.payment.models import PaymentProducts, PaymentRecipients, Payments
 from app.api.payment.schemas import (
     PaymentCreate,
     PaymentFilter,
     PaymentFilters,
     PaymentPreview,
     PaymentProductRequest,
+    PaymentRecipientRequest,
     PaymentSource,
     PaymentStatus,
+    PaymentType,
     PaymentUpdate,
 )
 from app.api.product.models import Products
 from app.api.product.product_state import ProductSaleState, derive_product_state
+from app.api.product.schemas import FulfillmentType
 from app.api.shared.crud import BaseCRUD
 from app.core.filters import build_filter_expression
 from app.utils.checkout_signing import (
@@ -875,6 +879,7 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
         products: list[PaymentProductRequest],
         *,
         granted_by_user_id: uuid.UUID | None = None,
+        replace_access: bool = False,
     ) -> Payments:
         """Auto-approve a $0 payment and materialize tickets, flush-only.
 
@@ -893,8 +898,10 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
         payment.status = PaymentStatus.APPROVED.value
         if granted_by_user_id is not None:
             payment.granted_by_user_id = granted_by_user_id
-        self._add_products_to_attendees(session, products, payment_id=payment.id)
         session.flush()
+        self._reconcile_payment_fulfillment(
+            session, payment, replace_access=replace_access
+        )
         return payment
 
     def preview_open_ticketing(
@@ -1017,14 +1024,24 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
 
         valid_products = gate.products
         products_map = {product.id: product for product in valid_products}
-        fabricated_requests = [
-            PaymentProductRequest(
-                product_id=line.product_id,
-                attendee_id=uuid.uuid4(),
-                quantity=line.quantity,
-            )
-            for line in obj.products
-        ]
+        selected_recipients = self._validate_recipient_requests(
+            session,
+            obj.recipients,
+            obj.products,
+            valid_products,
+            buyer_human_id=buyer.id,
+            tenant_id=tenant.id,
+            popup_id=popup.id,
+        )
+        self._validate_open_attendee_lines(
+            session,
+            obj.products,
+            valid_products,
+            buyer_human_id=buyer.id,
+            tenant_id=tenant.id,
+            popup_id=popup.id,
+        )
+        obj.products = self._normalize_payment_lines(obj.products, valid_products)
         # ADR-2 supersede pre-step + advisory lock: the ENTIRE new machinery
         # (proof gate, supersede, advisory lock, sibling re-check) is gated on
         # SUPERSEDE_PENDING_ENABLED so that setting it to False restores exact
@@ -1148,16 +1165,18 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
                 )
 
             # Atomically decrement total-stock counters (409 if sold out).
-            self._decrement_total_stocks(session, fabricated_requests, valid_products)
+            self._decrement_total_stocks(session, obj.products, valid_products)
 
             # Store buyer email (lowercase) in snapshot for supersede JSONB lookup
             # on future payment attempts by the same buyer.
             buyer_snapshot["buyer_email"] = obj.buyer.email.lower()
+            buyer_snapshot["buyer_name"] = buyer_name
 
             payment = Payments(
                 tenant_id=tenant.id,
                 application_id=None,
                 popup_id=popup.id,
+                buyer_human_id=buyer.id,
                 # Provenance only (design D7) — the flow this payment was
                 # made through, never read back for authorization/pricing.
                 sales_flow_id=target_flow.id if target_flow is not None else None,
@@ -1173,16 +1192,8 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
             )
             session.add(payment)
             session.flush()
-
-            # One attendee per (human, popup): a buyer who is already at this
-            # gathering gets their existing row, however they got there.
-            attendee = attendees_crud.find_or_create_buyer_attendee(
-                session,
-                human_id=buyer.id,
-                popup_id=popup.id,
-                tenant_id=tenant.id,
-                name=buyer_name,
-                email=obj.buyer.email,
+            recipient_snapshots = self._snapshot_recipients(
+                session, payment, selected_recipients
             )
 
             # Snapshot rows for the order (one PaymentProducts per unit).
@@ -1198,13 +1209,19 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
                         tenant_id=tenant.id,
                         payment_id=payment.id,
                         product_id=product.id,
-                        attendee_id=attendee.id,
+                        attendee_id=line.attendee_id,
+                        payment_recipient_id=(
+                            recipient_snapshots[line.recipient_key].id
+                            if line.recipient_key
+                            else None
+                        ),
                         quantity=1,
                         product_name=product.name,
                         product_description=product.description,
                         product_price=product.price,
                         product_category=product.category or "",
                         product_currency=popup.currency,
+                        fulfillment_type=product.fulfillment_type,
                     )
                     session.add(pp)
                     payment_products.append(pp)
@@ -1286,6 +1303,7 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
                         PaymentProductRequest(
                             product_id=pp.product_id,
                             attendee_id=pp.attendee_id,
+                            recipient_key=pp.recipient_key,
                             quantity=pp.quantity,
                         )
                         for pp in payment_products
@@ -1471,7 +1489,12 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
             )
         )
 
-        union_ids = app_leg.union(direct_leg).subquery()
+        snapshot_leg = select(Payments.id).where(
+            Payments.buyer_human_id == human_id,
+            Payments.popup_id == popup_id,
+        )
+
+        union_ids = app_leg.union(direct_leg, snapshot_leg).subquery()
 
         count_statement = select(func.count()).where(
             Payments.id.in_(select(union_ids.c.id))  # type: ignore[arg-type]
@@ -1575,6 +1598,9 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
         payment = session.exec(statement).first()
         if payment is None:
             return None
+
+        if payment.buyer_human_id == current_human_id:
+            return payment
 
         if (
             payment.application is not None
@@ -1750,6 +1776,7 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
             tenant_id=application.tenant_id,
             application_id=application.id,
             popup_id=application.popup_id,
+            buyer_human_id=application.human_id,
             status=simplefi_response.status,
             amount=fee_amount,
             currency=popup.currency,
@@ -2010,7 +2037,13 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
         application: Applications,
     ) -> None:
         """Validate that all attendees belong to this application."""
-        attendee_ids = {p.attendee_id for p in requested_products}
+        attendee_ids = {
+            product.attendee_id
+            for product in requested_products
+            if product.attendee_id is not None
+        }
+        if not attendee_ids:
+            return
         statement = select(Attendees).where(
             Attendees.id.in_(attendee_ids),  # type: ignore[attr-defined]
             Attendees.application_id == application.id,
@@ -2022,6 +2055,253 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Some attendees do not belong to this application",
             )
+
+    @staticmethod
+    def _recipient_error() -> HTTPException:
+        return HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Recipient is not valid for this payment",
+        )
+
+    def _validate_recipient_requests(
+        self,
+        session: Session,
+        recipients: list[PaymentRecipientRequest],
+        lines: Any,
+        products: list[Products],
+        *,
+        buyer_human_id: uuid.UUID,
+        tenant_id: uuid.UUID,
+        popup_id: uuid.UUID,
+    ) -> list[PaymentRecipientRequest]:
+        """Validate every referenced recipient and select recipient-owned snapshots."""
+        products_by_id = {product.id: product for product in products}
+        recipients_by_key = {
+            recipient.recipient_key: recipient for recipient in recipients
+        }
+        referenced: set[str] = set()
+        snapshot_keys: set[str] = set()
+        for line in lines:
+            if line.recipient_key is None:
+                continue
+            product = products_by_id.get(line.product_id)
+            if product is None:
+                raise self._recipient_error()
+            referenced.add(line.recipient_key)
+            if product.fulfillment_type in (
+                FulfillmentType.ACCESS.value,
+                FulfillmentType.PARTICIPANT.value,
+            ):
+                snapshot_keys.add(line.recipient_key)
+
+        validated = [
+            recipient
+            for recipient in recipients
+            if recipient.recipient_key in referenced
+        ]
+        if referenced - set(recipients_by_key):
+            raise self._recipient_error()
+        if (
+            session.exec(
+                select(Humans.id).where(
+                    Humans.id == buyer_human_id,
+                    Humans.tenant_id == tenant_id,
+                )
+            ).first()
+            is None
+        ):
+            raise self._recipient_error()
+
+        human_ids = {
+            recipient.human_id for recipient in validated if recipient.human_id
+        }
+        valid_human_ids = set(
+            session.exec(
+                select(Humans.id).where(
+                    Humans.id.in_(human_ids),  # type: ignore[attr-defined]
+                    Humans.tenant_id == tenant_id,
+                )
+            ).all()
+        )
+        category_ids = {
+            recipient.category_id
+            for recipient in validated
+            if recipient.category_id is not None
+        }
+        valid_category_ids = set(
+            session.exec(
+                select(AttendeeCategories.id).where(
+                    AttendeeCategories.id.in_(category_ids),  # type: ignore[attr-defined]
+                    AttendeeCategories.tenant_id == tenant_id,
+                    AttendeeCategories.popup_id == popup_id,
+                )
+            ).all()
+        )
+        attendee_ids = {
+            recipient.existing_attendee_id
+            for recipient in validated
+            if recipient.existing_attendee_id
+        }
+        attendees_by_id = {
+            attendee.id: attendee
+            for attendee in session.exec(
+                select(Attendees).where(Attendees.id.in_(attendee_ids))  # type: ignore[attr-defined]
+            ).all()
+        }
+        linked_attendees_by_human_id: dict[uuid.UUID, Attendees] = {}
+        if human_ids:
+            linked_attendees = session.exec(
+                select(Attendees)
+                .where(
+                    Attendees.tenant_id == tenant_id,
+                    Attendees.popup_id == popup_id,
+                    Attendees.human_id.in_(human_ids),  # type: ignore[attr-defined]
+                )
+                .order_by(Attendees.created_at, Attendees.id)
+            ).all()
+            for attendee in linked_attendees:
+                if attendee.human_id is not None:
+                    linked_attendees_by_human_id.setdefault(attendee.human_id, attendee)
+
+        for recipient in validated:
+            if recipient.human_id and recipient.human_id not in valid_human_ids:
+                raise self._recipient_error()
+            if (
+                recipient.category_id is not None
+                and recipient.category_id not in valid_category_ids
+            ):
+                raise self._recipient_error()
+            linked_attendee = (
+                linked_attendees_by_human_id.get(recipient.human_id)
+                if recipient.human_id
+                else None
+            )
+            if (
+                linked_attendee is not None
+                and linked_attendee.category_id != recipient.category_id
+            ):
+                raise self._recipient_error()
+            if recipient.human_id and recipient.existing_attendee_id:
+                raise self._recipient_error()
+            existing = attendees_by_id.get(recipient.existing_attendee_id)
+            if recipient.existing_attendee_id and (
+                existing is None
+                or existing.tenant_id != tenant_id
+                or existing.popup_id != popup_id
+                or existing.category_id != recipient.category_id
+                or existing.managed_by_human_id != buyer_human_id
+            ):
+                raise self._recipient_error()
+            for line in lines:
+                if line.recipient_key != recipient.recipient_key:
+                    continue
+                product = products_by_id[line.product_id]
+                if (
+                    product.attendee_category_id is not None
+                    and product.attendee_category_id != recipient.category_id
+                ):
+                    raise self._recipient_error()
+        return [
+            recipient
+            for recipient in validated
+            if recipient.recipient_key in snapshot_keys
+        ]
+
+    @staticmethod
+    def _normalize_payment_lines(lines: Any, products: list[Products]) -> list[Any]:
+        """Enforce server-owned fulfillment identity and discard legacy order links."""
+        products_by_id = {product.id: product for product in products}
+        normalized = []
+        for line in lines:
+            product = products_by_id.get(line.product_id)
+            if product is None or product.fulfillment_type is None:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Some products are not available or inactive",
+                )
+            has_attendee = line.attendee_id is not None
+            has_recipient = line.recipient_key is not None
+            if product.fulfillment_type in (
+                FulfillmentType.ACCESS.value,
+                FulfillmentType.PARTICIPANT.value,
+            ):
+                if has_attendee == has_recipient:
+                    raise HTTPException(
+                        status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                        detail="Payment product identity is not valid",
+                    )
+                normalized.append(line)
+            else:
+                normalized.append(
+                    line.model_copy(update={"attendee_id": None, "recipient_key": None})
+                )
+        return normalized
+
+    def _validate_open_attendee_lines(
+        self,
+        session: Session,
+        lines: Any,
+        products: list[Products],
+        *,
+        buyer_human_id: uuid.UUID,
+        tenant_id: uuid.UUID,
+        popup_id: uuid.UUID,
+    ) -> None:
+        """Validate explicit legacy attendee lines in open checkout."""
+        attendee_ids = {line.attendee_id for line in lines if line.attendee_id}
+        if not attendee_ids:
+            return
+        attendees = {
+            attendee.id: attendee
+            for attendee in session.exec(
+                select(Attendees).where(Attendees.id.in_(attendee_ids))  # type: ignore[attr-defined]
+            ).all()
+        }
+        products_by_id = {product.id: product for product in products}
+        for line in lines:
+            if line.attendee_id is None:
+                continue
+            attendee = attendees.get(line.attendee_id)
+            product = products_by_id.get(line.product_id)
+            if (
+                attendee is None
+                or product is None
+                or attendee.tenant_id != tenant_id
+                or attendee.popup_id != popup_id
+                or not (
+                    attendee.human_id == buyer_human_id
+                    or attendee.managed_by_human_id == buyer_human_id
+                )
+                or (
+                    product.attendee_category_id is not None
+                    and attendee.category_id != product.attendee_category_id
+                )
+            ):
+                raise self._recipient_error()
+
+    @staticmethod
+    def _snapshot_recipients(
+        session: Session,
+        payment: Payments,
+        recipients: list[PaymentRecipientRequest],
+    ) -> dict[str, PaymentRecipients]:
+        snapshots: dict[str, PaymentRecipients] = {}
+        for recipient in recipients:
+            snapshot = PaymentRecipients(
+                tenant_id=payment.tenant_id,
+                payment_id=payment.id,
+                recipient_key=recipient.recipient_key,
+                human_id=recipient.human_id,
+                existing_attendee_id=recipient.existing_attendee_id,
+                name=recipient.name,
+                email=str(recipient.email) if recipient.email else None,
+                category_id=recipient.category_id,
+                profile_snapshot=recipient.profile_snapshot.copy(),
+            )
+            session.add(snapshot)
+            snapshots[recipient.recipient_key] = snapshot
+        session.flush()
+        return snapshots
 
     def _calculate_insurance(
         self,
@@ -2269,8 +2549,18 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
             )
 
         self._validate_application(application)
-        self._validate_products(session, obj.products, application)
+        valid_products = self._validate_products(session, obj.products, application)
         self._validate_attendees(session, obj.products, application)
+        self._validate_recipient_requests(
+            session,
+            obj.recipients,
+            obj.products,
+            valid_products,
+            buyer_human_id=application.human_id,
+            tenant_id=application.tenant_id,
+            popup_id=application.popup_id,
+        )
+        obj.products = self._normalize_payment_lines(obj.products, valid_products)
 
         return self._apply_discounts(session, obj, application)
 
@@ -2294,8 +2584,25 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
         )
 
         incoming_fingerprint = sorted(
-            (p.product_id, p.attendee_id, p.quantity) for p in obj.products
+            (
+                p.product_id,
+                ("attendee", str(p.attendee_id))
+                if p.attendee_id
+                else ("recipient", p.recipient_key or ""),
+                p.quantity,
+            )
+            for p in obj.products
         )
+        referenced_recipient_keys = {
+            product.recipient_key
+            for product in obj.products
+            if product.recipient_key is not None
+        }
+        incoming_recipients = {
+            recipient.recipient_key: recipient.model_dump(mode="json")
+            for recipient in obj.recipients
+            if recipient.recipient_key in referenced_recipient_keys
+        }
 
         candidates = list(
             session.exec(
@@ -2306,17 +2613,45 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
                     Payments.created_at >= window_start,
                     Payments.amount == preview.amount,
                 )
-                .options(selectinload(Payments.products_snapshot))  # type: ignore[arg-type]
+                .options(
+                    selectinload(Payments.products_snapshot),  # type: ignore[arg-type]
+                    selectinload(Payments.recipients),  # type: ignore[arg-type]
+                )
                 .order_by(desc(Payments.created_at))
             ).all()
         )
 
         for candidate in candidates:
             snapshot = sorted(
-                (pp.product_id, pp.attendee_id, pp.quantity)
+                (
+                    pp.product_id,
+                    ("attendee", str(pp.attendee_id))
+                    if pp.attendee_id
+                    else ("recipient", pp.recipient_key or ""),
+                    pp.quantity,
+                )
                 for pp in candidate.products_snapshot
             )
-            if snapshot == incoming_fingerprint:
+            candidate_recipients = {
+                recipient.recipient_key: {
+                    "recipient_key": recipient.recipient_key,
+                    "human_id": str(recipient.human_id) if recipient.human_id else None,
+                    "existing_attendee_id": str(recipient.existing_attendee_id)
+                    if recipient.existing_attendee_id
+                    else None,
+                    "name": recipient.name,
+                    "email": recipient.email,
+                    "category_id": str(recipient.category_id)
+                    if recipient.category_id
+                    else None,
+                    "profile_snapshot": recipient.profile_snapshot,
+                }
+                for recipient in candidate.recipients
+            }
+            if (
+                snapshot == incoming_fingerprint
+                and candidate_recipients == incoming_recipients
+            ):
                 return candidate
 
         return None
@@ -2427,6 +2762,11 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
         # (the full eager-loaded `application` is fetched again further
         # down, once the lock/duplicate-short-circuit machinery needs it).
         self._enforce_restrictions_for_application(session, application_id, obj)
+
+        # Superseding a pending provider payment is destructive. Reject an
+        # invalid recipient payload before that external cancellation, then
+        # preview again under the application lock for authoritative pricing.
+        self.preview_payment(session, obj)
 
         # ADR-2 supersede pre-step: cancel any prior PENDING SimpleFi payment
         # for this application BEFORE acquiring the application row lock and
@@ -2569,6 +2909,16 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
                     ),
                 )
 
+        selected_recipients = self._validate_recipient_requests(
+            session,
+            obj.recipients,
+            obj.products,
+            valid_products,
+            buyer_human_id=application.human_id,
+            tenant_id=application.tenant_id,
+            popup_id=application.popup_id,
+        )
+
         # Handle zero or negative amount (credit covers cost)
         if preview.amount <= 0:
             current_stored_credit = _account_credit(application)
@@ -2616,23 +2966,12 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
                     )
                 preview.credit_applied = current_stored_credit
 
-            # Clear existing products if editing passes
-            if obj.edit_passes:
-                # Build a temporary payment-like object to reuse _clear_application_products
-                attendee_ids = {p.attendee_id for p in obj.products}
-                statement = select(AttendeeProducts).where(
-                    AttendeeProducts.attendee_id.in_(attendee_ids)  # type: ignore[attr-defined]
-                )
-                existing_products = list(session.exec(statement).all())
-                for ap in existing_products:
-                    session.delete(ap)
-                session.flush()
-
             # Create payment record first so AttendeeProducts can link to it.
             payment = Payments(
                 tenant_id=application.tenant_id,
                 application_id=obj.application_id,
                 popup_id=application.popup_id,
+                buyer_human_id=application.human_id,
                 # Provenance only (design D7) — the application's own flow.
                 sales_flow_id=application.sales_flow_id,
                 status=PaymentStatus.APPROVED.value,
@@ -2654,6 +2993,9 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
             )
             session.add(payment)
             session.flush()
+            recipient_snapshots = self._snapshot_recipients(
+                session, payment, selected_recipients
+            )
 
             # Emit passes.edited audit event for the edit-passes settlement.
             # Placed here (after flush, payment.id is available) so the row is
@@ -2692,6 +3034,11 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
                         payment_id=payment.id,
                         product_id=req_prod.product_id,
                         attendee_id=req_prod.attendee_id,
+                        payment_recipient_id=(
+                            recipient_snapshots[req_prod.recipient_key].id
+                            if req_prod.recipient_key
+                            else None
+                        ),
                         quantity=req_prod.quantity,
                         product_name=product.name,
                         product_description=product.description,
@@ -2702,6 +3049,7 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
                         if is_patreon
                         else None,
                         purchase_metadata=req_prod.purchase_metadata,
+                        fulfillment_type=product.fulfillment_type,
                     )
                     session.add(payment_product)
 
@@ -2724,7 +3072,12 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
             # Shared finalizer: materializes AttendeeProducts and flushes.
             # Same code path as the anonymous open-ticketing flow and the
             # admin bulk-grant flow so they can't drift again.
-            self._finalize_zero_amount_payment(session, payment, obj.products)
+            self._finalize_zero_amount_payment(
+                session,
+                payment,
+                obj.products,
+                replace_access=obj.edit_passes,
+            )
             session.commit()
             session.refresh(payment)
 
@@ -2767,7 +3120,10 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
                     if req_prod.product_id in products_map
                     else "",
                     "quantity": req_prod.quantity,
-                    "attendee_id": str(req_prod.attendee_id),
+                    "attendee_id": str(req_prod.attendee_id)
+                    if req_prod.attendee_id
+                    else None,
+                    "recipient_key": req_prod.recipient_key,
                 }
                 for req_prod in obj.products
             ],
@@ -2853,6 +3209,7 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
             tenant_id=application.tenant_id,
             application_id=obj.application_id,
             popup_id=application.popup_id,
+            buyer_human_id=application.human_id,
             # Provenance only (design D7) — the application's own flow.
             sales_flow_id=application.sales_flow_id,
             status=simplefi_response.status,
@@ -2882,6 +3239,9 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
 
         session.add(payment)
         session.flush()  # Get payment ID
+        recipient_snapshots = self._snapshot_recipients(
+            session, payment, selected_recipients
+        )
 
         # Debit the application's credit balance at payment creation (reservation).
         # This must happen after flush so payment.id exists for the audit log.
@@ -2925,6 +3285,11 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
                     payment_id=payment.id,
                     product_id=req_prod.product_id,
                     attendee_id=req_prod.attendee_id,
+                    payment_recipient_id=(
+                        recipient_snapshots[req_prod.recipient_key].id
+                        if req_prod.recipient_key
+                        else None
+                    ),
                     quantity=req_prod.quantity,
                     product_name=product.name,
                     product_description=product.description,
@@ -2935,6 +3300,7 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
                     if is_patreon
                     else None,
                     purchase_metadata=req_prod.purchase_metadata,
+                    fulfillment_type=product.fulfillment_type,
                 )
                 session.add(payment_product)
 
@@ -2970,6 +3336,8 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
         Used to clear the open-checkout cart, which is now keyed by (human, popup)
         like the authenticated portal cart.
         """
+        if payment.buyer_human_id is not None:
+            return payment.buyer_human_id
         snapshot = payment.products_snapshot
         if not snapshot:
             return None
@@ -2993,17 +3361,24 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
         This is called when payment is confirmed (e.g., webhook from payment provider).
         All changes are committed atomically -- on failure, everything is rolled back.
         """
-        payment = self.get(session, payment_id)
+        payment = session.exec(
+            select(Payments)
+            .where(Payments.id == payment_id)
+            .execution_options(populate_existing=True)
+            .with_for_update()
+        ).first()
         if not payment:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Payment not found",
             )
-
-        if payment.status == PaymentStatus.APPROVED.value:
-            return payment  # Already approved
-
         try:
+            if payment.status not in (
+                PaymentStatus.PENDING.value,
+                PaymentStatus.APPROVED.value,
+            ):
+                raise self._invalid_transition(payment.status, PaymentStatus.APPROVED)
+            was_approved = payment.status == PaymentStatus.APPROVED.value
             # Set payment fields directly (no intermediate commit)
             payment.status = PaymentStatus.APPROVED.value
             if not payment.currency:
@@ -3017,22 +3392,10 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
                 payment.source = source
             session.add(payment)
 
-            # Clear existing products if editing passes
-            if payment.edit_passes:
-                self._clear_application_products(session, payment)
-
-            # Add products to attendees
-            products_to_add = [
-                PaymentProductRequest(
-                    product_id=pp.product_id,
-                    attendee_id=pp.attendee_id,
-                    quantity=pp.quantity,
-                    purchase_metadata=pp.purchase_metadata,
-                )
-                for pp in payment.products_snapshot
-            ]
-            self._add_products_to_attendees(
-                session, products_to_add, payment_id=payment.id
+            self._reconcile_payment_fulfillment(
+                session,
+                payment,
+                replace_access=payment.edit_passes and not was_approved,
             )
 
             # Clear cart after successful payment. Application flow clears by
@@ -3040,7 +3403,7 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
             # buyer email so a returning buyer never restores an already-paid cart.
             from app.api.cart.crud import carts_crud
 
-            if payment.application:
+            if not was_approved and payment.application:
                 carts_crud.delete_by_human_popup(
                     session,
                     human_id=payment.application.human_id,
@@ -3048,7 +3411,7 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
                     sales_flow_id=payment.sales_flow_id
                     or payment.application.sales_flow_id,
                 )
-            elif payment.popup_id and payment.sales_flow_id:
+            elif not was_approved and payment.popup_id and payment.sales_flow_id:
                 buyer_human_id = self._direct_buyer_human_id(session, payment)
                 if buyer_human_id:
                     carts_crud.delete_by_human_popup(
@@ -3075,36 +3438,435 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
 
         return payment
 
-    def _clear_application_products(
+    @staticmethod
+    def _fulfillment_error() -> HTTPException:
+        return HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Recipient could not be fulfilled",
+        )
+
+    @staticmethod
+    def _invalid_transition(
+        old_status: str, new_status: PaymentStatus
+    ) -> HTTPException:
+        return HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={
+                "code": "invalid_payment_transition",
+                "message": (
+                    f"Payment cannot transition from {old_status} to {new_status.value}"
+                ),
+            },
+        )
+
+    def _lock_attendee(
+        self, session: Session, attendee_id: uuid.UUID
+    ) -> Attendees | None:
+        return session.exec(
+            select(Attendees).where(Attendees.id == attendee_id).with_for_update()
+        ).first()
+
+    def _resolve_recipient_attendee(
         self,
         session: Session,
         payment: Payments,
+        recipient: PaymentRecipients,
+    ) -> Attendees:
+        if recipient.tenant_id != payment.tenant_id:
+            raise self._fulfillment_error()
+        if recipient.category_id is not None:
+            category_exists = session.exec(
+                select(AttendeeCategories.id).where(
+                    AttendeeCategories.id == recipient.category_id,
+                    AttendeeCategories.tenant_id == payment.tenant_id,
+                    AttendeeCategories.popup_id == payment.popup_id,
+                )
+            ).first()
+            if category_exists is None:
+                raise self._fulfillment_error()
+
+        if (
+            recipient.attendee_id is not None
+            and recipient.existing_attendee_id is not None
+            and recipient.attendee_id != recipient.existing_attendee_id
+        ):
+            raise self._fulfillment_error()
+        requested_attendee_id = recipient.attendee_id or recipient.existing_attendee_id
+        attendee = (
+            self._lock_attendee(session, requested_attendee_id)
+            if requested_attendee_id
+            else None
+        )
+        if requested_attendee_id is not None and attendee is None:
+            raise self._fulfillment_error()
+
+        if recipient.human_id:
+            human = session.exec(
+                select(Humans)
+                .where(
+                    Humans.id == recipient.human_id,
+                    Humans.tenant_id == payment.tenant_id,
+                )
+                .with_for_update()
+            ).first()
+            if human is None:
+                raise self._fulfillment_error()
+            if attendee is None:
+                attendee = session.exec(
+                    select(Attendees)
+                    .where(
+                        Attendees.tenant_id == payment.tenant_id,
+                        Attendees.popup_id == payment.popup_id,
+                        Attendees.human_id == recipient.human_id,
+                    )
+                    .order_by(Attendees.created_at, Attendees.id)
+                    .limit(1)
+                    .with_for_update()
+                ).first()
+            if attendee is not None and (
+                attendee.tenant_id != payment.tenant_id
+                or attendee.popup_id != payment.popup_id
+                or attendee.human_id != recipient.human_id
+                or attendee.category_id != recipient.category_id
+            ):
+                raise self._fulfillment_error()
+            manager_id = recipient.human_id
+        else:
+            manager_id = payment.buyer_human_id
+            if (
+                manager_id is None
+                or session.exec(
+                    select(Humans.id)
+                    .where(
+                        Humans.id == manager_id,
+                        Humans.tenant_id == payment.tenant_id,
+                    )
+                    .with_for_update()
+                ).first()
+                is None
+            ):
+                raise self._fulfillment_error()
+            if attendee is not None and (
+                attendee.tenant_id != payment.tenant_id
+                or attendee.popup_id != payment.popup_id
+                or attendee.category_id != recipient.category_id
+                or attendee.managed_by_human_id != manager_id
+            ):
+                raise self._fulfillment_error()
+
+        if attendee is None:
+            from app.services.trial_limits import enforce_trial_attendee_cap
+
+            enforce_trial_attendee_cap(session, payment.tenant_id)
+            attendee = Attendees(
+                tenant_id=payment.tenant_id,
+                application_id=None,
+                popup_id=payment.popup_id,
+                human_id=recipient.human_id,
+                managed_by_human_id=manager_id,
+                name=recipient.name,
+                email=recipient.email,
+                category_id=recipient.category_id,
+                additional_data=recipient.profile_snapshot,
+            )
+            session.add(attendee)
+            session.flush()
+        elif recipient.human_id:
+            attendee.managed_by_human_id = manager_id
+            session.add(attendee)
+
+        if recipient.attendee_id is None:
+            recipient.attendee_id = attendee.id
+            session.add(recipient)
+        elif recipient.attendee_id != attendee.id:
+            raise self._fulfillment_error()
+        return attendee
+
+    def _reconcile_payment_fulfillment(
+        self,
+        session: Session,
+        payment: Payments,
+        *,
+        replace_access: bool = False,
     ) -> None:
-        """Clear all existing products for attendees in this payment's application.
+        """Reconcile legacy and typed personal fulfillment lineage."""
+        if payment.payment_type == PaymentType.APPLICATION_FEE.value:
+            return
 
-        Used when edit_passes=True to replace existing products with new ones.
-        """
-        # Get all attendee IDs from this payment's products
-        attendee_ids = {pp.attendee_id for pp in payment.products_snapshot}
+        lines = list(
+            session.exec(
+                select(PaymentProducts)
+                .where(PaymentProducts.payment_id == payment.id)
+                .order_by(PaymentProducts.created_at, PaymentProducts.id)
+                .with_for_update()
+            ).all()
+        )
+        product_ids = {line.product_id for line in lines}
+        products = list(
+            session.exec(
+                select(Products).where(
+                    Products.id.in_(product_ids),  # type: ignore[attr-defined]
+                    Products.tenant_id == payment.tenant_id,
+                    Products.popup_id == payment.popup_id,
+                )
+            ).all()
+        )
+        products_by_id = {product.id: product for product in products}
+        for line in lines:
+            if (
+                line.tenant_id != payment.tenant_id
+                or line.quantity <= 0
+                or line.product_id not in products_by_id
+            ):
+                raise self._fulfillment_error()
 
+        personal_lines = [
+            line
+            for line in lines
+            if line.fulfillment_type != FulfillmentType.ORDER.value
+        ]
+
+        recipients = list(
+            session.exec(
+                select(PaymentRecipients)
+                .where(PaymentRecipients.payment_id == payment.id)
+                .order_by(PaymentRecipients.created_at, PaymentRecipients.id)
+                .with_for_update()
+            ).all()
+        )
+        recipients_by_id = {recipient.id: recipient for recipient in recipients}
+        for recipient in recipients:
+            if recipient.tenant_id != payment.tenant_id:
+                raise self._fulfillment_error()
+        referenced_recipient_ids = {
+            line.payment_recipient_id
+            for line in personal_lines
+            if line.payment_recipient_id is not None
+        }
+        resolved_recipients: dict[uuid.UUID, Attendees] = {}
+        for recipient_id in referenced_recipient_ids:
+            recipient = recipients_by_id.get(recipient_id)
+            if recipient is None:
+                raise self._fulfillment_error()
+            resolved_recipients[recipient_id] = self._resolve_recipient_attendee(
+                session, payment, recipient
+            )
+
+        attendees_by_line: dict[uuid.UUID, Attendees] = {}
+        for line in personal_lines:
+            product = products_by_id[line.product_id]
+            if line.payment_recipient_id:
+                recipient = recipients_by_id.get(line.payment_recipient_id)
+                attendee = resolved_recipients.get(line.payment_recipient_id)
+                if recipient is None or attendee is None:
+                    raise self._fulfillment_error()
+                if line.attendee_id is None and line.fulfillment_type is None:
+                    line.attendee_id = attendee.id
+                    session.add(line)
+                elif line.attendee_id is not None and line.attendee_id != attendee.id:
+                    raise self._fulfillment_error()
+            elif line.attendee_id is None:
+                raise self._fulfillment_error()
+            else:
+                attendee = self._lock_attendee(session, line.attendee_id)
+                if attendee is None or (
+                    attendee.tenant_id != payment.tenant_id
+                    or attendee.popup_id != payment.popup_id
+                ):
+                    raise self._fulfillment_error()
+            if (
+                product.attendee_category_id is not None
+                and attendee.category_id != product.attendee_category_id
+            ):
+                raise self._fulfillment_error()
+            attendees_by_line[line.id] = attendee
+
+        same_payment_access = {
+            self._fulfillment_identity(line, attendee)
+            for line in personal_lines
+            if line.fulfillment_type == FulfillmentType.ACCESS.value
+            for attendee in [attendees_by_line[line.id]]
+        }
+        for line in personal_lines:
+            if line.fulfillment_type != FulfillmentType.PARTICIPANT.value:
+                continue
+            attendee = attendees_by_line[line.id]
+            recipient = recipients_by_id.get(line.payment_recipient_id)
+            if self._fulfillment_identity(
+                line, attendee
+            ) not in same_payment_access and not self._has_entitlement(
+                session, payment, attendee, recipient
+            ):
+                raise self._fulfillment_error()
+
+        if replace_access:
+            self._replace_access_holdings(
+                session, {attendee.id for attendee in attendees_by_line.values()}
+            )
+
+        line_ids = [line.id for line in personal_lines]
+        tickets = (
+            list(
+                session.exec(
+                    select(AttendeeProducts)
+                    .where(
+                        or_(
+                            AttendeeProducts.payment_id == payment.id,
+                            AttendeeProducts.payment_product_id.in_(line_ids),  # type: ignore[attr-defined]
+                        )
+                    )
+                    .order_by(AttendeeProducts.id)
+                    .with_for_update()
+                ).all()
+            )
+            if line_ids
+            else []
+        )
+        by_lineage = {
+            (ticket.payment_product_id, ticket.unit_index): ticket
+            for ticket in tickets
+            if ticket.payment_product_id in line_ids
+        }
+        retained_order_pairs = {
+            (line.attendee_id, line.product_id)
+            for line in lines
+            if line.fulfillment_type == FulfillmentType.ORDER.value
+            and line.attendee_id is not None
+        }
+        unlinked: dict[tuple[uuid.UUID, uuid.UUID], list[AttendeeProducts]] = {}
+        for ticket in tickets:
+            pair = (ticket.attendee_id, ticket.product_id)
+            if ticket.payment_product_id is None and pair not in retained_order_pairs:
+                unlinked.setdefault((ticket.attendee_id, ticket.product_id), []).append(
+                    ticket
+                )
+
+        expected_lineage: set[tuple[uuid.UUID, int]] = set()
+        for line in personal_lines:
+            attendee_id = attendees_by_line[line.id].id
+            candidates = unlinked.get((attendee_id, line.product_id), [])
+            for unit_index in range(line.quantity):
+                key = (line.id, unit_index)
+                expected_lineage.add(key)
+                ticket = by_lineage.get(key) or (
+                    candidates.pop(0) if candidates else None
+                )
+                if ticket is None:
+                    ticket = AttendeeProducts(
+                        tenant_id=payment.tenant_id,
+                        attendee_id=attendee_id,
+                        product_id=line.product_id,
+                        check_in_code=generate_check_in_code(""),
+                    )
+                    session.add(ticket)
+                ticket.payment_id = payment.id
+                ticket.payment_product_id = line.id
+                ticket.unit_index = unit_index
+                ticket.fulfillment_type = line.fulfillment_type
+                if ticket.purchase_metadata is None:
+                    ticket.purchase_metadata = line.purchase_metadata
+
+        for ticket in tickets:
+            lineage = (ticket.payment_product_id, ticket.unit_index)
+            if (
+                ticket.payment_product_id in line_ids
+                and lineage not in expected_lineage
+            ):
+                session.delete(ticket)
+        for candidates in unlinked.values():
+            for ticket in candidates:
+                session.delete(ticket)
+        session.flush()
+
+    @staticmethod
+    def _fulfillment_identity(
+        line: PaymentProducts, attendee: Attendees
+    ) -> tuple[str, uuid.UUID]:
+        if line.payment_recipient_id is not None:
+            return ("recipient", line.payment_recipient_id)
+        return ("attendee", attendee.id)
+
+    @staticmethod
+    def _has_entitlement(
+        session: Session,
+        payment: Payments,
+        attendee: Attendees,
+        recipient: PaymentRecipients | None,
+    ) -> bool:
+        application_filters = []
+        if payment.application_id is not None:
+            application_filters.append(Applications.id == payment.application_id)
+        if attendee.application_id is not None:
+            application_filters.append(Applications.id == attendee.application_id)
+        if recipient is not None and recipient.human_id is not None:
+            application_filters.append(Applications.human_id == recipient.human_id)
+        if (
+            application_filters
+            and session.exec(
+                select(Applications.id).where(
+                    Applications.tenant_id == payment.tenant_id,
+                    Applications.popup_id == payment.popup_id,
+                    Applications.status == ApplicationStatus.ACCEPTED.value,
+                    or_(*application_filters),
+                )
+            ).first()
+            is not None
+        ):
+            return True
+
+        return (
+            session.exec(
+                select(AttendeeProducts.id)
+                .join(Products, Products.id == AttendeeProducts.product_id)
+                .where(
+                    AttendeeProducts.attendee_id == attendee.id,
+                    Products.tenant_id == payment.tenant_id,
+                    Products.popup_id == payment.popup_id,
+                    or_(
+                        AttendeeProducts.fulfillment_type
+                        == FulfillmentType.ACCESS.value,
+                        (
+                            AttendeeProducts.fulfillment_type.is_(None)
+                            & (Products.category == "ticket")
+                        ),
+                    ),
+                )
+            ).first()
+            is not None
+        )
+
+    def _replace_access_holdings(
+        self,
+        session: Session,
+        attendee_ids: set[uuid.UUID],
+    ) -> None:
+        """Remove access holdings represented by one edit-passes settlement."""
         if not attendee_ids:
             return
 
-        # Delete all AttendeeProducts for these attendees
-        statement = select(AttendeeProducts).where(
-            AttendeeProducts.attendee_id.in_(attendee_ids)  # type: ignore[attr-defined]
+        statement = (
+            select(AttendeeProducts)
+            .join(Products, Products.id == AttendeeProducts.product_id)
+            .where(
+                AttendeeProducts.attendee_id.in_(attendee_ids),  # type: ignore[attr-defined]
+                or_(
+                    AttendeeProducts.fulfillment_type == FulfillmentType.ACCESS.value,
+                    (
+                        AttendeeProducts.fulfillment_type.is_(None)
+                        & (Products.category == "ticket")
+                    ),
+                ),
+            )
         )
-        existing_products = list(session.exec(statement).all())
-
-        for ap in existing_products:
-            session.delete(ap)
+        holdings = list(session.exec(statement).all())
+        for holding in holdings:
+            session.delete(holding)
 
         session.flush()
         logger.info(
-            "Cleared %d existing products for %d attendees (payment %s, edit_passes=True)",
-            len(existing_products),
+            "Replaced {} access holdings for {} attendees",
+            len(holdings),
             len(attendee_ids),
-            payment.id,
         )
 
     def _remove_products_from_attendees(
@@ -3112,55 +3874,28 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
         session: Session,
         payment: Payments,
     ) -> None:
-        """Remove all AttendeeProducts rows linked to this payment.
+        """Remove personal and legacy holdings linked to this payment.
 
         Uses payment_id FK for precise removal — avoids deleting tickets that
         belong to a different payment but share the same (attendee, product) pair.
+        Typed order holdings remain durable order history.
         """
         logger.info("Removing products from attendees for payment {}", payment.id)
         statement = select(AttendeeProducts).where(
             AttendeeProducts.payment_id == payment.id,
+            or_(
+                AttendeeProducts.fulfillment_type.is_(None),
+                AttendeeProducts.fulfillment_type.in_(  # type: ignore[attr-defined]
+                    (
+                        FulfillmentType.ACCESS.value,
+                        FulfillmentType.PARTICIPANT.value,
+                    )
+                ),
+            ),
         )
         tickets = list(session.exec(statement).all())
         for ticket in tickets:
             session.delete(ticket)
-
-        session.flush()
-
-    def _add_products_to_attendees(
-        self,
-        session: Session,
-        products: list[PaymentProductRequest],
-        payment_id: uuid.UUID | None = None,
-    ) -> None:
-        """Add products to attendees after payment approval.
-
-        Each PaymentProductRequest.quantity creates N new AttendeeProducts rows.
-        Always-INSERT — no upsert. Each row is an independent ticket with its own
-        UUID and check_in_code.
-        """
-        if not products:
-            return
-
-        first_attendee = session.get(Attendees, products[0].attendee_id)
-        if not first_attendee:
-            logger.error(f"Attendee not found: {products[0].attendee_id}")
-            return
-
-        tenant_id = first_attendee.tenant_id
-
-        for req_prod in products:
-            for _ in range(req_prod.quantity):
-                attendee_product = AttendeeProducts(
-                    id=uuid.uuid4(),
-                    tenant_id=tenant_id,
-                    attendee_id=req_prod.attendee_id,
-                    product_id=req_prod.product_id,
-                    check_in_code=generate_check_in_code(""),
-                    payment_id=payment_id,
-                    purchase_metadata=req_prod.purchase_metadata,
-                )
-                session.add(attendee_product)
 
         session.flush()
 
@@ -3213,20 +3948,13 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
         dispatch is the caller's responsibility because this method is
         synchronous.
 
-        Acquires a ``SELECT ... FOR UPDATE`` row lock before reading the current
-        status so that a concurrent webhook path (which also calls approve_payment
-        via update_status) cannot add products a second time.  The lock also
-        refreshes the session identity map so approve_payment sees the current
-        DB state even when supersede_pending_payments pre-loaded the payment as
-        PENDING in the same session.
+        Acquires a ``SELECT ... FOR UPDATE`` row lock before reconciling through
+        approve_payment. Fulfillment lineage, rather than status alone, makes an
+        already-approved replay safe and repairs missing ticket units.
 
         Returns the (possibly freshly) approved payment.
         """
-        # Lock the row and get a fresh DB read, overriding any stale PENDING
-        # value cached in the session identity map from the earlier supersede
-        # lookup.  After this query, session.get(Payments, payment.id) returns
-        # the refreshed instance, so approve_payment's own idempotency guard
-        # sees the current status from the DB.
+        # Lock the row and refresh stale state loaded by supersede/sweeper paths.
         fresh = session.exec(
             select(Payments).where(Payments.id == payment.id).with_for_update()
         ).first()
@@ -3235,10 +3963,6 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Payment not found",
             )
-        if fresh.status == PaymentStatus.APPROVED.value:
-            # Already approved by a concurrent transaction (e.g. webhook beat
-            # supersede to the lock).  Return without adding products again.
-            return fresh
         return self.approve_payment(session, payment.id)
 
     def _check_no_pending_sibling_by_application(
@@ -3892,6 +4616,30 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
             )
 
         old_status = payment.status
+        if old_status == new_status.value and new_status != PaymentStatus.APPROVED:
+            session.commit()
+            session.refresh(payment)
+            return payment
+        terminal_statuses = {
+            PaymentStatus.CANCELLED.value,
+            PaymentStatus.EXPIRED.value,
+            PaymentStatus.REJECTED.value,
+        }
+        if old_status in terminal_statuses and new_status.value in terminal_statuses:
+            session.commit()
+            session.refresh(payment)
+            return payment
+        valid_transition = old_status == PaymentStatus.PENDING.value or (
+            old_status == PaymentStatus.APPROVED.value
+            and new_status == PaymentStatus.CANCELLED
+        )
+        if not valid_transition and not (
+            old_status == PaymentStatus.APPROVED.value
+            and new_status == PaymentStatus.APPROVED
+        ):
+            error = self._invalid_transition(old_status, new_status)
+            session.rollback()
+            raise error
 
         # Restore stock when transitioning OUT of PENDING into a terminal non-approved
         # state.  Idempotency guard: only restore when old_status was PENDING.
@@ -3942,23 +4690,8 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
 
         payment.status = new_status.value
 
-        # If approving, add products to attendees
-        if (
-            new_status == PaymentStatus.APPROVED
-            and old_status != PaymentStatus.APPROVED.value
-        ):
-            products_to_add = [
-                PaymentProductRequest(
-                    product_id=pp.product_id,
-                    attendee_id=pp.attendee_id,
-                    quantity=pp.quantity,
-                    purchase_metadata=pp.purchase_metadata,
-                )
-                for pp in payment.products_snapshot
-            ]
-            self._add_products_to_attendees(
-                session, products_to_add, payment_id=payment.id
-            )
+        if new_status == PaymentStatus.APPROVED:
+            self._reconcile_payment_fulfillment(session, payment)
 
         session.add(payment)
         session.commit()

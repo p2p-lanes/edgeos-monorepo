@@ -1,10 +1,18 @@
 import { act, renderHook } from "@testing-library/react"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 import type { AttendeePassState } from "@/types/Attendee"
-import type { SelectedPassItem } from "@/types/checkout"
+import type {
+  CheckoutRecipientDraft,
+  SelectedDynamicItem,
+  SelectedMealPlanItem,
+  SelectedPassItem,
+} from "@/types/checkout"
 import type { ProductsPass } from "@/types/Products"
 
 const purchaseOpenTicketing = vi.hoisted(() =>
+  vi.fn().mockResolvedValue({ status: "created" }),
+)
+const createMyPayment = vi.hoisted(() =>
   vi.fn().mockResolvedValue({ status: "created" }),
 )
 const telemetry = vi.hoisted(() => ({ trackPortalTelemetry: vi.fn() }))
@@ -13,7 +21,7 @@ const queryClient = vi.hoisted(() => ({ invalidateQueries: vi.fn() }))
 vi.mock("@/client", () => ({
   ApiError: class ApiError extends Error {},
   CheckoutService: { purchaseOpenTicketing },
-  PaymentsService: { createMyPayment: vi.fn() },
+  PaymentsService: { createMyPayment },
 }))
 vi.mock("@tanstack/react-query", () => ({
   useQueryClient: () => queryClient,
@@ -50,6 +58,11 @@ const product = {
   is_active: true,
 } satisfies ProductsPass
 
+const typedProduct = (
+  id: string,
+  fulfillment_type: ProductsPass["fulfillment_type"],
+): ProductsPass => ({ ...product, id, fulfillment_type })
+
 const attendee = {
   tenant_id: "tenant-1",
   popup_id: "popup-1",
@@ -75,22 +88,32 @@ const selectedPasses = [
   },
 ] satisfies SelectedPassItem[]
 
-function renderPaymentSubmit(salesFlowSlug: string | null) {
+function renderPaymentSubmit(
+  salesFlowSlug: string | null,
+  options: {
+    submitMode?: "application" | "open-ticketing"
+    passes?: SelectedPassItem[]
+    attendees?: AttendeePassState[]
+    mealPlans?: SelectedMealPlanItem[]
+    dynamicItems?: Record<string, SelectedDynamicItem[]>
+  } = {},
+) {
+  const submitMode = options.submitMode ?? "open-ticketing"
   return renderHook(() =>
     usePaymentSubmit({
-      applicationId: undefined,
+      applicationId: submitMode === "application" ? "application-1" : undefined,
       popupId: "popup-1",
       popupSlug: "festival-2026",
       salesFlowSlug,
       appCredit: 0,
       checkoutMode: "pass_system",
-      attendeePasses: [attendee],
-      selectedPasses,
+      attendeePasses: options.attendees ?? [attendee],
+      selectedPasses: options.passes ?? selectedPasses,
       housing: null,
       merch: [],
       patron: null,
-      selectedMealPlans: [],
-      dynamicItems: {},
+      selectedMealPlans: options.mealPlans ?? [],
+      dynamicItems: options.dynamicItems ?? {},
       promoCode: "",
       promoCodeValid: false,
       insurance: false,
@@ -101,7 +124,7 @@ function renderPaymentSubmit(salesFlowSlug: string | null) {
       setPromoError: vi.fn(),
       clearPromoCode: vi.fn(),
       paymentCompleteRef: { current: false },
-      submitMode: "open-ticketing",
+      submitMode,
       buyerData: {
         email: "taylor@example.com",
         firstName: "Taylor",
@@ -116,6 +139,7 @@ function renderPaymentSubmit(salesFlowSlug: string | null) {
 describe("usePaymentSubmit public purchase payload", () => {
   beforeEach(() => {
     purchaseOpenTicketing.mockClear()
+    createMyPayment.mockClear()
     telemetry.trackPortalTelemetry.mockClear()
     queryClient.invalidateQueries.mockClear()
   })
@@ -134,7 +158,13 @@ describe("usePaymentSubmit public purchase payload", () => {
       slug: "festival-2026",
       flowSlug: salesFlowSlug,
       requestBody: expect.objectContaining({
-        products: [{ product_id: "product-1", quantity: 2 }],
+        products: [
+          {
+            product_id: "product-1",
+            attendee_id: "attendee-1",
+            quantity: 2,
+          },
+        ],
         buyer: {
           email: "taylor@example.com",
           first_name: "Taylor",
@@ -143,6 +173,185 @@ describe("usePaymentSubmit public purchase payload", () => {
         },
       }),
     })
+  })
+
+  it.each([
+    ["anonymous", "open-ticketing"],
+    ["authenticated", "application"],
+  ] as const)("submits restored recipient snapshots in %s mode", async (_, submitMode) => {
+    const recipient = {
+      recipient_key: "managed-spouse",
+      existing_attendee_id: "spouse-attendee",
+      name: "Sam Spouse",
+      email: "sam@example.com",
+      category_id: "category-spouse",
+      profile_snapshot: { category: "spouse", residence: "Lisbon" },
+    }
+    const restoredPasses = [
+      {
+        ...selectedPasses[0],
+        attendeeId: "recipient:managed-spouse",
+        recipient,
+      },
+      {
+        ...selectedPasses[0],
+        productId: "product-2",
+        product: { ...product, id: "product-2" },
+        attendeeId: "recipient:managed-spouse",
+        recipient,
+        quantity: 1,
+        price: 99,
+      },
+    ] satisfies SelectedPassItem[]
+    const { result } = renderPaymentSubmit("merch-store", {
+      submitMode,
+      passes: restoredPasses,
+    })
+
+    await act(async () => {
+      await result.current.submitPayment()
+    })
+
+    const service =
+      submitMode === "open-ticketing" ? purchaseOpenTicketing : createMyPayment
+    const requestBody = service.mock.calls[0]?.[0].requestBody
+    expect(requestBody.products).toEqual([
+      {
+        product_id: "product-1",
+        recipient_key: "managed-spouse",
+        quantity: 2,
+      },
+      {
+        product_id: "product-2",
+        recipient_key: "managed-spouse",
+        quantity: 1,
+      },
+    ])
+    expect(requestBody.recipients).toEqual([recipient])
+  })
+
+  it("preserves authenticated legacy attendee identity", async () => {
+    const { result } = renderPaymentSubmit("merch-store", {
+      submitMode: "application",
+    })
+
+    await act(async () => {
+      await result.current.submitPayment()
+    })
+
+    expect(createMyPayment.mock.calls[0]?.[0].requestBody).toMatchObject({
+      products: [
+        {
+          product_id: "product-1",
+          attendee_id: "attendee-1",
+          quantity: 2,
+        },
+      ],
+      recipients: [],
+    })
+  })
+
+  it.each([
+    ["anonymous", "open-ticketing"],
+    ["authenticated", "application"],
+  ] as const)("routes a restored mixed cart in %s mode", async (_, submitMode) => {
+    const recipient = {
+      recipient_key: "managed-family",
+      name: "Family Member",
+      profile_snapshot: { dietary_notes: "vegetarian" },
+    } satisfies CheckoutRecipientDraft
+    const restoredAttendee = {
+      ...attendee,
+      id: "recipient:managed-family",
+      recipient,
+    }
+    const accessProduct = typedProduct("access-pass", "access")
+    const orderProduct = typedProduct("parking-order", "order")
+    const mixedPasses = [accessProduct, orderProduct].map(
+      (selectedProduct) => ({
+        productId: selectedProduct.id,
+        product: selectedProduct,
+        attendeeId: restoredAttendee.id,
+        attendee: restoredAttendee,
+        recipient,
+        quantity: 1,
+        price: selectedProduct.price,
+      }),
+    ) satisfies SelectedPassItem[]
+    const mealPlans = [
+      {
+        productId: "participant-meal",
+        product: {
+          ...typedProduct("participant-meal", "participant"),
+          category: "meal_plan",
+        },
+        attendeeId: restoredAttendee.id,
+        dailyChoices: { "2026-09-01": "veggie" },
+        dietaryRestriction: "vegetarian",
+        specialRequest: null,
+      },
+    ] satisfies SelectedMealPlanItem[]
+    const sideProduct = typedProduct("ownerless-extra", "order")
+    const { result } = renderPaymentSubmit("merch-store", {
+      submitMode,
+      passes: mixedPasses,
+      attendees: [restoredAttendee],
+      mealPlans,
+      dynamicItems: {
+        extras: [2, 3].map((quantity) => ({
+          productId: sideProduct.id,
+          product: sideProduct,
+          quantity,
+          price: 10,
+          stepType: "extras",
+        })),
+      },
+    })
+
+    await act(async () => {
+      await result.current.submitPayment()
+    })
+
+    const service =
+      submitMode === "open-ticketing" ? purchaseOpenTicketing : createMyPayment
+    const requestBody = service.mock.calls[0]?.[0].requestBody
+    expect(requestBody.recipients).toEqual([recipient])
+    expect(requestBody.products.slice(0, 2)).toEqual([
+      {
+        product_id: "access-pass",
+        recipient_key: "managed-family",
+        quantity: 1,
+      },
+      { product_id: "parking-order", quantity: 1 },
+    ])
+    expect(
+      requestBody.products.filter(
+        ({ product_id }: { product_id: string }) =>
+          product_id === "ownerless-extra",
+      ),
+    ).toEqual(
+      submitMode === "open-ticketing"
+        ? [{ product_id: "ownerless-extra", quantity: 5 }]
+        : [
+            { product_id: "ownerless-extra", quantity: 2 },
+            { product_id: "ownerless-extra", quantity: 3 },
+          ],
+    )
+    const mealLine = requestBody.products.at(-1)
+    expect(mealLine).toMatchObject({
+      product_id: "participant-meal",
+      recipient_key: "managed-family",
+      quantity: 1,
+    })
+    expect(mealLine.purchase_metadata).toEqual(
+      submitMode === "application"
+        ? {
+            daily_choices: { "2026-09-01": "veggie" },
+            dietary_restriction: "vegetarian",
+            special_request: null,
+          }
+        : undefined,
+    )
   })
 
   it("invalidates the popup upsale catalog after an approved payment", async () => {

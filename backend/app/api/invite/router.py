@@ -614,7 +614,7 @@ async def create_my_link(
     which belongs to the flow the sharer came through).
     Token auto-generated when omitted. 409 if (popup_id, token) collides.
     """
-    from app.api.attendee.crud import attendees_crud
+    from app.api.application.crud import applications_crud
     from app.api.popup.crud import popups_crud
     from app.api.sales_flow.resolver import config_for  # noqa: PLC0415
 
@@ -636,12 +636,11 @@ async def create_my_link(
             detail="Attendee links are not enabled for this way in",
         )
 
-    # Anti-abuse gate: only attendees who actually hold a ticket may create a
-    # link. Stops someone who just arrived through a link (and was
-    # auto-approved) from immediately spawning their own without committing.
-    if not attendees_crud.human_has_ticket_in_popup(
+    # Reuse the popup access gate so accepted applicants and self/managed access
+    # holders qualify, while participant/order holdings and bare attendees do not.
+    if not applications_crud.resolve_popup_access(
         db, current_human.id, body.popup_id
-    ):
+    ).allowed:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="You need a ticket for this popup to create a link.",

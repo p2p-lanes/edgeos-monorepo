@@ -69,4 +69,28 @@ describe("purchasesFromPayments", () => {
       ),
     ).toEqual([])
   })
+
+  it("does not project a pending recipient before attendee materialization", () => {
+    expect(
+      purchasesFromPayments(
+        [
+          {
+            products_snapshot: [
+              {
+                attendee_id: null,
+                product_id: "product-1",
+                product_name: "Weekend pass",
+                product_price: "99.00",
+                product_category: "ticket",
+                product_currency: "USD",
+                quantity: 1,
+                created_at: "2026-08-21T00:00:00Z",
+              },
+            ],
+          },
+        ],
+        [],
+      ),
+    ).toEqual([])
+  })
 })

@@ -4,6 +4,7 @@ from decimal import Decimal
 from enum import Enum
 
 from pydantic import BaseModel, ConfigDict, model_validator
+from pydantic.json_schema import SkipJsonSchema
 from sqlalchemy import Boolean, Numeric, Text
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlmodel import Column, DateTime, Field, SQLModel
@@ -32,6 +33,12 @@ class TicketDuration(str, Enum):
     WEEK = "week"
     MONTH = "month"
     FULL = "full"
+
+
+class FulfillmentType(str, Enum):
+    ACCESS = "access"
+    PARTICIPANT = "participant"
+    ORDER = "order"
 
 
 class ProductBase(SQLModel):
@@ -110,6 +117,7 @@ class ProductPublic(ProductBase):
     """
 
     id: uuid.UUID
+    fulfillment_type: FulfillmentType | None = None
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -118,6 +126,7 @@ class ProductCreate(BaseModel):
     """Product schema for creation."""
 
     popup_id: uuid.UUID
+    fulfillment_type: FulfillmentType
     name: str
     slug: str | None = None
     price: Decimal = Field(ge=0)
@@ -200,6 +209,7 @@ class ProductUpdate(BaseModel):
     """Product schema for updates."""
 
     name: str | None = None
+    fulfillment_type: FulfillmentType | SkipJsonSchema[None] = None
     slug: str | None = None
     price: Decimal | None = Field(default=None, ge=0)
     compare_price: Decimal | None = Field(default=None, ge=0)
@@ -218,6 +228,15 @@ class ProductUpdate(BaseModel):
     insurance_eligible: bool | None = None
     requires_check_in: bool | None = None
     discountable: bool | None = None
+
+    @model_validator(mode="after")
+    def validate_fulfillment_type(self) -> "ProductUpdate":
+        if (
+            "fulfillment_type" in self.model_fields_set
+            and self.fulfillment_type is None
+        ):
+            raise ValueError("fulfillment_type cannot be null when supplied")
+        return self
 
     @model_validator(mode="after")
     def validate_patreon_price(self) -> "ProductUpdate":
@@ -266,6 +285,7 @@ class ProductBatchItem(BaseModel):
     """Single product in a batch import (popup_id is top-level)."""
 
     name: str
+    fulfillment_type: FulfillmentType
     slug: str | None = None
     price: Decimal = Field(ge=0)
     compare_price: Decimal | None = Field(default=None, ge=0)

@@ -155,6 +155,13 @@ def _validate_meal_plan_select_template_config(
     return out
 
 
+def validate_template_config(
+    template: str | None, template_config: dict[str, Any] | None
+) -> dict[str, Any] | None:
+    template_config = _validate_sections_in_template_config(template, template_config)
+    return _validate_meal_plan_select_template_config(template, template_config)
+
+
 class TicketingStepBase(SQLModel):
     tenant_id: uuid.UUID = Field(foreign_key="tenants.id", index=True)
     popup_id: uuid.UUID = Field(foreign_key="popups.id", index=True)

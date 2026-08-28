@@ -1,7 +1,9 @@
 import { useQueryClient } from "@tanstack/react-query"
 import { type MutableRefObject, useCallback, useEffect } from "react"
 import {
+  type CartItemPass,
   type CartState,
+  EMPTY_CART,
   useCart,
   useClearCart,
   useSaveCart,
@@ -10,6 +12,7 @@ import { checkAndClearPurchasePending } from "@/hooks/usePaymentRedirect"
 import { getProductAvailability } from "@/lib/product-availability"
 import { queryKeys } from "@/lib/query-keys"
 import type {
+  CheckoutRecipientDraft,
   CheckoutStep,
   SelectedDynamicItem,
   SelectedHousingItem,
@@ -33,6 +36,33 @@ export interface CartSelectionState {
   currentStep: CheckoutStep
 }
 
+export interface PersistedPassSelections {
+  passes: CartItemPass[]
+  recipients: CheckoutRecipientDraft[]
+}
+
+export function buildPersistedPassSelections(
+  selectedPasses: SelectedPassItem[],
+): PersistedPassSelections {
+  const recipients = new Map<string, CheckoutRecipientDraft>()
+  const passes = selectedPasses.map((pass) => {
+    if (pass.recipient) {
+      recipients.set(pass.recipient.recipient_key, pass.recipient)
+      return {
+        recipient_key: pass.recipient.recipient_key,
+        product_id: pass.productId,
+        quantity: pass.quantity,
+      }
+    }
+    return {
+      attendee_id: pass.attendeeId,
+      product_id: pass.productId,
+      quantity: pass.quantity,
+    }
+  })
+  return { passes, recipients: [...recipients.values()] }
+}
+
 export interface RestorationSetters {
   setHousing: (item: SelectedHousingItem | null) => void
   setMerch: (items: SelectedMerchItem[]) => void
@@ -41,6 +71,10 @@ export interface RestorationSetters {
   setInsurance: (value: boolean) => void
   setDynamicItems: (items: Record<string, SelectedDynamicItem[]>) => void
   setPromoCode?: (code: string) => void
+  restorePassRecipients?: (
+    recipients: CheckoutRecipientDraft[],
+    passes: PersistedPassSelections["passes"],
+  ) => void
 }
 
 interface UseCartPersistenceParams {
@@ -85,42 +119,41 @@ export function useCartPersistence({
 
   // --- Build CartState from the ref's current value ---
   const buildCartState = useCallback((): CartState => {
-    const s = selectionStateRef.current
+    const state = selectionStateRef.current
+    const recipientSelections = buildPersistedPassSelections(
+      state.selectedPasses,
+    )
     return {
-      passes: s.selectedPasses.map((p) => ({
-        attendee_id: p.attendeeId,
-        product_id: p.productId,
-        quantity: p.quantity,
-      })),
-      housing: s.housing
+      ...recipientSelections,
+      housing: state.housing
         ? {
-            product_id: s.housing.productId,
-            check_in: s.housing.checkIn,
-            check_out: s.housing.checkOut,
-            quantity: s.housing.quantity,
+            product_id: state.housing.productId,
+            check_in: state.housing.checkIn,
+            check_out: state.housing.checkOut,
+            quantity: state.housing.quantity,
           }
         : null,
-      merch: s.merch.map((m) => ({
-        product_id: m.productId,
-        quantity: m.quantity,
+      merch: state.merch.map((item) => ({
+        product_id: item.productId,
+        quantity: item.quantity,
       })),
-      patron: s.patron
+      patron: state.patron
         ? {
-            product_id: s.patron.productId,
-            amount: s.patron.amount,
-            is_custom_amount: s.patron.isCustomAmount,
+            product_id: state.patron.productId,
+            amount: state.patron.amount,
+            is_custom_amount: state.patron.isCustomAmount,
           }
         : null,
-      meal_plans: s.selectedMealPlans.map((m) => ({
-        attendee_id: m.attendeeId,
-        product_id: m.productId,
-        daily_choices: m.dailyChoices,
-        dietary_restriction: m.dietaryRestriction,
-        special_request: m.specialRequest,
+      meal_plans: state.selectedMealPlans.map((item) => ({
+        attendee_id: item.attendeeId,
+        product_id: item.productId,
+        daily_choices: item.dailyChoices,
+        dietary_restriction: item.dietaryRestriction,
+        special_request: item.specialRequest,
       })),
-      promo_code: s.promoCodeValid ? s.promoCode : null,
-      insurance: s.insurance,
-      current_step: s.currentStep !== "success" ? s.currentStep : null,
+      promo_code: state.promoCodeValid ? state.promoCode : null,
+      insurance: state.insurance,
+      current_step: state.currentStep !== "success" ? state.currentStep : null,
     }
   }, [selectionStateRef])
 
@@ -188,16 +221,7 @@ export function useCartPersistence({
         onSettled: () => {
           queryClient.setQueryData<CartState>(
             queryKeys.cart.byPopup(cityId ?? ""),
-            {
-              passes: [],
-              housing: null,
-              merch: [],
-              patron: null,
-              meal_plans: [],
-              promo_code: null,
-              insurance: false,
-              current_step: null,
-            },
+            { ...EMPTY_CART },
           )
         },
       })

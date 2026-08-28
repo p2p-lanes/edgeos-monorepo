@@ -21,6 +21,7 @@ from app.api.attendee.models import AttendeeProducts, Attendees
 from app.api.attendee_category.models import AttendeeCategories
 from app.api.popup.models import Popups
 from app.api.product.models import Products
+from app.api.product.schemas import FulfillmentType
 from app.api.tenant.models import Tenants
 from tests.api.application_review.test_pending_reviews import (
     _auth,
@@ -73,15 +74,14 @@ def _make_attendee(
     return attendee
 
 
-def _make_ticket(
-    db: Session, tenant: Tenants, popup: Popups, attendee: Attendees
-) -> None:
+def _make_ticket(db, tenant, popup, attendee, kind=FulfillmentType.ACCESS):
     product = Products(
         tenant_id=tenant.id,
         popup_id=popup.id,
         name="Filters Ticket",
         slug=f"filters-ticket-{uuid.uuid4().hex[:8]}",
         price=Decimal("10.00"),
+        fulfillment_type=kind.value,
     )
     db.add(product)
     db.flush()
@@ -91,6 +91,7 @@ def _make_ticket(
             attendee_id=attendee.id,
             product_id=product.id,
             check_in_code=f"FLT{uuid.uuid4().hex[:8].upper()}",
+            fulfillment_type=kind.value,
         )
     )
     db.commit()
@@ -212,8 +213,10 @@ class TestAttendeeListFilters:
         popup = _make_popup(db, tenant_a)
         admin = _make_admin(db, tenant_a)
         with_ticket = _make_attendee(db, tenant_a, popup)
+        with_participant = _make_attendee(db, tenant_a, popup)
         without_ticket = _make_attendee(db, tenant_a, popup)
         _make_ticket(db, tenant_a, popup, with_ticket)
+        _make_ticket(db, tenant_a, popup, with_participant, FulfillmentType.PARTICIPANT)
 
         response = _list(
             client, admin, tenant_a, popup, _one("has_tickets", "eq", True)
@@ -223,7 +226,7 @@ class TestAttendeeListFilters:
         response = _list(
             client, admin, tenant_a, popup, _one("has_tickets", "eq", False)
         )
-        assert _ids(response) == {str(without_ticket.id)}
+        assert _ids(response) == {str(with_participant.id), str(without_ticket.id)}
 
     def test_match_all_vs_any(
         self, db: Session, tenant_a: Tenants, client: TestClient

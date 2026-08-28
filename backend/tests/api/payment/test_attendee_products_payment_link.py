@@ -19,7 +19,7 @@ from app.api.attendee.models import AttendeeProducts, Attendees
 from app.api.human.models import Humans
 from app.api.payment.crud import payments_crud
 from app.api.payment.models import PaymentProducts, Payments
-from app.api.payment.schemas import PaymentProductRequest, PaymentStatus
+from app.api.payment.schemas import PaymentStatus
 from app.api.popup.models import Popups
 from app.api.product.models import Products
 from app.api.tenant.models import Tenants
@@ -168,45 +168,3 @@ def test_update_status_to_approved_links_tickets_to_payment(
         "update_status -> APPROVED must link every new AttendeeProducts row "
         "to the payment whose status transitioned."
     )
-
-
-def test_add_products_to_attendees_forwards_payment_id(
-    db: Session,
-    tenant_a: Tenants,
-    popup_tenant_a: Popups,
-) -> None:
-    """_add_products_to_attendees stamps payment_id when the kwarg is provided.
-
-    Direct contract test that backs up the auto-approve branch of
-    create_payment, which constructs the Payments row, flushes it, and then
-    calls this method with payment_id=payment.id.
-    """
-    product = _make_product(db, tenant_a, popup_tenant_a)
-    payment, attendee = _make_pending_payment_with_snapshot(
-        db, tenant_a, popup_tenant_a, [(product, 1)]
-    )
-
-    payments_crud._add_products_to_attendees(
-        db,
-        [
-            PaymentProductRequest(
-                product_id=product.id,
-                attendee_id=attendee.id,
-                quantity=2,
-            )
-        ],
-        payment_id=payment.id,
-    )
-    db.commit()
-
-    db.expire_all()
-    tickets = list(
-        db.exec(
-            select(AttendeeProducts).where(
-                AttendeeProducts.attendee_id == attendee.id,
-                AttendeeProducts.product_id == product.id,
-            )
-        ).all()
-    )
-    assert len(tickets) == 2
-    assert all(t.payment_id == payment.id for t in tickets)

@@ -20,6 +20,9 @@ from __future__ import annotations
 
 import uuid
 
+from sqlmodel import Session
+
+from app.api.human.models import Humans
 from app.api.payment.models import Payments
 from app.services.email import (
     EmailAttachment,
@@ -107,6 +110,23 @@ def _build_payment_confirmed_context(
     )
 
 
+def _resolve_payment_buyer(
+    payment: Payments, db_session: Session | None = None
+) -> Humans | None:
+    """Resolve the buyer snapshot first, retaining legacy attendee fallback."""
+    if payment.buyer_human_id is not None and db_session is not None:
+        human = db_session.get(Humans, payment.buyer_human_id)
+        if human is not None:
+            return human
+    if payment.application is not None and payment.application.human is not None:
+        return payment.application.human
+    if payment.products_snapshot:
+        attendee = payment.products_snapshot[0].attendee
+        if attendee is not None:
+            return attendee.human
+    return None
+
+
 async def _send_payment_confirmed_email(payment, db_session=None) -> None:
     """Send payment confirmation email.
 
@@ -125,18 +145,13 @@ async def _send_payment_confirmed_email(payment, db_session=None) -> None:
     if payment_model.application_id is not None:
         # Application-based payment (existing flow)
         application = payment_model.application
-        human = application.human if application else None
         popup = application.popup if application else None
     else:
         # Direct-sale payment: no application. Human comes from the attendee
         # linked to the first product snapshot (direct-sale only ever has one
         # attendee per payment — the buyer).
         popup = payment_model.popup
-        human = None
-        if payment_model.products_snapshot:
-            attendee = payment_model.products_snapshot[0].attendee
-            if attendee is not None:
-                human = attendee.human
+    human = _resolve_payment_buyer(payment_model, db_session)
 
     if popup is None:
         logger.warning(

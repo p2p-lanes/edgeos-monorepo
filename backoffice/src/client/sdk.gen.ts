@@ -35,7 +35,7 @@ export class AdminApiKeysService {
             }
         });
     }
-
+    
     /**
      * List Admin Api Keys
      * List admin API keys.
@@ -60,7 +60,7 @@ export class AdminApiKeysService {
             }
         });
     }
-
+    
     /**
      * Get Admin Api Key
      * Retrieve a specific admin API key.
@@ -89,7 +89,7 @@ export class AdminApiKeysService {
             }
         });
     }
-
+    
     /**
      * Revoke Admin Api Key
      * Revoke an admin API key by setting revoked_at.
@@ -132,7 +132,7 @@ export class ApiKeysService {
             url: '/api/v1/api-keys'
         });
     }
-
+    
     /**
      * Create an API key
      * @param data The data for the request.
@@ -151,7 +151,7 @@ export class ApiKeysService {
             }
         });
     }
-
+    
     /**
      * Revoke an API key
      * @param data The data for the request.
@@ -204,7 +204,7 @@ export class ApplicationReviewsService {
             }
         });
     }
-
+    
     /**
      * Submit Review
      * Submit or update a review for an application.
@@ -235,7 +235,7 @@ export class ApplicationReviewsService {
             }
         });
     }
-
+    
     /**
      * Get Review Summary
      * Get a summary of reviews for an application.
@@ -260,7 +260,7 @@ export class ApplicationReviewsService {
             }
         });
     }
-
+    
     /**
      * List Pending Reviews
      * List applications pending review by the current user.
@@ -294,7 +294,7 @@ export class ApplicationReviewsService {
             }
         });
     }
-
+    
     /**
      * List My Reviews
      * List reviews submitted by the current user.
@@ -321,7 +321,7 @@ export class ApplicationReviewsService {
             }
         });
     }
-
+    
     /**
      * Skip Application
      * Skip an application: drop it from your own pending queue without voting.
@@ -351,7 +351,7 @@ export class ApplicationReviewsService {
             }
         });
     }
-
+    
     /**
      * Unskip Application
      * Un-skip an application: return it to your pending queue.
@@ -442,7 +442,7 @@ export class ApplicationsService {
             }
         });
     }
-
+    
     /**
      * Create Application Admin
      * Create an application as admin (BO only - superadmin for testing).
@@ -469,7 +469,7 @@ export class ApplicationsService {
             }
         });
     }
-
+    
     /**
      * Get Application Group Counts
      * Count a popup's applications grouped by one field (BO only).
@@ -517,7 +517,7 @@ export class ApplicationsService {
             }
         });
     }
-
+    
     /**
      * List Application Reviewers
      * List users who have submitted at least one review for a popup.
@@ -542,6 +542,7 @@ export class ApplicationsService {
             }
         });
     }
+    
     /**
      * Admin bulk-grant of free tickets
      * Atomically grant free tickets to a batch of people for a popup.
@@ -583,7 +584,7 @@ export class ApplicationsService {
             }
         });
     }
-
+    
     /**
      * Get Application
      * Get a single application (BO only).
@@ -608,7 +609,7 @@ export class ApplicationsService {
             }
         });
     }
-
+    
     /**
      * List this applicant's applications to other popups
      * List the same human's applications to the tenant's other popups (BO only).
@@ -639,6 +640,7 @@ export class ApplicationsService {
             }
         });
     }
+    
     /**
      * Grant credit to an application
      * Grant credit to a specific application (BO admin only).
@@ -670,7 +672,7 @@ export class ApplicationsService {
             }
         });
     }
-
+    
     /**
      * List your applications
      * List applications for the current human (Portal).
@@ -693,7 +695,7 @@ export class ApplicationsService {
             }
         });
     }
-
+    
     /**
      * List your tickets
      * List all tickets for the current human (Portal).
@@ -712,7 +714,7 @@ export class ApplicationsService {
             url: '/api/v1/applications/my/tickets'
         });
     }
-
+    
     /**
      * Get your participation in a popup
      * Get participation status for the current human in a popup (Portal).
@@ -738,7 +740,7 @@ export class ApplicationsService {
             }
         });
     }
-
+    
     /**
      * List your purchases for a popup
      * Get purchased products grouped by attendee for a popup (Portal).
@@ -759,7 +761,7 @@ export class ApplicationsService {
             }
         });
     }
-
+    
     /**
      * Get your application for a popup
      * Get current human's application for a popup (Portal).
@@ -780,7 +782,7 @@ export class ApplicationsService {
             }
         });
     }
-
+    
     /**
      * Update your application for a popup
      * Update current human's application (Portal).
@@ -804,7 +806,7 @@ export class ApplicationsService {
             }
         });
     }
-
+    
     /**
      * Detach yourself as a companion from another application
      * Remove the current human from being a companion on another applicant's
@@ -1442,14 +1444,7 @@ export class AttendeesService {
     
     /**
      * Update your attendee
-     * Update a companion attendee using the dual-path auth predicate.
-     *
-     * Authorization: attendee.popup_id == popup_id AND (
-     * attendee.human_id == current_human.id
-     * OR attendee.application.human_id == current_human.id
-     * ).
-     * Returns 404 if attendee not found, popup_id mismatch, or predicate fails
-     * (do not expose existence to unauthorized callers).
+     * Update a self, explicitly managed, or legacy-owned Attendee.
      * @param data The data for the request.
      * @param data.popupId
      * @param data.attendeeId
@@ -1507,10 +1502,8 @@ export class AttendeesService {
      * dietary_restriction, special_request) for a week whose sale window is still
      * open. Does not change products, price, stock, or the payment snapshot.
      *
-     * Authorization: same dual-path predicate as update_my_attendee_for_popup —
-     * attendee.popup_id == popup_id AND (attendee.human_id == current_human.id OR
-     * attendee.application.human_id == current_human.id). Returns 404 (never 403)
-     * on any failure so existence is not leaked to unauthorized callers.
+     * Authorization uses the same centralized self-or-manager compatibility
+     * predicate as all other portal Attendee operations.
      *
      * Errors from the CRUD layer: 404 (ticket/product not found), 409
      * meal_plan_week_locked (week closed), 422 not_meal_plan_ticket or
@@ -2530,6 +2523,7 @@ export class CheckoutService {
             }
         });
     }
+    
     /**
      * Restore Flow Cart
      * Restore a flow-scoped cart from a signed link.
@@ -2564,6 +2558,7 @@ export class CheckoutService {
             }
         });
     }
+    
     /**
      * Release Pending Open
      * Opportunistically release a buyer's own prior PENDING payment on checkout return.
@@ -5872,6 +5867,7 @@ export class GroupsService {
             }
         });
     }
+    
     /**
      * List My Groups
      * List groups where current human is a leader or member (Portal).
@@ -7641,6 +7637,7 @@ export class PopupsService {
             }
         });
     }
+    
     /**
      * List Portal Popups
      * List popups visible to the current human in the Portal.
@@ -7875,14 +7872,7 @@ export class PortalService {
     
     /**
      * Update your attendee
-     * Update a companion attendee using the dual-path auth predicate.
-     *
-     * Authorization: attendee.popup_id == popup_id AND (
-     * attendee.human_id == current_human.id
-     * OR attendee.application.human_id == current_human.id
-     * ).
-     * Returns 404 if attendee not found, popup_id mismatch, or predicate fails
-     * (do not expose existence to unauthorized callers).
+     * Update a self, explicitly managed, or legacy-owned Attendee.
      * @param data The data for the request.
      * @param data.popupId
      * @param data.attendeeId
@@ -7940,10 +7930,8 @@ export class PortalService {
      * dietary_restriction, special_request) for a week whose sale window is still
      * open. Does not change products, price, stock, or the payment snapshot.
      *
-     * Authorization: same dual-path predicate as update_my_attendee_for_popup —
-     * attendee.popup_id == popup_id AND (attendee.human_id == current_human.id OR
-     * attendee.application.human_id == current_human.id). Returns 404 (never 403)
-     * on any failure so existence is not leaked to unauthorized callers.
+     * Authorization uses the same centralized self-or-manager compatibility
+     * predicate as all other portal Attendee operations.
      *
      * Errors from the CRUD layer: 404 (ticket/product not found), 409
      * meal_plan_week_locked (week closed), 422 not_meal_plan_ticket or
@@ -8384,6 +8372,7 @@ export class SalesFlowsService {
             }
         });
     }
+    
     /**
      * List Sales Flows
      * List sales flows for a popup (BO only).

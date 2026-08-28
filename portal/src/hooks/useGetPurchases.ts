@@ -22,6 +22,7 @@ export function purchasesFromPayments(
 
   for (const payment of payments) {
     for (const product of payment.products_snapshot ?? []) {
+      if (!product.attendee_id) continue
       const attendee = attendeesById.get(product.attendee_id)
       if (!attendee) continue
 

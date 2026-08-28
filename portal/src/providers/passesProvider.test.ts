@@ -4,11 +4,16 @@ import { describe, expect, it } from "vitest"
 import { CHECKOUT_MODE } from "@/checkout/popupCheckoutPolicy"
 import type { ProductWithQuantity } from "@/client"
 import {
+  applyCartSelections,
   buildBaseAttendeePasses,
   buildPurchasesMap,
   mergeAvailableAndPurchasedProducts,
+  projectRecipientDraft,
+  rebuildRecipientPasses,
+  restoreRecipientDrafts,
 } from "@/providers/passesProvider"
 import type { AttendeePassState } from "@/types/Attendee"
+import type { CheckoutRecipientPassState } from "@/types/checkout"
 import type { ProductsPass } from "@/types/Products"
 
 // ---------------------------------------------------------------------------
@@ -275,6 +280,165 @@ describe("buildBaseAttendeePasses", () => {
       result[0]?.products.find((product) => product.id === "inactive-ticket")
         ?.is_active,
     ).toBe(false)
+  })
+})
+
+describe("recipient draft restoration", () => {
+  const companionDraft = {
+    recipient_key: "draft:11111111-1111-4111-8111-111111111111",
+    name: "Sam Companion",
+    email: "sam@example.com",
+    category_id: "category-spouse",
+    profile_snapshot: {
+      category: "spouse",
+      gender: "nonbinary",
+      residence: "Lisbon",
+    },
+  }
+
+  it("projects a local companion draft onto the current products", () => {
+    const projected = projectRecipientDraft(
+      [],
+      companionDraft,
+      "popup-1",
+      [createProduct({ id: "spouse-pass" })],
+      0,
+      new Map(),
+      CHECKOUT_MODE.PASS_SYSTEM,
+    )
+
+    expect(projected).toEqual([
+      expect.objectContaining({
+        id: "recipient:draft:11111111-1111-4111-8111-111111111111",
+        popup_id: "popup-1",
+        category_id: "category-spouse",
+        category: "spouse",
+        name: "Sam Companion",
+        email: "sam@example.com",
+        gender: "nonbinary",
+        additional_data: companionDraft.profile_snapshot,
+        recipient: companionDraft,
+        products: [expect.objectContaining({ id: "spouse-pass" })],
+      }),
+    ])
+  })
+
+  it("preserves a local draft through structural rebuilds and dedupes a restored snapshot", () => {
+    const firstProduct = createProduct({ id: "spouse-pass" })
+    const current = projectRecipientDraft(
+      [],
+      companionDraft,
+      "popup-1",
+      [firstProduct],
+      0,
+      new Map(),
+      CHECKOUT_MODE.PASS_SYSTEM,
+    )
+    current[0].products[0].selected = true
+
+    const rebuilt = rebuildRecipientPasses(
+      [],
+      [companionDraft],
+      [
+        {
+          recipient_key: companionDraft.recipient_key,
+          product_id: firstProduct.id,
+          quantity: 1,
+        },
+      ],
+      "popup-1",
+      [firstProduct, createProduct({ id: "meal-pass" })],
+      10,
+      new Map(),
+      CHECKOUT_MODE.PASS_SYSTEM,
+      current,
+    )
+
+    expect(rebuilt).toHaveLength(1)
+    expect(rebuilt[0].recipient).toBe(companionDraft)
+    expect(rebuilt[0].products).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ id: "spouse-pass", selected: true }),
+        expect.objectContaining({ id: "meal-pass", selected: false }),
+      ]),
+    )
+  })
+
+  it("restores accountless spouse and kid drafts without persisted Attendees", () => {
+    const recipients = [
+      {
+        recipient_key: "managed-spouse",
+        existing_attendee_id: "reusable-spouse-attendee",
+        name: "Sam Spouse",
+        email: "sam@example.com",
+        category_id: "category-spouse",
+        profile_snapshot: { category: "spouse", residence: "Lisbon" },
+      },
+      {
+        recipient_key: "managed-kid",
+        name: "Taylor Kid",
+        category_id: "category-kid",
+        profile_snapshot: { category: "kid", age_group: "under_12" },
+      },
+    ]
+
+    const restored = restoreRecipientDrafts([], recipients, "popup-1")
+
+    expect(restored).toEqual([
+      expect.objectContaining({
+        id: "recipient:managed-spouse",
+        popup_id: "popup-1",
+        category: "spouse",
+        additional_data: { category: "spouse", residence: "Lisbon" },
+        recipient: recipients[0],
+      }),
+      expect.objectContaining({
+        id: "recipient:managed-kid",
+        category: "kid",
+        recipient: recipients[1],
+      }),
+    ])
+  })
+
+  it("reattaches linked Human drafts and restores recipient and legacy selections", () => {
+    const buyer = {
+      id: "buyer-attendee",
+      human_id: "human-buyer",
+      name: "Alex Buyer",
+      category: "main",
+      products: [
+        createProduct({ id: "recipient-ticket", quantity: 1 }),
+        createProduct({ id: "legacy-ticket", quantity: 1 }),
+      ],
+    } as CheckoutRecipientPassState
+    const recipient = {
+      recipient_key: "human:human-buyer",
+      human_id: "human-buyer",
+      name: "Alex Buyer",
+      profile_snapshot: { category: "main" },
+    }
+
+    const restored = restoreRecipientDrafts([buyer], [recipient], "popup-1")
+    const [selected] = applyCartSelections(restored, [
+      {
+        recipient_key: "human:human-buyer",
+        product_id: "recipient-ticket",
+        quantity: 1,
+      },
+      {
+        attendee_id: "buyer-attendee",
+        product_id: "legacy-ticket",
+        quantity: 1,
+      },
+    ])
+
+    expect(restored[0].recipient).toEqual(recipient)
+    expect(selected.products).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ id: "recipient-ticket", selected: true }),
+        expect.objectContaining({ id: "legacy-ticket", selected: true }),
+      ]),
+    )
   })
 })
 

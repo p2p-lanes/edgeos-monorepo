@@ -69,6 +69,7 @@ def _make_product(
     price: str = "100.00",
     total_stock_cap: int | None = None,
     category: str = "ticket",
+    fulfillment_type: str | None = "access",
 ) -> Products:
     product = Products(
         id=uuid.uuid4(),
@@ -78,6 +79,7 @@ def _make_product(
         slug=f"prod-{uuid.uuid4().hex[:6]}",
         price=Decimal(price),
         category=category,
+        fulfillment_type=fulfillment_type,
         is_active=True,
         total_stock_cap=total_stock_cap,
         total_stock_remaining=total_stock_cap,
@@ -173,6 +175,7 @@ def test_grant_creates_human_application_payment_and_tickets(
     assert human is not None
     assert human.first_name == "New"
     assert human.last_name == "Person"
+    assert payment.buyer_human_id == human.id
 
     snapshots = list(
         db.exec(
@@ -181,6 +184,7 @@ def test_grant_creates_human_application_payment_and_tickets(
     )
     assert len(snapshots) == 1
     assert snapshots[0].quantity == 2
+    assert snapshots[0].fulfillment_type == "access"
 
     tickets = list(
         db.exec(
@@ -188,6 +192,9 @@ def test_grant_creates_human_application_payment_and_tickets(
         ).all()
     )
     assert len(tickets) == 2  # quantity=2 → 2 ticket rows
+    assert {ticket.fulfillment_type for ticket in tickets} == {"access"}
+    assert {ticket.payment_product_id for ticket in tickets} == {snapshots[0].id}
+    assert {ticket.unit_index for ticket in tickets} == {0, 1}
 
     assert mock_payment_email.await_count == 1
 
@@ -257,7 +264,6 @@ def test_grant_promotes_existing_draft_application(
     db.commit()
     db.refresh(human)
 
-    primary_cat = _ensure_primary_category(db, grant_popup)
     application = Applications(
         sales_flow_id=application_flow_id(db, grant_popup.id),
         id=uuid.uuid4(),
@@ -267,18 +273,6 @@ def test_grant_promotes_existing_draft_application(
         status=ApplicationStatus.DRAFT.value,
     )
     db.add(application)
-    # Direct-attendee link so get_main_attendee finds a row.
-    attendee = Attendees(
-        id=uuid.uuid4(),
-        tenant_id=tenant_a.id,
-        application_id=application.id,
-        popup_id=grant_popup.id,
-        name="Already Here",
-        email=human.email,
-        human_id=human.id,
-        category_id=primary_cat.id,
-    )
-    db.add(attendee)
     db.commit()
     db.refresh(application)
 
@@ -300,7 +294,26 @@ def test_grant_promotes_existing_draft_application(
     db.expire(application)
     db.refresh(application)
     assert application.status == ApplicationStatus.ACCEPTED.value
-
+    grant_attendees = list(
+        db.exec(select(Attendees).where(Attendees.application_id == application.id))
+    )
+    assert len(grant_attendees) == 1
+    assert (
+        len(
+            db.exec(
+                select(AttendeeProducts).where(
+                    AttendeeProducts.attendee_id == grant_attendees[0].id
+                )
+            ).all()
+        )
+        == 1
+    )
+    holding = db.exec(
+        select(AttendeeProducts).where(
+            AttendeeProducts.attendee_id == grant_attendees[0].id
+        )
+    ).one()
+    assert holding.fulfillment_type == "access"
     apps_for_human = list(
         db.exec(
             select(Applications).where(
@@ -310,6 +323,71 @@ def test_grant_promotes_existing_draft_application(
         ).all()
     )
     assert len(apps_for_human) == 1  # no duplicate created
+
+
+@pytest.mark.parametrize(
+    ("fulfillment_type", "expected_status", "expected_detail"),
+    [
+        (None, 400, "Some products are not available or inactive"),
+        ("participant", 422, "Only access products can be granted as tickets"),
+        ("order", 422, "Only access products can be granted as tickets"),
+    ],
+)
+@pytest.mark.usefixtures("mock_payment_email")
+def test_grant_rejects_non_access_products_before_writes(
+    client: TestClient,
+    db: Session,
+    admin_token_tenant_a: str,
+    tenant_a: Tenants,
+    grant_popup: Popups,
+    fulfillment_type: str | None,
+    expected_status: int,
+    expected_detail: str,
+) -> None:
+    product = _make_product(
+        db,
+        grant_popup,
+        total_stock_cap=3,
+        fulfillment_type=fulfillment_type,
+    )
+    email = f"invalid-grant-{uuid.uuid4().hex[:6]}@test.com"
+
+    response = client.post(
+        "/api/v1/applications/admin/grant-tickets",
+        json={
+            "popup_id": str(grant_popup.id),
+            "people": [
+                {
+                    "email": email,
+                    "products": [{"product_id": str(product.id), "quantity": 1}],
+                }
+            ],
+        },
+        headers=_auth(admin_token_tenant_a),
+    )
+
+    assert response.status_code == expected_status
+    assert response.json()["detail"] == expected_detail
+    assert (
+        db.exec(
+            select(Humans).where(Humans.email == email, Humans.tenant_id == tenant_a.id)
+        ).first()
+        is None
+    )
+    assert (
+        db.exec(
+            select(PaymentProducts).where(PaymentProducts.product_id == product.id)
+        ).all()
+        == []
+    )
+    assert (
+        db.exec(
+            select(AttendeeProducts).where(AttendeeProducts.product_id == product.id)
+        ).all()
+        == []
+    )
+    db.refresh(product)
+    assert product.total_stock_remaining == 3
 
 
 @pytest.mark.usefixtures("tenant_a")
@@ -846,4 +924,5 @@ def test_grant_to_a_direct_buyer_uses_their_row(
     payment = db.get(Payments, uuid.UUID(granted["payment_id"]))
     assert payment is not None
     assert payment.application_id is None
+    assert payment.buyer_human_id == buyer.id
     assert payment.status == PaymentStatus.APPROVED.value

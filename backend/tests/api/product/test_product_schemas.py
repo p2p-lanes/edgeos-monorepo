@@ -22,6 +22,7 @@ class TestProductCreatePatreonPrice:
             name="Patron",
             price=Decimal("0"),
             category="patreon",
+            fulfillment_type="order",
         )
         assert product.price == Decimal("0")
 
@@ -33,6 +34,7 @@ class TestProductCreatePatreonPrice:
                 name="Patron",
                 price=Decimal("500"),
                 category="patreon",
+                fulfillment_type="order",
             )
         errors = exc_info.value.errors()
         assert any(
@@ -46,6 +48,7 @@ class TestProductCreatePatreonPrice:
             name="General Admission",
             price=Decimal("500"),
             category="ticket",
+            fulfillment_type="access",
         )
         assert product.price == Decimal("500")
 
@@ -57,6 +60,7 @@ class TestProductCreatePatreonPrice:
                 name="Patron",
                 price=Decimal("0.01"),
                 category="patreon",
+                fulfillment_type="order",
             )
 
 

@@ -194,6 +194,9 @@ describe("ProductForm — patron-product-rules (Phase 3.1)", () => {
       expect(screen.queryByPlaceholderText("100.00")).toBeNull()
     })
 
+    await user.click(screen.getByRole("combobox", { name: "Fulfillment type" }))
+    await user.click(screen.getByRole("option", { name: /^Order/ }))
+
     await user.click(screen.getByRole("button", { name: /create product/i }))
 
     await waitFor(() => {

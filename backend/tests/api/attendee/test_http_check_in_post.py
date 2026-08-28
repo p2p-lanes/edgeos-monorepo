@@ -16,6 +16,7 @@ Addendum #12 spec:
 import uuid
 from decimal import Decimal
 
+import pytest
 from fastapi.testclient import TestClient
 from sqlmodel import Session
 
@@ -23,6 +24,7 @@ from app.api.attendee.models import AttendeeProducts, Attendees
 from app.api.human.models import Humans
 from app.api.popup.models import Popups
 from app.api.product.models import Products
+from app.api.product.schemas import FulfillmentType
 from app.api.tenant.models import Tenants
 from app.api.user.models import Users
 from app.core.security import create_access_token
@@ -37,7 +39,13 @@ def _auth(user: Users) -> dict[str, str]:
     return {"Authorization": f"Bearer {token}"}
 
 
-def _make_product(db: Session, tenant: Tenants, popup: Popups) -> Products:
+def _make_product(
+    db: Session,
+    tenant: Tenants,
+    popup: Popups,
+    *,
+    fulfillment_type: str | None = FulfillmentType.ACCESS.value,
+) -> Products:
     product = Products(
         id=uuid.uuid4(),
         tenant_id=tenant.id,
@@ -47,6 +55,7 @@ def _make_product(db: Session, tenant: Tenants, popup: Popups) -> Products:
         price=Decimal("30"),
         category="ticket",
         requires_check_in=True,
+        fulfillment_type=fulfillment_type,
     )
     db.add(product)
     db.commit()
@@ -92,6 +101,7 @@ def _make_ticket(
     attendee: Attendees,
     product: Products,
     code: str | None = None,
+    fulfillment_type: str | None = FulfillmentType.ACCESS.value,
 ) -> AttendeeProducts:
     ticket = AttendeeProducts(
         id=uuid.uuid4(),
@@ -99,6 +109,7 @@ def _make_ticket(
         attendee_id=attendee.id,
         product_id=product.id,
         check_in_code=code or f"CI{uuid.uuid4().hex[:6].upper()}",
+        fulfillment_type=fulfillment_type,
     )
     db.add(ticket)
     db.commit()
@@ -237,6 +248,47 @@ class TestPostCheckIn:
         assert "does not require check-in" in response.json()["detail"].lower(), (
             f"Expected detail to mention non-scannable; got {response.json()['detail']!r}"
         )
+
+    @pytest.mark.parametrize(
+        "fulfillment_type",
+        [FulfillmentType.PARTICIPANT.value, None],
+        ids=["participant", "legacy-null"],
+    )
+    def test_non_access_holding_code_returns_404(
+        self,
+        fulfillment_type: str | None,
+        client: TestClient,
+        db: Session,
+        tenant_a: Tenants,
+        popup_tenant_a: Popups,
+        admin_user_tenant_a: Users,
+    ) -> None:
+        product = _make_product(
+            db,
+            tenant_a,
+            popup_tenant_a,
+            fulfillment_type=fulfillment_type,
+        )
+        human = _make_human(db, tenant_a)
+        attendee = _make_attendee(db, tenant_a, popup_tenant_a, human)
+        code = f"NOACCESS{uuid.uuid4().hex[:4].upper()}"
+        _make_ticket(
+            db,
+            tenant_a,
+            attendee,
+            product,
+            code=code,
+            fulfillment_type=fulfillment_type,
+        )
+
+        response = client.post(
+            f"/api/v1/attendees/check-in/{code}?popup_id={popup_tenant_a.id}",
+            json={"source": "qr"},
+            headers=_auth(admin_user_tenant_a),
+        )
+
+        assert response.status_code == 404, response.text
+        assert response.json()["detail"] == "Ticket not found"
 
     def test_cross_popup_returns_404(
         self,

@@ -136,7 +136,7 @@ class CartsCRUD:
         races with concurrent deletes (DELETE /my/{popup_id}, checkout cleanup),
         which under RLS surfaces as "Could not refresh instance".
         """
-        cart.items = items.model_dump()
+        cart.items = items.model_dump(mode="json")
         cart.updated_at = datetime.now(UTC)
         session.add(cart)
         session.commit()

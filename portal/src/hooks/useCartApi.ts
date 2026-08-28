@@ -1,15 +1,23 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { useCallback, useRef } from "react"
-import { OpenAPI } from "@/client"
+import { OpenAPI, type PaymentRecipientRequest } from "@/client"
 import { request } from "@/client/core/request"
 import { useIsAuthenticated } from "@/hooks/useIsAuthenticated"
 import { queryKeys } from "@/lib/query-keys"
 
-export interface CartItemPass {
-  attendee_id: string
-  product_id: string
-  quantity: number
-}
+export type CartItemPass =
+  | {
+      attendee_id: string
+      recipient_key?: never
+      product_id: string
+      quantity: number
+    }
+  | {
+      attendee_id?: never
+      recipient_key: string
+      product_id: string
+      quantity: number
+    }
 
 export interface CartItemHousing {
   product_id: string
@@ -39,6 +47,7 @@ export interface CartItemMealPlan {
 
 export interface CartState {
   passes: CartItemPass[]
+  recipients: PaymentRecipientRequest[]
   housing: CartItemHousing | null
   merch: CartItemMerch[]
   patron: CartItemPatron | null
@@ -57,8 +66,9 @@ interface CartPublic {
   updated_at: string
 }
 
-const EMPTY_CART: CartState = {
+export const EMPTY_CART: CartState = {
   passes: [],
+  recipients: [],
   housing: null,
   merch: [],
   patron: null,

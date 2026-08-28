@@ -2,11 +2,8 @@
 `has_popup_products`, `is_upsale_eligible`) and the flow-aware catalog
 resolution (`ApplicationsCRUD.resolve_upsale_catalog`).
 
-Design: sdd/sales-flows D8, G0 #2/#3, amended by product-owner decision —
-eligibility for an upsale-type flow is "any product assigned OR any
-APPROVED payment anywhere in the popup", evaluated live, never a snapshot.
-Admin-granted attendee products (no payment) qualify; an
-accepted-but-unpaid application without granted products does NOT.
+Positive grants are accepted Applications or typed access holdings. Bare
+Attendees, other holding types, and Payment ancestry remain negative.
 
 TDD: RED -> GREEN.
 """
@@ -14,6 +11,7 @@ TDD: RED -> GREEN.
 import uuid
 from decimal import Decimal
 
+import pytest
 from sqlmodel import Session
 
 from app.api.application.models import Applications
@@ -24,6 +22,7 @@ from app.api.payment.models import PaymentProducts, Payments
 from app.api.payment.schemas import PaymentStatus
 from app.api.popup.models import Popups
 from app.api.product.models import Products
+from app.api.product.schemas import FulfillmentType
 from app.api.sales_flow.crud import sales_flows_crud
 from app.api.sales_flow.eligibility import (
     has_approved_payment,
@@ -155,6 +154,7 @@ def _make_direct_purchase(
         product_price=product.price,
         product_category="ticket",
         product_currency="USD",
+        fulfillment_type=FulfillmentType.ORDER.value,
     )
     db.add(payment_product)
     db.flush()
@@ -162,9 +162,15 @@ def _make_direct_purchase(
 
 
 def _grant_admin_products(
-    db: Session, tenant: Tenants, popup: Popups, human: Humans
+    db: Session,
+    tenant: Tenants,
+    popup: Popups,
+    human: Humans,
+    *,
+    fulfillment_type: FulfillmentType = FulfillmentType.ACCESS,
+    managed: bool = False,
+    product_is_active: bool = True,
 ) -> None:
-    """Admin-granted ticket: attendee_products row with NO payment at all."""
     product = Products(
         id=uuid.uuid4(),
         tenant_id=tenant.id,
@@ -172,6 +178,7 @@ def _grant_admin_products(
         name="Granted Ticket",
         slug=f"granted-{uuid.uuid4().hex[:6]}",
         price=Decimal("50"),
+        is_active=product_is_active,
     )
     db.add(product)
     db.flush()
@@ -181,7 +188,8 @@ def _grant_admin_products(
         tenant_id=tenant.id,
         application_id=None,
         popup_id=popup.id,
-        human_id=human.id,
+        human_id=None if managed else human.id,
+        managed_by_human_id=human.id if managed else None,
         name="Granted Attendee",
         category="main",
     )
@@ -196,6 +204,7 @@ def _grant_admin_products(
             product_id=product.id,
             check_in_code=f"GRANT-{uuid.uuid4().hex[:8]}",
             payment_id=None,
+            fulfillment_type=fulfillment_type.value,
         )
     )
     db.flush()
@@ -340,9 +349,18 @@ class TestHasPopupProducts:
 
         assert has_popup_products(db, human.id, popup.id) is True
 
-    def test_no_products_not_detected(self, db: Session, tenant_a: Tenants) -> None:
+    def test_participant_holding_not_detected(
+        self, db: Session, tenant_a: Tenants
+    ) -> None:
         popup = _make_popup(db, tenant_a, suffix="no-products")
         human = _make_human(db, tenant_a, suffix="no-products")
+        _grant_admin_products(
+            db,
+            tenant_a,
+            popup,
+            human,
+            fulfillment_type=FulfillmentType.PARTICIPANT,
+        )
         db.commit()
 
         assert has_popup_products(db, human.id, popup.id) is False
@@ -360,48 +378,59 @@ class TestHasPopupProducts:
 
 
 class TestIsUpsaleEligible:
-    def test_admin_granted_products_zero_payments_is_eligible(
-        self, db: Session, tenant_a: Tenants
+    @pytest.mark.parametrize(
+        ("grant", "expected"),
+        [
+            ("managed_access", True),
+            ("inactive_product", True),
+            ("payment_order", False),
+        ],
+    )
+    def test_access_truth_table(
+        self, db: Session, tenant_a: Tenants, grant: str, expected: bool
     ) -> None:
-        """Product-owner amendment: granted products qualify without any
-        payment ever existing."""
-        popup = _make_popup(db, tenant_a, suffix="elig-granted")
-        human = _make_human(db, tenant_a, suffix="elig-granted")
+        popup = _make_popup(db, tenant_a, suffix=grant)
+        human = _make_human(db, tenant_a, suffix=grant)
+        if grant == "payment_order":
+            _make_direct_purchase(
+                db, tenant_a, popup, human, payment_status=PaymentStatus.APPROVED.value
+            )
+        else:
+            _grant_admin_products(
+                db,
+                tenant_a,
+                popup,
+                human,
+                managed=grant == "managed_access",
+                product_is_active=grant != "inactive_product",
+            )
+        db.commit()
+
+        assert is_upsale_eligible(db, human.id, popup.id) is expected
+
+    @pytest.mark.parametrize(
+        "application_status",
+        [ApplicationStatus.IN_REVIEW.value, ApplicationStatus.REJECTED.value],
+    )
+    def test_grant_plus_negatives_is_positive_first(
+        self,
+        db: Session,
+        tenant_a: Tenants,
+        application_status: str,
+    ) -> None:
+        from app.api.application.crud import applications_crud
+
+        popup = _make_popup(db, tenant_a, suffix="positive-first")
+        human = _make_human(db, tenant_a, suffix="positive-first")
+        _make_application(db, tenant_a, popup, human, status=application_status)
         _grant_admin_products(db, tenant_a, popup, human)
         db.commit()
 
-        assert is_upsale_eligible(db, human.id, popup.id) is True
+        result = applications_crud.resolve_popup_access(db, human.id, popup.id)
 
-    def test_approved_payment_without_granted_products_is_eligible(
-        self, db: Session, tenant_a: Tenants
-    ) -> None:
-        popup = _make_popup(db, tenant_a, suffix="elig-payment")
-        human = _make_human(db, tenant_a, suffix="elig-payment")
-        application = _make_application(
-            db, tenant_a, popup, human, status=ApplicationStatus.ACCEPTED.value
-        )
-        _make_application_payment(
-            db,
-            tenant_a,
-            popup,
-            application,
-            payment_status=PaymentStatus.APPROVED.value,
-        )
-        db.commit()
-
-        assert is_upsale_eligible(db, human.id, popup.id) is True
-
-    def test_no_products_no_payment_not_eligible(
-        self, db: Session, tenant_a: Tenants
-    ) -> None:
-        popup = _make_popup(db, tenant_a, suffix="elig-none")
-        human = _make_human(db, tenant_a, suffix="elig-none")
-        _make_application(
-            db, tenant_a, popup, human, status=ApplicationStatus.ACCEPTED.value
-        )
-        db.commit()
-
-        assert is_upsale_eligible(db, human.id, popup.id) is False
+        assert result.allowed is True
+        assert result.source == "attendee"
+        assert result.reason is None
 
 
 # ---------------------------------------------------------------------------
@@ -417,9 +446,7 @@ class TestResolveUpsaleCatalog:
 
         popup = _make_popup(db, tenant_a, suffix="catalog-eligible")
         human = _make_human(db, tenant_a, suffix="catalog-eligible")
-        _make_direct_purchase(
-            db, tenant_a, popup, human, payment_status=PaymentStatus.APPROVED.value
-        )
+        _grant_admin_products(db, tenant_a, popup, human)
         flow = _make_upsale_flow(db, popup, slug="addon")
         db.commit()
 
@@ -456,7 +483,7 @@ class TestResolveUpsaleCatalog:
 
         assert catalog == []
 
-    def test_accepted_unpaid_application_sees_empty_catalog(
+    def test_accepted_application_sees_upsale_catalog(
         self, db: Session, tenant_a: Tenants
     ) -> None:
         from app.api.application.crud import applications_crud
@@ -466,12 +493,12 @@ class TestResolveUpsaleCatalog:
         _make_application(
             db, tenant_a, popup, human, status=ApplicationStatus.ACCEPTED.value
         )
-        _make_upsale_flow(db, popup, slug="addon")
+        flow = _make_upsale_flow(db, popup, slug="addon")
         db.commit()
 
         catalog = applications_crud.resolve_upsale_catalog(db, human.id, popup.id)
 
-        assert catalog == []
+        assert [item.id for item in catalog] == [flow.id]
 
     def test_direct_url_only_upsale_excluded_from_catalog(
         self, db: Session, tenant_a: Tenants
@@ -480,9 +507,7 @@ class TestResolveUpsaleCatalog:
 
         popup = _make_popup(db, tenant_a, suffix="catalog-unlisted")
         human = _make_human(db, tenant_a, suffix="catalog-unlisted")
-        _make_direct_purchase(
-            db, tenant_a, popup, human, payment_status=PaymentStatus.APPROVED.value
-        )
+        _grant_admin_products(db, tenant_a, popup, human)
         _make_upsale_flow(db, popup, slug="hidden-addon", visibility="direct_url_only")
         db.commit()
 
@@ -497,9 +522,7 @@ class TestResolveUpsaleCatalog:
 
         popup = _make_popup(db, tenant_a, suffix="catalog-app-type")
         human = _make_human(db, tenant_a, suffix="catalog-app-type")
-        _make_direct_purchase(
-            db, tenant_a, popup, human, payment_status=PaymentStatus.APPROVED.value
-        )
+        _grant_admin_products(db, tenant_a, popup, human)
         sales_flows_crud.provision_default_flow(
             db, popup_id=popup.id, tenant_id=tenant_a.id, sale_type="application"
         )

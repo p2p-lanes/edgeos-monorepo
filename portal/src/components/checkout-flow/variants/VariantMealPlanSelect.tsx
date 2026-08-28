@@ -49,6 +49,16 @@ import { SaleStateBadge } from "./saleStateBadge"
  *  product field narrowed to ProductsPass for this checkout step. */
 type MealPlanProduct = SharedMealPlanProduct<ProductsPass>
 
+export function participantMealProducts(
+  products: ProductsPass[],
+): ProductsPass[] {
+  return products.filter(
+    (product) =>
+      product.category === "meal_plan" &&
+      product.fulfillment_type === "participant",
+  )
+}
+
 /** Identifies which (attendee, product) cell is expanded for editing. */
 type OpenCell = { attendeeId: string; productId: string } | null
 
@@ -145,7 +155,7 @@ export default function VariantMealPlanSelect({
   // product list; we still defensively filter so a misconfigured step can't
   // render a non-meal-plan product as a column).
   const mealPlanProducts = useMemo(
-    () => products.filter((p) => p.category === "meal_plan"),
+    () => participantMealProducts(products),
     [products],
   )
 

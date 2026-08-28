@@ -178,6 +178,12 @@ class AttendeeProductsBase(SQLModel):
         nullable=True,
         index=True,
     )
+    payment_product_id: uuid.UUID | None = Field(
+        default=None,
+        foreign_key="payment_products.id",
+        nullable=True,
+    )
+    unit_index: int | None = Field(default=None, nullable=True)
     # Per-purchase metadata blob. Populated by step-specific submission logic
     # (e.g. meal_plan_select stores daily_choices + dietary_restriction +
     # special_request). NULL for products that don't collect metadata.

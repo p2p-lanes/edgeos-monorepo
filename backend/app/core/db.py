@@ -21,6 +21,28 @@ engine = create_engine(
 )
 
 SEED_DATA_PATH = Path(__file__).parent / "seed_data.json"
+SEED_PRODUCT_FULFILLMENT_TYPES = {
+    "general-admission": "access",
+    "vip-pass": "access",
+    "day-pass": "access",
+    "spouse-ticket": "access",
+    "kids-ticket": "access",
+    "onsite-accommodation": "order",
+    "conference-tshirt": "order",
+    "free-entry": "access",
+    "premium-networking": "participant",
+    "full-week-pass": "access",
+    "family-package-spouse": "access",
+    "family-package-child": "access",
+}
+
+
+def _seed_product_fulfillment_type(product) -> str:
+    if product.fulfillment_type is None:
+        raise RuntimeError(
+            f"Seed product {product.slug!r} must define fulfillment_type"
+        )
+    return product.fulfillment_type
 
 
 def _load_seed_data() -> dict:
@@ -372,6 +394,11 @@ def _seed_products(
                 if cat_key
                 else None
             )
+            fulfillment_type = SEED_PRODUCT_FULFILLMENT_TYPES.get(product_slug)
+            if fulfillment_type is None:
+                raise RuntimeError(
+                    f"Seed product {product_slug!r} must define fulfillment_type"
+                )
             product = Products(
                 tenant_id=tenant_id,
                 popup_id=popup.id,
@@ -388,6 +415,7 @@ def _seed_products(
                 attendee_category_id=attendee_category_id,
                 duration_type=product_data.get("duration_type"),
                 requires_check_in=product_data.get("requires_check_in", False),
+                fulfillment_type=fulfillment_type,
                 start_date=(
                     parse_datetime(product_data["start_date"])
                     if product_data.get("start_date")
@@ -839,6 +867,9 @@ def _seed_applications(
                 if product:
                     from app.api.attendee.crud import generate_check_in_code
 
+                    fulfillment_type = _seed_product_fulfillment_type(product)
+                    if fulfillment_type == "order":
+                        continue
                     quantity = prod_data.get("quantity", 1)
                     for _ in range(quantity):
                         attendee_product = AttendeeProducts(
@@ -847,6 +878,7 @@ def _seed_applications(
                             attendee_id=attendee.id,
                             product_id=product.id,
                             check_in_code=generate_check_in_code(""),
+                            fulfillment_type=fulfillment_type,
                         )
                         session.add(attendee_product)
                     session.commit()
@@ -915,6 +947,7 @@ def _seed_payments(
             tenant_id=tenant_id,
             application_id=application.id,
             popup_id=application.popup_id,
+            buyer_human_id=application.human_id,
             status=payment_data.get("status", "pending"),
             amount=Decimal(payment_data.get("amount", "0")),
             currency=payment_data.get("currency", "USD"),
@@ -955,6 +988,7 @@ def _seed_payments(
                 continue
 
             attendee = attendees[attendee_index]
+            fulfillment_type = _seed_product_fulfillment_type(product)
 
             existing_pp = session.exec(
                 select(PaymentProducts).where(
@@ -970,13 +1004,14 @@ def _seed_payments(
                 tenant_id=tenant_id,
                 payment_id=payment.id,
                 product_id=product.id,
-                attendee_id=attendee.id,
+                attendee_id=(attendee.id if fulfillment_type != "order" else None),
                 quantity=quantity,
                 product_name=product.name,
                 product_description=product.description,
                 product_price=product.price,
                 product_category=product.category,
                 product_currency="USD",
+                fulfillment_type=fulfillment_type,
             )
             session.add(payment_product)
             session.commit()

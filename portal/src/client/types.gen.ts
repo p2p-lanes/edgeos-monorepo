@@ -1005,7 +1005,8 @@ export type CartItemMerch = {
  * Pass selection in cart.
  */
 export type CartItemPass = {
-    attendee_id: string;
+    attendee_id?: (string | null);
+    recipient_key?: (string | null);
     product_id: string;
     quantity?: number;
 };
@@ -1056,6 +1057,7 @@ export type CartPublic = {
  */
 export type CartState = {
     passes?: Array<CartItemPass>;
+    recipients?: Array<PaymentRecipientRequest>;
     housing?: (CartItemHousing | null);
     merch?: Array<CartItemMerch>;
     patron?: (CartItemPatron | null);
@@ -1177,6 +1179,7 @@ export type CheckoutPreviewRequest = {
     coupon_code?: (string | null);
     insurance?: boolean;
     buyer?: (BuyerInfo | null);
+    recipients?: Array<PaymentRecipientRequest>;
 };
 
 /**
@@ -2158,6 +2161,8 @@ export type FormSectionUpdate = {
     hidden?: (boolean | null);
 };
 
+export type FulfillmentType = 'access' | 'participant' | 'order';
+
 /**
  * A single family, trimmed to what the picker actually renders.
  *
@@ -3138,6 +3143,7 @@ export type OpenCartUpsert = {
  */
 export type OpenTicketingPurchaseCreate = {
     products: Array<ProductLine>;
+    recipients?: Array<PaymentRecipientRequest>;
     buyer: BuyerInfo;
     coupon_code?: (string | null);
     insurance?: boolean;
@@ -3182,6 +3188,7 @@ export type PaymentCreate = {
     application_id?: (string | null);
     popup_id?: (string | null);
     products: Array<PaymentProductRequest_Input>;
+    recipients?: Array<PaymentRecipientRequest>;
     coupon_code?: (string | null);
     edit_passes?: boolean;
     insurance?: boolean;
@@ -3215,7 +3222,8 @@ export type PaymentPreview = {
  */
 export type PaymentProductRequest_Input = {
     product_id: string;
-    attendee_id: string;
+    attendee_id?: (string | null);
+    recipient_key?: (string | null);
     quantity?: number;
     unit_price_override?: (number | string | null);
     purchase_metadata?: ({
@@ -3228,7 +3236,8 @@ export type PaymentProductRequest_Input = {
  */
 export type PaymentProductRequest_Output = {
     product_id: string;
-    attendee_id: string;
+    attendee_id?: (string | null);
+    recipient_key?: (string | null);
     quantity?: number;
     unit_price_override?: (string | null);
     purchase_metadata?: ({
@@ -3241,7 +3250,9 @@ export type PaymentProductRequest_Output = {
  */
 export type PaymentProductResponse = {
     product_id: string;
-    attendee_id: string;
+    attendee_id: (string | null);
+    payment_recipient_id?: (string | null);
+    recipient_key?: (string | null);
     quantity: number;
     product_name: string;
     product_description?: (string | null);
@@ -3260,6 +3271,7 @@ export type PaymentPublic = {
     tenant_id: string;
     application_id?: (string | null);
     popup_id: string;
+    buyer_human_id?: (string | null);
     sales_flow_id?: (string | null);
     external_id?: (string | null);
     status?: string;
@@ -3288,10 +3300,41 @@ export type PaymentPublic = {
     credit_applied?: string;
     id: string;
     products_snapshot?: Array<PaymentProductResponse>;
+    recipients?: Array<PaymentRecipientResponse>;
     buyer_email?: (string | null);
     buyer_name?: (string | null);
     created_at?: (string | null);
     updated_at?: (string | null);
+};
+
+/**
+ * Stable recipient identity and profile supplied for one payment attempt.
+ */
+export type PaymentRecipientRequest = {
+    recipient_key: string;
+    human_id?: (string | null);
+    existing_attendee_id?: (string | null);
+    name: string;
+    email?: (string | null);
+    category_id?: (string | null);
+    profile_snapshot?: {
+        [key: string]: unknown;
+    };
+};
+
+export type PaymentRecipientResponse = {
+    recipient_key: string;
+    human_id?: (string | null);
+    existing_attendee_id?: (string | null);
+    name: string;
+    email?: (string | null);
+    category_id?: (string | null);
+    profile_snapshot?: {
+        [key: string]: unknown;
+    };
+    id: string;
+    attendee_id?: (string | null);
+    created_at: string;
 };
 
 /**
@@ -3803,6 +3846,7 @@ export type ProductBatch = {
  */
 export type ProductBatchItem = {
     name: string;
+    fulfillment_type: FulfillmentType;
     slug?: (string | null);
     price: (number | string);
     compare_price?: (number | string | null);
@@ -3851,6 +3895,7 @@ export type ProductBatchResult = {
     discountable?: boolean;
     sold_out_override?: boolean;
     id: string;
+    fulfillment_type?: (FulfillmentType | null);
     success: boolean;
     err_msg?: (string | null);
     row_number: number;
@@ -3872,6 +3917,7 @@ export type ProductBreakdownItem = {
  */
 export type ProductCreate = {
     popup_id: string;
+    fulfillment_type: FulfillmentType;
     name: string;
     slug?: (string | null);
     price: (number | string);
@@ -3899,6 +3945,8 @@ export type ProductCreate = {
 export type ProductLine = {
     product_id: string;
     quantity?: number;
+    attendee_id?: (string | null);
+    recipient_key?: (string | null);
 };
 
 /**
@@ -3933,6 +3981,7 @@ export type ProductPublic = {
     discountable?: boolean;
     sold_out_override?: boolean;
     id: string;
+    fulfillment_type?: (FulfillmentType | null);
 };
 
 /**
@@ -3947,6 +3996,7 @@ export type ProductSoldOutUpdate = {
  */
 export type ProductUpdate = {
     name?: (string | null);
+    fulfillment_type?: FulfillmentType;
     slug?: (string | null);
     price?: (number | string | null);
     compare_price?: (number | string | null);
@@ -3995,6 +4045,7 @@ export type ProductWithQuantity = {
     discountable?: boolean;
     sold_out_override?: boolean;
     id: string;
+    fulfillment_type?: (FulfillmentType | null);
     quantity?: number;
 };
 

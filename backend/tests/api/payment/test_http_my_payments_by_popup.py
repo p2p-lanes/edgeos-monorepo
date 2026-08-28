@@ -263,6 +263,8 @@ class TestListMyPaymentsByPopupHttp:
                 "effective_unit_price": None,
                 "product_id": result["products_snapshot"][0]["product_id"],
                 "attendee_id": result["products_snapshot"][0]["attendee_id"],
+                "payment_recipient_id": None,
+                "recipient_key": None,
                 "created_at": result["products_snapshot"][0]["created_at"],
             }
         ]
