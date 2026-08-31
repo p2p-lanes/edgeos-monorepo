@@ -302,6 +302,7 @@
     "pending_payment_wait": "You have a pending payment. Please wait a few minutes.",
     "payment_cancel_failed": "We could not process your payment. Please try again.",
     "amanita": {
+      "hero_headline": "4 days of music, art, yoga and workshops",
       "buyer_kicker": "Your details",
       "buyer_title": "You're one step away!",
       "buyer_intro": "Just a few details to issue your tickets — then all that's left is to confirm.",

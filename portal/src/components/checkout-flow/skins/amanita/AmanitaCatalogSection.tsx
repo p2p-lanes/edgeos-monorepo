@@ -49,6 +49,7 @@ import { imageOptimization } from "@/lib/image-optimization"
 import { cn } from "@/lib/utils"
 import { useCheckout } from "@/providers/checkoutProvider"
 import { formatCurrency } from "@/types/checkout"
+import { AmanitaHero } from "./AmanitaHero"
 import type { GemVariant } from "./Gem"
 import { GoldStar } from "./GoldStar"
 import { SectionShell } from "./SectionShell"
@@ -324,11 +325,18 @@ export interface AmanitaCatalogSectionProps {
    * (Task 12) decides which gem each step type gets; defaults to "mid" so
    * this component is usable standalone. */
   gem?: GemVariant
+  /** True when this catalog is the flow's first section, i.e. the screen the
+   * shopper lands on. It then carries the brand hero above its shell (see
+   * AmanitaHero) — the festival introduces itself before it starts selling.
+   * With the standalone Home step gone, this is the only place that block
+   * still renders. */
+  isFirstSection?: boolean
 }
 
 export default function AmanitaCatalogSection({
   stepConfig,
   gem = "mid",
+  isFirstSection = false,
 }: AmanitaCatalogSectionProps) {
   const { getProductsForStep } = useCheckout()
   const products = getProductsForStep(stepConfig)
@@ -377,34 +385,37 @@ export default function AmanitaCatalogSection({
   }
 
   return (
-    <SectionShell
-      gem={gem}
-      kicker={kicker}
-      title={stepConfig.title}
-      intro={stepConfig.description ?? undefined}
-    >
-      {clusters.map((cluster, idx) => (
-        <Fragment key={cluster.sections[0]?.key ?? idx}>
-          {cluster.category && (
-            <div className="-mb-2 flex items-center justify-center gap-2.5">
-              <GoldStar className="h-3 w-3" />
-              <h3 className="font-display text-lg uppercase tracking-wide text-cream md:text-xl">
-                {cluster.category}
-              </h3>
-              <GoldStar className="h-3 w-3" />
-            </div>
-          )}
-          {cluster.sections.map((section) => (
-            <ProductCard
-              key={section.key}
-              section={section}
-              onIncRow={handleInc}
-              onDecRow={handleDec}
-              onAddRow={handleAdd}
-            />
-          ))}
-        </Fragment>
-      ))}
-    </SectionShell>
+    <>
+      {isFirstSection && <AmanitaHero />}
+      <SectionShell
+        gem={gem}
+        kicker={kicker}
+        title={stepConfig.title}
+        intro={stepConfig.description ?? undefined}
+      >
+        {clusters.map((cluster, idx) => (
+          <Fragment key={cluster.sections[0]?.key ?? idx}>
+            {cluster.category && (
+              <div className="-mb-2 flex items-center justify-center gap-2.5">
+                <GoldStar className="h-3 w-3" />
+                <h3 className="font-display text-lg uppercase tracking-wide text-cream md:text-xl">
+                  {cluster.category}
+                </h3>
+                <GoldStar className="h-3 w-3" />
+              </div>
+            )}
+            {cluster.sections.map((section) => (
+              <ProductCard
+                key={section.key}
+                section={section}
+                onIncRow={handleInc}
+                onDecRow={handleDec}
+                onAddRow={handleAdd}
+              />
+            ))}
+          </Fragment>
+        ))}
+      </SectionShell>
+    </>
   )
 }
