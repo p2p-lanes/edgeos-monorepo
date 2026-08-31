@@ -550,7 +550,12 @@ export default function StepperCheckoutFlow({
       (stepType === "passes" || stepType === "tickets" || !!config) &&
       !isContentOnlyTemplate
     if (isProductStep && isAmanita && config) {
-      return <AmanitaCatalogSection stepConfig={config} />
+      return (
+        <AmanitaCatalogSection
+          stepConfig={config}
+          isFirstSection={isFirstSection}
+        />
+      )
     }
     if (stepType === "passes" || stepType === "tickets") {
       if (shouldUseDynamicStep(config ?? undefined)) {
