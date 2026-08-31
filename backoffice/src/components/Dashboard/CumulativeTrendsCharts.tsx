@@ -61,7 +61,7 @@ export function CumulativeTrendsCharts({
 }: CumulativeTrendsChartsProps) {
   if (isLoading || !data) {
     return (
-      <div className="grid gap-4 md:grid-cols-2">
+      <div className="grid gap-4 @2xl/dashboard:grid-cols-2">
         <Card>
           <CardHeader>
             <Skeleton className="h-5 w-40" />
@@ -90,7 +90,7 @@ export function CumulativeTrendsCharts({
   const hasRevenue = revenue.length > 0
 
   return (
-    <div className="grid gap-4 md:grid-cols-2">
+    <div className="grid gap-4 @2xl/dashboard:grid-cols-2">
       {/* Cumulative Tickets */}
       <Card>
         <CardHeader>
