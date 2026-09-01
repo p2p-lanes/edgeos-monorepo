@@ -16,6 +16,7 @@ from app.api.application.schemas import (
     AdminGrantTicketsRequest,
     AdminGrantTicketsResponse,
     ApplicantParticipation,
+    ApplicationAccessSource,
     ApplicationAdminCreate,
     ApplicationCommentCreate,
     ApplicationCommentPublic,
@@ -108,6 +109,7 @@ def _build_application_public(
     application,
     review_decision=None,
     referred_by_name=None,
+    access_sources=None,
     reviewers=None,
     comment_count=0,
     skipped_by_me=False,
@@ -170,6 +172,7 @@ def _build_application_public(
         invite_id=application.invite_id,
         referral_id=application.referral_id,
         referred_by_name=referred_by_name,
+        access_sources=access_sources or [],
         info_not_shared=application.info_not_shared or [],
         status=application.status,
         custom_fields=application.custom_fields or {},
@@ -772,13 +775,40 @@ async def get_application(
     # Resolve the referrer's display name (referral_id → referral →
     # referrer_human_id → human) so the BO can show "Referred by ...".
     referred_by_name = None
-    if application.referral_id:
-        from app.api.human.models import Humans
-        from app.api.invite.models import Invites
+    access_sources: list[ApplicationAccessSource] = []
+    if application.group_id:
+        from app.api.group.crud import groups_crud
 
-        referral = db.get(Invites, application.referral_id)
+        group = groups_crud.get(db, application.group_id)
+        if group:
+            access_sources.append(
+                ApplicationAccessSource(kind="group", id=group.id, label=group.name)
+            )
+
+    if application.invite_id or application.referral_id:
+        from app.api.invite.crud import invites_crud
+
+        if application.invite_id:
+            invite = invites_crud.get(db, application.invite_id)
+            if invite:
+                access_sources.append(
+                    ApplicationAccessSource(
+                        kind="invite", id=invite.id, label=invite.token
+                    )
+                )
+
+    if application.referral_id:
+        from app.api.human.crud import humans_crud
+
+        referral = invites_crud.get(db, application.referral_id)
+        if referral:
+            access_sources.append(
+                ApplicationAccessSource(
+                    kind="referral", id=referral.id, label=referral.token
+                )
+            )
         if referral and referral.referrer_human_id:
-            referrer = db.get(Humans, referral.referrer_human_id)
+            referrer = humans_crud.get(db, referral.referrer_human_id)
             if referrer:
                 referred_by_name = (
                     f"{referrer.first_name or ''} {referrer.last_name or ''}".strip()
@@ -798,6 +828,7 @@ async def get_application(
     return _build_application_public(
         application,
         referred_by_name=referred_by_name,
+        access_sources=access_sources,
         comment_count=comment_count,
         skipped_by_me=my_skip is not None,
         my_skip_reason=my_skip.reason if my_skip else None,
@@ -1368,20 +1399,27 @@ async def update_my_application(
     status_before_str = application.status
 
     if is_group_join:
-        # Group invite links bypass the popup's approval strategy and force
-        # accept/reject — same behavior as create_internal so a brand-new
-        # signup and an existing in-review user both end up able to buy.
+        # Group links bypass the popup strategy, but only groups that explicitly
+        # enable auto-approval may accept an existing application.
         from sqlmodel import select
 
         from app.api.group.models import GroupMembers
 
-        if current_human.red_flag:
-            application.status = ApplicationStatus.REJECTED.value
-            crud.applications_crud.create_snapshot(db, application, "auto_rejected")
-        else:
-            application.status = ApplicationStatus.ACCEPTED.value
-            application.accepted_at = datetime.now(UTC)
-            crud.applications_crud.create_snapshot(db, application, "auto_accepted")
+        if group.auto_approve_applications:
+            if current_human.red_flag:
+                application.status = ApplicationStatus.REJECTED.value
+                crud.applications_crud.create_snapshot(db, application, "auto_rejected")
+            else:
+                application.status = ApplicationStatus.ACCEPTED.value
+                application.accepted_at = datetime.now(UTC)
+                crud.applications_crud.create_snapshot(db, application, "auto_accepted")
+                from app.api.application.crud import _maybe_grant_fee_credit
+
+                _maybe_grant_fee_credit(db, application)
+        elif application.status == ApplicationStatus.IN_REVIEW.value:
+            crud.applications_crud.create_snapshot(db, application, "submitted")
+
+        if not current_human.red_flag:
             # Sync GroupMembers junction (vigente membership). Application.group_id
             # was set via setattr above; the junction is the authoritative source
             # for "currently in this group" — see commit 756f55a.
@@ -1399,9 +1437,6 @@ async def update_my_application(
                         human_id=current_human.id,
                     )
                 )
-            from app.api.application.crud import _maybe_grant_fee_credit
-
-            _maybe_grant_fee_credit(db, application)
     elif (
         app_update.get("status") == ApplicationStatus.IN_REVIEW.value
         and application.human

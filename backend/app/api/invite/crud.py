@@ -62,7 +62,7 @@ class InvitesCRUD(BaseCRUD[Invites, InviteCreate, InviteUpdate]):
     def get_by_token(
         self,
         session: Session,
-        popup_id: uuid.UUID,
+        popup_id: uuid.UUID | None,
         token: str,
         *,
         issuer: str = "admin",
@@ -135,14 +135,16 @@ class InvitesCRUD(BaseCRUD[Invites, InviteCreate, InviteUpdate]):
         skip: int = 0,
         limit: int = 100,
     ) -> tuple[list[Invites], int]:
-        """List links for a popup with optional recipient_email filter.
+        """List links, optionally scoped by popup, recipient, and issuer.
 
         ``issuer`` selects which kind: "admin" (backoffice links), "portal"
         (attendee links), or "all". It defaults to "admin" so a caller that
         forgets to choose keeps the pre-merge behaviour rather than silently
         widening what it shows.
         """
-        stmt = select(Invites).where(Invites.popup_id == popup_id)
+        stmt = select(Invites)
+        if popup_id is not None:
+            stmt = stmt.where(Invites.popup_id == popup_id)
         if issuer == "admin":
             stmt = stmt.where(col(Invites.referrer_human_id).is_(None))
         elif issuer == "portal":
@@ -266,9 +268,7 @@ class InvitesCRUD(BaseCRUD[Invites, InviteCreate, InviteUpdate]):
             token=token,
             max_uses=effective_max_uses,
             expires_at=obj_in.expires_at,
-            # Referrals open the reduced checkout form and auto-approve by
-            # default. Administrators can revoke auto-approval when they need
-            # a referral to record attribution without granting purchase access.
+            # Auto-approval is an invariant for attendee-created links.
             express_checkout=True,
             auto_approve=True,
         )
@@ -288,6 +288,11 @@ class InvitesCRUD(BaseCRUD[Invites, InviteCreate, InviteUpdate]):
         token and recipient_email are immutable — callers must not pass them here.
         """
         update_data = obj_in.model_dump(exclude_unset=True)
+        if db_obj.is_portal_created and update_data.get("auto_approve") is False:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Referral links must always auto-approve applications",
+            )
         for field, value in update_data.items():
             setattr(db_obj, field, value)
         session.add(db_obj)
