@@ -2,6 +2,7 @@ import uuid
 from typing import Annotated
 
 from fastapi import APIRouter, Header, HTTPException, status
+from sqlmodel import col, select
 
 from app.api.shared.enums import UserRole
 from app.api.shared.response import ListModel, PaginationLimit, PaginationSkip, Paging
@@ -94,6 +95,57 @@ async def get_ticketing_step(
     return TicketingStepPublic.model_validate(step)
 
 
+def _validate_accommodation_properties_fk(
+    template_config: dict | None,
+    popup_id: uuid.UUID,
+    db,
+) -> None:
+    """Every property offered by the step must belong to this popup.
+
+    Same split as ticket-select: Pydantic checks the shape, the router checks
+    existence. A stale id here would silently narrow the checkout to nothing,
+    so it is rejected rather than ignored.
+    """
+    raw_ids = (template_config or {}).get("property_ids") or []
+    if not raw_ids:
+        return
+
+    from app.api.accommodation.models import AccommodationProperties
+
+    wanted: set[uuid.UUID] = set()
+    for value in raw_ids:
+        try:
+            wanted.add(value if isinstance(value, uuid.UUID) else uuid.UUID(str(value)))
+        except (ValueError, AttributeError):
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=f"Invalid UUID in property_ids: {value}",
+            ) from None
+
+    found = {
+        row.id
+        for row in db.exec(
+            select(AccommodationProperties).where(
+                col(AccommodationProperties.id).in_(wanted),
+                AccommodationProperties.popup_id == popup_id,
+            )
+        ).all()
+    }
+    missing = wanted - found
+    if missing:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=[
+                {
+                    "code": "invalid_accommodation_property",
+                    "message": (
+                        "One or more property_ids do not belong to this gathering"
+                    ),
+                }
+            ],
+        )
+
+
 def _validate_template_config_fk(
     template: str | None,
     template_config: dict | None,
@@ -105,6 +157,9 @@ def _validate_template_config_fk(
     Pattern B (locked decision #1268): Pydantic validates UUID structure,
     router validates FK existence. This keeps schemas pure.
     """
+    if template == "accommodation-booking":
+        _validate_accommodation_properties_fk(template_config, popup_id, db)
+        return
     if template != "ticket-select" or not template_config:
         return
     sections = template_config.get("sections") or []

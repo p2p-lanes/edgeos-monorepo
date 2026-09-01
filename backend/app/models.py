@@ -1,5 +1,25 @@
 from sqlmodel import SQLModel
 
+# Accommodations (lodging inventory, pricing rules and bookings)
+from app.api.accommodation.models import (
+    AccommodationBookings,
+    AccommodationImageLinks,
+    AccommodationImages,
+    AccommodationPriceRules,
+    AccommodationProperties,
+    Accommodations,
+    AccommodationUnits,
+)
+from app.api.accommodation.schemas import (
+    AccommodationAvailability,
+    AccommodationCreate,
+    AccommodationPropertyCreate,
+    AccommodationPropertyPublic,
+    AccommodationPropertyUpdate,
+    AccommodationPublic,
+    AccommodationQuote,
+    AccommodationUpdate,
+)
 from app.api.api_key.models import ApiKeys
 from app.api.api_key.schemas import ApiKeyCreate, ApiKeyCreated, ApiKeyPublic
 
@@ -161,6 +181,22 @@ from app.api.user.schemas import UserCreate, UserPublic, UserUpdate
 
 __all__ = [
     "SQLModel",
+    # Accommodations
+    "AccommodationProperties",
+    "Accommodations",
+    "AccommodationUnits",
+    "AccommodationPriceRules",
+    "AccommodationBookings",
+    "AccommodationImages",
+    "AccommodationImageLinks",
+    "AccommodationCreate",
+    "AccommodationUpdate",
+    "AccommodationPublic",
+    "AccommodationPropertyCreate",
+    "AccommodationPropertyUpdate",
+    "AccommodationPropertyPublic",
+    "AccommodationQuote",
+    "AccommodationAvailability",
     # Audit log
     "AuditLog",
     "AuditLogPublic",

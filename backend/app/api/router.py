@@ -2,6 +2,7 @@ from fastapi import APIRouter
 
 from app.api import (
     access,
+    accommodation,
     admin_api_key,
     api_key,
     application,
@@ -44,6 +45,9 @@ from app.api import (
     upload,
     user,
 )
+from app.api.accommodation.portal_router import (
+    portal_router as accommodation_portal_router,
+)
 from app.api.application.router import portal_router
 from app.api.check_in import router as check_in_router
 from app.api.group.router import portal_router as group_portal_router
@@ -68,6 +72,8 @@ api_router.include_router(attendee_category.router)
 
 # Popup-related resources
 api_router.include_router(product.router)
+api_router.include_router(accommodation.router)
+api_router.include_router(accommodation_portal_router)
 api_router.include_router(publishable_key.router)
 api_router.include_router(coupon.router)
 api_router.include_router(group.router)

@@ -274,6 +274,12 @@ class PopupBase(SQLModel):
     # Null disables the check-in pass for this popup; a positive value enables
     # it and sets the lead time. Read by the check-in pass cron dispatcher.
     checkin_pass_lead_days: int | None = Field(default=None, nullable=True)
+    # Default minimum number of nights an accommodation booking must cover.
+    # A room type overrides it with its own `min_stay_override`.
+    accommodation_min_stay: int = Field(
+        default=1,
+        sa_column=Column(Integer, nullable=False, server_default="1"),
+    )
     show_attendee_directory: bool = Field(
         default=False,
         sa_column=Column(Boolean, nullable=False, server_default="false"),
@@ -389,6 +395,7 @@ class PopupCreate(SQLModel):
     installments_interval: InstallmentInterval = InstallmentInterval.month
     installments_interval_count: int = 1
     checkin_pass_lead_days: int | None = None
+    accommodation_min_stay: int = 1
     abandoned_cart_delay_days: int | None = None
     abandoned_cart_repeat_days: int | None = None
     abandoned_cart_max_count: int | None = None
@@ -515,6 +522,7 @@ class PopupUpdate(SQLModel):
     installments_interval: InstallmentInterval | None = None
     installments_interval_count: int | None = None
     checkin_pass_lead_days: int | None = None
+    accommodation_min_stay: int | None = None
     invites_enabled: bool | None = None
     referrals_enabled: bool | None = None
     group_private_events_enabled: bool | None = None
@@ -655,6 +663,7 @@ class PopupPublic(SQLModel):
     contribution_description: str | None = None
     application_layout: ApplicationLayout = ApplicationLayout.single_page
     events_enabled: bool = True
+    accommodation_min_stay: int = 1
     show_attendee_directory: bool = False
     edit_passes_enabled: bool = False
     # groups-rework feature flags (portal needs these to gate nav/UI)

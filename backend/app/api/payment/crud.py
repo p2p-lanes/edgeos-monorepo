@@ -25,6 +25,7 @@ if TYPE_CHECKING:
     from app.api.human.models import Humans
     from app.api.popup.models import Popups
     from app.api.tenant.models import Tenants
+from app.api.accommodation import payments as accommodation_payments
 from app.api.application.schemas import ApplicationStatus, ScholarshipStatus
 from app.api.attendee.crud import attendees_crud, generate_check_in_code
 from app.api.attendee.models import AttendeeProducts, Attendees
@@ -368,6 +369,7 @@ def compute_open_ticketing_amounts(
     lines: Any,
     coupon_code: str | None,
     insurance: bool,
+    line_prices: "dict[int, Decimal] | None" = None,
 ) -> OpenTicketingAmounts:
     """Authoritative open-ticketing money math, shared by /purchase and /preview.
 
@@ -380,9 +382,13 @@ def compute_open_ticketing_amounts(
     discountable_amount = Decimal("0")
     non_discountable_amount = Decimal("0")
 
-    for line in lines:
+    for index, line in enumerate(lines):
         product = products_map[line.product_id]
-        line_total = product.price * line.quantity
+        # An accommodation's price is not on the product: it depends on the
+        # dates, so the caller resolves it first and passes it in by position
+        # (two lines can book the same room type for different dates).
+        unit_price = (line_prices or {}).get(index, product.price)
+        line_total = unit_price * line.quantity
         is_discountable = not (
             product.category == "patreon" or not product.discountable
         )
@@ -394,7 +400,7 @@ def compute_open_ticketing_amounts(
             OpenTicketingAmountLine(
                 product_id=product.id,
                 quantity=line.quantity,
-                unit_price=product.price,
+                unit_price=unit_price,
                 line_total=line_total,
                 discountable=is_discountable,
             )
@@ -508,6 +514,7 @@ def _edit_giveup_credit(application: Applications, discount_value: Decimal) -> D
 def _calculate_amounts(
     session: Session,
     requested_products: list[PaymentProductRequest],
+    line_prices: "dict[int, Decimal] | None" = None,
 ) -> tuple[Decimal, Decimal]:
     """
     Calculate standard and non-discountable amounts.
@@ -532,13 +539,16 @@ def _calculate_amounts(
     product_models = {p.id: p for p in session.exec(statement).all()}
 
     attendees: dict[uuid.UUID, dict[str, Decimal]] = {}
-    for req_prod in requested_products:
+    for index, req_prod in enumerate(requested_products):
         product_model = product_models.get(req_prod.product_id)
         if not product_model:
             logger.error(f"Product model not found for ID: {req_prod.product_id}")
             continue
 
         quantity = req_prod.quantity
+        # Accommodations price by date, not by product: the caller resolves
+        # the nightly total up front and passes it in keyed by line position.
+        unit_price = (line_prices or {}).get(index, product_model.price)
         attendee_id = req_prod.attendee_id
         if attendee_id not in attendees:
             attendees[attendee_id] = {
@@ -553,10 +563,10 @@ def _calculate_amounts(
             if product_model.category == "patreon":
                 line_amount = req_prod.unit_price_override or Decimal("0")
             else:
-                line_amount = product_model.price * quantity
+                line_amount = unit_price * quantity
             attendees[attendee_id]["non_discountable"] += line_amount
         else:
-            attendees[attendee_id]["standard"] += product_model.price * quantity
+            attendees[attendee_id]["standard"] += unit_price * quantity
 
     standard_amount = sum((a["standard"] for a in attendees.values()), Decimal("0"))
     non_discountable_amount = sum(
@@ -877,6 +887,17 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
                 )
 
         products_map = {p.id: p for p in valid_products}
+        # Price the stays first: the total the buyer sees here is the one they
+        # will be charged, and it depends on their dates. resolve_lines also
+        # writes the night-by-night quote onto each line, echoed back below so
+        # the checkout can show the breakdown.
+        resolved_stays = accommodation_payments.resolve_lines(
+            session, popup, obj.products
+        )
+        stay_prices = accommodation_payments.line_prices(resolved_stays)
+        stay_quotes = {
+            entry.index: entry.quote.model_dump(mode="json") for entry in resolved_stays
+        }
         amounts = compute_open_ticketing_amounts(
             session,
             popup,
@@ -884,6 +905,7 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
             obj.products,
             coupon_code=obj.coupon_code,
             insurance=obj.insurance,
+            line_prices=stay_prices,
         )
         return CheckoutPreviewResponse(
             lines=[
@@ -893,8 +915,9 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
                     unit_price=line.unit_price,
                     line_total=line.line_total,
                     discountable=line.discountable,
+                    accommodation_quote=stay_quotes.get(index),
                 )
-                for line in amounts.lines
+                for index, line in enumerate(amounts.lines)
             ],
             discountable_amount=amounts.discountable_amount,
             non_discountable_amount=amounts.non_discountable_amount,
@@ -1009,9 +1032,18 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
                 product_id=line.product_id,
                 attendee_id=uuid.uuid4(),
                 quantity=line.quantity,
+                purchase_metadata=line.purchase_metadata,
             )
             for line in obj.products
         ]
+        # Accommodation lines carry dates, not a price. Resolve (validate +
+        # re-quote) before any money math so coupons, insurance and the
+        # contribution fee are computed over the real nightly totals. Raises
+        # 422/409 on anything the buyer could have got wrong.
+        resolved_stays = accommodation_payments.resolve_lines(
+            session, popup, obj.products
+        )
+        stay_prices = accommodation_payments.line_prices(resolved_stays)
         # ADR-2 supersede pre-step + advisory lock: the ENTIRE new machinery
         # (proof gate, supersede, advisory lock, sibling re-check) is gated on
         # SUPERSEDE_PENDING_ENABLED so that setting it to False restores exact
@@ -1170,9 +1202,27 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
             # _add_products_to_attendees when the webhook confirms the payment.
             # Pre-creating them here caused duplicates (double the tickets) on
             # every approved checkout.
+            # Reserve the rooms first, so the booking id is already in each
+            # line's metadata when the snapshot rows below copy it. Same
+            # transaction as the payment: a failure anywhere releases them.
+            stay_bookings = accommodation_payments.create_holds(
+                session,
+                payment_id=payment.id,
+                resolved=resolved_stays,
+                lines=obj.products,
+                hold_expires_at=datetime.now(UTC)
+                + timedelta(minutes=_settings.PENDING_SWEEP_STALE_MINUTES),
+                human_id=buyer.id,
+                buyer_name=buyer_name,
+                buyer_email=obj.buyer.email,
+            )
+
             payment_products: list[PaymentProducts] = []
-            for line in obj.products:
+            for line_index, line in enumerate(obj.products):
                 product = products_map[line.product_id]
+                # For a stay this is the quote total, not the product's price:
+                # the product row only carries the base nightly rate.
+                stay_price = stay_prices.get(line_index)
                 for _ in range(line.quantity):
                     pp = PaymentProducts(
                         tenant_id=tenant.id,
@@ -1185,9 +1235,17 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
                         product_price=product.price,
                         product_category=product.category or "",
                         product_currency=popup.currency,
+                        effective_unit_price=stay_price,
+                        purchase_metadata=line.purchase_metadata,
                     )
                     session.add(pp)
                     payment_products.append(pp)
+
+            if stay_bookings:
+                session.flush()
+                accommodation_payments.attach_payment_products(
+                    session, payment_id=payment.id, bookings=stay_bookings
+                )
 
             # Authoritative amounts — the SAME math POST /checkout/{slug}/preview
             # serves, so the displayed total always matches what is charged.
@@ -1199,6 +1257,7 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
                 obj.products,
                 coupon_code=obj.coupon_code,
                 insurance=obj.insurance,
+                line_prices=stay_prices,
             )
             if amounts.coupon_id is not None:
                 payment.coupon_id = amounts.coupon_id
@@ -1266,6 +1325,7 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
                             product_id=pp.product_id,
                             attendee_id=pp.attendee_id,
                             quantity=pp.quantity,
+                            purchase_metadata=pp.purchase_metadata,
                         )
                         for pp in payment_products
                     ],
@@ -2015,6 +2075,23 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
         ]
         return calculate_insurance_amount(popup, product_quantity_pairs)
 
+    def _resolve_stays(
+        self,
+        session: Session,
+        popup: Any,
+        products: list[PaymentProductRequest],
+    ) -> tuple[list[Any], dict[int, Decimal]]:
+        """Validate and price the accommodation lines of a request, if any.
+
+        A stay costs what its dates cost, so this has to run before the money
+        math — both in the preview and in the real purchase, or the buyer would
+        be shown one total and charged another. No-op for carts without a room.
+        """
+        if not any(accommodation_payments.is_accommodation_line(p) for p in products):
+            return [], {}
+        resolved = accommodation_payments.resolve_lines(session, popup, products)
+        return resolved, accommodation_payments.line_prices(resolved)
+
     def _apply_discounts(
         self,
         session: Session,
@@ -2034,9 +2111,13 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
             discount_value=discount_assigned,
         )
 
+        _resolved_stays, stay_prices = self._resolve_stays(
+            session, application.popup, obj.products
+        )
         standard_amount, non_discountable_amount = _calculate_amounts(
             session,
             obj.products,
+            line_prices=stay_prices,
         )
 
         response.original_amount = standard_amount + non_discountable_amount
@@ -2421,6 +2502,14 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
                 detail="Application not found",
             )
 
+        # Same resolution the preview just ran, repeated on purpose: it
+        # re-validates the dates and re-quotes immediately before the rooms are
+        # held, so a stay that became unbookable between preview and purchase is
+        # refused rather than sold.
+        resolved_stays, stay_prices = self._resolve_stays(
+            session, application.popup, obj.products
+        )
+
         # Block edit_passes when an installment plan is in flight on this
         # application. SimpleFi keeps charging the plan independent of our
         # state, so swapping passes would leave attendee products inconsistent
@@ -2560,10 +2649,25 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
             )
             products_map = {p.id: p for p in session.exec(prod_statement).all()}
 
-            for req_prod in obj.products:
+            # Reserve the rooms before the snapshot rows copy the metadata:
+            # create_holds writes booking_id into each line. Zero-amount means
+            # nothing will ever be charged, so the booking is confirmed outright
+            # instead of waiting for a webhook that never fires.
+            stay_bookings = accommodation_payments.create_holds(
+                session,
+                payment_id=payment.id,
+                resolved=resolved_stays,
+                lines=obj.products,
+                confirmed=True,
+                human_id=application.human_id,
+                buyer_email=application.human.email if application.human else None,
+            )
+
+            for line_index, req_prod in enumerate(obj.products):
                 product = products_map.get(req_prod.product_id)
                 if product:
                     is_patreon = product.category == "patreon"
+                    stay_price = stay_prices.get(line_index)
                     payment_product = PaymentProducts(
                         tenant_id=application.tenant_id,
                         payment_id=payment.id,
@@ -2577,10 +2681,16 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
                         product_currency=preview.currency,
                         effective_unit_price=req_prod.unit_price_override
                         if is_patreon
-                        else None,
+                        else stay_price,
                         purchase_metadata=req_prod.purchase_metadata,
                     )
                     session.add(payment_product)
+
+            if stay_bookings:
+                session.flush()
+                accommodation_payments.attach_payment_products(
+                    session, payment_id=payment.id, bookings=stay_bookings
+                )
 
             # Increment coupon usage if used
             if preview.coupon_id:
@@ -2782,11 +2892,26 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
                 details={"payment_id": str(payment.id)},
             )
 
+        # Hold the rooms before the snapshot rows copy the metadata, so each
+        # line already carries its booking_id. Released automatically if the
+        # payment expires or is cancelled.
+        stay_bookings = accommodation_payments.create_holds(
+            session,
+            payment_id=payment.id,
+            resolved=resolved_stays,
+            lines=obj.products,
+            hold_expires_at=datetime.now(UTC)
+            + timedelta(minutes=_settings.PENDING_SWEEP_STALE_MINUTES),
+            human_id=application.human_id,
+            buyer_email=application.human.email if application.human else None,
+        )
+
         # Create product snapshots
-        for req_prod in obj.products:
+        for line_index, req_prod in enumerate(obj.products):
             product = products_map.get(req_prod.product_id)
             if product:
                 is_patreon = product.category == "patreon"
+                stay_price = stay_prices.get(line_index)
                 payment_product = PaymentProducts(
                     tenant_id=application.tenant_id,
                     payment_id=payment.id,
@@ -2800,10 +2925,16 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
                     product_currency=preview.currency,
                     effective_unit_price=req_prod.unit_price_override
                     if is_patreon
-                    else None,
+                    else stay_price,
                     purchase_metadata=req_prod.purchase_metadata,
                 )
                 session.add(payment_product)
+
+        if stay_bookings:
+            session.flush()
+            accommodation_payments.attach_payment_products(
+                session, payment_id=payment.id, bookings=stay_bookings
+            )
 
         # Increment coupon usage if used
         if preview.coupon_id:
@@ -3026,6 +3157,15 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
                 )
                 session.add(attendee_product)
 
+        # A stay is not a pass: it has its own row that the calendar, the CSV
+        # export and the partner view read. Promote its hold now that the money
+        # is in, and point it at the attendee the pass was issued to.
+        if payment_id is not None:
+            accommodation_payments.confirm_for_payment(session, payment_id)
+            accommodation_payments.link_attendee(
+                session, payment_id, products[0].attendee_id
+            )
+
         session.flush()
 
     def _restore_payment_stock(
@@ -3053,6 +3193,12 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
         See design §4.2 and proposal locked decisions.
         """
         from app.api.product.crud import products_crud
+
+        # Free the rooms this payment was holding. Runs before the early return
+        # below: a cart of nothing but accommodation has no product snapshot to
+        # restore, and its rooms would stay locked until the hold expiry.
+        # Confirmed bookings are left alone — a refund is a separate decision.
+        accommodation_payments.release_for_payment(session, payment.id)
 
         if not payment.products_snapshot:
             return

@@ -3,7 +3,9 @@
 Endpoints:
 - GET  /checkout/{slug}/runtime  — public, anonymous, rate-limited 120/min/IP
 - GET  /checkout/{slug}/share    — public, anonymous, rate-limited 120/min/IP
-- POST /checkout/{slug}/purchase — public, anonymous, rate-limited 10/min/IP
+- POST /checkout/{slug}/purchase: public, anonymous, rate-limited 10/min/IP
+- GET  /checkout/{slug}/accommodations:              public, 120/min/IP
+- POST /checkout/{slug}/accommodations/availability: public, 60/min/IP
 """
 
 import uuid
@@ -21,6 +23,15 @@ from fastapi import (
 )
 from loguru import logger
 
+from app.api.accommodation.public import (
+    availability_for_popup,
+    offer_for_popup,
+)
+from app.api.accommodation.schemas import (
+    AccommodationAvailabilityRequest,
+    AccommodationOffer,
+    PublicAccommodationAvailability,
+)
 from app.api.cart.crud import carts_crud
 from app.api.cart.schemas import CartState, OpenCartPublic, OpenCartUpsert
 from app.api.checkout.crud import (
@@ -104,6 +115,22 @@ def _enqueue_checkout_purchase_event(
             "Failed to queue Meta CAPI Purchase event payment_id={}",
             getattr(payment, "id", ""),
         )
+
+
+def _resolve_checkout_popup(
+    db: object, slug: str, tenant_id: uuid.UUID, preview_token: str | None
+):
+    """Resolve the popup for a public checkout read, honouring a preview token.
+
+    Same rule as ``get_runtime``: a token minted for a different popup falls
+    back to the public gates instead of unlocking a draft.
+    """
+    preview_popup_id = resolve_preview_popup_id(preview_token)
+    if preview_popup_id is not None:
+        popup = get_open_ticketing_popup(db, slug, tenant_id, preview=True)
+        if popup.id == preview_popup_id:
+            return popup
+    return get_open_ticketing_popup(db, slug, tenant_id)
 
 
 @router.get(
@@ -290,6 +317,76 @@ async def purchase_open_ticketing(
         redirect_url=redirect_url,
         amount=payment.amount,
         currency=payment.currency,
+    )
+
+
+@router.get(
+    "/{slug}/accommodations",
+    response_model=AccommodationOffer,
+    dependencies=[
+        Depends(
+            RateLimit(limit=120, window_sec=60, key_prefix="rl:checkout-accommodations")
+        ),
+    ],
+)
+async def list_checkout_accommodations(
+    slug: str,
+    db: SessionDep,
+    tenant: PublicTenant,
+    preview_token: Annotated[
+        str | None, Header(alias=CHECKOUT_PREVIEW_TOKEN_HEADER)
+    ] = None,
+) -> AccommodationOffer:
+    """Room types this checkout sells, before any dates are picked.
+
+    404 when the popup has no enabled ``accommodation-booking`` step, the
+    same answer an unknown slug gets, because whether a checkout has the
+    section turned off is not an anonymous caller's business.
+
+    Honours the preview token for the same reason ``/runtime`` does: the step
+    preview in the backoffice renders against real inventory, and a popup
+    still in draft would otherwise show an empty section to the admin who is
+    configuring it.
+    """
+    popup = _resolve_checkout_popup(db, slug, tenant.id, preview_token)
+    return offer_for_popup(db, popup.id, currency=popup.currency)
+
+
+@router.post(
+    "/{slug}/accommodations/availability",
+    response_model=list[PublicAccommodationAvailability],
+    dependencies=[
+        Depends(
+            RateLimit(
+                limit=60, window_sec=60, key_prefix="rl:checkout-accommodation-avail"
+            )
+        ),
+    ],
+)
+async def check_accommodation_availability(
+    slug: str,
+    request_in: AccommodationAvailabilityRequest,
+    db: SessionDep,
+    tenant: PublicTenant,
+    preview_token: Annotated[
+        str | None, Header(alias=CHECKOUT_PREVIEW_TOKEN_HEADER)
+    ] = None,
+) -> list[PublicAccommodationAvailability]:
+    """Free rooms and the price of the stay, for every room type at once.
+
+    Read-only: nothing is held here. A room is only taken off the market by
+    the payment, so two buyers can both be quoted the last room and the
+    second one finds out at purchase, which is the honest place to find out,
+    since a hold taken on a date change would leak rooms to browsers.
+    """
+    popup = _resolve_checkout_popup(db, slug, tenant.id, preview_token)
+    return availability_for_popup(
+        db,
+        popup.id,
+        check_in=request_in.check_in,
+        check_out=request_in.check_out,
+        guest_count=request_in.guest_count,
+        currency=popup.currency,
     )
 
 
