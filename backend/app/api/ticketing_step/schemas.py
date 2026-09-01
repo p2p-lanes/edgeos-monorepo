@@ -1,6 +1,6 @@
 import uuid
 from datetime import date
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, model_validator
 from sqlalchemy import Column
@@ -155,6 +155,58 @@ def _validate_meal_plan_select_template_config(
     return out
 
 
+class AccommodationBookingConfig(BaseModel):
+    """Typed template_config for the ``accommodation-booking`` step.
+
+    Deliberately small. This step only decides **how accommodation is offered
+    in this checkout**: which properties, how they are laid out, whether guest
+    names are collected, and the copy of the payment notice. The inventory
+    itself — rooms, units, nightly prices, photos, the booking calendar —
+    lives in the Accommodations section and is shared across steps (and, once
+    sales flows land, across flows).
+
+    ``property_ids`` empty means "every visible property", so a step works the
+    moment it is enabled instead of showing an empty screen until an admin
+    ticks boxes.
+    """
+
+    property_ids: list[uuid.UUID] = []
+    layout: Literal["grid", "list"] = "grid"
+    show_property_headers: bool = True
+    require_guest_names: bool = True
+    notice_text: str | None = None
+
+    model_config = ConfigDict(extra="allow")
+
+    @model_validator(mode="after")
+    def _validate(self) -> "AccommodationBookingConfig":
+        if len(set(self.property_ids)) != len(self.property_ids):
+            raise ValueError(
+                "accommodation-booking template_config.property_ids must be unique"
+            )
+        return self
+
+
+def _validate_accommodation_booking_template_config(
+    template: str | None,
+    template_config: dict[str, Any] | None,
+) -> dict[str, Any] | None:
+    """Validate template_config when template == 'accommodation-booking'.
+
+    Structural validation only (shape, uniqueness). Checking that each
+    property actually belongs to the popup is an FK question and lives in the
+    router, following the same split as ticket-select.
+    """
+    # `is None` rather than falsy: an explicit ``{}`` means "configured with
+    # nothing", and filling it with defaults makes the stored row say what the
+    # step actually offers instead of leaving that to whoever reads it.
+    if template != "accommodation-booking" or template_config is None:
+        return template_config
+
+    validated = AccommodationBookingConfig.model_validate(template_config)
+    return {**template_config, **validated.model_dump(mode="json")}
+
+
 class TicketingStepBase(SQLModel):
     tenant_id: uuid.UUID = Field(foreign_key="tenants.id", index=True)
     popup_id: uuid.UUID = Field(foreign_key="popups.id", index=True)
@@ -222,6 +274,9 @@ class TicketingStepCreate(BaseModel):
         self.template_config = _validate_meal_plan_select_template_config(
             self.template, self.template_config
         )
+        self.template_config = _validate_accommodation_booking_template_config(
+            self.template, self.template_config
+        )
         return self
 
 
@@ -257,6 +312,9 @@ class TicketingStepUpdate(BaseModel):
             self.template, self.template_config
         )
         self.template_config = _validate_meal_plan_select_template_config(
+            self.template, self.template_config
+        )
+        self.template_config = _validate_accommodation_booking_template_config(
             self.template, self.template_config
         )
         return self

@@ -1,6 +1,7 @@
 "use client"
 
 import {
+  BedDouble,
   HandCoins,
   Heart,
   Home,
@@ -15,7 +16,7 @@ import { useTranslation } from "react-i18next"
 import { resolveStepIcon } from "@/lib/checkoutStepIcons"
 import { useCheckout } from "@/providers/checkoutProvider"
 import { useCityProvider } from "@/providers/cityProvider"
-import { formatCurrency } from "@/types/checkout"
+import { formatCheckoutDate, formatCurrency } from "@/types/checkout"
 
 export default function CartItemList({
   showServiceFee = true,
@@ -34,6 +35,7 @@ export default function CartItemList({
     togglePass,
     resetDayProduct,
     clearHousing,
+    removeAccommodation,
     updateMerchQuantity,
     clearPatron,
     removeMealPlan,
@@ -120,6 +122,56 @@ export default function CartItemList({
                     type="button"
                     onClick={() =>
                       handleRemovePass(pass.attendeeId, pass.productId)
+                    }
+                    className="p-1 text-muted-foreground hover:text-destructive transition-colors"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Booked rooms */}
+      {cart.accommodations.length > 0 && (
+        <div className="mb-4">
+          <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
+            Accommodation
+          </h4>
+          <div className="space-y-1">
+            {cart.accommodations.map((item) => (
+              <div
+                key={`${item.accommodationId}-${item.checkIn}-${item.checkOut}`}
+                className="flex items-center justify-between py-2"
+              >
+                <div className="flex items-center gap-3 flex-1 min-w-0">
+                  <BedDouble className="w-4 h-4 text-muted-foreground shrink-0" />
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium text-foreground truncate">
+                      {item.name}
+                    </p>
+                    <p className="text-xs text-muted-foreground truncate">
+                      {item.propertyName ? `${item.propertyName} · ` : ""}
+                      {formatCheckoutDate(item.checkIn)} →{" "}
+                      {formatCheckoutDate(item.checkOut)} · {item.guestCount}{" "}
+                      guest{item.guestCount === 1 ? "" : "s"}
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-medium text-foreground">
+                    {formatCurrency(item.totalPrice)}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      removeAccommodation(
+                        item.accommodationId,
+                        item.checkIn,
+                        item.checkOut,
+                      )
                     }
                     className="p-1 text-muted-foreground hover:text-destructive transition-colors"
                   >

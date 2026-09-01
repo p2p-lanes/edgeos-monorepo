@@ -120,6 +120,11 @@ class ProductLine(BaseModel):
 
     product_id: uuid.UUID
     quantity: int = Field(ge=1, default=1)
+    # Per-purchase blob, same contract as the authenticated flow.
+    # An accommodation booking travels here: {kind: "accommodation_booking",
+    # accommodation_id, check_in, check_out, guest_count, guests}. Never a
+    # price — the server re-quotes from the dates.
+    purchase_metadata: dict[str, Any] | None = None
 
 
 class BuyerInfo(BaseModel):
@@ -214,6 +219,9 @@ class CheckoutPreviewLine(BaseModel):
     unit_price: Decimal
     line_total: Decimal
     discountable: bool
+    # Night-by-night breakdown when this line is an accommodation
+    # booking, so the checkout can show what makes up the total.
+    accommodation_quote: dict[str, Any] | None = None
 
 
 class CheckoutPreviewResponse(BaseModel):

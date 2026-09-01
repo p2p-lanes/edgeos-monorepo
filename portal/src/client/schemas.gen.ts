@@ -253,6 +253,2140 @@ export const AbandonedCartPublicSchema = {
     description: 'Abandoned cart with enriched info for backoffice.'
 } as const;
 
+export const AccommodationAvailabilitySchema = {
+    properties: {
+        accommodation_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Accommodation Id'
+        },
+        available: {
+            type: 'integer',
+            title: 'Available'
+        },
+        quote: {
+            anyOf: [
+                {
+                    '$ref': '#/components/schemas/AccommodationQuote'
+                },
+                {
+                    type: 'null'
+                }
+            ]
+        },
+        unavailable_reason: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Unavailable Reason'
+        }
+    },
+    type: 'object',
+    required: ['accommodation_id', 'available'],
+    title: 'AccommodationAvailability',
+    description: `Per-accommodation answer to "can I book these dates, and for how much".
+
+\`\`available\`\` is a count, not a boolean: the checkout shows "3 left".
+\`\`unavailable_reason\`\` explains a zero so the UI can say *why* (too short
+a stay, outside the bookable window, sold out).`
+} as const;
+
+export const AccommodationAvailabilityRequestSchema = {
+    properties: {
+        check_in: {
+            type: 'string',
+            format: 'date',
+            title: 'Check In'
+        },
+        check_out: {
+            type: 'string',
+            format: 'date',
+            title: 'Check Out'
+        },
+        guest_count: {
+            anyOf: [
+                {
+                    type: 'integer',
+                    maximum: 50,
+                    minimum: 1
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Guest Count'
+        }
+    },
+    type: 'object',
+    required: ['check_in', 'check_out'],
+    title: 'AccommodationAvailabilityRequest'
+} as const;
+
+export const AccommodationBlockRangeSchema = {
+    properties: {
+        popup_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Popup Id'
+        },
+        accommodation_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Accommodation Id'
+        },
+        check_in: {
+            type: 'string',
+            format: 'date',
+            title: 'Check In'
+        },
+        check_out: {
+            type: 'string',
+            format: 'date',
+            title: 'Check Out'
+        },
+        kind: {
+            '$ref': '#/components/schemas/BookingKind',
+            default: 'block'
+        },
+        notes: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Notes'
+        }
+    },
+    type: 'object',
+    required: ['popup_id', 'accommodation_id', 'check_in', 'check_out'],
+    title: 'AccommodationBlockRange',
+    description: `Take a whole room type off the market for a range.
+
+One booking per unit, so the calendar shows the block on every row and
+the exclusion constraint keeps guests out.`
+} as const;
+
+export const AccommodationBookingCreateSchema = {
+    properties: {
+        popup_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Popup Id'
+        },
+        accommodation_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Accommodation Id'
+        },
+        unit_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Unit Id'
+        },
+        kind: {
+            '$ref': '#/components/schemas/BookingKind',
+            default: 'guest'
+        },
+        check_in: {
+            type: 'string',
+            format: 'date',
+            title: 'Check In'
+        },
+        check_out: {
+            type: 'string',
+            format: 'date',
+            title: 'Check Out'
+        },
+        guest_count: {
+            anyOf: [
+                {
+                    type: 'integer',
+                    minimum: 1
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Guest Count'
+        },
+        guests: {
+            items: {
+                '$ref': '#/components/schemas/BookingGuest'
+            },
+            type: 'array',
+            title: 'Guests'
+        },
+        primary_guest_name: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Primary Guest Name'
+        },
+        primary_guest_email: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Primary Guest Email'
+        },
+        notes: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Notes'
+        },
+        ignore_restrictions: {
+            type: 'boolean',
+            title: 'Ignore Restrictions',
+            default: false
+        }
+    },
+    type: 'object',
+    required: ['popup_id', 'accommodation_id', 'check_in', 'check_out'],
+    title: 'AccommodationBookingCreate',
+    description: `Staff-created booking (comp, block, maintenance).
+
+\`\`unit_id\`\` is optional: without it the backend picks a free unit of the
+accommodation with the same best-fit logic the checkout uses.`
+} as const;
+
+export const AccommodationBookingPublicSchema = {
+    properties: {
+        tenant_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Tenant Id'
+        },
+        popup_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Popup Id'
+        },
+        accommodation_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Accommodation Id'
+        },
+        unit_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Unit Id'
+        },
+        kind: {
+            '$ref': '#/components/schemas/BookingKind',
+            default: 'guest'
+        },
+        status: {
+            '$ref': '#/components/schemas/BookingStatus',
+            default: 'hold'
+        },
+        check_in: {
+            type: 'string',
+            format: 'date',
+            title: 'Check In'
+        },
+        check_out: {
+            type: 'string',
+            format: 'date',
+            title: 'Check Out'
+        },
+        guest_count: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Guest Count'
+        },
+        guests: {
+            items: {
+                additionalProperties: true,
+                type: 'object'
+            },
+            type: 'array',
+            title: 'Guests'
+        },
+        primary_guest_name: {
+            anyOf: [
+                {
+                    type: 'string',
+                    maxLength: 255
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Primary Guest Name'
+        },
+        primary_guest_email: {
+            anyOf: [
+                {
+                    type: 'string',
+                    maxLength: 255
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Primary Guest Email'
+        },
+        attendee_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Attendee Id'
+        },
+        human_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Human Id'
+        },
+        payment_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Payment Id'
+        },
+        payment_product_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Payment Product Id'
+        },
+        price_snapshot: {
+            anyOf: [
+                {
+                    additionalProperties: true,
+                    type: 'object'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Price Snapshot'
+        },
+        hold_expires_at: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Hold Expires At'
+        },
+        notes: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Notes'
+        },
+        created_by_user_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Created By User Id'
+        },
+        created_at: {
+            type: 'string',
+            format: 'date-time',
+            title: 'Created At'
+        },
+        updated_at: {
+            type: 'string',
+            format: 'date-time',
+            title: 'Updated At'
+        },
+        id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Id'
+        },
+        nights: {
+            type: 'integer',
+            title: 'Nights',
+            default: 0
+        }
+    },
+    type: 'object',
+    required: ['tenant_id', 'popup_id', 'accommodation_id', 'unit_id', 'check_in', 'check_out', 'id'],
+    title: 'AccommodationBookingPublic'
+} as const;
+
+export const AccommodationBookingUpdateSchema = {
+    properties: {
+        unit_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Unit Id'
+        },
+        status: {
+            anyOf: [
+                {
+                    '$ref': '#/components/schemas/BookingStatus'
+                },
+                {
+                    type: 'null'
+                }
+            ]
+        },
+        guest_count: {
+            anyOf: [
+                {
+                    type: 'integer',
+                    minimum: 1
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Guest Count'
+        },
+        guests: {
+            anyOf: [
+                {
+                    items: {
+                        '$ref': '#/components/schemas/BookingGuest'
+                    },
+                    type: 'array'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Guests'
+        },
+        primary_guest_name: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Primary Guest Name'
+        },
+        primary_guest_email: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Primary Guest Email'
+        },
+        notes: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Notes'
+        }
+    },
+    type: 'object',
+    title: 'AccommodationBookingUpdate'
+} as const;
+
+export const AccommodationBulkFilterSchema = {
+    properties: {
+        popup_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Popup Id'
+        },
+        property_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Property Id'
+        },
+        kind: {
+            anyOf: [
+                {
+                    '$ref': '#/components/schemas/AccommodationKind'
+                },
+                {
+                    type: 'null'
+                }
+            ]
+        },
+        is_active: {
+            anyOf: [
+                {
+                    type: 'boolean'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Is Active'
+        }
+    },
+    type: 'object',
+    required: ['popup_id'],
+    title: 'AccommodationBulkFilter',
+    description: `Selects room types by attribute instead of by id.
+
+Exists so an operator (or an agent over MCP) can say "every room in this
+property" without first listing them.`
+} as const;
+
+export const AccommodationBulkPriceSchema = {
+    properties: {
+        ids: {
+            anyOf: [
+                {
+                    items: {
+                        type: 'string',
+                        format: 'uuid'
+                    },
+                    type: 'array'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Ids'
+        },
+        filter: {
+            anyOf: [
+                {
+                    '$ref': '#/components/schemas/AccommodationBulkFilter'
+                },
+                {
+                    type: 'null'
+                }
+            ]
+        },
+        mode: {
+            '$ref': '#/components/schemas/BulkPriceMode',
+            default: 'set'
+        },
+        value: {
+            anyOf: [
+                {
+                    type: 'number'
+                },
+                {
+                    type: 'string',
+                    pattern: '^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$'
+                }
+            ],
+            title: 'Value'
+        },
+        start_date: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Start Date'
+        },
+        end_date: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'End Date'
+        },
+        label: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Label'
+        },
+        priority: {
+            type: 'integer',
+            title: 'Priority',
+            default: 0
+        }
+    },
+    type: 'object',
+    required: ['value'],
+    title: 'AccommodationBulkPrice',
+    description: `Re-price many room types at once.
+
+Without a date range this moves \`\`default_nightly_price\`\`; with one it
+creates (or replaces) a date-range rule per room type, which is how a
+"high season +20%" is expressed.`
+} as const;
+
+export const AccommodationBulkUpdateRequestSchema = {
+    properties: {
+        ids: {
+            anyOf: [
+                {
+                    items: {
+                        type: 'string',
+                        format: 'uuid'
+                    },
+                    type: 'array'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Ids'
+        },
+        filter: {
+            anyOf: [
+                {
+                    '$ref': '#/components/schemas/AccommodationBulkFilter'
+                },
+                {
+                    type: 'null'
+                }
+            ]
+        },
+        patch: {
+            '$ref': '#/components/schemas/AccommodationUpdate'
+        }
+    },
+    type: 'object',
+    required: ['patch'],
+    title: 'AccommodationBulkUpdateRequest',
+    description: `Apply one patch to many room types.
+
+Named \`\`...Request\`\` rather than \`\`...Update\`\` on purpose: this is the
+envelope of a bulk endpoint, not a PATCH body. The PATCH body it carries
+is \`\`patch\`\`, and that one is a real \`\`*Update\`\` schema.`
+} as const;
+
+export const AccommodationCalendarSchema = {
+    properties: {
+        date_from: {
+            type: 'string',
+            format: 'date',
+            title: 'Date From'
+        },
+        date_to: {
+            type: 'string',
+            format: 'date',
+            title: 'Date To'
+        },
+        properties: {
+            items: {
+                '$ref': '#/components/schemas/CalendarProperty'
+            },
+            type: 'array',
+            title: 'Properties',
+            default: []
+        }
+    },
+    type: 'object',
+    required: ['date_from', 'date_to'],
+    title: 'AccommodationCalendar'
+} as const;
+
+export const AccommodationCreateSchema = {
+    properties: {
+        popup_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Popup Id'
+        },
+        property_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Property Id'
+        },
+        name: {
+            type: 'string',
+            maxLength: 255,
+            minLength: 1,
+            title: 'Name'
+        },
+        kind: {
+            '$ref': '#/components/schemas/AccommodationKind',
+            default: 'room'
+        },
+        description: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Description'
+        },
+        guest_capacity: {
+            type: 'integer',
+            maximum: 100,
+            minimum: 1,
+            title: 'Guest Capacity',
+            default: 1
+        },
+        beds: {
+            items: {
+                '$ref': '#/components/schemas/BedSpec'
+            },
+            type: 'array',
+            title: 'Beds'
+        },
+        default_nightly_price: {
+            anyOf: [
+                {
+                    type: 'number',
+                    minimum: 0
+                },
+                {
+                    type: 'string',
+                    pattern: '^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$'
+                }
+            ],
+            title: 'Default Nightly Price'
+        },
+        long_stay_price: {
+            anyOf: [
+                {
+                    type: 'number',
+                    minimum: 0
+                },
+                {
+                    type: 'string',
+                    pattern: '^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Long Stay Price'
+        },
+        min_stay_override: {
+            anyOf: [
+                {
+                    type: 'integer',
+                    minimum: 1
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Min Stay Override'
+        },
+        bookable_from: {
+            type: 'string',
+            format: 'date',
+            title: 'Bookable From'
+        },
+        bookable_to: {
+            type: 'string',
+            format: 'date',
+            title: 'Bookable To'
+        },
+        visible_in_checkout: {
+            type: 'boolean',
+            title: 'Visible In Checkout',
+            default: true
+        },
+        is_active: {
+            type: 'boolean',
+            title: 'Is Active',
+            default: true
+        },
+        sort_order: {
+            type: 'integer',
+            title: 'Sort Order',
+            default: 0
+        },
+        units_count: {
+            anyOf: [
+                {
+                    type: 'integer',
+                    maximum: 500,
+                    minimum: 1
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Units Count'
+        },
+        unit_label_prefix: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Unit Label Prefix'
+        },
+        image_ids: {
+            anyOf: [
+                {
+                    items: {
+                        type: 'string',
+                        format: 'uuid'
+                    },
+                    type: 'array'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Image Ids'
+        }
+    },
+    type: 'object',
+    required: ['popup_id', 'property_id', 'name', 'default_nightly_price', 'bookable_from', 'bookable_to'],
+    title: 'AccommodationCreate'
+} as const;
+
+export const AccommodationDuplicateSchema = {
+    properties: {
+        name: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Name'
+        },
+        copy_units: {
+            type: 'boolean',
+            title: 'Copy Units',
+            default: true
+        },
+        units_count: {
+            anyOf: [
+                {
+                    type: 'integer',
+                    maximum: 500,
+                    minimum: 1
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Units Count'
+        },
+        copy_price_rules: {
+            type: 'boolean',
+            title: 'Copy Price Rules',
+            default: true
+        },
+        copy_images: {
+            type: 'boolean',
+            title: 'Copy Images',
+            default: true
+        }
+    },
+    type: 'object',
+    title: 'AccommodationDuplicate',
+    description: 'Copy a room type, optionally with its units and price rules.'
+} as const;
+
+export const AccommodationImageCreateSchema = {
+    properties: {
+        popup_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Popup Id'
+        },
+        url: {
+            type: 'string',
+            title: 'Url'
+        },
+        filename: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Filename'
+        },
+        width: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Width'
+        },
+        height: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Height'
+        }
+    },
+    type: 'object',
+    required: ['popup_id', 'url'],
+    title: 'AccommodationImageCreate'
+} as const;
+
+export const AccommodationImagePublicSchema = {
+    properties: {
+        id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Id'
+        },
+        url: {
+            type: 'string',
+            title: 'Url'
+        },
+        filename: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Filename'
+        },
+        width: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Width'
+        },
+        height: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Height'
+        }
+    },
+    type: 'object',
+    required: ['id', 'url'],
+    title: 'AccommodationImagePublic'
+} as const;
+
+export const AccommodationKindSchema = {
+    type: 'string',
+    enum: ['room', 'apartment', 'studio', 'tent', 'cabin', 'other'],
+    title: 'AccommodationKind',
+    description: 'Physical shape of an accommodation type. Presentational only.'
+} as const;
+
+export const AccommodationOfferSchema = {
+    properties: {
+        properties: {
+            items: {
+                '$ref': '#/components/schemas/PublicAccommodationProperty'
+            },
+            type: 'array',
+            title: 'Properties',
+            default: []
+        },
+        accommodations: {
+            items: {
+                '$ref': '#/components/schemas/PublicAccommodation'
+            },
+            type: 'array',
+            title: 'Accommodations',
+            default: []
+        },
+        currency: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Currency'
+        }
+    },
+    type: 'object',
+    title: 'AccommodationOffer',
+    description: 'Everything the accommodation step needs to render before dates exist.'
+} as const;
+
+export const AccommodationPriceRuleCreateSchema = {
+    properties: {
+        label: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Label'
+        },
+        start_date: {
+            type: 'string',
+            format: 'date',
+            title: 'Start Date'
+        },
+        end_date: {
+            type: 'string',
+            format: 'date',
+            title: 'End Date'
+        },
+        nightly_price: {
+            anyOf: [
+                {
+                    type: 'number',
+                    minimum: 0
+                },
+                {
+                    type: 'string',
+                    pattern: '^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$'
+                }
+            ],
+            title: 'Nightly Price'
+        },
+        priority: {
+            type: 'integer',
+            title: 'Priority',
+            default: 0
+        }
+    },
+    type: 'object',
+    required: ['start_date', 'end_date', 'nightly_price'],
+    title: 'AccommodationPriceRuleCreate'
+} as const;
+
+export const AccommodationPriceRulePublicSchema = {
+    properties: {
+        tenant_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Tenant Id'
+        },
+        popup_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Popup Id'
+        },
+        accommodation_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Accommodation Id'
+        },
+        label: {
+            anyOf: [
+                {
+                    type: 'string',
+                    maxLength: 255
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Label'
+        },
+        start_date: {
+            type: 'string',
+            format: 'date',
+            title: 'Start Date'
+        },
+        end_date: {
+            type: 'string',
+            format: 'date',
+            title: 'End Date'
+        },
+        nightly_price: {
+            type: 'string',
+            pattern: '^(?!^[-+.]*$)[+-]?0*(?:\\d{0,8}|(?=[\\d.]{1,11}0*$)\\d{0,8}\\.\\d{0,2}0*$)',
+            title: 'Nightly Price'
+        },
+        priority: {
+            type: 'integer',
+            title: 'Priority',
+            default: 0
+        },
+        created_at: {
+            type: 'string',
+            format: 'date-time',
+            title: 'Created At'
+        },
+        updated_at: {
+            type: 'string',
+            format: 'date-time',
+            title: 'Updated At'
+        },
+        id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Id'
+        }
+    },
+    type: 'object',
+    required: ['tenant_id', 'popup_id', 'accommodation_id', 'start_date', 'end_date', 'nightly_price', 'id'],
+    title: 'AccommodationPriceRulePublic'
+} as const;
+
+export const AccommodationPriceRuleUpdateSchema = {
+    properties: {
+        label: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Label'
+        },
+        start_date: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Start Date'
+        },
+        end_date: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'End Date'
+        },
+        nightly_price: {
+            anyOf: [
+                {
+                    type: 'number',
+                    minimum: 0
+                },
+                {
+                    type: 'string',
+                    pattern: '^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Nightly Price'
+        },
+        priority: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Priority'
+        }
+    },
+    type: 'object',
+    title: 'AccommodationPriceRuleUpdate'
+} as const;
+
+export const AccommodationPropertyCreateSchema = {
+    properties: {
+        popup_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Popup Id'
+        },
+        name: {
+            type: 'string',
+            maxLength: 255,
+            minLength: 1,
+            title: 'Name'
+        },
+        address: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Address'
+        },
+        description: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Description'
+        },
+        contact_email: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Contact Email'
+        },
+        contact_name: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Contact Name'
+        },
+        tax_percentage: {
+            anyOf: [
+                {
+                    type: 'number',
+                    maximum: 100,
+                    minimum: 0
+                },
+                {
+                    type: 'string',
+                    pattern: '^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Tax Percentage'
+        },
+        is_active: {
+            type: 'boolean',
+            title: 'Is Active',
+            default: true
+        },
+        sort_order: {
+            type: 'integer',
+            title: 'Sort Order',
+            default: 0
+        }
+    },
+    type: 'object',
+    required: ['popup_id', 'name'],
+    title: 'AccommodationPropertyCreate'
+} as const;
+
+export const AccommodationPropertyPublicSchema = {
+    properties: {
+        tenant_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Tenant Id'
+        },
+        popup_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Popup Id'
+        },
+        name: {
+            type: 'string',
+            maxLength: 255,
+            title: 'Name'
+        },
+        address: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Address'
+        },
+        description: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Description'
+        },
+        contact_email: {
+            anyOf: [
+                {
+                    type: 'string',
+                    maxLength: 255
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Contact Email'
+        },
+        contact_name: {
+            anyOf: [
+                {
+                    type: 'string',
+                    maxLength: 255
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Contact Name'
+        },
+        tax_percentage: {
+            anyOf: [
+                {
+                    type: 'string',
+                    pattern: '^(?!^[-+.]*$)[+-]?0*(?:\\d{0,3}|(?=[\\d.]{1,6}0*$)\\d{0,3}\\.\\d{0,2}0*$)'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Tax Percentage'
+        },
+        is_active: {
+            type: 'boolean',
+            title: 'Is Active',
+            default: true
+        },
+        sort_order: {
+            type: 'integer',
+            title: 'Sort Order',
+            default: 0
+        },
+        created_at: {
+            type: 'string',
+            format: 'date-time',
+            title: 'Created At'
+        },
+        updated_at: {
+            type: 'string',
+            format: 'date-time',
+            title: 'Updated At'
+        },
+        id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Id'
+        }
+    },
+    type: 'object',
+    required: ['tenant_id', 'popup_id', 'name', 'id'],
+    title: 'AccommodationPropertyPublic'
+} as const;
+
+export const AccommodationPropertyUpdateSchema = {
+    properties: {
+        name: {
+            anyOf: [
+                {
+                    type: 'string',
+                    maxLength: 255,
+                    minLength: 1
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Name'
+        },
+        address: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Address'
+        },
+        description: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Description'
+        },
+        contact_email: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Contact Email'
+        },
+        contact_name: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Contact Name'
+        },
+        tax_percentage: {
+            anyOf: [
+                {
+                    type: 'number',
+                    maximum: 100,
+                    minimum: 0
+                },
+                {
+                    type: 'string',
+                    pattern: '^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Tax Percentage'
+        },
+        is_active: {
+            anyOf: [
+                {
+                    type: 'boolean'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Is Active'
+        },
+        sort_order: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Sort Order'
+        }
+    },
+    type: 'object',
+    title: 'AccommodationPropertyUpdate'
+} as const;
+
+export const AccommodationPublicSchema = {
+    properties: {
+        tenant_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Tenant Id'
+        },
+        popup_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Popup Id'
+        },
+        property_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Property Id'
+        },
+        product_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Product Id'
+        },
+        name: {
+            type: 'string',
+            maxLength: 255,
+            title: 'Name'
+        },
+        kind: {
+            '$ref': '#/components/schemas/AccommodationKind',
+            default: 'room'
+        },
+        description: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Description'
+        },
+        guest_capacity: {
+            type: 'integer',
+            title: 'Guest Capacity',
+            default: 1
+        },
+        beds: {
+            items: {
+                additionalProperties: true,
+                type: 'object'
+            },
+            type: 'array',
+            title: 'Beds'
+        },
+        default_nightly_price: {
+            type: 'string',
+            pattern: '^(?!^[-+.]*$)[+-]?0*(?:\\d{0,8}|(?=[\\d.]{1,11}0*$)\\d{0,8}\\.\\d{0,2}0*$)',
+            title: 'Default Nightly Price'
+        },
+        long_stay_price: {
+            anyOf: [
+                {
+                    type: 'string',
+                    pattern: '^(?!^[-+.]*$)[+-]?0*(?:\\d{0,8}|(?=[\\d.]{1,11}0*$)\\d{0,8}\\.\\d{0,2}0*$)'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Long Stay Price'
+        },
+        min_stay_override: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Min Stay Override'
+        },
+        bookable_from: {
+            type: 'string',
+            format: 'date',
+            title: 'Bookable From'
+        },
+        bookable_to: {
+            type: 'string',
+            format: 'date',
+            title: 'Bookable To'
+        },
+        visible_in_checkout: {
+            type: 'boolean',
+            title: 'Visible In Checkout',
+            default: true
+        },
+        is_active: {
+            type: 'boolean',
+            title: 'Is Active',
+            default: true
+        },
+        sort_order: {
+            type: 'integer',
+            title: 'Sort Order',
+            default: 0
+        },
+        deleted_at: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Deleted At'
+        },
+        created_at: {
+            type: 'string',
+            format: 'date-time',
+            title: 'Created At'
+        },
+        updated_at: {
+            type: 'string',
+            format: 'date-time',
+            title: 'Updated At'
+        },
+        id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Id'
+        },
+        units: {
+            items: {
+                '$ref': '#/components/schemas/AccommodationUnitPublic'
+            },
+            type: 'array',
+            title: 'Units',
+            default: []
+        },
+        images: {
+            items: {
+                '$ref': '#/components/schemas/AccommodationImagePublic'
+            },
+            type: 'array',
+            title: 'Images',
+            default: []
+        }
+    },
+    type: 'object',
+    required: ['tenant_id', 'popup_id', 'property_id', 'name', 'default_nightly_price', 'bookable_from', 'bookable_to', 'id'],
+    title: 'AccommodationPublic'
+} as const;
+
+export const AccommodationQuoteSchema = {
+    properties: {
+        nights: {
+            items: {
+                '$ref': '#/components/schemas/QuoteNight'
+            },
+            type: 'array',
+            title: 'Nights'
+        },
+        night_count: {
+            type: 'integer',
+            title: 'Night Count'
+        },
+        subtotal: {
+            type: 'string',
+            pattern: '^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$',
+            title: 'Subtotal'
+        },
+        tax_percentage: {
+            anyOf: [
+                {
+                    type: 'string',
+                    pattern: '^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Tax Percentage'
+        },
+        tax: {
+            type: 'string',
+            pattern: '^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$',
+            title: 'Tax',
+            default: '0.00'
+        },
+        total: {
+            type: 'string',
+            pattern: '^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$',
+            title: 'Total'
+        },
+        applied_rule: {
+            type: 'string',
+            title: 'Applied Rule'
+        },
+        currency: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Currency'
+        }
+    },
+    type: 'object',
+    required: ['nights', 'night_count', 'subtotal', 'total', 'applied_rule'],
+    title: 'AccommodationQuote',
+    description: `Server-computed price of a stay. The client never sends prices.
+
+Stored verbatim in \`\`accommodation_bookings.price_snapshot\`\` and in the
+payment line's \`\`purchase_metadata.quote\`\` so a booking can always be
+explained after the fact, even if the rules change afterwards.`
+} as const;
+
+export const AccommodationUnitBulkCreateSchema = {
+    properties: {
+        labels: {
+            anyOf: [
+                {
+                    items: {
+                        type: 'string'
+                    },
+                    type: 'array'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Labels'
+        },
+        prefix: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Prefix'
+        },
+        count: {
+            anyOf: [
+                {
+                    type: 'integer',
+                    maximum: 500,
+                    minimum: 1
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Count'
+        },
+        start_at: {
+            type: 'integer',
+            minimum: 0,
+            title: 'Start At',
+            default: 1
+        }
+    },
+    type: 'object',
+    title: 'AccommodationUnitBulkCreate',
+    description: 'Either explicit labels, or ``prefix`` + ``count`` -> "Room 1..N".'
+} as const;
+
+export const AccommodationUnitPublicSchema = {
+    properties: {
+        id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Id'
+        },
+        accommodation_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Accommodation Id'
+        },
+        label: {
+            type: 'string',
+            title: 'Label'
+        },
+        notes: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Notes'
+        },
+        is_active: {
+            type: 'boolean',
+            title: 'Is Active'
+        },
+        sort_order: {
+            type: 'integer',
+            title: 'Sort Order'
+        }
+    },
+    type: 'object',
+    required: ['id', 'accommodation_id', 'label', 'is_active', 'sort_order'],
+    title: 'AccommodationUnitPublic'
+} as const;
+
+export const AccommodationUnitUpdateSchema = {
+    properties: {
+        label: {
+            anyOf: [
+                {
+                    type: 'string',
+                    maxLength: 100,
+                    minLength: 1
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Label'
+        },
+        notes: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Notes'
+        },
+        is_active: {
+            anyOf: [
+                {
+                    type: 'boolean'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Is Active'
+        },
+        sort_order: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Sort Order'
+        }
+    },
+    type: 'object',
+    title: 'AccommodationUnitUpdate'
+} as const;
+
+export const AccommodationUpdateSchema = {
+    properties: {
+        property_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Property Id'
+        },
+        name: {
+            anyOf: [
+                {
+                    type: 'string',
+                    maxLength: 255,
+                    minLength: 1
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Name'
+        },
+        kind: {
+            anyOf: [
+                {
+                    '$ref': '#/components/schemas/AccommodationKind'
+                },
+                {
+                    type: 'null'
+                }
+            ]
+        },
+        description: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Description'
+        },
+        guest_capacity: {
+            anyOf: [
+                {
+                    type: 'integer',
+                    maximum: 100,
+                    minimum: 1
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Guest Capacity'
+        },
+        beds: {
+            anyOf: [
+                {
+                    items: {
+                        '$ref': '#/components/schemas/BedSpec'
+                    },
+                    type: 'array'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Beds'
+        },
+        default_nightly_price: {
+            anyOf: [
+                {
+                    type: 'number',
+                    minimum: 0
+                },
+                {
+                    type: 'string',
+                    pattern: '^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Default Nightly Price'
+        },
+        long_stay_price: {
+            anyOf: [
+                {
+                    type: 'number',
+                    minimum: 0
+                },
+                {
+                    type: 'string',
+                    pattern: '^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Long Stay Price'
+        },
+        min_stay_override: {
+            anyOf: [
+                {
+                    type: 'integer',
+                    minimum: 1
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Min Stay Override'
+        },
+        bookable_from: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Bookable From'
+        },
+        bookable_to: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Bookable To'
+        },
+        visible_in_checkout: {
+            anyOf: [
+                {
+                    type: 'boolean'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Visible In Checkout'
+        },
+        is_active: {
+            anyOf: [
+                {
+                    type: 'boolean'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Is Active'
+        },
+        sort_order: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Sort Order'
+        },
+        image_ids: {
+            anyOf: [
+                {
+                    items: {
+                        type: 'string',
+                        format: 'uuid'
+                    },
+                    type: 'array'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Image Ids'
+        }
+    },
+    type: 'object',
+    title: 'AccommodationUpdate'
+} as const;
+
 export const AddMemberByApplicationRequestSchema = {
     properties: {
         application_id: {
@@ -310,7 +2444,7 @@ export const AdminApiKeyCreateSchema = {
         scopes: {
             items: {
                 type: 'string',
-                enum: ['events:read', 'events:write', 'rsvp:write', 'venues:read', 'venues:write', 'applications:read', 'applications:write', 'attendees:read', 'attendees:write', 'humans:read', 'humans:write', 'groups:read', 'groups:write', 'products:read', 'products:write', 'coupons:read', 'coupons:write', 'forms:read', 'forms:write', 'payments:read', 'tracks:read', 'tracks:write', 'ticketing_steps:read', 'ticketing_steps:write', 'translations:read', 'translations:write']
+                enum: ['events:read', 'events:write', 'rsvp:write', 'venues:read', 'venues:write', 'applications:read', 'applications:write', 'attendees:read', 'attendees:write', 'humans:read', 'humans:write', 'groups:read', 'groups:write', 'products:read', 'products:write', 'accommodations:read', 'accommodations:write', 'coupons:read', 'coupons:write', 'forms:read', 'forms:write', 'payments:read', 'tracks:read', 'tracks:write', 'ticketing_steps:read', 'ticketing_steps:write', 'translations:read', 'translations:write']
             },
             type: 'array',
             minItems: 1,
@@ -353,7 +2487,7 @@ export const AdminApiKeyCreatedSchema = {
         scopes: {
             items: {
                 type: 'string',
-                enum: ['events:read', 'events:write', 'rsvp:write', 'venues:read', 'venues:write', 'applications:read', 'applications:write', 'attendees:read', 'attendees:write', 'humans:read', 'humans:write', 'groups:read', 'groups:write', 'products:read', 'products:write', 'coupons:read', 'coupons:write', 'forms:read', 'forms:write', 'payments:read', 'tracks:read', 'tracks:write', 'ticketing_steps:read', 'ticketing_steps:write', 'translations:read', 'translations:write']
+                enum: ['events:read', 'events:write', 'rsvp:write', 'venues:read', 'venues:write', 'applications:read', 'applications:write', 'attendees:read', 'attendees:write', 'humans:read', 'humans:write', 'groups:read', 'groups:write', 'products:read', 'products:write', 'accommodations:read', 'accommodations:write', 'coupons:read', 'coupons:write', 'forms:read', 'forms:write', 'payments:read', 'tracks:read', 'tracks:write', 'ticketing_steps:read', 'ticketing_steps:write', 'translations:read', 'translations:write']
             },
             type: 'array',
             title: 'Scopes'
@@ -430,7 +2564,7 @@ export const AdminApiKeyPublicSchema = {
         scopes: {
             items: {
                 type: 'string',
-                enum: ['events:read', 'events:write', 'rsvp:write', 'venues:read', 'venues:write', 'applications:read', 'applications:write', 'attendees:read', 'attendees:write', 'humans:read', 'humans:write', 'groups:read', 'groups:write', 'products:read', 'products:write', 'coupons:read', 'coupons:write', 'forms:read', 'forms:write', 'payments:read', 'tracks:read', 'tracks:write', 'ticketing_steps:read', 'ticketing_steps:write', 'translations:read', 'translations:write']
+                enum: ['events:read', 'events:write', 'rsvp:write', 'venues:read', 'venues:write', 'applications:read', 'applications:write', 'attendees:read', 'attendees:write', 'humans:read', 'humans:write', 'groups:read', 'groups:write', 'products:read', 'products:write', 'accommodations:read', 'accommodations:write', 'coupons:read', 'coupons:write', 'forms:read', 'forms:write', 'payments:read', 'tracks:read', 'tracks:write', 'ticketing_steps:read', 'ticketing_steps:write', 'translations:read', 'translations:write']
             },
             type: 'array',
             title: 'Scopes'
@@ -548,7 +2682,7 @@ export const ApiKeyCreateSchema = {
         scopes: {
             items: {
                 type: 'string',
-                enum: ['events:read', 'events:write', 'rsvp:write', 'venues:read', 'venues:write', 'applications:read', 'applications:write', 'attendees:read', 'attendees:write', 'humans:read', 'humans:write', 'groups:read', 'groups:write', 'products:read', 'products:write', 'coupons:read', 'coupons:write', 'forms:read', 'forms:write', 'payments:read', 'tracks:read', 'tracks:write', 'ticketing_steps:read', 'ticketing_steps:write', 'translations:read', 'translations:write']
+                enum: ['events:read', 'events:write', 'rsvp:write', 'venues:read', 'venues:write', 'applications:read', 'applications:write', 'attendees:read', 'attendees:write', 'humans:read', 'humans:write', 'groups:read', 'groups:write', 'products:read', 'products:write', 'accommodations:read', 'accommodations:write', 'coupons:read', 'coupons:write', 'forms:read', 'forms:write', 'payments:read', 'tracks:read', 'tracks:write', 'ticketing_steps:read', 'ticketing_steps:write', 'translations:read', 'translations:write']
             },
             type: 'array',
             title: 'Scopes'
@@ -590,7 +2724,7 @@ export const ApiKeyCreatedSchema = {
         scopes: {
             items: {
                 type: 'string',
-                enum: ['events:read', 'events:write', 'rsvp:write', 'venues:read', 'venues:write', 'applications:read', 'applications:write', 'attendees:read', 'attendees:write', 'humans:read', 'humans:write', 'groups:read', 'groups:write', 'products:read', 'products:write', 'coupons:read', 'coupons:write', 'forms:read', 'forms:write', 'payments:read', 'tracks:read', 'tracks:write', 'ticketing_steps:read', 'ticketing_steps:write', 'translations:read', 'translations:write']
+                enum: ['events:read', 'events:write', 'rsvp:write', 'venues:read', 'venues:write', 'applications:read', 'applications:write', 'attendees:read', 'attendees:write', 'humans:read', 'humans:write', 'groups:read', 'groups:write', 'products:read', 'products:write', 'accommodations:read', 'accommodations:write', 'coupons:read', 'coupons:write', 'forms:read', 'forms:write', 'payments:read', 'tracks:read', 'tracks:write', 'ticketing_steps:read', 'ticketing_steps:write', 'translations:read', 'translations:write']
             },
             type: 'array',
             title: 'Scopes'
@@ -678,7 +2812,7 @@ export const ApiKeyPublicSchema = {
         scopes: {
             items: {
                 type: 'string',
-                enum: ['events:read', 'events:write', 'rsvp:write', 'venues:read', 'venues:write', 'applications:read', 'applications:write', 'attendees:read', 'attendees:write', 'humans:read', 'humans:write', 'groups:read', 'groups:write', 'products:read', 'products:write', 'coupons:read', 'coupons:write', 'forms:read', 'forms:write', 'payments:read', 'tracks:read', 'tracks:write', 'ticketing_steps:read', 'ticketing_steps:write', 'translations:read', 'translations:write']
+                enum: ['events:read', 'events:write', 'rsvp:write', 'venues:read', 'venues:write', 'applications:read', 'applications:write', 'attendees:read', 'attendees:write', 'humans:read', 'humans:write', 'groups:read', 'groups:write', 'products:read', 'products:write', 'accommodations:read', 'accommodations:write', 'coupons:read', 'coupons:write', 'forms:read', 'forms:write', 'payments:read', 'tracks:read', 'tracks:write', 'ticketing_steps:read', 'ticketing_steps:write', 'translations:read', 'translations:write']
             },
             type: 'array',
             title: 'Scopes'
@@ -4285,6 +6419,94 @@ export const BaseFieldConfigUpdateSchema = {
     title: 'BaseFieldConfigUpdate'
 } as const;
 
+export const BedSpecSchema = {
+    properties: {
+        type: {
+            '$ref': '#/components/schemas/BedType'
+        },
+        count: {
+            type: 'integer',
+            maximum: 50,
+            minimum: 1,
+            title: 'Count'
+        }
+    },
+    type: 'object',
+    required: ['type', 'count'],
+    title: 'BedSpec',
+    description: 'One entry of ``accommodations.beds``: "2 single beds".'
+} as const;
+
+export const BedTypeSchema = {
+    type: 'string',
+    enum: ['king', 'queen', 'double', 'single', 'bunk', 'sofa'],
+    title: 'BedType',
+    description: 'Bed types listed in ``accommodations.beds``.'
+} as const;
+
+export const BlockRangeResultSchema = {
+    properties: {
+        created: {
+            type: 'integer',
+            title: 'Created'
+        },
+        skipped: {
+            type: 'integer',
+            title: 'Skipped'
+        },
+        booking_ids: {
+            items: {
+                type: 'string',
+                format: 'uuid'
+            },
+            type: 'array',
+            title: 'Booking Ids'
+        }
+    },
+    type: 'object',
+    required: ['created', 'skipped', 'booking_ids'],
+    title: 'BlockRangeResult'
+} as const;
+
+export const BookingGuestSchema = {
+    properties: {
+        name: {
+            type: 'string',
+            maxLength: 255,
+            minLength: 1,
+            title: 'Name'
+        }
+    },
+    type: 'object',
+    required: ['name'],
+    title: 'BookingGuest',
+    description: `One occupant.
+
+Names are collected in the checkout and exported to the property owner,
+who needs them for their own registry.`
+} as const;
+
+export const BookingKindSchema = {
+    type: 'string',
+    enum: ['guest', 'block', 'maintenance'],
+    title: 'BookingKind',
+    description: `Why a unit is occupied.
+
+\`\`GUEST\`\` bookings come from the checkout (or are created manually by
+staff for comps); \`\`BLOCK\`\` / \`\`MAINTENANCE\`\` are internal and never
+carry a payment.`
+} as const;
+
+export const BookingStatusSchema = {
+    type: 'string',
+    enum: ['hold', 'confirmed', 'cancelled', 'expired'],
+    title: 'BookingStatus',
+    description: `Lifecycle of a booking.
+
+\`\`HOLD\`\` and \`\`CONFIRMED\`\` are the *blocking* states: they are the ones
+covered by the exclusion constraint, so only those two occupy a unit.`
+} as const;
+
 export const BugReportCreateSchema = {
     properties: {
         title: {
@@ -4342,6 +6564,26 @@ Attachments are optional screenshots / screen-recordings already uploaded
 to S3.`
 } as const;
 
+export const BulkPriceModeSchema = {
+    type: 'string',
+    enum: ['set', 'percent'],
+    title: 'BulkPriceMode'
+} as const;
+
+export const BulkResultSchema = {
+    properties: {
+        updated: {
+            type: 'integer',
+            title: 'Updated'
+        }
+    },
+    type: 'object',
+    required: ['updated'],
+    title: 'BulkResult',
+    description: `How many rows a bulk call touched. Deliberately not the rows
+themselves: a bulk over a whole property would be a huge response.`
+} as const;
+
 export const BuyerInfoSchema = {
     properties: {
         email: {
@@ -4368,6 +6610,213 @@ export const BuyerInfoSchema = {
     required: ['email', 'first_name', 'last_name'],
     title: 'BuyerInfo',
     description: 'Buyer identification and form data for open-ticketing purchase.'
+} as const;
+
+export const CalendarAccommodationSchema = {
+    properties: {
+        id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Id'
+        },
+        name: {
+            type: 'string',
+            title: 'Name'
+        },
+        kind: {
+            '$ref': '#/components/schemas/AccommodationKind'
+        },
+        guest_capacity: {
+            type: 'integer',
+            title: 'Guest Capacity'
+        },
+        units: {
+            items: {
+                '$ref': '#/components/schemas/CalendarUnit'
+            },
+            type: 'array',
+            title: 'Units',
+            default: []
+        },
+        availability_by_day: {
+            additionalProperties: {
+                type: 'integer'
+            },
+            type: 'object',
+            title: 'Availability By Day',
+            default: {}
+        }
+    },
+    type: 'object',
+    required: ['id', 'name', 'kind', 'guest_capacity'],
+    title: 'CalendarAccommodation'
+} as const;
+
+export const CalendarBookingSchema = {
+    properties: {
+        id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Id'
+        },
+        unit_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Unit Id'
+        },
+        accommodation_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Accommodation Id'
+        },
+        kind: {
+            '$ref': '#/components/schemas/BookingKind'
+        },
+        status: {
+            '$ref': '#/components/schemas/BookingStatus'
+        },
+        check_in: {
+            type: 'string',
+            format: 'date',
+            title: 'Check In'
+        },
+        check_out: {
+            type: 'string',
+            format: 'date',
+            title: 'Check Out'
+        },
+        nights: {
+            type: 'integer',
+            title: 'Nights'
+        },
+        guest_count: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Guest Count'
+        },
+        primary_guest_name: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Primary Guest Name'
+        },
+        primary_guest_email: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Primary Guest Email'
+        },
+        payment_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Payment Id'
+        },
+        total: {
+            anyOf: [
+                {
+                    type: 'string',
+                    pattern: '^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Total'
+        },
+        notes: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Notes'
+        }
+    },
+    type: 'object',
+    required: ['id', 'unit_id', 'accommodation_id', 'kind', 'status', 'check_in', 'check_out', 'nights'],
+    title: 'CalendarBooking',
+    description: 'One bar on the calendar.'
+} as const;
+
+export const CalendarPropertySchema = {
+    properties: {
+        id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Id'
+        },
+        name: {
+            type: 'string',
+            title: 'Name'
+        },
+        accommodations: {
+            items: {
+                '$ref': '#/components/schemas/CalendarAccommodation'
+            },
+            type: 'array',
+            title: 'Accommodations',
+            default: []
+        }
+    },
+    type: 'object',
+    required: ['id', 'name'],
+    title: 'CalendarProperty'
+} as const;
+
+export const CalendarUnitSchema = {
+    properties: {
+        id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Id'
+        },
+        label: {
+            type: 'string',
+            title: 'Label'
+        },
+        is_active: {
+            type: 'boolean',
+            title: 'Is Active'
+        },
+        bookings: {
+            items: {
+                '$ref': '#/components/schemas/CalendarBooking'
+            },
+            type: 'array',
+            title: 'Bookings',
+            default: []
+        }
+    },
+    type: 'object',
+    required: ['id', 'label', 'is_active'],
+    title: 'CalendarUnit',
+    description: 'One row of the calendar.'
 } as const;
 
 export const CartHumanInfoSchema = {
@@ -4408,6 +6857,55 @@ export const CartHumanInfoSchema = {
     required: ['id', 'email'],
     title: 'CartHumanInfo',
     description: 'Embedded human info for abandoned cart listing.'
+} as const;
+
+export const CartItemAccommodationSchema = {
+    properties: {
+        accommodation_id: {
+            type: 'string',
+            title: 'Accommodation Id'
+        },
+        check_in: {
+            type: 'string',
+            title: 'Check In'
+        },
+        check_out: {
+            type: 'string',
+            title: 'Check Out'
+        },
+        guest_count: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Guest Count'
+        },
+        guests: {
+            items: {
+                type: 'string'
+            },
+            type: 'array',
+            title: 'Guests',
+            default: []
+        }
+    },
+    type: 'object',
+    required: ['accommodation_id', 'check_in', 'check_out'],
+    title: 'CartItemAccommodation',
+    description: `A room the buyer picked, as it survives a page reload.
+
+Keyed by \`\`accommodation_id\`\` rather than by the shadow \`\`product_id\`\`:
+the product is an implementation detail of how the booking travels
+through payments, and resolving it at purchase time means a cart saved
+before a room was re-synced still points at the right room.
+
+Guests are stored as plain names: the buyer types nothing else about
+them, and the \`\`{name: ...}\`\` shape the purchase needs is built when the
+payment is submitted.`
 } as const;
 
 export const CartItemHousingSchema = {
@@ -4709,6 +7207,14 @@ export const CartStateSchema = {
             },
             type: 'array',
             title: 'Meal Plans',
+            default: []
+        },
+        accommodations: {
+            items: {
+                '$ref': '#/components/schemas/CartItemAccommodation'
+            },
+            type: 'array',
+            title: 'Accommodations',
             default: []
         },
         promo_code: {
@@ -5152,6 +7658,18 @@ export const CheckoutPreviewLineSchema = {
         discountable: {
             type: 'boolean',
             title: 'Discountable'
+        },
+        accommodation_quote: {
+            anyOf: [
+                {
+                    additionalProperties: true,
+                    type: 'object'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Accommodation Quote'
         }
     },
     type: 'object',
@@ -13023,6 +15541,78 @@ export const ListModel_AbandonedCartPublic_Schema = {
     title: 'ListModel[AbandonedCartPublic]'
 } as const;
 
+export const ListModel_AccommodationBookingPublic_Schema = {
+    properties: {
+        results: {
+            items: {
+                '$ref': '#/components/schemas/AccommodationBookingPublic'
+            },
+            type: 'array',
+            title: 'Results'
+        },
+        paging: {
+            '$ref': '#/components/schemas/Paging'
+        }
+    },
+    type: 'object',
+    required: ['results', 'paging'],
+    title: 'ListModel[AccommodationBookingPublic]'
+} as const;
+
+export const ListModel_AccommodationImagePublic_Schema = {
+    properties: {
+        results: {
+            items: {
+                '$ref': '#/components/schemas/AccommodationImagePublic'
+            },
+            type: 'array',
+            title: 'Results'
+        },
+        paging: {
+            '$ref': '#/components/schemas/Paging'
+        }
+    },
+    type: 'object',
+    required: ['results', 'paging'],
+    title: 'ListModel[AccommodationImagePublic]'
+} as const;
+
+export const ListModel_AccommodationPropertyPublic_Schema = {
+    properties: {
+        results: {
+            items: {
+                '$ref': '#/components/schemas/AccommodationPropertyPublic'
+            },
+            type: 'array',
+            title: 'Results'
+        },
+        paging: {
+            '$ref': '#/components/schemas/Paging'
+        }
+    },
+    type: 'object',
+    required: ['results', 'paging'],
+    title: 'ListModel[AccommodationPropertyPublic]'
+} as const;
+
+export const ListModel_AccommodationPublic_Schema = {
+    properties: {
+        results: {
+            items: {
+                '$ref': '#/components/schemas/AccommodationPublic'
+            },
+            type: 'array',
+            title: 'Results'
+        },
+        paging: {
+            '$ref': '#/components/schemas/Paging'
+        }
+    },
+    type: 'object',
+    required: ['results', 'paging'],
+    title: 'ListModel[AccommodationPublic]'
+} as const;
+
 export const ListModel_ApplicationCommentPublic_Schema = {
     properties: {
         results: {
@@ -15732,6 +18322,11 @@ export const PopupAdminSchema = {
             ],
             title: 'Checkin Pass Lead Days'
         },
+        accommodation_min_stay: {
+            type: 'integer',
+            title: 'Accommodation Min Stay',
+            default: 1
+        },
         show_attendee_directory: {
             type: 'boolean',
             title: 'Show Attendee Directory',
@@ -16395,6 +18990,11 @@ export const PopupCreateSchema = {
             ],
             title: 'Checkin Pass Lead Days'
         },
+        accommodation_min_stay: {
+            type: 'integer',
+            title: 'Accommodation Min Stay',
+            default: 1
+        },
         abandoned_cart_delay_days: {
             anyOf: [
                 {
@@ -16800,6 +19400,11 @@ export const PopupPublicSchema = {
             type: 'boolean',
             title: 'Events Enabled',
             default: true
+        },
+        accommodation_min_stay: {
+            type: 'integer',
+            title: 'Accommodation Min Stay',
+            default: 1
         },
         show_attendee_directory: {
             type: 'boolean',
@@ -17590,6 +20195,17 @@ export const PopupUpdateSchema = {
             ],
             title: 'Checkin Pass Lead Days'
         },
+        accommodation_min_stay: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Accommodation Min Stay'
+        },
         invites_enabled: {
             anyOf: [
                 {
@@ -18347,6 +20963,17 @@ export const ProductBatchResultSchema = {
             title: 'Sold Out Override',
             default: false
         },
+        managed_by: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Managed By'
+        },
         id: {
             type: 'string',
             format: 'uuid',
@@ -18609,6 +21236,18 @@ export const ProductLineSchema = {
             minimum: 1,
             title: 'Quantity',
             default: 1
+        },
+        purchase_metadata: {
+            anyOf: [
+                {
+                    additionalProperties: true,
+                    type: 'object'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Purchase Metadata'
         }
     },
     type: 'object',
@@ -18796,6 +21435,17 @@ export const ProductPublicSchema = {
             type: 'boolean',
             title: 'Sold Out Override',
             default: false
+        },
+        managed_by: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Managed By'
         },
         id: {
             type: 'string',
@@ -19240,6 +21890,17 @@ export const ProductWithQuantitySchema = {
             title: 'Sold Out Override',
             default: false
         },
+        managed_by: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Managed By'
+        },
         id: {
             type: 'string',
             format: 'uuid',
@@ -19255,6 +21916,211 @@ export const ProductWithQuantitySchema = {
     required: ['tenant_id', 'popup_id', 'name', 'slug', 'price', 'id'],
     title: 'ProductWithQuantity',
     description: 'Product with quantity for attendee products.'
+} as const;
+
+export const PublicAccommodationSchema = {
+    properties: {
+        id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Id'
+        },
+        property_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Property Id'
+        },
+        product_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Product Id'
+        },
+        name: {
+            type: 'string',
+            title: 'Name'
+        },
+        kind: {
+            '$ref': '#/components/schemas/AccommodationKind'
+        },
+        description: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Description'
+        },
+        guest_capacity: {
+            type: 'integer',
+            title: 'Guest Capacity'
+        },
+        beds: {
+            items: {
+                '$ref': '#/components/schemas/BedSpec'
+            },
+            type: 'array',
+            title: 'Beds',
+            default: []
+        },
+        default_nightly_price: {
+            type: 'string',
+            pattern: '^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$',
+            title: 'Default Nightly Price'
+        },
+        long_stay_price: {
+            anyOf: [
+                {
+                    type: 'string',
+                    pattern: '^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Long Stay Price'
+        },
+        min_stay: {
+            type: 'integer',
+            title: 'Min Stay'
+        },
+        bookable_from: {
+            type: 'string',
+            format: 'date',
+            title: 'Bookable From'
+        },
+        bookable_to: {
+            type: 'string',
+            format: 'date',
+            title: 'Bookable To'
+        },
+        images: {
+            items: {
+                '$ref': '#/components/schemas/AccommodationImagePublic'
+            },
+            type: 'array',
+            title: 'Images',
+            default: []
+        }
+    },
+    type: 'object',
+    required: ['id', 'property_id', 'name', 'kind', 'guest_capacity', 'default_nightly_price', 'min_stay', 'bookable_from', 'bookable_to'],
+    title: 'PublicAccommodation',
+    description: `A room type as the buyer sees it.
+
+No units: how many rooms exist, and which one a guest lands in, is the
+operator's business. What the checkout needs is whether *a* room is free,
+which is what the availability endpoint answers.`
+} as const;
+
+export const PublicAccommodationAvailabilitySchema = {
+    properties: {
+        accommodation_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Accommodation Id'
+        },
+        available: {
+            type: 'integer',
+            title: 'Available'
+        },
+        unavailable_reason: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Unavailable Reason'
+        },
+        quote: {
+            anyOf: [
+                {
+                    '$ref': '#/components/schemas/AccommodationQuote'
+                },
+                {
+                    type: 'null'
+                }
+            ]
+        }
+    },
+    type: 'object',
+    required: ['accommodation_id', 'available'],
+    title: 'PublicAccommodationAvailability',
+    description: `What a room type costs for these dates, and whether it can be had.
+
+The quote is server-computed and comes back with the availability so the
+checkout never multiplies a nightly price by a night count, because date-range
+rules and the long-stay price make that arithmetic wrong more often than
+it is right.`
+} as const;
+
+export const PublicAccommodationPropertySchema = {
+    properties: {
+        id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Id'
+        },
+        name: {
+            type: 'string',
+            title: 'Name'
+        },
+        address: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Address'
+        },
+        description: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Description'
+        },
+        tax_percentage: {
+            anyOf: [
+                {
+                    type: 'string',
+                    pattern: '^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Tax Percentage'
+        }
+    },
+    type: 'object',
+    required: ['id', 'name'],
+    title: 'PublicAccommodationProperty',
+    description: `A property as the buyer sees it.
+
+Deliberately narrower than \`\`AccommodationPropertyPublic\`\`: the contact
+name and email belong to the operator's relationship with the owner, not
+to a checkout page. The tax percentage is exposed because it shows up as
+a line in the quote and the buyer is entitled to know why.`
 } as const;
 
 export const PublishPermissionSchema = {
@@ -19425,6 +22291,29 @@ export const PublishableKeyPublicSchema = {
     type: 'object',
     required: ['id', 'name', 'key_prefix', 'allowed_origins', 'created_at'],
     title: 'PublishableKeyPublic'
+} as const;
+
+export const QuoteNightSchema = {
+    properties: {
+        date: {
+            type: 'string',
+            format: 'date',
+            title: 'Date'
+        },
+        price: {
+            type: 'string',
+            pattern: '^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$',
+            title: 'Price'
+        },
+        rule: {
+            type: 'string',
+            title: 'Rule'
+        }
+    },
+    type: 'object',
+    required: ['date', 'price', 'rule'],
+    title: 'QuoteNight',
+    description: 'Price of a single night plus the rule that produced it.'
 } as const;
 
 export const RecurrenceRuleSchema = {
@@ -21915,7 +24804,7 @@ export const ThirdPartyAppCreateSchema = {
         allowed_api_key_scopes: {
             items: {
                 type: 'string',
-                enum: ['events:read', 'events:write', 'rsvp:write', 'venues:read', 'venues:write', 'applications:read', 'applications:write', 'attendees:read', 'attendees:write', 'humans:read', 'humans:write', 'groups:read', 'groups:write', 'products:read', 'products:write', 'coupons:read', 'coupons:write', 'forms:read', 'forms:write', 'payments:read', 'tracks:read', 'tracks:write', 'ticketing_steps:read', 'ticketing_steps:write', 'translations:read', 'translations:write']
+                enum: ['events:read', 'events:write', 'rsvp:write', 'venues:read', 'venues:write', 'applications:read', 'applications:write', 'attendees:read', 'attendees:write', 'humans:read', 'humans:write', 'groups:read', 'groups:write', 'products:read', 'products:write', 'accommodations:read', 'accommodations:write', 'coupons:read', 'coupons:write', 'forms:read', 'forms:write', 'payments:read', 'tracks:read', 'tracks:write', 'ticketing_steps:read', 'ticketing_steps:write', 'translations:read', 'translations:write']
             },
             type: 'array',
             title: 'Allowed Api Key Scopes'
@@ -22128,7 +25017,7 @@ export const ThirdPartyAppUpdateSchema = {
                 {
                     items: {
                         type: 'string',
-                        enum: ['events:read', 'events:write', 'rsvp:write', 'venues:read', 'venues:write', 'applications:read', 'applications:write', 'attendees:read', 'attendees:write', 'humans:read', 'humans:write', 'groups:read', 'groups:write', 'products:read', 'products:write', 'coupons:read', 'coupons:write', 'forms:read', 'forms:write', 'payments:read', 'tracks:read', 'tracks:write', 'ticketing_steps:read', 'ticketing_steps:write', 'translations:read', 'translations:write']
+                        enum: ['events:read', 'events:write', 'rsvp:write', 'venues:read', 'venues:write', 'applications:read', 'applications:write', 'attendees:read', 'attendees:write', 'humans:read', 'humans:write', 'groups:read', 'groups:write', 'products:read', 'products:write', 'accommodations:read', 'accommodations:write', 'coupons:read', 'coupons:write', 'forms:read', 'forms:write', 'payments:read', 'tracks:read', 'tracks:write', 'ticketing_steps:read', 'ticketing_steps:write', 'translations:read', 'translations:write']
                     },
                     type: 'array'
                 },

@@ -1,5 +1,6 @@
 import type { ComponentType } from "react"
 import type { ProductsPass } from "@/types/Products"
+import VariantAccommodationBooking from "../variants/VariantAccommodationBooking"
 import VariantFaqs from "../variants/VariantFaqs"
 import VariantHero from "../variants/VariantHero"
 import VariantHousingDate from "../variants/VariantHousingDate"
@@ -28,6 +29,7 @@ export const VARIANT_REGISTRY: Record<string, ComponentType<VariantProps>> = {
   "ticket-card": VariantTicketCard,
   "patron-preset": VariantPatronPreset,
   "housing-date": VariantHousingDate,
+  "accommodation-booking": VariantAccommodationBooking,
   "merch-image": VariantMerchImage,
   "meal-plan-select": VariantMealPlanSelect,
   "youtube-video": VariantYouTubeVideo,
@@ -37,7 +39,17 @@ export const VARIANT_REGISTRY: Record<string, ComponentType<VariantProps>> = {
   hero: VariantHero,
 }
 
+/**
+ * Templates that render without a product list.
+ *
+ * `accommodation-booking` is here for a different reason than the rest: it is
+ * not content, it sells something, but its inventory lives outside
+ * `products` (the shadow products are hidden from the portal on purpose), so
+ * the "no products, no step" guard would otherwise hide a step that has
+ * plenty to show.
+ */
 export const CONTENT_ONLY_TEMPLATES = new Set([
+  "accommodation-booking",
   "youtube-video",
   "image-gallery",
   "faqs",

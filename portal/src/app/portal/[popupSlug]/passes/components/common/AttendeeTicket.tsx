@@ -25,8 +25,10 @@ import type { AttendeePassState, TicketEntry } from "@/types/Attendee"
 import type { ProductsPass } from "@/types/Products"
 import { badgeName } from "../../constants/multiuse"
 import useModal from "../../hooks/useModal"
+import { isAccommodationEntry } from "../../utils/accommodationBooking"
 import { compareByCategory, getCategoryIcon } from "../../utils/categoryDisplay"
 import { AttendeeModal } from "../AttendeeModal"
+import { AccommodationBookingRow } from "./AccommodationBookingRow"
 import OptionsMenu from "./Buttons/OptionsMenu"
 import { MealPlanEditModal } from "./MealPlanEditModal"
 import Product from "./Products/ProductTicket"
@@ -307,6 +309,21 @@ const AttendeeTicket = ({
                 {ticketEntries.map((entry, idx) => {
                   const CategoryIcon = getCategoryIcon(entry.product_category)
                   const isScanned = entry.last_scan_at != null
+                  // A booked room is a stay, not a ticket: it needs its dates
+                  // and its guest list, and it has no gate to be scanned at.
+                  if (isAccommodationEntry(entry)) {
+                    return (
+                      <div
+                        key={entry.id}
+                        className={cn(
+                          idx !== ticketEntries.length - 1 &&
+                            "border-b border-dotted border-border",
+                        )}
+                      >
+                        <AccommodationBookingRow entry={entry} />
+                      </div>
+                    )
+                  }
                   return (
                     <div
                       key={entry.id}

@@ -46,6 +46,9 @@ interface OpenCheckoutRuntimeProps {
   /** Renders for the backoffice live preview instead of a real buyer: no
    *  payment, no analytics, no attribution, no favicon takeover. */
   previewMode?: boolean
+  /** Only set by the backoffice preview; unlocks draft popups on the
+   *  read-only public endpoints the steps call for themselves. */
+  previewToken?: string | null
 }
 
 function toProductsPass(product: CheckoutRuntimeProduct): ProductsPass {
@@ -143,6 +146,7 @@ export function OpenCheckoutRuntime({
   popupSlug,
   prefilledBuyer,
   previewMode = false,
+  previewToken = null,
 }: OpenCheckoutRuntimeProps) {
   const { t } = useTranslation()
   const searchParams = useSearchParams()
@@ -282,6 +286,7 @@ export function OpenCheckoutRuntime({
                   submitMode="open-ticketing"
                   submitPopupSlug={popupSlug}
                   previewMode={previewMode}
+                  previewToken={previewToken}
                 >
                   {/* The preview lives in an iframe inside the backoffice —
                       swapping the tab's favicon there would be the

@@ -141,6 +141,7 @@ export default function CheckoutPreviewClient({
         runtime={patched}
         popupSlug={popupSlug}
         previewMode
+        previewToken={state?.previewToken}
       />
     </CheckoutShell>
   )
