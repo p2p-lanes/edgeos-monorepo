@@ -982,13 +982,12 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
         # (T-gr-032: referral attribution wiring, groups-rework Decision 1f).
         # Its current_uses is incremented further down, on commit.
 
-        # Auto-accept only when the group explicitly enables it via the
-        # auto_approve_applications flag, or when the referral/invite enables it.
+        # Auto-accept referrals, and groups/invites only when their policy enables it.
         # Previously this triggered for any application with a group_id (implicit);
         # now the flag must be True. Design Decision 1f: NO retroactive changes.
         should_auto_accept = bool(
             (_group and _group.auto_approve_applications)
-            or (_referral and _referral.auto_approve)
+            or _referral
             or (_invite and _invite.auto_approve)
         )
         if should_auto_accept:
@@ -1048,15 +1047,6 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
             category_id=main_cat.id if main_cat else None,
         )
 
-        # A referral whose auto-approval was revoked must remain in review.
-        # Falling through to the popup's AUTO_ACCEPT strategy would grant the
-        # referred attendee purchase access despite the link policy.
-        if (
-            _referral is not None
-            and application.status == ApplicationStatus.IN_REVIEW.value
-        ):
-            self.create_snapshot(session, application, "submitted")
-
         # Apply the popup approval strategy for other non-group applications
         # still in review.
         if (
@@ -1071,14 +1061,20 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
             else:
                 self._apply_approval_strategy(session, application, human)
 
-        # Create snapshot for group auto-accept/reject
+        # Create a snapshot matching the group's explicit approval policy.
         if data.get("group_id"):
-            event = (
-                "auto_rejected"
-                if application.status == ApplicationStatus.REJECTED.value
-                else "auto_accepted"
-            )
-            self.create_snapshot(session, application, event)
+            if _group and _group.auto_approve_applications:
+                event = (
+                    "auto_rejected"
+                    if application.status == ApplicationStatus.REJECTED.value
+                    else "auto_accepted"
+                )
+            elif application.status == ApplicationStatus.IN_REVIEW.value:
+                event = "submitted"
+            else:
+                event = None
+            if event:
+                self.create_snapshot(session, application, event)
 
         # Create snapshot for invite auto-accept/reject (mirrors group snapshot).
         # No group membership is added — invite flow is purchase-only.

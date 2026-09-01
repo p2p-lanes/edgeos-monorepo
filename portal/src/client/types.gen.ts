@@ -149,6 +149,17 @@ export type ApplicantParticipation = {
 };
 
 /**
+ * Resolved source through which an application was accessed.
+ */
+export type ApplicationAccessSource = {
+    kind: 'group' | 'invite' | 'referral';
+    id: string;
+    label: string;
+};
+
+export type kind = 'group' | 'invite' | 'referral';
+
+/**
  * Application schema for admin creation.
  *
  * Admins can create applications on behalf of users and set any status.
@@ -272,6 +283,7 @@ export type ApplicationPublic = {
     invite_id?: (string | null);
     referral_id?: (string | null);
     referred_by_name?: (string | null);
+    access_sources?: Array<ApplicationAccessSource>;
     info_not_shared?: Array<(string)>;
     status: string;
     custom_fields?: {

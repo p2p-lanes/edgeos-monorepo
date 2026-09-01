@@ -5,9 +5,11 @@ import {
   useSuspenseQuery,
 } from "@tanstack/react-query"
 import { createFileRoute, useNavigate } from "@tanstack/react-router"
-import { Ban, Calendar, Hash, Percent, ShieldCheck } from "lucide-react"
+import { Ban, Calendar, Hash, Percent } from "lucide-react"
 import { Suspense } from "react"
 import { InvitesService, type InviteUpdate } from "@/client"
+import { SourceApplicationsSection } from "@/components/applications/SourceApplicationsSection"
+import { DangerZone } from "@/components/Common/DangerZone"
 import { FormPageLayout } from "@/components/Common/FormPageLayout"
 import { QueryErrorBoundary } from "@/components/Common/QueryErrorBoundary"
 import { Button } from "@/components/ui/button"
@@ -78,12 +80,21 @@ function EditReferralContent({ referralId }: { referralId: string }) {
     onError: createErrorHandler(showErrorToast),
   })
 
+  const deleteMutation = useMutation({
+    mutationFn: () => InvitesService.deleteInvite({ inviteId: referral.id }),
+    onSuccess: () => {
+      showSuccessToast("Referral deleted successfully")
+      queryClient.invalidateQueries({ queryKey: ["referrals"] })
+      navigate({ to: "/referrals" })
+    },
+    onError: createErrorHandler(showErrorToast),
+  })
+
   const form = useForm({
     defaultValues: {
       discount_percentage: referral.discount_percentage?.toString() ?? "0",
       max_uses: referral.max_uses?.toString() ?? "",
       expires_at: formatDateForInput(referral.expires_at),
-      auto_approve: referral.auto_approve ?? false,
       is_disabled: referral.is_disabled ?? false,
     },
     onSubmit: ({ value }) => {
@@ -92,14 +103,13 @@ function EditReferralContent({ referralId }: { referralId: string }) {
         discount_percentage: Number(value.discount_percentage) || 0,
         max_uses: value.max_uses ? Number(value.max_uses) : null,
         expires_at: toUTCDate(value.expires_at),
-        auto_approve: value.auto_approve,
         is_disabled: value.is_disabled,
       })
     },
   })
 
   const blocker = useUnsavedChanges(form)
-  const isPending = updateMutation.isPending
+  const isPending = updateMutation.isPending || deleteMutation.isPending
 
   return (
     <div className="space-y-6">
@@ -193,29 +203,12 @@ function EditReferralContent({ referralId }: { referralId: string }) {
             )}
           </form.Field>
 
-          <form.Field name="auto_approve">
-            {(field) => (
-              <InlineRow
-                icon={<ShieldCheck className="h-4 w-4 text-muted-foreground" />}
-                label="Auto Approve"
-                description="Automatically approve applications submitted via this referral"
-              >
-                <Switch
-                  id="referral_auto_approve"
-                  checked={field.state.value}
-                  onCheckedChange={(checked) => field.handleChange(checked)}
-                  disabled={readOnly}
-                />
-              </InlineRow>
-            )}
-          </form.Field>
-
           <form.Field name="is_disabled">
             {(field) => (
               <InlineRow
                 icon={<Ban className="h-4 w-4 text-muted-foreground" />}
                 label="Disabled"
-                description="A disabled referral link stops granting access and discounts immediately"
+                description="Prevent new applications without affecting people who already used this referral"
               >
                 <Switch
                   id="referral_is_disabled"
@@ -246,6 +239,23 @@ function EditReferralContent({ referralId }: { referralId: string }) {
           )}
         </div>
       </form>
+      <SourceApplicationsSection
+        popupId={referral.popup_id}
+        source="referral"
+        sourceId={referral.id}
+      />
+      {!readOnly && referral.current_uses === 0 && (
+        <div className="mx-auto max-w-2xl">
+          <DangerZone
+            description="Delete this unused referral permanently."
+            onDelete={() => deleteMutation.mutate()}
+            isDeleting={deleteMutation.isPending}
+            confirmText="Delete Referral"
+            resourceName={referral.token}
+            variant="inline"
+          />
+        </div>
+      )}
       <UnsavedChangesDialog blocker={blocker} />
     </div>
   )
@@ -257,7 +267,7 @@ function EditReferralPage() {
   return (
     <FormPageLayout
       title="Edit Referral"
-      description="Update discount and approval settings for this referral code"
+      description="Update discount and availability settings for this referral code"
       backTo="/referrals"
     >
       <QueryErrorBoundary>

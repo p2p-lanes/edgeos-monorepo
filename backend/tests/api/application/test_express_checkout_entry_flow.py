@@ -156,7 +156,7 @@ def _make_referral(db: Session, popup: Popups, referrer: Humans) -> Invites:
         popup_id=popup.id,
         referrer_human_id=referrer.id,
         token=f"ref-{uuid.uuid4().hex[:12]}",
-        auto_approve=False,
+        auto_approve=True,
         express_checkout=True,
         discount_percentage=Decimal("0"),
     )

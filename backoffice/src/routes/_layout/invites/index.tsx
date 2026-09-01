@@ -11,6 +11,7 @@ import { EmptyState } from "@/components/Common/EmptyState"
 import { QueryErrorBoundary } from "@/components/Common/QueryErrorBoundary"
 import { WorkspaceAlert } from "@/components/Common/WorkspaceAlert"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
+import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
 import { useWorkspace } from "@/contexts/WorkspaceContext"
@@ -22,7 +23,7 @@ import {
 } from "@/hooks/useTableSearchParams"
 import { getInvitePortalUrl, getPortalBaseUrl } from "@/lib/portal-urls"
 
-function getInvitesQueryOptions(
+export function getInvitesQueryOptions(
   popupId: string | null,
   page: number,
   pageSize: number,
@@ -31,6 +32,7 @@ function getInvitesQueryOptions(
     queryFn: () =>
       InvitesService.listInvites({
         popupId: popupId ?? undefined,
+        issuer: "admin",
         skip: page * pageSize,
         limit: pageSize,
       }),
@@ -78,7 +80,12 @@ const columns: ColumnDef<InvitePublic>[] = [
     accessorKey: "token",
     header: ({ column }) => <SortableHeader label="Token" column={column} />,
     cell: ({ row }) => (
-      <span className="font-mono text-sm">{row.original.token}</span>
+      <span className="inline-flex items-center gap-2">
+        <span className="font-mono text-sm">{row.original.token}</span>
+        {row.original.is_disabled && (
+          <Badge variant="destructive">Disabled</Badge>
+        )}
+      </span>
     ),
   },
   {
