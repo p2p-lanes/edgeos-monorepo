@@ -943,6 +943,30 @@ class TestAdminParticipantCrud:
         assert row is not None
         assert row.status == ParticipantStatus.REGISTERED
 
+    def test_admin_get_exposes_participant_popup_scope(
+        self,
+        client: TestClient,
+        db: Session,
+        tenant_a: Tenants,
+        admin_token_tenant_a: str,
+    ) -> None:
+        popup = _make_popup(db, tenant_a)
+        event = _make_event(db, tenant_a, popup)
+        created = client.post(
+            "/api/v1/event-participants",
+            headers=_admin_headers(admin_token_tenant_a),
+            json={"event_id": str(event.id), "profile_id": str(uuid.uuid4())},
+        )
+        assert created.status_code == 201, created.text
+
+        response = client.get(
+            f"/api/v1/event-participants/{created.json()['id']}",
+            headers=_admin_headers(admin_token_tenant_a),
+        )
+
+        assert response.status_code == 200, response.text
+        assert response.json()["popup_id"] == str(popup.id)
+
     def test_admin_add_on_existing_active_row_conflicts(
         self,
         client: TestClient,

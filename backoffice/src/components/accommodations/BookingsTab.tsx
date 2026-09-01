@@ -24,13 +24,13 @@ import {
 import { Skeleton } from "@/components/ui/skeleton"
 import useCustomToast from "@/hooks/useCustomToast"
 import { cn } from "@/lib/utils"
-import { bookingAppearance } from "./bookingAppearance"
 import {
   type BookingDetail,
   BookingDetailDialog,
   detailFromRow,
 } from "./BookingDetailDialog"
 import { NewBookingDialog } from "./BookingDialog"
+import { bookingAppearance } from "./bookingAppearance"
 import { addDays, monthWindow, todayKey } from "./calendarLayout"
 import { downloadBookingsCsv } from "./exportBookings"
 

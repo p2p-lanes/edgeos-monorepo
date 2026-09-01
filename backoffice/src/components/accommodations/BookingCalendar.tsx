@@ -28,17 +28,17 @@ import { Skeleton } from "@/components/ui/skeleton"
 import useCustomToast from "@/hooks/useCustomToast"
 import { cn } from "@/lib/utils"
 import {
-  BOOKING_APPEARANCE,
-  bookingAppearance,
-  bookingBarLabel,
-  HOLD_HATCH,
-} from "./bookingAppearance"
-import {
   type BookingDetail,
   BookingDetailDialog,
   detailFromCalendar,
 } from "./BookingDetailDialog"
 import { BlockDatesDialog, NewBookingDialog } from "./BookingDialog"
+import {
+  BOOKING_APPEARANCE,
+  bookingAppearance,
+  bookingBarLabel,
+  HOLD_HATCH,
+} from "./bookingAppearance"
 import {
   DAY_WIDTH,
   dayNumber,

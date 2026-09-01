@@ -1565,6 +1565,13 @@ async def list_attendees_directory(
     "/my/directory/{popup_id}/csv",
     summary="Export the attendees directory for a popup as CSV",
     dependencies=[needs("portal:directory:read")],
+    response_class=Response,
+    responses={
+        status.HTTP_200_OK: {
+            "description": "Attendees directory CSV",
+            "content": {"text/csv": {"schema": {"type": "string"}}},
+        }
+    },
 )
 async def export_attendees_directory_csv(
     popup_id: uuid.UUID,

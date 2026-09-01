@@ -84,5 +84,35 @@ jobs:
       - name: Typecheck (backoffice)
         run: pnpm --filter backoffice exec tsc -p tsconfig.build.json --noEmit
 
+      - name: AI unit tests (backoffice)
+        run: pnpm --filter backoffice test:ai
+
       - name: Typecheck (portal)
         run: pnpm --filter portal exec tsc --noEmit
+
+  ai-service:
+    name: AI service (lint + typecheck + tests + build)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Check AI service
+        run: pnpm check:ai
+
+      - name: Build AI service
+        run: pnpm --filter ai-service build

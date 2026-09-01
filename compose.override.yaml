@@ -72,6 +72,27 @@ services:
       - ADMINER_DEFAULT_SERVER=db
       - ADMINER_DESIGN=pepa-linha-dark
 
+  ai-service:
+    pull_policy: build
+    restart: "no"
+    ports:
+      - "3002:3002"
+    build:
+      context: .
+      dockerfile: ai-service/Dockerfile
+      target: build
+    command: pnpm --dir ai-service dev
+    develop:
+      watch:
+        - path: ./ai-service/src
+          action: sync
+          target: /app/ai-service/src
+        - path: ./ai-service/skills
+          action: sync
+          target: /app/ai-service/skills
+        - path: ./ai-service/package.json
+          action: rebuild
+
   backoffice:
     pull_policy: build
     restart: "no"

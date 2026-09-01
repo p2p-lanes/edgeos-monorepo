@@ -6,12 +6,13 @@
  * month drawn from the wrong edge, or two guests whose turnover day overlaps
  * so the room looks double-booked when it is not.
  */
-import type { CalendarBooking } from "@/client"
+
 import { describe, expect, it } from "vitest"
+import type { CalendarBooking } from "@/client"
 import {
   addDays,
-  dayOffset,
   DAY_WIDTH,
+  dayOffset,
   eachDay,
   isWeekend,
   layoutBooking,

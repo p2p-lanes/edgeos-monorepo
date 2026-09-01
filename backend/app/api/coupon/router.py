@@ -1,6 +1,7 @@
 import uuid
+from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, Header, HTTPException, status
 
 from app.api.coupon import crud
 from app.api.coupon.schemas import (
@@ -124,6 +125,9 @@ async def create_coupon(
     coupon_in: CouponCreate,
     db: AdminOrApiKeySession_CouponsWrite,
     current_user: AdminOrApiKey_CouponsWrite,
+    x_ai_tool_call_id: Annotated[
+        str | None, Header(alias="X-EdgeOS-AI-Tool-Call-Id")
+    ] = None,
 ) -> CouponPublic:
     """Create a new coupon (BO only)."""
 
@@ -157,6 +161,34 @@ async def create_coupon(
     coupon = Coupons(**coupon_data)
 
     db.add(coupon)
+
+    # Stage the audit row in the same transaction as the coupon. The optional
+    # tool-call id is supplied by the internal AI service; regular backoffice
+    # creates are audited too, without AI metadata.
+    from app.api.audit_log.actor import actor_from_user
+    from app.api.audit_log.constants import AuditAction, AuditEntityType
+    from app.api.audit_log.crud import audit_logs_crud
+
+    audit_logs_crud.record(
+        db,
+        tenant_id=tenant_id,
+        actor=actor_from_user(current_user),
+        action=AuditAction.COUPON_CREATED,
+        entity_type=AuditEntityType.COUPON,
+        entity_id=coupon.id,
+        entity_label=coupon.code,
+        popup_id=coupon.popup_id,
+        details={
+            "via_ai": x_ai_tool_call_id is not None,
+            "ai_tool_call_id": x_ai_tool_call_id,
+            "snapshot": {
+                "code": coupon.code,
+                "discount_value": coupon.discount_value,
+                "max_uses": coupon.max_uses,
+                "is_active": coupon.is_active,
+            },
+        },
+    )
     db.commit()
     db.refresh(coupon)
 
@@ -168,7 +200,10 @@ async def update_coupon(
     coupon_id: uuid.UUID,
     coupon_in: CouponUpdate,
     db: AdminOrApiKeySession_CouponsWrite,
-    _current_user: AdminOrApiKey_CouponsWrite,
+    current_user: AdminOrApiKey_CouponsWrite,
+    x_ai_tool_call_id: Annotated[
+        str | None, Header(alias="X-EdgeOS-AI-Tool-Call-Id")
+    ] = None,
 ) -> CouponPublic:
     """Update a coupon (BO only)."""
 
@@ -189,8 +224,39 @@ async def update_coupon(
                 detail="A coupon with this code already exists in this popup",
             )
 
-    updated = crud.coupons_crud.update(db, coupon, coupon_in)
-    return CouponPublic.model_validate(updated)
+    before = CouponPublic.model_validate(coupon).model_dump(mode="json")
+    update_data = coupon_in.model_dump(exclude_unset=True)
+    for field, value in update_data.items():
+        setattr(coupon, field, value)
+    db.add(coupon)
+
+    from app.api.audit_log.actor import actor_from_user
+    from app.api.audit_log.constants import AuditAction, AuditEntityType
+    from app.api.audit_log.crud import audit_logs_crud
+
+    after = CouponPublic.model_validate(coupon).model_dump(mode="json")
+    changed_fields = {
+        field: {"from": before[field], "to": after[field]} for field in update_data
+    }
+    audit_logs_crud.record(
+        db,
+        tenant_id=coupon.tenant_id,
+        actor=actor_from_user(current_user),
+        action=AuditAction.COUPON_UPDATED,
+        entity_type=AuditEntityType.COUPON,
+        entity_id=coupon.id,
+        entity_label=coupon.code,
+        popup_id=coupon.popup_id,
+        details={
+            "via_ai": x_ai_tool_call_id is not None,
+            "ai_tool_call_id": x_ai_tool_call_id,
+            "changes": changed_fields,
+            "snapshot": after,
+        },
+    )
+    db.commit()
+    db.refresh(coupon)
+    return CouponPublic.model_validate(coupon)
 
 
 @router.delete("/{coupon_id}", status_code=status.HTTP_204_NO_CONTENT)

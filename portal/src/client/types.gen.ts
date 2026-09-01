@@ -459,6 +459,52 @@ export type AdminGrantTicketsResponse = {
     granted: Array<GrantedPaymentInfo>;
 };
 
+export type AIConversationPublic = {
+    id: string;
+    title: string;
+    messages: Array<{
+        [key: string]: unknown;
+    }>;
+    schema_version: number;
+    revision: number;
+    created_at: string;
+    updated_at: string;
+    expires_at: string;
+    usage?: AIConversationUsageSummary;
+};
+
+export type AIConversationUpsert = {
+    messages: Array<{
+        [key: string]: unknown;
+    }>;
+};
+
+export type AIConversationUsageSummary = {
+    input_tokens?: number;
+    cached_input_tokens?: number;
+    output_tokens?: number;
+    reasoning_tokens?: number;
+    models?: Array<(string)>;
+    providers?: Array<(string)>;
+    response_count?: number;
+};
+
+export type AIExecutionClaimRequest = {
+    fingerprint: string;
+};
+
+export type AIExecutionClaimResponse = {
+    state: 'acquired' | 'pending' | 'completed';
+    result?: unknown;
+};
+
+export type state = 'acquired' | 'pending' | 'completed';
+
+export type AIExecutionCompleteRequest = {
+    fingerprint: string;
+    result: unknown;
+};
+
 export type AITranslateRequest = {
     entity_type: string;
     entity_id: string;
@@ -1849,6 +1895,15 @@ export type CumulativeTrends = {
     revenue?: Array<RevenueTimelinePoint>;
 };
 
+export type CustomExportSpec = {
+    dataset: string;
+    popup_id?: (string | null);
+    columns: Array<ExportColumn>;
+    filters?: Array<ExportFilter>;
+    format?: ExportFormat;
+    filename?: (string | null);
+};
+
 /**
  * Complete dashboard statistics.
  */
@@ -2161,6 +2216,7 @@ export type EventParticipantPublic = {
     created_at?: string;
     updated_at?: string;
     id: string;
+    popup_id?: (string | null);
     first_name?: (string | null);
     last_name?: (string | null);
 };
@@ -2465,6 +2521,77 @@ export type EventVenueUpdate = {
 };
 
 export type EventVisibility = 'public' | 'private' | 'unlisted';
+
+export type ExportCatalogPublic = {
+    datasets: Array<ExportDatasetPublic>;
+    formats: Array<ExportFormat>;
+    limits: {
+        [key: string]: (number);
+    };
+};
+
+export type ExportColumn = {
+    field: string;
+    label?: (string | null);
+};
+
+export type ExportDatasetPublic = {
+    dataset: string;
+    label: string;
+    description: string;
+    scope: 'organization' | 'gathering';
+    row_label: string;
+    fields: Array<ExportFieldPublic>;
+};
+
+export type scope = 'organization' | 'gathering';
+
+export type ExportDownloadRequest = {
+    spec: CustomExportSpec;
+    fingerprint: string;
+};
+
+export type ExportFieldPublic = {
+    field: string;
+    label: string;
+    type: string;
+    sensitivity: string;
+    filter_operators: Array<(string)>;
+};
+
+export type ExportFilter = {
+    field: string;
+    operator: 'eq' | 'neq' | 'contains' | 'not_contains' | 'in' | 'is_empty' | 'not_empty' | 'gt' | 'gte' | 'lt' | 'lte' | 'before' | 'after';
+    value?: unknown;
+};
+
+export type operator = 'eq' | 'neq' | 'contains' | 'not_contains' | 'in' | 'is_empty' | 'not_empty' | 'gt' | 'gte' | 'lt' | 'lte' | 'before' | 'after';
+
+export type ExportFormat = 'csv' | 'xlsx';
+
+export type ExportPreview = {
+    title: string;
+    dataset: string;
+    dataset_label: string;
+    scope: 'organization' | 'gathering';
+    row_label: string;
+    estimated_rows: number;
+    columns: Array<ExportPreviewColumn>;
+    filters: Array<ExportFilter>;
+    warnings: Array<(string)>;
+    format: ExportFormat;
+    filename: string;
+    spec: CustomExportSpec;
+    fingerprint: string;
+    generated_at: string;
+};
+
+export type ExportPreviewColumn = {
+    field: string;
+    label: string;
+    type: string;
+    sensitivity: string;
+};
 
 export type FormFieldCreate = {
     popup_id: string;
@@ -5759,6 +5886,50 @@ export type AdminApiKeysRevokeAdminApiKeyData = {
 
 export type AdminApiKeysRevokeAdminApiKeyResponse = (void);
 
+export type AiConversationsListAiConversationsData = {
+    xTenantId?: (string | null);
+};
+
+export type AiConversationsListAiConversationsResponse = (Array<AIConversationPublic>);
+
+export type AiConversationsGetAiConversationData = {
+    conversationId: string;
+    xTenantId?: (string | null);
+};
+
+export type AiConversationsGetAiConversationResponse = (AIConversationPublic);
+
+export type AiConversationsUpsertAiConversationData = {
+    conversationId: string;
+    requestBody: AIConversationUpsert;
+    xTenantId?: (string | null);
+};
+
+export type AiConversationsUpsertAiConversationResponse = (AIConversationPublic);
+
+export type AiConversationsDeleteAiConversationData = {
+    conversationId: string;
+    xTenantId?: (string | null);
+};
+
+export type AiConversationsDeleteAiConversationResponse = (void);
+
+export type AiExecutionsClaimAiExecutionData = {
+    requestBody: AIExecutionClaimRequest;
+    toolCallId: string;
+    xTenantId?: (string | null);
+};
+
+export type AiExecutionsClaimAiExecutionResponse = (AIExecutionClaimResponse);
+
+export type AiExecutionsCompleteAiExecutionData = {
+    requestBody: AIExecutionCompleteRequest;
+    toolCallId: string;
+    xTenantId?: (string | null);
+};
+
+export type AiExecutionsCompleteAiExecutionResponse = (void);
+
 export type ApiKeysListApiKeysResponse = (Array<ApiKeyPublic>);
 
 export type ApiKeysCreateApiKeyData = {
@@ -5998,7 +6169,7 @@ export type ApplicationsExportAttendeesDirectoryCsvData = {
     q?: (string | null);
 };
 
-export type ApplicationsExportAttendeesDirectoryCsvResponse = (unknown);
+export type ApplicationsExportAttendeesDirectoryCsvResponse = (string);
 
 export type ApplicationsAddMyAttendeeData = {
     popupId: string;
@@ -6112,6 +6283,13 @@ export type AttendeeCategoriesCreateAttendeeCategoryData = {
 
 export type AttendeeCategoriesCreateAttendeeCategoryResponse = (AttendeeCategoryPublic);
 
+export type AttendeeCategoriesGetAttendeeCategoryData = {
+    categoryId: string;
+    xTenantId?: (string | null);
+};
+
+export type AttendeeCategoriesGetAttendeeCategoryResponse = (AttendeeCategoryPublic);
+
 export type AttendeeCategoriesUpdateAttendeeCategoryData = {
     categoryId: string;
     requestBody: AttendeeCategoryUpdate;
@@ -6194,6 +6372,17 @@ export type AttendeesListAttendeesData = {
 };
 
 export type AttendeesListAttendeesResponse = (ListModel_AttendeeListItem_);
+
+export type AttendeesExportAttendeesCsvData = {
+    categoryId?: (string | null);
+    filters?: (string | null);
+    hasTickets?: (boolean | null);
+    popupId: string;
+    search?: (string | null);
+    xTenantId?: (string | null);
+};
+
+export type AttendeesExportAttendeesCsvResponse = (string);
 
 export type AttendeesGetAttendeeData = {
     attendeeId: string;
@@ -6531,6 +6720,7 @@ export type CouponsListCouponsResponse = (ListModel_CouponPublic_);
 
 export type CouponsCreateCouponData = {
     requestBody: CouponCreate;
+    xEdgeOsAiToolCallId?: (string | null);
     xTenantId?: (string | null);
 };
 
@@ -6546,6 +6736,7 @@ export type CouponsGetCouponResponse = (CouponPublic);
 export type CouponsUpdateCouponData = {
     couponId: string;
     requestBody: CouponUpdate;
+    xEdgeOsAiToolCallId?: (string | null);
     xTenantId?: (string | null);
 };
 
@@ -6563,6 +6754,22 @@ export type CouponsValidateCouponData = {
 };
 
 export type CouponsValidateCouponResponse = (CouponPublic);
+
+export type CustomExportsGetExportCatalogResponse = (ExportCatalogPublic);
+
+export type CustomExportsPreviewCustomExportData = {
+    requestBody: CustomExportSpec;
+    xTenantId?: (string | null);
+};
+
+export type CustomExportsPreviewCustomExportResponse = (ExportPreview);
+
+export type CustomExportsDownloadCustomExportData = {
+    requestBody: ExportDownloadRequest;
+    xTenantId?: (string | null);
+};
+
+export type CustomExportsDownloadCustomExportResponse = (string);
 
 export type DashboardGetDashboardStatsData = {
     /**
@@ -6694,6 +6901,13 @@ export type EventParticipantsAdminAddParticipantData = {
 
 export type EventParticipantsAdminAddParticipantResponse = (EventParticipantPublic);
 
+export type EventParticipantsGetParticipantData = {
+    participantId: string;
+    xTenantId?: (string | null);
+};
+
+export type EventParticipantsGetParticipantResponse = (EventParticipantPublic);
+
 export type EventParticipantsUpdateParticipantData = {
     participantId: string;
     requestBody: EventParticipantUpdate;
@@ -6781,7 +6995,7 @@ export type EventsPublicCalendarIcsData = {
     popupId: string;
 };
 
-export type EventsPublicCalendarIcsResponse = (unknown);
+export type EventsPublicCalendarIcsResponse = (string);
 
 export type EventsListEventsData = {
     eventStatus?: (EventStatus | null);
@@ -6982,7 +7196,7 @@ export type EventsExportEventIcsData = {
     xTenantId?: (string | null);
 };
 
-export type EventsExportEventIcsResponse = (unknown);
+export type EventsExportEventIcsResponse = (string);
 
 export type EventsListPortalEventsData = {
     eventStatus?: (EventStatus | null);
@@ -7097,7 +7311,7 @@ export type EventsExportPortalEventIcsData = {
     eventId: string;
 };
 
-export type EventsExportPortalEventIcsResponse = (unknown);
+export type EventsExportPortalEventIcsResponse = (string);
 
 export type EventSettingsGetEventSettingsData = {
     popupId: string;
@@ -7875,7 +8089,7 @@ export type PaymentsGetPaymentInvoiceData = {
     xTenantId?: (string | null);
 };
 
-export type PaymentsGetPaymentInvoiceResponse = (unknown);
+export type PaymentsGetPaymentInvoiceResponse = ((Blob | File));
 
 export type PaymentsCreateMyApplicationFeeData = {
     requestBody: ApplicationFeeCreate;
@@ -7933,7 +8147,7 @@ export type PaymentsGetMyInvoiceData = {
     paymentId: string;
 };
 
-export type PaymentsGetMyInvoiceResponse = (unknown);
+export type PaymentsGetMyInvoiceResponse = ((Blob | File));
 
 export type PaymentsPreviewMyPaymentData = {
     requestBody: PaymentCreate;

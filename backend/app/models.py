@@ -20,6 +20,8 @@ from app.api.accommodation.schemas import (
     AccommodationQuote,
     AccommodationUpdate,
 )
+from app.api.ai_conversation.models import AIConversations, AIConversationUsage
+from app.api.ai_execution.models import AIExecutions
 from app.api.api_key.models import ApiKeys
 from app.api.api_key.schemas import ApiKeyCreate, ApiKeyCreated, ApiKeyPublic
 
@@ -205,6 +207,10 @@ __all__ = [
     "AttendeeCategoryCreate",
     "AttendeeCategoryPublic",
     "AttendeeCategoryUpdate",
+    # AI conversations
+    "AIConversations",
+    "AIConversationUsage",
+    "AIExecutions",
     # API keys
     "ApiKeys",
     "ApiKeyCreate",

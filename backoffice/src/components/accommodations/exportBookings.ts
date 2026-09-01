@@ -6,7 +6,7 @@
  * only turns the response into a saved file.
  */
 
-import { type BookingStatus, AccommodationsService } from "@/client"
+import { AccommodationsService, type BookingStatus } from "@/client"
 
 export interface BookingFilters {
   popupId: string

@@ -40,16 +40,21 @@ def _participants_with_names(db, participants: list) -> list[EventParticipantPub
     """
     from sqlmodel import select
 
+    from app.api.event.models import Events
     from app.api.human.models import Humans
 
     if not participants:
         return []
     profile_ids = {p.profile_id for p in participants}
+    event_ids = {p.event_id for p in participants}
     rows = db.exec(select(Humans).where(Humans.id.in_(profile_ids))).all()
+    events = db.exec(select(Events).where(Events.id.in_(event_ids))).all()
     names = {h.id: (h.first_name, h.last_name) for h in rows}
+    popup_ids = {event.id: event.popup_id for event in events}
     out: list[EventParticipantPublic] = []
     for p in participants:
         public = EventParticipantPublic.model_validate(p)
+        public.popup_id = popup_ids.get(p.event_id)
         first, last = names.get(p.profile_id, (None, None))
         public.first_name = first
         public.last_name = last
@@ -87,6 +92,22 @@ async def list_participants(
         results=_participants_with_names(db, participants),
         paging=Paging(offset=skip, limit=limit, total=total),
     )
+
+
+@router.get("/{participant_id}", response_model=EventParticipantPublic)
+async def get_participant(
+    participant_id: uuid.UUID,
+    db: AdminOrApiKeySession_EventsRead,
+    _: AdminOrApiKey_EventsRead,
+) -> EventParticipantPublic:
+    """Get one event participant with its resolved gathering."""
+    participant = crud.event_participants_crud.get(db, participant_id)
+    if not participant:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Participant not found",
+        )
+    return _participants_with_names(db, [participant])[0]
 
 
 @router.post(

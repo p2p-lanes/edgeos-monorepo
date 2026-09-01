@@ -30,13 +30,13 @@ import { supportsQuantitySelector } from "@/components/ui/QuantitySelector"
 import type { StepProductResolution } from "@/hooks/checkout"
 import {
   type CartSelectionState,
+  useAccommodationSelection,
   useCartPersistence,
   useCartSummary,
   useCheckoutSteps,
   useCreditCalculation,
   useHousingSelection,
   useInsuranceCalculation,
-  useAccommodationSelection,
   useMealPlanSelection,
   useMerchSelection,
   usePatronSelection,

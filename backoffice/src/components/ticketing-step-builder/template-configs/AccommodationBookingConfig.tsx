@@ -181,7 +181,9 @@ export function AccommodationBookingConfig({
                     onClick={() => update({ layout: option.value })}
                     className={cn(
                       "flex flex-col items-start gap-0.5 rounded-lg border-2 p-3 text-left transition-all hover:bg-accent/50",
-                      isActive ? "border-primary bg-primary/5" : "border-border",
+                      isActive
+                        ? "border-primary bg-primary/5"
+                        : "border-border",
                     )}
                   >
                     <span

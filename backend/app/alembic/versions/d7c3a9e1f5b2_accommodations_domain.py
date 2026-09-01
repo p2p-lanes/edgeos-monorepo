@@ -41,7 +41,7 @@ from app.alembic.utils import (
 )
 
 revision: str = "d7c3a9e1f5b2"
-down_revision: str | Sequence[str] | None = "c4d8e6f1a2b3"
+down_revision: str | Sequence[str] | None = "f3a1b7c9d2e4"
 branch_labels: Sequence[str] | None = None
 depends_on: Sequence[str] | None = None
 

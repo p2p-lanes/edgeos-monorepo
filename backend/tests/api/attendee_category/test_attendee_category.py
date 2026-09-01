@@ -102,6 +102,33 @@ def test_list_categories_by_popup(
     assert isinstance(data["results"], list)
 
 
+def test_get_category_exposes_its_popup_scope(
+    client: TestClient,
+    admin_token_tenant_a: str,
+    popup_tenant_a: Popups,
+) -> None:
+    """GET /attendee-categories/{id} identifies the owning popup."""
+    created = client.post(
+        "/api/v1/attendee-categories",
+        headers=_admin_headers(admin_token_tenant_a),
+        json={
+            "popup_id": str(popup_tenant_a.id),
+            "key": f"scope_{uuid.uuid4().hex[:8]}",
+            "display_meta": {},
+            "required_fields": [],
+        },
+    )
+    assert created.status_code == 201, created.text
+
+    response = client.get(
+        f"/api/v1/attendee-categories/{created.json()['id']}",
+        headers=_admin_headers(admin_token_tenant_a),
+    )
+
+    assert response.status_code == 200, response.text
+    assert response.json()["popup_id"] == str(popup_tenant_a.id)
+
+
 # ---------------------------------------------------------------------------
 # T1.1a — Scenario: duplicate-key-rejected
 # ---------------------------------------------------------------------------

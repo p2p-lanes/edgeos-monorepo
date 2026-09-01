@@ -69,6 +69,7 @@ lerna-debug.log*
 /playwright/.cache/
 /playwright/.auth/
 coverage/
+/dogfood-output/
 
 # Build outputs
 dist/

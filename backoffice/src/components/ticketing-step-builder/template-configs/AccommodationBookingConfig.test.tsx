@@ -92,7 +92,9 @@ describe("AccommodationBookingConfig", () => {
 
     await waitFor(() => {
       expect(
-        screen.getByText("Nothing selected. Every visible property is offered."),
+        screen.getByText(
+          "Nothing selected. Every visible property is offered.",
+        ),
       ).toBeTruthy()
     })
   })
@@ -143,9 +145,9 @@ describe("AccommodationBookingConfig", () => {
     })
     fireEvent.click(screen.getByRole("button", { name: /Presentation/ }))
     const switches = screen.getAllByRole("switch")
-    expect(switches.every((s) => s.getAttribute("data-state") === "checked")).toBe(
-      true,
-    )
+    expect(
+      switches.every((s) => s.getAttribute("data-state") === "checked"),
+    ).toBe(true)
 
     fireEvent.click(switches[1])
     expect(onChange.mock.calls[0][0].require_guest_names).toBe(false)
