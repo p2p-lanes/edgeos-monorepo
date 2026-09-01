@@ -6630,6 +6630,21 @@ export const CalendarAccommodationSchema = {
             type: 'integer',
             title: 'Guest Capacity'
         },
+        is_active: {
+            type: 'boolean',
+            title: 'Is Active',
+            default: true
+        },
+        bookable_from: {
+            type: 'string',
+            format: 'date',
+            title: 'Bookable From'
+        },
+        bookable_to: {
+            type: 'string',
+            format: 'date',
+            title: 'Bookable To'
+        },
         units: {
             items: {
                 '$ref': '#/components/schemas/CalendarUnit'
@@ -6648,7 +6663,7 @@ export const CalendarAccommodationSchema = {
         }
     },
     type: 'object',
-    required: ['id', 'name', 'kind', 'guest_capacity'],
+    required: ['id', 'name', 'kind', 'guest_capacity', 'bookable_from', 'bookable_to'],
     title: 'CalendarAccommodation'
 } as const;
 

@@ -37,9 +37,12 @@ import {
   BOOKING_APPEARANCE,
   bookingAppearance,
   bookingBarLabel,
+  CLOSED_DAY,
+  CLOSED_DAY_HATCH,
   HOLD_HATCH,
 } from "./bookingAppearance"
 import {
+  closedDays,
   DAY_WIDTH,
   dayNumber,
   eachDay,
@@ -50,6 +53,7 @@ import {
   monthWindow,
   ROW_HEIGHT,
   shiftMonth,
+  shortDay,
   todayKey,
   weekdayInitial,
 } from "./calendarLayout"
@@ -66,6 +70,12 @@ import { downloadBookingsCsv } from "./exportBookings"
  * The per-day "Available" number sits on the room-type row rather than in a
  * separate footer row: it is read together with the room's name, and the
  * server already computes it so the two never disagree.
+ *
+ * Nights the room type cannot be sold on, because they fall outside its
+ * bookable window or because the type is switched off, are greyed across the
+ * whole block. An empty unit on such a night is not availability, and the
+ * operator taking a phone booking is exactly the person who must not read it
+ * as one.
  */
 
 const ALL_PROPERTIES = "all"
@@ -109,22 +119,36 @@ function DayHeader({ days }: { days: string[] }) {
   )
 }
 
-/** Day stripes behind the bars: weekends and today, drawn once per row. */
-function DayStripes({ days }: { days: string[] }) {
+/**
+ * Day stripes behind the bars: weekends, today, and the nights this room
+ * cannot be sold on, drawn once per row.
+ *
+ * The closed tint is applied last and wins over the weekend and today tints,
+ * because "you cannot sell this night" outranks both.
+ */
+function DayStripes({ days, closed }: { days: string[]; closed: Set<string> }) {
   const today = todayKey()
   return (
     <>
-      {days.map((day, index) => (
-        <div
-          key={day}
-          className={cn(
-            "absolute top-0 bottom-0 border-r border-border/60",
-            isWeekend(day) && "bg-muted-foreground/5",
-            day === today && "bg-primary/10",
-          )}
-          style={{ left: index * DAY_WIDTH, width: DAY_WIDTH }}
-        />
-      ))}
+      {days.map((day, index) => {
+        const isClosed = closed.has(day)
+        return (
+          <div
+            key={day}
+            className={cn(
+              "absolute top-0 bottom-0 border-r border-border/60",
+              isWeekend(day) && "bg-muted-foreground/5",
+              day === today && "bg-primary/10",
+              isClosed && CLOSED_DAY.className,
+            )}
+            style={{
+              left: index * DAY_WIDTH,
+              width: DAY_WIDTH,
+              ...(isClosed ? CLOSED_DAY_HATCH : {}),
+            }}
+          />
+        )
+      })}
     </>
   )
 }
@@ -132,11 +156,17 @@ function DayStripes({ days }: { days: string[] }) {
 function AvailabilityRow({
   accommodation,
   days,
+  closed,
 }: {
   accommodation: CalendarAccommodation
   days: string[]
+  closed: Set<string>
 }) {
   const availability = accommodation.availability_by_day ?? {}
+  const unitCount = accommodation.units?.length ?? 0
+  // The window is a check-out bound, so it reads as "you can stay from A and
+  // must be out by B", which is the sentence an operator would say out loud.
+  const window = `on sale ${shortDay(accommodation.bookable_from)} to ${shortDay(accommodation.bookable_to)}`
   return (
     <div className="flex border-b border-border bg-card/60">
       <div
@@ -144,14 +174,15 @@ function AvailabilityRow({
         style={{ width: LABEL_WIDTH }}
       >
         <div className="truncate text-sm font-medium">{accommodation.name}</div>
-        <div className="text-[11px] text-muted-foreground">
-          {accommodation.units?.length ?? 0} unit
-          {(accommodation.units?.length ?? 0) === 1 ? "" : "s"} · sleeps{" "}
+        <div className="truncate text-[11px] text-muted-foreground">
+          {unitCount} unit{unitCount === 1 ? "" : "s"} · sleeps{" "}
           {accommodation.guest_capacity}
+          {accommodation.is_active === false && " · off"}
         </div>
       </div>
       <div className="relative flex" style={{ height: ROW_HEIGHT + 12 }}>
         {days.map((day) => {
+          const isClosed = closed.has(day)
           const free = availability[day] ?? 0
           return (
             <div
@@ -159,14 +190,25 @@ function AvailabilityRow({
               className={cn(
                 "flex shrink-0 items-center justify-center border-r border-border/60 text-xs tabular-nums",
                 isWeekend(day) && "bg-muted-foreground/5",
-                free === 0
-                  ? "font-semibold text-destructive"
-                  : "text-muted-foreground",
+                isClosed
+                  ? CLOSED_DAY.className
+                  : free === 0
+                    ? "font-semibold text-destructive"
+                    : "text-muted-foreground",
               )}
-              style={{ width: DAY_WIDTH }}
-              title={`${free} free on ${day}`}
+              style={{
+                width: DAY_WIDTH,
+                ...(isClosed ? CLOSED_DAY_HATCH : {}),
+              }}
+              title={
+                isClosed
+                  ? accommodation.is_active === false
+                    ? `${accommodation.name} is switched off and cannot be sold`
+                    : `${day} is outside this room's booking window (${window})`
+                  : `${free} free on ${day}`
+              }
             >
-              {free}
+              {isClosed ? "" : free}
             </div>
           )
         })}
@@ -182,6 +224,7 @@ function UnitRow({
   days,
   from,
   to,
+  closed,
   onBookingClick,
   onEmptyClick,
 }: {
@@ -191,10 +234,15 @@ function UnitRow({
   days: string[]
   from: string
   to: string
+  /** Nights the room type is not on sale for; see `closedDays`. */
+  closed: Set<string>
   onBookingClick: (booking: CalendarBooking) => void
   onEmptyClick: (day: string) => void
 }) {
   const bars = layoutBookings(bookings, from, to)
+  // A retired unit is off the market whatever its room type's window says, so
+  // its whole row greys out rather than only the nights outside that window.
+  const closedHere = isActive ? closed : new Set(days)
 
   const handleSurfaceClick = (event: React.MouseEvent<HTMLDivElement>) => {
     const rect = event.currentTarget.getBoundingClientRect()
@@ -232,7 +280,7 @@ function UnitRow({
         tabIndex={0}
         aria-label={`Book ${label}`}
       >
-        <DayStripes days={days} />
+        <DayStripes days={days} closed={closedHere} />
         {bars.map((bar) => {
           const appearance = bookingAppearance(bar.booking)
           const isHold = bar.booking.status === "hold"
@@ -289,6 +337,18 @@ function Legend() {
             {appearance.label}
           </span>
         ))}
+      {/* Not a booking state: the absence of one, which is why it is spelled
+          out here rather than folded into BOOKING_APPEARANCE. */}
+      <span
+        className="flex items-center gap-1.5"
+        title={CLOSED_DAY.description}
+      >
+        <span
+          className={cn("size-3 rounded-sm", CLOSED_DAY.swatchClassName)}
+          style={CLOSED_DAY_HATCH}
+        />
+        {CLOSED_DAY.label}
+      </span>
     </div>
   )
 }
@@ -452,55 +512,64 @@ export function BookingCalendar({ popupId }: { popupId: string }) {
                     <div style={{ width: days.length * DAY_WIDTH }} />
                   </div>
 
-                  {(property.accommodations ?? []).map((accommodation) => (
-                    <div key={accommodation.id}>
-                      <AvailabilityRow
-                        accommodation={accommodation}
-                        days={days}
-                      />
-                      {(accommodation.units ?? []).map((unit) => (
-                        <UnitRow
-                          key={unit.id}
-                          label={unit.label}
-                          isActive={unit.is_active}
+                  {(property.accommodations ?? []).map((accommodation) => {
+                    // One set per room type, shared by its availability row
+                    // and every one of its unit rows.
+                    const closed = closedDays(days, accommodation)
+                    return (
+                      <div key={accommodation.id}>
+                        <AvailabilityRow
+                          accommodation={accommodation}
                           days={days}
-                          from={from}
-                          to={to}
-                          bookings={(unit.bookings ?? []).filter(matchesSearch)}
-                          onBookingClick={(booking) =>
-                            setDetail({
-                              booking: detailFromCalendar(booking),
-                              roomName: accommodation.name,
-                              units: (accommodation.units ?? []).map(
-                                (item) => ({
-                                  id: item.id,
-                                  label: item.label,
-                                }),
-                              ),
-                            })
-                          }
-                          onEmptyClick={(day) =>
-                            setNewBooking({
-                              accommodationId: accommodation.id,
-                              unitId: unit.id,
-                              checkIn: day,
-                            })
-                          }
+                          closed={closed}
                         />
-                      ))}
-                      {(accommodation.units ?? []).length === 0 && (
-                        <div className="flex border-b border-border">
-                          <div
-                            className="sticky left-0 z-10 shrink-0 border-r border-border bg-card py-1 pl-7 pr-3 text-xs text-muted-foreground"
-                            style={{ width: LABEL_WIDTH }}
-                          >
-                            No units · cannot be booked
+                        {(accommodation.units ?? []).map((unit) => (
+                          <UnitRow
+                            key={unit.id}
+                            label={unit.label}
+                            isActive={unit.is_active}
+                            days={days}
+                            from={from}
+                            to={to}
+                            closed={closed}
+                            bookings={(unit.bookings ?? []).filter(
+                              matchesSearch,
+                            )}
+                            onBookingClick={(booking) =>
+                              setDetail({
+                                booking: detailFromCalendar(booking),
+                                roomName: accommodation.name,
+                                units: (accommodation.units ?? []).map(
+                                  (item) => ({
+                                    id: item.id,
+                                    label: item.label,
+                                  }),
+                                ),
+                              })
+                            }
+                            onEmptyClick={(day) =>
+                              setNewBooking({
+                                accommodationId: accommodation.id,
+                                unitId: unit.id,
+                                checkIn: day,
+                              })
+                            }
+                          />
+                        ))}
+                        {(accommodation.units ?? []).length === 0 && (
+                          <div className="flex border-b border-border">
+                            <div
+                              className="sticky left-0 z-10 shrink-0 border-r border-border bg-card py-1 pl-7 pr-3 text-xs text-muted-foreground"
+                              style={{ width: LABEL_WIDTH }}
+                            >
+                              No units · cannot be booked
+                            </div>
+                            <div style={{ width: days.length * DAY_WIDTH }} />
                           </div>
-                          <div style={{ width: days.length * DAY_WIDTH }} />
-                        </div>
-                      )}
-                    </div>
-                  ))}
+                        )}
+                      </div>
+                    )
+                  })}
                 </div>
               ))}
             </div>

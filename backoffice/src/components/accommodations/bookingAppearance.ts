@@ -83,6 +83,31 @@ export const HOLD_HATCH: CSSProperties = {
     "repeating-linear-gradient(45deg, rgba(255,255,255,0.35) 0 4px, transparent 4px 8px)",
 }
 
+/**
+ * A night the room type is not on sale for: outside its bookable window, or
+ * the whole type switched off.
+ *
+ * Grey plus a hatch rather than grey alone. The calendar already tints
+ * weekends and today, and a closed night has to be unmistakable against both
+ * without competing with the coloured bars laid over it.
+ */
+export const CLOSED_DAY: {
+  label: string
+  className: string
+  swatchClassName: string
+  description: string
+} = {
+  label: "Not bookable",
+  className: "bg-zinc-400/25 dark:bg-zinc-500/25",
+  swatchClassName: "bg-zinc-400/40 border border-zinc-500/40",
+  description: "Outside the room's bookable window, or the room is off.",
+}
+
+export const CLOSED_DAY_HATCH: CSSProperties = {
+  backgroundImage:
+    "repeating-linear-gradient(45deg, rgba(113,113,122,0.28) 0 4px, transparent 4px 8px)",
+}
+
 export function bookingAppearanceKey(booking: {
   kind?: BookingKind
   status?: BookingStatus

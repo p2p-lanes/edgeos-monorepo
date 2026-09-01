@@ -46,6 +46,21 @@ def _days(date_from: date, date_to: date) -> list[date]:
     ]
 
 
+def _is_sellable(accommodation: Accommodations, night: date) -> bool:
+    """Can this night be sold at all?
+
+    ``bookable_to`` is a check-out bound, so the last night on sale is the day
+    before it: half-open here as everywhere else. A night outside the window,
+    or a room type switched off, has no availability to report even when every
+    unit is empty, and the calendar greys it rather than showing a count an
+    operator would read as "free".
+    """
+    return (
+        accommodation.is_active
+        and accommodation.bookable_from <= night < accommodation.bookable_to
+    )
+
+
 def build_calendar(
     session: Session,
     *,
@@ -193,9 +208,16 @@ def build_calendar(
                     name=accommodation.name,
                     kind=accommodation.kind,
                     guest_capacity=accommodation.guest_capacity,
+                    is_active=accommodation.is_active,
+                    bookable_from=accommodation.bookable_from,
+                    bookable_to=accommodation.bookable_to,
                     units=calendar_units,
                     availability_by_day={
-                        day.isoformat(): max(0, active_units - occupied_per_day[day])
+                        day.isoformat(): (
+                            max(0, active_units - occupied_per_day[day])
+                            if _is_sellable(accommodation, day)
+                            else 0
+                        )
                         for day in calendar_days
                     },
                 )

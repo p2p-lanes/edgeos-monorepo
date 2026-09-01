@@ -47,6 +47,28 @@ export function eachDay(from: string, to: string): string[] {
   return Array.from({ length: total }, (_, index) => addDays(from, index))
 }
 
+/**
+ * The nights a room type is not on sale for, out of the visible columns.
+ *
+ * `bookable_to` is a check-out bound, so the last night that can be sold is
+ * the day before it: half-open here as everywhere else. A room type that is
+ * switched off is closed on every night, whatever its window says.
+ *
+ * Keys are `YYYY-MM-DD`, which compare correctly as strings, so this needs no
+ * date parsing.
+ */
+export function closedDays(
+  days: string[],
+  window: { bookable_from: string; bookable_to: string; is_active?: boolean },
+): Set<string> {
+  if (window.is_active === false) return new Set(days)
+  return new Set(
+    days.filter(
+      (day) => day < window.bookable_from || day >= window.bookable_to,
+    ),
+  )
+}
+
 export function isWeekend(key: string): boolean {
   const weekday = parseDay(key).getUTCDay()
   return weekday === 0 || weekday === 6
@@ -62,6 +84,15 @@ export function monthLabel(key: string): string {
 
 export function dayNumber(key: string): string {
   return String(parseDay(key).getUTCDate())
+}
+
+/** "Jun 1": compact enough for a tooltip or a label cell. */
+export function shortDay(key: string): string {
+  return parseDay(key).toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    timeZone: "UTC",
+  })
 }
 
 export function weekdayInitial(key: string): string {

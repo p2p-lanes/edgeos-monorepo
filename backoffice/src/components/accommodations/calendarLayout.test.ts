@@ -11,6 +11,7 @@ import { describe, expect, it } from "vitest"
 import type { CalendarBooking } from "@/client"
 import {
   addDays,
+  closedDays,
   DAY_WIDTH,
   dayOffset,
   eachDay,
@@ -161,5 +162,53 @@ describe("layoutBookings", () => {
     )
 
     expect(bars.map((bar) => bar.booking.id)).toEqual(["early", "late"])
+  })
+})
+
+describe("closedDays", () => {
+  const march = eachDay("2026-03-01", "2026-04-01")
+
+  it("closes the nights on either side of the bookable window", () => {
+    const closed = closedDays(march, {
+      bookable_from: "2026-03-10",
+      bookable_to: "2026-03-20",
+    })
+
+    expect(closed.has("2026-03-09")).toBe(true)
+    expect(closed.has("2026-03-10")).toBe(false)
+    expect(closed.size).toBe(march.length - 10)
+  })
+
+  it("treats bookable_to as a check-out date, so its own night is closed", () => {
+    // A guest may check out on the 20th, which means the last night anyone can
+    // sleep is the 19th. Counting the 20th as sellable would offer a night the
+    // checkout refuses.
+    const closed = closedDays(march, {
+      bookable_from: "2026-03-10",
+      bookable_to: "2026-03-20",
+    })
+
+    expect(closed.has("2026-03-19")).toBe(false)
+    expect(closed.has("2026-03-20")).toBe(true)
+  })
+
+  it("closes every visible night when the room type is switched off", () => {
+    const closed = closedDays(march, {
+      bookable_from: "2026-03-01",
+      bookable_to: "2026-04-01",
+      is_active: false,
+    })
+
+    expect(closed.size).toBe(march.length)
+  })
+
+  it("closes nothing when the window covers the whole view", () => {
+    const closed = closedDays(march, {
+      bookable_from: "2026-01-01",
+      bookable_to: "2027-01-01",
+      is_active: true,
+    })
+
+    expect(closed.size).toBe(0)
   })
 })
