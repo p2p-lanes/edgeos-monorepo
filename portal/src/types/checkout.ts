@@ -115,6 +115,37 @@ export interface SelectedMealPlanItem {
   specialRequest: string | null
 }
 
+/**
+ * One booked room in the cart.
+ *
+ * Unlike every other cart item this one has no product-derived price: the
+ * charge comes from the server's quote for those exact dates, because
+ * date-range rules and the long-stay rate make "nightly × nights" wrong more
+ * often than it is right. `totalPrice` is the quote's total, tax included
+ * (the same number the backend charges), and `subtotal`/`tax` are carried only
+ * so the breakdown can show its parts.
+ *
+ * `productId` is the accommodation's shadow product. The purchase line must
+ * point at it, or the backend refuses the booking metadata.
+ */
+export interface SelectedAccommodationItem {
+  accommodationId: string
+  productId: string
+  name: string
+  propertyId: string
+  propertyName: string
+  checkIn: string
+  checkOut: string
+  nights: number
+  guestCount: number
+  /** One name per guest, in order. Empty until the buyer fills them in. */
+  guests: string[]
+  subtotal: number
+  tax: number
+  totalPrice: number
+  imageUrl?: string | null
+}
+
 export interface SelectedDynamicItem {
   productId: string
   product: ProductsPass
@@ -130,6 +161,7 @@ export interface CheckoutCartState {
   merch: SelectedMerchItem[]
   patron: SelectedPatronItem | null
   mealPlans: SelectedMealPlanItem[]
+  accommodations: SelectedAccommodationItem[]
   promoCode: string
   promoCodeValid: boolean
   promoCodeDiscount: number
@@ -146,6 +178,7 @@ export interface CheckoutCartSummary {
   merchSubtotal: number
   patronSubtotal: number
   mealPlansSubtotal: number
+  accommodationsSubtotal: number
   insuranceSubtotal: number
   contributionSubtotal: number
   /**
@@ -275,6 +308,7 @@ export function createInitialCartState(): CheckoutCartState {
     merch: [],
     patron: null,
     mealPlans: [],
+    accommodations: [],
     promoCode: "",
     promoCodeValid: false,
     promoCodeDiscount: 0,
@@ -292,6 +326,7 @@ export function createInitialSummary(): CheckoutCartSummary {
     merchSubtotal: 0,
     patronSubtotal: 0,
     mealPlansSubtotal: 0,
+    accommodationsSubtotal: 0,
     insuranceSubtotal: 0,
     contributionSubtotal: 0,
     discountableSubtotal: 0,

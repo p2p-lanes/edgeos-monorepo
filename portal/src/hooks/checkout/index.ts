@@ -1,4 +1,8 @@
 export { buildPaymentProducts } from "./buildPaymentProducts"
+export {
+  entryKey as accommodationEntryKey,
+  useAccommodationSelection,
+} from "./useAccommodationSelection"
 export type { CartSelectionState } from "./useCartPersistence"
 export { useCartPersistence } from "./useCartPersistence"
 export { useCartSummary } from "./useCartSummary"

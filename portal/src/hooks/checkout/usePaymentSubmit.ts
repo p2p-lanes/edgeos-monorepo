@@ -15,6 +15,7 @@ import { queryKeys } from "@/lib/query-keys"
 import type { AttendeePassState } from "@/types/Attendee"
 import type {
   CheckoutStep,
+  SelectedAccommodationItem,
   SelectedDynamicItem,
   SelectedHousingItem,
   SelectedMealPlanItem,
@@ -38,6 +39,7 @@ interface UsePaymentSubmitParams {
   attendeePasses: AttendeePassState[]
   selectedPasses: SelectedPassItem[]
   housing: SelectedHousingItem | null
+  accommodations: SelectedAccommodationItem[]
   merch: SelectedMerchItem[]
   patron: SelectedPatronItem | null
   selectedMealPlans: SelectedMealPlanItem[]
@@ -91,6 +93,7 @@ export function usePaymentSubmit({
   attendeePasses,
   selectedPasses,
   housing,
+  accommodations,
   merch,
   patron,
   selectedMealPlans,
@@ -164,6 +167,7 @@ export function usePaymentSubmit({
     const hasAnyCartSelection =
       selectedPasses.length > 0 ||
       !!housing ||
+      accommodations.length > 0 ||
       merch.length > 0 ||
       !!patron ||
       selectedMealPlans.length > 0 ||
@@ -193,6 +197,7 @@ export function usePaymentSubmit({
           attendeePasses,
           selectedPasses,
           housing,
+          accommodations,
           merch,
           patron,
           selectedMealPlans,
@@ -436,6 +441,7 @@ export function usePaymentSubmit({
     selectedPasses,
     merch,
     housing,
+    accommodations,
     patron,
     selectedMealPlans,
     dynamicItems,

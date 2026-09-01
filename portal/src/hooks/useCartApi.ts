@@ -37,12 +37,28 @@ export interface CartItemMealPlan {
   special_request: string | null
 }
 
+/**
+ * A room the buyer picked. Mirrors the backend `CartItemAccommodation`.
+ *
+ * Keyed by the accommodation, not by its shadow product: the product is how
+ * a booking travels through payments, and a cart saved before a room was
+ * re-synced still has to point at the right room.
+ */
+export interface CartItemAccommodation {
+  accommodation_id: string
+  check_in: string
+  check_out: string
+  guest_count: number | null
+  guests: string[]
+}
+
 export interface CartState {
   passes: CartItemPass[]
   housing: CartItemHousing | null
   merch: CartItemMerch[]
   patron: CartItemPatron | null
   meal_plans: CartItemMealPlan[]
+  accommodations: CartItemAccommodation[]
   promo_code: string | null
   insurance: boolean
   current_step: string | null
@@ -63,6 +79,7 @@ const EMPTY_CART: CartState = {
   merch: [],
   patron: null,
   meal_plans: [],
+  accommodations: [],
   promo_code: null,
   insurance: false,
   current_step: null,

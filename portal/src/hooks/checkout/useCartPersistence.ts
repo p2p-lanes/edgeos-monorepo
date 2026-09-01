@@ -11,6 +11,7 @@ import { getProductAvailability } from "@/lib/product-availability"
 import { queryKeys } from "@/lib/query-keys"
 import type {
   CheckoutStep,
+  SelectedAccommodationItem,
   SelectedDynamicItem,
   SelectedHousingItem,
   SelectedMealPlanItem,
@@ -23,6 +24,7 @@ import type { ProductsPass } from "@/types/Products"
 export interface CartSelectionState {
   selectedPasses: SelectedPassItem[]
   housing: SelectedHousingItem | null
+  accommodations: SelectedAccommodationItem[]
   merch: SelectedMerchItem[]
   patron: SelectedPatronItem | null
   selectedMealPlans: SelectedMealPlanItem[]
@@ -35,6 +37,7 @@ export interface CartSelectionState {
 
 export interface RestorationSetters {
   setHousing: (item: SelectedHousingItem | null) => void
+  setAccommodations: (items: SelectedAccommodationItem[]) => void
   setMerch: (items: SelectedMerchItem[]) => void
   setPatron: (item: SelectedPatronItem | null) => void
   setMealPlans: (items: SelectedMealPlanItem[]) => void
@@ -110,6 +113,19 @@ export function useCartPersistence({
         daily_choices: m.dailyChoices,
         dietary_restriction: m.dietaryRestriction,
         special_request: m.specialRequest,
+      })),
+      // Saved, but deliberately not restored below. Two reasons: the price
+      // of a stay is a server quote for specific dates, so a stored total is
+      // only as good as the minute it was taken; and a room in a cart is not
+      // held in inventory, so restoring one would show a bookable room that
+      // may already be gone. Saving it is still worth it — the abandoned-cart
+      // view in the backoffice is how an operator sees what a buyer wanted.
+      accommodations: s.accommodations.map((a) => ({
+        accommodation_id: a.accommodationId,
+        check_in: a.checkIn,
+        check_out: a.checkOut,
+        guest_count: a.guestCount,
+        guests: a.guests.filter(Boolean),
       })),
       promo_code: s.promoCodeValid ? s.promoCode : null,
       insurance: s.insurance,
@@ -187,6 +203,7 @@ export function useCartPersistence({
               merch: [],
               patron: null,
               meal_plans: [],
+              accommodations: [],
               promo_code: null,
               insurance: false,
               current_step: null,

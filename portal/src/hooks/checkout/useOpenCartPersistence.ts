@@ -50,6 +50,19 @@ interface CartItemsSnapshot {
     dietary_restriction: string | null
     special_request: string | null
   }[]
+  /**
+   * Booked rooms. Saved but not restored — see the note in
+   * `useCartPersistence.buildCartState`: a stay's price is a dated server
+   * quote and a room in a cart is not held, so bringing one back would show
+   * a bookable room that may be gone.
+   */
+  accommodations: {
+    accommodation_id: string
+    check_in: string
+    check_out: string
+    guest_count: number | null
+    guests: string[]
+  }[]
   /** Flat array of dynamic-step items, keyed by step_type for reconstruction. */
   dynamic_items: {
     step_type: string
@@ -174,6 +187,13 @@ function buildItemsSnapshot(state: CartSelectionState): CartItemsSnapshot {
       daily_choices: m.dailyChoices,
       dietary_restriction: m.dietaryRestriction,
       special_request: m.specialRequest,
+    })),
+    accommodations: state.accommodations.map((a) => ({
+      accommodation_id: a.accommodationId,
+      check_in: a.checkIn,
+      check_out: a.checkOut,
+      guest_count: a.guestCount,
+      guests: a.guests.filter(Boolean),
     })),
     // Flat array — step_type is the grouping key used to reconstruct the
     // Record<string, SelectedDynamicItem[]> during hydration.

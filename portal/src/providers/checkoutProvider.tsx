@@ -36,6 +36,7 @@ import {
   useCreditCalculation,
   useHousingSelection,
   useInsuranceCalculation,
+  useAccommodationSelection,
   useMealPlanSelection,
   useMerchSelection,
   usePatronSelection,
@@ -57,6 +58,7 @@ import type {
   CheckoutCartState,
   CheckoutCartSummary,
   CheckoutStep,
+  SelectedAccommodationItem,
   SelectedDynamicItem,
   SelectedPassItem,
 } from "@/types/checkout"
@@ -125,6 +127,31 @@ interface CheckoutContextValue {
   setMealPlanDietaryRestriction: (attendeeId: string, value: string) => void
   /** Per-attendee field — synced across every meal-plan entry for the attendee. */
   setMealPlanSpecialRequest: (attendeeId: string, value: string) => void
+  /** Put a room in the cart. The item carries the server's quote for those
+   *  exact dates; nothing here re-prices it. Adding the same room for the
+   *  same nights twice is a no-op. */
+  addAccommodation: (item: SelectedAccommodationItem) => void
+  removeAccommodation: (
+    accommodationId: string,
+    checkIn: string,
+    checkOut: string,
+  ) => void
+  setAccommodationGuestCount: (
+    accommodationId: string,
+    checkIn: string,
+    checkOut: string,
+    guestCount: number,
+  ) => void
+  setAccommodationGuestName: (
+    accommodationId: string,
+    checkIn: string,
+    checkOut: string,
+    index: number,
+    name: string,
+  ) => void
+  /** Drop rooms booked for other dates. Called when the buyer moves the stay:
+   *  their quotes were for the old nights. */
+  clearAccommodationsOutsideStay: (checkIn: string, checkOut: string) => void
   applyPromoCode: (code: string) => Promise<boolean>
   clearPromoCode: () => void
   toggleInsurance: () => void
@@ -135,6 +162,13 @@ interface CheckoutContextValue {
   /** True when the flow renders inside the backoffice live preview, where
    *  submitPayment is inert. Flows use it to label the CTA. */
   previewMode: boolean
+  /** Token to send with public reads while previewing a draft popup. */
+  previewToken: string | null
+  /** Which checkout this is. Steps that fetch for themselves need it: the
+   *  anonymous endpoints only serve `direct` popups, and an application
+   *  popup's data lives behind the logged-in portal ones. */
+  submitMode: "application" | "open-ticketing"
+
   isEditing: boolean
   toggleEditing: (editing?: boolean) => void
   editCredit: number
@@ -228,6 +262,10 @@ interface CheckoutProviderProps {
    *  checking out is inert. Exposed on the context so the flows can label the
    *  CTA accordingly. */
   previewMode?: boolean
+  /** Preview token minted for the operator. Read-only public endpoints that
+   *  serve a draft popup need it; without one they answer as they would to
+   *  any anonymous visitor. */
+  previewToken?: string | null
 }
 
 export function CheckoutProvider({
@@ -247,6 +285,7 @@ export function CheckoutProvider({
   openCartCid = null,
   openCartSig = null,
   previewMode = false,
+  previewToken = null,
 }: CheckoutProviderProps) {
   const { t } = useTranslation()
   const {
@@ -390,6 +429,16 @@ export function CheckoutProvider({
     setMealPlanSpecialRequest,
   } = useMealPlanSelection(allActiveProducts)
 
+  const {
+    accommodations,
+    setAccommodations,
+    addAccommodation,
+    removeAccommodation,
+    setAccommodationGuestCount,
+    setAccommodationGuestName,
+    clearAccommodationsOutsideStay,
+  } = useAccommodationSelection()
+
   const [insurance, setInsurance] = useState(false)
   const [termsAccepted, setTermsAccepted] = useState(false)
   const [dynamicItems, setDynamicItems] = useState<
@@ -491,6 +540,7 @@ export function CheckoutProvider({
   const selectionStateRef = useRef<CartSelectionState>({
     selectedPasses,
     housing,
+    accommodations,
     merch,
     patron,
     selectedMealPlans,
@@ -516,6 +566,7 @@ export function CheckoutProvider({
     selectionStateRef,
     restorationSetters: {
       setHousing,
+      setAccommodations,
       setMerch,
       setPatron,
       setMealPlans: setSelectedMealPlans,
@@ -576,6 +627,7 @@ export function CheckoutProvider({
     housingPricePerDay,
     restorationSetters: {
       setHousing,
+      setAccommodations,
       setMerch,
       setPatron,
       setMealPlans: setSelectedMealPlans,
@@ -794,6 +846,7 @@ export function CheckoutProvider({
   selectionStateRef.current = {
     selectedPasses,
     housing,
+    accommodations,
     merch,
     patron,
     selectedMealPlans,
@@ -814,6 +867,7 @@ export function CheckoutProvider({
   }, [
     selectedPasses,
     housing,
+    accommodations,
     merch,
     patron,
     selectedMealPlans,
@@ -949,6 +1003,7 @@ export function CheckoutProvider({
   const { summary } = useCartSummary({
     selectedPasses,
     housing,
+    accommodations,
     merch,
     patron,
     mealPlans: selectedMealPlans,
@@ -969,6 +1024,7 @@ export function CheckoutProvider({
 
     hasRestoredCheckoutRef.current = false
     setHousing(null)
+    setAccommodations([])
     setMerch([])
     setPatron(null)
     setSelectedMealPlans([])
@@ -984,6 +1040,7 @@ export function CheckoutProvider({
     cityId,
     setCurrentStep,
     setHousing,
+    setAccommodations,
     setMerch,
     setPatron,
     setSelectedMealPlans,
@@ -1058,6 +1115,7 @@ export function CheckoutProvider({
     () => ({
       passes: selectedPasses,
       housing,
+      accommodations,
       merch,
       patron,
       mealPlans: selectedMealPlans,
@@ -1072,6 +1130,7 @@ export function CheckoutProvider({
     [
       selectedPasses,
       housing,
+      accommodations,
       merch,
       patron,
       selectedMealPlans,
@@ -1147,6 +1206,7 @@ export function CheckoutProvider({
     merch.length > 0 ||
     !!patron ||
     selectedMealPlans.length > 0 ||
+    accommodations.length > 0 ||
     Object.values(dynamicItems).some((items) => items.length > 0)
 
   // Dynamic item actions
@@ -1303,6 +1363,7 @@ export function CheckoutProvider({
     if (openCartEnabled) clearOpenCart()
     clearSelections()
     clearHousing()
+    setAccommodations([])
     setMerch([])
     clearPatron()
     setSelectedMealPlans([])
@@ -1315,6 +1376,7 @@ export function CheckoutProvider({
     openCartEnabled,
     clearSelections,
     clearHousing,
+    setAccommodations,
     setMerch,
     clearPatron,
     setSelectedMealPlans,
@@ -1331,6 +1393,7 @@ export function CheckoutProvider({
     attendeePasses,
     selectedPasses,
     housing,
+    accommodations,
     merch,
     patron,
     selectedMealPlans,
@@ -1395,6 +1458,11 @@ export function CheckoutProvider({
     updateMerchQuantity,
     setPatronAmount,
     clearPatron,
+    addAccommodation,
+    removeAccommodation,
+    setAccommodationGuestCount,
+    setAccommodationGuestName,
+    clearAccommodationsOutsideStay,
     addMealPlan,
     removeMealPlan,
     setMealPlanDailyChoice,
@@ -1408,6 +1476,8 @@ export function CheckoutProvider({
     isStepComplete: isStepCompleteFn,
     submitPayment,
     previewMode,
+    previewToken,
+    submitMode,
     isEditing,
     toggleEditing,
     editCredit,
