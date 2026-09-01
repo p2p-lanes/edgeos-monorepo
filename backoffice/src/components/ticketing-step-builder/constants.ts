@@ -1,4 +1,5 @@
 import {
+  BedDouble,
   CheckCircle,
   CheckSquare,
   FileText,
@@ -63,9 +64,17 @@ export const TEMPLATE_DEFINITIONS: TemplateDefinition[] = [
     icon: Heart,
   },
   {
+    key: "accommodation-booking",
+    label: "Accommodation",
+    description:
+      "Rooms with real availability and nightly pricing. Inventory is managed in Accommodations — this step only picks what is offered here",
+    icon: BedDouble,
+    stepType: "housing",
+  },
+  {
     key: "housing-date",
-    label: "Housing",
-    description: "Property cards with date range",
+    label: "Housing (legacy)",
+    description: "Property cards with date range, priced as plain products",
     icon: HomeIcon,
   },
   {
@@ -117,6 +126,9 @@ export const TEMPLATE_DEFINITIONS: TemplateDefinition[] = [
 /** Templates that don't display products and therefore don't need a product category. */
 export const CONTENT_ONLY_TEMPLATES = new Set([
   "hero",
+  // Reads the accommodation inventory, not products: a product category
+  // would be meaningless (and the shadow products are hidden anyway).
+  "accommodation-booking",
   "youtube-video",
   "image-gallery",
   "faqs",
