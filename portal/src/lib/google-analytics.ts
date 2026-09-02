@@ -72,6 +72,22 @@ export function trackGAViewItem(params: {
   })
 }
 
+export function trackGACheckoutStep(params: {
+  popup: GAPopup
+  stepNumber: number
+  stepId: string
+  stepType: string
+  stepName: string
+}) {
+  trackGAEvent("checkout_step", {
+    ...getPopupParams(params.popup),
+    step_number: params.stepNumber,
+    step_id: params.stepId,
+    step_type: params.stepType,
+    step_name: params.stepName,
+  })
+}
+
 export function trackGAAddToCart(params: {
   popup: GAPopup
   product: GAProduct

@@ -6,6 +6,7 @@ import type { CSSProperties } from "react"
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useTranslation } from "react-i18next"
 import { Loader } from "@/components/ui/Loader"
+import { useCheckoutStepTracking } from "@/hooks/checkout/useCheckoutStepTracking"
 import { type CheckoutSkin, resolveCheckoutSkin } from "@/lib/checkout-skin"
 import { imageOptimization } from "@/lib/image-optimization"
 import { useCheckout } from "@/providers/checkoutProvider"
@@ -249,6 +250,7 @@ export default function StepperCheckoutFlow({
     stepConfigs,
     submitPayment,
     isInitialLoading,
+    previewMode,
     markStepVisited,
     hasAnyCartItems,
     summary,
@@ -298,6 +300,13 @@ export default function StepperCheckoutFlow({
 
   const [active, setActive] = useState(0)
   const last = Math.max(0, sections.length - 1)
+
+  useCheckoutStepTracking({
+    activeStepId: sections[active]?.id,
+    sections,
+    popup,
+    enabled: !previewMode && !isInitialLoading,
+  })
 
   // Each step should open at the top. The checkout scrolls inside an
   // overflow container (not the window), so on a step change we reset that
