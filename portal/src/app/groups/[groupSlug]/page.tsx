@@ -169,6 +169,7 @@ const GroupCheckoutPage = () => {
         popup={popup}
         background={contentBackground}
         groupId={group.id}
+        requiresManualApproval={!group.auto_approve_applications}
       />
     </>
   )

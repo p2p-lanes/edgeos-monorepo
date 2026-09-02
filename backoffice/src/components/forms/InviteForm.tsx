@@ -1,13 +1,22 @@
 import { useForm } from "@tanstack/react-form"
 import { useMutation, useQueryClient } from "@tanstack/react-query"
 import { useNavigate } from "@tanstack/react-router"
-import { Calendar, Hash, Mail, Percent, Power, ShieldCheck } from "lucide-react"
+import {
+  Ban,
+  Calendar,
+  Hash,
+  Mail,
+  Percent,
+  Power,
+  ShieldCheck,
+} from "lucide-react"
 import {
   type InviteCreate,
   type InvitePublic,
   InvitesService,
   type InviteUpdate,
 } from "@/client"
+import { SourceApplicationsSection } from "@/components/applications/SourceApplicationsSection"
 import { DangerZone } from "@/components/Common/DangerZone"
 import { FieldError } from "@/components/Common/FieldError"
 import { WorkspaceAlert } from "@/components/Common/WorkspaceAlert"
@@ -110,6 +119,7 @@ export function InviteForm({ defaultValues, onSuccess }: InviteFormProps) {
       expires_at: formatDateForInput(defaultValues?.expires_at),
       auto_approve: defaultValues?.auto_approve ?? true,
       express_checkout: defaultValues?.express_checkout ?? true,
+      is_disabled: defaultValues?.is_disabled ?? false,
     },
     onSubmit: ({ value }) => {
       if (readOnly) return
@@ -120,6 +130,7 @@ export function InviteForm({ defaultValues, onSuccess }: InviteFormProps) {
           expires_at: toUTCDate(value.expires_at),
           auto_approve: value.auto_approve,
           express_checkout: value.express_checkout,
+          is_disabled: value.is_disabled,
         })
       } else {
         if (!selectedPopupId) {
@@ -323,6 +334,25 @@ export function InviteForm({ defaultValues, onSuccess }: InviteFormProps) {
               </InlineRow>
             )}
           </form.Field>
+
+          {isEdit && (
+            <form.Field name="is_disabled">
+              {(field) => (
+                <InlineRow
+                  icon={<Ban className="h-4 w-4 text-muted-foreground" />}
+                  label="Disabled"
+                  description="Prevent new applications without affecting people who already used this invite"
+                >
+                  <Switch
+                    id="invite_is_disabled"
+                    checked={field.state.value}
+                    onCheckedChange={(checked) => field.handleChange(checked)}
+                    disabled={readOnly}
+                  />
+                </InlineRow>
+              )}
+            </form.Field>
+          )}
         </InlineSection>
 
         <Separator />
@@ -344,10 +374,18 @@ export function InviteForm({ defaultValues, onSuccess }: InviteFormProps) {
         </div>
       </form>
 
-      {isEdit && !readOnly && (
+      {isEdit && (
+        <SourceApplicationsSection
+          popupId={defaultValues.popup_id}
+          source="invite"
+          sourceId={defaultValues.id}
+        />
+      )}
+
+      {isEdit && !readOnly && defaultValues.current_uses === 0 && (
         <div className="mx-auto max-w-2xl">
           <DangerZone
-            description="Once you delete this invite, it cannot be undone. Invites with existing redemptions cannot be deleted."
+            description="Delete this unused invite permanently."
             onDelete={() => deleteMutation.mutate()}
             isDeleting={deleteMutation.isPending}
             confirmText="Delete Invite"

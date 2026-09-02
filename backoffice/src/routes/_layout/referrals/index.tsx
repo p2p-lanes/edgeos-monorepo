@@ -73,11 +73,6 @@ const columns: ColumnDef<InvitePublic>[] = [
     ),
   },
   {
-    accessorKey: "auto_approve",
-    header: "Auto Approve",
-    cell: ({ row }) => <span>{row.original.auto_approve ? "Yes" : "No"}</span>,
-  },
-  {
     accessorKey: "expires_at",
     header: "Expires",
     cell: ({ row }) =>
@@ -163,10 +158,10 @@ function Referrals() {
           <AlertTitle>About referrals</AlertTitle>
           <AlertDescription>
             Referral codes are created by attendees in the portal to refer other
-            people. Each code can carry a discount and an automatic approval for
-            the referred person. Unlike invites, which admins create for
-            specific recipients, referrals grow from your attendees. Here you
-            can moderate them: disable codes or adjust their discount.
+            people. Each code automatically approves the referred person and can
+            carry a discount. Unlike invites, which admins create for specific
+            recipients, referrals grow from your attendees. Here you can
+            moderate them: disable codes or adjust their discount.
           </AlertDescription>
         </Alert>
       )}

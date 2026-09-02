@@ -378,17 +378,14 @@ async def list_invites(
 
     Spec: REQ-GR-006 — admin listing scoped to current tenant via RLS.
     """
-    if popup_id:
-        results, total = invites_crud.find_by_popup(
-            db,
-            popup_id,
-            recipient_email=recipient_email,
-            issuer=issuer,
-            skip=skip,
-            limit=limit,
-        )
-    else:
-        results, total = invites_crud.find(db, skip=skip, limit=limit)
+    results, total = invites_crud.find_by_popup(
+        db,
+        popup_id,
+        recipient_email=recipient_email,
+        issuer=issuer,
+        skip=skip,
+        limit=limit,
+    )
 
     return ListModel[InvitePublic](
         results=[InvitePublic.model_validate(r) for r in results],

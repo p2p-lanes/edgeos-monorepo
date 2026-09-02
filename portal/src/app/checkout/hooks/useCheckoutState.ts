@@ -284,11 +284,9 @@ const useCheckoutState = ({
     },
   })
 
-  // Existing applicant arriving through a group invite link. Persists the
-  // group membership on their current application so the backend auto-accepts
-  // it (mirrors the form-submit path, which also sends group_id). Without this
-  // the payment step 403s with "Application must be accepted before purchasing
-  // products" because the reused draft/in-review application is never accepted.
+  // Existing applicant arriving through a group link. Persist the group on the
+  // current application so the backend can apply that group's approval policy
+  // and discount. Manual-approval groups are gated before this mutation runs.
   const joinGroupMutation = useMutation({
     mutationFn: async () => {
       if (!popupId) throw new Error("No popup selected")
