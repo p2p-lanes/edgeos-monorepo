@@ -9,6 +9,7 @@ ticket-holding attendee, sourced from that attendee's own human):
 - A main applicant with 0 tickets whose spouse holds the ticket → the spouse
   appears, the 0-ticket main does not.
 - Only main + spouse are listed; kids (and any other categories) are excluded.
+- Unlinked ticket holders retain the attendee name/email snapshot in their row.
 - info_not_shared masking + role/organization apply ONLY to the main applicant;
   companions show their own profile with blank role/org and no masking.
 """
@@ -288,6 +289,47 @@ def test_main_entry_keeps_role_org_and_masking(db: Session, directory_world) -> 
     assert entry.role == "Founder"
     assert entry.organization == "Staple & Spindle"
     assert entry.email == "*"  # masked via info_not_shared=["email"]
+
+
+def test_unlinked_attendee_entry_uses_identity_snapshot(
+    db: Session, tenant_a: Tenants
+) -> None:
+    popup = _popup(db, tenant_a)
+    spouse = _category(db, popup, "spouse", is_primary=False)
+    host = _human(db, tenant_a, "Host", "Person")
+    app = _application(db, popup, host)
+    product = _product(db, popup)
+    attendee = Attendees(
+        id=uuid.uuid4(),
+        tenant_id=popup.tenant_id,
+        application_id=app.id,
+        popup_id=popup.id,
+        human_id=None,
+        name="Taylor Companion",
+        email="taylor@example.com",
+        category_id=spouse.id,
+    )
+    db.add(attendee)
+    db.commit()
+    db.add(
+        AttendeeProducts(
+            id=uuid.uuid4(),
+            tenant_id=popup.tenant_id,
+            attendee_id=attendee.id,
+            product_id=product.id,
+            product_category_snapshot="ticket",
+            check_in_code=uuid.uuid4().hex[:10].upper(),
+        )
+    )
+    db.commit()
+
+    results, total = applications_crud.find_directory(db, popup_id=popup.id)
+    assert total == 1
+
+    entry = _build_directory_entry(results[0])
+    assert entry.first_name == "Taylor Companion"
+    assert entry.last_name is None
+    assert entry.email == "taylor@example.com"
 
 
 def test_directory_excludes_non_accepted_application(

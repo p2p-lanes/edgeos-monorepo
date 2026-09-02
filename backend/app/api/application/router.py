@@ -1558,7 +1558,8 @@ def _build_directory_entry(attendee) -> AttendeesDirectoryEntry:
     """Build a single directory entry from a ticket-holding attendee.
 
     The entry is sourced from the attendee's OWN human record, so companions
-    (spouse/kid/...) appear as their own people. Field masking and the
+    (spouse/kid/...) appear as their own people. Unlinked attendees retain the
+    identity snapshot stored with their ticket. Field masking and the
     role/organization form fields only apply to the main applicant, since
     companions never filled an application form and have no privacy prefs.
     """
@@ -1606,9 +1607,9 @@ def _build_directory_entry(attendee) -> AttendeesDirectoryEntry:
 
     return AttendeesDirectoryEntry(
         id=attendee.id,
-        first_name=mask("first_name", human.first_name if human else None),
+        first_name=mask("first_name", human.first_name if human else attendee.name),
         last_name=mask("last_name", human.last_name if human else None),
-        email=mask("email", human.email if human else None),
+        email=mask("email", human.email if human else attendee.email),
         telegram=mask("telegram", human.telegram if human else None),
         role=mask("role", custom.get("role")),
         organization=mask("organization", custom.get("organization")),
