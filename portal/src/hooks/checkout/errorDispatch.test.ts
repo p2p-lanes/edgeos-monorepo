@@ -3,7 +3,11 @@
 // No React, no DOM, no mocks — everything is deterministic pure-function logic.
 
 import { describe, expect, it } from "vitest"
-import { dispatchPaymentError, extractCartMeta } from "./errorDispatch"
+import {
+  dispatchPaymentError,
+  extractCartMeta,
+  extractServerErrorMessage,
+} from "./errorDispatch"
 
 // ---------------------------------------------------------------------------
 // extractCartMeta
@@ -319,5 +323,73 @@ describe("dispatchPaymentError — unrecognised codes fall through", () => {
 
   it("returns null when detail is empty object", () => {
     expect(dispatchPaymentError({}, "application", "slug")).toBeNull()
+  })
+})
+
+// ---------------------------------------------------------------------------
+// extractServerErrorMessage
+// ---------------------------------------------------------------------------
+
+describe("extractServerErrorMessage", () => {
+  it("returns a plain string detail (the reported bug: 403 on purchase)", () => {
+    expect(
+      extractServerErrorMessage(
+        { detail: "Application must be accepted before purchasing products" },
+        403,
+      ),
+    ).toBe("Application must be accepted before purchasing products")
+  })
+
+  it("returns the message field of a structured detail", () => {
+    expect(
+      extractServerErrorMessage(
+        {
+          detail: {
+            code: "some_unmapped_code",
+            message:
+              "Another checkout is currently in progress for this email.",
+          },
+        },
+        409,
+      ),
+    ).toBe("Another checkout is currently in progress for this email.")
+  })
+
+  it("trims surrounding whitespace", () => {
+    expect(
+      extractServerErrorMessage({ detail: "  Popup is not active  " }, 422),
+    ).toBe("Popup is not active")
+  })
+
+  it("returns null for 5xx — the server broke, not the buyer", () => {
+    expect(
+      extractServerErrorMessage({ detail: "Failed to create payment" }, 500),
+    ).toBeNull()
+    expect(
+      extractServerErrorMessage(
+        { detail: { code: "x", message: "Upstream exploded" } },
+        502,
+      ),
+    ).toBeNull()
+  })
+
+  it("returns null for FastAPI 422 validation arrays", () => {
+    expect(
+      extractServerErrorMessage(
+        { detail: [{ loc: ["body", "amount"], msg: "field required" }] },
+        422,
+      ),
+    ).toBeNull()
+  })
+
+  it("returns null for empty, missing, non-object and structured-without-message bodies", () => {
+    expect(extractServerErrorMessage({ detail: "   " }, 400)).toBeNull()
+    expect(extractServerErrorMessage({}, 400)).toBeNull()
+    expect(extractServerErrorMessage(null, 400)).toBeNull()
+    expect(extractServerErrorMessage("Internal Server Error", 400)).toBeNull()
+    expect(extractServerErrorMessage([{ detail: "nope" }], 400)).toBeNull()
+    expect(
+      extractServerErrorMessage({ detail: { code: "no_message_field" } }, 409),
+    ).toBeNull()
   })
 })

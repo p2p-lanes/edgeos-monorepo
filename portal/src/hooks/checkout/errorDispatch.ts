@@ -126,3 +126,46 @@ export function dispatchPaymentError(
 
   return null
 }
+
+/**
+ * Pulls the human-readable reason out of an API error body so the checkout can
+ * tell the buyer what actually went wrong ("Application must be accepted
+ * before purchasing products") instead of the generic payment error.
+ *
+ * `detail` is not always a string, which is the only reason this is more than
+ * one line. The backend produces three shapes:
+ *
+ *   {"detail": "Application must be accepted before purchasing products"}
+ *   {"detail": {"code": "...", "message": "Another checkout is in progress"}}
+ *   {"detail": [{"loc": [...], "msg": "..."}]}   <- FastAPI 422 validation
+ *
+ * Handing shape 2 or 3 straight to the banner puts an object into JSX, and
+ * React throws "Objects are not valid as a React child" — a crashed checkout
+ * instead of a message. So each shape is checked before it is used.
+ *
+ * Returns null when there is no message to show; the caller then falls back to
+ * the generic translated copy. 5xx is withheld deliberately: the server broke,
+ * not the buyer, and "Failed to create payment with payment provider" is not
+ * something they can act on.
+ */
+export function extractServerErrorMessage(
+  body: unknown,
+  status: number,
+): string | null {
+  if (status >= 500) return null
+  if (typeof body !== "object" || body === null || Array.isArray(body)) {
+    return null
+  }
+
+  const detail = (body as { detail?: unknown }).detail
+  if (typeof detail === "string") return detail.trim() || null
+  if (
+    typeof detail === "object" &&
+    detail !== null &&
+    !Array.isArray(detail) &&
+    typeof (detail as { message?: unknown }).message === "string"
+  ) {
+    return (detail as { message: string }).message.trim() || null
+  }
+  return null
+}
