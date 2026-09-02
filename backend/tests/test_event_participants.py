@@ -38,7 +38,6 @@ from app.api.event_participant.schemas import ParticipantRole, ParticipantStatus
 from app.api.human.models import Humans
 from app.api.popup.models import Popups
 from app.api.product.models import Products
-from app.api.product.schemas import FulfillmentType
 from app.api.tenant.models import Tenants
 from app.core.security import create_access_token
 from tests._flow_helpers import application_flow_id
@@ -107,7 +106,7 @@ def _give_ticket(
     popup: Popups,
     human: Humans,
     *,
-    fulfillment_type: FulfillmentType = FulfillmentType.ACCESS,
+    product_category: str = "ticket",
     managed: bool = False,
 ) -> Attendees:
     """Give ``human`` a purchased ticket for ``popup``.
@@ -124,7 +123,7 @@ def _give_ticket(
         name=f"Ticket {uuid.uuid4().hex[:6]}",
         slug=f"ticket-{uuid.uuid4().hex[:10]}",
         price=Decimal("100.00"),
-        fulfillment_type=fulfillment_type.value,
+        category=product_category,
     )
     db.add(product)
     db.commit()
@@ -148,7 +147,7 @@ def _give_ticket(
             attendee_id=attendee.id,
             product_id=product.id,
             check_in_code=uuid.uuid4().hex[:10],
-            fulfillment_type=fulfillment_type.value,
+            product_category_snapshot=product_category,
         )
     )
     db.commit()
@@ -598,7 +597,7 @@ class TestPortalRegisterEligibility:
             tenant_a,
             popup,
             human,
-            fulfillment_type=FulfillmentType.PARTICIPANT,
+            product_category="meal_plan",
         )
 
         with patch(_ITIP_TARGET, new=AsyncMock(return_value=None)):
@@ -610,7 +609,7 @@ class TestPortalRegisterEligibility:
         assert response.status_code == 403, response.text
         assert _fetch_participant(db, event.id, human.id) is None
 
-    def test_register_with_managed_access_holding_succeeds(
+    def test_register_with_managed_only_ticket_is_forbidden(
         self,
         client: TestClient,
         db: Session,
@@ -627,8 +626,8 @@ class TestPortalRegisterEligibility:
                 headers=_human_headers(human),
             )
 
-        assert response.status_code == 200, response.text
-        assert response.json()["profile_id"] == str(human.id)
+        assert response.status_code == 403, response.text
+        assert _fetch_participant(db, event.id, human.id) is None
 
     def test_register_with_access_and_rejected_application_succeeds(
         self,

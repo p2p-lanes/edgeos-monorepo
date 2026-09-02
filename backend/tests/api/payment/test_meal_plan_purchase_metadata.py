@@ -81,12 +81,15 @@ def _meal_plan_product(db: Session, popup: Popups, *, price: str = "75") -> Prod
         slug=f"mp-{uuid.uuid4().hex[:6]}",
         price=Decimal(price),
         category="meal_plan",
-        fulfillment_type="participant",
         is_active=True,
     )
     db.add(p)
     db.flush()
-    offer_category(db, popup, "meal_plan")
+    step = offer_category(db, popup, "meal_plan")
+    step.template = "meal-plan-select"
+    step.template_config = {"sections": [{"products": [{"product_id": str(p.id)}]}]}
+    db.add(step)
+    db.flush()
     return p
 
 
@@ -99,7 +102,6 @@ def _ticket_product(db: Session, popup: Popups, *, price: str = "10") -> Product
         slug=f"tkt-{uuid.uuid4().hex[:6]}",
         price=Decimal(price),
         category="ticket",
-        fulfillment_type="access",
         is_active=True,
     )
     db.add(p)
@@ -234,7 +236,7 @@ class TestSimpleFiPaidPath:
                 "approve_payment dropped purchase_metadata when rebuilding from "
                 "products_snapshot (regression of PR-#179 fix)"
             )
-            assert ap.fulfillment_type == "participant"
+            assert ap.product_category_snapshot == "meal_plan"
         finally:
             # Cleanup: attendee_products → payment_products → payment → attendee → app → product
             for ap_row in db.exec(
@@ -298,7 +300,7 @@ class TestZeroAmountAutoApprovePath:
             ).first()
             assert ap is not None
             assert ap.purchase_metadata == SAMPLE_METADATA
-            assert ap.fulfillment_type == "participant"
+            assert ap.product_category_snapshot == "meal_plan"
 
             pp = db.exec(
                 select(PaymentProducts).where(

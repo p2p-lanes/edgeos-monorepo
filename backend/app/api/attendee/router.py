@@ -2,8 +2,10 @@ import uuid
 from typing import Annotated
 
 from fastapi import APIRouter, HTTPException, Query, status
+from sqlmodel import select
 
 from app.api.attendee import crud
+from app.api.attendee.models import AttendeeProducts
 from app.api.attendee.schemas import (
     AttendeeCreate,
     AttendeeListItem,
@@ -27,6 +29,7 @@ from app.api.check_in.crud import (
     record_check_in,
 )
 from app.api.check_in.schemas import CheckInPayload
+from app.api.product.models import Products
 from app.api.shared.response import ListModel, PaginationLimit, PaginationSkip, Paging
 from app.core.dependencies.users import (
     AdminOrApiKey_AttendeesWrite,
@@ -39,8 +42,14 @@ from app.core.dependencies.users import (
     TenantSession,
     needs,
 )
+from app.core.logging import get_request_id
 
 router = APIRouter(prefix="/attendees", tags=["attendees"])
+
+
+class StaffTicketPublic(TicketPublic):
+    attendee: TicketAttendeeSnapshot | None = None
+
 
 # Pagination type for portal attendees endpoint (max 100 per page)
 _AttendeeLimit = Annotated[
@@ -164,6 +173,9 @@ def _build_attendee_with_origin(
                     last_scan_by_ticket.get(ap.id) if last_scan_by_ticket else None
                 ),
                 purchase_metadata=ap.purchase_metadata,
+                product_category_snapshot=ap.product_category_snapshot,
+                requires_check_in_snapshot=ap.requires_check_in_snapshot,
+                revoked_at=ap.revoked_at,
             )
         )
     origin = "application" if attendee.application_id is not None else "direct_sale"
@@ -750,6 +762,7 @@ async def add_attendee_ticket(
         items=[(line.product_id, line.quantity) for line in body.items],
         tenant_id=attendee.tenant_id,
         actor=actor_from_user(current_user),
+        grant_key=get_request_id(),
     )
 
     return _attendee_response(db, attendee_id)
@@ -810,7 +823,7 @@ async def remove_attendee_ticket(
     return _attendee_response(db, attendee_id)
 
 
-@router.post("/check-in/{code}", response_model=TicketPublic)
+@router.post("/check-in/{code}", response_model=StaffTicketPublic)
 async def post_check_in(
     code: str,
     payload: CheckInPayload,
@@ -820,7 +833,7 @@ async def post_check_in(
         uuid.UUID,
         Query(description="Popup the scanner is operating in"),
     ],
-) -> TicketPublic:
+) -> StaffTicketPublic:
     """Record a check-in event and return enriched TicketPublic (BO - scanner endpoint).
 
     POST replaces the former GET — the endpoint now mutates state by inserting a
@@ -840,35 +853,35 @@ async def post_check_in(
 
     Code is matched case-insensitively (uppercased before lookup).
     """
-    result = crud.attendees_crud.get_by_check_in_code(db, code.upper())
+    ticket = db.exec(
+        select(AttendeeProducts)
+        .join(Products, AttendeeProducts.product_id == Products.id)  # type: ignore[arg-type]
+        .where(
+            AttendeeProducts.check_in_code == code.upper(),
+            AttendeeProducts.revoked_at.is_(None),
+            Products.popup_id == popup_id,
+        )
+        .with_for_update(of=AttendeeProducts)
+    ).first()
 
-    if not result:
+    if ticket is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Ticket not found",
         )
 
-    ticket, attendee, product = result
-
-    # Reject codes from a different popup. We treat cross-popup access as
-    # "not found" rather than a distinct error to keep the response uniform
-    # with the way every other popup-scoped route handles non-matching rows.
-    if attendee.popup_id != popup_id:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Ticket not found",
-        )
+    attendee = ticket.attendee
+    product = ticket.product
 
     # Reject codes belonging to non-scannable products (e.g. merch, lodging).
     # The migration generates a check_in_code for every attendee_products row to
     # keep the column NOT NULL, but only `requires_check_in=true` products are
     # legitimate scan targets.
-    if not product.requires_check_in:
+    if ticket.requires_check_in_snapshot is not True:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Product does not require check-in",
         )
-
     # Record the check-in event; actor is the current user
     record_check_in(
         db,
@@ -881,15 +894,12 @@ async def post_check_in(
     # Build scan summary from ticket_events (single aggregation query).
     summary = get_check_in_summary(db, ticket.id)
 
-    return TicketPublic(
+    return StaffTicketPublic(
         id=ticket.id,
         check_in_code=ticket.check_in_code,
         payment_id=ticket.payment_id,
-        attendee=TicketAttendeeSnapshot(
-            id=attendee.id,
-            name=attendee.name,
-            email=attendee.email,
-            category=attendee.category,
+        attendee=(
+            TicketAttendeeSnapshot.model_validate(attendee) if attendee else None
         ),
         product=TicketProductSnapshot(
             id=product.id,

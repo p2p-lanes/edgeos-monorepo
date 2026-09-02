@@ -45,14 +45,14 @@ def _base_section(suffix: str = "") -> dict:
     }
 
 
-def _product(db: Session, popup: Popups, fulfillment_type: str | None) -> Products:
+def _product(db: Session, popup: Popups, category: str | None) -> Products:
     product = Products(
         tenant_id=popup.tenant_id,
         popup_id=popup.id,
-        name=f"{fulfillment_type or 'legacy'} product",
+        name=f"{category or 'uncategorized'} product",
         slug=f"config-product-{uuid.uuid4().hex[:8]}",
         price=10,
-        fulfillment_type=fulfillment_type,
+        category=category,
     )
     db.add(product)
     db.commit()
@@ -107,7 +107,7 @@ def _patch_step(client, token: str, step_id: str, payload: dict):
 
 
 @pytest.mark.parametrize("template", ["ticket-card", "ticket-select"])
-def test_generic_ticket_templates_accept_every_fulfillment_type_without_inference(
+def test_generic_ticket_templates_accept_every_product_category_without_inference(
     template: str,
     client: TestClient,
     db: Session,
@@ -116,8 +116,8 @@ def test_generic_ticket_templates_accept_every_fulfillment_type_without_inferenc
     default_flow_tenant_a,
 ) -> None:
     products = [
-        _product(db, popup_tenant_a, fulfillment_type)
-        for fulfillment_type in ("access", "participant", "order")
+        _product(db, popup_tenant_a, category)
+        for category in ("ticket", "meal_plan", "merch")
     ]
     product_ids = [str(product.id) for product in products]
     config = {"sections": [{**_base_section(template), "product_ids": product_ids}]}
@@ -134,15 +134,15 @@ def test_generic_ticket_templates_accept_every_fulfillment_type_without_inferenc
         response.json()["template_config"]["sections"][0]["product_ids"] == product_ids
     )
     db.expire_all()
-    assert [product.fulfillment_type for product in products] == [
-        "access",
-        "participant",
-        "order",
+    assert [product.category for product in products] == [
+        "ticket",
+        "meal_plan",
+        "merch",
     ]
 
 
 @pytest.mark.parametrize(
-    "kind", ["participant", "access", "order", "null", "missing", "cross-popup"]
+    "kind", ["meal_plan", "ticket", "merch", "null", "missing", "cross-popup"]
 )
 def test_meal_plan_create_validates_product_reference_non_enumeratively(
     kind: str,
@@ -156,7 +156,7 @@ def test_meal_plan_create_validates_product_reference_non_enumeratively(
     if kind == "missing":
         product_id = uuid.uuid4()
     elif kind == "cross-popup":
-        product_id = _product(db, popup_tenant_b, "participant").id
+        product_id = _product(db, popup_tenant_b, "meal_plan").id
     else:
         product_id = _product(db, popup_tenant_a, None if kind == "null" else kind).id
     response = _post_step(
@@ -167,25 +167,23 @@ def test_meal_plan_create_validates_product_reference_non_enumeratively(
         "meal-plan-select",
         _meal_config(product_id),
     )
-    assert response.status_code == (201 if kind == "participant" else 422), (
-        response.text
-    )
-    if kind != "participant":
+    assert response.status_code == (201 if kind == "meal_plan" else 422), response.text
+    if kind != "meal_plan":
         assert response.json()["detail"] == "One or more meal plan products are invalid"
 
 
 @pytest.mark.parametrize(
-    "patch_kind, fulfillment_type, expected_status",
+    "patch_kind, category, expected_status",
     [
-        ("config", "participant", 200),
-        ("config", "order", 422),
-        ("switch", "participant", 200),
-        ("switch", "access", 422),
+        ("config", "meal_plan", 200),
+        ("config", "merch", 422),
+        ("switch", "meal_plan", 200),
+        ("switch", "ticket", 422),
     ],
 )
 def test_meal_plan_patch_validates_effective_template_and_config(
     patch_kind: str,
-    fulfillment_type: str,
+    category: str,
     expected_status: int,
     client: TestClient,
     db: Session,
@@ -193,7 +191,7 @@ def test_meal_plan_patch_validates_effective_template_and_config(
     popup_tenant_a: Popups,
     default_flow_tenant_a,
 ) -> None:
-    product = _product(db, popup_tenant_a, fulfillment_type)
+    product = _product(db, popup_tenant_a, category)
     initial_template = "meal-plan-select" if patch_kind == "config" else "ticket-card"
     initial_config = (
         {"sections": []} if patch_kind == "config" else _meal_config(product.id)

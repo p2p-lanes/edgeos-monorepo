@@ -1,14 +1,11 @@
 """Leaving APPROVED revokes what approval granted.
 
-Design D8 promises revocation takes effect immediately. Since
-sdd/sales-flows-rediseno slice 5 access is read from `attendee_products`
-rather than from payment status, so a cancelled payment that left its
-holding rows behind would keep a refunded buyer inside upsale flows and any
-`has_product` rule. `update_status` used to only ADD on approval; these
-tests keep the other direction honest.
+Revocation takes effect immediately through `revoked_at` while preserving
+ProductUnit identity and history. Active holding queries must exclude revoked
+rows even though the underlying records remain durable.
 
 Scenarios:
-- APPROVED -> CANCELLED removes the rows that approval created.
+- APPROVED -> CANCELLED revokes the rows that approval created.
 - An admin-granted product (no payment) survives someone else's refund.
 - Products from a DIFFERENT payment survive.
 """
@@ -66,7 +63,7 @@ def _make_attendee(db: Session, popup: Popups) -> Attendees:
 def _make_product(
     db: Session,
     popup: Popups,
-    fulfillment_type: str | None = None,
+    category: str = "ticket",
 ) -> Products:
     product = Products(
         tenant_id=popup.tenant_id,
@@ -74,8 +71,7 @@ def _make_product(
         name=f"Product {uuid.uuid4().hex[:6]}",
         slug=f"prod-{uuid.uuid4().hex[:8]}",
         price=Decimal("10"),
-        category="ticket",
-        fulfillment_type=fulfillment_type,
+        category=category,
         is_active=True,
     )
     db.add(product)
@@ -123,12 +119,15 @@ def _approved_payment_with_holding(
 def _holdings(db: Session, attendee_id: uuid.UUID) -> list[AttendeeProducts]:
     return list(
         db.exec(
-            select(AttendeeProducts).where(AttendeeProducts.attendee_id == attendee_id)
+            select(AttendeeProducts).where(
+                AttendeeProducts.attendee_id == attendee_id,
+                AttendeeProducts.revoked_at.is_(None),  # type: ignore[union-attr]
+            )
         ).all()
     )
 
 
-def test_cancelling_an_approved_payment_removes_its_holdings(
+def test_cancelling_an_approved_payment_revokes_its_holdings(
     db: Session, tenant_a: Tenants
 ) -> None:
     popup = _make_popup(db, tenant_a)
@@ -145,7 +144,7 @@ def test_cancelling_an_approved_payment_removes_its_holdings(
 def test_an_admin_granted_product_survives_a_refund(
     db: Session, tenant_a: Tenants
 ) -> None:
-    """Removal is keyed by payment_id, so a courtesy nobody paid for stays."""
+    """Revocation is keyed by payment_id, so a courtesy nobody paid for stays."""
     popup = _make_popup(db, tenant_a)
     attendee = _make_attendee(db, popup)
     paid_product = _make_product(db, popup)
@@ -182,7 +181,7 @@ def test_another_payments_products_survive(db: Session, tenant_a: Tenants) -> No
     assert [h.product_id for h in remaining] == [second_product.id]
 
 
-def test_cancelling_typed_mixed_payment_preserves_order_and_snapshots(
+def test_cancelling_mixed_payment_revokes_units_and_preserves_snapshots(
     db: Session, tenant_a: Tenants
 ) -> None:
     popup = _make_popup(db, tenant_a)
@@ -205,21 +204,19 @@ def test_cancelling_typed_mixed_payment_preserves_order_and_snapshots(
     db.add(recipient)
     db.flush()
 
-    order_holding: AttendeeProducts | None = None
-    for fulfillment_type in ("access", "participant", "order", None):
-        product = _make_product(db, popup, fulfillment_type)
+    for category in ("ticket", "meal_plan", "parking", "merch"):
+        product = _make_product(db, popup, category)
         line = PaymentProducts(
             tenant_id=popup.tenant_id,
             payment_id=payment.id,
             product_id=product.id,
-            attendee_id=attendee.id if fulfillment_type in ("order", None) else None,
+            attendee_id=attendee.id,
             payment_recipient_id=(
-                recipient.id if fulfillment_type in ("access", "participant") else None
+                recipient.id if category in ("ticket", "meal_plan") else None
             ),
             product_name=product.name,
             product_price=product.price,
-            product_category=product.category or "ticket",
-            fulfillment_type=fulfillment_type,
+            product_category=product.category or "merch",
         )
         db.add(line)
         db.flush()
@@ -231,17 +228,15 @@ def test_cancelling_typed_mixed_payment_preserves_order_and_snapshots(
             payment_product_id=line.id,
             unit_index=0,
             check_in_code=f"TYPE-{uuid.uuid4().hex[:8]}",
-            fulfillment_type=fulfillment_type,
+            product_category_snapshot=category,
         )
         db.add(holding)
-        if fulfillment_type == "order":
-            order_holding = holding
     db.commit()
 
     payments_crud.update_status(db, payment.id, PaymentStatus.CANCELLED)
 
     remaining = _holdings(db, attendee.id)
-    assert remaining == [order_holding]
+    assert remaining == []
     assert (
         len(
             db.exec(
@@ -254,11 +249,11 @@ def test_cancelling_typed_mixed_payment_preserves_order_and_snapshots(
     assert db.get(Attendees, attendee.id) is not None
 
 
-def test_cancelling_side_only_order_preserves_snapshot_without_identity(
+def test_cancelling_generic_line_preserves_snapshot_without_identity(
     db: Session, tenant_a: Tenants
 ) -> None:
     popup = _make_popup(db, tenant_a)
-    product = _make_product(db, popup, "order")
+    product = _make_product(db, popup, "merch")
     payment = Payments(
         tenant_id=popup.tenant_id,
         popup_id=popup.id,
@@ -273,8 +268,7 @@ def test_cancelling_side_only_order_preserves_snapshot_without_identity(
         product_id=product.id,
         product_name=product.name,
         product_price=product.price,
-        product_category=product.category or "ticket",
-        fulfillment_type="order",
+        product_category=product.category or "merch",
     )
     db.add(line)
     db.commit()

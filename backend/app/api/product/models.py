@@ -3,7 +3,7 @@ from datetime import datetime
 from decimal import Decimal
 from typing import TYPE_CHECKING
 
-from sqlalchemy import CheckConstraint, Index, text
+from sqlalchemy import Index, text
 from sqlalchemy import Numeric as SaNumerical
 from sqlalchemy.dialects.postgresql import UUID
 from sqlmodel import Column, DateTime, Field, Relationship
@@ -26,12 +26,6 @@ class Products(ProductBase, table=True):
     """Product model for tickets, passes, and other purchasable items."""
 
     __table_args__ = (
-        CheckConstraint(
-            "fulfillment_type IS NULL OR fulfillment_type IN "
-            "('access', 'participant', 'order')",
-            name="ck_products_fulfillment_type",
-        ),
-        Index("ix_products_fulfillment_type", "fulfillment_type"),
         Index(
             "uq_product_slug_popup_id_active",
             "slug",
@@ -55,8 +49,6 @@ class Products(ProductBase, table=True):
             primary_key=True,
         ),
     )
-    fulfillment_type: str | None = Field(default=None, nullable=True)
-
     # Soft-delete marker. When set, the row is hidden from all user-facing queries
     # and its slug is released by the partial unique index above.
     deleted_at: datetime | None = Field(

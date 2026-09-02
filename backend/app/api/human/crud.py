@@ -366,39 +366,17 @@ class HumansCRUD(BaseCRUD[Humans, HumanCreate, HumanUpdate]):
     ) -> HumanProfileStats:
         """Aggregate popups history + total_days for a human's profile page.
 
-        A popup counts as "attended" when the human is either the application
-        owner (Applications.human_id) or a direct-sale attendee
-        (Attendees.human_id with no application). Per-popup days are derived
-        from purchased tickets (AttendeeProducts.payment_id IS NOT NULL) on
-        the main attendee — FULL tickets snap to the popup duration, MONTH
-        adds 30, WEEK adds 7, DAY counts each row as 1, all capped at popup
+        A popup counts as attended when the human directly owns an active
+        allocated ticket unit. Ticket duration remains capped at the popup
         duration when known.
         """
-        from app.api.application.models import Applications
         from app.api.attendee.models import AttendeeProducts, Attendees
         from app.api.popup.models import Popups
 
         main_attendees = list(
             session.exec(
                 select(Attendees)
-                .join(Applications, Attendees.application_id == Applications.id)  # type: ignore[arg-type]
-                .where(Applications.human_id == human_id)
-                .options(
-                    selectinload(Attendees.popup),  # type: ignore[arg-type]
-                    selectinload(Attendees.attendee_products).selectinload(  # type: ignore[arg-type]
-                        AttendeeProducts.product  # ty: ignore[invalid-argument-type]
-                    ),
-                )
-            ).all()
-        )
-
-        direct_attendees = list(
-            session.exec(
-                select(Attendees)
-                .where(
-                    Attendees.human_id == human_id,
-                    Attendees.application_id.is_(None),  # type: ignore[union-attr]
-                )
+                .where(Attendees.human_id == human_id)
                 .options(
                     selectinload(Attendees.popup),  # type: ignore[arg-type]
                     selectinload(Attendees.attendee_products).selectinload(  # type: ignore[arg-type]
@@ -409,7 +387,7 @@ class HumansCRUD(BaseCRUD[Humans, HumanCreate, HumanUpdate]):
         )
 
         per_popup: dict[uuid.UUID, HumanProfileStatsPopup] = {}
-        for attendee in [*main_attendees, *direct_attendees]:
+        for attendee in main_attendees:
             popup: Popups | None = attendee.popup
             if popup is None:
                 continue
@@ -645,14 +623,18 @@ def _popup_duration_days(popup) -> int | None:  # noqa: ANN001
 
 
 def _days_for_attendee(attendee, popup_days: int | None) -> int:  # noqa: ANN001
-    """Sum days from purchased tickets, capped at popup duration when known."""
+    """Sum days from active ticket units, capped at the popup duration."""
     total = 0
     has_full = False
     for ap in attendee.attendee_products:
-        if ap.payment_id is None:
+        if (
+            ap.attendee_id is None
+            or ap.revoked_at is not None
+            or ap.product_category_snapshot != CATEGORY_TICKET
+        ):
             continue
         product = ap.product
-        if product is None or product.category != CATEGORY_TICKET:
+        if product is None:
             continue
         duration = product.duration_type
         if duration == TicketDuration.FULL:

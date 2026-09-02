@@ -24,6 +24,7 @@ from app.api.payment.models import Payments
 from app.api.popup.models import Popups
 from app.api.product.models import Products
 from app.api.tenant.models import Tenants
+from tests._flow_helpers import application_flow_id
 
 
 def _auth(token: str) -> dict[str, str]:
@@ -72,6 +73,7 @@ def _make_application(
     submitted_at: datetime | None = None,
 ) -> Applications:
     application = Applications(
+        sales_flow_id=application_flow_id(db, popup.id),
         id=uuid.uuid4(),
         tenant_id=tenant.id,
         popup_id=popup.id,
@@ -128,6 +130,7 @@ def _add_tickets(
                 tenant_id=tenant.id,
                 attendee_id=attendee.id,
                 product_id=product.id,
+                product_category_snapshot="ticket",
                 check_in_code=uuid.uuid4().hex[:10],
             )
         )

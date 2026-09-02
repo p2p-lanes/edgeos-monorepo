@@ -21,7 +21,6 @@ from app.api.payment.models import PaymentProducts, Payments
 from app.api.payment.schemas import PaymentStatus, PaymentType
 from app.api.popup.models import Popups
 from app.api.product.models import Products
-from app.api.product.schemas import FulfillmentType
 from app.api.tenant.models import Tenants
 
 
@@ -366,7 +365,7 @@ class TestRevenueBreakdownNetReconciliation:
 class TestCategorySourceConsistency:
     """Legacy NULL lines retain deterministic category fallback reporting."""
 
-    def test_cumulative_tickets_count_live_category(
+    def test_cumulative_tickets_count_snapshot_category(
         self, db: Session, tenant_a: Tenants
     ) -> None:
         popup = Popups(
@@ -418,7 +417,7 @@ class TestCategorySourceConsistency:
                 quantity=2,
                 product_name=ticket.name,
                 product_price=Decimal("250.00"),
-                product_category="month",
+                product_category="ticket",
             )
         )
         db.commit()
@@ -503,7 +502,7 @@ class TestTypedOwnershipReporting:
         db.add(popup)
         db.flush()
 
-        def product(name: str, category: str, kind: str | None, duration=None):
+        def product(name: str, category: str, _kind: str | None, duration=None):
             item = Products(
                 tenant_id=tenant_a.id,
                 popup_id=popup.id,
@@ -511,7 +510,6 @@ class TestTypedOwnershipReporting:
                 slug=f"{name.lower().replace(' ', '-')}-{uuid.uuid4().hex[:6]}",
                 price=Decimal("10.00"),
                 category=category,
-                fulfillment_type=kind,
                 duration_type=duration,
                 discountable=True,
             )
@@ -519,21 +517,15 @@ class TestTypedOwnershipReporting:
             db.flush()
             return item
 
-        access = product("Custom Access", "vip", FulfillmentType.ACCESS.value, "week")
+        access = product("Custom Access", "vip", "access", "week")
         participant_ticket = product(
-            "Participant Ticket", "ticket", FulfillmentType.PARTICIPANT.value, "day"
+            "Participant Ticket", "ticket", "participant", "day"
         )
-        order_ticket = product(
-            "Order Ticket", "ticket", FulfillmentType.ORDER.value, "month"
-        )
-        housing = product("Cabin", "housing", FulfillmentType.ORDER.value)
-        access_housing = product(
-            "Access Housing", "housing", FulfillmentType.ACCESS.value, "day"
-        )
-        participant_housing = product(
-            "Participant Housing", "housing", FulfillmentType.PARTICIPANT.value
-        )
-        merch = product("Merch", "merch", FulfillmentType.ORDER.value)
+        order_ticket = product("Order Ticket", "ticket", "order", "month")
+        housing = product("Cabin", "housing", "order")
+        access_housing = product("Access Housing", "housing", "access", "day")
+        participant_housing = product("Participant Housing", "housing", "participant")
+        merch = product("Merch", "merch", "order")
         legacy_ticket = product("Legacy Pass", "ticket", None, "full")
         legacy_housing = product("Legacy Lodge", "housing", None)
 
@@ -566,13 +558,12 @@ class TestTypedOwnershipReporting:
                 product_name=item.name,
                 product_price=item.price,
                 product_category=item.category,
-                fulfillment_type=item.fulfillment_type,
             )
             db.add(snapshot)
             db.flush()
             return snapshot
 
-        def hold(attendee, snapshot, kind):
+        def hold(attendee, snapshot, _kind):
             db.add(
                 AttendeeProducts(
                     tenant_id=tenant_a.id,
@@ -582,7 +573,7 @@ class TestTypedOwnershipReporting:
                     payment_id=snapshot.payment_id,
                     payment_product_id=snapshot.id,
                     unit_index=0,
-                    fulfillment_type=kind,
+                    product_category_snapshot="ticket",
                 )
             )
 
@@ -625,35 +616,37 @@ class TestTypedOwnershipReporting:
         data = response.json()
 
         metrics = data["key_metrics"]
-        assert metrics["people"] == 7
-        assert metrics["paying_people"] == 4
-        assert Decimal(str(metrics["accommodation_percentage"])) == Decimal("42.9")
+        assert metrics["people"] == 6
+        assert metrics["paying_people"] == 5
+        assert Decimal(str(metrics["accommodation_percentage"])) == Decimal("66.7")
         assert Decimal(str(metrics["total_revenue"])) == Decimal("390")
         assert Decimal(str(metrics["avg_ticket_price"])) == Decimal("97.50")
-        assert Decimal(str(metrics["avg_revenue_per_person"])) == Decimal("97.50")
+        assert Decimal(str(metrics["avg_revenue_per_person"])) == Decimal("78.00")
 
         assert (
-            sum(point["value"] for point in data["cumulative_trends"]["tickets"]) == 11
+            sum(point["value"] for point in data["cumulative_trends"]["tickets"]) == 4
         )
         distribution = data["distribution"]
         assert {
             row["label"]: row["value"] for row in distribution["tickets_by_duration"]
         } == {
-            "Day Pass": 7,
-            "Week Pass": 3,
+            "Day Pass": 1,
+            "Month Pass": 2,
             "Full Event": 1,
         }
         assert {
             row["label"]: row["value"]
             for row in distribution["accommodation_by_product"]
         } == {
+            "Access Housing": 7,
             "Cabin": 9,
             "Legacy Lodge": 1,
+            "Participant Housing": 11,
         }
         assert {
             row["ticket_type"]: (row["total_attendees"], row["with_accommodation"])
             for row in distribution["accommodation_attach_rate"]
-        } == {"Week Pass": (3, 2), "Full Event": (1, 1)}
+        } == {"Day Pass": (1, 1), "Week Pass": (3, 2), "Full Event": (1, 1)}
 
         categories = {
             row["category"]: (row["quantity"], Decimal(str(row["revenue"])))

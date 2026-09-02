@@ -150,6 +150,8 @@ class ProductLine(BaseModel):
     attendee_id: uuid.UUID | None = None
     recipient_key: str | None = Field(default=None, min_length=1, max_length=255)
 
+    model_config = ConfigDict(extra="forbid")
+
     @model_validator(mode="after")
     def validate_identity(self) -> "ProductLine":
         if self.attendee_id is not None and self.recipient_key is not None:

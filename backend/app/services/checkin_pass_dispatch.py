@@ -21,15 +21,18 @@ import uuid
 from datetime import UTC, datetime, timedelta
 
 from loguru import logger
-from sqlalchemy import text
+from sqlalchemy import and_, func, or_, text
 from sqlalchemy.orm import selectinload
 from sqlmodel import Session, select
 
+from app.api.application.models import Applications
 from app.api.attendee.crud import attendees_crud
-from app.api.attendee.models import AttendeeProducts
+from app.api.attendee.models import AttendeeProducts, Attendees
 from app.api.email_template.schemas import EmailTemplateType
 from app.api.human.models import Humans
+from app.api.payment.models import Payments
 from app.api.popup.models import Popups
+from app.api.product.models import Products
 from app.api.sales_flow.models import SalesFlows
 from app.api.tenant.utils import get_portal_url
 from app.services.checkin_qr import generate_checkin_qr_url
@@ -49,15 +52,51 @@ def _as_utc(dt: datetime | None) -> datetime | None:
     return dt if dt.tzinfo is not None else dt.replace(tzinfo=UTC)
 
 
-def _resolve_buyer(ticket: AttendeeProducts) -> Humans | None:
-    """The human who should receive the pass: the application owner (buyer),
-    falling back to the attendee's own human for direct sales."""
+def _resolve_buyer(db: Session, ticket: AttendeeProducts) -> Humans | None:
+    """Resolve immutable Payment buyer first, then allocated legacy ownership."""
+    if ticket.payment_id is not None:
+        payment = db.get(Payments, ticket.payment_id)
+        if payment is not None and payment.buyer_human_id is not None:
+            return db.get(Humans, payment.buyer_human_id)
     attendee = ticket.attendee
     if attendee is None:
         return None
     if attendee.application is not None and attendee.application.human is not None:
         return attendee.application.human
     return attendee.human
+
+
+def _find_unsent_units(
+    db: Session, flow: SalesFlows, popup: Popups
+) -> list[AttendeeProducts]:
+    """Return active scannable units scoped to the flow's notification window."""
+    statement = (
+        select(AttendeeProducts)
+        .outerjoin(Attendees, AttendeeProducts.attendee_id == Attendees.id)  # type: ignore[arg-type]
+        .join(Products, AttendeeProducts.product_id == Products.id)  # type: ignore[arg-type]
+        .outerjoin(Applications, Attendees.application_id == Applications.id)  # type: ignore[arg-type]
+        .outerjoin(Payments, AttendeeProducts.payment_id == Payments.id)  # type: ignore[arg-type]
+        .where(
+            Products.popup_id == popup.id,
+            AttendeeProducts.revoked_at.is_(None),
+            AttendeeProducts.requires_check_in_snapshot.is_(True),
+            or_(
+                AttendeeProducts.attendee_id.is_(None),
+                func.lower(AttendeeProducts.product_category_snapshot) == "ticket",
+            ),
+            AttendeeProducts.checkin_pass_sent_at.is_(None),
+        )
+    )
+    scope = or_(
+        Applications.sales_flow_id == flow.id,
+        Payments.sales_flow_id == flow.id,
+    )
+    if flow.is_default:
+        scope = or_(
+            scope,
+            and_(Applications.id.is_(None), Payments.sales_flow_id.is_(None)),
+        )
+    return list(db.exec(statement.where(scope)).all())
 
 
 def _due_flows(db: Session, now: datetime) -> list[tuple[SalesFlows, Popups]]:
@@ -120,12 +159,7 @@ async def _send_flow_passes(
     A direct purchase names no door, so the popup's default flow answers for
     those tickets — otherwise nobody would, and the buyer would never get a QR.
     """
-    tickets = attendees_crud.find_unsent_checkin_pass_tickets(
-        db,
-        popup.id,
-        sales_flow_id=flow.id,
-        include_flowless=bool(flow.is_default),
-    )
+    tickets = _find_unsent_units(db, flow, popup)
     if not tickets:
         return {"emails_sent": 0, "tickets_marked": 0, "failures": 0}
 
@@ -133,7 +167,7 @@ async def _send_flow_passes(
     # drop tickets whose buyer has no email.
     by_buyer: dict[uuid.UUID, tuple[Humans, list[AttendeeProducts]]] = {}
     for ticket in tickets:
-        buyer = _resolve_buyer(ticket)
+        buyer = _resolve_buyer(db, ticket)
         if buyer is None or not buyer.email:
             logger.warning(
                 "Skipping check-in pass for ticket {}: no buyer email", ticket.id
@@ -158,7 +192,7 @@ async def _send_flow_passes(
         try:
             qrs = [
                 CheckInQrItem(
-                    attendee_name=t.attendee.name,
+                    attendee_name=t.attendee.name if t.attendee else buyer.display_name,
                     product_name=t.product.name,
                     check_in_code=t.check_in_code,
                     qr_url=generate_checkin_qr_url(t.check_in_code),

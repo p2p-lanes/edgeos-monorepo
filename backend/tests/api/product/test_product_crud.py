@@ -30,7 +30,6 @@ def _create_product_payload(popup_id: uuid.UUID, *, suffix: str) -> dict:
         "name": f"Sale Window Test Product {suffix}",
         "price": "50.00",
         "category": "ticket",
-        "fulfillment_type": "access",
     }
 
 
@@ -46,11 +45,11 @@ def test_product_create_and_batch_enforce_fulfillment_type(
     tenant_a: Tenants,
 ) -> None:
     item = _create_product_payload(popup_tenant_a.id, suffix=str(fulfillment_type))
-    if fulfillment_type == "missing":
-        item.pop("fulfillment_type")
-    else:
+    if fulfillment_type != "missing":
         item["fulfillment_type"] = fulfillment_type
     batch = endpoint == "batch"
+    if batch:
+        item.pop("popup_id")
     response = client.post(
         "/api/v1/products/batch" if batch else "/api/v1/products",
         headers=(
@@ -62,16 +61,16 @@ def test_product_create_and_batch_enforce_fulfillment_type(
         if batch
         else item,
     )
-    valid = fulfillment_type in {"access", "participant", "order"}
+    valid = fulfillment_type == "missing"
     assert response.status_code == ((207 if batch else 201) if valid else 422), (
         response.text
     )
     if valid:
         body = response.json()[0] if batch else response.json()
-        assert body["fulfillment_type"] == fulfillment_type
+        assert "fulfillment_type" not in body
 
 
-def test_product_public_reads_legacy_null_fulfillment_type(
+def test_product_public_omits_fulfillment_type(
     client: TestClient,
     db: Session,
     admin_token_tenant_a: str,
@@ -84,7 +83,6 @@ def test_product_public_reads_legacy_null_fulfillment_type(
         name="Legacy unclassified product",
         slug=f"legacy-unclassified-{uuid.uuid4().hex[:8]}",
         price=10,
-        fulfillment_type=None,
     )
     db.add(product)
     db.commit()
@@ -93,10 +91,10 @@ def test_product_public_reads_legacy_null_fulfillment_type(
         headers=_admin_headers(admin_token_tenant_a),
     )
     assert response.status_code == 200, response.text
-    assert response.json()["fulfillment_type"] is None
+    assert "fulfillment_type" not in response.json()
 
 
-def test_product_patch_distinguishes_omitted_from_explicit_null_type(
+def test_product_patch_rejects_fulfillment_type(
     client: TestClient,
     admin_token_tenant_a: str,
     popup_tenant_a: Popups,
@@ -114,21 +112,14 @@ def test_product_patch_distinguishes_omitted_from_explicit_null_type(
         json={"name": "Renamed without classification"},
     )
     assert omitted.status_code == 200, omitted.text
-    assert omitted.json()["fulfillment_type"] == "access"
-    for invalid in (None, "unsupported"):
+    assert "fulfillment_type" not in omitted.json()
+    for invalid in (None, "unsupported", "order"):
         rejected = client.patch(
             f"/api/v1/products/{product_id}",
             headers=_admin_headers(admin_token_tenant_a),
             json={"fulfillment_type": invalid},
         )
         assert rejected.status_code == 422, rejected.text
-    changed = client.patch(
-        f"/api/v1/products/{product_id}",
-        headers=_admin_headers(admin_token_tenant_a),
-        json={"fulfillment_type": "order"},
-    )
-    assert changed.status_code == 200, changed.text
-    assert changed.json()["fulfillment_type"] == "order"
 
 
 # ---------------------------------------------------------------------------

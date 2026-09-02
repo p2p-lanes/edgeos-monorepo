@@ -1,7 +1,7 @@
 import random
 import string
 import uuid
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Any
 
 from fastapi import HTTPException, status
@@ -34,25 +34,41 @@ def _attendee_condition_expression(condition: AttendeeFilterCondition):
 
 
 def _access_holding_exists():
-    """Typed access, plus legacy NULL ticket-category holdings until drain."""
-    from app.api.product.models import Products
-    from app.api.product.schemas import FulfillmentType
-
+    """Match an active allocated ticket unit by immutable category."""
     return (
         select(AttendeeProducts.id)
-        .join(Products, Products.id == AttendeeProducts.product_id)
         .where(
             AttendeeProducts.attendee_id == Attendees.id,
-            or_(
-                AttendeeProducts.fulfillment_type == FulfillmentType.ACCESS.value,
-                and_(
-                    AttendeeProducts.fulfillment_type.is_(None),
-                    Products.category == "ticket",
-                ),
-            ),
+            AttendeeProducts.revoked_at.is_(None),
+            AttendeeProducts.product_category_snapshot == "ticket",
         )
         .exists()
     )
+
+
+def unit_authority_predicate(human_id: uuid.UUID, popup_id: uuid.UUID):
+    """Authorize a unit by allocation or immutable payment buyer lineage."""
+    from app.api.application.models import Applications
+    from app.api.payment.models import PaymentProducts, Payments
+
+    allocated = and_(
+        Attendees.popup_id == popup_id,
+        or_(
+            Attendees.human_id == human_id,
+            and_(
+                Applications.human_id == human_id,
+                Applications.popup_id == popup_id,
+                Applications.tenant_id == Attendees.tenant_id,
+            ),
+        ),
+    )
+    purchased = and_(
+        PaymentProducts.id == AttendeeProducts.payment_product_id,
+        PaymentProducts.payment_id == Payments.id,
+        Payments.buyer_human_id == human_id,
+        Payments.popup_id == popup_id,
+    )
+    return or_(allocated, purchased)
 
 
 def build_attendee_filter_expression(filters: AttendeeFilters):
@@ -75,24 +91,21 @@ def generate_check_in_code(prefix: str = "") -> str:
     return f"{prefix}{code}"
 
 
-def _require_holding_fulfillment_type(product: Any, *, access_only: bool) -> str:
-    if product.fulfillment_type is None:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Some products are not available or inactive",
-        )
-    allowed = {"access"} if access_only else {"access", "participant"}
-    if product.fulfillment_type not in allowed:
-        detail = (
-            "Only access products can be granted as tickets"
-            if access_only
-            else "Only access or participant products can be attached to attendees"
-        )
+def _grant_unit_id(
+    attendee_id: uuid.UUID, grant_key: str, line_index: int, unit_index: int
+) -> uuid.UUID:
+    """Derive a stable paymentless unit identity from one grant request."""
+    return uuid.uuid5(
+        attendee_id, f"product-unit-grant:{grant_key}:{line_index}:{unit_index}"
+    )
+
+
+def _require_ticket_product(product: Any) -> None:
+    if (product.category or "").lower() != "ticket":
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail=detail,
+            detail="Only ticket products can be granted as tickets",
         )
-    return product.fulfillment_type
 
 
 class AttendeesCRUD(BaseCRUD[Attendees, AttendeeCreate, AttendeeUpdate]):
@@ -116,7 +129,8 @@ class AttendeesCRUD(BaseCRUD[Attendees, AttendeeCreate, AttendeeUpdate]):
             select(AttendeeProducts)
             .where(
                 AttendeeProducts.check_in_code == code,
-                AttendeeProducts.fulfillment_type == "access",
+                AttendeeProducts.revoked_at.is_(None),
+                AttendeeProducts.product_category_snapshot == "ticket",
             )
             .options(
                 selectinload(AttendeeProducts.attendee),  # type: ignore[arg-type]
@@ -931,7 +945,6 @@ class AttendeesCRUD(BaseCRUD[Attendees, AttendeeCreate, AttendeeUpdate]):
                 ),
             )
 
-        fulfillment_type = _require_holding_fulfillment_type(product, access_only=False)
         if payment_id is not None:
             raise HTTPException(
                 status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
@@ -957,7 +970,8 @@ class AttendeesCRUD(BaseCRUD[Attendees, AttendeeCreate, AttendeeUpdate]):
             product_id=product_id,
             check_in_code=generate_check_in_code(check_in_code_prefix),
             payment_id=payment_id,
-            fulfillment_type=fulfillment_type,
+            product_category_snapshot=product.category,
+            requires_check_in_snapshot=product.requires_check_in,
         )
         session.add(ticket)
 
@@ -993,6 +1007,7 @@ class AttendeesCRUD(BaseCRUD[Attendees, AttendeeCreate, AttendeeUpdate]):
         items: list[tuple[uuid.UUID, int]],
         tenant_id: uuid.UUID | None = None,
         actor: AuditActor | None = None,
+        grant_key: str | None = None,
     ) -> None:
         """Add multiple tickets (product × quantity) to an attendee atomically.
 
@@ -1004,7 +1019,9 @@ class AttendeesCRUD(BaseCRUD[Attendees, AttendeeCreate, AttendeeUpdate]):
         """
         from app.api.product.crud import products_crud
 
-        attendee = session.get(Attendees, attendee_id)
+        attendee = session.exec(
+            select(Attendees).where(Attendees.id == attendee_id).with_for_update()
+        ).first()
         if attendee is None:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
@@ -1014,7 +1031,7 @@ class AttendeesCRUD(BaseCRUD[Attendees, AttendeeCreate, AttendeeUpdate]):
             tenant_id = attendee.tenant_id
 
         products = []
-        for product_id, quantity in items:
+        for line_index, (product_id, quantity) in enumerate(items):
             product = products_crud.get(session, product_id)
             if product is None or product.popup_id != attendee.popup_id:
                 raise HTTPException(
@@ -1026,33 +1043,62 @@ class AttendeesCRUD(BaseCRUD[Attendees, AttendeeCreate, AttendeeUpdate]):
                     status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
                     detail=f"'{product.name}' is not available",
                 )
-            fulfillment_type = _require_holding_fulfillment_type(
-                product, access_only=True
-            )
-            products.append((product, quantity, fulfillment_type))
+            _require_ticket_product(product)
+            products.append((line_index, product, quantity))
 
         added: list[dict] = []
-        for product, quantity, fulfillment_type in products:
+        for line_index, product, quantity in products:
+            unit_ids = [
+                _grant_unit_id(attendee_id, grant_key, line_index, unit_index)
+                if grant_key
+                else uuid.uuid4()
+                for unit_index in range(quantity)
+            ]
+            existing = {
+                unit.id: unit
+                for unit in session.exec(
+                    select(AttendeeProducts)
+                    .where(AttendeeProducts.id.in_(unit_ids))  # type: ignore[attr-defined]
+                    .with_for_update()
+                ).all()
+            }
+            for unit in existing.values():
+                if (
+                    unit.tenant_id != tenant_id
+                    or unit.attendee_id != attendee_id
+                    or unit.product_id != product.id
+                    or unit.payment_id is not None
+                    or unit.payment_product_id is not None
+                    or unit.unit_index is not None
+                ):
+                    raise HTTPException(
+                        status_code=status.HTTP_409_CONFLICT,
+                        detail="Grant identity conflicts with an existing product unit",
+                    )
+            missing_ids = [unit_id for unit_id in unit_ids if unit_id not in existing]
+            if not missing_ids:
+                continue
             # Atomic decrement of the whole quantity (409 if insufficient).
-            products_crud.decrement_total_stock(session, product.id, quantity)
+            products_crud.decrement_total_stock(session, product.id, len(missing_ids))
 
-            for _ in range(quantity):
+            for unit_id in missing_ids:
                 session.add(
                     AttendeeProducts(
-                        id=uuid.uuid4(),
+                        id=unit_id,
                         tenant_id=tenant_id,
                         attendee_id=attendee_id,
                         product_id=product.id,
                         check_in_code=generate_check_in_code(),
                         payment_id=None,
-                        fulfillment_type=fulfillment_type,
+                        product_category_snapshot=product.category,
+                        requires_check_in_snapshot=product.requires_check_in,
                     )
                 )
             added.append(
                 {
                     "product_id": str(product.id),
                     "product_name": product.name,
-                    "quantity": quantity,
+                    "quantity": len(missing_ids),
                 }
             )
 
@@ -1169,9 +1215,7 @@ class AttendeesCRUD(BaseCRUD[Attendees, AttendeeCreate, AttendeeUpdate]):
                 status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
                 detail="Product belongs to a different popup",
             )
-        fulfillment_type = _require_holding_fulfillment_type(
-            new_product, access_only=True
-        )
+        _require_ticket_product(new_product)
 
         # Decrement the new product first so a sold-out 409 aborts before any
         # mutation. Restore the old product only once the new one is secured.
@@ -1179,7 +1223,8 @@ class AttendeesCRUD(BaseCRUD[Attendees, AttendeeCreate, AttendeeUpdate]):
         products_crud.restore_total_stock(session, old_product_id, 1)
 
         ticket.product_id = new_product_id
-        ticket.fulfillment_type = fulfillment_type
+        ticket.product_category_snapshot = new_product.category
+        ticket.requires_check_in_snapshot = new_product.requires_check_in
         session.add(ticket)
 
         if actor is not None:
@@ -1300,23 +1345,34 @@ class AttendeesCRUD(BaseCRUD[Attendees, AttendeeCreate, AttendeeUpdate]):
         ticket_id: uuid.UUID,
         actor: AuditActor | None = None,
     ) -> None:
-        """Remove a single ticket from an attendee and restore its stock (admin).
-
-        Unlike the lower-level remove_ticket helper, this asserts ownership and
-        restores one unit of the product's inventory — the admin panel frees the
-        ticket back to the pool, mirroring the cancel/refund flow.
-        """
+        """Revoke one paymentless unit and restore its stock exactly once."""
         from app.api.product.crud import products_crud
         from app.api.product.models import Products
 
-        ticket = session.get(AttendeeProducts, ticket_id)
+        ticket = session.exec(
+            select(AttendeeProducts)
+            .where(AttendeeProducts.id == ticket_id)
+            .with_for_update()
+            .execution_options(populate_existing=True)
+        ).first()
         if ticket is None or ticket.attendee_id != attendee_id:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Ticket not found",
             )
+        if ticket.payment_id is not None:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Paid product units can only be revoked by cancelling their payment",
+            )
+
+        if ticket.revoked_at is not None:
+            session.commit()
+            return
 
         products_crud.restore_total_stock(session, ticket.product_id, 1)
+        ticket.revoked_at = datetime.now(UTC)
+        session.add(ticket)
 
         if actor is not None:
             attendee = session.get(Attendees, attendee_id)
@@ -1334,7 +1390,6 @@ class AttendeesCRUD(BaseCRUD[Attendees, AttendeeCreate, AttendeeUpdate]):
                     },
                 )
 
-        session.delete(ticket)
         session.commit()
 
     def clear_products(
@@ -1388,8 +1443,9 @@ class AttendeesCRUD(BaseCRUD[Attendees, AttendeeCreate, AttendeeUpdate]):
             .outerjoin(Applications, Attendees.application_id == Applications.id)  # type: ignore[arg-type]
             .where(
                 Attendees.popup_id == popup_id,
-                Products.requires_check_in.is_(True),  # type: ignore[union-attr]
-                AttendeeProducts.fulfillment_type == "access",
+                AttendeeProducts.revoked_at.is_(None),
+                AttendeeProducts.product_category_snapshot == "ticket",
+                AttendeeProducts.requires_check_in_snapshot.is_(True),
                 AttendeeProducts.checkin_pass_sent_at.is_(None),  # type: ignore[union-attr]
             )
             .options(

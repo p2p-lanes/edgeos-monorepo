@@ -21,7 +21,6 @@ from app.api.attendee.models import AttendeeProducts, Attendees
 from app.api.attendee_category.models import AttendeeCategories
 from app.api.popup.models import Popups
 from app.api.product.models import Products
-from app.api.product.schemas import FulfillmentType
 from app.api.tenant.models import Tenants
 from tests.api.application_review.test_pending_reviews import (
     _auth,
@@ -74,14 +73,14 @@ def _make_attendee(
     return attendee
 
 
-def _make_ticket(db, tenant, popup, attendee, kind=FulfillmentType.ACCESS):
+def _make_ticket(db, tenant, popup, attendee, category="ticket"):
     product = Products(
         tenant_id=tenant.id,
         popup_id=popup.id,
         name="Filters Ticket",
         slug=f"filters-ticket-{uuid.uuid4().hex[:8]}",
         price=Decimal("10.00"),
-        fulfillment_type=kind.value,
+        category=category,
     )
     db.add(product)
     db.flush()
@@ -91,7 +90,7 @@ def _make_ticket(db, tenant, popup, attendee, kind=FulfillmentType.ACCESS):
             attendee_id=attendee.id,
             product_id=product.id,
             check_in_code=f"FLT{uuid.uuid4().hex[:8].upper()}",
-            fulfillment_type=kind.value,
+            product_category_snapshot=category,
         )
     )
     db.commit()
@@ -216,7 +215,7 @@ class TestAttendeeListFilters:
         with_participant = _make_attendee(db, tenant_a, popup)
         without_ticket = _make_attendee(db, tenant_a, popup)
         _make_ticket(db, tenant_a, popup, with_ticket)
-        _make_ticket(db, tenant_a, popup, with_participant, FulfillmentType.PARTICIPANT)
+        _make_ticket(db, tenant_a, popup, with_participant, "meal_plan")
 
         response = _list(
             client, admin, tenant_a, popup, _one("has_tickets", "eq", True)

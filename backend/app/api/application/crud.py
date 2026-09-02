@@ -730,7 +730,11 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
         # nested under the main applicant. Gate on an accepted parent
         # application, on the attendee holding at least one product, and on the
         # category being directory-visible (main/spouse — kids are excluded).
-        has_products = exists().where(AttendeeProducts.attendee_id == Attendees.id)
+        has_products = exists().where(
+            AttendeeProducts.attendee_id == Attendees.id,
+            AttendeeProducts.revoked_at.is_(None),
+            AttendeeProducts.product_category_snapshot == "ticket",
+        )
         base_statement = (
             select(Attendees)
             .join(Applications, Attendees.application_id == Applications.id)  # type: ignore[arg-type]
@@ -813,7 +817,11 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
         match on the human's first/last name.
         """
 
-        has_products = exists().where(AttendeeProducts.attendee_id == Attendees.id)
+        has_products = exists().where(
+            AttendeeProducts.attendee_id == Attendees.id,
+            AttendeeProducts.revoked_at.is_(None),
+            AttendeeProducts.product_category_snapshot == "ticket",
+        )
         # info_not_shared is a Postgres text[] column, so name-hiding is detected
         # with the array-overlap operator (&&): true when the list shares any
         # element with {first_name, last_name}. (?| is a JSONB operator and does

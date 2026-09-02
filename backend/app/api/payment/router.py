@@ -6,8 +6,10 @@ from ipaddress import ip_address
 from typing import TYPE_CHECKING, Annotated, Any, Literal
 
 from fastapi import APIRouter, HTTPException, Query, Request, Response, status
-from sqlmodel import Session
+from sqlalchemy.orm import selectinload
+from sqlmodel import Session, select
 
+from app.api.attendee.models import AttendeeProducts
 from app.api.audit_log.actor import actor_from_human
 from app.api.payment.crud import payments_crud
 from app.api.payment.models import Payments
@@ -16,6 +18,8 @@ from app.api.payment.schemas import (
     PaymentCreate,
     PaymentFilter,
     PaymentPreview,
+    PaymentProductResponse,
+    PaymentProductUnitResponse,
     PaymentPublic,
     PaymentSource,
     PaymentStatus,
@@ -65,6 +69,61 @@ router = APIRouter(prefix="/payments", tags=["payments"])
 
 _META_BROWSER_ID_PATTERN = re.compile(r"^fb\.1\.\d{10,13}\.[A-Za-z0-9._-]{1,256}$")
 _MAX_USER_AGENT_LENGTH = 512
+
+
+def _payment_public_with_units(
+    db: Session,
+    payments: list[Payments],
+    tenant_id: uuid.UUID,
+    human_id: uuid.UUID,
+) -> list[PaymentPublic]:
+    """Expose operational units only for payments bought by this Human."""
+    line_ids = [line.id for payment in payments for line in payment.products_snapshot]
+    units_by_line: dict[uuid.UUID, list[PaymentProductUnitResponse]] = {
+        line_id: [] for line_id in line_ids
+    }
+    buyer_line_ids = [
+        line.id
+        for payment in payments
+        if payment.buyer_human_id == human_id
+        for line in payment.products_snapshot
+    ]
+    if buyer_line_ids:
+        units = db.exec(
+            select(AttendeeProducts)
+            .where(
+                AttendeeProducts.tenant_id == tenant_id,
+                AttendeeProducts.payment_product_id.in_(buyer_line_ids),  # type: ignore[union-attr]
+            )
+            .options(selectinload(AttendeeProducts.product))  # type: ignore[arg-type]
+        ).all()
+        for unit in units:
+            requires_check_in = unit.requires_check_in_snapshot
+            if requires_check_in is None:
+                requires_check_in = unit.product.requires_check_in
+            units_by_line[unit.payment_product_id].append(  # type: ignore[index]
+                PaymentProductUnitResponse(
+                    id=unit.id,
+                    attendee_id=unit.attendee_id,
+                    check_in_code=unit.check_in_code,
+                    active=unit.revoked_at is None,
+                    requires_check_in=requires_check_in,
+                )
+            )
+
+    return [
+        PaymentPublic.model_validate(payment).model_copy(
+            update={
+                "products_snapshot": [
+                    PaymentProductResponse.model_validate(line).model_copy(
+                        update={"units": units_by_line[line.id]}
+                    )
+                    for line in payment.products_snapshot
+                ]
+            }
+        )
+        for payment in payments
+    ]
 
 
 def _normalize_payment_source(provider: str | None) -> str:
@@ -634,7 +693,9 @@ async def list_my_payments_by_popup(
     payments, total = payments_crud.find_by_human_popup(
         db, human_id=current_human.id, popup_id=popup_id, skip=skip, limit=limit
     )
-    results = [PaymentPublic.model_validate(p) for p in payments]
+    results = _payment_public_with_units(
+        db, payments, current_human.tenant_id, current_human.id
+    )
     return ListModel[PaymentPublic](
         results=results,
         paging=Paging(offset=skip, limit=limit, total=total),

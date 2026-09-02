@@ -95,18 +95,7 @@ class PurchaseContext:
 def _holds_product(
     session: Session, popup_id: uuid.UUID, human_id: uuid.UUID, product_id: uuid.UUID
 ) -> bool:
-    """Does `human_id` hold `product_id` in this popup, however they got it?
-
-    `attendee_products` is the holding table: an approved payment writes
-    rows there on approval, and an admin grant writes them directly with no
-    payment at all. Reading it answers both cases with one query and keeps
-    this predicate identical to
-    `sales_flow/eligibility.py::has_popup_products` — the divergence
-    between those two was F1.
-
-    Revocation stays live: cancelling an approved payment deletes the rows
-    it created, so access disappears with them.
-    """
+    """Whether the human owns an active allocated ticket for this product."""
     from sqlalchemy import exists as sa_exists
     from sqlmodel import select
 
@@ -115,6 +104,9 @@ def _holds_product(
     stmt = select(
         sa_exists().where(
             AttendeeProducts.product_id == product_id,
+            AttendeeProducts.attendee_id.is_not(None),
+            AttendeeProducts.revoked_at.is_(None),
+            AttendeeProducts.product_category_snapshot == "ticket",
             AttendeeProducts.attendee_id.in_(  # type: ignore[union-attr]
                 select(Attendees.id).where(
                     Attendees.human_id == human_id,
@@ -129,28 +121,18 @@ def _holds_product(
 def _holds_category(
     session: Session, popup_id: uuid.UUID, human_id: uuid.UUID, category: str
 ) -> bool:
-    """Same as `_holds_product`, matched by the product's category.
-
-    The category comes from a live join to `Products`, not a purchase-time
-    snapshot: an admin-granted product has no payment row to snapshot, so
-    this is the one source available to both paths. Recategorising a product
-    therefore changes who matches, which is the honest reading of "holds
-    something in this category".
-    """
+    """Whether the human owns an active ticket snapshot in this category."""
     from sqlalchemy import exists as sa_exists
     from sqlmodel import select
 
     from app.api.attendee.models import AttendeeProducts, Attendees
-    from app.api.product.models import Products
 
     stmt = select(
         sa_exists().where(
-            AttendeeProducts.product_id.in_(  # type: ignore[union-attr]
-                select(Products.id).where(
-                    Products.popup_id == popup_id,
-                    Products.category == category,
-                )
-            ),
+            category == "ticket",
+            AttendeeProducts.attendee_id.is_not(None),
+            AttendeeProducts.revoked_at.is_(None),
+            AttendeeProducts.product_category_snapshot == category,
             AttendeeProducts.attendee_id.in_(  # type: ignore[union-attr]
                 select(Attendees.id).where(
                     Attendees.human_id == human_id,

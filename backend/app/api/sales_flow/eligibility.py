@@ -26,19 +26,18 @@ if TYPE_CHECKING:
 def has_popup_products(
     session: Session, human_id: uuid.UUID, popup_id: uuid.UUID
 ) -> bool:
-    """Whether an accessible Attendee has an active typed access holding."""
-    from app.api.attendee.crud import attendees_crud
-    from app.api.attendee.models import AttendeeProducts
-    from app.api.product.schemas import FulfillmentType
-
-    attendee_ids = attendees_crud._human_accessible_attendee_ids(human_id, popup_id)
+    """Whether the human owns an active allocated ticket unit."""
+    from app.api.attendee.models import AttendeeProducts, Attendees
 
     product_exists = select(
-        sa_exists().where(
-            AttendeeProducts.attendee_id.in_(  # type: ignore[union-attr]
-                select(attendee_ids.c.id)
-            ),
-            AttendeeProducts.fulfillment_type == FulfillmentType.ACCESS.value,
+        sa_exists()
+        .where(AttendeeProducts.attendee_id == Attendees.id)
+        .where(
+            Attendees.human_id == human_id,
+            Attendees.popup_id == popup_id,
+            AttendeeProducts.attendee_id.is_not(None),
+            AttendeeProducts.revoked_at.is_(None),
+            AttendeeProducts.product_category_snapshot == "ticket",
         )
     )
     return session.exec(product_exists).one()

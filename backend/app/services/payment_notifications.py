@@ -56,6 +56,8 @@ def _build_payment_email_attendees(
     for product_snapshot in payment.products_snapshot:
         attendee = product_snapshot.attendee
         attendee_id = product_snapshot.attendee_id
+        if attendee_id is None:
+            continue
 
         if attendee_id not in attendees_by_id:
             attendees_by_id[attendee_id] = PaymentAttendeeItem(
@@ -75,7 +77,7 @@ def _build_payment_email_attendees(
             ),
         ]
 
-    return list(attendees_by_id.values())
+    return list(attendees_by_id.values()) or None
 
 
 def _build_payment_confirmed_context(

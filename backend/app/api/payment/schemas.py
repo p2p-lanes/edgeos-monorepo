@@ -127,6 +127,7 @@ class PaymentProductBase(SQLModel):
         sa_column=Column(Numeric(10, 2), nullable=True),
     )
     product_category: str
+    requires_check_in_snapshot: bool | None = Field(default=None, nullable=True)
     product_currency: str = Field(
         default="USD",
         sa_column=Column(String(3), nullable=False, server_default="USD"),
@@ -301,6 +302,8 @@ class PaymentProductRequest(BaseModel):
     # metadata.
     purchase_metadata: dict | None = None
 
+    model_config = ConfigDict(extra="forbid")
+
     @model_validator(mode="after")
     def validate_request(self) -> "PaymentProductRequest":
         """Structural validation: unit_price_override must be non-negative if provided."""
@@ -309,6 +312,14 @@ class PaymentProductRequest(BaseModel):
         if self.unit_price_override is not None and self.unit_price_override < 0:
             raise ValueError("unit_price_override must be non-negative")
         return self
+
+
+class PaymentProductUnitResponse(BaseModel):
+    id: uuid.UUID
+    attendee_id: uuid.UUID | None = None
+    check_in_code: str
+    active: bool
+    requires_check_in: bool
 
 
 class PaymentProductResponse(BaseModel):
@@ -324,8 +335,10 @@ class PaymentProductResponse(BaseModel):
     product_price: Decimal
     effective_unit_price: Decimal | None = None
     product_category: str
+    requires_check_in_snapshot: bool | None = None
     product_currency: str
     attendee_name: str | None = None
+    units: list[PaymentProductUnitResponse] = PydanticField(default_factory=list)
     created_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
@@ -345,6 +358,8 @@ class PaymentCreate(BaseModel):
     coupon_code: str | None = None
     edit_passes: bool = False
     insurance: bool = False
+
+    model_config = ConfigDict(extra="forbid")
 
     @field_validator("products", mode="before")
     @classmethod

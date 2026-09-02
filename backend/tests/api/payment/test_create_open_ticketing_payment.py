@@ -26,12 +26,14 @@ from app.api.payment.models import PaymentProducts, Payments
 from app.api.payment.schemas import PaymentStatus
 from app.api.popup.models import Popups
 from app.api.product.models import Products
+from app.api.sales_flow.models import SalesFlows
 from app.api.shared.enums import SaleType
 from app.api.tenant.models import Tenants
 from app.services.simplefi.client import CancelOutcome
 from tests._flow_helpers import (
     coupon_flow_id,
     default_flow_id,
+    offer_category,
     seed_default_steps,
 )
 
@@ -79,6 +81,8 @@ def _make_product(
     price: str,
     attendee_category_id: uuid.UUID | None = None,
     insurance_eligible: bool = False,
+    category: str = "ticket",
+    requires_check_in: bool = False,
 ) -> Products:
     product = Products(
         id=uuid.uuid4(),
@@ -87,7 +91,8 @@ def _make_product(
         name=name,
         slug=f"prod-{uuid.uuid4().hex[:6]}",
         price=Decimal(price),
-        category="ticket",
+        category=category,
+        requires_check_in=requires_check_in,
         attendee_category_id=attendee_category_id,
         is_active=True,
         insurance_eligible=insurance_eligible,
@@ -814,18 +819,27 @@ def test_create_open_ticketing_payment_100_percent_coupon_auto_approves(
     db: Session,
     tenant_a: Tenants,
 ) -> None:
-    """A 100% coupon zeroes the cart: skip SimpleFI, mark APPROVED, materialize
-    AttendeeProducts so the router can fire the confirmation email."""
+    """A fully discounted Parking purchase materializes one ownerless unit."""
     popup = _make_popup(db, tenant_a, slug_prefix="full-coupon")
-    product = _make_product(db, popup, name="GA", price="75.00")
+    product = _make_product(
+        db,
+        popup,
+        name="Parking",
+        price="75.00",
+        category="parking",
+        requires_check_in=True,
+    )
+    offer_category(db, popup, "parking")
     coupon = _make_coupon(db, popup, code="FREEPASS", discount_value=100)
+    flow = db.get(SalesFlows, default_flow_id(db, popup.id))
+    assert flow is not None
     db.commit()
 
     obj = _purchase_create(
         email="buyer@test.com",
         first_name="Matias",
         last_name="Walter",
-        products=[(product, 2)],
+        products=[(product, 1)],
         form_data={},
         coupon_code="FREEPASS",
     )
@@ -836,6 +850,7 @@ def test_create_open_ticketing_payment_100_percent_coupon_auto_approves(
             obj=obj,
             popup=popup,
             tenant=tenant_a,
+            flow_slug=flow.slug,
         )
 
     mock_get_client.assert_not_called()
@@ -850,7 +865,16 @@ def test_create_open_ticketing_payment_100_percent_coupon_auto_approves(
             select(AttendeeProducts).where(AttendeeProducts.payment_id == payment.id)
         ).all()
     )
-    assert len(attendee_products) == 2
+    assert len(attendee_products) == 1
+    unit = attendee_products[0]
+    assert unit.attendee_id is None
+    assert unit.product_id == product.id
+    assert unit.payment_product_id is not None
+    assert unit.unit_index == 0
+    assert unit.check_in_code
+    assert unit.revoked_at is None
+    assert unit.product_category_snapshot == "parking"
+    assert unit.requires_check_in_snapshot is True
 
     db.expire(coupon)
     db.refresh(coupon)

@@ -156,6 +156,7 @@ def _attendee(
                     tenant_id=popup.tenant_id,
                     attendee_id=attendee.id,
                     product_id=prod.id,
+                    product_category_snapshot="ticket",
                     check_in_code=uuid.uuid4().hex[:10].upper(),
                 )
             )

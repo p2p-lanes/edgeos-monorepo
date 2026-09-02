@@ -221,7 +221,7 @@ def _validate_meal_product_references(
 
     products = products_crud.get_by_ids(db, list(product_ids))
     if len(products) != len(product_ids) or any(
-        product.popup_id != popup_id or product.fulfillment_type != "participant"
+        product.popup_id != popup_id or (product.category or "").lower() != "meal_plan"
         for product in products.values()
     ):
         raise HTTPException(

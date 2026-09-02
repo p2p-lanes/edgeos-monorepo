@@ -64,16 +64,12 @@ def test_seeded_popups_each_get_exactly_one_default_flow(db: Session) -> None:
     }
 
     assert products and snapshots and holdings and payments
-    assert all(product.fulfillment_type is not None for product in products)
-    assert all(snapshot.fulfillment_type is not None for snapshot in snapshots)
-    assert {holding.fulfillment_type for holding in holdings} <= {
-        "access",
-        "participant",
-    }
+    assert all(snapshot.product_category for snapshot in snapshots)
+    assert {holding.product_category_snapshot for holding in holdings} == {"ticket"}
     assert all(
         snapshot.attendee_id is None
         for snapshot in snapshots
-        if snapshot.fulfillment_type == "order"
+        if snapshot.product_category != "ticket"
     )
     assert all(
         payment.application_id is not None

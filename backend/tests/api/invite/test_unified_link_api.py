@@ -21,7 +21,6 @@ from app.api.human.models import Humans
 from app.api.invite.models import Invites
 from app.api.popup.models import Popups
 from app.api.product.models import Products
-from app.api.product.schemas import FulfillmentType
 from app.api.tenant.models import Tenants
 from app.api.user.models import Users
 from app.core.security import create_access_token
@@ -72,7 +71,7 @@ def _give_ticket(
     popup: Popups,
     human: Humans,
     *,
-    fulfillment_type: FulfillmentType = FulfillmentType.ACCESS,
+    product_category: str = "ticket",
     managed: bool = False,
 ) -> None:
     """Creating a portal link is gated on actually holding a ticket."""
@@ -82,8 +81,7 @@ def _give_ticket(
         name="Ticket",
         slug=f"tkt-{uuid.uuid4().hex[:8]}",
         price=Decimal("0"),
-        category="ticket",
-        fulfillment_type=fulfillment_type.value,
+        category=product_category,
     )
     db.add(product)
     db.flush()
@@ -103,7 +101,7 @@ def _give_ticket(
             attendee_id=attendee.id,
             product_id=product.id,
             check_in_code=uuid.uuid4().hex[:8].upper(),
-            fulfillment_type=fulfillment_type.value,
+            product_category_snapshot=product_category,
         )
     )
     db.commit()
@@ -197,14 +195,14 @@ class TestPortalLinkEndpoints:
             db,
             participant_popup,
             participant_human,
-            fulfillment_type=FulfillmentType.PARTICIPANT,
+            product_category="meal_plan",
         )
         assert create_link(participant_popup, participant_human).status_code == 403
 
         managed_popup = _make_popup(db, tenant_a)
         managed_human = _make_human(db, tenant_a)
         _give_ticket(db, managed_popup, managed_human, managed=True)
-        assert create_link(managed_popup, managed_human).status_code == 201
+        assert create_link(managed_popup, managed_human).status_code == 403
 
         rejected_popup = _make_popup(db, tenant_a)
         rejected_human = _make_human(db, tenant_a)

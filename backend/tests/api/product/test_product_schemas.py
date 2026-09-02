@@ -12,6 +12,19 @@ from pydantic import ValidationError
 from app.api.product.schemas import ProductCreate, ProductUpdate
 
 
+@pytest.mark.parametrize(
+    ("schema", "payload"),
+    [
+        (ProductCreate, {"popup_id": uuid.uuid4(), "name": "Ticket", "price": 10}),
+        (ProductUpdate, {"name": "Renamed"}),
+    ],
+)
+def test_product_writes_reject_fulfillment_type(schema, payload) -> None:
+    with pytest.raises(ValidationError) as error:
+        schema(**payload, fulfillment_type="access")
+    assert error.value.errors()[0]["type"] == "extra_forbidden"
+
+
 class TestProductCreatePatreonPrice:
     """ProductCreate must reject price > 0 for category=patreon."""
 
@@ -22,7 +35,6 @@ class TestProductCreatePatreonPrice:
             name="Patron",
             price=Decimal("0"),
             category="patreon",
-            fulfillment_type="order",
         )
         assert product.price == Decimal("0")
 
@@ -34,7 +46,6 @@ class TestProductCreatePatreonPrice:
                 name="Patron",
                 price=Decimal("500"),
                 category="patreon",
-                fulfillment_type="order",
             )
         errors = exc_info.value.errors()
         assert any(
@@ -48,7 +59,6 @@ class TestProductCreatePatreonPrice:
             name="General Admission",
             price=Decimal("500"),
             category="ticket",
-            fulfillment_type="access",
         )
         assert product.price == Decimal("500")
 
@@ -60,7 +70,6 @@ class TestProductCreatePatreonPrice:
                 name="Patron",
                 price=Decimal("0.01"),
                 category="patreon",
-                fulfillment_type="order",
             )
 
 

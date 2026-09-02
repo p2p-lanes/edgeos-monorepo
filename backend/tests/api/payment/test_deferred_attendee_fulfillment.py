@@ -59,7 +59,7 @@ def _category(db: Session, popup: Popups) -> AttendeeCategories:
 def _product(
     db: Session,
     popup: Popups,
-    fulfillment_type: str | None = None,
+    category: str = "ticket",
     *,
     attendee_category_id: uuid.UUID | None = None,
 ) -> Products:
@@ -69,8 +69,7 @@ def _product(
         name=f"Deferred pass {uuid.uuid4().hex[:6]}",
         slug=f"deferred-{uuid.uuid4().hex[:8]}",
         price=Decimal("25"),
-        category="ticket",
-        fulfillment_type=fulfillment_type,
+        category=category,
         attendee_category_id=attendee_category_id,
         is_active=True,
     )
@@ -127,7 +126,6 @@ def _payment(
         product_price=product.price,
         product_category=product.category or "ticket",
         purchase_metadata={"meal": "vegan"},
-        fulfillment_type=product.fulfillment_type,
     )
     db.add(line)
     db.commit()
@@ -164,7 +162,6 @@ def _line(
         product_price=product.price,
         product_category=product.category or "",
         purchase_metadata=metadata,
-        fulfillment_type=product.fulfillment_type,
     )
     db.add(line)
     db.flush()
@@ -177,7 +174,7 @@ def _attendee_count(db: Session, popup: Popups) -> int:
     )
 
 
-def test_approval_materializes_managed_attendee_and_repairs_missing_lineage(
+def test_approval_materializes_unmanaged_attendee_and_repairs_missing_lineage(
     db: Session, tenant_a: Tenants, popup_tenant_a: Popups
 ) -> None:
     buyer = _human(db, tenant_a, "Buyer")
@@ -192,7 +189,7 @@ def test_approval_materializes_managed_attendee_and_repairs_missing_lineage(
 
     assert attendee is not None
     assert attendee.human_id is None
-    assert attendee.managed_by_human_id == buyer.id
+    assert attendee.managed_by_human_id is None
     assert attendee.additional_data == {"dietary_restriction": "vegan"}
     assert line.attendee_id == attendee.id
     assert [ticket.unit_index for ticket in tickets] == [0, 1]
@@ -210,7 +207,7 @@ def test_approval_materializes_managed_attendee_and_repairs_missing_lineage(
     assert repaired[0].check_in_code == preserved_code
 
     payments_crud.update_status(db, payment.id, PaymentStatus.CANCELLED)
-    assert _tickets(db, payment.id) == []
+    assert all(ticket.revoked_at is not None for ticket in _tickets(db, payment.id))
     assert db.get(PaymentRecipients, recipient.id) is not None
     assert db.get(Attendees, attendee.id) is not None
 
@@ -219,7 +216,7 @@ def test_same_access_product_keeps_recipient_price_category_and_qr_lines_separat
     db: Session, tenant_a: Tenants, popup_tenant_a: Popups
 ) -> None:
     buyer = _human(db, tenant_a, "DiscountBuyer")
-    product = _product(db, popup_tenant_a, "access")
+    product = _product(db, popup_tenant_a, "ticket")
     adult_category = _category(db, popup_tenant_a)
     child_category = AttendeeCategories(
         tenant_id=tenant_a.id,
@@ -303,15 +300,17 @@ def test_same_access_product_keeps_recipient_price_category_and_qr_lines_separat
     assert all(holding.unit_index == 0 for holding in holdings)
 
 
-def test_linked_recipient_reuses_popup_attendee_and_stamps_self_management(
+def test_linked_recipient_reuses_popup_attendee_without_changing_manager(
     db: Session, tenant_a: Tenants, popup_tenant_a: Popups
 ) -> None:
     buyer = _human(db, tenant_a, "Linked")
+    other_manager = _human(db, tenant_a, "ExistingManager")
     product = _product(db, popup_tenant_a)
     existing = Attendees(
         tenant_id=tenant_a.id,
         popup_id=popup_tenant_a.id,
         human_id=buyer.id,
+        managed_by_human_id=other_manager.id,
         name="Existing identity",
         category_id=_category(db, popup_tenant_a).id,
     )
@@ -324,7 +323,7 @@ def test_linked_recipient_reuses_popup_attendee_and_stamps_self_management(
     db.refresh(existing)
 
     assert recipient.attendee_id == existing.id
-    assert existing.managed_by_human_id == buyer.id
+    assert existing.managed_by_human_id == other_manager.id
     assert len(_tickets(db, payment.id)) == 1
 
 
@@ -365,8 +364,8 @@ def test_approval_materializes_only_referenced_recipients_without_application_li
     assert _resolve_payment_buyer(payment, db) == buyer
 
 
-@pytest.mark.parametrize("invalid_field", ["tenant", "popup", "category", "manager"])
-def test_explicit_reuse_rejects_scope_or_manager_without_transferring_ownership(
+@pytest.mark.parametrize("invalid_field", ["tenant", "popup", "category"])
+def test_explicit_reuse_rejects_invalid_scope_without_transferring_ownership(
     db: Session,
     tenant_a: Tenants,
     tenant_b: Tenants,
@@ -375,7 +374,6 @@ def test_explicit_reuse_rejects_scope_or_manager_without_transferring_ownership(
     invalid_field: str,
 ) -> None:
     buyer = _human(db, tenant_a, "ReuseBuyer")
-    other_manager = _human(db, tenant_a, "OtherManager")
     product = _product(db, popup_tenant_a)
     wrong_category = AttendeeCategories(
         tenant_id=tenant_a.id,
@@ -393,9 +391,7 @@ def test_explicit_reuse_rejects_scope_or_manager_without_transferring_ownership(
             if invalid_field == "category"
             else _category(db, popup_tenant_a).id
         ),
-        managed_by_human_id=other_manager.id
-        if invalid_field == "manager"
-        else buyer.id,
+        managed_by_human_id=buyer.id,
     )
     db.add(attendee)
     db.commit()
@@ -411,11 +407,59 @@ def test_explicit_reuse_rejects_scope_or_manager_without_transferring_ownership(
     db.refresh(attendee)
     db.refresh(recipient)
     db.refresh(line)
-    assert attendee.managed_by_human_id == (
-        other_manager.id if invalid_field == "manager" else buyer.id
-    )
+    assert attendee.managed_by_human_id == buyer.id
     assert recipient.attendee_id is None
     assert line.attendee_id is None
+
+
+def test_explicit_recipient_reuse_ignores_existing_manager_metadata(
+    db: Session, tenant_a: Tenants, popup_tenant_a: Popups
+) -> None:
+    buyer = _human(db, tenant_a, "ExplicitBuyer")
+    existing_manager = _human(db, tenant_a, "UnrelatedManager")
+    product = _product(db, popup_tenant_a)
+    attendee = Attendees(
+        tenant_id=tenant_a.id,
+        popup_id=popup_tenant_a.id,
+        name="Explicit guest",
+        category_id=_category(db, popup_tenant_a).id,
+        managed_by_human_id=existing_manager.id,
+    )
+    db.add(attendee)
+    db.flush()
+    prior_payment = Payments(
+        tenant_id=tenant_a.id,
+        popup_id=popup_tenant_a.id,
+        buyer_human_id=buyer.id,
+        status=PaymentStatus.APPROVED.value,
+        amount=product.price,
+    )
+    db.add(prior_payment)
+    db.flush()
+    db.add(
+        PaymentRecipients(
+            tenant_id=tenant_a.id,
+            payment_id=prior_payment.id,
+            recipient_key="prior-explicit-recipient",
+            attendee_id=attendee.id,
+            name=attendee.name,
+            category_id=attendee.category_id,
+        )
+    )
+    db.commit()
+    payment, recipient, line = _payment(
+        db, popup_tenant_a, buyer, product, existing_attendee=attendee
+    )
+
+    payments_crud.approve_payment(db, payment.id)
+    db.refresh(attendee)
+    db.refresh(recipient)
+    db.refresh(line)
+
+    assert attendee.managed_by_human_id == existing_manager.id
+    assert recipient.attendee_id == attendee.id
+    assert line.attendee_id == attendee.id
+    assert [unit.attendee_id for unit in _tickets(db, payment.id)] == [attendee.id]
 
 
 def test_concurrent_approval_and_legacy_or_fee_compatibility(
@@ -425,18 +469,18 @@ def test_concurrent_approval_and_legacy_or_fee_compatibility(
     popup_tenant_a: Popups,
 ) -> None:
     buyer = _human(db, tenant_a, "Concurrent")
-    product = _product(db, popup_tenant_a, "access")
+    product = _product(db, popup_tenant_a, "ticket")
     payment, recipient, access_line = _payment(
         db, popup_tenant_a, buyer, product, quantity=2
     )
     participant_line = _line(
         db,
         payment,
-        _product(db, popup_tenant_a, "participant"),
+        _product(db, popup_tenant_a, "meal_plan"),
         recipient=recipient,
         metadata={"meal": "vegan"},
     )
-    order_line = _line(db, payment, _product(db, popup_tenant_a, "order"))
+    order_line = _line(db, payment, _product(db, popup_tenant_a, "merch"))
     db.commit()
     attendee_count = _attendee_count(db, popup_tenant_a)
     started = Event()
@@ -454,10 +498,10 @@ def test_concurrent_approval_and_legacy_or_fee_compatibility(
 
     db.expire_all()
     tickets = _tickets(db, payment.id)
-    assert sorted(ticket.fulfillment_type for ticket in tickets) == [
-        "access",
-        "access",
-        "participant",
+    assert sorted(ticket.product_category_snapshot for ticket in tickets) == [
+        "meal_plan",
+        "ticket",
+        "ticket",
     ]
     assert {ticket.payment_product_id for ticket in tickets} == {
         access_line.id,
@@ -480,7 +524,7 @@ def test_concurrent_approval_and_legacy_or_fee_compatibility(
     assert recipient.attendee_id == recipient_attendee_id is not None
     assert {
         line.attendee_id for line in (access_line, participant_line, order_line)
-    } == {None}
+    } == {recipient_attendee_id, None}
     assert _attendee_count(db, popup_tenant_a) == attendee_count + 1
 
     legacy_attendee = Attendees(
@@ -515,7 +559,7 @@ def test_concurrent_approval_and_legacy_or_fee_compatibility(
     payments_crud.approve_payment(db, legacy_payment.id)
     legacy_tickets = _tickets(db, legacy_payment.id)
     assert len(legacy_tickets) == 1
-    assert legacy_tickets[0].fulfillment_type is None
+    assert legacy_tickets[0].product_category_snapshot == "ticket"
 
     fee, _, _ = _payment(
         db,
@@ -528,25 +572,25 @@ def test_concurrent_approval_and_legacy_or_fee_compatibility(
     assert _tickets(db, fee.id) == []
 
 
-def test_mixed_typed_approval_materializes_personal_lineage_and_skips_order(
+def test_mixed_snapshot_approval_materializes_personal_lineage_and_skips_merch(
     db: Session, tenant_a: Tenants, popup_tenant_a: Popups
 ) -> None:
     buyer = _human(db, tenant_a, "MixedBuyer")
     products = {
-        kind: _product(db, popup_tenant_a, kind)
-        for kind in ("access", "participant", "order")
+        category: _product(db, popup_tenant_a, category)
+        for category in ("ticket", "meal_plan", "merch")
     }
     payment, recipient, access_line = _payment(
-        db, popup_tenant_a, buyer, products["access"], quantity=2
+        db, popup_tenant_a, buyer, products["ticket"], quantity=2
     )
     participant_line = _line(
         db,
         payment,
-        products["participant"],
+        products["meal_plan"],
         recipient=recipient,
         metadata={"meal": "vegan"},
     )
-    order_line = _line(db, payment, products["order"])
+    order_line = _line(db, payment, products["merch"])
     db.commit()
 
     payments_crud.approve_payment(db, payment.id)
@@ -555,10 +599,10 @@ def test_mixed_typed_approval_materializes_personal_lineage_and_skips_order(
         db.refresh(line)
     tickets = _tickets(db, payment.id)
 
-    assert sorted(ticket.fulfillment_type for ticket in tickets) == [
-        "access",
-        "access",
-        "participant",
+    assert sorted(ticket.product_category_snapshot for ticket in tickets) == [
+        "meal_plan",
+        "ticket",
+        "ticket",
     ]
     assert tickets[-1].purchase_metadata == {"meal": "vegan"}
     assert {ticket.payment_product_id for ticket in tickets} == {
@@ -568,14 +612,14 @@ def test_mixed_typed_approval_materializes_personal_lineage_and_skips_order(
     assert recipient.attendee_id is not None
     assert {
         line.attendee_id for line in (access_line, participant_line, order_line)
-    } == {None}
+    } == {recipient.attendee_id, None}
 
 
-def test_side_only_order_approval_creates_no_attendee_or_holding(
+def test_side_only_merch_approval_creates_no_attendee_or_unit(
     db: Session, tenant_a: Tenants, popup_tenant_a: Popups
 ) -> None:
     buyer = _human(db, tenant_a, "OrderBuyer")
-    product = _product(db, popup_tenant_a, "order")
+    product = _product(db, popup_tenant_a, "merch")
     attendee = Attendees(
         tenant_id=tenant_a.id,
         popup_id=popup_tenant_a.id,
@@ -585,34 +629,38 @@ def test_side_only_order_approval_creates_no_attendee_or_holding(
     )
     db.add(attendee)
     db.flush()
-    payment, recipient, line = _payment(db, popup_tenant_a, buyer, product)
-    legacy_line = _line(db, payment, product, attendee=attendee)
+    payment = Payments(
+        tenant_id=tenant_a.id,
+        popup_id=popup_tenant_a.id,
+        buyer_human_id=buyer.id,
+        status=PaymentStatus.PENDING.value,
+        amount=product.price,
+    )
+    db.add(payment)
+    db.flush()
+    line = _line(db, payment, product)
     holding = AttendeeProducts(
         tenant_id=tenant_a.id,
         attendee_id=attendee.id,
         product_id=product.id,
         check_in_code="LEGACY01",
         payment_id=payment.id,
-        payment_product_id=legacy_line.id,
+        payment_product_id=line.id,
         unit_index=0,
-        fulfillment_type="order",
+        product_category_snapshot="merch",
     )
     db.add(holding)
     db.commit()
     attendee_count = _attendee_count(db, popup_tenant_a)
 
     payments_crud.approve_payment(db, payment.id)
-    db.refresh(line)
-    db.refresh(recipient)
-
     assert line.attendee_id is None
-    assert recipient.attendee_id is None
     assert _tickets(db, payment.id) == [holding]
     assert _attendee_count(db, popup_tenant_a) == attendee_count
 
 
-@pytest.mark.parametrize("grant", ["application", "access", "legacy"])
-def test_application_or_existing_access_entitles_participant(
+@pytest.mark.parametrize("grant", ["application", "ticket", "unresolved"])
+def test_application_or_existing_unit_authority(
     db: Session,
     tenant_a: Tenants,
     popup_tenant_a: Popups,
@@ -620,7 +668,7 @@ def test_application_or_existing_access_entitles_participant(
 ) -> None:
     buyer = _human(db, tenant_a, "Entitled")
     category = _category(db, popup_tenant_a)
-    participant_product = _product(db, popup_tenant_a, "participant")
+    purchased_product = _product(db, popup_tenant_a)
     if grant == "application":
         application = Applications(
             tenant_id=tenant_a.id,
@@ -632,7 +680,7 @@ def test_application_or_existing_access_entitles_participant(
         db.add(application)
         db.flush()
         payment, _, _ = _payment(
-            db, popup_tenant_a, buyer, participant_product, human=buyer
+            db, popup_tenant_a, buyer, purchased_product, human=buyer
         )
         payment.application_id = application.id
     else:
@@ -643,34 +691,37 @@ def test_application_or_existing_access_entitles_participant(
             name="Existing guest",
             category_id=category.id,
         )
-        access_product = _product(
-            db, popup_tenant_a, "access" if grant == "access" else None
-        )
+        prior_product = _product(db, popup_tenant_a)
         db.add(attendee)
         db.flush()
         db.add(
             AttendeeProducts(
                 tenant_id=tenant_a.id,
                 attendee_id=attendee.id,
-                product_id=access_product.id,
+                product_id=prior_product.id,
                 check_in_code=uuid.uuid4().hex[:8].upper(),
-                fulfillment_type="access" if grant == "access" else None,
+                product_category_snapshot="ticket" if grant == "ticket" else None,
             )
         )
         db.commit()
         payment, _, _ = _payment(
-            db, popup_tenant_a, buyer, participant_product, existing_attendee=attendee
+            db, popup_tenant_a, buyer, purchased_product, existing_attendee=attendee
         )
     db.commit()
 
-    payments_crud.approve_payment(db, payment.id)
+    if grant == "application":
+        payments_crud.approve_payment(db, payment.id)
+        assert [
+            ticket.product_category_snapshot for ticket in _tickets(db, payment.id)
+        ] == ["ticket"]
+    else:
+        with pytest.raises(HTTPException) as error:
+            payments_crud.approve_payment(db, payment.id)
+        assert error.value.status_code == 422
+        assert _tickets(db, payment.id) == []
 
-    assert [ticket.fulfillment_type for ticket in _tickets(db, payment.id)] == [
-        "participant"
-    ]
 
-
-def test_payment_application_entitles_accountless_participant(
+def test_payment_application_allocates_accountless_ticket_unit(
     db: Session, tenant_a: Tenants, popup_tenant_a: Popups
 ) -> None:
     buyer = _human(db, tenant_a, "FamilyApplicant")
@@ -683,18 +734,16 @@ def test_payment_application_entitles_accountless_participant(
     )
     db.add(application)
     db.flush()
-    payment, _, _ = _payment(
-        db, popup_tenant_a, buyer, _product(db, popup_tenant_a, "participant")
-    )
+    payment, _, _ = _payment(db, popup_tenant_a, buyer, _product(db, popup_tenant_a))
     payment.application_id = application.id
     db.add(payment)
     db.commit()
 
     payments_crud.approve_payment(db, payment.id)
 
-    assert [ticket.fulfillment_type for ticket in _tickets(db, payment.id)] == [
-        "participant"
-    ]
+    assert [
+        ticket.product_category_snapshot for ticket in _tickets(db, payment.id)
+    ] == ["ticket"]
 
 
 def test_same_payment_access_does_not_cross_recipient_identity(
@@ -714,10 +763,11 @@ def test_same_payment_access_does_not_cross_recipient_identity(
         db,
         popup_tenant_a,
         buyer,
-        _product(db, popup_tenant_a, "access"),
+        _product(db, popup_tenant_a, "ticket"),
+        human=buyer,
         existing_attendee=attendee,
     )
-    participant_recipient = PaymentRecipients(
+    meal_recipient = PaymentRecipients(
         tenant_id=tenant_a.id,
         payment_id=payment.id,
         recipient_key="different-snapshot",
@@ -725,13 +775,13 @@ def test_same_payment_access_does_not_cross_recipient_identity(
         name="Same attendee, different recipient",
         category_id=attendee.category_id,
     )
-    db.add(participant_recipient)
+    db.add(meal_recipient)
     db.flush()
     _line(
         db,
         payment,
-        _product(db, popup_tenant_a, "participant"),
-        recipient=participant_recipient,
+        _product(db, popup_tenant_a, "meal_plan"),
+        recipient=meal_recipient,
     )
     db.commit()
 
@@ -742,28 +792,28 @@ def test_same_payment_access_does_not_cross_recipient_identity(
     assert _tickets(db, payment.id) == []
 
 
-def test_inactive_purchased_access_still_entitles_participant(
+def test_self_attendee_allocates_ticket_when_prior_product_is_inactive(
     db: Session, tenant_a: Tenants, popup_tenant_a: Popups
 ) -> None:
     buyer = _human(db, tenant_a, "InactiveAccess")
     attendee = Attendees(
         tenant_id=tenant_a.id,
         popup_id=popup_tenant_a.id,
-        managed_by_human_id=buyer.id,
+        human_id=buyer.id,
         name="Existing guest",
         category_id=_category(db, popup_tenant_a).id,
     )
-    access_product = _product(db, popup_tenant_a, "access")
-    access_product.is_active = False
+    ticket_product = _product(db, popup_tenant_a, "ticket")
+    ticket_product.is_active = False
     db.add(attendee)
     db.flush()
     db.add(
         AttendeeProducts(
             tenant_id=tenant_a.id,
             attendee_id=attendee.id,
-            product_id=access_product.id,
+            product_id=ticket_product.id,
             check_in_code=uuid.uuid4().hex[:8].upper(),
-            fulfillment_type="access",
+            product_category_snapshot="ticket",
         )
     )
     db.commit()
@@ -771,37 +821,33 @@ def test_inactive_purchased_access_still_entitles_participant(
         db,
         popup_tenant_a,
         buyer,
-        _product(db, popup_tenant_a, "participant"),
-        existing_attendee=attendee,
+        _product(db, popup_tenant_a, "ticket"),
+        human=buyer,
     )
 
     payments_crud.approve_payment(db, payment.id)
 
-    assert [ticket.fulfillment_type for ticket in _tickets(db, payment.id)] == [
-        "participant"
-    ]
+    assert [
+        ticket.product_category_snapshot for ticket in _tickets(db, payment.id)
+    ] == ["ticket"]
 
 
-@pytest.mark.parametrize("invalid", ["participant_entitlement", "access_category"])
-def test_invalid_typed_fulfillment_rejects_and_rolls_back_materialization(
-    db: Session, tenant_a: Tenants, popup_tenant_a: Popups, invalid: str
+def test_recipient_category_mismatch_rejects_and_rolls_back_materialization(
+    db: Session, tenant_a: Tenants, popup_tenant_a: Popups
 ) -> None:
-    expected_category = None
-    if invalid == "access_category":
-        other = AttendeeCategories(
-            tenant_id=tenant_a.id,
-            popup_id=popup_tenant_a.id,
-            key=f"other-{uuid.uuid4().hex[:6]}",
-        )
-        db.add(other)
-        db.flush()
-        expected_category = other.id
-    buyer = _human(db, tenant_a, "InvalidFulfillment")
+    other = AttendeeCategories(
+        tenant_id=tenant_a.id,
+        popup_id=popup_tenant_a.id,
+        key=f"other-{uuid.uuid4().hex[:6]}",
+    )
+    db.add(other)
+    db.flush()
+    buyer = _human(db, tenant_a, "InvalidRecipientCategory")
     product = _product(
         db,
         popup_tenant_a,
-        "access" if expected_category else "participant",
-        attendee_category_id=expected_category,
+        "ticket",
+        attendee_category_id=other.id,
     )
     attendee_count = _attendee_count(db, popup_tenant_a)
     payment, recipient, line = _payment(db, popup_tenant_a, buyer, product)
@@ -873,7 +919,7 @@ def test_sweeper_repairs_approved_payment_and_terminal_state_blocks_reapproval(
     with pytest.raises(HTTPException) as error:
         payments_crud.approve_payment(db, payment.id)
     assert error.value.status_code == 409
-    assert _tickets(db, payment.id) == []
+    assert all(ticket.revoked_at is not None for ticket in _tickets(db, payment.id))
 
 
 def test_notification_resolves_direct_buyer_from_payment_snapshot(

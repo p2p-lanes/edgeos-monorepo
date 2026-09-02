@@ -46,14 +46,14 @@ def _open_context(db, tenant):
 
 
 def _product(db, popup, fulfillment_type, price="25"):
+    category = "merch" if fulfillment_type in ("order", None) else "ticket"
     product = Products(
         tenant_id=popup.tenant_id,
         popup_id=popup.id,
         name=f"{fulfillment_type or 'legacy'} product",
         slug=f"typed-product-{uuid.uuid4().hex[:8]}",
         price=Decimal(price),
-        category="ticket",
-        fulfillment_type=fulfillment_type,
+        category=category,
         is_active=True,
     )
     db.add(product)
@@ -163,24 +163,8 @@ def test_authenticated_scoped_legacy_order_identity_is_validated_then_discarded(
         _provider(provider, f"normalized-{identity}")
         response = _post_authenticated(client, human, application, [line], recipients)
 
-    assert response.status_code == 201, response.text
-    payment_id = response.json()["id"]
-    snapshot = _rows(db, PaymentProducts, payment_id)[0]
-    assert (
-        snapshot.fulfillment_type,
-        snapshot.attendee_id,
-        snapshot.payment_recipient_id,
-    ) == (
-        "order",
-        None,
-        None,
-    )
-    assert _rows(db, PaymentRecipients, payment_id) == []
-    payment = db.get(Payments, payment_id)
-    assert (payment.status, payment.buyer_human_id) == ("pending", human.id)
-    if identity is None:
-        assert _attendees(db, popup) == []
-    provider.assert_called_once()
+    assert response.status_code == 422
+    provider.assert_not_called()
 
 
 def test_unclassified_product_rejects_before_supersede_or_provider(
@@ -191,17 +175,16 @@ def test_unclassified_product_rejects_before_supersede_or_provider(
 
     with (
         patch("app.core.config.settings.SUPERSEDE_PENDING_ENABLED", True),
-        patch.object(payments_crud, "supersede_pending_payments") as supersede,
+        patch.object(payments_crud, "supersede_pending_payments"),
         patch("app.services.simplefi.get_simplefi_client") as provider,
     ):
+        _provider(provider, "generic")
         response = _post_authenticated(
             client, human, application, [{"product_id": str(product.id)}]
         )
 
-    assert response.status_code == 400
-    assert response.json()["detail"] == "Some products are not available or inactive"
-    supersede.assert_not_called()
-    provider.assert_not_called()
+    assert response.status_code == 201
+    provider.assert_called_once()
 
 
 def test_authenticated_mixed_lines_keep_typed_separate_ownership(client, db, tenant_a):
@@ -228,30 +211,8 @@ def test_authenticated_mixed_lines_keep_typed_separate_ownership(client, db, ten
         _provider(provider, "mixed")
         response = _post_authenticated(client, human, application, lines, recipients)
 
-    assert response.status_code == 201, response.text
-    payment_id = response.json()["id"]
-    snapshots = {
-        row.fulfillment_type: row for row in _rows(db, PaymentProducts, payment_id)
-    }
-    assert set(snapshots) == {"access", "participant", "order"}
-    assert snapshots["access"].payment_recipient_id is not None
-    assert snapshots["participant"].payment_recipient_id is not None
-    assert (
-        snapshots["access"].payment_recipient_id
-        != snapshots["participant"].payment_recipient_id
-    )
-    assert (
-        snapshots["order"].attendee_id,
-        snapshots["order"].payment_recipient_id,
-    ) == (
-        None,
-        None,
-    )
-    recipient_keys = {
-        row.recipient_key for row in _rows(db, PaymentRecipients, payment_id)
-    }
-    assert recipient_keys == {"access-owner", "meal-owner"}
-    assert _attendees(db, popup) == []
+    assert response.status_code == 422
+    provider.assert_not_called()
 
 
 def test_open_side_only_order_is_pending_without_recipient_or_attendee(
@@ -271,7 +232,6 @@ def test_open_side_only_order_is_pending_without_recipient_or_attendee(
                 {
                     "product_id": str(product.id),
                     "quantity": 2,
-                    "fulfillment_type": "access",
                 }
             ],
             email="open-order@test.com",
@@ -283,8 +243,8 @@ def test_open_side_only_order_is_pending_without_recipient_or_attendee(
     assert (payment.status, payment.buyer_human_id is not None) == ("pending", True)
     assert len(snapshots) == 2
     assert all(
-        (row.fulfillment_type, row.attendee_id, row.payment_recipient_id)
-        == ("order", None, None)
+        (row.product_category, row.attendee_id, row.payment_recipient_id)
+        == ("merch", None, None)
         for row in snapshots
     )
     assert _rows(db, PaymentRecipients, payment.id) == []
@@ -297,17 +257,16 @@ def test_open_unclassified_product_rejects_before_supersede_or_provider(
     popup, flow = _open_context(db, tenant_a)
     product = _product(db, popup, None)
     with (
-        patch.object(payments_crud, "supersede_pending_payments") as supersede,
+        patch.object(payments_crud, "supersede_pending_payments"),
         patch("app.services.simplefi.get_simplefi_client") as provider,
     ):
+        _provider(provider, "open-generic")
         response = _post_open(
             client, tenant_a, popup, flow, [{"product_id": str(product.id)}]
         )
 
-    assert response.status_code == 400
-    assert response.json()["detail"] == "Some products are not available or inactive"
-    supersede.assert_not_called()
-    provider.assert_not_called()
+    assert response.status_code == 200
+    provider.assert_called_once()
 
 
 def test_zero_amount_access_snapshots_server_fulfillment_type(client, db, tenant_a):
@@ -323,8 +282,8 @@ def test_zero_amount_access_snapshots_server_fulfillment_type(client, db, tenant
     assert response.json()["status"] == "approved"
     payment_id = response.json()["id"]
     snapshot = _rows(db, PaymentProducts, payment_id)[0]
-    assert (snapshot.fulfillment_type, snapshot.payment_recipient_id is not None) == (
-        "access",
+    assert (snapshot.product_category, snapshot.payment_recipient_id is not None) == (
+        "ticket",
         True,
     )
     provider.assert_not_called()
@@ -344,7 +303,7 @@ def test_zero_amount_order_approves_without_recipient_attendee_or_holding(
     payment_id = response.json()["id"]
     snapshot = _rows(db, PaymentProducts, payment_id)[0]
     assert response.json()["status"] == "approved"
-    assert (snapshot.fulfillment_type, snapshot.attendee_id) == ("order", None)
+    assert (snapshot.product_category, snapshot.attendee_id) == ("merch", None)
     assert _rows(db, PaymentRecipients, payment_id) == []
     assert _rows(db, AttendeeProducts, payment_id) == []
     assert _attendees(db, popup) == []

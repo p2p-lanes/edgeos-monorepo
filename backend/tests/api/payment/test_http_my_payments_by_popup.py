@@ -21,7 +21,7 @@ from sqlmodel import Session
 
 from app.api.application.models import Applications
 from app.api.application.schemas import ApplicationStatus
-from app.api.attendee.models import Attendees
+from app.api.attendee.models import AttendeeProducts, Attendees
 from app.api.human.models import Humans
 from app.api.payment.models import PaymentProducts, Payments
 from app.api.payment.schemas import PaymentStatus
@@ -233,6 +233,38 @@ class TestListMyPaymentsByPopupHttp:
         assert body["paging"]["total"] == 1
         assert body["results"][0]["id"] == str(payment.id)
 
+    def test_compatibility_owner_cannot_see_buyer_unit_details(
+        self, client: TestClient, db: Session, tenant_a: Tenants
+    ) -> None:
+        popup = _make_popup(db, tenant_a, suffix="compatibility-unit-authority")
+        compatibility_owner = _make_human(db, tenant_a, suffix="compatibility-owner")
+        buyer = _make_human(db, tenant_a, suffix="buyer")
+        payment = _make_direct_payment(db, tenant_a, popup, compatibility_owner)
+        payment.buyer_human_id = buyer.id
+        line = payment.products_snapshot[0]
+        unit = AttendeeProducts(
+            tenant_id=tenant_a.id,
+            attendee_id=None,
+            product_id=line.product_id,
+            payment_id=payment.id,
+            payment_product_id=line.id,
+            unit_index=0,
+            check_in_code="BUYERONLY",
+            product_category_snapshot="parking",
+            requires_check_in_snapshot=True,
+        )
+        db.add_all([payment, unit])
+        db.commit()
+
+        response = client.get(
+            _payments_url(popup.id), headers=_auth(compatibility_owner)
+        )
+
+        assert response.status_code == 200, response.text
+        result = response.json()["results"][0]
+        assert result["id"] == str(payment.id)
+        assert result["products_snapshot"][0]["units"] == []
+
     def test_legacy_status_and_non_ticket_snapshot_remain_visible(
         self, client: TestClient, db: Session, tenant_a: Tenants
     ) -> None:
@@ -255,6 +287,7 @@ class TestListMyPaymentsByPopupHttp:
             {
                 "product_name": "Direct Product",
                 "product_category": "standard",
+                "requires_check_in_snapshot": None,
                 "quantity": 1,
                 "product_price": "50.00",
                 "product_currency": "USD",
@@ -266,6 +299,7 @@ class TestListMyPaymentsByPopupHttp:
                 "payment_recipient_id": None,
                 "recipient_key": None,
                 "created_at": result["products_snapshot"][0]["created_at"],
+                "units": [],
             }
         ]
 

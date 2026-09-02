@@ -24,16 +24,6 @@ class AttendeeProducts(AttendeeProductsBase, table=True):
     __tablename__ = "attendee_products"
     __table_args__ = (
         CheckConstraint(
-            "fulfillment_type IS NULL OR fulfillment_type IN "
-            "('access', 'participant', 'order')",
-            name="ck_attendee_products_fulfillment_type",
-        ),
-        Index(
-            "ix_attendee_products_attendee_fulfillment_type",
-            "attendee_id",
-            "fulfillment_type",
-        ),
-        CheckConstraint(
             "(payment_product_id IS NULL) = (unit_index IS NULL)",
             name="ck_attendee_product_lineage_pair",
         ),
@@ -48,11 +38,26 @@ class AttendeeProducts(AttendeeProductsBase, table=True):
             unique=True,
             postgresql_where=text("payment_product_id IS NOT NULL"),
         ),
+        CheckConstraint(
+            "attendee_id IS NOT NULL OR payment_product_id IS NOT NULL",
+            name="ck_attendee_product_owner_or_lineage",
+        ),
+        Index(
+            "ix_attendee_products_active_attendee_category",
+            "attendee_id",
+            "product_category_snapshot",
+            postgresql_where=text("revoked_at IS NULL AND attendee_id IS NOT NULL"),
+        ),
+        Index(
+            "ix_attendee_products_active_scannable",
+            "check_in_code",
+            postgresql_where=text(
+                "revoked_at IS NULL AND requires_check_in_snapshot IS TRUE"
+            ),
+        ),
     )
-    fulfillment_type: str | None = Field(default=None, nullable=True)
-
     # Relationships
-    attendee: "Attendees" = Relationship(back_populates="attendee_products")
+    attendee: Optional["Attendees"] = Relationship(back_populates="attendee_products")
     product: "Products" = Relationship(back_populates="attendee_products")
 
 

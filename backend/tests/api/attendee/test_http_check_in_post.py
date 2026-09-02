@@ -18,13 +18,13 @@ from decimal import Decimal
 
 import pytest
 from fastapi.testclient import TestClient
-from sqlmodel import Session
+from sqlmodel import Session, select
 
 from app.api.attendee.models import AttendeeProducts, Attendees
+from app.api.check_in.models import CheckIn
 from app.api.human.models import Humans
 from app.api.popup.models import Popups
 from app.api.product.models import Products
-from app.api.product.schemas import FulfillmentType
 from app.api.tenant.models import Tenants
 from app.api.user.models import Users
 from app.core.security import create_access_token
@@ -43,8 +43,6 @@ def _make_product(
     db: Session,
     tenant: Tenants,
     popup: Popups,
-    *,
-    fulfillment_type: str | None = FulfillmentType.ACCESS.value,
 ) -> Products:
     product = Products(
         id=uuid.uuid4(),
@@ -55,7 +53,6 @@ def _make_product(
         price=Decimal("30"),
         category="ticket",
         requires_check_in=True,
-        fulfillment_type=fulfillment_type,
     )
     db.add(product)
     db.commit()
@@ -101,7 +98,6 @@ def _make_ticket(
     attendee: Attendees,
     product: Products,
     code: str | None = None,
-    fulfillment_type: str | None = FulfillmentType.ACCESS.value,
 ) -> AttendeeProducts:
     ticket = AttendeeProducts(
         id=uuid.uuid4(),
@@ -109,7 +105,8 @@ def _make_ticket(
         attendee_id=attendee.id,
         product_id=product.id,
         check_in_code=code or f"CI{uuid.uuid4().hex[:6].upper()}",
-        fulfillment_type=fulfillment_type,
+        product_category_snapshot=product.category,
+        requires_check_in_snapshot=product.requires_check_in,
     )
     db.add(ticket)
     db.commit()
@@ -209,33 +206,28 @@ class TestPostCheckIn:
             "first_scan_at must not change on re-scan"
         )
 
-    def test_non_scannable_product_returns_400(
+    @pytest.mark.parametrize(
+        "requires_check_in_snapshot",
+        [False, None],
+        ids=["false", "unresolved"],
+    )
+    def test_non_scannable_snapshot_returns_400(
         self,
+        requires_check_in_snapshot: bool | None,
         client: TestClient,
         db: Session,
         tenant_a: Tenants,
         popup_tenant_a: Popups,
         admin_user_tenant_a: Users,
     ) -> None:
-        """POST with a code from a `requires_check_in=False` product returns 400."""
-        product = Products(
-            id=uuid.uuid4(),
-            tenant_id=tenant_a.id,
-            popup_id=popup_tenant_a.id,
-            name=f"Non-Scannable {uuid.uuid4().hex[:6]}",
-            slug=f"ns-{uuid.uuid4().hex[:6]}",
-            price=Decimal("10"),
-            category="merch",
-            requires_check_in=False,
-        )
-        db.add(product)
-        db.commit()
-        db.refresh(product)
-
+        product = _make_product(db, tenant_a, popup_tenant_a)
         human = _make_human(db, tenant_a)
         attendee = _make_attendee(db, tenant_a, popup_tenant_a, human)
         code = f"NOSCAN{uuid.uuid4().hex[:2].upper()}"
-        _make_ticket(db, tenant_a, attendee, product, code=code)
+        ticket = _make_ticket(db, tenant_a, attendee, product, code=code)
+        ticket.requires_check_in_snapshot = requires_check_in_snapshot
+        db.add(ticket)
+        db.commit()
 
         response = client.post(
             f"/api/v1/attendees/check-in/{code}?popup_id={popup_tenant_a.id}",
@@ -249,37 +241,26 @@ class TestPostCheckIn:
             f"Expected detail to mention non-scannable; got {response.json()['detail']!r}"
         )
 
-    @pytest.mark.parametrize(
-        "fulfillment_type",
-        [FulfillmentType.PARTICIPANT.value, None],
-        ids=["participant", "legacy-null"],
-    )
-    def test_non_access_holding_code_returns_404(
+    def test_allocated_meal_plan_snapshot_scans_and_persists_history(
         self,
-        fulfillment_type: str | None,
         client: TestClient,
         db: Session,
         tenant_a: Tenants,
         popup_tenant_a: Popups,
         admin_user_tenant_a: Users,
     ) -> None:
-        product = _make_product(
-            db,
-            tenant_a,
-            popup_tenant_a,
-            fulfillment_type=fulfillment_type,
-        )
+        product = _make_product(db, tenant_a, popup_tenant_a)
+        product.category = "meal_plan"
+        product.requires_check_in = False
+        db.add(product)
+        db.commit()
         human = _make_human(db, tenant_a)
         attendee = _make_attendee(db, tenant_a, popup_tenant_a, human)
-        code = f"NOACCESS{uuid.uuid4().hex[:4].upper()}"
-        _make_ticket(
-            db,
-            tenant_a,
-            attendee,
-            product,
-            code=code,
-            fulfillment_type=fulfillment_type,
-        )
+        code = f"MEAL{uuid.uuid4().hex[:4].upper()}"
+        ticket = _make_ticket(db, tenant_a, attendee, product, code=code)
+        ticket.requires_check_in_snapshot = True
+        db.add(ticket)
+        db.commit()
 
         response = client.post(
             f"/api/v1/attendees/check-in/{code}?popup_id={popup_tenant_a.id}",
@@ -287,8 +268,15 @@ class TestPostCheckIn:
             headers=_auth(admin_user_tenant_a),
         )
 
-        assert response.status_code == 404, response.text
-        assert response.json()["detail"] == "Ticket not found"
+        assert response.status_code == 200, response.text
+        assert response.json()["attendee"]["id"] == str(attendee.id)
+        assert response.json()["product"]["category"] == "meal_plan"
+        assert response.json()["total_scans"] == 1
+        events = db.exec(
+            select(CheckIn).where(CheckIn.attendee_product_id == ticket.id)
+        ).all()
+        assert len(events) == 1
+        assert events[0].payload == {"source": "qr"}
 
     def test_cross_popup_returns_404(
         self,
@@ -341,10 +329,6 @@ class TestPostCheckIn:
         admin_user_tenant_a: Users,
     ) -> None:
         """POST with source='manual' stores that source in ticket_events.payload."""
-        from sqlmodel import select
-
-        from app.api.check_in.models import CheckIn
-
         product = _make_product(db, tenant_a, popup_tenant_a)
         human = _make_human(db, tenant_a)
         attendee = _make_attendee(db, tenant_a, popup_tenant_a, human)

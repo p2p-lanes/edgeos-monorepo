@@ -2,7 +2,7 @@ import uuid
 from decimal import ROUND_HALF_UP, Decimal
 
 from fastapi import APIRouter, Query
-from sqlalchemy import and_, case, func, or_
+from sqlalchemy import and_, case, func
 from sqlmodel import select
 
 from app.api.application.models import Applications
@@ -31,11 +31,7 @@ from app.api.payment.models import PaymentProducts, Payments
 from app.api.payment.schemas import PaymentStatus, PaymentType
 from app.api.popup.crud import popups_crud
 from app.api.product.models import Products
-from app.api.product.schemas import (
-    CATEGORY_HOUSING,
-    CATEGORY_TICKET,
-    FulfillmentType,
-)
+from app.api.product.schemas import CATEGORY_HOUSING, CATEGORY_TICKET
 from app.api.sales_flow.models import SalesFlows
 from app.core.dependencies.users import CurrentOperator, TenantSession
 
@@ -155,10 +151,15 @@ def _get_attendee_stats(db: TenantSession, popup_id: uuid.UUID) -> AttendeeStats
     attendees.category string column was dropped in PR 2.
     """
     category_counts = db.exec(
-        select(AttendeeCategories.key, func.count(Attendees.id))
+        select(AttendeeCategories.key, func.count(func.distinct(Attendees.id)))
         .select_from(Attendees)
         .outerjoin(AttendeeCategories, Attendees.category_id == AttendeeCategories.id)
-        .where(Attendees.popup_id == popup_id)
+        .join(AttendeeProducts, AttendeeProducts.attendee_id == Attendees.id)
+        .where(
+            Attendees.popup_id == popup_id,
+            AttendeeProducts.revoked_at.is_(None),
+            AttendeeProducts.product_category_snapshot == CATEGORY_TICKET,
+        )
         .group_by(AttendeeCategories.key)
     ).all()
 
@@ -226,34 +227,21 @@ TWO_DECIMAL = Decimal("0.01")
 ONE_DECIMAL = Decimal("0.1")
 
 
-def _typed_line_or_legacy_category(fulfillment_type: str, legacy_category: str):
-    """Match a typed snapshot, or an explicitly unclassified legacy line."""
-    return or_(
-        PaymentProducts.fulfillment_type == fulfillment_type,
-        and_(
-            PaymentProducts.fulfillment_type.is_(None),
-            Products.fulfillment_type.is_(None),
-            Products.category == legacy_category,
-        ),
-    )
+def _category_line(category: str):
+    return PaymentProducts.product_category == category
 
 
 def _fulfilled_access_holding():
-    """Require active holding lineage without accepting typed conflicts."""
+    """Match an active allocated ticket unit."""
     return and_(
-        _typed_line_or_legacy_category(FulfillmentType.ACCESS.value, CATEGORY_TICKET),
-        or_(
-            AttendeeProducts.fulfillment_type == FulfillmentType.ACCESS.value,
-            AttendeeProducts.fulfillment_type.is_(None),
-        ),
+        AttendeeProducts.attendee_id.is_not(None),
+        AttendeeProducts.revoked_at.is_(None),
+        AttendeeProducts.product_category_snapshot == CATEGORY_TICKET,
     )
 
 
 def _order_housing_line():
-    return and_(
-        _typed_line_or_legacy_category(FulfillmentType.ORDER.value, CATEGORY_HOUSING),
-        Products.category == CATEGORY_HOUSING,
-    )
+    return _category_line(CATEGORY_HOUSING)
 
 
 def _housing_payment_ids():
@@ -396,9 +384,7 @@ def _get_cumulative_trends(
             Payments.popup_id == popup_id,
             Payments.status == PaymentStatus.APPROVED.value,
             Payments.payment_type == PaymentType.PASS_PURCHASE.value,
-            _typed_line_or_legacy_category(
-                FulfillmentType.ACCESS.value, CATEGORY_TICKET
-            ),
+            _category_line(CATEGORY_TICKET),
         )
         .group_by(bucket)
         .order_by(bucket)
@@ -616,9 +602,7 @@ def _get_distribution(db: TenantSession, popup_id: uuid.UUID) -> Distribution:
             Payments.popup_id == popup_id,
             Payments.status == PaymentStatus.APPROVED.value,
             Payments.payment_type == PaymentType.PASS_PURCHASE.value,
-            _typed_line_or_legacy_category(
-                FulfillmentType.ACCESS.value, CATEGORY_TICKET
-            ),
+            _category_line(CATEGORY_TICKET),
         )
         .group_by(Products.duration_type)
     ).all()
@@ -665,9 +649,7 @@ def _get_distribution(db: TenantSession, popup_id: uuid.UUID) -> Distribution:
             Payments.popup_id == popup_id,
             Payments.status == PaymentStatus.APPROVED.value,
             Payments.payment_type == PaymentType.PASS_PURCHASE.value,
-            _typed_line_or_legacy_category(
-                FulfillmentType.ACCESS.value, CATEGORY_TICKET
-            ),
+            _category_line(CATEGORY_TICKET),
         )
         .group_by(AttendeeCategories.key)
     ).all()

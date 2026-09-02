@@ -70,7 +70,6 @@ def _payment_context(db: Session, tenant: Tenants):
         slug=f"recipient-pass-{uuid.uuid4().hex[:8]}",
         price=Decimal("25"),
         category="ticket",
-        fulfillment_type="access",
         attendee_category_id=category.id,
         is_active=True,
     )
@@ -444,7 +443,6 @@ def test_open_checkout_writes_uncategorized_recipient_without_attendee(
         slug=f"guest-pass-{uuid.uuid4().hex[:8]}",
         price=Decimal("20"),
         category="ticket",
-        fulfillment_type="access",
     )
     db.add(product)
     db.commit()

@@ -26,7 +26,6 @@ from app.api.attendee.models import AttendeeProducts, Attendees
 from app.api.human.models import Humans
 from app.api.popup.models import Popups
 from app.api.product.models import Products
-from app.api.product.schemas import FulfillmentType
 from app.api.tenant.models import Tenants
 from app.services.checkin_pass_dispatch import dispatch_checkin_passes
 from tests._flow_helpers import application_flow_id
@@ -84,7 +83,6 @@ def _make_product(
     popup: Popups,
     *,
     requires_check_in: bool = True,
-    fulfillment_type: str | None = FulfillmentType.ACCESS.value,
 ) -> Products:
     product = Products(
         id=uuid.uuid4(),
@@ -95,7 +93,6 @@ def _make_product(
         price=Decimal("25"),
         category="ticket",
         requires_check_in=requires_check_in,
-        fulfillment_type=fulfillment_type,
     )
     db.add(product)
     db.commit()
@@ -129,8 +126,6 @@ def _make_ticket(
     tenant: Tenants,
     attendee: Attendees,
     product: Products,
-    *,
-    fulfillment_type: str | None = FulfillmentType.ACCESS.value,
 ) -> AttendeeProducts:
     ticket = AttendeeProducts(
         id=uuid.uuid4(),
@@ -138,7 +133,8 @@ def _make_ticket(
         attendee_id=attendee.id,
         product_id=product.id,
         check_in_code=f"PASS{uuid.uuid4().hex[:6].upper()}",
-        fulfillment_type=fulfillment_type,
+        product_category_snapshot=product.category,
+        requires_check_in_snapshot=product.requires_check_in,
     )
     db.add(ticket)
     db.commit()
@@ -152,7 +148,6 @@ def _make_due_popup_with_tickets(
     *,
     n_tickets: int = 1,
     start_in_hours: float = 1.0,
-    fulfillment_type: str | None = FulfillmentType.ACCESS.value,
 ) -> tuple[Popups, Humans, list[AttendeeProducts]]:
     popup = _make_popup(db, tenant, start_in_hours=start_in_hours)
     human = _make_human(db, tenant)
@@ -161,7 +156,6 @@ def _make_due_popup_with_tickets(
         tenant,
         popup,
         requires_check_in=True,
-        fulfillment_type=fulfillment_type,
     )
     application = Applications(
         sales_flow_id=application_flow_id(db, popup.id),
@@ -183,7 +177,6 @@ def _make_due_popup_with_tickets(
                 tenant,
                 attendee,
                 product,
-                fulfillment_type=fulfillment_type,
             )
         )
     return popup, human, tickets
@@ -278,15 +271,15 @@ def test_dispatch_sends_after_event_started(db: Session, tenant_a: Tenants) -> N
     email_service.send_check_in_pass.assert_awaited_once()
 
 
-def test_dispatch_excludes_participant_and_legacy_null_holdings(
+def test_dispatch_excludes_allocated_non_ticket_units(
     db: Session, tenant_a: Tenants
 ) -> None:
-    _make_due_popup_with_tickets(
-        db,
-        tenant_a,
-        fulfillment_type=FulfillmentType.PARTICIPANT.value,
-    )
-    _make_due_popup_with_tickets(db, tenant_a, fulfillment_type=None)
+    _, _, parking = _make_due_popup_with_tickets(db, tenant_a)
+    _, _, unresolved = _make_due_popup_with_tickets(db, tenant_a)
+    parking[0].product_category_snapshot = "parking"
+    unresolved[0].product_category_snapshot = None
+    db.add_all([*parking, *unresolved])
+    db.commit()
     email_service = _mock_email_service()
 
     with (

@@ -132,6 +132,9 @@ def _build_application_public(
                 purchase_metadata=ap.purchase_metadata,
             )
             for ap in a.attendee_products
+            if ap.attendee_id is not None
+            and ap.revoked_at is None
+            and ap.product_category_snapshot == "ticket"
         ]
         # Build the base dict from scalar ORM columns only — do NOT call
         # AttendeePublic.model_validate(a) because it triggers ORM property
@@ -515,7 +518,6 @@ async def grant_tickets_admin(
     from app.api.popup.crud import popups_crud
     from app.api.product.crud import products_crud
     from app.api.product.models import Products
-    from app.api.product.schemas import FulfillmentType
 
     popup = popups_crud.get(db, payload.popup_id)
     if not popup:
@@ -551,20 +553,6 @@ async def grant_tickets_admin(
             detail="One or more products are unavailable, inactive, or not in this popup",
         )
     products_map = {p.id: p for p in valid_products}
-    if any(product.fulfillment_type is None for product in valid_products):
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Some products are not available or inactive",
-        )
-    if any(
-        product.fulfillment_type != FulfillmentType.ACCESS.value
-        for product in valid_products
-    ):
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail="Only access products can be granted as tickets",
-        )
-
     # Aggregate total requested quantity per product across ALL people for the
     # up-front stock cap check. Each person may request a different mix, so
     # this sum is what we compare against total_stock_remaining.
@@ -707,9 +695,9 @@ async def grant_tickets_admin(
                     product_description=product.description,
                     product_price=Decimal("0") if is_patreon else product.price,
                     product_category=product.category or "",
+                    requires_check_in_snapshot=product.requires_check_in,
                     product_currency=popup.currency,
                     effective_unit_price=Decimal("0") if is_patreon else None,
-                    fulfillment_type=product.fulfillment_type,
                 )
                 db.add(snapshot)
                 finalize_lines.append(
@@ -984,8 +972,15 @@ async def list_my_tickets(
         popup = attendee.popup
 
         # Build product list — group ticket rows by product_id and count.
-        counts = Counter(ap.product_id for ap in attendee.attendee_products)
-        seen = {ap.product_id: ap.product for ap in attendee.attendee_products}
+        ticket_units = [
+            ap
+            for ap in attendee.attendee_products
+            if ap.attendee_id is not None
+            and ap.revoked_at is None
+            and ap.product_category_snapshot == "ticket"
+        ]
+        counts = Counter(ap.product_id for ap in ticket_units)
+        seen = {ap.product_id: ap.product for ap in ticket_units}
         products = [
             TicketProduct(
                 name=seen[pid].name,
@@ -1585,6 +1580,12 @@ def _build_directory_entry(attendee) -> AttendeesDirectoryEntry:
     products: list[DirectoryProduct] = []
     seen_pids: set[uuid.UUID] = set()
     for ap in attendee.attendee_products:
+        if (
+            ap.attendee_id is None
+            or ap.revoked_at is not None
+            or ap.product_category_snapshot != "ticket"
+        ):
+            continue
         if ap.product_id in seen_pids:
             continue
         seen_pids.add(ap.product_id)

@@ -22,7 +22,6 @@ from app.api.payment.models import PaymentProducts, Payments
 from app.api.payment.schemas import PaymentStatus
 from app.api.popup.models import Popups
 from app.api.product.models import Products
-from app.api.product.schemas import FulfillmentType
 from app.api.sales_flow.crud import sales_flows_crud
 from app.api.sales_flow.eligibility import (
     has_approved_payment,
@@ -154,7 +153,6 @@ def _make_direct_purchase(
         product_price=product.price,
         product_category="ticket",
         product_currency="USD",
-        fulfillment_type=FulfillmentType.ORDER.value,
     )
     db.add(payment_product)
     db.flush()
@@ -167,7 +165,7 @@ def _grant_admin_products(
     popup: Popups,
     human: Humans,
     *,
-    fulfillment_type: FulfillmentType = FulfillmentType.ACCESS,
+    product_category: str = "ticket",
     managed: bool = False,
     product_is_active: bool = True,
 ) -> None:
@@ -178,6 +176,7 @@ def _grant_admin_products(
         name="Granted Ticket",
         slug=f"granted-{uuid.uuid4().hex[:6]}",
         price=Decimal("50"),
+        category=product_category,
         is_active=product_is_active,
     )
     db.add(product)
@@ -204,7 +203,7 @@ def _grant_admin_products(
             product_id=product.id,
             check_in_code=f"GRANT-{uuid.uuid4().hex[:8]}",
             payment_id=None,
-            fulfillment_type=fulfillment_type.value,
+            product_category_snapshot=product_category,
         )
     )
     db.flush()
@@ -359,7 +358,7 @@ class TestHasPopupProducts:
             tenant_a,
             popup,
             human,
-            fulfillment_type=FulfillmentType.PARTICIPANT,
+            product_category="meal_plan",
         )
         db.commit()
 
@@ -381,7 +380,7 @@ class TestIsUpsaleEligible:
     @pytest.mark.parametrize(
         ("grant", "expected"),
         [
-            ("managed_access", True),
+            ("managed_access", False),
             ("inactive_product", True),
             ("payment_order", False),
         ],

@@ -69,7 +69,6 @@ def _make_product(
     price: str = "100.00",
     total_stock_cap: int | None = None,
     category: str = "ticket",
-    fulfillment_type: str | None = "access",
 ) -> Products:
     product = Products(
         id=uuid.uuid4(),
@@ -79,7 +78,6 @@ def _make_product(
         slug=f"prod-{uuid.uuid4().hex[:6]}",
         price=Decimal(price),
         category=category,
-        fulfillment_type=fulfillment_type,
         is_active=True,
         total_stock_cap=total_stock_cap,
         total_stock_remaining=total_stock_cap,
@@ -184,7 +182,7 @@ def test_grant_creates_human_application_payment_and_tickets(
     )
     assert len(snapshots) == 1
     assert snapshots[0].quantity == 2
-    assert snapshots[0].fulfillment_type == "access"
+    assert snapshots[0].product_category == "ticket"
 
     tickets = list(
         db.exec(
@@ -192,7 +190,7 @@ def test_grant_creates_human_application_payment_and_tickets(
         ).all()
     )
     assert len(tickets) == 2  # quantity=2 → 2 ticket rows
-    assert {ticket.fulfillment_type for ticket in tickets} == {"access"}
+    assert {ticket.product_category_snapshot for ticket in tickets} == {"ticket"}
     assert {ticket.payment_product_id for ticket in tickets} == {snapshots[0].id}
     assert {ticket.unit_index for ticket in tickets} == {0, 1}
 
@@ -313,7 +311,7 @@ def test_grant_promotes_existing_draft_application(
             AttendeeProducts.attendee_id == grant_attendees[0].id
         )
     ).one()
-    assert holding.fulfillment_type == "access"
+    assert holding.product_category_snapshot == "ticket"
     apps_for_human = list(
         db.exec(
             select(Applications).where(
@@ -326,29 +324,26 @@ def test_grant_promotes_existing_draft_application(
 
 
 @pytest.mark.parametrize(
-    ("fulfillment_type", "expected_status", "expected_detail"),
+    "category",
     [
-        (None, 400, "Some products are not available or inactive"),
-        ("participant", 422, "Only access products can be granted as tickets"),
-        ("order", 422, "Only access products can be granted as tickets"),
+        "meal_plan",
+        "housing",
+        "merch",
     ],
 )
 @pytest.mark.usefixtures("mock_payment_email")
-def test_grant_rejects_non_access_products_before_writes(
+def test_grant_snapshots_non_ticket_products_without_access(
     client: TestClient,
     db: Session,
     admin_token_tenant_a: str,
-    tenant_a: Tenants,
     grant_popup: Popups,
-    fulfillment_type: str | None,
-    expected_status: int,
-    expected_detail: str,
+    category: str,
 ) -> None:
     product = _make_product(
         db,
         grant_popup,
         total_stock_cap=3,
-        fulfillment_type=fulfillment_type,
+        category=category,
     )
     email = f"invalid-grant-{uuid.uuid4().hex[:6]}@test.com"
 
@@ -366,28 +361,18 @@ def test_grant_rejects_non_access_products_before_writes(
         headers=_auth(admin_token_tenant_a),
     )
 
-    assert response.status_code == expected_status
-    assert response.json()["detail"] == expected_detail
-    assert (
-        db.exec(
-            select(Humans).where(Humans.email == email, Humans.tenant_id == tenant_a.id)
-        ).first()
-        is None
-    )
-    assert (
-        db.exec(
-            select(PaymentProducts).where(PaymentProducts.product_id == product.id)
-        ).all()
-        == []
-    )
-    assert (
-        db.exec(
-            select(AttendeeProducts).where(AttendeeProducts.product_id == product.id)
-        ).all()
-        == []
-    )
+    assert response.status_code == 201
+    snapshot = db.exec(
+        select(PaymentProducts).where(PaymentProducts.product_id == product.id)
+    ).one()
+    unit = db.exec(
+        select(AttendeeProducts).where(AttendeeProducts.product_id == product.id)
+    ).one()
+    assert snapshot.product_category == category
+    assert unit.product_category_snapshot == category
+    assert unit.product_category_snapshot != "ticket"
     db.refresh(product)
-    assert product.total_stock_remaining == 3
+    assert product.total_stock_remaining == 2
 
 
 @pytest.mark.usefixtures("tenant_a")

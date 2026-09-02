@@ -159,6 +159,7 @@ def _grant_product(
             attendee_id=attendee.id,
             product_id=product.id,
             payment_id=payment_id,
+            product_category_snapshot=product.category,
             check_in_code=uuid.uuid4().hex[:10],
         )
     )
@@ -257,7 +258,7 @@ class TestHoldsCategory:
             db, popup, flow, human=HumanPublic.model_validate(human)
         )
 
-        assert context.has_product("category", "merch") is True
+        assert context.has_product("category", "merch") is False
 
     def test_negative_returns_false_for_a_different_category(
         self, db: Session, tenant_a: Tenants

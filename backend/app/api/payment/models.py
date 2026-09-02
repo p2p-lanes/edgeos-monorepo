@@ -37,22 +37,6 @@ class PaymentProducts(PaymentProductBase, table=True):
 
     __tablename__ = "payment_products"
     __table_args__ = (
-        CheckConstraint(
-            "fulfillment_type IS NULL OR fulfillment_type IN "
-            "('access', 'participant', 'order')",
-            name="ck_payment_products_fulfillment_type",
-        ),
-        Index(
-            "ix_payment_products_payment_fulfillment_type",
-            "payment_id",
-            "fulfillment_type",
-        ),
-        CheckConstraint(
-            "fulfillment_type IS NULL OR fulfillment_type = 'order' OR "
-            "(fulfillment_type IN ('access', 'participant') AND "
-            "(payment_recipient_id IS NOT NULL OR attendee_id IS NOT NULL))",
-            name="ck_payment_product_fulfillment_identity_compatibility",
-        ),
         ForeignKeyConstraint(
             ["payment_recipient_id", "payment_id"],
             ["payment_recipients.id", "payment_recipients.payment_id"],
@@ -66,8 +50,6 @@ class PaymentProducts(PaymentProductBase, table=True):
             DateTime(timezone=True), server_default=func.now(), nullable=False
         ),
     )
-    fulfillment_type: str | None = Field(default=None, nullable=True)
-
     # Relationships
     payment: "Payments" = Relationship(back_populates="products_snapshot")
     product: "Products" = Relationship(back_populates="payment_products")
