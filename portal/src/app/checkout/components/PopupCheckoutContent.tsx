@@ -223,12 +223,9 @@ export const PopupCheckoutContent = ({
       return
     }
 
-    // Existing applicant clicking a group link: persist the group membership on
-    // their current application. This both auto-accepts an in-progress
-    // application (otherwise payment 403s "Application must be accepted before
-    // purchasing products") AND links the group so its discount is applied
-    // server-side — without the link the group discount only ever shows
-    // client-side and the payment is charged the full amount.
+    // Existing applicant clicking an auto-approved group link: persist the group
+    // membership so the backend applies its approval policy and discount. Manual
+    // groups return above while the application is still in review.
     // Include "accepted" so an application auto-accepted by a prior invite still
     // picks up the group discount. Limited to statuses the backend allows
     // updating (draft/pending_fee/in review/accepted); rejected/withdrawn fall

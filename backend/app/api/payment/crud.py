@@ -2208,14 +2208,15 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
                     response.coupon_code = None
                     response.group_id = None
 
-        # Check referral discount — read live; a disabled referral grants nothing.
+        # Check referral discount. Disabling blocks new uses, but applications
+        # that already used the link keep their original benefit.
         if application.referral_id:
             from app.api.invite.crud import invites_crud as referrals_crud
 
             referral = referrals_crud.get_portal_created(
                 session, application.referral_id
             )
-            if referral and not referral.is_disabled and referral.discount_percentage:
+            if referral and referral.discount_percentage:
                 referral_discount = Decimal(str(referral.discount_percentage))
                 discounted_amount, discounted_credit_applied = _calculate_price(
                     standard_amount=standard_amount,

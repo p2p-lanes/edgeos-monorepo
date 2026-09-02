@@ -2889,6 +2889,29 @@ export const ApplicantParticipationSchema = {
     description: 'Response when human is the main applicant.'
 } as const;
 
+export const ApplicationAccessSourceSchema = {
+    properties: {
+        kind: {
+            type: 'string',
+            enum: ['group', 'invite', 'referral'],
+            title: 'Kind'
+        },
+        id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Id'
+        },
+        label: {
+            type: 'string',
+            title: 'Label'
+        }
+    },
+    type: 'object',
+    required: ['kind', 'id', 'label'],
+    title: 'ApplicationAccessSource',
+    description: 'Resolved source through which an application was accessed.'
+} as const;
+
 export const ApplicationAdminCreateSchema = {
     properties: {
         popup_id: {
@@ -3498,6 +3521,13 @@ export const ApplicationPublicSchema = {
                 }
             ],
             title: 'Referred By Name'
+        },
+        access_sources: {
+            items: {
+                '$ref': '#/components/schemas/ApplicationAccessSource'
+            },
+            type: 'array',
+            title: 'Access Sources'
         },
         info_not_shared: {
             items: {
