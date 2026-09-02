@@ -23,17 +23,17 @@ import { resolvedApplicationDestination } from "./lib/resolvedApplicationDestina
 import { shouldRedirectToStatus } from "./lib/shouldRedirectToStatus"
 
 /**
- * @param flowId Which way into the gathering the form is for. Without it,
+ * @param application The application selected for the current way in.
+ *   Without it,
  *   someone holding two applications would resume editing whichever the
  *   provider picked, and could overwrite the wrong one
  *   (sdd/sales-flows-rediseno).
  */
-function useFormInitData(flowId: string | null) {
+function useFormInitData(application: ApplicationPublic | null) {
   const { getCity, getPopups } = useCityProvider()
-  const { applications, getRelevantApplication } = useApplication()
+  const { applications } = useApplication()
   const city = getCity()
   const popups = getPopups()
-  const application = getRelevantApplication(flowId)
 
   return useMemo(() => {
     if (!city || !applications) return { application: null, importSource: null }
@@ -87,20 +87,44 @@ export default function FormPage() {
   // readable flow slug; authenticated portal handoffs carry the internal id.
   // Both resolve to the id required by the application API.
   const flowIdentifier = searchParams.get("flow")
-  const [selectedFlowId, setSelectedFlowId] = useState<string | null>(null)
+  const [flowSelection, setFlowSelection] = useState<{
+    identifier: string | null
+    flowId: string | null
+  }>({ identifier: flowIdentifier, flowId: null })
+  // A selection belongs only to the URL identifier that produced it. Reading
+  // it through that identifier drops flow A synchronously when the mounted
+  // page starts resolving flow B, before redirect effects can observe A.
+  const selectedFlowId =
+    flowSelection.identifier === flowIdentifier ? flowSelection.flowId : null
   // Declared after the door, not before it: asking which application this
   // is without saying which way in used to answer with whichever came last.
-  const application = getRelevantApplication(selectedFlowId)
+  const application =
+    flowIdentifier && !selectedFlowId
+      ? null
+      : getRelevantApplication(selectedFlowId)
   // Resolved independently of the <FlowPicker> element below (not via its
   // onResolved callback): the terminal-status guards further down need this
   // before we know whether it's even safe to reach the JSX that mounts
   // FlowPicker. Same query, shared cache — no extra request.
   const { data: portalFlows } = usePortalSalesFlows(city?.id)
   useEffect(() => {
-    if (!portalFlows || selectedFlowId) return
+    if (!portalFlows) return
     const resolvedFlowId = resolveApplicationFlowId(flowIdentifier, portalFlows)
-    if (resolvedFlowId) setSelectedFlowId(resolvedFlowId)
-  }, [flowIdentifier, portalFlows, selectedFlowId])
+    setFlowSelection((current) => {
+      if (resolvedFlowId) {
+        if (
+          current.identifier === flowIdentifier &&
+          current.flowId === resolvedFlowId
+        ) {
+          return current
+        }
+        return { identifier: flowIdentifier, flowId: resolvedFlowId }
+      }
+      return current.identifier === flowIdentifier
+        ? current
+        : { identifier: flowIdentifier, flowId: null }
+    })
+  }, [flowIdentifier, portalFlows])
   // Whether a door still has to be picked before the form means anything.
   // Its only job now is holding the form back: without a door, the schema
   // query could show the wrong questions.
@@ -118,7 +142,7 @@ export default function FormPage() {
     isError,
   } = useApplicationSchema(city?.id, selectedFlowId)
   const { application: existingApp, importSource } =
-    useFormInitData(selectedFlowId)
+    useFormInitData(application)
 
   const [showImport, setShowImport] = useState(false)
   const [importedData, setImportedData] = useState<ApplicationPublic | null>(
@@ -140,8 +164,8 @@ export default function FormPage() {
   useEffect(() => {
     if (!portalFlows || !selectedFlowId) return
     if (portalFlows.some((flow) => flow.id === selectedFlowId)) return
-    setSelectedFlowId(null)
-  }, [portalFlows, selectedFlowId])
+    setFlowSelection({ identifier: flowIdentifier, flowId: null })
+  }, [flowIdentifier, portalFlows, selectedFlowId])
 
   // Resolved applications are no longer accessible from the form.
   // draft/pending_fee/in review stay editable so the applicant can still
@@ -244,7 +268,9 @@ export default function FormPage() {
       <FlowPicker
         popupId={city.id}
         selectedFlowId={selectedFlowId}
-        onSelect={setSelectedFlowId}
+        onSelect={(flowId) =>
+          setFlowSelection({ identifier: flowIdentifier, flowId })
+        }
       />
       {needsFlowChoice && !selectedFlowId ? null : (
         <FileUploadProvider value={uploadFile}>
