@@ -10,7 +10,13 @@ import { arrayMove } from "@dnd-kit/sortable"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { createFileRoute, useNavigate } from "@tanstack/react-router"
 import { Eye, Loader2 } from "lucide-react"
-import { useCallback, useEffect, useMemo, useState } from "react"
+import {
+  type ReactNode,
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+} from "react"
 
 import {
   PopupsService,
@@ -34,6 +40,33 @@ import { createErrorHandler } from "@/utils"
 interface TicketingStepsSearch {
   step?: string
   flow?: string
+}
+
+export function TicketingStepsHeader({
+  onPreview,
+  scopeBar,
+}: {
+  onPreview: () => void
+  scopeBar: ReactNode
+}) {
+  return (
+    <>
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight">Ticketing Steps</h1>
+          <p className="text-muted-foreground">
+            Drag to reorder steps, toggle to enable/disable, click the title to
+            rename
+          </p>
+        </div>
+        <Button variant="outline" onClick={onPreview} className="shrink-0">
+          <Eye className="mr-2 h-4 w-4" />
+          Preview checkout
+        </Button>
+      </div>
+      {scopeBar}
+    </>
+  )
 }
 
 export const Route = createFileRoute("/_layout/ticketing-steps/")({
@@ -236,31 +269,19 @@ function TicketingStepsContent({ popupId }: { popupId: string }) {
     <div className="flex flex-col gap-6">
       {/* Page header. Preview belongs here rather than in a step's editor:
           it shows the whole checkout, starting where a buyer would. */}
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">Ticketing Steps</h1>
-          <p className="text-muted-foreground">
-            Drag to reorder steps, toggle to enable/disable, click the title to
-            rename
-          </p>
-        </div>
-        <FlowScopeBar
-          popupId={popupId}
-          flows={flows}
-          activeFlowId={activeFlowId}
-          onSelect={selectFlow}
-          isLoading={flowsLoading}
-          resource="checkout steps"
-        />
-        <Button
-          variant="outline"
-          onClick={() => setPreviewOpen(true)}
-          className="shrink-0"
-        >
-          <Eye className="mr-2 h-4 w-4" />
-          Preview checkout
-        </Button>
-      </div>
+      <TicketingStepsHeader
+        onPreview={() => setPreviewOpen(true)}
+        scopeBar={
+          <FlowScopeBar
+            popupId={popupId}
+            flows={flows}
+            activeFlowId={activeFlowId}
+            onSelect={selectFlow}
+            isLoading={flowsLoading}
+            resource="checkout steps"
+          />
+        }
+      />
 
       <div className="flex flex-col gap-6 md:flex-row md:items-start">
         {/* Journey rail */}
