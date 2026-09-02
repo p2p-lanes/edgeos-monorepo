@@ -31,6 +31,7 @@ from app.api.product.models import Products
 from app.api.tenant.models import Tenants
 from app.api.user.models import Users
 from app.core.security import create_access_token
+from tests._flow_helpers import invite_flow_id, provision_default_flow, set_link_policy
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -66,6 +67,7 @@ def _make_popup(
     db.add(popup)
     db.commit()
     db.refresh(popup)
+    provision_default_flow(db, popup)
     return popup
 
 
@@ -112,6 +114,8 @@ def _give_ticket(db: Session, popup: Popups, human: Humans) -> AttendeeProducts:
         attendee_id=attendee.id,
         product_id=product.id,
         check_in_code=uuid.uuid4().hex[:8].upper(),
+        product_category_snapshot=product.category,
+        requires_check_in_snapshot=product.requires_check_in,
     )
     db.add(ap)
     db.commit()
@@ -138,6 +142,7 @@ def _make_referral(
     """
     ref_code = code or f"ref-{uuid.uuid4().hex[:12]}"
     ref = Invites(
+        sales_flow_id=invite_flow_id(db, popup.id),
         tenant_id=popup.tenant_id,
         popup_id=popup.id,
         referrer_human_id=referrer.id,
@@ -862,10 +867,7 @@ class TestPerPopupReferralLimit:
     ) -> None:
         """Popup config max_referrals_per_attendee=5 sets max_uses=5 on the new referral."""
         popup = _make_popup(db, tenant_a)
-        popup.max_referrals_per_attendee = 5
-        db.add(popup)
-        db.commit()
-        db.refresh(popup)
+        set_link_policy(db, popup, max_referrals_per_attendee=5)
 
         human = _make_human(db, tenant_a)
         _give_ticket(db, popup, human)
@@ -887,10 +889,7 @@ class TestPerPopupReferralLimit:
     ) -> None:
         """Popup max_referrals_per_attendee=null → max_uses=null (unlimited)."""
         popup = _make_popup(db, tenant_a)
-        popup.max_referrals_per_attendee = None
-        db.add(popup)
-        db.commit()
-        db.refresh(popup)
+        set_link_policy(db, popup, max_referrals_per_attendee=None)
 
         human = _make_human(db, tenant_a)
         _give_ticket(db, popup, human)
@@ -910,12 +909,9 @@ class TestPerPopupReferralLimit:
         db: Session,
         tenant_a: Tenants,
     ) -> None:
-        """Popup config max_uses=3 overrides any body-provided max_uses."""
+        """The flow's ceiling overrides any body-provided max_uses."""
         popup = _make_popup(db, tenant_a)
-        popup.max_referrals_per_attendee = 3
-        db.add(popup)
-        db.commit()
-        db.refresh(popup)
+        set_link_policy(db, popup, max_referrals_per_attendee=3)
 
         human = _make_human(db, tenant_a)
         _give_ticket(db, popup, human)

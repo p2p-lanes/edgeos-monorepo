@@ -1,7 +1,7 @@
 import { keepPreviousData, useQuery } from "@tanstack/react-query"
-import { createFileRoute, Link, useNavigate } from "@tanstack/react-router"
+import { createFileRoute, useNavigate } from "@tanstack/react-router"
 import type { ColumnDef } from "@tanstack/react-table"
-import { AlertCircle, Download, Plus, Users, X } from "lucide-react"
+import { AlertCircle, Download, Users, X } from "lucide-react"
 import { Suspense, useCallback, useMemo, useState } from "react"
 
 import { type HumanPublic, type HumanRating, HumansService } from "@/client"
@@ -30,7 +30,6 @@ import {
 } from "@/components/ui/select"
 import { Skeleton } from "@/components/ui/skeleton"
 import { useWorkspace } from "@/contexts/WorkspaceContext"
-import useAuth from "@/hooks/useAuth"
 import {
   type TableSearchParams,
   useTableSearchParams,
@@ -379,21 +378,9 @@ function HumansTable() {
   )
 }
 
-function AddHumanButton() {
-  return (
-    <Button asChild>
-      <Link to="/humans/new">
-        <Plus className="mr-2 h-4 w-4" />
-        Create Human
-      </Link>
-    </Button>
-  )
-}
-
 function Humans() {
   const { needsTenantSelection, isContextReady, selectedPopupId } =
     useWorkspace()
-  const { isSuperadmin } = useAuth()
   const searchParams = Route.useSearch()
   const { filtersJson } = useHumansFilterParams()
   const [isExporting, setIsExporting] = useState(false)
@@ -450,7 +437,6 @@ function Humans() {
         </div>
         {isContextReady && (
           <div className="flex items-center gap-2">
-            {isSuperadmin && <AddHumanButton />}
             <Button
               variant="outline"
               onClick={handleExport}

@@ -11,6 +11,7 @@ import {
   type ProductPublic,
 } from "@/client"
 import FaviconOverride from "@/components/checkout-flow/FaviconOverride"
+import { OpenCheckoutQuoteStatus } from "@/components/checkout-flow/OpenCheckoutQuoteStatus"
 import ScrollyCheckoutFlow from "@/components/checkout-flow/ScrollyCheckoutFlow"
 import StepperCheckoutFlow from "@/components/checkout-flow/StepperCheckoutFlow"
 import { LanguageSwitcher } from "@/components/common/LanguageSwitcher"
@@ -18,6 +19,7 @@ import { captureAttribution } from "@/lib/attribution"
 import { resolveCheckoutShell } from "@/lib/checkout-shell"
 import { trackGAViewItem } from "@/lib/google-analytics"
 import { trackMetaViewContent } from "@/lib/meta-pixel"
+import { trackPortalTelemetry } from "@/lib/portal-telemetry"
 import { queryKeys } from "@/lib/query-keys"
 import { ApplicationContext } from "@/providers/applicationProvider"
 import { CheckoutProvider } from "@/providers/checkoutProvider"
@@ -25,7 +27,7 @@ import { CityContext } from "@/providers/cityProvider"
 import { DiscountContext } from "@/providers/discountProvider"
 import { LanguageProvider } from "@/providers/languageProvider"
 import PassesProvider from "@/providers/passesProvider"
-import ThemeProvider from "@/providers/themeProvider"
+import { useThemeScopeStyle } from "@/providers/themeProvider"
 import type { AttendeePassState } from "@/types/Attendee"
 import { setActiveCurrency } from "@/types/checkout"
 import type { DiscountProps } from "@/types/discounts"
@@ -38,11 +40,13 @@ import type { ProductsPass } from "@/types/Products"
 interface OpenCheckoutRuntimeProps {
   runtime: CheckoutRuntimeResponse
   popupSlug: string
+  flowSlug: string
   prefilledBuyer?: {
     email?: string
     firstName?: string
     lastName?: string
   }
+  showQuoteStatus?: boolean
   /** Renders for the backoffice live preview instead of a real buyer: no
    *  payment, no analytics, no attribution, no favicon takeover. */
   previewMode?: boolean
@@ -144,11 +148,14 @@ function buildOpenBuyerSchema(
 export function OpenCheckoutRuntime({
   runtime,
   popupSlug,
+  flowSlug,
   prefilledBuyer,
+  showQuoteStatus = false,
   previewMode = false,
   previewToken = null,
 }: OpenCheckoutRuntimeProps) {
   const { t } = useTranslation()
+  const flowScopeStyle = useThemeScopeStyle()
   const searchParams = useSearchParams()
   const cartCid = previewMode ? null : searchParams.get("cid")
   const cartSig = previewMode ? null : searchParams.get("sig")
@@ -208,6 +215,7 @@ export function OpenCheckoutRuntime({
 
     trackMetaViewContent({ popup, products: runtime.products })
     trackGAViewItem({ popup, products: runtime.products })
+    trackPortalTelemetry("checkout_opened")
     trackedViewContentRef.current = popup.id
   }, [popup, runtime.products, previewMode])
 
@@ -225,93 +233,111 @@ export function OpenCheckoutRuntime({
         popupsLoaded: true,
       }}
     >
-      <ThemeProvider>
-        <LanguageProvider>
-          <ApplicationContext.Provider
+      <LanguageProvider>
+        <ApplicationContext.Provider
+          value={{
+            // An anonymous checkout has no application at all, so every
+            // accessor answers empty rather than guessing.
+            applications: null,
+            participation: null,
+            getRelevantApplication: () => null,
+            getApplicationsForPopup: () => [],
+            getAttendees: () => [],
+            updateApplication: () => {},
+          }}
+        >
+          <DiscountContext.Provider
             value={{
-              applications: null,
-              participation: null,
-              getRelevantApplication: () => null,
-              getAttendees: () => [],
-              updateApplication: () => {},
+              discountApplied,
+              setDiscount: (discount) => setDiscountApplied(discount),
+              resetDiscount: () =>
+                setDiscountApplied({
+                  discount_value: 0,
+                  discount_type: "percentage",
+                  discount_code: null,
+                  city_id: popup.id,
+                }),
             }}
           >
-            <DiscountContext.Provider
-              value={{
-                discountApplied,
-                setDiscount: (discount) => setDiscountApplied(discount),
-                resetDiscount: () =>
-                  setDiscountApplied({
-                    discount_value: 0,
-                    discount_type: "percentage",
-                    discount_code: null,
-                    city_id: popup.id,
-                  }),
-              }}
+            <PassesProvider
+              attendees={attendees}
+              restoreFromCart={false}
+              flowType={runtime.flow_type ?? null}
+              productsOverride={products}
+              purchasesOverride={[]}
+              salesFlowId={runtime.selected_flow.id}
             >
-              <PassesProvider
-                attendees={attendees}
-                restoreFromCart={false}
+              <CheckoutProvider
+                initialStep="passes"
+                salesFlowId={runtime.selected_flow.id}
+                salesFlowSlug={flowSlug}
+                flowType={runtime.flow_type ?? null}
                 productsOverride={products}
-                purchasesOverride={[]}
+                emptyCatalogReason={runtime.empty_catalog_reason ?? null}
+                configuredStepsOverride={runtime.ticketing_steps}
+                accountCreditOverride={0}
+                buyerFormSchema={buyerFormSchema}
+                initialBuyerValues={
+                  buyerFormSchema
+                    ? buildInitialBuyerValues(buyerFormSchema, prefilledBuyer)
+                    : {}
+                }
+                cartPersistenceEnabled={false}
+                cartUiEnabled={true}
+                openCartPopupSlug={previewMode ? null : popupSlug}
+                openCartCid={cartCid}
+                openCartSig={cartSig}
+                validatePromoCodeOverride={async (code) => {
+                  const result = await CouponsService.validateCouponPublic({
+                    requestBody: {
+                      popup_slug: popupSlug,
+                      code,
+                      flow_slug: flowSlug,
+                    },
+                  })
+                  return Number(result.discount_value)
+                }}
+                submitMode="open-ticketing"
+                submitPopupSlug={popupSlug}
+                previewMode={previewMode}
+                previewToken={previewToken}
               >
-                <CheckoutProvider
-                  initialStep="passes"
-                  productsOverride={products}
-                  configuredStepsOverride={runtime.ticketing_steps}
-                  accountCreditOverride={0}
-                  buyerFormSchema={buyerFormSchema}
-                  initialBuyerValues={
-                    buyerFormSchema
-                      ? buildInitialBuyerValues(buyerFormSchema, prefilledBuyer)
-                      : {}
-                  }
-                  cartPersistenceEnabled={false}
-                  cartUiEnabled={true}
-                  // No anonymous cart is saved for a preview: those rows feed
-                  // abandoned-cart reminders, and an operator poking at their
-                  // own checkout is not a shopper who left one behind.
-                  openCartPopupSlug={previewMode ? null : popupSlug}
-                  openCartCid={cartCid}
-                  openCartSig={cartSig}
-                  validatePromoCodeOverride={async (code) => {
-                    const result = await CouponsService.validateCouponPublic({
-                      requestBody: {
-                        popup_slug: popupSlug,
-                        code,
-                      },
-                    })
-                    return Number(result.discount_value)
-                  }}
-                  submitMode="open-ticketing"
-                  submitPopupSlug={popupSlug}
-                  previewMode={previewMode}
-                  previewToken={previewToken}
-                >
-                  {/* The preview lives in an iframe inside the backoffice —
-                      swapping the tab's favicon there would be the
-                      backoffice's, not the buyer's. */}
-                  {!previewMode && (
-                    <FaviconOverride
-                      url={
-                        (popup as { favicon_url?: string | null })
-                          .favicon_url ?? null
-                      }
-                    />
-                  )}
-                  <Flow
-                    navExtraContent={<LanguageSwitcher compact />}
-                    brandLogoUrl={
-                      (popup as { icon_url?: string | null }).icon_url ?? null
+                {/* A preview is rendered inside the backoffice. Replacing the
+                    iframe tab's favicon would replace the backoffice favicon,
+                    not a buyer-facing checkout favicon. */}
+                {!previewMode && (
+                  <FaviconOverride
+                    url={
+                      (popup as { favicon_url?: string | null }).favicon_url ??
+                      null
                     }
-                    brandLabel={popup.name}
                   />
-                </CheckoutProvider>
-              </PassesProvider>
-            </DiscountContext.Provider>
-          </ApplicationContext.Provider>
-        </LanguageProvider>
-      </ThemeProvider>
+                )}
+                <Flow
+                  navExtraContent={
+                    <div className="flex items-center gap-3">
+                      {showQuoteStatus && (
+                        <OpenCheckoutQuoteStatus
+                          popupSlug={popupSlug}
+                          flowSlug={flowSlug}
+                        />
+                      )}
+                      <LanguageSwitcher
+                        compact
+                        portalContentStyle={flowScopeStyle}
+                      />
+                    </div>
+                  }
+                  brandLogoUrl={
+                    (popup as { icon_url?: string | null }).icon_url ?? null
+                  }
+                  brandLabel={popup.name}
+                />
+              </CheckoutProvider>
+            </PassesProvider>
+          </DiscountContext.Provider>
+        </ApplicationContext.Provider>
+      </LanguageProvider>
     </CityContext.Provider>
   )
 }

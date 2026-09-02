@@ -20,6 +20,7 @@ import {
   type FormFieldUpdate,
   FormSectionsService,
   PopupsService,
+  SalesFlowsService,
 } from "@/client"
 import { DangerZone } from "@/components/Common/DangerZone"
 import { FieldError } from "@/components/Common/FieldError"
@@ -55,6 +56,7 @@ import {
   UnsavedChangesDialog,
   useUnsavedChanges,
 } from "@/hooks/useUnsavedChanges"
+import { salesFlowsQueryKey } from "@/lib/salesFlowQueries"
 import { createErrorHandler } from "@/utils"
 
 const FIELD_TYPES = [
@@ -96,6 +98,20 @@ export function FormFieldForm({
     isEdit && defaultValues ? isSpecialField(defaultValues) : false
 
   const popupId = isEdit ? defaultValues.popup_id : selectedPopupId
+
+  // These standalone routes carry no flow context, so the row joins the
+  // popup's primary flow — named explicitly rather than left for the
+  // backend to guess.
+  const { data: flowsData } = useQuery({
+    queryKey: salesFlowsQueryKey(popupId),
+    queryFn: () =>
+      SalesFlowsService.listSalesFlows({
+        popupId: popupId as string,
+        limit: 100,
+      }),
+    enabled: !!popupId,
+  })
+  const defaultFlowId = flowsData?.results.find((f) => f.is_default)?.id
 
   const { data: popupData } = useQuery({
     queryKey: ["popups", popupId],
@@ -202,12 +218,13 @@ export function FormFieldForm({
           help_text: value.help_text || undefined,
         })
       } else {
-        if (!selectedPopupId) {
+        if (!selectedPopupId || !defaultFlowId) {
           showErrorToast("Please select a gathering first")
           return
         }
         createMutation.mutate({
           popup_id: selectedPopupId,
+          sales_flow_id: defaultFlowId,
           label: value.label,
           field_type: value.field_type,
           section_id: sectionId || null,

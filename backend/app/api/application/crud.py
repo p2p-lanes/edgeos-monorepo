@@ -4,7 +4,7 @@ from decimal import Decimal
 from typing import TYPE_CHECKING, Any
 
 from fastapi import HTTPException, status
-from sqlalchemy import desc, exists, or_
+from sqlalchemy import case, desc, exists, nullslast, or_
 from sqlalchemy.dialects import postgresql
 from sqlalchemy.orm import selectinload
 from sqlmodel import Session, col, func, select
@@ -44,6 +44,7 @@ from app.core.filters import build_filter_expression, text_condition_expression
 
 if TYPE_CHECKING:
     from app.api.human.models import Humans
+    from app.api.sales_flow.models import SalesFlows
 
 
 # Attendee categories shown in the Portal attendee directory. Kids (and any
@@ -232,12 +233,115 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
     def get_by_human_popup(
         self, session: Session, human_id: uuid.UUID, popup_id: uuid.UUID
     ) -> Applications | None:
-        """Get an application by human_id and popup_id."""
-        statement = select(Applications).where(
-            Applications.human_id == human_id,
-            Applications.popup_id == popup_id,
+        """Get an application by human_id and popup_id.
+
+        Popup-scoped, not flow-scoped — legitimate for reads where "does
+        this human already participate in this popup, in any flow" is the
+        actual question (access-ladder checks, invite redemption, "my
+        application" lookups). NOT used by the duplicate-creation guards
+        (see `get_by_human_flow`) since sdd/sales-flows slice 5 (G2).
+
+        Deterministic selection: after the re-key, a human can legitimately
+        hold 2+ applications for one popup (one per flow). Priority:
+        accepted status first, then most recent `submitted_at` (NULLs
+        last), then id as a tiebreaker — reads/mutations always resolve to
+        the same row.
+        """
+
+        accepted_first = case(
+            (Applications.status == ApplicationStatus.ACCEPTED.value, 0), else_=1
+        )
+        statement = (
+            select(Applications)
+            .where(
+                Applications.human_id == human_id,
+                Applications.popup_id == popup_id,
+            )
+            .order_by(
+                accepted_first,
+                nullslast(desc(Applications.submitted_at)),
+                desc(Applications.id),
+            )
         )
         return session.exec(statement).first()
+
+    def get_by_human_flow(
+        self, session: Session, human_id: uuid.UUID, sales_flow_id: uuid.UUID
+    ) -> Applications | None:
+        """Get an application by human_id and sales_flow_id.
+
+        Design: sdd/sales-flows slice 5, human checkpoint G2 (confirmed
+        2026-08-04) — one application per person PER FLOW, not per popup.
+        Used by the duplicate-creation guards.
+        """
+
+        statement = select(Applications).where(
+            Applications.human_id == human_id,
+            Applications.sales_flow_id == sales_flow_id,
+        )
+        return session.exec(statement).first()
+
+    def resolve_target_flow_id(
+        self,
+        session: Session,
+        popup_id: uuid.UUID,
+        explicit_flow_id: uuid.UUID | None = None,
+    ) -> uuid.UUID | None:
+        """Resolve the flow id to stamp on a new application, honoring an
+        explicit target when given (sdd/sales-flows task 9.7).
+
+        `explicit_flow_id` must belong to `popup_id` and be
+        `type=application` — raises 404 otherwise (mirrors every other
+        `_get_flow_or_404` in this SDD change; a client-supplied flow id is
+        always ownership-checked). Omitted means the popup's default flow.
+        """
+
+        if explicit_flow_id is None:
+            return self.resolve_creation_flow_id(session, popup_id)
+
+        from app.api.sales_flow.crud import sales_flows_crud
+        from app.api.sales_flow.schemas import SalesFlowType
+
+        flow = sales_flows_crud.get(session, explicit_flow_id)
+        if (
+            not flow
+            or flow.popup_id != popup_id
+            or flow.type != SalesFlowType.application
+        ):
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Sales flow not found for this popup",
+            )
+        # A closed way in stops taking new applications. It is dropped from
+        # the portal listing at the same time, so nobody arrives here by
+        # clicking — but this endpoint takes the flow id from the client, and
+        # a link somebody kept is enough to reach it.
+        if flow.status is not None:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="This way in is closed and is not taking applications",
+            )
+        return flow.id
+
+    def resolve_creation_flow_id(
+        self, session: Session, popup_id: uuid.UUID
+    ) -> uuid.UUID:
+        """The flow a new application is stamped with when none was named.
+
+        Since sdd/sales-flows-rediseno F4 `applications.sales_flow_id` is NOT
+        NULL, a popup without a compatibility default cannot serve this legacy
+        entry point. Named application flows remain available.
+        """
+
+        from app.api.sales_flow.crud import sales_flows_crud
+
+        default_flow = sales_flows_crud.get_default_flow(session, popup_id)
+        if default_flow is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Sales flow not found",
+            )
+        return default_flow.id
 
     def find_by_human(
         self,
@@ -247,6 +351,7 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
         limit: int = 100,
     ) -> tuple[list[Applications], int]:
         """Find applications by human_id with eager loading."""
+
         base_statement = select(Applications).where(Applications.human_id == human_id)
 
         count_statement = select(func.count()).select_from(base_statement.subquery())
@@ -300,6 +405,7 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
         match=any. A value is ignored when its field is not set; with a
         field set and no value the NULL bucket is selected.
         """
+
         # Each grouped-view scope becomes a plain WHERE clause; either may
         # require the Humans join.
         scope_clauses = []
@@ -495,6 +601,7 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
         limit: int = 100,
     ) -> tuple[list[Applications], int]:
         """Find applications by status with optional popup filter and eager loading."""
+
         base_statement = select(Applications).where(
             Applications.status == status_filter.value
         )
@@ -535,7 +642,29 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
 
         The reviewed-by-me exclusion and pagination run in SQL so the count is
         exact and no oversized candidate list is loaded into Python.
+
+        TODO (sdd/sales-flows, deferred from slice 14 — disclosed, not
+        forgotten): this queue is scoped by `popup_ids` only, with no
+        `sales_flow_id`/`reviewers_mode` awareness (design D4's tri-state).
+        A reviewer added only at a flow's OVERRIDE tier currently sees every
+        IN_REVIEW application across the whole popup, not just the flows
+        they're actually assigned to — the queue doesn't yet resolve, per
+        application, whether its flow's `reviewers_mode` is inherit or
+        override and filter accordingly. Fixing this correctly also touches
+        the reviewers_mode flip's concurrency story (two reviewers editing
+        the same flow's override list at once), which should use the
+        `with_for_update` precedent already established in
+        `payment/crud.py`'s pending-payment locking, not be bolted onto this
+        read path ad hoc. Deferred as its own reviewed slice — this queue is
+        a hot, constantly-polled surface and this final slice already spans
+        3 services; disclosed rather than bundled in under time pressure.
+
+        TODO (disclosed): `approval_strategy` also resolves flow -> popup
+        with no admin write path for the flow tier (see
+        `approval_strategy/crud.py::get_by_flow`) — the same shape of gap
+        as `reviewers_mode` above: backend-supported, admin-inaccessible.
         """
+
         already_reviewed = (
             exists()
             .where(ApplicationReviews.application_id == Applications.id)
@@ -596,11 +725,16 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
         other categories) are excluded. Supports text search across the
         attendee's own human fields.
         """
+
         # Root on attendees so the spouse appears as their own row, not just
         # nested under the main applicant. Gate on an accepted parent
         # application, on the attendee holding at least one product, and on the
         # category being directory-visible (main/spouse — kids are excluded).
-        has_products = exists().where(AttendeeProducts.attendee_id == Attendees.id)
+        has_products = exists().where(
+            AttendeeProducts.attendee_id == Attendees.id,
+            AttendeeProducts.revoked_at.is_(None),
+            AttendeeProducts.product_category_snapshot == "ticket",
+        )
         base_statement = (
             select(Attendees)
             .join(Applications, Attendees.application_id == Applications.id)  # type: ignore[arg-type]
@@ -682,7 +816,12 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
         the picker never renders a blank entry. Optional ``q`` does an ilike
         match on the human's first/last name.
         """
-        has_products = exists().where(AttendeeProducts.attendee_id == Attendees.id)
+
+        has_products = exists().where(
+            AttendeeProducts.attendee_id == Attendees.id,
+            AttendeeProducts.revoked_at.is_(None),
+            AttendeeProducts.product_category_snapshot == "ticket",
+        )
         # info_not_shared is a Postgres text[] column, so name-hiding is detected
         # with the array-overlap operator (&&): true when the list shares any
         # element with {first_name, last_name}. (?| is a JSONB operator and does
@@ -745,6 +884,7 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
         "first_name" or "last_name" in ``info_not_shared``. Used to drop those
         people from portal-facing participant/RSVP lists.
         """
+
         if not human_ids:
             return set()
 
@@ -774,6 +914,7 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
         from app.api.form_field.crud import form_fields_crud
         from app.api.human.crud import humans_crud
         from app.api.popup.crud import popups_crud
+        from app.api.sales_flow.resolver import config_for  # noqa: PLC0415
 
         # Get popup for check-in code prefix
         popup = popups_crud.get(session, app_data.popup_id)
@@ -786,12 +927,26 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
         # Popup feature-flag guards for invite/referral paths (T-gr-017).
         # These flags gate whether the invite/referral modules are active for
         # this popup. Checked early so we fail fast before any DB lookups.
-        if getattr(app_data, "invite_id", None) and not popup.invites_enabled:
+        if (
+            getattr(app_data, "invite_id", None)
+            and not config_for(
+                session,
+                sales_flow_id=getattr(app_data, "sales_flow_id", None),
+                popup_id=popup.id,
+            ).invites_enabled
+        ):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Invite-based applications are not enabled for this popup",
             )
-        if getattr(app_data, "referral_id", None) and not popup.referrals_enabled:
+        if (
+            getattr(app_data, "referral_id", None)
+            and not config_for(
+                session,
+                sales_flow_id=getattr(app_data, "sales_flow_id", None),
+                popup_id=popup.id,
+            ).referrals_enabled
+        ):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Referral-based applications are not enabled for this popup",
@@ -870,6 +1025,14 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
                 app_data.custom_fields or {},
                 skip_required=is_draft,
                 is_express_checkout=is_express_checkout,
+                # The same flow this application will be stamped with, so it
+                # is judged against the form it was shown and not against
+                # every flow's questions at once.
+                sales_flow_id=self.resolve_target_flow_id(
+                    session,
+                    app_data.popup_id,
+                    getattr(app_data, "sales_flow_id", None),
+                ),
             )
             if not is_valid:
                 raise HTTPException(
@@ -974,6 +1137,32 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
         }
         data["tenant_id"] = tenant_id
         data["human_id"] = human_id
+        # Stamp the target flow on every new application — an explicit
+        # `sales_flow_id` (e.g. from the portal FlowPicker) when given, else
+        # the popup's default flow. Never absent (F4).
+        requested_flow_id = getattr(app_data, "sales_flow_id", None)
+        data["sales_flow_id"] = self.resolve_target_flow_id(
+            session, app_data.popup_id, requested_flow_id
+        )
+
+        # A group decides the flow for the people who join through it
+        # (sdd/sales-flows-rediseno). A request naming a different one is a
+        # disagreement about where this person belongs, and answering it by
+        # picking a side silently is how the group's own form and emails
+        # stopped reaching anybody in the first place.
+        if _group is not None:
+            if (
+                requested_flow_id is not None
+                and requested_flow_id != _group.sales_flow_id
+            ):
+                raise HTTPException(
+                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                    detail=(
+                        "This group applies through a different sales flow. "
+                        "Leave the flow out to use the group's own."
+                    ),
+                )
+            data["sales_flow_id"] = _group.sales_flow_id
         data["scholarship_status"] = _scholarship_status_for_request(
             bool(data.get("scholarship_request", False))
         )
@@ -1011,41 +1200,24 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
             data["status"] = data["status"].value
 
         # Capture the custom fields schema at submission time
-        data["custom_fields_schema"] = form_fields_crud.build_schema_for_popup(
-            session, app_data.popup_id
+        data["custom_fields_schema"] = form_fields_crud.build_schema_for_flow(
+            session, app_data.popup_id, data["sales_flow_id"]
         )
 
         application = Applications(**data)
         session.add(application)
         session.flush()
 
-        # Create main attendee
-        # Get name from human (just updated)
-        session.refresh(human)
-        name = (
-            f"{human.first_name or ''} {human.last_name or ''}".strip() or human.email
-        )
-
-        # Look up the popup's primary category to set category_id on the main attendee
-        from app.api.attendee_category.crud import (
-            attendee_categories_crud,  # noqa: PLC0415
-        )
-
-        main_cat = attendee_categories_crud.get_primary_for_popup(
-            session, application.popup_id
-        )
-
-        attendees_crud.create_internal(
-            session,
-            tenant_id=tenant_id,
-            application_id=application.id,
-            popup_id=application.popup_id,
-            name=name,
-            email=human.email,
-            gender=human.gender,
-            human_id=human.id,
-            category_id=main_cat.id if main_cat else None,
-        )
+        detached_attendee = session.exec(
+            select(Attendees).where(
+                Attendees.human_id == human.id,
+                Attendees.popup_id == app_data.popup_id,
+                Attendees.application_id.is_(None),  # type: ignore[union-attr]
+            )
+        ).first()
+        if detached_attendee is not None:
+            detached_attendee.application_id = application.id
+            session.add(detached_attendee)
 
         # Apply the popup approval strategy for other non-group applications
         # still in review.
@@ -1054,8 +1226,13 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
             and _referral is None
             and application.status == ApplicationStatus.IN_REVIEW.value
         ):
-            # Intercept: if popup requires application fee, gate on PENDING_FEE
-            if popup.requires_application_fee:
+            # Intercept: if the flow applied through charges a fee, gate on
+            # PENDING_FEE.
+            if config_for(
+                session,
+                sales_flow_id=application.sales_flow_id,
+                popup_id=application.popup_id,
+            ).requires_application_fee:
                 application.status = ApplicationStatus.PENDING_FEE.value
                 self.create_snapshot(session, application, "pending_fee")
             else:
@@ -1141,6 +1318,7 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
         This will find or create a Human record based on email,
         then create the application with the specified status.
         """
+
         from app.api.form_field.crud import form_fields_crud
         from app.api.human.crud import humans_crud
         from app.api.popup.crud import popups_crud
@@ -1178,6 +1356,14 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
                 app_data.custom_fields or {},
                 skip_required=is_draft,
                 is_express_checkout=is_express_checkout,
+                # The same flow this application will be stamped with, so it
+                # is judged against the form it was shown and not against
+                # every flow's questions at once.
+                sales_flow_id=self.resolve_target_flow_id(
+                    session,
+                    app_data.popup_id,
+                    getattr(app_data, "sales_flow_id", None),
+                ),
             )
             if not is_valid:
                 raise HTTPException(
@@ -1242,14 +1428,50 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
             if profile_update:
                 humans_crud.update(session, human, HumanUpdate(**profile_update))
 
-        # Check for existing application
-        existing = self.get_by_human_popup(
-            session, human_id=human.id, popup_id=app_data.popup_id
+        # Check for existing application, scoped to the flow this one
+        # lands in. Honors an explicit sales_flow_id from the backoffice,
+        # 404 if it does not belong to this popup or is not an application
+        # flow. A group overrides it for the same reason as the portal
+        # path: the group decides where the people who join it belong.
+        flow_id = self.resolve_target_flow_id(
+            session, app_data.popup_id, app_data.sales_flow_id
+        )
+        if _admin_group is not None:
+            if (
+                app_data.sales_flow_id is not None
+                and app_data.sales_flow_id != _admin_group.sales_flow_id
+            ):
+                raise HTTPException(
+                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                    detail=(
+                        "This group applies through a different sales flow. "
+                        "Leave the flow out to use the group's own."
+                    ),
+                )
+            flow_id = _admin_group.sales_flow_id
+        existing = self.get_by_human_flow(
+            session, human_id=human.id, sales_flow_id=flow_id
         )
         if existing:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="An application already exists for this human and popup",
+                detail="An application already exists for this human and sales flow",
+            )
+
+        # An application brings its own primary attendee, and this person
+        # already has a row on somebody else's. Two rows is two QR codes for
+        # one body at the door. Mirrors the guard the portal applies to the
+        # same move in create_my_application.
+        companion = attendees_crud.find_companion_for_popup(
+            session, human_id=human.id, popup_id=app_data.popup_id
+        )
+        if companion:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=(
+                    "This person is already attending this event as a companion "
+                    "on another application."
+                ),
             )
 
         # Build application data
@@ -1272,6 +1494,7 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
         }
         data["tenant_id"] = tenant_id
         data["human_id"] = human.id
+        data["sales_flow_id"] = flow_id
         data["scholarship_status"] = _scholarship_status_for_request(
             bool(data.get("scholarship_request", False))
         )
@@ -1288,40 +1511,13 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
             data["accepted_at"] = datetime.now(UTC)
 
         # Capture the custom fields schema at submission time
-        data["custom_fields_schema"] = form_fields_crud.build_schema_for_popup(
-            session, app_data.popup_id
+        data["custom_fields_schema"] = form_fields_crud.build_schema_for_flow(
+            session, app_data.popup_id, flow_id
         )
 
         application = Applications(**data)
         session.add(application)
         session.flush()
-
-        # Create main attendee
-        session.refresh(human)
-        name = (
-            f"{human.first_name or ''} {human.last_name or ''}".strip() or human.email
-        )
-
-        # Look up the popup's primary category to set category_id on the main attendee
-        from app.api.attendee_category.crud import (
-            attendee_categories_crud,  # noqa: PLC0415
-        )
-
-        main_cat = attendee_categories_crud.get_primary_for_popup(
-            session, application.popup_id
-        )
-
-        attendees_crud.create_internal(
-            session,
-            tenant_id=tenant_id,
-            application_id=application.id,
-            popup_id=application.popup_id,
-            name=name,
-            email=human.email,
-            gender=human.gender,
-            human_id=human.id,
-            category_id=main_cat.id if main_cat else None,
-        )
 
         # Apply approval strategy if status is IN_REVIEW
         if application.status == ApplicationStatus.IN_REVIEW.value:
@@ -1343,6 +1539,7 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
         - No strategy or AUTO_ACCEPT → ACCEPTED
         - Other strategies → IN_REVIEW (unchanged)
         """
+
         from app.api.approval_strategy.crud import approval_strategies_crud
         from app.api.approval_strategy.schemas import ApprovalStrategyType
 
@@ -1352,8 +1549,10 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
             self.create_snapshot(session, application, "auto_rejected")
             return
 
-        # Check approval strategy
-        strategy = approval_strategies_crud.get_by_popup(session, application.popup_id)
+        # The strategy of the application's own flow (slice 6).
+        strategy = approval_strategies_crud.get_by_flow(
+            session, application.sales_flow_id
+        )
         should_auto_accept = (
             strategy is None
             or strategy.strategy_type == ApprovalStrategyType.AUTO_ACCEPT
@@ -1409,6 +1608,7 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
         Returns the resolved ``custom_fields`` the caller must store, or
         ``None`` when the payload does not update them.
         """
+
         from app.api.form_field.crud import form_fields_crud
 
         incoming_status = update_data.get("status")
@@ -1456,6 +1656,7 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
             custom_fields,
             skip_required=is_draft,
             is_express_checkout=is_express_checkout,
+            sales_flow_id=application.sales_flow_id,
         )
         if not is_valid:
             raise HTTPException(
@@ -1504,13 +1705,17 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
         Profile fields in update_data are applied to the Human record.
         Application fields are applied to the Application record.
         """
+
         from app.api.form_field.crud import form_fields_crud
         from app.api.human.crud import humans_crud
 
         # Validate custom_fields if being updated
         if validate_custom_fields and update_data.custom_fields is not None:
             is_valid, errors = form_fields_crud.validate_custom_fields(
-                session, application.popup_id, update_data.custom_fields
+                session,
+                application.popup_id,
+                update_data.custom_fields,
+                sales_flow_id=application.sales_flow_id,
             )
             if not is_valid:
                 raise HTTPException(
@@ -1582,6 +1787,7 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
 
         Uses flush (not commit) — the caller owns the transaction boundary.
         """
+
         snapshot = application.create_snapshot(event)
         session.add(snapshot)
         session.flush()
@@ -1601,6 +1807,7 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
 
         Idempotent: a no-op when the application is already accepted.
         """
+
         if application.status == ApplicationStatus.ACCEPTED.value:
             return application
 
@@ -1630,19 +1837,26 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
         Caller owns the transaction boundary so a sold-out failure mid-batch
         rolls back every Human/Application/Attendee created in this run.
         """
+
         from app.api.attendee_category.crud import attendee_categories_crud
         from app.api.form_field.crud import form_fields_crud
 
         now = datetime.now(UTC)
+        # sdd/sales-flows slice 5: stamp the popup's default flow, same as
+        # every other application-creation path. The caller (grant_tickets_admin)
+        # already confirmed no application exists for this human/popup via
+        # get_by_human_popup before reaching here, so this never collides.
+        flow_id = self.resolve_creation_flow_id(session, popup_id)
         application = Applications(
             tenant_id=tenant_id,
             popup_id=popup_id,
             human_id=human.id,
+            sales_flow_id=flow_id,
             status=ApplicationStatus.ACCEPTED.value,
             submitted_at=now,
             accepted_at=now,
-            custom_fields_schema=form_fields_crud.build_schema_for_popup(
-                session, popup_id
+            custom_fields_schema=form_fields_crud.build_schema_for_flow(
+                session, popup_id, flow_id
             ),
             # Granted (comped/gifted) people never filled the application
             # form, so they never consented to sharing anything: default the
@@ -1684,6 +1898,7 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
         Raises:
             RedFlaggedHumanError: If the human is red-flagged and cannot be accepted.
         """
+
         # Red-flagged humans cannot be accepted
         human_red_flag = application.human.red_flag if application.human else False
         if human_red_flag:
@@ -1715,6 +1930,7 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
         The legacy category string is no longer accepted — callers must resolve
         a category_id against the popup's attendee_categories table.
         """
+
         # Check for duplicate emails
         if email:
             existing_emails = [a.email for a in application.attendees if a.email]
@@ -1722,6 +1938,21 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
                     detail="Attendee with this email already exists",
+                )
+
+            # The same guard the other add-a-companion route applies
+            # (attendee/router.py). This one only looked inside the
+            # application, so a person already at the gathering through any
+            # other door came in a second time.
+            existing_human_id = attendees_crud._find_human_id_by_email(
+                session, email, application.tenant_id
+            )
+            if existing_human_id is not None and attendees_crud.human_attends_popup(
+                session, existing_human_id, application.popup_id
+            ):
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail="This person is already attending this event.",
                 )
 
         attendee = attendees_crud.create_internal(
@@ -1745,6 +1976,7 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
         attendee_id: uuid.UUID,
     ) -> None:
         """Delete an attendee from an application."""
+
         attendee = next((a for a in application.attendees if a.id == attendee_id), None)
         if not attendee:
             raise HTTPException(
@@ -1775,6 +2007,7 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
         """
         from app.api.application.schemas import ScholarshipStatus
         from app.api.popup.crud import popups_crud
+        from app.api.sales_flow.resolver import config_for  # noqa: PLC0415
         from app.services.approval.calculator import approval_calculator
 
         # 1. Fetch application
@@ -1794,7 +2027,11 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
             )
 
         # 3. Validate popup allows scholarship
-        if not popup.allows_scholarship:
+        if not config_for(
+            session,
+            sales_flow_id=application.sales_flow_id,
+            popup_id=application.popup_id,
+        ).allows_scholarship:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Scholarship is not enabled for this popup",
@@ -1807,7 +2044,14 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
                     status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
                     detail="discount_percentage is required when approving a scholarship",
                 )
-            if decision.incentive_amount is not None and not popup.allows_incentive:
+            if (
+                decision.incentive_amount is not None
+                and not config_for(
+                    session,
+                    sales_flow_id=application.sales_flow_id,
+                    popup_id=application.popup_id,
+                ).allows_incentive
+            ):
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
                     detail="Incentives are not enabled for this popup",
@@ -1864,38 +2108,28 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
         human_id: uuid.UUID,
         popup_id: uuid.UUID,
     ) -> PopupAccessResponse:
-        """Run the 7-step access ladder for (human_id, popup_id).
+        """Resolve positive grants before preserving Application denials."""
+        from app.api.sales_flow.eligibility import has_popup_products
 
-        Resolution order (first match wins):
-        1. Accepted Application → allowed=True, source="application"
-        2. Submitted or in-review Application → denied, reason="application_pending"
-        3. Rejected Application → denied, reason="application_rejected"
-        4. Direct Attendee row for (human_id, popup_id) → allowed, source="attendee"
-        5. Payment owned by human for popup → allowed, source="payment"
-        6. Companion participation (find_companion_for_popup) → allowed, source="companion"
-        7. Fallback → denied, reason="no_access"
-
-        Uses lightweight scalar/exists probes so no full row is loaded unnecessarily.
-        Short-circuits at the first match — application checks run before attendee
-        and payment checks to respect the application flow semantics.
-        """
-        from app.api.attendee.crud import attendees_crud
-        from app.api.attendee.models import Attendees
-        from app.api.payment.models import PaymentProducts, Payments
-
-        # ---- Steps 1-3: Application check ----
         application = self.get_by_human_popup(session, human_id, popup_id)
+
+        if application is not None and (
+            application.status == ApplicationStatus.ACCEPTED.value
+        ):
+            return PopupAccessResponse(
+                allowed=True,
+                source="application",
+                application_status="accepted",
+            )
+
+        if has_popup_products(session, human_id, popup_id):
+            return PopupAccessResponse(
+                allowed=True,
+                source="attendee",
+            )
 
         if application is not None:
             app_status = application.status
-
-            if app_status == ApplicationStatus.ACCEPTED.value:
-                return PopupAccessResponse(
-                    allowed=True,
-                    source="application",
-                    application_status="accepted",
-                )
-
             if app_status in (ApplicationStatus.IN_REVIEW.value, "submitted"):
                 return PopupAccessResponse(
                     allowed=False,
@@ -1904,7 +2138,6 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
                     else "submitted",
                     reason="application_pending",
                 )
-
             if app_status == ApplicationStatus.REJECTED.value:
                 return PopupAccessResponse(
                     allowed=False,
@@ -1912,90 +2145,65 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
                     reason="application_rejected",
                 )
 
-        # ---- Step 4: Direct Attendee check ----
-        # Check for attendees OWNED by this human (application owner or direct-sale).
-        # This uses the same dual-path predicate as find_by_human_popup so that
-        # companion attendees (whose APPLICATION.human_id != human_id) are excluded
-        # here and fall through to Step 6.
-        from sqlalchemy import exists as sa_exists
-
-        union_ids = attendees_crud._human_popup_attendee_ids(
-            session, human_id, popup_id
-        )
-        attendee_exists_stmt = select(
-            sa_exists().where(
-                Attendees.id.in_(select(union_ids.c.id))  # type: ignore[arg-type]
-            )
-        )
-        has_attendee = session.exec(attendee_exists_stmt).one()
-
-        if has_attendee:
-            return PopupAccessResponse(
-                allowed=True,
-                source="attendee",
-            )
-
-        # ---- Step 5: Payment check ----
-        # Application-leg: payment linked to an application owned by this human for this popup
-        app_payment_exists = select(
-            sa_exists()
-            .where(Payments.popup_id == popup_id)
-            .where(
-                Payments.application_id.in_(  # type: ignore[union-attr]
-                    select(Applications.id).where(
-                        Applications.human_id == human_id,
-                        Applications.popup_id == popup_id,
-                    )
-                )
-            )
-        )
-        has_app_payment = session.exec(app_payment_exists).one()
-
-        if has_app_payment:
-            return PopupAccessResponse(
-                allowed=True,
-                source="payment",
-            )
-
-        # Direct-sale leg: payment via product snapshot → attendee with human_id
-        direct_payment_exists = select(
-            sa_exists()
-            .where(Payments.popup_id == popup_id)
-            .where(Payments.application_id.is_(None))  # type: ignore[union-attr]
-            .where(
-                Payments.id.in_(  # type: ignore[union-attr]
-                    select(PaymentProducts.payment_id)
-                    .join(Attendees, PaymentProducts.attendee_id == Attendees.id)
-                    .where(
-                        Attendees.human_id == human_id,
-                        Attendees.popup_id == popup_id,
-                        Attendees.application_id.is_(None),  # type: ignore[union-attr]
-                    )
-                )
-            )
-        )
-        has_direct_payment = session.exec(direct_payment_exists).one()
-
-        if has_direct_payment:
-            return PopupAccessResponse(
-                allowed=True,
-                source="payment",
-            )
-
-        # ---- Step 6: Companion check ----
-        companion = attendees_crud.find_companion_for_popup(session, human_id, popup_id)
-
-        if companion is not None:
-            return PopupAccessResponse(
-                allowed=True,
-                source="companion",
-            )
-
-        # ---- Step 7: No match ----
         return PopupAccessResponse(
             allowed=False,
             reason="no_access",
         )
+
+    def resolve_upsale_catalog(
+        self,
+        session: Session,
+        human_id: uuid.UUID,
+        popup_id: uuid.UUID,
+    ) -> list["SalesFlows"]:
+        """Flow-aware catalog resolution (sdd/sales-flows design G0 #2, D8,
+        task 13.2). Returns every portal-listed, `type=upsale` sales flow of
+        `popup_id` the human is currently eligible for.
+
+        Eligibility (D8) is "any product assigned OR any APPROVED payment
+        anywhere in the popup", evaluated live via `is_upsale_eligible` —
+        the products leg is a product-owner amendment superseding G0 #3's
+        payment-only wording so admin-granted attendee products qualify.
+        An accepted but unpaid application STILL does not qualify unless
+        products were granted. This is a listing, not an access gate: an
+        ineligible or unknown human degrades to an empty catalog rather
+        than raising, matching `find_portal_listed`'s own listing
+        semantics elsewhere.
+
+        Scope note: this resolves the ELIGIBLE UPSALE side of G0's "the
+        catalog a person sees is their accepting flow's plus eligible
+        upsale flows" only. The "accepting flow" half has no consumer yet
+        (no shipped surface needs to know which flow a human's application
+        belongs to alongside this list) — inventing that lookup here would
+        be unused public surface (same precedent as slice 9's
+        EffectiveFlowConfig scoping decision). Add it when a real consumer
+        needs it.
+        """
+        from app.api.popup.models import Popups
+        from app.api.sales_flow.crud import sales_flows_crud
+        from app.api.sales_flow.eligibility import is_upsale_eligible
+        from app.api.sales_flow.schemas import SalesFlowType
+        from app.services.restrictions.context import build_context
+        from app.services.restrictions.enforcement import restriction_passes
+
+        if not is_upsale_eligible(session, human_id, popup_id):
+            return []
+
+        popup = session.get(Popups, popup_id)
+        human = session.get(Humans, human_id)
+        if popup is None or human is None:
+            return []
+
+        flows = sales_flows_crud.find_portal_listed(
+            session, popup_id, type=SalesFlowType.upsale
+        )
+        return [
+            flow
+            for flow in flows
+            if restriction_passes(
+                flow, build_context(session, popup, flow, human=human)
+            )
+        ]
 
     def list_comments(
         self, session: Session, application_id: uuid.UUID
@@ -2095,6 +2303,7 @@ def _maybe_grant_fee_credit(
     from app.api.audit_log.constants import AuditAction
     from app.api.payment.crud import adjust_application_credit, payments_crud
     from app.api.payment.schemas import PaymentStatus
+    from app.api.sales_flow.resolver import config_for  # noqa: PLC0415
 
     if application.status != ApplicationStatus.ACCEPTED.value:
         return
@@ -2102,12 +2311,11 @@ def _maybe_grant_fee_credit(
     if application.fee_credit_granted:
         return
 
-    # Load popup explicitly to avoid stale lazy-load after an internal commit
-    # (e.g. recalculate_status commits and refreshes the application row).
-    from app.api.popup.models import Popups
-
-    popup = session.get(Popups, application.popup_id)
-    if popup is None or not popup.requires_application_fee:
+    if not config_for(
+        session,
+        sales_flow_id=application.sales_flow_id,
+        popup_id=application.popup_id,
+    ).requires_application_fee:
         return
 
     fee_payment = payments_crud.get_latest_fee_payment(session, application.id)

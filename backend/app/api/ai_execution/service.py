@@ -63,9 +63,7 @@ def claim_execution(
                 updated_at=now,
                 expires_at=expires_at,
             )
-            .on_conflict_do_nothing(
-                constraint="uq_ai_executions_owner_execution"
-            )
+            .on_conflict_do_nothing(constraint="uq_ai_executions_owner_execution")
             .returning(table.c.id)
         ).first()
         if inserted is not None:

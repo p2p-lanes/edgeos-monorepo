@@ -6,7 +6,8 @@ export const queryKeys = {
     mine: () => ["applications", "mine"] as const,
   },
   products: {
-    byPopup: (popupId: string) => ["products", popupId] as const,
+    byPopup: (popupId: string, salesFlowId?: string | null) =>
+      ["products", popupId, salesFlowId ?? null] as const,
   },
   attendees: {
     directory: (popupId: string) =>
@@ -17,7 +18,8 @@ export const queryKeys = {
     byPopup: (popupId: string) => ["purchases", popupId] as const,
   },
   cart: {
-    byPopup: (popupId: string) => ["cart", popupId] as const,
+    byPopup: (popupId: string, salesFlowId?: string | null) =>
+      ["cart", popupId, salesFlowId ?? null] as const,
   },
   participation: {
     byPopup: (popupId: string) => ["participation", popupId] as const,
@@ -40,21 +42,41 @@ export const queryKeys = {
     stats: ["profile", "stats"] as const,
   },
   formSchema: {
-    portal: (popupId: string) => ["form-schema", "portal", popupId] as const,
+    // `salesFlowId` (sdd/sales-flows D6 URL scheme, task 9.4) is part of the
+    // identity — a named flow's schema must never be served from the
+    // another flow's cache entry.
+    portal: (popupId: string, salesFlowId?: string | null) =>
+      salesFlowId
+        ? (["form-schema", "portal", popupId, salesFlowId] as const)
+        : (["form-schema", "portal", popupId] as const),
   },
   checkout: {
     // The runtime payload is translated server-side from Accept-Language, so
-    // the language is part of the cache identity. Omitting `lang` yields the
-    // language-agnostic prefix, which still matches every language's entry for
-    // invalidation.
-    runtime: (slug: string, lang?: string | null) =>
-      lang
-        ? (["checkout", "runtime", slug, lang] as const)
-        : (["checkout", "runtime", slug] as const),
+    // the language is part of the cache identity. `flowSlug` (sdd/sales-flows
+    // D6 URL scheme) is part of the identity too — a named flow's runtime
+    // must never be served from another flow's cache entry, or vice
+    // versa. Both dimensions are labeled keys of a trailing filter object
+    // (not positional slots) so a flow slugged e.g. "es" can never collide
+    // with the "es" language, and `runtime(slug)` alone still yields `{}` —
+    // a filter that partially matches every flow/lang variant for broad
+    // invalidation (see checkoutProvider.tsx).
+    runtime: (slug: string, flowSlug?: string | null, lang?: string | null) => {
+      const filter: { flowSlug?: string; lang?: string } = {}
+      if (flowSlug) filter.flowSlug = flowSlug
+      if (lang) filter.lang = lang
+      return ["checkout", "runtime", slug, filter] as const
+    },
     coupon: (slug: string, code: string) =>
       ["checkout", "coupon", slug, code] as const,
   },
   attendeeCategories: {
     byPopup: (popupId: string) => ["attendee-categories", popupId] as const,
+  },
+  salesFlows: {
+    portal: (popupId: string) => ["sales-flows", "portal", popupId] as const,
+    portalDirect: (popupId: string) =>
+      ["sales-flows", "portal", "direct", popupId] as const,
+    portalUpsale: (popupId: string) =>
+      ["sales-flows", "portal", "upsale", popupId] as const,
   },
 } as const

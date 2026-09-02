@@ -52,6 +52,11 @@ class Invites(SQLModel, table=True):
     )
     tenant_id: uuid.UUID = Field(foreign_key="tenants.id")
     popup_id: uuid.UUID = Field(foreign_key="popups.id")
+    # The flow this invite lands someone in. Required
+    # (sdd/sales-flows-rediseno): redeeming creates an application, and an
+    # application always belongs to a flow. Without this the invite fell
+    # back to the popup's default flow whatever it was meant for.
+    sales_flow_id: uuid.UUID = Field(foreign_key="sales_flows.id", index=True)
     token: str = Field(max_length=64)
     recipient_email: str | None = Field(default=None, nullable=True)
     discount_percentage: Decimal = Field(

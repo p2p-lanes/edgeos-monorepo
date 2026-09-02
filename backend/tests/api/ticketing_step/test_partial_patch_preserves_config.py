@@ -36,13 +36,14 @@ def _sections() -> list[dict]:
 
 
 def _create_step(
-    client: TestClient, token: str, popup_id: uuid.UUID
+    client: TestClient, token: str, popup_id: uuid.UUID, flow_id: uuid.UUID
 ) -> tuple[str, dict]:
     resp = client.post(
         "/api/v1/ticketing-steps",
         headers=_admin_headers(token),
         json={
             "popup_id": str(popup_id),
+            "sales_flow_id": str(flow_id),
             "step_type": "tickets",
             "title": f"Tickets {uuid.uuid4().hex[:8]}",
             "template": "ticket-select",
@@ -68,9 +69,10 @@ class TestPartialPatchPreservesTemplateConfig:
         client: TestClient,
         admin_token_tenant_a: str,
         popup_tenant_a: Popups,
+        default_flow_tenant_a,
     ) -> None:
         step_id, created_config = _create_step(
-            client, admin_token_tenant_a, popup_tenant_a.id
+            client, admin_token_tenant_a, popup_tenant_a.id, default_flow_tenant_a.id
         )
 
         patch = client.patch(
@@ -89,9 +91,10 @@ class TestPartialPatchPreservesTemplateConfig:
         client: TestClient,
         admin_token_tenant_a: str,
         popup_tenant_a: Popups,
+        default_flow_tenant_a,
     ) -> None:
         step_id, created_config = _create_step(
-            client, admin_token_tenant_a, popup_tenant_a.id
+            client, admin_token_tenant_a, popup_tenant_a.id, default_flow_tenant_a.id
         )
 
         patch = client.patch(
@@ -110,9 +113,10 @@ class TestPartialPatchPreservesTemplateConfig:
         client: TestClient,
         admin_token_tenant_a: str,
         popup_tenant_a: Popups,
+        default_flow_tenant_a,
     ) -> None:
         step_id, created_config = _create_step(
-            client, admin_token_tenant_a, popup_tenant_a.id
+            client, admin_token_tenant_a, popup_tenant_a.id, default_flow_tenant_a.id
         )
 
         patch = client.patch(
@@ -131,9 +135,12 @@ class TestPartialPatchPreservesTemplateConfig:
         client: TestClient,
         admin_token_tenant_a: str,
         popup_tenant_a: Popups,
+        default_flow_tenant_a,
     ) -> None:
         """The guard must not make the config impossible to clear on purpose."""
-        step_id, _ = _create_step(client, admin_token_tenant_a, popup_tenant_a.id)
+        step_id, _ = _create_step(
+            client, admin_token_tenant_a, popup_tenant_a.id, default_flow_tenant_a.id
+        )
 
         patch = client.patch(
             f"/api/v1/ticketing-steps/{step_id}",
@@ -150,9 +157,12 @@ class TestPartialPatchPreservesTemplateConfig:
         client: TestClient,
         admin_token_tenant_a: str,
         popup_tenant_a: Popups,
+        default_flow_tenant_a,
     ) -> None:
         """A payload that does carry the config still goes through validation."""
-        step_id, _ = _create_step(client, admin_token_tenant_a, popup_tenant_a.id)
+        step_id, _ = _create_step(
+            client, admin_token_tenant_a, popup_tenant_a.id, default_flow_tenant_a.id
+        )
 
         patch = client.patch(
             f"/api/v1/ticketing-steps/{step_id}",

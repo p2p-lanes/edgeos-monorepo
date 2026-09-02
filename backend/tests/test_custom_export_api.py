@@ -16,6 +16,7 @@ from app.api.popup.models import Popups
 from app.api.tenant.models import Tenants
 from app.api.user.models import Users
 from app.core.security import create_access_token
+from tests._flow_helpers import application_flow_id
 
 
 def _headers(user: Users, tenant: Tenants) -> dict[str, str]:
@@ -45,10 +46,13 @@ def test_preview_and_download_cross_resource_xlsx(
         first_name="Export",
         last_name="Person",
     )
+    db.add_all([popup, human])
+    db.flush()
     application = Applications(
         id=uuid.uuid4(),
         tenant_id=tenant_a.id,
         popup_id=popup.id,
+        sales_flow_id=application_flow_id(db, popup.id),
         human_id=human.id,
         status=ApplicationStatus.ACCEPTED.value,
     )
@@ -69,7 +73,7 @@ def test_preview_and_download_cross_resource_xlsx(
         amount=Decimal("125.50"),
         currency="EUR",
     )
-    db.add_all([popup, human, application, attendee, payment])
+    db.add_all([application, attendee, payment])
     db.commit()
 
     spec = {

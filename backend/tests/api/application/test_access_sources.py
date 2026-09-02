@@ -10,6 +10,7 @@ from app.api.human.models import Humans
 from app.api.invite.models import Invites
 from app.api.popup.models import Popups
 from app.api.tenant.models import Tenants
+from tests._flow_helpers import application_flow_id
 from tests.api.application_review.test_pending_reviews import (
     _auth,
     _make_admin,
@@ -50,21 +51,25 @@ def test_application_detail_lists_only_present_access_sources(
     admin = _make_admin(db, tenant_a)
     applicant = _make_human(db, tenant_a)
     referrer = _make_human(db, tenant_a)
+    flow_id = application_flow_id(db, popup.id)
     group = Groups(
         tenant_id=tenant_a.id,
         popup_id=popup.id,
+        sales_flow_id=flow_id,
         name="Source Group",
         slug=f"source-group-{uuid.uuid4().hex[:8]}",
     )
     invite = Invites(
         tenant_id=tenant_a.id,
         popup_id=popup.id,
+        sales_flow_id=flow_id,
         token="source-invite",
         created_by=admin.id,
     )
     referral = Invites(
         tenant_id=tenant_a.id,
         popup_id=popup.id,
+        sales_flow_id=flow_id,
         token="source-referral",
         referrer_human_id=referrer.id,
         auto_approve=True,
@@ -76,6 +81,7 @@ def test_application_detail_lists_only_present_access_sources(
     application = Applications(
         tenant_id=tenant_a.id,
         popup_id=popup.id,
+        sales_flow_id=flow_id,
         human_id=applicant.id,
         status=ApplicationStatus.ACCEPTED.value,
         group_id=group.id,
@@ -108,6 +114,7 @@ def test_application_detail_omits_access_sources_when_none_were_used(
     admin = _make_admin(db, tenant_a)
     applicant = _make_human(db, tenant_a)
     application = Applications(
+        sales_flow_id=application_flow_id(db, popup.id),
         tenant_id=tenant_a.id,
         popup_id=popup.id,
         human_id=applicant.id,

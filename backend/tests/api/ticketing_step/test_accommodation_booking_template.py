@@ -18,6 +18,8 @@ from sqlmodel import Session
 from app.api.accommodation.crud import accommodation_properties_crud
 from app.api.accommodation.schemas import AccommodationPropertyCreate
 from app.api.popup.models import Popups
+from app.api.sales_flow.crud import sales_flows_crud
+from app.api.sales_flow.models import SalesFlows
 from app.api.tenant.models import Tenants
 
 BASE = "/api/v1/ticketing-steps"
@@ -39,9 +41,26 @@ def _make_property(db: Session, popup: Popups, tenant: Tenants):
     return row
 
 
-def _step_payload(popup_id: uuid.UUID, config: dict | None = None) -> dict:
+def _flow_id(db: Session, popup: Popups) -> uuid.UUID:
+    flow = sales_flows_crud.get_default_flow(db, popup.id)
+    if flow is None:
+        flow = SalesFlows(
+            tenant_id=popup.tenant_id,
+            popup_id=popup.id,
+            slug="checkout",
+            name="Checkout",
+            type=popup.sale_type,
+            is_default=True,
+        )
+        db.add(flow)
+        db.flush()
+    return flow.id
+
+
+def _step_payload(db: Session, popup: Popups, config: dict | None = None) -> dict:
     return {
-        "popup_id": str(popup_id),
+        "popup_id": str(popup.id),
+        "sales_flow_id": str(_flow_id(db, popup)),
         "step_type": "housing",
         "title": f"Accommodation {uuid.uuid4().hex[:6]}",
         "template": "accommodation-booking",
@@ -51,14 +70,18 @@ def _step_payload(popup_id: uuid.UUID, config: dict | None = None) -> dict:
 
 class TestDefaults:
     def test_an_empty_config_is_filled_with_defaults(
-        self, client: TestClient, admin_token_tenant_a: str, popup_tenant_a: Popups
+        self,
+        client: TestClient,
+        db: Session,
+        admin_token_tenant_a: str,
+        popup_tenant_a: Popups,
     ) -> None:
         """A step must work the moment it is enabled, without an admin having
         to tick anything."""
         response = client.post(
             BASE,
             headers=_auth(admin_token_tenant_a),
-            json=_step_payload(popup_tenant_a.id, {}),
+            json=_step_payload(db, popup_tenant_a, {}),
         )
         assert response.status_code == 201, response.text
         config = response.json()["template_config"]
@@ -71,12 +94,16 @@ class TestDefaults:
         }
 
     def test_a_null_config_is_left_alone(
-        self, client: TestClient, admin_token_tenant_a: str, popup_tenant_a: Popups
+        self,
+        client: TestClient,
+        db: Session,
+        admin_token_tenant_a: str,
+        popup_tenant_a: Popups,
     ) -> None:
         response = client.post(
             BASE,
             headers=_auth(admin_token_tenant_a),
-            json=_step_payload(popup_tenant_a.id, None),
+            json=_step_payload(db, popup_tenant_a, None),
         )
         assert response.status_code == 201, response.text
         assert response.json()["template_config"] is None
@@ -95,7 +122,8 @@ class TestDefaults:
             BASE,
             headers=_auth(admin_token_tenant_a),
             json=_step_payload(
-                popup_tenant_a.id,
+                db,
+                popup_tenant_a,
                 {
                     "property_ids": [str(property_row.id)],
                     "layout": "list",
@@ -116,22 +144,30 @@ class TestDefaults:
 
 class TestShapeValidation:
     def test_an_unknown_layout_is_rejected(
-        self, client: TestClient, admin_token_tenant_a: str, popup_tenant_a: Popups
+        self,
+        client: TestClient,
+        db: Session,
+        admin_token_tenant_a: str,
+        popup_tenant_a: Popups,
     ) -> None:
         response = client.post(
             BASE,
             headers=_auth(admin_token_tenant_a),
-            json=_step_payload(popup_tenant_a.id, {"layout": "carousel"}),
+            json=_step_payload(db, popup_tenant_a, {"layout": "carousel"}),
         )
         assert response.status_code == 422
 
     def test_a_malformed_property_id_is_rejected(
-        self, client: TestClient, admin_token_tenant_a: str, popup_tenant_a: Popups
+        self,
+        client: TestClient,
+        db: Session,
+        admin_token_tenant_a: str,
+        popup_tenant_a: Popups,
     ) -> None:
         response = client.post(
             BASE,
             headers=_auth(admin_token_tenant_a),
-            json=_step_payload(popup_tenant_a.id, {"property_ids": ["not-a-uuid"]}),
+            json=_step_payload(db, popup_tenant_a, {"property_ids": ["not-a-uuid"]}),
         )
         assert response.status_code == 422
 
@@ -148,7 +184,8 @@ class TestShapeValidation:
             BASE,
             headers=_auth(admin_token_tenant_a),
             json=_step_payload(
-                popup_tenant_a.id,
+                db,
+                popup_tenant_a,
                 {"property_ids": [str(property_row.id), str(property_row.id)]},
             ),
         )
@@ -172,19 +209,23 @@ class TestForeignKeyValidation:
         response = client.post(
             BASE,
             headers=_auth(admin_token_tenant_a),
-            json=_step_payload(popup_tenant_a.id, {"property_ids": [str(foreign.id)]}),
+            json=_step_payload(db, popup_tenant_a, {"property_ids": [str(foreign.id)]}),
         )
         assert response.status_code == 422
         assert "invalid_accommodation_property" in response.text
 
     def test_an_unknown_property_is_rejected(
-        self, client: TestClient, admin_token_tenant_a: str, popup_tenant_a: Popups
+        self,
+        client: TestClient,
+        db: Session,
+        admin_token_tenant_a: str,
+        popup_tenant_a: Popups,
     ) -> None:
         response = client.post(
             BASE,
             headers=_auth(admin_token_tenant_a),
             json=_step_payload(
-                popup_tenant_a.id, {"property_ids": [str(uuid.uuid4())]}
+                db, popup_tenant_a, {"property_ids": [str(uuid.uuid4())]}
             ),
         )
         assert response.status_code == 422
@@ -201,7 +242,7 @@ class TestForeignKeyValidation:
         created = client.post(
             BASE,
             headers=_auth(admin_token_tenant_a),
-            json=_step_payload(popup_tenant_a.id, {}),
+            json=_step_payload(db, popup_tenant_a, {}),
         )
         step_id = created.json()["id"]
         foreign = _make_property(db, popup_tenant_a_summer_fest, tenant_a)
@@ -219,7 +260,11 @@ class TestForeignKeyValidation:
 
 class TestOtherTemplatesAreUnaffected:
     def test_the_legacy_housing_template_still_accepts_its_own_config(
-        self, client: TestClient, admin_token_tenant_a: str, popup_tenant_a: Popups
+        self,
+        client: TestClient,
+        db: Session,
+        admin_token_tenant_a: str,
+        popup_tenant_a: Popups,
     ) -> None:
         """`housing-date` keeps working untouched: popups already selling
         housing as plain products must not break."""
@@ -228,6 +273,7 @@ class TestOtherTemplatesAreUnaffected:
             headers=_auth(admin_token_tenant_a),
             json={
                 "popup_id": str(popup_tenant_a.id),
+                "sales_flow_id": str(_flow_id(db, popup_tenant_a)),
                 "step_type": "housing",
                 "title": f"Housing {uuid.uuid4().hex[:6]}",
                 "template": "housing-date",
@@ -242,14 +288,18 @@ class TestOtherTemplatesAreUnaffected:
         assert response.json()["template_config"]["variant"] == "grid"
 
     def test_reordering_the_step_does_not_wipe_its_config(
-        self, client: TestClient, admin_token_tenant_a: str, popup_tenant_a: Popups
+        self,
+        client: TestClient,
+        db: Session,
+        admin_token_tenant_a: str,
+        popup_tenant_a: Popups,
     ) -> None:
         """Regression guard shared with every other template: a drag sends
         exactly {"order": n} and must not blank template_config."""
         created = client.post(
             BASE,
             headers=_auth(admin_token_tenant_a),
-            json=_step_payload(popup_tenant_a.id, {"layout": "list"}),
+            json=_step_payload(db, popup_tenant_a, {"layout": "list"}),
         )
         step_id = created.json()["id"]
 

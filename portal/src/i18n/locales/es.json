@@ -72,7 +72,95 @@
     "no_active_popups": "Sin eventos activos",
     "no_active_popups_description": "No hay eventos activos disponibles en este momento. Por favor, vuelve más tarde.",
     "no_profile": "No hay datos de perfil disponibles.",
-    "no_profile_contact": "Por favor, contacta a soporte si crees que esto es un error."
+    "no_profile_contact": "Por favor, contacta a soporte si crees que esto es un error.",
+    "direct_sales_title": "Opciones de compra",
+    "direct_sales_description": "Elige una opción disponible para este evento.",
+    "door_generic": "Tu postulación",
+    "door_status": {
+      "accepted": "Aceptada",
+      "in_review": "En revisión",
+      "draft": "Borrador",
+      "rejected": "No aceptada",
+      "none": "Abierta"
+    },
+    "door_action": {
+      "passes": "Ver mis pases",
+      "application": "Ver postulación",
+      "apply": "Postularme"
+    }
+  },
+  "shop": {
+    "title": "Tienda",
+    "description": "Elija una opción disponible.",
+    "catalog": "Opciones disponibles",
+    "application": "Solicitud",
+    "direct": "Compra directa",
+    "upsale": "Disponible para usted",
+    "open": "Ver opción",
+    "source": "Origen: {{source}}",
+    "eligibility": {
+      "application": "Disponible para solicitantes aprobados",
+      "direct": "Disponible para todos los asistentes",
+      "upsale": "Disponible después de una compra elegible"
+    },
+    "price_from": "Desde {{price}}",
+    "price_unavailable": "Precio no disponible",
+    "empty_title": "No hay opciones disponibles por ahora",
+    "empty_description": "Vuelva más tarde para consultar nuevas opciones.",
+    "approval_required_title": "Se requiere aprobación",
+    "approval_required_description": "Su solicitud debe ser aprobada antes de poder comprar esta opción.",
+    "approval_required_cta": "Ver solicitud",
+    "estimated_total": "Total estimado",
+    "definitive_total": "Total"
+  },
+  "orders": {
+    "title": "Pedidos",
+    "description": "Tu historial de pagos para este evento.",
+    "empty_title": "Todavía no hay pedidos",
+    "empty_description": "Tu historial de pagos aparecerá aquí.",
+    "total": "Total",
+    "lines": "Artículos del pedido",
+    "line_quantity": "Cantidad: {{count}}",
+    "legacy_purchase": "Compra heredada",
+    "invoice": "Factura",
+    "download_invoice_error": "No se pudo descargar la factura. Inténtelo de nuevo.",
+    "status": {
+      "approved": "Aprobado",
+      "pending": "Pendiente",
+      "rejected": "Rechazado",
+      "expired": "Vencido",
+      "cancelled": "Cancelado",
+      "unknown": "Estado de pago desconocido"
+    }
+  },
+  "people": {
+    "title": "Personas",
+    "description": "Personas que puedes administrar para este evento.",
+    "primary": "Asistente principal",
+    "dependent": "Dependiente",
+    "can_manage": "Administrado por ti",
+    "empty_title": "Aún no hay personas",
+    "empty_description": "Las personas que administras aparecerán aquí."
+  },
+  "tickets_access": {
+    "title": "Pases y acceso",
+    "description": "Tus entradas activas y artículos con check-in para este evento.",
+    "empty_title": "Aún no hay entradas ni artículos con check-in",
+    "empty_description": "Las entradas activas y los artículos con check-in aparecerán aquí.",
+    "purchased_by_you": "Comprado por ti",
+    "show_code": "Mostrar código de check-in para {{ticket}}",
+    "checked_in": "Registro completado",
+    "active": "Listo para registrarse",
+    "access_active": "Acceso activo",
+    "code_title": "Código de check-in",
+    "code_description": "Usa este código al hacer check-in.",
+    "duration": {
+      "day": "Acceso diario al evento",
+      "week": "Acceso semanal al evento",
+      "month": "Acceso mensual al evento",
+      "full": "Acceso completo al evento"
+    },
+    "qr_alt": "Código QR"
   },
   "auth": {
     "sign_up_or_log_in": "Registrarse o Iniciar Sesión",
@@ -129,6 +217,8 @@
   "application": {
     "unavailable": "Aplicación no disponible",
     "unavailable_description": "El formulario de aplicación para este evento aún no está configurado.",
+    "flow_picker_title": "Elige cómo quieres aplicar",
+    "flow_picker_description": "Este evento tiene más de un tipo de aplicación. Selecciona uno para continuar.",
     "step_of": "Paso {{current}} de {{total}}",
     "existing_found": "Aplicación existente encontrada",
     "existing_description": "Encontramos una aplicación previa asociada a tu email.",
@@ -244,7 +334,19 @@
     "cart": {
       "close_aria": "Cerrar carrito",
       "empty_title": "Tu carrito está vacío",
-      "empty_description": "Por favor, volvé atrás y seleccioná algunos pases para continuar."
+      "empty_description": "Por favor, volvé atrás y seleccioná algunos pases para continuar.",
+      "unknown_attendee": "Asistente desconocido",
+      "passes": "Pases",
+      "housing": "Alojamiento",
+      "full_stay": "Estadía completa",
+      "merchandise": "Productos",
+      "patron_contribution": "Contribución de patrocinio",
+      "community_support": "Apoyo a la comunidad",
+      "meal_plans": "Planes de comidas",
+      "pass_protection": "Protección de pases",
+      "pass_protection_description": "Cobertura para todos los pases",
+      "promo_code": "Código promocional",
+      "promo_code_expired": "Tu código promocional ya no es válido"
     },
     "actions": {
       "pay": "Pagar",
@@ -278,6 +380,46 @@
         "next_image_aria": "Siguiente imagen"
       }
     },
+    "accommodation": {
+      "default_notice": "El alojamiento se paga por completo al finalizar la compra y no es reembolsable.",
+      "in_cart": "En el carrito",
+      "sleeps": "Capacidad para {{count}}",
+      "nights_one": "{{count}} noche",
+      "nights_other": "{{count}} noches",
+      "monthly_rate": "tarifa mensual",
+      "per_night": "noche",
+      "includes_tax": "Incluye {{amount}} de impuesto de alojamiento",
+      "remove": "Quitar",
+      "select": "Seleccionar",
+      "only_left_one": "Solo queda {{count}}",
+      "only_left_other": "Solo quedan {{count}}",
+      "guests_label": "Huéspedes",
+      "guests_one": "{{count}} huésped",
+      "guests_other": "{{count}} huéspedes",
+      "guest_name_placeholder": "Nombre completo del huésped {{number}}",
+      "no_rooms": "No hay alojamientos disponibles para este checkout.",
+      "check_in": "Entrada",
+      "check_out": "Salida",
+      "who_is_staying": "Quiénes se alojarán",
+      "cart_title": "Alojamiento",
+      "bed_count": "{{count}} {{type}}",
+      "bed_types": {
+        "king": "cama king",
+        "queen": "cama queen",
+        "double": "cama doble",
+        "single": "cama individual",
+        "bunk": "litera",
+        "sofa": "sofá cama"
+      },
+      "unavailable": {
+        "sold_out": "Completo para estas fechas",
+        "min_stay_not_met": "Requiere una estadía más larga",
+        "outside_bookable_window": "No disponible en estas fechas",
+        "over_capacity": "Capacidad insuficiente para el grupo",
+        "inactive": "No disponible",
+        "default": "No disponible para estas fechas"
+      }
+    },
     "contribution": {
       "fallbackLabel": "Contribución al evento",
       "fallbackDescription": "Apoya la realización del evento"
@@ -290,6 +432,7 @@
     "payment_error": "Something went wrong with your payment. Please try again.",
     "popup_ended_error": "Este popup ha finalizado. Las compras ya no están disponibles.",
     "no_products": "No hay productos disponibles para este paso.",
+    "not_eligible_for_flow": "Este checkout no está disponible para tu cuenta.",
     "no_images": "No hay imágenes disponibles para este paso.",
     "no_video": "No hay video disponible para este paso.",
     "no_passes": "No hay pases disponibles.",
@@ -301,6 +444,8 @@
     "previous_payment_completed": "Tu pago anterior fue completado.",
     "pending_payment_wait": "Tenés un pago pendiente. Por favor, esperá unos minutos.",
     "payment_cancel_failed": "No pudimos procesar tu pago. Por favor, intentá de nuevo.",
+    "flow_restriction_violated": "No sos elegible para comprar a través de este canal.",
+    "product_not_in_flow": "Este producto no está disponible a través de este canal.",
     "amanita": {
       "hero_headline": "4 días de música, arte, yoga y talleres",
       "buyer_kicker": "Tus datos",
@@ -358,6 +503,9 @@
     "loading": "Cargando checkout...",
     "unavailable_title": "Checkout no disponible",
     "unavailable_description": "El link es inválido o este evento ya no está disponible.",
+    "sign_in_required_title": "Necesitas iniciar sesión",
+    "sign_in_required_description": "Este checkout es para asistentes registrados. Inicia sesión en tu cuenta del portal para continuar.",
+    "sign_in_required_cta": "Iniciar sesión",
     "tickets_title": "Tickets",
     "tickets_subtitle": "Elegí cuántos tickets querés comprar.",
     "coupon_title": "Cupón",
@@ -380,12 +528,20 @@
     "thank_you_total": "Total",
     "previous_payment_completed": "Tu pago anterior fue completado.",
     "payment_cancel_failed": "No pudimos procesar tu pago. Por favor, intentá de nuevo.",
-    "pending_payment_wait": "Tenés un pago pendiente. Por favor, esperá unos minutos."
+    "pending_payment_wait": "Tenés un pago pendiente. Por favor, esperá unos minutos.",
+    "flow_restriction_violated": "No sos elegible para comprar a través de este canal.",
+    "product_not_in_flow": "Este producto no está disponible a través de este canal."
   },
   "passes": {
     "your_passes": "Tus Pases",
+    "companion_attending": "Asistís como acompañante.",
+    "companion_attending_city": "Asistís a {{city}} como acompañante.",
+    "companion_no_passes": "Todavía no tenés pases asignados. Volvé a consultar más tarde.",
+    "companion_waiting_acceptance": "Los pases estarán disponibles cuando se acepte la aplicación.",
     "buy_passes": "Comprar Pases",
     "your_passes_description": "Mirá y administrá tu orden acá.",
+    "upsale_title": "Más para vos",
+    "upsale_description": "Complementos exclusivos disponibles para tu compra.",
     "loading_passes": "Cargando información de pases...",
     "add_spouse": "Agregar pareja",
     "add_children": "Agregar hijos",
@@ -452,7 +608,7 @@
     }
   },
   "attendees": {
-    "title": "Directorio de Asistentes",
+    "title": "Directorio",
     "description": "Contactá a tus amigos para planificar fechas, encontrar alojamiento compartido u organizar actividades juntos. *Este directorio incluye solo la información de quienes voluntariamente optaron por compartir sus datos.",
     "search_placeholder": "Buscar por nombre, email, organización...",
     "export_csv": "Exportar asistentes como CSV",
@@ -505,8 +661,18 @@
     "coming_soon": "(Próximamente)",
     "soon_badge": "Próximamente",
     "application": "Aplicación",
+    "navigation": "Navegación del portal",
+    "mobile_navigation": "Menú de navegación del portal",
+    "general": "General",
+    "participation": "Participación",
+    "commerce": "Comercio",
+    "community": "Comunidad",
+    "shop": "Tienda",
+    "orders": "Pedidos",
+    "people": "Personas",
+    "tickets_access": "Entradas y acceso",
     "passes": "Pases",
-    "attendee_directory": "Directorio de Asistentes",
+    "attendee_directory": "Directorio",
     "companion": "Acompañante",
     "status": "Estado",
     "groups": "Grupos",
@@ -573,7 +739,7 @@
     "application": "Aplicación",
     "passes": "Pases",
     "buy": "Comprar",
-    "attendees": "Directorio de Asistentes",
+    "attendees": "Directorio",
     "groups": "Grupos",
     "profile": "Perfil"
   },
@@ -931,7 +1097,7 @@
       "visibility_private": "Privado (solo invitados)",
       "visibility_unlisted": "No listado (oculto, link compartible)",
       "host_label": "Organizador visible (opcional)",
-      "host_placeholder_default": "{{name}} (por defecto)",
+      "host_placeholder_popup": "{{name}}",
       "host_placeholder_optional": "Opcional",
       "host_use_popup": "Usar {{name}}",
       "host_use_me": "Usar mi nombre",

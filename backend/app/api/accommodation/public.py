@@ -56,8 +56,10 @@ def _not_offered() -> HTTPException:
     )
 
 
-def _resolve_offer(session: Session, popup_id: uuid.UUID) -> AccommodationStepOffer:
-    offer = step_offer(session, popup_id)
+def _resolve_offer(
+    session: Session, popup_id: uuid.UUID, sales_flow_id: uuid.UUID
+) -> AccommodationStepOffer:
+    offer = step_offer(session, popup_id, sales_flow_id)
     if not offer.enabled:
         raise _not_offered()
     return offer
@@ -118,10 +120,14 @@ def _offered_accommodations(
 
 
 def offer_for_popup(
-    session: Session, popup_id: uuid.UUID, *, currency: str | None = None
+    session: Session,
+    popup_id: uuid.UUID,
+    sales_flow_id: uuid.UUID,
+    *,
+    currency: str | None = None,
 ) -> AccommodationOffer:
     """Inventory for the accommodation step, before any dates are picked."""
-    offer = _resolve_offer(session, popup_id)
+    offer = _resolve_offer(session, popup_id, sales_flow_id)
     accommodations, properties = _offered_accommodations(session, popup_id, offer)
 
     popup_min_stay = crud.accommodations_crud.popup_min_stay(session, popup_id)
@@ -173,6 +179,7 @@ def offer_for_popup(
 def availability_for_popup(
     session: Session,
     popup_id: uuid.UUID,
+    sales_flow_id: uuid.UUID,
     *,
     check_in,
     check_out,
@@ -184,7 +191,7 @@ def availability_for_popup(
     One call covers the whole screen: the checkout re-asks on every date
     change, and doing that per card would be an N+1 on the hot path.
     """
-    offer = _resolve_offer(session, popup_id)
+    offer = _resolve_offer(session, popup_id, sales_flow_id)
 
     if check_out <= check_in:
         raise HTTPException(

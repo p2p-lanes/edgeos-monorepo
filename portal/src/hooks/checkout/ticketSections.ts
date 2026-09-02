@@ -119,6 +119,31 @@ export function buildSectionGroups(
     .filter((g) => g.products.length > 0)
 }
 
+export function hasRenderableSectionProducts(
+  attendee: AttendeePassState,
+  sections: TemplateSection[],
+): boolean {
+  return buildSectionGroups(attendee, sections).length > 0
+}
+
+/** Category IDs that can add recipients in this step. Null means unrestricted. */
+export function getStepAttendeeCategoryIds(
+  sections: TemplateSection[],
+): string[] | null {
+  if (
+    sections.length === 0 ||
+    sections.some((section) => section.attendee_categories == null)
+  ) {
+    return null
+  }
+
+  return [
+    ...new Set(
+      sections.flatMap((section) => section.attendee_categories ?? []),
+    ),
+  ]
+}
+
 // ---------------------------------------------------------------------------
 // buildDurationGroups (fallback — no sections configured)
 // ---------------------------------------------------------------------------

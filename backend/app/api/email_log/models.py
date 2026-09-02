@@ -41,6 +41,16 @@ class EmailLogs(SQLModel, table=True):
         sa_column=Column(UUID(as_uuid=True), nullable=True, index=True),
     )
 
+    # sdd/sales-flows slice 10: reminder dedupe partition key. Same
+    # denormalized shape as popup_id (no FK) — a log row must outlive the
+    # flow it was sent for. NULL on legacy/pre-backfill rows is treated as
+    # "the popup's default flow" by callers, never as "no flow" (design's
+    # migration-hazard mitigation for the dispatcher's dedupe key).
+    sales_flow_id: uuid.UUID | None = Field(
+        default=None,
+        sa_column=Column(UUID(as_uuid=True), nullable=True, index=True),
+    )
+
     # The EmailTemplateType value that was rendered.
     template_type: str = Field(index=True)
 

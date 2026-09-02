@@ -55,7 +55,7 @@ from app.api.attendee.schemas import (
     AttendeeUpdate,
     AttendeeWithTickets,
 )
-from app.api.shared.enums import SaleType, UserRole
+from app.api.shared.enums import UserRole
 from app.api.shared.response import ListModel, PaginationLimit, PaginationSkip, Paging
 from app.core.dependencies.users import (
     AdminOrApiKey_ApplicationsRead,
@@ -134,6 +134,9 @@ def _build_application_public(
                 purchase_metadata=ap.purchase_metadata,
             )
             for ap in a.attendee_products
+            if ap.attendee_id is not None
+            and ap.revoked_at is None
+            and ap.product_category_snapshot == "ticket"
         ]
         # Build the base dict from scalar ORM columns only — do NOT call
         # AttendeePublic.model_validate(a) because it triggers ORM property
@@ -168,6 +171,7 @@ def _build_application_public(
         popup_id=application.popup_id,
         human_id=application.human_id,
         group_id=application.group_id,
+        sales_flow_id=application.sales_flow_id,
         referral=application.referral,
         invite_id=application.invite_id,
         referral_id=application.referral_id,
@@ -552,7 +556,6 @@ async def grant_tickets_admin(
             detail="One or more products are unavailable, inactive, or not in this popup",
         )
     products_map = {p.id: p for p in valid_products}
-
     # Aggregate total requested quantity per product across ALL people for the
     # up-front stock cap check. Each person may request a different mix, so
     # this sum is what we compare against total_stock_remaining.
@@ -614,23 +617,45 @@ async def grant_tickets_admin(
             application = crud.applications_crud.get_by_human_popup(
                 db, human_id=human.id, popup_id=payload.popup_id
             )
+            grant_attendee = None
             if application is None:
-                application = crud.applications_crud.create_for_admin_grant(
-                    db,
-                    tenant_id=tenant_id,
-                    popup_id=payload.popup_id,
-                    human=human,
+                # Someone can be at this popup without an application of their
+                # own — as somebody's companion, or from a direct purchase.
+                # Building them an application would give one person a second
+                # attendee: two QR codes for the same body at the door. Grant
+                # onto the row they already are instead.
+                grant_attendee = attendees_crud.find_attendee_for_human(
+                    db, human_id=human.id, popup_id=payload.popup_id
                 )
+                if grant_attendee is None:
+                    application = crud.applications_crud.create_for_admin_grant(
+                        db,
+                        tenant_id=tenant_id,
+                        popup_id=payload.popup_id,
+                        human=human,
+                    )
             else:
                 crud.applications_crud.promote_to_accepted(db, application)
 
-            main_attendee = attendees_crud.get_main_attendee(db, application.id)
-            if main_attendee is None:
-                # Should be impossible — create_for_admin_grant always inserts
-                # one, and an existing application always has a main attendee.
-                raise HTTPException(
-                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                    detail="Main attendee not found for application",
+            if grant_attendee is None:
+                grant_attendee = attendees_crud.get_main_attendee(db, application.id)
+            if grant_attendee is None:
+                from app.api.attendee_category.crud import attendee_categories_crud
+
+                main_cat = attendee_categories_crud.get_primary_for_popup(
+                    db, payload.popup_id
+                )
+                grant_attendee = attendees_crud.create_internal(
+                    db,
+                    tenant_id=tenant_id,
+                    application_id=application.id,
+                    popup_id=payload.popup_id,
+                    name=human.full_name or human.email,
+                    email=human.email,
+                    gender=human.gender,
+                    human_id=human.id,
+                    category_id=main_cat.id if main_cat else None,
+                    commit=False,
                 )
 
             # Per-product, per-quantity stock decrement. Raises 409 if a
@@ -643,8 +668,11 @@ async def grant_tickets_admin(
 
             payment = Payments(
                 tenant_id=tenant_id,
-                application_id=application.id,
+                # None when the grant landed on a companion or direct-sale row:
+                # the ticket is that person's, not the host application's.
+                application_id=application.id if application is not None else None,
                 popup_id=payload.popup_id,
+                buyer_human_id=human.id,
                 status=PaymentStatus.PENDING.value,
                 amount=Decimal("0"),
                 currency=popup.currency,
@@ -664,12 +692,13 @@ async def grant_tickets_admin(
                     tenant_id=tenant_id,
                     payment_id=payment.id,
                     product_id=item.product_id,
-                    attendee_id=main_attendee.id,
+                    attendee_id=grant_attendee.id,
                     quantity=item.quantity,
                     product_name=product.name,
                     product_description=product.description,
                     product_price=Decimal("0") if is_patreon else product.price,
                     product_category=product.category or "",
+                    requires_check_in_snapshot=product.requires_check_in,
                     product_currency=popup.currency,
                     effective_unit_price=Decimal("0") if is_patreon else None,
                 )
@@ -677,7 +706,7 @@ async def grant_tickets_admin(
                 finalize_lines.append(
                     PaymentProductRequest(
                         product_id=item.product_id,
-                        attendee_id=main_attendee.id,
+                        attendee_id=grant_attendee.id,
                         quantity=item.quantity,
                     )
                 )
@@ -696,8 +725,8 @@ async def grant_tickets_admin(
                 actor=actor_from_user(current_user),
                 action=AuditAction.TICKET_GRANT,
                 entity_type=AuditEntityType.ATTENDEE,
-                entity_id=main_attendee.id,
-                entity_label=main_attendee.name,
+                entity_id=grant_attendee.id,
+                entity_label=grant_attendee.name,
                 popup_id=payload.popup_id,
                 details={
                     "payment_id": str(payment.id),
@@ -716,7 +745,7 @@ async def grant_tickets_admin(
             granted.append(
                 GrantedPaymentInfo(
                     payment_id=payment.id,
-                    application_id=application.id,
+                    application_id=application.id if application is not None else None,
                     human_id=human.id,
                     email=human.email,
                     tickets_created=ticket_count,
@@ -974,8 +1003,15 @@ async def list_my_tickets(
         popup = attendee.popup
 
         # Build product list — group ticket rows by product_id and count.
-        counts = Counter(ap.product_id for ap in attendee.attendee_products)
-        seen = {ap.product_id: ap.product for ap in attendee.attendee_products}
+        ticket_units = [
+            ap
+            for ap in attendee.attendee_products
+            if ap.attendee_id is not None
+            and ap.revoked_at is None
+            and ap.product_category_snapshot == "ticket"
+        ]
+        counts = Counter(ap.product_id for ap in ticket_units)
+        seen = {ap.product_id: ap.product for ap in ticket_units}
         products = [
             TicketProduct(
                 name=seen[pid].name,
@@ -1088,7 +1124,10 @@ async def get_my_purchases(
     from app.api.product.schemas import ProductWithQuantity
 
     attendees = attendees_crud.find_purchases_by_human_popup(
-        db, human_id=current_human.id, popup_id=popup_id
+        db,
+        human_id=current_human.id,
+        popup_id=popup_id,
+        tenant_id=current_human.tenant_id,
     )
 
     results = []
@@ -1139,6 +1178,35 @@ async def get_my_application(
     return _build_application_public(application)
 
 
+def _host_paid_for_any(db, attendee_products) -> bool:
+    """Whether any of these tickets was paid through an application.
+
+    A ticket bought through the host's application is the host's money, and
+    unwinding that is a support decision. A ticket whose payment carries no
+    application is this person's own — a direct purchase, or a grant made
+    straight to them. A ticket with no payment at all says nothing about who
+    paid, so it counts as the host's.
+    """
+    from sqlmodel import select
+
+    from app.api.payment.models import Payments
+
+    payment_ids = {ap.payment_id for ap in attendee_products}
+    if None in payment_ids:
+        return True
+    return (
+        db.exec(
+            select(Payments.id)
+            .where(
+                Payments.id.in_(payment_ids),  # type: ignore[union-attr]
+                Payments.application_id.is_not(None),  # type: ignore[union-attr]
+            )
+            .limit(1)
+        ).first()
+        is not None
+    )
+
+
 @router.post(
     "/my/detach-companion",
     status_code=status.HTTP_204_NO_CONTENT,
@@ -1146,8 +1214,8 @@ async def get_my_application(
     responses={
         409: {
             "description": (
-                "Tickets have already been purchased for this attendee on the "
-                "host application. Detach blocked; route to support."
+                "The host paid for tickets on this attendee. Detach blocked; "
+                "route to support."
             ),
         },
     },
@@ -1166,8 +1234,11 @@ async def detach_companion(
     to their own application via the group invite.
 
     Idempotent: returns 204 when the human is not actually a companion.
-    Returns 409 when tickets have already been purchased for this attendee
-    (money decisions handled by support, not by a checkout button).
+
+    A row carrying tickets the person paid for themselves is detached rather
+    than deleted, so those passes survive the move. Returns 409 when the host
+    paid for any of them — that is a money decision for support, not for a
+    checkout button.
     """
     from app.api.attendee.crud import attendees_crud
     from app.api.popup.crud import popups_crud
@@ -1181,8 +1252,12 @@ async def detach_companion(
     if not companion:
         return  # idempotent no-op
 
-    if companion.attendee_products:
-        host_human = companion.application.human if companion.application else None
+    host_application = companion.application
+
+    if companion.attendee_products and _host_paid_for_any(
+        db, companion.attendee_products
+    ):
+        host_human = host_application.human if host_application else None
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail={
@@ -1195,8 +1270,15 @@ async def detach_companion(
             },
         )
 
-    host_application = companion.application
-    db.delete(companion)
+    if companion.attendee_products:
+        # Every ticket on the row is theirs — bought or granted with no
+        # application behind it. Deleting the row would delete passes they
+        # paid for, so the row leaves the party instead and travels with them.
+        # Their own application adopts it when they file one.
+        companion.application_id = None
+        db.add(companion)
+    else:
+        db.delete(companion)
     if host_application:
         crud.applications_crud.create_snapshot(
             db, host_application, "companion_detached"
@@ -1219,17 +1301,38 @@ async def create_my_application(
     """Create an application for the current human (Portal)."""
     from app.api.popup.crud import popups_crud
     from app.api.popup.guards import ensure_popup_writable
+    from app.api.sales_flow.crud import sales_flows_crud
+    from app.api.sales_flow.resolver import config_for  # noqa: PLC0415
 
     ensure_popup_writable(popups_crud.get(db, app_in.popup_id))
 
-    # Check for existing application
-    existing = crud.applications_crud.get_by_human_popup(
-        db, human_id=current_human.id, popup_id=app_in.popup_id
+    # One application per person PER FLOW, not per popup. `sales_flow_id`
+    # (e.g. from the portal FlowPicker) targets an explicit non-default flow
+    # — validated for ownership and type=application by
+    # `resolve_target_flow_id`, which raises 404 for an invalid one. Omitted
+    # means the popup's default flow.
+    flow_id = crud.applications_crud.resolve_target_flow_id(
+        db, app_in.popup_id, app_in.sales_flow_id
+    )
+    existing = crud.applications_crud.get_by_human_flow(
+        db, human_id=current_human.id, sales_flow_id=flow_id
     )
     if existing:
+        # Wording: the portal string-matches "already have an application"
+        # (useCheckoutState.ts:199) to recover the existing-application
+        # state — that substring is preserved verbatim in BOTH branches.
+        # "for this sales flow" only surfaces once a non-default flow was
+        # targeted (a portal-facing concept via the FlowPicker); the
+        # single-flow-per-popup case keeps the jargon-free wording.
+        target_flow = sales_flows_crud.get(db, flow_id)
+        detail = (
+            "You already have an application for this sales flow"
+            if target_flow is not None and not target_flow.is_default
+            else "You already have an application for this popup"
+        )
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="You already have an application for this popup",
+            detail=detail,
         )
 
     # Check if human is already a companion on someone else's application
@@ -1244,10 +1347,13 @@ async def create_my_application(
             detail="You are already participating as a companion in this popup",
         )
 
-    # Validate scholarship request against popup settings
+    # Validate the scholarship request against the flow being applied to
     if app_in.scholarship_request is True:
-        popup = popups_crud.get(db, app_in.popup_id)
-        if not popup or not popup.allows_scholarship:
+        if not config_for(
+            db,
+            sales_flow_id=app_in.sales_flow_id,
+            popup_id=app_in.popup_id,
+        ).allows_scholarship:
             raise HTTPException(
                 status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
                 detail="This popup does not accept scholarship requests",
@@ -1270,26 +1376,28 @@ async def create_my_application(
 @router.patch(
     "/my/{popup_id}",
     response_model=ApplicationPublic,
-    summary="Update your application for a popup",
+    summary="Update your application for a sales flow",
     dependencies=[needs("portal:applications:write")],
 )
 async def update_my_application(
     popup_id: uuid.UUID,
+    sales_flow_id: uuid.UUID,
     app_in: ApplicationUpdate,
     db: HumanTenantSession,
     current_human: CurrentHuman,
 ) -> ApplicationPublic:
-    """Update current human's application (Portal)."""
+    """Update the current human's application in a selected sales flow."""
     from app.api.popup.crud import popups_crud
     from app.api.popup.guards import ensure_popup_writable
+    from app.api.sales_flow.resolver import config_for  # noqa: PLC0415
 
     ensure_popup_writable(popups_crud.get(db, popup_id))
 
-    application = crud.applications_crud.get_by_human_popup(
-        db, human_id=current_human.id, popup_id=popup_id
+    application = crud.applications_crud.get_by_human_flow(
+        db, human_id=current_human.id, sales_flow_id=sales_flow_id
     )
 
-    if not application:
+    if not application or application.popup_id != popup_id:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Application not found",
@@ -1442,11 +1550,13 @@ async def update_my_application(
         and application.human
     ):
         # Apply approval strategy when transitioning draft → IN_REVIEW
-        # Intercept: if popup requires application fee AND not already paid
-        from app.api.popup.crud import popups_crud
-
-        popup = popups_crud.get(db, application.popup_id)
-        if popup and popup.requires_application_fee:
+        # Intercept: if the flow applied through charges a fee AND it is not
+        # already paid.
+        if config_for(
+            db,
+            sales_flow_id=application.sales_flow_id,
+            popup_id=application.popup_id,
+        ).requires_application_fee:
             from app.api.payment.crud import payments_crud
             from app.api.payment.schemas import PaymentStatus as PmtStatus
 
@@ -1484,7 +1594,8 @@ def _build_directory_entry(attendee) -> AttendeesDirectoryEntry:
     """Build a single directory entry from a ticket-holding attendee.
 
     The entry is sourced from the attendee's OWN human record, so companions
-    (spouse/kid/...) appear as their own people. Field masking and the
+    (spouse/kid/...) appear as their own people. Unlinked attendees retain the
+    identity snapshot stored with their ticket. Field masking and the
     role/organization form fields only apply to the main applicant, since
     companions never filled an application form and have no privacy prefs.
     """
@@ -1506,6 +1617,12 @@ def _build_directory_entry(attendee) -> AttendeesDirectoryEntry:
     products: list[DirectoryProduct] = []
     seen_pids: set[uuid.UUID] = set()
     for ap in attendee.attendee_products:
+        if (
+            ap.attendee_id is None
+            or ap.revoked_at is not None
+            or ap.product_category_snapshot != "ticket"
+        ):
+            continue
         if ap.product_id in seen_pids:
             continue
         seen_pids.add(ap.product_id)
@@ -1526,9 +1643,9 @@ def _build_directory_entry(attendee) -> AttendeesDirectoryEntry:
 
     return AttendeesDirectoryEntry(
         id=attendee.id,
-        first_name=mask("first_name", human.first_name if human else None),
+        first_name=mask("first_name", human.first_name if human else attendee.name),
         last_name=mask("last_name", human.last_name if human else None),
-        email=mask("email", human.email if human else None),
+        email=mask("email", human.email if human else attendee.email),
         telegram=mask("telegram", human.telegram if human else None),
         role=mask("role", custom.get("role")),
         organization=mask("organization", custom.get("organization")),
@@ -1545,14 +1662,28 @@ def _build_directory_entry(attendee) -> AttendeesDirectoryEntry:
 def _ensure_attendee_directory_enabled(
     db: HumanTenantSession, popup_id: uuid.UUID
 ) -> None:
+    from sqlmodel import select as _select
+
     from app.api.popup.crud import popups_crud
+    from app.api.sales_flow.models import SalesFlows
+    from app.api.sales_flow.schemas import SalesFlowType
 
     popup = popups_crud.get(db, popup_id)
-    if (
-        not popup
-        or popup.sale_type == SaleType.direct.value
-        or not popup.show_attendee_directory
-    ):
+    # A directory exists where people applied. Asked of the popup, a gathering
+    # that takes applications through one door and sells through another had
+    # no directory at all — or had one for buyers who never applied.
+    takes_applications = (
+        db.exec(
+            _select(SalesFlows.id)
+            .where(
+                SalesFlows.popup_id == popup_id,
+                SalesFlows.type == SalesFlowType.application.value,
+            )
+            .limit(1)
+        ).first()
+        is not None
+    )
+    if not popup or not takes_applications or not popup.show_attendee_directory:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Attendee directory not found",

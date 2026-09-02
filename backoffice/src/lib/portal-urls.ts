@@ -57,8 +57,12 @@ export function getPopupPortalUrl(baseUrl: string, popupSlug: string) {
   return `${baseUrl}/portal/${popupSlug}`
 }
 
-export function getPopupCheckoutUrl(baseUrl: string, popupSlug: string) {
-  return `${baseUrl}/checkout/${popupSlug}`
+export function getFlowCheckoutUrl(
+  baseUrl: string,
+  popupSlug: string,
+  flowSlug: string,
+) {
+  return `${baseUrl}/checkout/${popupSlug}/${flowSlug}`
 }
 
 export function getSelfCheckInUrl(baseUrl: string, popupSlug: string) {

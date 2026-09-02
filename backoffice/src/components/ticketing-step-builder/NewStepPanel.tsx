@@ -34,6 +34,9 @@ function toKebabCase(str: string): string {
 
 interface NewStepPanelProps {
   popupId: string
+  /** The flow this step is created into. Required: a step always belongs to
+   * exactly one flow (sdd/sales-flows-rediseno slice 2). */
+  salesFlowId: string
   nextOrder: number
   confirmStepId?: string
   onCreated: (stepId: string) => void
@@ -42,6 +45,7 @@ interface NewStepPanelProps {
 
 export function NewStepPanel({
   popupId,
+  salesFlowId,
   nextOrder,
   confirmStepId,
   onCreated,
@@ -83,6 +87,7 @@ export function NewStepPanel({
       const newStep = await TicketingStepsService.createTicketingStep({
         requestBody: {
           popup_id: popupId,
+          sales_flow_id: salesFlowId,
           step_type: effectiveStepType,
           title,
           order: insertOrder,

@@ -9,7 +9,8 @@ const useGetData = () => {
   const { getCity } = useCityProvider()
   const city = getCity()
   const attendeeDirectoryEnabled =
-    city?.sale_type !== "direct" && (city?.show_attendee_directory ?? false)
+    city?.takes_applications !== false &&
+    (city?.show_attendee_directory ?? false)
   const [currentPage, setCurrentPage] = useState<number>(1)
   const [pageSize, setPageSize] = useState<number>(10)
 

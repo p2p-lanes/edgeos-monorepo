@@ -6,6 +6,7 @@ const mocks = vi.hoisted(() => ({
   group: {
     id: "group-1",
     popup_id: "popup-1",
+    sales_flow_id: "flow-group",
     discount_percentage: 0,
     auto_approve_applications: false,
   },
@@ -14,6 +15,14 @@ const mocks = vi.hoisted(() => ({
 vi.mock("next/navigation", () => ({
   useParams: () => ({ groupSlug: "group-slug" }),
   useRouter: () => ({ replace: vi.fn() }),
+}))
+
+vi.mock("@/client", () => ({
+  ApiError: class ApiError extends Error {
+    status = 500
+  },
+  InvitesService: { previewInvite: vi.fn() },
+  PortalService: { resolveGroupSlug: vi.fn() },
 }))
 
 vi.mock("@tanstack/react-query", () => ({
@@ -64,9 +73,13 @@ vi.mock("@/lib/background-image", () => ({
 vi.mock("@/app/checkout/components/PopupCheckoutContent", () => ({
   PopupCheckoutContent: ({
     requiresManualApproval,
+    salesFlowId,
   }: {
     requiresManualApproval?: boolean
-  }) => <div>requires-manual-approval:{String(requiresManualApproval)}</div>,
+    salesFlowId?: string | null
+  }) => (
+    <div>{`requires-manual-approval:${String(requiresManualApproval)};flow:${salesFlowId}`}</div>
+  ),
 }))
 
 describe("GroupCheckoutPage approval policy", () => {
@@ -77,7 +90,9 @@ describe("GroupCheckoutPage approval policy", () => {
   it("uses the pending-review checkout state for a manual-approval group", () => {
     render(<GroupCheckoutPage />)
 
-    expect(screen.getByText("requires-manual-approval:true")).toBeTruthy()
+    expect(
+      screen.getByText("requires-manual-approval:true;flow:flow-group"),
+    ).toBeTruthy()
   })
 
   it("keeps checkout available for an auto-approved group", () => {
@@ -85,6 +100,8 @@ describe("GroupCheckoutPage approval policy", () => {
 
     render(<GroupCheckoutPage />)
 
-    expect(screen.getByText("requires-manual-approval:false")).toBeTruthy()
+    expect(
+      screen.getByText("requires-manual-approval:false;flow:flow-group"),
+    ).toBeTruthy()
   })
 })

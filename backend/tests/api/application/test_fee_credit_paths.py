@@ -32,6 +32,12 @@ from app.api.popup.models import Popups
 from app.api.shared.enums import HumanRating, SaleType
 from app.api.tenant.models import Tenants
 from app.core.security import create_access_token
+from tests._flow_helpers import (
+    application_flow_id,
+    default_flow_id,
+    group_flow_id,
+    provision_default_flow,
+)
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -58,6 +64,7 @@ def _make_fee_popup(
     )
     db.add(popup)
     db.flush()
+    provision_default_flow(db, popup)
     return popup
 
 
@@ -104,6 +111,7 @@ def _make_application(
     status: str = ApplicationStatus.IN_REVIEW.value,
 ) -> Applications:
     application = Applications(
+        sales_flow_id=application_flow_id(db, popup.id),
         tenant_id=tenant.id,
         popup_id=popup.id,
         human_id=human.id,
@@ -285,6 +293,7 @@ class TestFeeCreditPaths:
         strategy = ApprovalStrategies(
             tenant_id=tenant_a.id,
             popup_id=popup.id,
+            sales_flow_id=default_flow_id(db, popup.id),
             strategy_type=ApprovalStrategyType.AUTO_ACCEPT,
         )
         db.add(strategy)
@@ -322,6 +331,7 @@ class TestFeeCreditPaths:
 
         # Create an open group for this popup
         group = Groups(
+            sales_flow_id=group_flow_id(db, popup.id),
             tenant_id=tenant_a.id,
             popup_id=popup.id,
             name=f"FeeGroup {uuid.uuid4().hex[:6]}",
@@ -337,6 +347,7 @@ class TestFeeCreditPaths:
         response = client.patch(
             f"/api/v1/applications/my/{popup.id}",
             json={"group_id": str(group.id)},
+            params={"sales_flow_id": str(application.sales_flow_id)},
             headers={
                 "Authorization": f"Bearer {human_token}",
                 "X-Tenant-Id": str(tenant_a.id),
@@ -363,6 +374,7 @@ class TestFeeCreditPaths:
         group = Groups(
             tenant_id=tenant_a.id,
             popup_id=popup.id,
+            sales_flow_id=application.sales_flow_id,
             name=f"ManualGroup {uuid.uuid4().hex[:6]}",
             slug=f"manualgroup-{uuid.uuid4().hex[:6]}",
             auto_approve_applications=False,
@@ -374,6 +386,7 @@ class TestFeeCreditPaths:
         response = client.patch(
             f"/api/v1/applications/my/{popup.id}",
             json={"group_id": str(group.id)},
+            params={"sales_flow_id": str(application.sales_flow_id)},
             headers={
                 "Authorization": f"Bearer {human_token}",
                 "X-Tenant-Id": str(tenant_a.id),

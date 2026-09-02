@@ -11,11 +11,11 @@ Spec scenarios covered:
 4. Submitted application (no attendees/payments) → 200, allowed=False, reason=application_pending
 5. In-review application → 200, allowed=False, reason=application_pending
 6. Rejected application (no attendees/payments) → 200, allowed=False, reason=application_rejected
-7. No application, direct attendee → 200, allowed=True, source=attendee
-8. No application, no attendee, payment via app-leg → 200, allowed=True, source=payment
-9. Companion (attendee on another human's application) → 200, allowed=True, source=companion
+7. Bare direct attendee → 200, allowed=False, reason=no_access
+8. Payment ancestry → 200, allowed=False, reason=no_access
+9. Bare companion → 200, allowed=False, reason=no_access
 10. No match → 200, allowed=False, reason=no_access
-11. Ladder short-circuit: submitted app + direct attendees → denied (step 2 wins)
+11. Submitted app + bare direct attendee → denied with application_pending
 """
 
 import uuid
@@ -33,6 +33,7 @@ from app.api.payment.schemas import PaymentStatus
 from app.api.popup.models import Popups
 from app.api.tenant.models import Tenants
 from app.core.security import create_access_token
+from tests._flow_helpers import application_flow_id
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -73,6 +74,7 @@ def _make_application(
     status: str,
 ) -> Applications:
     application = Applications(
+        sales_flow_id=application_flow_id(db, popup.id),
         id=uuid.uuid4(),
         tenant_id=tenant.id,
         popup_id=popup.id,
@@ -115,6 +117,7 @@ def _make_companion_attendee(
 ) -> None:
     """Companion: attendee linked to owner's application but with companion's human_id."""
     application = Applications(
+        sales_flow_id=application_flow_id(db, popup.id),
         id=uuid.uuid4(),
         tenant_id=tenant.id,
         popup_id=popup.id,
@@ -148,6 +151,7 @@ def _make_app_payment_no_attendees(
     This ensures step 4 (attendee check) doesn't fire and step 5 (payment) can fire.
     """
     application = Applications(
+        sales_flow_id=application_flow_id(db, popup.id),
         id=uuid.uuid4(),
         tenant_id=tenant.id,
         popup_id=popup.id,
@@ -286,13 +290,12 @@ class TestGetPopupAccessHttp:
         assert body["application_status"] == "rejected"
         assert body["reason"] == "application_rejected"
 
-    def test_no_application_but_attendee_returns_allowed(
+    def test_bare_attendee_returns_no_access(
         self,
         client: TestClient,
         db: Session,
         tenant_a: Tenants,
     ) -> None:
-        """Ladder step 4: no application, direct attendee → 200, allowed, source=attendee."""
         popup = _make_popup(db, tenant_a, suffix="http-att")
         human = _make_human(db, tenant_a, suffix="http-att")
         _make_direct_attendee(db, tenant_a, popup, human)
@@ -301,18 +304,17 @@ class TestGetPopupAccessHttp:
 
         assert response.status_code == 200
         body = response.json()
-        assert body["allowed"] is True
-        assert body["source"] == "attendee"
+        assert body["allowed"] is False
+        assert body["source"] is None
         assert body["application_status"] is None
-        assert body["reason"] is None
+        assert body["reason"] == "no_access"
 
-    def test_no_attendee_but_payment_returns_allowed(
+    def test_payment_ancestry_returns_no_access(
         self,
         client: TestClient,
         db: Session,
         tenant_a: Tenants,
     ) -> None:
-        """Ladder step 5: no own attendees, but payment via app-leg → 200, source=payment."""
         popup = _make_popup(db, tenant_a, suffix="http-pay")
         human = _make_human(db, tenant_a, suffix="http-pay")
         _make_app_payment_no_attendees(db, tenant_a, popup, human)
@@ -321,18 +323,17 @@ class TestGetPopupAccessHttp:
 
         assert response.status_code == 200
         body = response.json()
-        assert body["allowed"] is True
-        assert body["source"] == "payment"
+        assert body["allowed"] is False
+        assert body["source"] is None
         assert body["application_status"] is None
-        assert body["reason"] is None
+        assert body["reason"] == "no_access"
 
-    def test_companion_returns_allowed(
+    def test_bare_companion_returns_no_access(
         self,
         client: TestClient,
         db: Session,
         tenant_a: Tenants,
     ) -> None:
-        """Ladder step 6: companion participant → 200, allowed, source=companion."""
         popup = _make_popup(db, tenant_a, suffix="http-comp")
         owner = _make_human(db, tenant_a, suffix="http-comp-owner")
         companion = _make_human(db, tenant_a, suffix="http-comp-self")
@@ -342,10 +343,10 @@ class TestGetPopupAccessHttp:
 
         assert response.status_code == 200
         body = response.json()
-        assert body["allowed"] is True
-        assert body["source"] == "companion"
+        assert body["allowed"] is False
+        assert body["source"] is None
         assert body["application_status"] is None
-        assert body["reason"] is None
+        assert body["reason"] == "no_access"
 
     def test_no_match_returns_no_access(
         self,

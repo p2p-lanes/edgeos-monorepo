@@ -36,7 +36,11 @@ def _ticket_counts(
     rows = session.exec(
         select(Attendees.application_id, func.count(col(AttendeeProducts.id)))
         .join(AttendeeProducts, col(AttendeeProducts.attendee_id) == Attendees.id)
-        .where(col(Attendees.application_id).in_(application_ids))
+        .where(
+            col(Attendees.application_id).in_(application_ids),
+            col(AttendeeProducts.revoked_at).is_(None),
+            AttendeeProducts.product_category_snapshot == "ticket",
+        )
         .group_by(col(Attendees.application_id))
     ).all()
     return {application_id: count for application_id, count in rows if application_id}

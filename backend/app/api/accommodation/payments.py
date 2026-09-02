@@ -123,8 +123,10 @@ def is_accommodation_line(line: Any) -> bool:
     return bool(metadata) and metadata.get("kind") == PURCHASE_METADATA_KIND
 
 
-def step_offer(session: Session, popup_id: uuid.UUID) -> AccommodationStepOffer:
-    """Read what the popup's checkout is configured to offer.
+def step_offer(
+    session: Session, popup_id: uuid.UUID, sales_flow_id: uuid.UUID
+) -> AccommodationStepOffer:
+    """Read what one sales flow's checkout is configured to offer.
 
     A disabled (or absent) step means the checkout does not show the section
     **and** the backend refuses the lines. Without the second half the
@@ -134,6 +136,7 @@ def step_offer(session: Session, popup_id: uuid.UUID) -> AccommodationStepOffer:
     step = session.exec(
         select(TicketingSteps).where(
             TicketingSteps.popup_id == popup_id,
+            TicketingSteps.sales_flow_id == sales_flow_id,
             TicketingSteps.template == ACCOMMODATION_STEP_TEMPLATE,
             col(TicketingSteps.is_enabled).is_(True),
         )
@@ -176,6 +179,7 @@ def _parse_date(raw: Any, field: str) -> date:
 def resolve_lines(
     session: Session,
     popup: Any,
+    sales_flow_id: uuid.UUID,
     lines: list[Any],
 ) -> list[ResolvedAccommodationLine]:
     """Validate and price every accommodation line of a purchase.
@@ -194,7 +198,7 @@ def resolve_lines(
     if not indexed:
         return []
 
-    offer = step_offer(session, popup.id)
+    offer = step_offer(session, popup.id, sales_flow_id)
     if not offer.enabled:
         raise _reject(
             ERROR_STEP_DISABLED,
@@ -203,6 +207,11 @@ def resolve_lines(
 
     accommodation_ids: list[uuid.UUID] = []
     for _, line in indexed:
+        if line.quantity != 1:
+            raise _reject(
+                ERROR_BAD_METADATA,
+                "An accommodation booking line must have quantity 1",
+            )
         raw_id = (line.purchase_metadata or {}).get("accommodation_id")
         try:
             accommodation_ids.append(uuid.UUID(str(raw_id)))
@@ -496,6 +505,40 @@ def link_attendee(
     ).all():
         booking.attendee_id = attendee_id
         session.add(booking)
+
+
+def link_payment_product_attendees(session: Session, payment_id: uuid.UUID) -> None:
+    """Link each booking to the attendee resolved for its own payment line."""
+    from app.api.accommodation.models import AccommodationBookings
+    from app.api.payment.models import PaymentProducts
+
+    bookings = list(
+        session.exec(
+            select(AccommodationBookings).where(
+                AccommodationBookings.payment_id == payment_id,
+                col(AccommodationBookings.payment_product_id).is_not(None),
+            )
+        ).all()
+    )
+    if not bookings:
+        return
+
+    line_ids = {
+        booking.payment_product_id
+        for booking in bookings
+        if booking.payment_product_id is not None
+    }
+    lines = {
+        line.id: line
+        for line in session.exec(
+            select(PaymentProducts).where(col(PaymentProducts.id).in_(line_ids))
+        ).all()
+    }
+    for booking in bookings:
+        line = lines.get(booking.payment_product_id)
+        if line is not None and line.attendee_id is not None:
+            booking.attendee_id = line.attendee_id
+            session.add(booking)
 
 
 def utcnow() -> datetime:

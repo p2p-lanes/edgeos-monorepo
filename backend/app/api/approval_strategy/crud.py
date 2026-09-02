@@ -1,6 +1,7 @@
 import uuid
 from datetime import UTC, datetime
 
+from fastapi import HTTPException, status
 from sqlmodel import Session, select
 
 from app.api.approval_strategy.models import ApprovalStrategies
@@ -22,9 +23,27 @@ class ApprovalStrategiesCRUD(
     def get_by_popup(
         self, session: Session, popup_id: uuid.UUID
     ) -> ApprovalStrategies | None:
-        """Get approval strategy by popup_id."""
+        """The strategy of the popup's DEFAULT flow.
+
+        Kept for callers that name a popup and mean "its default flow"
+        (sdd/sales-flows-rediseno slice 6). There is no popup-shared
+        strategy any more: a strategy belongs to one flow, so two
+        application flows can review their applicants differently.
+        """
+        from app.api.sales_flow.crud import sales_flows_crud
+
+        default_flow = sales_flows_crud.get_default_flow(session, popup_id)
+        if default_flow is None:
+            return None
+        return self.get_by_flow(session, default_flow.id)
+
+    def get_by_flow(
+        self, session: Session, flow_id: uuid.UUID
+    ) -> ApprovalStrategies | None:
+        """The strategy of `flow_id` — the only way to read one. None means
+        this flow has no strategy, never that it should borrow another's."""
         statement = select(ApprovalStrategies).where(
-            ApprovalStrategies.popup_id == popup_id
+            ApprovalStrategies.sales_flow_id == flow_id
         )
         return session.exec(statement).first()
 
@@ -34,11 +53,48 @@ class ApprovalStrategiesCRUD(
         popup_id: uuid.UUID,
         tenant_id: uuid.UUID,
         strategy_in: ApprovalStrategyCreate,
+        sales_flow_id: uuid.UUID | None = None,
     ) -> ApprovalStrategies:
-        """Create approval strategy for a popup."""
+        """Create a strategy for a flow. Omitting `sales_flow_id` means the
+        popup's optional compatibility default.
+
+        Only `application` flows may have one: direct sales and upsales
+        never produce an application, so a review strategy there would be
+        configuration that can never run.
+        """
+        from app.api.sales_flow.crud import sales_flows_crud
+        from app.api.sales_flow.schemas import SalesFlowType
+
+        if sales_flow_id is None:
+            default_flow = sales_flows_crud.get_default_flow(session, popup_id)
+            if default_flow is None:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="Sales flow not found",
+                )
+            flow = default_flow
+        else:
+            flow = sales_flows_crud.get(session, sales_flow_id)
+            if flow is None or flow.popup_id != popup_id:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="Sales flow not found for this popup",
+                )
+
+        if flow.type != SalesFlowType.application:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=(
+                    "Only application flows can have an approval strategy. "
+                    f"This flow sells directly ({flow.type})."
+                ),
+            )
+        sales_flow_id = flow.id
+
         db_obj = ApprovalStrategies(
             popup_id=popup_id,
             tenant_id=tenant_id,
+            sales_flow_id=sales_flow_id,
             **strategy_in.model_dump(),
         )
         session.add(db_obj)

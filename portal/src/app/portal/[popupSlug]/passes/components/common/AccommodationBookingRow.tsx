@@ -1,6 +1,7 @@
 "use client"
 
 import { BedDouble } from "lucide-react"
+import { useTranslation } from "react-i18next"
 import type { TicketEntry } from "@/types/Attendee"
 import { formatCheckoutDate, formatCurrency } from "@/types/checkout"
 import { parseBooking } from "../../utils/accommodationBooking"
@@ -17,6 +18,7 @@ import { parseBooking } from "../../utils/accommodationBooking"
  * desk, which is why the guest list matters more than a code here.
  */
 export function AccommodationBookingRow({ entry }: { entry: TicketEntry }) {
+  const { t } = useTranslation()
   const booking = parseBooking(entry)
   if (!booking) return null
 
@@ -24,7 +26,7 @@ export function AccommodationBookingRow({ entry }: { entry: TicketEntry }) {
     booking.guests.length > 0
       ? booking.guests.join(", ")
       : booking.guestCount
-        ? `${booking.guestCount} guest${booking.guestCount === 1 ? "" : "s"}`
+        ? t("checkout.accommodation.guests", { count: booking.guestCount })
         : null
 
   return (
@@ -45,7 +47,7 @@ export function AccommodationBookingRow({ entry }: { entry: TicketEntry }) {
           {formatCheckoutDate(booking.checkIn)} →{" "}
           {formatCheckoutDate(booking.checkOut)}
           {booking.nights
-            ? ` · ${booking.nights} night${booking.nights === 1 ? "" : "s"}`
+            ? ` · ${t("checkout.accommodation.nights", { count: booking.nights })}`
             : ""}
         </p>
 

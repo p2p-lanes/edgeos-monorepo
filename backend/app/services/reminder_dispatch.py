@@ -1,12 +1,18 @@
 """Reminder dispatch service — cross-tenant automatic reminder emails.
 
-Runs as superuser (RLS bypass), iterating every popup that has at least one
-reminder configured. For each configured reminder type it finds eligible
-targets and sends the email, honoring the per-popup cadence: first send N days
-after the triggering condition (``*_delay_days``), repeat every M days
-(``*_repeat_days``, null = single send), capped at K total sends
-(``*_max_count``). Cadence and cap are derived from the ``email_logs`` history,
-so the job is idempotent and keeps no tracking state of its own.
+Runs as superuser (RLS bypass), iterating every SALES FLOW that has at least
+one reminder configured (sdd/sales-flows slice 10 — the dispatch unit moved
+from popup to flow; a popup with N flows is dispatched N times, once per
+flow, each with its own cadence and history). For each configured reminder
+type it finds eligible targets and sends the email, honoring the per-flow
+cadence: first send N days after the triggering condition
+(``*_delay_days``), repeat every M days (``*_repeat_days``, null = single
+send), capped at K total sends (``*_max_count``). Cadence is resolved
+per-flow via ``EffectiveFlowConfig`` (``sales_flow/resolver.py::
+build_effective_config`` — flow value if set, else the popup's, design D1/D2:
+this is that function's first production consumer). Cadence and cap are
+derived from the ``email_logs`` history, so the job is idempotent and keeps
+no tracking state of its own.
 
 Three reminder types:
 - abandoned_cart: a non-completed payment (expired/pending) whose buyer has no
@@ -16,15 +22,24 @@ Three reminder types:
 - abandoned_application: an application left in draft (anchored on its last
   edit, ``updated_at``).
 
-A null ``*_delay_days`` disables that reminder for the popup, so an operator
-turns a reminder off simply by clearing its delay.
+A null effective ``*_delay_days`` (flow value, else popup's) disables that
+reminder for the flow, so an operator turns a reminder off simply by
+clearing its delay at whichever tier it's currently set.
+
+Candidate selection and dedupe both partition by flow (design's D7: reading
+``sales_flow_id`` here is background/reporting partitioning, never a
+request-path rule). A payment/application/email-log row with no
+``sales_flow_id`` of its own (pre-migration data, or a row inserted by a
+test that bypasses the real creation path) is treated as belonging to the
+popup's DEFAULT flow rather than to no flow — see ``_scoped_to_flow`` and
+``email_log/crud.py::get_reminder_stats``'s ``flow_is_default`` matching.
 """
 
 import uuid
 from datetime import UTC, datetime, timedelta
 
 from loguru import logger
-from sqlalchemy import or_, text
+from sqlalchemy import ColumnElement, or_, text
 from sqlmodel import Session, exists, select
 
 from app.api.application.models import Applications
@@ -35,6 +50,9 @@ from app.api.payment.models import Payments
 from app.api.payment.schemas import PaymentStatus
 from app.api.popup.models import Popups
 from app.api.product.models import Products
+from app.api.sales_flow.models import SalesFlows
+from app.api.sales_flow.resolver import build_effective_config
+from app.api.sales_flow.schemas import EffectiveFlowConfig
 from app.services.email.service import get_email_service
 from app.services.email.templates import (
     AbandonedApplicationContext,
@@ -85,6 +103,21 @@ def _should_send(
     if repeat_days is None or last_sent_at is None:
         return False
     return now >= last_sent_at + timedelta(days=repeat_days)
+
+
+def _scoped_to_flow(column: ColumnElement, flow: SalesFlows) -> ColumnElement:
+    """Candidate-selection filter for one flow's dispatch (design D7).
+
+    A row carrying this flow's own id always matches. A row with NO
+    ``sales_flow_id`` (legacy data from before this slice's migration, or a
+    test fixture that inserts rows directly) is treated as belonging to the
+    popup's default flow rather than to no flow, so it is only matched when
+    ``flow`` IS that popup's default — never picked up by a non-default
+    flow, and never dispatched twice.
+    """
+    if flow.is_default:
+        return or_(column == flow.id, column.is_(None))
+    return column == flow.id
 
 
 def _portal_passes_url(db: Session, popup: Popups) -> str | None:
@@ -171,13 +204,19 @@ def _recompute_cart(
 
 
 async def _dispatch_abandoned_cart(
-    db: Session, popup: Popups, now: datetime, summary: dict
+    db: Session,
+    flow: SalesFlows,
+    popup: Popups,
+    effective: EffectiveFlowConfig,
+    now: datetime,
+    summary: dict,
 ) -> None:
-    delay = popup.abandoned_cart_delay_days
+    delay = effective.abandoned_cart_delay_days
     if delay is None:
         return
 
-    # Emails that already completed a purchase in this popup — never remind them.
+    # Emails that already completed a purchase in this popup (any flow) —
+    # never remind them, regardless of which flow they'd abandon a cart in.
     paid_emails: set[str] = set()
     for paid in db.exec(
         select(Payments).where(
@@ -194,6 +233,7 @@ async def _dispatch_abandoned_cart(
         select(Payments)
         .where(
             Payments.popup_id == popup.id,
+            _scoped_to_flow(Payments.sales_flow_id, flow),  # type: ignore[arg-type]
             Payments.status.in_(_ABANDONED_PAYMENT_STATES),  # type: ignore[attr-defined]
             Payments.created_at <= threshold,
         )
@@ -217,14 +257,16 @@ async def _dispatch_abandoned_cart(
             db,
             template_type=EmailTemplateType.ABANDONED_CART.value,
             popup_id=popup.id,
+            sales_flow_id=flow.id,
+            flow_is_default=flow.is_default,
             to_email=email,
         )
         if not _should_send(
             sent_count=sent_count,
             last_sent_at=last_sent_at,
             delay_days=delay,
-            repeat_days=popup.abandoned_cart_repeat_days,
-            max_count=popup.abandoned_cart_max_count,
+            repeat_days=effective.abandoned_cart_repeat_days,
+            max_count=effective.abandoned_cart_max_count,
             anchor=payment.created_at,
             now=now,
         ):
@@ -247,6 +289,7 @@ async def _dispatch_abandoned_cart(
             from_address=sender_email,
             from_name=sender_name,
             popup_id=popup.id,
+            sales_flow_id=flow.id,
             db_session=db,
             application_id=payment.application_id,
             payment_id=payment.id,
@@ -256,9 +299,14 @@ async def _dispatch_abandoned_cart(
 
 
 async def _dispatch_purchase_reminder(
-    db: Session, popup: Popups, now: datetime, summary: dict
+    db: Session,
+    flow: SalesFlows,
+    popup: Popups,
+    effective: EffectiveFlowConfig,
+    now: datetime,
+    summary: dict,
 ) -> None:
-    delay = popup.purchase_reminder_delay_days
+    delay = effective.purchase_reminder_delay_days
     if delay is None:
         return
 
@@ -270,6 +318,7 @@ async def _dispatch_purchase_reminder(
     candidates = db.exec(
         select(Applications).where(
             Applications.popup_id == popup.id,
+            _scoped_to_flow(Applications.sales_flow_id, flow),  # type: ignore[arg-type]
             Applications.status == ApplicationStatus.ACCEPTED.value,
             Applications.accepted_at.is_not(None),  # type: ignore[attr-defined]
             Applications.accepted_at <= threshold,
@@ -291,14 +340,16 @@ async def _dispatch_purchase_reminder(
             db,
             template_type=EmailTemplateType.PURCHASE_REMINDER.value,
             popup_id=popup.id,
+            sales_flow_id=flow.id,
+            flow_is_default=flow.is_default,
             application_id=application.id,
         )
         if not _should_send(
             sent_count=sent_count,
             last_sent_at=last_sent_at,
             delay_days=delay,
-            repeat_days=popup.purchase_reminder_repeat_days,
-            max_count=popup.purchase_reminder_max_count,
+            repeat_days=effective.purchase_reminder_repeat_days,
+            max_count=effective.purchase_reminder_max_count,
             anchor=anchor,
             now=now,
         ):
@@ -315,6 +366,7 @@ async def _dispatch_purchase_reminder(
             from_address=sender_email,
             from_name=sender_name,
             popup_id=popup.id,
+            sales_flow_id=flow.id,
             db_session=db,
             application_id=application.id,
             human_id=human.id,
@@ -323,9 +375,14 @@ async def _dispatch_purchase_reminder(
 
 
 async def _dispatch_abandoned_application(
-    db: Session, popup: Popups, now: datetime, summary: dict
+    db: Session,
+    flow: SalesFlows,
+    popup: Popups,
+    effective: EffectiveFlowConfig,
+    now: datetime,
+    summary: dict,
 ) -> None:
-    delay = popup.abandoned_application_delay_days
+    delay = effective.abandoned_application_delay_days
     if delay is None:
         return
 
@@ -333,6 +390,7 @@ async def _dispatch_abandoned_application(
     candidates = db.exec(
         select(Applications).where(
             Applications.popup_id == popup.id,
+            _scoped_to_flow(Applications.sales_flow_id, flow),  # type: ignore[arg-type]
             Applications.status == ApplicationStatus.DRAFT.value,
             Applications.updated_at <= threshold,
         )
@@ -350,14 +408,16 @@ async def _dispatch_abandoned_application(
             db,
             template_type=EmailTemplateType.ABANDONED_APPLICATION.value,
             popup_id=popup.id,
+            sales_flow_id=flow.id,
+            flow_is_default=flow.is_default,
             application_id=application.id,
         )
         if not _should_send(
             sent_count=sent_count,
             last_sent_at=last_sent_at,
             delay_days=delay,
-            repeat_days=popup.abandoned_application_repeat_days,
-            max_count=popup.abandoned_application_max_count,
+            repeat_days=effective.abandoned_application_repeat_days,
+            max_count=effective.abandoned_application_max_count,
             anchor=application.updated_at,
             now=now,
         ):
@@ -375,6 +435,7 @@ async def _dispatch_abandoned_application(
             from_address=sender_email,
             from_name=sender_name,
             popup_id=popup.id,
+            sales_flow_id=flow.id,
             db_session=db,
             application_id=application.id,
             human_id=human.id,
@@ -383,26 +444,56 @@ async def _dispatch_abandoned_application(
 
 
 async def _run_dispatch(db: Session, now: datetime) -> dict:
-    """Inner dispatch loop — runs after the advisory lock is held."""
-    summary = {"status": "ok", "popups": 0, "sent": 0, "failed": 0, "skipped": 0}
-    popups = db.exec(
-        select(Popups).where(
+    """Inner dispatch loop — runs after the advisory lock is held.
+
+    Dispatch unit is one sales flow (sdd/sales-flows slice 10), not one
+    popup: a popup's flow list is pre-filtered so only flows whose EFFECTIVE
+    config (flow value, else the popup's — ``build_effective_config``) has
+    at least one reminder delay set are dispatched, matching a flow that
+    explicitly enables a reminder its popup left off, and a flow that
+    inherits a popup-level reminder unchanged.
+    """
+    summary = {
+        "status": "ok",
+        "popups": 0,
+        "flows": 0,
+        "sent": 0,
+        "failed": 0,
+        "skipped": 0,
+    }
+    rows = db.exec(
+        select(SalesFlows, Popups)
+        .join(Popups, SalesFlows.popup_id == Popups.id)  # type: ignore[arg-type]
+        .where(
             or_(
+                SalesFlows.abandoned_cart_delay_days.is_not(None),  # type: ignore[attr-defined]
                 Popups.abandoned_cart_delay_days.is_not(None),  # type: ignore[attr-defined]
+                SalesFlows.purchase_reminder_delay_days.is_not(None),  # type: ignore[attr-defined]
                 Popups.purchase_reminder_delay_days.is_not(None),  # type: ignore[attr-defined]
+                SalesFlows.abandoned_application_delay_days.is_not(None),  # type: ignore[attr-defined]
                 Popups.abandoned_application_delay_days.is_not(None),  # type: ignore[attr-defined]
             )
         )
     ).all()
-    for popup in popups:
-        summary["popups"] += 1
+    seen_popups: set[uuid.UUID] = set()
+    for flow, popup in rows:
+        summary["flows"] += 1
+        seen_popups.add(popup.id)
+        effective = build_effective_config(flow, popup)
         try:
-            await _dispatch_abandoned_cart(db, popup, now, summary)
-            await _dispatch_purchase_reminder(db, popup, now, summary)
-            await _dispatch_abandoned_application(db, popup, now, summary)
+            await _dispatch_abandoned_cart(db, flow, popup, effective, now, summary)
+            await _dispatch_purchase_reminder(db, flow, popup, effective, now, summary)
+            await _dispatch_abandoned_application(
+                db, flow, popup, effective, now, summary
+            )
         except Exception:
-            logger.exception("reminder_dispatch: popup {} raised; continuing", popup.id)
+            logger.exception(
+                "reminder_dispatch: flow {} (popup {}) raised; continuing",
+                flow.id,
+                popup.id,
+            )
             summary["failed"] += 1
+    summary["popups"] = len(seen_popups)
     return summary
 
 
@@ -413,8 +504,10 @@ async def dispatch_reminders(session: Session, *, now: datetime | None = None) -
     so overlapping runs no-op instead of double-sending. The lock persists
     across the per-email log commits made during the run.
 
-    Returns a summary dict with keys: ``status``, ``popups``, ``sent``,
-    ``failed``, ``skipped``.
+    Returns a summary dict with keys: ``status``, ``popups`` (distinct
+    popups touched), ``flows`` (dispatch units — the loop's real
+    granularity since sdd/sales-flows slice 10), ``sent``, ``failed``,
+    ``skipped``.
     """
     now = now or datetime.now(UTC)
     lock_conn = session.get_bind().connect()

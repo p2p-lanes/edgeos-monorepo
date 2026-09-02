@@ -1,7 +1,7 @@
 import uuid
 from typing import TYPE_CHECKING, Optional
 
-from sqlalchemy import UniqueConstraint
+from sqlalchemy import Index, text
 from sqlalchemy.dialects.postgresql import UUID
 from sqlmodel import Column, Field, Relationship
 
@@ -14,9 +14,28 @@ if TYPE_CHECKING:
 
 
 class BaseFieldConfigs(BaseFieldConfigBase, table=True):
+    """sdd/sales-flows slice 6: two-tier uniqueness on `field_name`.
+
+    `uq_base_field_config_flow_field` covers flow-owned rows;
+    `uq_base_field_config_popup_field_shared` re-scopes the original
+    popup-wide constraint to the NULL (popup-shared) tier. See migration
+    `597d9a2019ba_add_flow_id_form_definitions.py`.
+    """
+
     __table_args__ = (
-        UniqueConstraint(
-            "popup_id", "field_name", name="uq_base_field_config_popup_field"
+        Index(
+            "uq_base_field_config_flow_field",
+            "sales_flow_id",
+            "field_name",
+            unique=True,
+            postgresql_where=text("sales_flow_id IS NOT NULL"),
+        ),
+        Index(
+            "uq_base_field_config_popup_field_shared",
+            "popup_id",
+            "field_name",
+            unique=True,
+            postgresql_where=text("sales_flow_id IS NULL"),
         ),
     )
 

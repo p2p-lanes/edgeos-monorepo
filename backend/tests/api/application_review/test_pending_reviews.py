@@ -25,6 +25,7 @@ from app.api.shared.enums import UserRole
 from app.api.tenant.models import Tenants
 from app.api.user.models import Users
 from app.core.security import create_access_token
+from tests._flow_helpers import application_flow_id
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -75,6 +76,7 @@ def _make_in_review_application(
     db.flush()
 
     application = Applications(
+        sales_flow_id=application_flow_id(db, popup.id),
         tenant_id=tenant.id,
         popup_id=popup.id,
         human_id=human.id,

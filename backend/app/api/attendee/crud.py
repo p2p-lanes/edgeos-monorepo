@@ -1,10 +1,11 @@
 import random
 import string
 import uuid
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Any
 
 from fastapi import HTTPException, status
+from sqlalchemy import and_, or_
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import selectinload
 from sqlmodel import Session, func, select
@@ -27,13 +28,47 @@ def _attendee_condition_expression(condition: AttendeeFilterCondition):
     """Attendee-specific conditions; None delegates to the shared engine."""
     if condition.field == "has_tickets":
         # Same correlated EXISTS as the legacy has_tickets query param.
-        ticket_exists = (
-            select(AttendeeProducts.id)
-            .where(AttendeeProducts.attendee_id == Attendees.id)
-            .exists()
-        )
+        ticket_exists = _access_holding_exists()
         return ticket_exists if condition.value else ~ticket_exists
     return None
+
+
+def _access_holding_exists():
+    """Match an active allocated ticket unit by immutable category."""
+    return (
+        select(AttendeeProducts.id)
+        .where(
+            AttendeeProducts.attendee_id == Attendees.id,
+            AttendeeProducts.revoked_at.is_(None),
+            AttendeeProducts.product_category_snapshot == "ticket",
+        )
+        .exists()
+    )
+
+
+def unit_authority_predicate(human_id: uuid.UUID, popup_id: uuid.UUID):
+    """Authorize a unit by allocation or immutable payment buyer lineage."""
+    from app.api.application.models import Applications
+    from app.api.payment.models import PaymentProducts, Payments
+
+    allocated = and_(
+        Attendees.popup_id == popup_id,
+        or_(
+            Attendees.human_id == human_id,
+            and_(
+                Applications.human_id == human_id,
+                Applications.popup_id == popup_id,
+                Applications.tenant_id == Attendees.tenant_id,
+            ),
+        ),
+    )
+    purchased = and_(
+        PaymentProducts.id == AttendeeProducts.payment_product_id,
+        PaymentProducts.payment_id == Payments.id,
+        Payments.buyer_human_id == human_id,
+        Payments.popup_id == popup_id,
+    )
+    return or_(allocated, purchased)
 
 
 def build_attendee_filter_expression(filters: AttendeeFilters):
@@ -56,6 +91,23 @@ def generate_check_in_code(prefix: str = "") -> str:
     return f"{prefix}{code}"
 
 
+def _grant_unit_id(
+    attendee_id: uuid.UUID, grant_key: str, line_index: int, unit_index: int
+) -> uuid.UUID:
+    """Derive a stable paymentless unit identity from one grant request."""
+    return uuid.uuid5(
+        attendee_id, f"product-unit-grant:{grant_key}:{line_index}:{unit_index}"
+    )
+
+
+def _require_ticket_product(product: Any) -> None:
+    if (product.category or "").lower() != "ticket":
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Only ticket products can be granted as tickets",
+        )
+
+
 class AttendeesCRUD(BaseCRUD[Attendees, AttendeeCreate, AttendeeUpdate]):
     """CRUD operations for Attendees."""
 
@@ -75,7 +127,11 @@ class AttendeesCRUD(BaseCRUD[Attendees, AttendeeCreate, AttendeeUpdate]):
         """
         statement = (
             select(AttendeeProducts)
-            .where(AttendeeProducts.check_in_code == code)
+            .where(
+                AttendeeProducts.check_in_code == code,
+                AttendeeProducts.revoked_at.is_(None),
+                AttendeeProducts.product_category_snapshot == "ticket",
+            )
             .options(
                 selectinload(AttendeeProducts.attendee),  # type: ignore[arg-type]
                 selectinload(AttendeeProducts.product),  # type: ignore[arg-type]
@@ -166,10 +222,10 @@ class AttendeesCRUD(BaseCRUD[Attendees, AttendeeCreate, AttendeeUpdate]):
         application-based attendees (popup_id backfilled from application)
         and direct-sale attendees (popup_id set at creation, no application).
 
-        has_tickets filters by whether the attendee owns at least one
-        AttendeeProducts row (a purchased/granted ticket): True keeps only
-        attendees with tickets, False only those without, None disables the
-        filter. Uses a correlated EXISTS so it does not multiply rows.
+        has_tickets means an access holding: typed ``access`` or, until drain,
+        a legacy NULL holding whose Product category is ``ticket``. Participant
+        holdings do not qualify. Uses a correlated EXISTS so rows are not
+        multiplied.
 
         ``filters`` is a validated AttendeeFilters group compiled to one
         boolean expression and ANDed with the legacy params.
@@ -188,11 +244,7 @@ class AttendeesCRUD(BaseCRUD[Attendees, AttendeeCreate, AttendeeUpdate]):
             )
 
         if has_tickets is not None:
-            ticket_exists = (
-                select(AttendeeProducts.id)
-                .where(AttendeeProducts.attendee_id == Attendees.id)
-                .exists()
-            )
+            ticket_exists = _access_holding_exists()
             base_statement = base_statement.where(
                 ticket_exists if has_tickets else ~ticket_exists
             )
@@ -232,6 +284,7 @@ class AttendeesCRUD(BaseCRUD[Attendees, AttendeeCreate, AttendeeUpdate]):
         human_id: uuid.UUID | None = None,
         category_id: uuid.UUID | None = None,
         additional_data: dict | None = None,
+        commit: bool = True,
     ) -> Attendees:
         """Create an attendee with internal fields.
 
@@ -267,7 +320,10 @@ class AttendeesCRUD(BaseCRUD[Attendees, AttendeeCreate, AttendeeUpdate]):
             additional_data=additional_data or {},
         )
         session.add(attendee)
-        session.commit()
+        if commit:
+            session.commit()
+        else:
+            session.flush()
         session.refresh(attendee)
         return attendee
 
@@ -327,67 +383,134 @@ class AttendeesCRUD(BaseCRUD[Attendees, AttendeeCreate, AttendeeUpdate]):
         ).first()
         return fallback
 
-    def find_direct_attendee(
+    def find_attendee_for_human(
         self,
         session: Session,
         human_id: uuid.UUID,
         popup_id: uuid.UUID,
     ) -> Attendees | None:
-        """Find the direct-sale attendee for a (human, popup) pair.
+        """Find the attendee row this human IS at this popup, if any.
 
-        Direct-sale attendees have application_id=NULL. Returns the existing
-        attendee so repeated direct purchases by the same human reuse the
-        same record (one attendee per human per popup for direct sales).
+        Identity, not ownership: the only test is that the row carries their
+        human_id. So it also returns the row somebody else added them to as a
+        companion — that row is still them at this gathering, and the tickets
+        they buy for themselves belong on it.
+
+        Ownership (_human_popup_attendee_ids) answers a different question:
+        which rows a human holds, theirs plus their application's party. It
+        must not be used here, because a party contains other people.
+
+        Their own application-less row wins when several match, so a repeat
+        buyer keeps landing where they landed before, and a row on an
+        application of their own beats one they are a companion on. Older
+        rows break what is left. Only data from before the duplicate guards
+        can offer more than one row to choose from.
         """
+        from app.api.application.models import Applications
+
         statement = (
             select(Attendees)
+            .outerjoin(Applications, Attendees.application_id == Applications.id)  # type: ignore[arg-type]
             .where(
                 Attendees.human_id == human_id,
                 Attendees.popup_id == popup_id,
-                Attendees.application_id.is_(None),  # type: ignore[union-attr]
+            )
+            .order_by(
+                Attendees.application_id.is_(None).desc(),  # type: ignore[union-attr]
+                (Applications.human_id == human_id).desc(),
+                Attendees.created_at,  # type: ignore[arg-type]
             )
             .limit(1)
         )
         return session.exec(statement).first()
 
-    def create_direct_attendee(
+    def adopt_or_create_for_application(
         self,
         session: Session,
-        human_id: uuid.UUID,
-        popup_id: uuid.UUID,
+        *,
         tenant_id: uuid.UUID,
+        application_id: uuid.UUID,
+        popup_id: uuid.UUID,
+        human_id: uuid.UUID,
         name: str,
         email: str | None = None,
+        gender: str | None = None,
+        category_id: uuid.UUID | None = None,
     ) -> Attendees:
-        """Create a direct-sale attendee (no application).
+        """Give an application the attendee row of the person who filed it.
 
-        Used for popups with sale_type="direct". The attendee is bound to a
-        Human and a Popup directly — application_id remains NULL.
+        The applicant can already be at this popup without an application:
+        they bought a ticket before applying, or they left somebody else's
+        party carrying one. That row IS them, tickets and all, so the
+        application takes it over rather than making a second one.
 
-        category_id is looked up from the popup's primary (main) category.
-        Check-in codes live on AttendeeProducts (one per purchased ticket).
+        A row that already belongs to an application is left alone — holding
+        one application per flow is deliberate, and a companion row belongs to
+        its host.
+
+        Flush-only on the adoption path; the caller owns the commit.
         """
-        from app.api.attendee_category.crud import attendee_categories_crud
-        from app.services.trial_limits import enforce_trial_attendee_cap
+        existing = self.find_attendee_for_human(session, human_id, popup_id)
+        if existing is None or existing.application_id is not None:
+            return self.create_internal(
+                session,
+                tenant_id=tenant_id,
+                application_id=application_id,
+                popup_id=popup_id,
+                name=name,
+                email=email,
+                gender=gender,
+                human_id=human_id,
+                category_id=category_id,
+            )
 
-        enforce_trial_attendee_cap(session, tenant_id)
+        existing.application_id = application_id
+        existing.name = name
+        # They are the applicant here, whatever the row called them before.
+        if category_id is not None:
+            existing.category_id = category_id
+        if email and not existing.email:
+            existing.email = email.lower()
+        if gender and not existing.gender:
+            existing.gender = gender
+        session.add(existing)
+        session.flush()
+        return existing
 
-        main_cat = attendee_categories_crud.get_primary_for_popup(session, popup_id)
-        attendee = Attendees(
-            tenant_id=tenant_id,
-            application_id=None,
-            popup_id=popup_id,
-            human_id=human_id,
-            name=name,
-            category_id=main_cat.id if main_cat else None,
-            email=email.lower() if email else None,
+    def human_attends_popup(
+        self,
+        session: Session,
+        human_id: uuid.UUID,
+        popup_id: uuid.UUID,
+    ) -> bool:
+        """Whether this human is already at this popup, in any shape.
+
+        True when a row IS them — their own application's row, a direct-sale
+        row, or a row somebody added them to as a companion — and also when
+        they hold an application whose party is filed under them, which covers
+        the older rows that never got a human_id stamped on them.
+
+        The question every path that adds a person has to ask before adding
+        them again.
+        """
+        if self.find_attendee_for_human(session, human_id, popup_id) is not None:
+            return True
+
+        from app.api.application.models import Applications
+
+        legacy_identity = (
+            select(Attendees.id)
+            .join(Applications, Attendees.application_id == Applications.id)  # type: ignore[arg-type]
+            .where(
+                Applications.human_id == human_id,
+                Applications.popup_id == popup_id,
+                Applications.tenant_id == Attendees.tenant_id,
+            )
+            .limit(1)
         )
-        session.add(attendee)
-        session.commit()
-        session.refresh(attendee)
-        return attendee
+        return session.exec(legacy_identity).first() is not None
 
-    def find_or_create_direct_attendee(
+    def find_or_create_buyer_attendee(
         self,
         session: Session,
         human_id: uuid.UUID,
@@ -396,16 +519,21 @@ class AttendeesCRUD(BaseCRUD[Attendees, AttendeeCreate, AttendeeUpdate]):
         name: str,
         email: str | None = None,
     ) -> Attendees:
-        """Find or create the single direct-sale attendee for a (human, popup) pair.
+        """Return the attendee a direct purchase belongs to, creating it if new.
+
+        A buyer who is already at this popup — because they applied, because
+        they bought before, or because somebody listed them as a companion —
+        gets that row. Only a buyer who is not there at all gets a fresh
+        application-less one.
 
         Implements SELECT → INSERT → IntegrityError → re-SELECT so concurrent
         purchases by the same human for the same popup converge on one row.
         Does NOT call session.commit() — callers control the transaction boundary.
 
-        One attendee is shared across all direct purchases by the same human for
-        the same popup. Tickets are tracked via AttendeeProducts rows.
+        Tickets are tracked via AttendeeProducts rows, so one attendee carries
+        every direct purchase the buyer makes.
         """
-        existing = self.find_direct_attendee(session, human_id, popup_id)
+        existing = self.find_attendee_for_human(session, human_id, popup_id)
         if existing:
             return existing
 
@@ -430,7 +558,7 @@ class AttendeesCRUD(BaseCRUD[Attendees, AttendeeCreate, AttendeeUpdate]):
         except IntegrityError:
             session.rollback()
             # Concurrent INSERT — re-SELECT the winner
-            existing = self.find_direct_attendee(session, human_id, popup_id)
+            existing = self.find_attendee_for_human(session, human_id, popup_id)
             if existing is None:
                 raise  # unexpected — re-raise original error
             return existing
@@ -548,26 +676,52 @@ class AttendeesCRUD(BaseCRUD[Attendees, AttendeeCreate, AttendeeUpdate]):
         )
         return session.exec(statement).first()
 
+    def _human_accessible_attendee_ids(
+        self,
+        human_id: uuid.UUID,
+        popup_id: uuid.UUID,
+        tenant_id: uuid.UUID | None = None,
+    ):
+        """Return IDs accessible through self, manager, or legacy ownership."""
+        from app.api.application.models import Applications
+
+        legacy_application_owner = and_(
+            Attendees.managed_by_human_id.is_(None),  # type: ignore[union-attr]
+            Applications.human_id == human_id,
+            Applications.popup_id == popup_id,
+            Applications.tenant_id == Attendees.tenant_id,
+        )
+        statement = (
+            select(Attendees.id)
+            .outerjoin(Applications, Attendees.application_id == Applications.id)  # type: ignore[arg-type]
+            .where(
+                Attendees.popup_id == popup_id,
+                or_(
+                    Attendees.human_id == human_id,
+                    Attendees.managed_by_human_id == human_id,
+                    legacy_application_owner,
+                ),
+            )
+        )
+        if tenant_id is not None:
+            statement = statement.where(Attendees.tenant_id == tenant_id)
+        return statement.subquery()
+
     def _human_popup_attendee_ids(
         self,
         session: Session,
         human_id: uuid.UUID,
         popup_id: uuid.UUID,
     ):
-        """Return a subquery of Attendee IDs owned by (human_id, popup_id).
+        """Preserve the legacy bare-Attendee popup eligibility predicate.
 
-        Uses a UNION of two ownership legs:
-        1. Application-linked leg: attendees whose Application.human_id == human_id
-           AND Application.popup_id == popup_id.
-        2. Direct-sale leg: attendees with human_id == human_id AND popup_id == popup_id
-           AND application_id IS NULL.
-
-        Shared by find_purchases_by_human_popup and find_by_human_popup so both
-        functions use the same dual-path ownership predicate.
+        Portal attendee authorization must use `_human_accessible_attendee_ids`.
+        This helper remains only until task 4.2 replaces the existing popup-access
+        ladder with active self-or-managed ticket grants.
         """
         from app.api.application.models import Applications
 
-        app_leg = (
+        application_ids = (
             select(Attendees.id)
             .join(Applications, Attendees.application_id == Applications.id)  # type: ignore[arg-type]
             .where(
@@ -575,14 +729,41 @@ class AttendeesCRUD(BaseCRUD[Attendees, AttendeeCreate, AttendeeUpdate]):
                 Applications.popup_id == popup_id,
             )
         )
-
-        direct_leg = select(Attendees.id).where(
+        direct_ids = select(Attendees.id).where(
             Attendees.human_id == human_id,
             Attendees.popup_id == popup_id,
             Attendees.application_id.is_(None),  # type: ignore[union-attr]
         )
+        return application_ids.union(direct_ids).subquery()
 
-        return app_leg.union(direct_leg).subquery()
+    def get_for_human_popup(
+        self,
+        session: Session,
+        *,
+        attendee_id: uuid.UUID,
+        human_id: uuid.UUID,
+        popup_id: uuid.UUID,
+        tenant_id: uuid.UUID,
+    ) -> Attendees | None:
+        """Return one authorized Attendee without revealing foreign rows."""
+        attendee_ids = self._human_accessible_attendee_ids(
+            human_id, popup_id, tenant_id
+        )
+        statement = (
+            select(Attendees)
+            .where(
+                Attendees.id == attendee_id,
+                Attendees.id.in_(select(attendee_ids.c.id)),  # type: ignore[arg-type]
+            )
+            .options(
+                selectinload(Attendees.attendee_products).selectinload(  # type: ignore[arg-type]
+                    AttendeeProducts.product  # ty: ignore[invalid-argument-type]
+                ),
+                selectinload(Attendees.payment_products),  # type: ignore[arg-type]
+                selectinload(Attendees.category_ref),  # type: ignore[arg-type]
+            )
+        )
+        return session.exec(statement).first()
 
     def find_by_human_popup(
         self,
@@ -591,26 +772,28 @@ class AttendeesCRUD(BaseCRUD[Attendees, AttendeeCreate, AttendeeUpdate]):
         popup_id: uuid.UUID,
         skip: int = 0,
         limit: int = 50,
+        tenant_id: uuid.UUID | None = None,
     ) -> tuple[list[Attendees], int]:
-        """Return ALL attendees owned by (human_id, popup_id), both legs.
+        """Return all accessible Attendees for (human_id, popup_id).
 
-        Uses the UNION subquery from _human_popup_attendee_ids so the same
-        dual-path ownership predicate is applied consistently with
-        find_purchases_by_human_popup. Eager-loads attendee_products → product
-        so callers can build AttendeeWithOriginPublic without extra queries.
+        Uses the centralized self-or-manager compatibility predicate. Eager-loads
+        attendee_products → product so callers can build portal responses without
+        extra queries.
 
         Returns (rows, total_count) for paginated response building.
         """
-        union_ids = self._human_popup_attendee_ids(session, human_id, popup_id)
+        accessible_ids = self._human_accessible_attendee_ids(
+            human_id, popup_id, tenant_id
+        )
 
         count_statement = select(func.count()).where(
-            Attendees.id.in_(select(union_ids.c.id))  # type: ignore[arg-type]
+            Attendees.id.in_(select(accessible_ids.c.id))  # type: ignore[arg-type]
         )
         total = session.exec(count_statement).one()
 
         statement = (
             select(Attendees)
-            .where(Attendees.id.in_(select(union_ids.c.id)))  # type: ignore[arg-type]
+            .where(Attendees.id.in_(select(accessible_ids.c.id)))  # type: ignore[arg-type]
             .options(
                 selectinload(Attendees.attendee_products).selectinload(  # type: ignore[arg-type]
                     AttendeeProducts.product  # ty: ignore[invalid-argument-type]
@@ -624,23 +807,51 @@ class AttendeesCRUD(BaseCRUD[Attendees, AttendeeCreate, AttendeeUpdate]):
         results = list(session.exec(statement).all())
         return results, total
 
+    def count_party_by_category(
+        self,
+        session: Session,
+        human_id: uuid.UUID,
+        popup_id: uuid.UUID,
+        category_id: uuid.UUID,
+        tenant_id: uuid.UUID | None = None,
+    ) -> int:
+        """How many of a human's party at this popup are of one category.
+
+        Counted over the whole party, not one application. A person has one
+        spouse at a gathering however many ways in they hold, so a cap read
+        per application let the second door hand out a second one
+        (sdd/sales-flows-rediseno).
+        """
+        accessible_ids = self._human_accessible_attendee_ids(
+            human_id, popup_id, tenant_id
+        )
+
+        return session.exec(
+            select(func.count()).where(
+                Attendees.id.in_(select(accessible_ids.c.id)),  # type: ignore[arg-type]
+                Attendees.category_id == category_id,
+            )
+        ).one()
+
     def find_purchases_by_human_popup(
         self,
         session: Session,
         human_id: uuid.UUID,
         popup_id: uuid.UUID,
+        tenant_id: uuid.UUID | None = None,
     ) -> list[Attendees]:
         """Find attendees with purchased products for a human+popup combination.
 
-        Includes both application-linked attendees (via Applications.human_id) and
-        direct-sale attendees (application_id IS NULL, keyed by human_id + popup_id).
-        Uses a UNION subquery so both legs are covered without duplicates.
+        Uses the same self-or-manager compatibility predicate as portal attendee
+        management so managed recipients and legacy application companions agree.
         """
-        union_ids = self._human_popup_attendee_ids(session, human_id, popup_id)
+        accessible_ids = self._human_accessible_attendee_ids(
+            human_id, popup_id, tenant_id
+        )
 
         statement = (
             select(Attendees)
-            .where(Attendees.id.in_(select(union_ids.c.id)))  # type: ignore[arg-type]
+            .where(Attendees.id.in_(select(accessible_ids.c.id)))  # type: ignore[arg-type]
             .options(
                 selectinload(Attendees.attendee_products).selectinload(  # type: ignore[arg-type]
                     AttendeeProducts.product  # ty: ignore[invalid-argument-type]
@@ -734,6 +945,12 @@ class AttendeesCRUD(BaseCRUD[Attendees, AttendeeCreate, AttendeeUpdate]):
                 ),
             )
 
+        if payment_id is not None:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="Paid holdings must be created through payment fulfillment",
+            )
+
         # Atomic total-stock decrement (no-op when unlimited)
         products_crud.decrement_total_stock(session, product_id, 1)
 
@@ -753,6 +970,8 @@ class AttendeesCRUD(BaseCRUD[Attendees, AttendeeCreate, AttendeeUpdate]):
             product_id=product_id,
             check_in_code=generate_check_in_code(check_in_code_prefix),
             payment_id=payment_id,
+            product_category_snapshot=product.category,
+            requires_check_in_snapshot=product.requires_check_in,
         )
         session.add(ticket)
 
@@ -788,6 +1007,7 @@ class AttendeesCRUD(BaseCRUD[Attendees, AttendeeCreate, AttendeeUpdate]):
         items: list[tuple[uuid.UUID, int]],
         tenant_id: uuid.UUID | None = None,
         actor: AuditActor | None = None,
+        grant_key: str | None = None,
     ) -> None:
         """Add multiple tickets (product × quantity) to an attendee atomically.
 
@@ -799,7 +1019,9 @@ class AttendeesCRUD(BaseCRUD[Attendees, AttendeeCreate, AttendeeUpdate]):
         """
         from app.api.product.crud import products_crud
 
-        attendee = session.get(Attendees, attendee_id)
+        attendee = session.exec(
+            select(Attendees).where(Attendees.id == attendee_id).with_for_update()
+        ).first()
         if attendee is None:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
@@ -808,8 +1030,8 @@ class AttendeesCRUD(BaseCRUD[Attendees, AttendeeCreate, AttendeeUpdate]):
         if tenant_id is None:
             tenant_id = attendee.tenant_id
 
-        added: list[dict] = []
-        for product_id, quantity in items:
+        products = []
+        for line_index, (product_id, quantity) in enumerate(items):
             product = products_crud.get(session, product_id)
             if product is None or product.popup_id != attendee.popup_id:
                 raise HTTPException(
@@ -821,26 +1043,62 @@ class AttendeesCRUD(BaseCRUD[Attendees, AttendeeCreate, AttendeeUpdate]):
                     status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
                     detail=f"'{product.name}' is not available",
                 )
+            _require_ticket_product(product)
+            products.append((line_index, product, quantity))
 
+        added: list[dict] = []
+        for line_index, product, quantity in products:
+            unit_ids = [
+                _grant_unit_id(attendee_id, grant_key, line_index, unit_index)
+                if grant_key
+                else uuid.uuid4()
+                for unit_index in range(quantity)
+            ]
+            existing = {
+                unit.id: unit
+                for unit in session.exec(
+                    select(AttendeeProducts)
+                    .where(AttendeeProducts.id.in_(unit_ids))  # type: ignore[attr-defined]
+                    .with_for_update()
+                ).all()
+            }
+            for unit in existing.values():
+                if (
+                    unit.tenant_id != tenant_id
+                    or unit.attendee_id != attendee_id
+                    or unit.product_id != product.id
+                    or unit.payment_id is not None
+                    or unit.payment_product_id is not None
+                    or unit.unit_index is not None
+                ):
+                    raise HTTPException(
+                        status_code=status.HTTP_409_CONFLICT,
+                        detail="Grant identity conflicts with an existing product unit",
+                    )
+            missing_ids = [unit_id for unit_id in unit_ids if unit_id not in existing]
+            if not missing_ids:
+                continue
             # Atomic decrement of the whole quantity (409 if insufficient).
-            products_crud.decrement_total_stock(session, product_id, quantity)
+            products_crud.decrement_total_stock(session, product.id, len(missing_ids))
 
-            for _ in range(quantity):
+            for unit_id in missing_ids:
                 session.add(
                     AttendeeProducts(
-                        id=uuid.uuid4(),
+                        id=unit_id,
                         tenant_id=tenant_id,
                         attendee_id=attendee_id,
-                        product_id=product_id,
+                        product_id=product.id,
                         check_in_code=generate_check_in_code(),
                         payment_id=None,
+                        product_category_snapshot=product.category,
+                        requires_check_in_snapshot=product.requires_check_in,
                     )
                 )
             added.append(
                 {
-                    "product_id": str(product_id),
+                    "product_id": str(product.id),
                     "product_name": product.name,
-                    "quantity": quantity,
+                    "quantity": len(missing_ids),
                 }
             )
 
@@ -957,6 +1215,7 @@ class AttendeesCRUD(BaseCRUD[Attendees, AttendeeCreate, AttendeeUpdate]):
                 status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
                 detail="Product belongs to a different popup",
             )
+        _require_ticket_product(new_product)
 
         # Decrement the new product first so a sold-out 409 aborts before any
         # mutation. Restore the old product only once the new one is secured.
@@ -964,6 +1223,8 @@ class AttendeesCRUD(BaseCRUD[Attendees, AttendeeCreate, AttendeeUpdate]):
         products_crud.restore_total_stock(session, old_product_id, 1)
 
         ticket.product_id = new_product_id
+        ticket.product_category_snapshot = new_product.category
+        ticket.requires_check_in_snapshot = new_product.requires_check_in
         session.add(ticket)
 
         if actor is not None:
@@ -1084,23 +1345,34 @@ class AttendeesCRUD(BaseCRUD[Attendees, AttendeeCreate, AttendeeUpdate]):
         ticket_id: uuid.UUID,
         actor: AuditActor | None = None,
     ) -> None:
-        """Remove a single ticket from an attendee and restore its stock (admin).
-
-        Unlike the lower-level remove_ticket helper, this asserts ownership and
-        restores one unit of the product's inventory — the admin panel frees the
-        ticket back to the pool, mirroring the cancel/refund flow.
-        """
+        """Revoke one paymentless unit and restore its stock exactly once."""
         from app.api.product.crud import products_crud
         from app.api.product.models import Products
 
-        ticket = session.get(AttendeeProducts, ticket_id)
+        ticket = session.exec(
+            select(AttendeeProducts)
+            .where(AttendeeProducts.id == ticket_id)
+            .with_for_update()
+            .execution_options(populate_existing=True)
+        ).first()
         if ticket is None or ticket.attendee_id != attendee_id:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Ticket not found",
             )
+        if ticket.payment_id is not None:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Paid product units can only be revoked by cancelling their payment",
+            )
+
+        if ticket.revoked_at is not None:
+            session.commit()
+            return
 
         products_crud.restore_total_stock(session, ticket.product_id, 1)
+        ticket.revoked_at = datetime.now(UTC)
+        session.add(ticket)
 
         if actor is not None:
             attendee = session.get(Attendees, attendee_id)
@@ -1118,7 +1390,6 @@ class AttendeesCRUD(BaseCRUD[Attendees, AttendeeCreate, AttendeeUpdate]):
                     },
                 )
 
-        session.delete(ticket)
         session.commit()
 
     def clear_products(
@@ -1139,6 +1410,9 @@ class AttendeesCRUD(BaseCRUD[Attendees, AttendeeCreate, AttendeeUpdate]):
         self,
         session: Session,
         popup_id: uuid.UUID,
+        *,
+        sales_flow_id: uuid.UUID | None = None,
+        include_flowless: bool = False,
     ) -> list[AttendeeProducts]:
         """Return scannable tickets in *popup_id* that have not been emailed yet.
 
@@ -1146,6 +1420,12 @@ class AttendeesCRUD(BaseCRUD[Attendees, AttendeeCreate, AttendeeUpdate]):
         - ``Attendees.popup_id == popup_id``
         - ``Products.requires_check_in IS TRUE``
         - ``AttendeeProducts.checkin_pass_sent_at IS NULL``
+
+        ``sales_flow_id`` narrows to the door a ticket was bought through, so
+        each flow can send on its own schedule. ``include_flowless`` adds
+        tickets on attendees with no application at all — direct purchases,
+        which name no door — and is meant for the popup's default flow, the
+        same absorption rule `reminder_dispatch._scoped_to_flow` applies.
 
         Eager-loads ``attendee → application → human`` and ``product`` so the
         check-in pass dispatcher can build per-ticket QR items and resolve the
@@ -1160,9 +1440,12 @@ class AttendeesCRUD(BaseCRUD[Attendees, AttendeeCreate, AttendeeUpdate]):
             select(AttendeeProducts)
             .join(Attendees, AttendeeProducts.attendee_id == Attendees.id)  # type: ignore[arg-type]
             .join(Products, AttendeeProducts.product_id == Products.id)  # type: ignore[arg-type]
+            .outerjoin(Applications, Attendees.application_id == Applications.id)  # type: ignore[arg-type]
             .where(
                 Attendees.popup_id == popup_id,
-                Products.requires_check_in.is_(True),  # type: ignore[union-attr]
+                AttendeeProducts.revoked_at.is_(None),
+                AttendeeProducts.product_category_snapshot == "ticket",
+                AttendeeProducts.requires_check_in_snapshot.is_(True),
                 AttendeeProducts.checkin_pass_sent_at.is_(None),  # type: ignore[union-attr]
             )
             .options(
@@ -1172,6 +1455,11 @@ class AttendeesCRUD(BaseCRUD[Attendees, AttendeeCreate, AttendeeUpdate]):
                 .selectinload(Applications.human),  # ty: ignore[invalid-argument-type]
             )
         )
+        if sales_flow_id is not None:
+            scope = Applications.sales_flow_id == sales_flow_id
+            if include_flowless:
+                scope = or_(scope, Attendees.application_id.is_(None))  # type: ignore[union-attr]
+            statement = statement.where(scope)
         return list(session.exec(statement).all())
 
     def mark_checkin_pass_sent(

@@ -3,16 +3,25 @@
 import uuid
 from datetime import datetime
 from decimal import Decimal
-from typing import Any
+from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    EmailStr,
+    Field,
+    field_validator,
+    model_validator,
+)
 
 from app.api.attendee_category.schemas import AttendeeCategoryPublic
+from app.api.payment.schemas import PaymentRecipientRequest
 from app.api.popup.schemas import PopupPublic
+from app.api.sales_flow.schemas import SelectedSalesFlow
 from app.api.ticketing_step.schemas import TicketingStepPublic
 
 # ---------------------------------------------------------------------------
-# Runtime schemas (GET /checkout/{slug}/runtime)
+# Runtime schemas (GET /checkout/{slug}/{flow_slug}/runtime)
 # ---------------------------------------------------------------------------
 
 
@@ -82,9 +91,10 @@ class CheckoutRuntimeProduct(BaseModel):
 
 
 class CheckoutRuntimeResponse(BaseModel):
-    """Full response for GET /checkout/{slug}/runtime."""
+    """Full response for GET /checkout/{slug}/{flow_slug}/runtime."""
 
     popup: PopupPublic
+    selected_flow: SelectedSalesFlow
     products: list[CheckoutRuntimeProduct]
     buyer_form: list[CheckoutBuyerSection]
     ticketing_steps: list[TicketingStepPublic]
@@ -93,12 +103,29 @@ class CheckoutRuntimeResponse(BaseModel):
     # the human-gated /portal/popups/{id}/attendee-categories endpoint.
     attendee_categories: list[AttendeeCategoryPublic] = []
     form_schema: dict[str, Any] | None = None
+    # Why the catalog is empty, when it is empty for a reason
+    # (sdd/sales-flows-rediseno slice 5, F3). Without it the portal cannot
+    # tell "this flow's rule turned you away" from "nothing is configured
+    # here", and showed the same blank step for both. A stable machine code
+    # so the portal renders its own copy; None whenever products are present
+    # or the flow simply has nothing set up.
+    empty_catalog_reason: str | None = None
+    # Which kind of flow this is. The portal needs it to pick the payment
+    # call: an application flow's buyer pays through their application, and
+    # sending them down the anonymous path would create a second, unlinked
+    # purchase (sdd/sales-flows-rediseno).
+    flow_type: str | None = None
+    # How THIS flow's checkout looks (sdd/sales-flows-rediseno). Separate
+    # from `popup.theme_config`, which still dresses the gathering's own
+    # pages: outside checkout no flow is in scope, so there is nothing to
+    # read it from. Two surfaces, two owners — not a fallback chain.
+    theme_config: dict[str, Any] | None = None
 
 
 class CheckoutShareMeta(BaseModel):
     """Tiny, unauthenticated projection for social/OpenGraph share previews.
 
-    Returned by the public ``/{slug}/share`` endpoint so social crawlers (which
+    Returned by the public ``/{slug}/{flow_slug}/share`` endpoint so social crawlers (which
     send no JWT) can render the popup name, tagline/location snippet and cover
     image without loading the full checkout runtime payload.
     """
@@ -111,7 +138,7 @@ class CheckoutShareMeta(BaseModel):
 
 
 # ---------------------------------------------------------------------------
-# Purchase schemas (POST /checkout/{slug}/purchase)
+# Purchase schemas (POST /checkout/{slug}/{flow_slug}/purchase)
 # ---------------------------------------------------------------------------
 
 
@@ -120,11 +147,20 @@ class ProductLine(BaseModel):
 
     product_id: uuid.UUID
     quantity: int = Field(ge=1, default=1)
+    attendee_id: uuid.UUID | None = None
+    recipient_key: str | None = Field(default=None, min_length=1, max_length=255)
     # Per-purchase blob, same contract as the authenticated flow.
-    # An accommodation booking travels here: {kind: "accommodation_booking",
-    # accommodation_id, check_in, check_out, guest_count, guests}. Never a
-    # price — the server re-quotes from the dates.
+    # Accommodation booking metadata carries dates and guests, never a price;
+    # the server always computes the authoritative quote.
     purchase_metadata: dict[str, Any] | None = None
+
+    model_config = ConfigDict(extra="forbid")
+
+    @model_validator(mode="after")
+    def validate_identity(self) -> "ProductLine":
+        if self.attendee_id is not None and self.recipient_key is not None:
+            raise ValueError("attendee_id and recipient_key cannot both be set")
+        return self
 
 
 class BuyerInfo(BaseModel):
@@ -160,9 +196,10 @@ class Attribution(BaseModel):
 
 
 class OpenTicketingPurchaseCreate(BaseModel):
-    """Request schema for POST /checkout/{slug}/purchase."""
+    """Request schema for POST /checkout/{slug}/{flow_slug}/purchase."""
 
     products: list[ProductLine] = Field(min_length=1)
+    recipients: list[PaymentRecipientRequest] = Field(default_factory=list)
     buyer: BuyerInfo
     coupon_code: str | None = None
     # Buyer opt-in for the optional insurance fee (mirrors the authenticated
@@ -176,16 +213,31 @@ class OpenTicketingPurchaseCreate(BaseModel):
     locale: str | None = Field(default=None, max_length=8)
     attribution: Attribution | None = None
     # Cart continuity proof: signed cart identifier from the abandoned-cart
-    # restore link (GET /checkout/{slug}/cart?cid=&sig=).  When both are
+    # restore link (GET /checkout/{slug}/{flow_slug}/cart?cid=&sig=).  When both are
     # present and valid for this buyer+popup, the system is allowed to supersede
     # a prior PENDING payment.  Missing or invalid → supersede is blocked;
     # a 409 pending_payment_exists is returned if a PENDING payment exists.
     cid: uuid.UUID | None = None
     sig: str | None = None
+    quote_token: str | None = None
+
+    @model_validator(mode="after")
+    def validate_recipients(self) -> "OpenTicketingPurchaseCreate":
+        keys = [recipient.recipient_key for recipient in self.recipients]
+        if len(keys) != len(set(keys)):
+            raise ValueError("recipient_key values must be unique")
+        referenced = {
+            line.recipient_key
+            for line in self.products
+            if line.recipient_key is not None
+        }
+        if referenced - set(keys):
+            raise ValueError("Every recipient_key must reference a supplied recipient")
+        return self
 
 
 class OpenTicketingPurchaseResponse(BaseModel):
-    """Response schema for POST /checkout/{slug}/purchase."""
+    """Response schema for POST /checkout/{slug}/{flow_slug}/purchase."""
 
     payment_id: uuid.UUID
     status: str
@@ -201,16 +253,18 @@ class OpenTicketingPurchaseResponse(BaseModel):
 
 
 # ---------------------------------------------------------------------------
-# Preview schemas (POST /checkout/{slug}/preview)
+# Preview schemas (POST /checkout/{slug}/{flow_slug}/preview)
 # ---------------------------------------------------------------------------
 
 
 class CheckoutPreviewRequest(BaseModel):
-    """Request schema for POST /checkout/{slug}/preview."""
+    """Request schema for POST /checkout/{slug}/{flow_slug}/preview."""
 
     products: list[ProductLine] = Field(min_length=1)
     coupon_code: str | None = None
     insurance: bool = False
+    buyer: BuyerInfo | None = None
+    recipients: list[PaymentRecipientRequest] = Field(default_factory=list)
 
 
 class CheckoutPreviewLine(BaseModel):
@@ -238,15 +292,19 @@ class CheckoutPreviewResponse(BaseModel):
     contribution_amount: Decimal = Decimal("0")
     total: Decimal
     currency: str
+    selected_flow: SelectedSalesFlow
+    kind: Literal["estimate", "definitive"]
+    quote_token: str | None = None
+    quote_expires_at: datetime | None = None
 
 
 # ---------------------------------------------------------------------------
-# Release-on-return schemas (POST /checkout/{slug}/pending/release)
+# Release-on-return schemas (POST /checkout/{slug}/{flow_slug}/pending/release)
 # ---------------------------------------------------------------------------
 
 
 class PendingReleaseOpenRequest(BaseModel):
-    """Request body for POST /checkout/{slug}/pending/release (anonymous surface).
+    """Request body for POST /checkout/{slug}/{flow_slug}/pending/release (anonymous surface).
 
     cid + sig constitute the cart continuity proof (HMAC). email is the buyer's
     address used as the payment lookup key (must match the cart's stored email).

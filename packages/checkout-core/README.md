@@ -16,10 +16,11 @@ npm install @edgeos/checkout-core
 
 ## What you need
 
-Two values, from your EdgeOS backoffice (**Organization → Checkout SDK Keys**):
+Three values, from your EdgeOS backoffice (**Organization → Checkout SDK Keys**):
 
 - a **publishable key** (`pk_live_…`, browser-safe, origin-allowlisted)
 - your **popup slug**
+- a **canonical sales flow slug**
 
 The API URL defaults to the EdgeOS production API; override `baseUrl` only for a
 non-prod environment.
@@ -29,7 +30,11 @@ non-prod environment.
 ```ts
 import { createCheckoutClient, createCheckoutStore } from "@edgeos/checkout-core"
 
-const client = createCheckoutClient({ slug: "my-popup", publishableKey: "pk_live_…" })
+const client = createCheckoutClient({
+  slug: "my-popup",
+  flowSlug: "checkout",
+  publishableKey: "pk_live_…",
+})
 const store = createCheckoutStore({ client })
 
 store.subscribe((state) => {

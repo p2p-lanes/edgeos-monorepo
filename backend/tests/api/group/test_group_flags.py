@@ -28,6 +28,11 @@ from app.api.popup.models import Popups
 from app.api.shared.enums import HumanRating
 from app.api.tenant.models import Tenants
 from app.core.security import create_access_token
+from tests._flow_helpers import (
+    application_flow_id,
+    group_flow_id,
+    seed_default_steps,
+)
 
 # ---------------------------------------------------------------------------
 # Test helpers
@@ -51,6 +56,7 @@ def _make_popup(db: Session, tenant: Tenants) -> Popups:
     db.add(popup)
     db.commit()
     db.refresh(popup)
+    seed_default_steps(db, popup)
     return popup
 
 
@@ -77,6 +83,7 @@ def _make_group(
 ) -> Groups:
     """Create a group with explicit behavior flags."""
     g = Groups(
+        sales_flow_id=group_flow_id(db, popup.id),
         tenant_id=tenant.id,
         popup_id=popup.id,
         name=f"Flag Group {uuid.uuid4().hex[:6]}",
@@ -247,6 +254,7 @@ class TestFlagTransitionRetroactive:
 
         # Create an application directly in ACCEPTED state (simulates prior accepted app)
         accepted_app = Applications(
+            sales_flow_id=application_flow_id(db, popup.id),
             tenant_id=tenant_a.id,
             popup_id=popup.id,
             human_id=human.id,
@@ -424,8 +432,12 @@ class TestPopupFlagGuards:
         popup = _make_popup(db, tenant_a)
         human = _make_human(db, tenant_a)
 
-        # invites_enabled defaults to False on new popups
-        assert not popup.invites_enabled
+        # The gate reads the flow being applied to, not the event.
+        from app.api.sales_flow.crud import sales_flows_crud
+
+        flow = sales_flows_crud.get_default_flow(db, popup.id)
+        assert flow is not None
+        assert not flow.invites_enabled, "copied from a popup that has them off"
 
         # Build a mock app_data that looks like ApplicationCreate + invite_id
         app_data = MagicMock()
@@ -435,6 +447,7 @@ class TestPopupFlagGuards:
         app_data.group_id = None
         app_data.status = None
         app_data.custom_fields = None
+        app_data.sales_flow_id = flow.id
 
         crud_instance = ApplicationsCRUD()
         with pytest.raises(HTTPException) as exc_info:
@@ -482,7 +495,11 @@ class TestPopupFlagGuards:
         popup = _make_popup(db, tenant_a)
         human = _make_human(db, tenant_a)
 
-        assert not popup.referrals_enabled
+        from app.api.sales_flow.crud import sales_flows_crud
+
+        flow = sales_flows_crud.get_default_flow(db, popup.id)
+        assert flow is not None
+        assert not flow.referrals_enabled, "copied from a popup that has them off"
 
         app_data = MagicMock()
         app_data.popup_id = popup.id
@@ -491,6 +508,7 @@ class TestPopupFlagGuards:
         app_data.group_id = None
         app_data.status = None
         app_data.custom_fields = None
+        app_data.sales_flow_id = flow.id
 
         crud_instance = ApplicationsCRUD()
         with pytest.raises(HTTPException) as exc_info:

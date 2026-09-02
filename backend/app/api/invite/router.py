@@ -5,7 +5,8 @@ Mounts at:
   /invites/redeem/{token} — portal (GET: unauthenticated preview; POST: CurrentHuman)
 
 Design: Decision 1c (module layout), API surface table for invites.
-Spec: REQ-GR-001..007 (invites), REQ-GR-026 (popup.invites_enabled gate).
+Spec: REQ-GR-001..007 (invites), REQ-GR-026 (the invites gate, which
+belongs to the sales flow an invite lands its recipient in).
 """
 
 import uuid
@@ -66,6 +67,8 @@ async def preview_invite(
     redirects them to their checkout instead of re-redeeming the link.
     recipient_email is NEVER returned.
     """
+    from app.api.sales_flow.resolver import config_for  # noqa: PLC0415
+
     # Never cache the preview — it reflects mutable invite state (max_uses,
     # current_uses, expiry) that an admin can change at any time.
     response.headers["Cache-Control"] = "no-store"
@@ -85,8 +88,16 @@ async def preview_invite(
     if current_human is not None:
         from app.api.application.crud import applications_crud
 
+        # Scoped to the invite's own flow. Popup-wide, an invite into
+        # Volunteers would read as already redeemed for anyone who had
+        # applied to the default flow — a different flow, a different
+        # application.
         already_redeemed = (
-            applications_crud.get_by_human_popup(db, current_human.id, invite.popup_id)
+            applications_crud.get_by_human_flow(
+                db,
+                human_id=current_human.id,
+                sales_flow_id=invite.sales_flow_id,
+            )
             is not None
         )
 
@@ -97,7 +108,12 @@ async def preview_invite(
 
         popup = popups_crud.get(db, invite.popup_id)
         ensure_popup_link_active(popup)
-        if popup is not None and not popup.invites_enabled:
+        if (
+            popup is not None
+            and not config_for(
+                db, sales_flow_id=invite.sales_flow_id, popup_id=invite.popup_id
+            ).invites_enabled
+        ):
             raise HTTPException(
                 status_code=status.HTTP_410_GONE,
                 detail="Invites are not enabled for this event",
@@ -151,6 +167,8 @@ async def preview_link(
     never names its owner: it is a public URL and the owner is a private
     individual (spec: referral preview returns no PII of the referrer).
     """
+    from app.api.sales_flow.resolver import config_for  # noqa: PLC0415
+
     response.headers["Cache-Control"] = "no-store"
     _no_store = {"Cache-Control": "no-store"}
 
@@ -178,10 +196,15 @@ async def preview_link(
         popup = popups_crud.get(db, link.popup_id)
         ensure_popup_link_active(popup)
         if popup is not None:
+            # Both flags belong to the flow this link lands people in, not to
+            # the event: a door can share while another does not.
+            config = config_for(
+                db, sales_flow_id=link.sales_flow_id, popup_id=link.popup_id
+            )
             enabled = (
-                popup.referrals_enabled
+                config.referrals_enabled
                 if link.is_portal_created
-                else popup.invites_enabled
+                else config.invites_enabled
             )
             if not enabled:
                 raise HTTPException(
@@ -242,6 +265,7 @@ async def redeem_invite(
     from app.api.application.crud import applications_crud
     from app.api.application.schemas import ApplicationCreate, ApplicationStatus
     from app.api.popup.crud import popups_crud
+    from app.api.sales_flow.resolver import config_for  # noqa: PLC0415
 
     invite = invites_crud.get_by_token_any_popup(db, token)
     if not invite:
@@ -284,8 +308,11 @@ async def redeem_invite(
             detail="You have already redeemed this invite",
         )
 
-    # Check popup.invites_enabled guard (REQ-GR-026)
-    if not popup.invites_enabled:
+    # The flow this invite lands its recipient in decides whether it may
+    # (REQ-GR-026, now per flow).
+    if not config_for(
+        db, sales_flow_id=invite.sales_flow_id, popup_id=invite.popup_id
+    ).invites_enabled:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Invite-based applications are not enabled for this popup",
@@ -294,9 +321,12 @@ async def redeem_invite(
     # Increment uses atomically
     invites_crud.increment_uses(db, invite, redeemed_by_human_id=current_human.id)
 
-    # Create application using invite's flags
+    # Create application using invite's flags. The invite names the flow,
+    # so the application lands where the invite meant rather than in
+    # whichever flow the popup happens to call default.
     app_create = ApplicationCreate(
         popup_id=invite.popup_id,
+        sales_flow_id=invite.sales_flow_id,
         first_name=current_human.first_name or "",
         last_name=current_human.last_name or "",
         email=current_human.email,
@@ -393,6 +423,52 @@ async def list_invites(
     )
 
 
+def _resolve_invite_flow_id(
+    db: SessionDep,
+    popup_id: uuid.UUID,
+    explicit_flow_id: uuid.UUID | None,
+) -> uuid.UUID:
+    """The flow an invite lands its recipient in.
+
+    Omitted means the popup's default flow, which is where every invite
+    landed people before it could say otherwise
+    (sdd/sales-flows-rediseno).
+
+    Only an application flow may be named. Redeeming an invite creates an
+    application, so an invite into a direct sale would redeem into nothing —
+    the same rule the approval strategy enforces, and 404 before 422 so a
+    flow of another popup is never described back to the caller.
+    """
+    from app.api.sales_flow.crud import sales_flows_crud
+    from app.api.sales_flow.schemas import SalesFlowType
+
+    if explicit_flow_id is None:
+        default_flow = sales_flows_crud.get_default_flow(db, popup_id)
+        if default_flow is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Sales flow not found",
+            )
+        flow = default_flow
+    else:
+        flow = sales_flows_crud.get(db, explicit_flow_id)
+        if flow is None or flow.popup_id != popup_id:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Sales flow not found for this popup",
+            )
+
+    if flow.type != SalesFlowType.application:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=(
+                "Invites can only be sent for application flows. "
+                f"This flow sells directly ({flow.type})."
+            ),
+        )
+    return flow.id
+
+
 @router.post("", response_model=InvitePublic, status_code=status.HTTP_201_CREATED)
 async def create_invite(
     db: SessionDep,
@@ -406,6 +482,7 @@ async def create_invite(
     409 if (popup_id, token) collides.
     """
     from app.api.popup.crud import popups_crud
+    from app.api.sales_flow.resolver import config_for  # noqa: PLC0415
 
     # Resolve popup to get tenant_id and check feature flag
     popup = popups_crud.get(db, body.popup_id)
@@ -414,11 +491,17 @@ async def create_invite(
             status_code=status.HTTP_404_NOT_FOUND, detail="Popup not found"
         )
 
-    # popup.invites_enabled gate (REQ-GR-026)
-    if not popup.invites_enabled:
+    # Resolve the target flow BEFORE the gate: the flow being invited into is
+    # the one that decides whether invites are allowed (REQ-GR-026, now per
+    # flow), so asking before resolving would ask the wrong door.
+    body.sales_flow_id = _resolve_invite_flow_id(db, popup.id, body.sales_flow_id)
+
+    if not config_for(
+        db, sales_flow_id=body.sales_flow_id, popup_id=popup.id
+    ).invites_enabled:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Invite-based applications are not enabled for this popup",
+            detail="Invite-based applications are not enabled for this sales flow",
         )
 
     # Use admin's tenant_id if set, otherwise derive from popup (for superadmin)
@@ -524,11 +607,13 @@ async def create_my_link(
 ) -> InvitePublic:
     """Portal: create this attendee's link for a popup.
 
-    Spec: REQ-GR-008 (entity), REQ-GR-026 (popup.referrals_enabled gate).
+    Spec: REQ-GR-008 (entity), REQ-GR-026 (the attendee-links gate,
+    which belongs to the flow the sharer came through).
     Token auto-generated when omitted. 409 if (popup_id, token) collides.
     """
-    from app.api.attendee.crud import attendees_crud
+    from app.api.application.crud import applications_crud
     from app.api.popup.crud import popups_crud
+    from app.api.sales_flow.resolver import config_for  # noqa: PLC0415
 
     popup = popups_crud.get(db, body.popup_id)
     if not popup:
@@ -536,18 +621,23 @@ async def create_my_link(
             status_code=status.HTTP_404_NOT_FOUND, detail="Popup not found"
         )
 
-    if not popup.referrals_enabled:
+    # The door this attendee came through is the one they would be sharing,
+    # so it is the one that decides whether they may — and at what rate.
+    link_flow_id = invites_crud._flow_for_attendee_link(
+        db, body.popup_id, current_human.id
+    )
+    link_config = config_for(db, sales_flow_id=link_flow_id, popup_id=popup.id)
+    if not link_config.referrals_enabled:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Attendee links are not enabled for this popup",
+            detail="Attendee links are not enabled for this way in",
         )
 
-    # Anti-abuse gate: only attendees who actually hold a ticket may create a
-    # link. Stops someone who just arrived through a link (and was
-    # auto-approved) from immediately spawning their own without committing.
-    if not attendees_crud.human_has_ticket_in_popup(
+    # Reuse the popup access gate so accepted applicants and self/managed access
+    # holders qualify, while participant/order holdings and bare attendees do not.
+    if not applications_crud.resolve_popup_access(
         db, current_human.id, body.popup_id
-    ):
+    ).allowed:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="You need a ticket for this popup to create a link.",
@@ -569,7 +659,7 @@ async def create_my_link(
         body,
         tenant_id=popup.tenant_id,
         referrer_human_id=current_human.id,
-        max_uses_override=popup.max_referrals_per_attendee,
+        max_uses_override=link_config.max_referrals_per_attendee,
     )
     return InvitePublic.model_validate(link)
 

@@ -104,5 +104,25 @@ export function dispatchPaymentError(
     }
   }
 
+  if (
+    detail.code === "flow_restriction_violated" ||
+    detail.code === "product_not_in_flow"
+  ) {
+    // sdd/sales-flows slice 12/14 (design D6): the buyer either fails this
+    // flow's restriction_rule, or is trying to purchase a product that
+    // belongs to a different flow. Both are hard, non-retryable blocks —
+    // resubmitting the same request will fail again — so this blocks
+    // resubmit unlike the transient codes above. Neither code exposes
+    // WHICH condition failed (matches the backend's anti-enumeration
+    // stance); the two message keys give the buyer distinct, honest copy
+    // without leaking flow internals.
+    return {
+      messageKey: `${prefix}.${detail.code}`,
+      blockResubmit: true,
+      setPersistentError: true,
+      navigate: null,
+    }
+  }
+
   return null
 }

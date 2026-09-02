@@ -1,13 +1,16 @@
 """Tests for POST /coupons/validate-public — CAP-B.
 
-TDD phase: RED → GREEN.
-
 Scenarios:
 1. Valid coupon returns 200 with correct shape
 2. Unknown coupon code returns 400 with uniform message
 3. Expired coupon returns 400 with identical shape (no differentiation)
-4. Application popup returns 403
+4. Application popup returns 400 via the uniform flow-type gate (never a
+   raw 403 — sdd/sales-flows slice 9)
 5. Rate-limit: 31st request returns 429 (mocked)
+6. Cross-tenant resolution: origin-scoped popup lookup, uniform 400 for a
+   coupon that exists but belongs to a different tenant
+7. Missing Origin/X-Tenant-Id returns 404 from the tenant resolver before
+   any coupon logic runs
 """
 
 import uuid
@@ -22,11 +25,28 @@ from app.api.coupon.models import Coupons
 from app.api.popup.models import Popups
 from app.api.shared.enums import SaleType
 from app.api.tenant.models import Tenants
+from tests._flow_helpers import coupon_flow_id
 from tests.conftest import with_origin
 
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
+
+def _provision_default_flow(db: Session, tenant: Tenants, popup: Popups) -> None:
+    # sdd/sales-flows slice 9+: `resolve_flow` requires every popup to carry a
+    # default sales flow (task 5.0 provisioning). These helpers bypass
+    # PopupsCRUD.create, so provision one directly — same fix applied to
+    # conftest.py's popup fixtures in slice 9 and test_reminder_dispatch.py's
+    # fixture in slice 10.
+    from app.api.sales_flow.crud import sales_flows_crud
+
+    sale_type = (
+        popup.sale_type.value if hasattr(popup.sale_type, "value") else popup.sale_type
+    )
+    sales_flows_crud.provision_default_flow(
+        db, popup_id=popup.id, tenant_id=tenant.id, sale_type=sale_type
+    )
 
 
 def _make_direct_popup(
@@ -44,6 +64,7 @@ def _make_direct_popup(
     )
     db.add(popup)
     db.flush()
+    _provision_default_flow(db, tenant, popup)
     return popup
 
 
@@ -59,6 +80,7 @@ def _make_app_popup(db: Session, tenant: Tenants) -> Popups:
     )
     db.add(popup)
     db.flush()
+    _provision_default_flow(db, tenant, popup)
     return popup
 
 
@@ -73,6 +95,7 @@ def _make_coupon(
     current_uses: int = 0,
 ) -> Coupons:
     coupon = Coupons(
+        sales_flow_id=coupon_flow_id(db, popup.id),
         id=uuid.uuid4(),
         tenant_id=popup.tenant_id,
         popup_id=popup.id,
@@ -170,10 +193,11 @@ def test_validate_public_expired_coupon_same_shape(
     assert body["detail"] == "Invalid or expired coupon"
 
 
-def test_validate_public_application_popup_returns_403(
+def test_validate_public_application_popup_returns_uniform_400(
     client: TestClient, db: Session, tenant_a: Tenants
 ) -> None:
-    """Application popup returns 403."""
+    """Application popup is rejected via the flow-type gate, collapsed to
+    the uniform 400 like every other failure state (never a raw 403)."""
     popup = _make_app_popup(db, tenant_a)
     db.commit()
 
@@ -183,7 +207,8 @@ def test_validate_public_application_popup_returns_403(
         headers={"X-Tenant-Id": str(tenant_a.id)},
     )
 
-    assert response.status_code == 403, response.text
+    assert response.status_code == 400, response.text
+    assert response.json()["detail"] == "Invalid or expired coupon"
 
 
 def test_validate_public_rate_limit_triggers_429(

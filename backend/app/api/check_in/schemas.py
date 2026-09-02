@@ -27,8 +27,8 @@ class SelfCheckInPopup(BaseModel):
 
 class SelfCheckInTicket(BaseModel):
     attendee_product_id: uuid.UUID
-    attendee_name: str
-    attendee_category: str
+    attendee_name: str | None = None
+    attendee_category: str | None = None
     product_name: str
     product_category: str | None = None
     duration_type: str | None = None
@@ -47,8 +47,8 @@ class SelfCheckInRequest(BaseModel):
 
 class SelfCheckInResult(BaseModel):
     attendee_product_id: uuid.UUID
-    attendee_name: str
-    attendee_category: str
+    attendee_name: str | None = None
+    attendee_category: str | None = None
     product_name: str
     product_category: str | None = None
     duration_type: str | None = None

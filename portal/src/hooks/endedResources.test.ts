@@ -12,6 +12,8 @@ const city = (over: Partial<PopupPublic>): PopupPublic =>
     events_enabled: true,
     show_attendee_directory: true,
     sale_type: "application",
+    takes_applications: true,
+    sells_directly: false,
     ...over,
   }) as PopupPublic
 
@@ -19,12 +21,20 @@ const byName = (rs: ReturnType<typeof buildEndedResources>) =>
   Object.fromEntries(rs.map((r) => [r.name, r.status]))
 
 describe("buildEndedResources", () => {
-  it("keeps application active and locks passes", () => {
+  it("keeps application active and exposes read-only access", () => {
     const rs = byName(
       buildEndedResources({ t, city: city({}), participated: true }),
     )
     expect(rs["sidebar.application"]).toBe("active")
-    expect(rs["sidebar.passes"]).toBe("disabled")
+    expect(rs["sidebar.tickets_access"]).toBe("active")
+    expect(rs["sidebar.passes"]).toBeUndefined()
+  })
+
+  it("keeps orders available as read-only history", () => {
+    const rs = byName(
+      buildEndedResources({ t, city: city({}), participated: false }),
+    )
+    expect(rs["sidebar.orders"]).toBe("active")
   })
 
   it("shows events and directory to participants", () => {
@@ -52,5 +62,34 @@ describe("buildEndedResources", () => {
       }),
     )
     expect(rs["sidebar.attendee_directory"]).toBe("hidden")
+  })
+
+  it("hides the directory where nobody applies", () => {
+    const rs = byName(
+      buildEndedResources({
+        t,
+        city: city({ takes_applications: false, sells_directly: true }),
+        participated: true,
+      }),
+    )
+    expect(rs["sidebar.attendee_directory"]).toBe("hidden")
+  })
+
+  it("keeps the directory when a gathering both takes applications and sells", () => {
+    // The case the popup's `sale_type` could never express, and the reason
+    // this stopped reading it: one door reviews people, another sells to
+    // them. The reviewed people still have a directory.
+    const rs = byName(
+      buildEndedResources({
+        t,
+        city: city({
+          sale_type: "direct",
+          takes_applications: true,
+          sells_directly: true,
+        }),
+        participated: true,
+      }),
+    )
+    expect(rs["sidebar.attendee_directory"]).toBe("active")
   })
 })

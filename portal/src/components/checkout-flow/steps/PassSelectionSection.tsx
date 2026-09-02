@@ -20,10 +20,7 @@ import {
   getPassSelectionLayout,
   shouldDisableForPrimaryRestriction,
 } from "@/checkout/passSelectionUi"
-import {
-  CHECKOUT_MODE,
-  resolvePopupCheckoutPolicy,
-} from "@/checkout/popupCheckoutPolicy"
+import { CHECKOUT_MODE } from "@/checkout/popupCheckoutPolicy"
 import AddAttendeeButtons from "@/components/checkout-flow/shared/AddAttendeeButtons"
 import {
   resolveMaxQuantity,
@@ -33,7 +30,6 @@ import { deriveProductState, type ProductSaleState } from "@/lib/product-state"
 import { cn } from "@/lib/utils"
 import { useApplication } from "@/providers/applicationProvider"
 import { useCheckout } from "@/providers/checkoutProvider"
-import { useCityProvider } from "@/providers/cityProvider"
 import { usePassesProvider } from "@/providers/passesProvider"
 import type { AttendeeCategory, AttendeePassState } from "@/types/Attendee"
 import { formatCurrency, formatPrice } from "@/types/checkout"
@@ -144,10 +140,8 @@ export default function PassSelectionSection() {
   const { t } = useTranslation()
   const { attendeePasses, toggleProduct, isEditing, toggleEditing } =
     usePassesProvider()
-  const { editCredit, editPassesEnabled } = useCheckout()
+  const { editCredit, editPassesEnabled, checkoutMode } = useCheckout()
   const { getRelevantApplication } = useApplication()
-  const { getCity } = useCityProvider()
-  const policy = resolvePopupCheckoutPolicy(getCity())
   const [focusedAttendeeId, setFocusedAttendeeId] = useState<string | null>(
     null,
   )
@@ -248,7 +242,7 @@ export default function PassSelectionSection() {
         </div>
       )}
 
-      {getPassSelectionLayout(policy.checkoutMode) === "flat" ? (
+      {getPassSelectionLayout(checkoutMode) === "flat" ? (
         <SimpleQuantityVariant
           attendees={attendeePasses}
           toggleProduct={toggleProduct}

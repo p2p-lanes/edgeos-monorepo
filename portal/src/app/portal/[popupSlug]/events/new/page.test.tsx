@@ -204,12 +204,15 @@ vi.mock("@tanstack/react-query", () => ({
 import NewPortalEventPage from "./page"
 
 beforeEach(() => {
+  vi.useFakeTimers({ toFake: ["Date"] })
+  vi.setSystemTime(new Date("2026-06-15T12:00:00.000Z"))
   mockPush.mockClear()
   mockCreatePortalEvent.mockClear()
   mockSettingsResult = { data: undefined, isLoading: true }
 })
 
 afterEach(() => {
+  vi.useRealTimers()
   vi.clearAllMocks()
 })
 

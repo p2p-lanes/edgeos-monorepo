@@ -101,7 +101,7 @@ def test_draft_popup_is_403_without_a_token(
     db.commit()
 
     response = client.get(
-        f"/api/v1/checkout/{popup.slug}/runtime",
+        f"/api/v1/checkout/{popup.slug}/checkout/runtime",
         headers={"X-Tenant-Id": str(tenant_a.id)},
     )
 
@@ -113,11 +113,12 @@ def test_draft_popup_is_served_with_a_token(
 ) -> None:
     popup = _make_direct_popup(db, tenant_a, status="draft")
     _make_product(db, popup, name="Draft GA")
+    _make_ticketing_step(db, popup, title="Tickets", order=0)
     db.commit()
     token, _ = mint_checkout_preview_token(popup.id)
 
     response = client.get(
-        f"/api/v1/checkout/{popup.slug}/runtime",
+        f"/api/v1/checkout/{popup.slug}/checkout/runtime",
         headers=_preview_headers(tenant_a, token),
     )
 
@@ -133,20 +134,26 @@ def test_application_popup_is_served_with_a_token(
     """sale_type=application is the other public gate the preview lifts."""
     popup = _make_direct_popup(db, tenant_a)
     popup.sale_type = SaleType.application.value
+    from app.api.sales_flow.crud import sales_flows_crud
+
+    flow = sales_flows_crud.get_default_flow(db, popup.id)
+    assert flow is not None
+    flow.type = SaleType.application.value
     db.add(popup)
+    db.add(flow)
     db.commit()
     token, _ = mint_checkout_preview_token(popup.id)
 
     unauthorized = client.get(
-        f"/api/v1/checkout/{popup.slug}/runtime",
+        f"/api/v1/checkout/{popup.slug}/checkout/runtime",
         headers={"X-Tenant-Id": str(tenant_a.id)},
     )
     authorized = client.get(
-        f"/api/v1/checkout/{popup.slug}/runtime",
+        f"/api/v1/checkout/{popup.slug}/checkout/runtime",
         headers=_preview_headers(tenant_a, token),
     )
 
-    assert unauthorized.status_code == 403
+    assert unauthorized.status_code == 401
     assert authorized.status_code == 200, authorized.text
 
 
@@ -160,11 +167,11 @@ def test_disabled_steps_are_included_only_in_preview(
     token, _ = mint_checkout_preview_token(popup.id)
 
     public = client.get(
-        f"/api/v1/checkout/{popup.slug}/runtime",
+        f"/api/v1/checkout/{popup.slug}/checkout/runtime",
         headers={"X-Tenant-Id": str(tenant_a.id)},
     )
     preview = client.get(
-        f"/api/v1/checkout/{popup.slug}/runtime",
+        f"/api/v1/checkout/{popup.slug}/checkout/runtime",
         headers=_preview_headers(tenant_a, token),
     )
 
@@ -189,7 +196,7 @@ def test_token_for_another_popup_does_not_unlock_this_one(
     token, _ = mint_checkout_preview_token(other.id)
 
     response = client.get(
-        f"/api/v1/checkout/{draft.slug}/runtime",
+        f"/api/v1/checkout/{draft.slug}/checkout/runtime",
         headers=_preview_headers(tenant_a, token),
     )
 
@@ -205,7 +212,7 @@ def test_token_from_another_tenant_does_not_unlock_a_draft(
     token, _ = mint_checkout_preview_token(foreign.id)
 
     response = client.get(
-        f"/api/v1/checkout/{draft.slug}/runtime",
+        f"/api/v1/checkout/{draft.slug}/checkout/runtime",
         headers=_preview_headers(tenant_a, token),
     )
 
@@ -224,7 +231,7 @@ def test_expired_token_is_rejected(
     )
 
     response = client.get(
-        f"/api/v1/checkout/{popup.slug}/runtime",
+        f"/api/v1/checkout/{popup.slug}/checkout/runtime",
         headers=_preview_headers(tenant_a, expired),
     )
 
@@ -238,7 +245,7 @@ def test_garbage_token_is_rejected(
     db.commit()
 
     response = client.get(
-        f"/api/v1/checkout/{popup.slug}/runtime",
+        f"/api/v1/checkout/{popup.slug}/checkout/runtime",
         headers=_preview_headers(tenant_a, "not-a-jwt"),
     )
 
@@ -256,7 +263,7 @@ def test_a_regular_user_token_does_not_unlock_a_draft(
     db.commit()
 
     response = client.get(
-        f"/api/v1/checkout/{popup.slug}/runtime",
+        f"/api/v1/checkout/{popup.slug}/checkout/runtime",
         headers=_preview_headers(tenant_a, operator_token_tenant_a),
     )
 
@@ -321,7 +328,7 @@ def test_every_non_active_status_is_previewable(
     token, _ = mint_checkout_preview_token(popup.id)
 
     response = client.get(
-        f"/api/v1/checkout/{popup.slug}/runtime",
+        f"/api/v1/checkout/{popup.slug}/checkout/runtime",
         headers=_preview_headers(tenant_a, token),
     )
 
@@ -336,7 +343,7 @@ def test_unknown_slug_still_404s_with_a_token(
     token, _ = mint_checkout_preview_token(popup.id)
 
     response = client.get(
-        f"/api/v1/checkout/does-not-exist-{uuid.uuid4().hex[:6]}/runtime",
+        f"/api/v1/checkout/does-not-exist-{uuid.uuid4().hex[:6]}/checkout/runtime",
         headers=_preview_headers(tenant_a, token),
     )
 
@@ -353,7 +360,7 @@ def test_preview_does_not_affect_a_normal_public_request(
     db.commit()
 
     response = client.get(
-        f"/api/v1/checkout/{popup.slug}/runtime",
+        f"/api/v1/checkout/{popup.slug}/checkout/runtime",
         headers={"X-Tenant-Id": str(tenant_a.id)},
     )
 

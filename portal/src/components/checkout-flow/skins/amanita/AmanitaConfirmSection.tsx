@@ -151,6 +151,7 @@ export default function AmanitaConfirmSection({
     updateMerchQuantity,
     clearPatron,
     housingDatesShown,
+    salesFlowId,
   } = useCheckout()
 
   // Removing a pass mirrors the footer cart: day passes reset, everything else
@@ -169,7 +170,10 @@ export default function AmanitaConfirmSection({
   const { getCity } = useCityProvider()
   const popup = getCity()
   const { getRelevantApplication } = useApplication()
-  const application = getRelevantApplication()
+  // The balance belongs to the door being bought through. Reading it
+  // without one used to spend another application's credit on this
+  // purchase (sdd/sales-flows-rediseno).
+  const application = getRelevantApplication(salesFlowId)
   const accountCredit = application?.credit ? Number(application.credit) : 0
 
   const [promoInput, setPromoInput] = useState(cart.promoCode)

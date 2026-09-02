@@ -143,6 +143,61 @@ async def get_group(
     )
 
 
+def _resolve_group_flow_id(
+    # `SessionDep`, not `Session`: the latter is imported under
+    # TYPE_CHECKING only, and Python 3.12 (what the container runs)
+    # evaluates annotations eagerly, so naming it here fails at import.
+    db: SessionDep,
+    popup_id: uuid.UUID,
+    explicit_flow_id: uuid.UUID | None,
+) -> uuid.UUID:
+    """The flow this group's members apply through.
+
+    Omitted means the popup's default flow, which is where every group's
+    members landed before a group could say otherwise
+    (sdd/sales-flows-rediseno).
+
+    Only an application flow may be named: a group is reached through an
+    application, so one attached to a direct sale would never be read. 404
+    before 422, so a flow of another popup is never described back.
+    """
+    from app.api.sales_flow.crud import sales_flows_crud
+    from app.api.sales_flow.schemas import SalesFlowType
+
+    if explicit_flow_id is None:
+        default_flow = sales_flows_crud.get_default_flow(db, popup_id)
+        if default_flow is None:
+            from app.api.popup.crud import popups_crud
+
+            if popups_crud.get(db, popup_id) is None:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="Popup not found",
+                )
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Sales flow not found",
+            )
+        flow = default_flow
+    else:
+        flow = sales_flows_crud.get(db, explicit_flow_id)
+        if flow is None or flow.popup_id != popup_id:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Sales flow not found for this popup",
+            )
+
+    if flow.type != SalesFlowType.application:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=(
+                "Groups can only be created for application flows. "
+                f"This flow sells directly ({flow.type})."
+            ),
+        )
+    return flow.id
+
+
 @router.post("", response_model=GroupPublic, status_code=status.HTTP_201_CREATED)
 async def create_group(
     group_in: GroupCreate,
@@ -178,6 +233,9 @@ async def create_group(
 
     # Set resolved slug before delegating to CRUD
     group_in.slug = slug
+    group_in.sales_flow_id = _resolve_group_flow_id(
+        db, group_in.popup_id, group_in.sales_flow_id
+    )
 
     group = crud.groups_crud.create(db, group_in, tenant_id=tenant_id)
 

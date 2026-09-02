@@ -30,6 +30,11 @@ from app.api.human.models import Humans
 from app.api.popup.models import Popups
 from app.api.tenant.models import Tenants
 from app.core.security import create_access_token
+from tests._flow_helpers import (
+    application_flow_id,
+    default_flow_id,
+    provision_default_flow,
+)
 
 # ---------------------------------------------------------------------------
 # Helpers — reused across all tests
@@ -58,6 +63,7 @@ def _make_popup(
         db.add(popup)
         db.commit()
         db.refresh(popup)
+        provision_default_flow(db, popup)
     return popup
 
 
@@ -90,6 +96,7 @@ def _set_auto_accept_strategy(
 
     strategy = ApprovalStrategies(
         popup_id=popup.id,
+        sales_flow_id=default_flow_id(db, popup.id),
         tenant_id=tenant.id,
         strategy_type=ApprovalStrategyType.AUTO_ACCEPT,
         required_approvals=1,
@@ -114,6 +121,7 @@ def _make_application_in_review(
 ) -> Applications:
     """Directly insert an application in IN_REVIEW state (bypass approval strategy)."""
     app = Applications(
+        sales_flow_id=application_flow_id(db, popup.id),
         tenant_id=tenant.id,
         popup_id=popup.id,
         human_id=human.id,
@@ -226,6 +234,7 @@ class TestScholarshipRequest:
         requested = client.patch(
             f"/api/v1/applications/my/{popup.id}",
             headers=headers,
+            params={"sales_flow_id": created.json()["sales_flow_id"]},
             json={"scholarship_request": True},
         )
         assert requested.status_code == 200, requested.text
@@ -234,6 +243,7 @@ class TestScholarshipRequest:
         withdrawn = client.patch(
             f"/api/v1/applications/my/{popup.id}",
             headers=headers,
+            params={"sales_flow_id": created.json()["sales_flow_id"]},
             json={"scholarship_request": False},
         )
         assert withdrawn.status_code == 200, withdrawn.text
@@ -267,6 +277,7 @@ class TestScholarshipRequest:
         updated = client.patch(
             f"/api/v1/applications/my/{popup.id}",
             headers={"Authorization": f"Bearer {human_token}"},
+            params={"sales_flow_id": str(application.sales_flow_id)},
             json={"scholarship_details": "Updated supporting information"},
         )
 
@@ -519,6 +530,7 @@ class TestScholarshipEndpoint:
         strategy = AS(
             popup_id=popup.id,
             tenant_id=tenant_a.id,
+            sales_flow_id=default_flow_id(db, popup.id),
             strategy_type=ApprovalStrategyType.ANY_REVIEWER,
             required_approvals=1,
         )

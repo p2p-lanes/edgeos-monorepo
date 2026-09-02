@@ -31,6 +31,7 @@ from app.api.popup.models import Popups
 from app.api.product.models import Products
 from app.api.tenant.models import Tenants
 from app.api.user.models import Users
+from tests._flow_helpers import application_flow_id
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -172,6 +173,7 @@ def test_grant_creates_human_application_payment_and_tickets(
     assert human is not None
     assert human.first_name == "New"
     assert human.last_name == "Person"
+    assert payment.buyer_human_id == human.id
 
     snapshots = list(
         db.exec(
@@ -180,6 +182,7 @@ def test_grant_creates_human_application_payment_and_tickets(
     )
     assert len(snapshots) == 1
     assert snapshots[0].quantity == 2
+    assert snapshots[0].product_category == "ticket"
 
     tickets = list(
         db.exec(
@@ -187,6 +190,9 @@ def test_grant_creates_human_application_payment_and_tickets(
         ).all()
     )
     assert len(tickets) == 2  # quantity=2 → 2 ticket rows
+    assert {ticket.product_category_snapshot for ticket in tickets} == {"ticket"}
+    assert {ticket.payment_product_id for ticket in tickets} == {snapshots[0].id}
+    assert {ticket.unit_index for ticket in tickets} == {0, 1}
 
     assert mock_payment_email.await_count == 1
 
@@ -256,8 +262,8 @@ def test_grant_promotes_existing_draft_application(
     db.commit()
     db.refresh(human)
 
-    primary_cat = _ensure_primary_category(db, grant_popup)
     application = Applications(
+        sales_flow_id=application_flow_id(db, grant_popup.id),
         id=uuid.uuid4(),
         tenant_id=tenant_a.id,
         popup_id=grant_popup.id,
@@ -265,18 +271,6 @@ def test_grant_promotes_existing_draft_application(
         status=ApplicationStatus.DRAFT.value,
     )
     db.add(application)
-    # Direct-attendee link so get_main_attendee finds a row.
-    attendee = Attendees(
-        id=uuid.uuid4(),
-        tenant_id=tenant_a.id,
-        application_id=application.id,
-        popup_id=grant_popup.id,
-        name="Already Here",
-        email=human.email,
-        human_id=human.id,
-        category_id=primary_cat.id,
-    )
-    db.add(attendee)
     db.commit()
     db.refresh(application)
 
@@ -298,7 +292,26 @@ def test_grant_promotes_existing_draft_application(
     db.expire(application)
     db.refresh(application)
     assert application.status == ApplicationStatus.ACCEPTED.value
-
+    grant_attendees = list(
+        db.exec(select(Attendees).where(Attendees.application_id == application.id))
+    )
+    assert len(grant_attendees) == 1
+    assert (
+        len(
+            db.exec(
+                select(AttendeeProducts).where(
+                    AttendeeProducts.attendee_id == grant_attendees[0].id
+                )
+            ).all()
+        )
+        == 1
+    )
+    holding = db.exec(
+        select(AttendeeProducts).where(
+            AttendeeProducts.attendee_id == grant_attendees[0].id
+        )
+    ).one()
+    assert holding.product_category_snapshot == "ticket"
     apps_for_human = list(
         db.exec(
             select(Applications).where(
@@ -308,6 +321,58 @@ def test_grant_promotes_existing_draft_application(
         ).all()
     )
     assert len(apps_for_human) == 1  # no duplicate created
+
+
+@pytest.mark.parametrize(
+    "category",
+    [
+        "meal_plan",
+        "housing",
+        "merch",
+    ],
+)
+@pytest.mark.usefixtures("mock_payment_email")
+def test_grant_snapshots_non_ticket_products_without_access(
+    client: TestClient,
+    db: Session,
+    admin_token_tenant_a: str,
+    grant_popup: Popups,
+    category: str,
+) -> None:
+    product = _make_product(
+        db,
+        grant_popup,
+        total_stock_cap=3,
+        category=category,
+    )
+    email = f"invalid-grant-{uuid.uuid4().hex[:6]}@test.com"
+
+    response = client.post(
+        "/api/v1/applications/admin/grant-tickets",
+        json={
+            "popup_id": str(grant_popup.id),
+            "people": [
+                {
+                    "email": email,
+                    "products": [{"product_id": str(product.id), "quantity": 1}],
+                }
+            ],
+        },
+        headers=_auth(admin_token_tenant_a),
+    )
+
+    assert response.status_code == 201
+    snapshot = db.exec(
+        select(PaymentProducts).where(PaymentProducts.product_id == product.id)
+    ).one()
+    unit = db.exec(
+        select(AttendeeProducts).where(AttendeeProducts.product_id == product.id)
+    ).one()
+    assert snapshot.product_category == category
+    assert unit.product_category_snapshot == category
+    assert unit.product_category_snapshot != "ticket"
+    db.refresh(product)
+    assert product.total_stock_remaining == 2
 
 
 @pytest.mark.usefixtures("tenant_a")
@@ -642,6 +707,7 @@ def test_grant_existing_application_keeps_privacy_choices(
 
     primary_cat = _ensure_primary_category(db, grant_popup)
     application = Applications(
+        sales_flow_id=application_flow_id(db, grant_popup.id),
         id=uuid.uuid4(),
         tenant_id=tenant_a.id,
         popup_id=grant_popup.id,
@@ -681,3 +747,167 @@ def test_grant_existing_application_keeps_privacy_choices(
     db.expire(application)
     db.refresh(application)
     assert application.info_not_shared == ["email"]
+
+
+@pytest.mark.usefixtures("mock_payment_email")
+def test_grant_to_a_companion_uses_their_row_and_makes_no_application(
+    client: TestClient,
+    db: Session,
+    admin_token_tenant_a: str,
+    tenant_a: Tenants,
+    grant_popup: Popups,
+) -> None:
+    """Somebody already at the popup as a companion must not become a second
+    person. The ticket lands on the row they already are."""
+    product = _make_product(db, grant_popup, name="GA", price="20.00")
+    primary_cat = _ensure_primary_category(db, grant_popup)
+
+    holder = Humans(
+        id=uuid.uuid4(),
+        tenant_id=tenant_a.id,
+        email=f"holder-{uuid.uuid4().hex[:6]}@test.com",
+    )
+    companion = Humans(
+        id=uuid.uuid4(),
+        tenant_id=tenant_a.id,
+        email=f"companion-{uuid.uuid4().hex[:6]}@test.com",
+    )
+    db.add(holder)
+    db.add(companion)
+    db.flush()
+
+    application = Applications(
+        sales_flow_id=application_flow_id(db, grant_popup.id),
+        id=uuid.uuid4(),
+        tenant_id=tenant_a.id,
+        popup_id=grant_popup.id,
+        human_id=holder.id,
+        status=ApplicationStatus.ACCEPTED.value,
+    )
+    db.add(application)
+    db.flush()
+    companion_row = Attendees(
+        id=uuid.uuid4(),
+        tenant_id=tenant_a.id,
+        application_id=application.id,
+        popup_id=grant_popup.id,
+        name="The Companion",
+        email=companion.email,
+        human_id=companion.id,
+        category_id=primary_cat.id,
+    )
+    db.add(companion_row)
+    db.commit()
+
+    response = client.post(
+        "/api/v1/applications/admin/grant-tickets",
+        json={
+            "popup_id": str(grant_popup.id),
+            "people": [
+                {
+                    "email": companion.email,
+                    "products": [{"product_id": str(product.id), "quantity": 1}],
+                }
+            ],
+        },
+        headers=_auth(admin_token_tenant_a),
+    )
+    assert response.status_code == 201, response.text
+    granted = response.json()["granted"][0]
+    assert granted["application_id"] is None
+
+    apps_for_companion = list(
+        db.exec(
+            select(Applications).where(
+                Applications.human_id == companion.id,
+                Applications.popup_id == grant_popup.id,
+            )
+        ).all()
+    )
+    assert apps_for_companion == []
+
+    rows = list(
+        db.exec(
+            select(Attendees).where(
+                Attendees.human_id == companion.id,
+                Attendees.popup_id == grant_popup.id,
+            )
+        ).all()
+    )
+    assert [r.id for r in rows] == [companion_row.id]
+
+    tickets = list(
+        db.exec(
+            select(AttendeeProducts).where(
+                AttendeeProducts.attendee_id == companion_row.id
+            )
+        ).all()
+    )
+    assert len(tickets) == 1
+
+
+@pytest.mark.usefixtures("mock_payment_email")
+def test_grant_to_a_direct_buyer_uses_their_row(
+    client: TestClient,
+    db: Session,
+    admin_token_tenant_a: str,
+    tenant_a: Tenants,
+    grant_popup: Popups,
+) -> None:
+    """Same for somebody who got here by buying, with no application at all."""
+    product = _make_product(db, grant_popup, name="GA", price="20.00")
+    primary_cat = _ensure_primary_category(db, grant_popup)
+
+    buyer = Humans(
+        id=uuid.uuid4(),
+        tenant_id=tenant_a.id,
+        email=f"buyer-{uuid.uuid4().hex[:6]}@test.com",
+    )
+    db.add(buyer)
+    db.flush()
+    buyer_row = Attendees(
+        id=uuid.uuid4(),
+        tenant_id=tenant_a.id,
+        application_id=None,
+        popup_id=grant_popup.id,
+        name="The Buyer",
+        email=buyer.email,
+        human_id=buyer.id,
+        category_id=primary_cat.id,
+    )
+    db.add(buyer_row)
+    db.commit()
+
+    response = client.post(
+        "/api/v1/applications/admin/grant-tickets",
+        json={
+            "popup_id": str(grant_popup.id),
+            "people": [
+                {
+                    "email": buyer.email,
+                    "products": [{"product_id": str(product.id), "quantity": 2}],
+                }
+            ],
+        },
+        headers=_auth(admin_token_tenant_a),
+    )
+    assert response.status_code == 201, response.text
+    granted = response.json()["granted"][0]
+    assert granted["application_id"] is None
+    assert granted["tickets_created"] == 2
+
+    rows = list(
+        db.exec(
+            select(Attendees).where(
+                Attendees.human_id == buyer.id,
+                Attendees.popup_id == grant_popup.id,
+            )
+        ).all()
+    )
+    assert [r.id for r in rows] == [buyer_row.id]
+
+    payment = db.get(Payments, uuid.UUID(granted["payment_id"]))
+    assert payment is not None
+    assert payment.application_id is None
+    assert payment.buyer_human_id == buyer.id
+    assert payment.status == PaymentStatus.APPROVED.value
