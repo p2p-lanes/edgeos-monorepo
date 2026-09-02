@@ -3,7 +3,11 @@
  * approval-style, per the established SalesFlowForm.override.test.tsx
  * precedent for JSX composition.
  */
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
+import {
+  QueryClient,
+  QueryClientProvider,
+  useQuery,
+} from "@tanstack/react-query"
 import { render, screen, waitFor } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import type { ReactNode } from "react"
@@ -30,19 +34,43 @@ import { CopyFormToFlowDialog } from "./CopyFormToFlowDialog"
 
 const mockListSalesFlows = vi.mocked(SalesFlowsService.listSalesFlows)
 const mockCopyFormToFlow = vi.mocked(FormFieldsService.copyFormToFlow)
+const refetchTargetFields = vi.fn()
+const refetchTargetSections = vi.fn()
 
-function Wrapper({ children }: { children: ReactNode }) {
-  const queryClient = new QueryClient({
+function makeQueryClient() {
+  return new QueryClient({
     defaultOptions: { queries: { retry: false } },
   })
+}
+
+function Wrapper({ children }: { children: ReactNode }) {
+  const queryClient = makeQueryClient()
   return (
     <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
   )
 }
 
+function ActiveTargetQueries() {
+  useQuery({
+    queryKey: ["form-fields", "popup-1", "flow-1"],
+    queryFn: refetchTargetFields,
+    initialData: "stale fields",
+    staleTime: Number.POSITIVE_INFINITY,
+  })
+  useQuery({
+    queryKey: ["form-sections", "popup-1", "flow-1"],
+    queryFn: refetchTargetSections,
+    initialData: "stale sections",
+    staleTime: Number.POSITIVE_INFINITY,
+  })
+  return null
+}
+
 describe("CopyFormToFlowDialog", () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    refetchTargetFields.mockResolvedValue("fresh fields")
+    refetchTargetSections.mockResolvedValue("fresh sections")
     mockListSalesFlows.mockResolvedValue({
       results: [
         { id: "flow-2", name: "Application Flow", type: "application" },
@@ -84,14 +112,16 @@ describe("CopyFormToFlowDialog", () => {
   })
 
   it("defaults to the event's shared form and copies on confirm", async () => {
+    const queryClient = makeQueryClient()
     render(
-      <Wrapper>
+      <QueryClientProvider client={queryClient}>
+        <ActiveTargetQueries />
         <CopyFormToFlowDialog
           popupId="popup-1"
           targetFlowId="flow-1"
           targetFlowType="application"
         />
-      </Wrapper>,
+      </QueryClientProvider>,
     )
     await userEvent.click(
       screen.getByRole("button", { name: /copy form from/i }),
@@ -105,5 +135,7 @@ describe("CopyFormToFlowDialog", () => {
       targetFlowId: "flow-1",
       requestBody: { source_flow_id: null },
     })
+    await waitFor(() => expect(refetchTargetFields).toHaveBeenCalledOnce())
+    expect(refetchTargetSections).toHaveBeenCalledOnce()
   })
 })

@@ -89,7 +89,12 @@ export function CopyFormToFlowDialog({
       showSuccessToast(
         `Copied ${result.sections} section(s), ${result.base_fields} base field(s), and ${result.fields} custom field(s)`,
       )
-      queryClient.invalidateQueries({ queryKey: ["form-schema", targetFlowId] })
+      queryClient.invalidateQueries({
+        queryKey: ["form-fields", popupId, targetFlowId],
+      })
+      queryClient.invalidateQueries({
+        queryKey: ["form-sections", popupId, targetFlowId],
+      })
       setOpen(false)
     },
     onError: createErrorHandler(showErrorToast),
