@@ -3,11 +3,24 @@ from datetime import UTC, datetime
 from decimal import Decimal
 from typing import TYPE_CHECKING, Optional
 
-from sqlalchemy import Index, Numeric, String, Text, text
+from sqlalchemy import (
+    CheckConstraint,
+    ForeignKeyConstraint,
+    Index,
+    Numeric,
+    String,
+    Text,
+    UniqueConstraint,
+    text,
+)
 from sqlalchemy.dialects.postgresql import UUID
 from sqlmodel import Column, DateTime, Field, Relationship, SQLModel, func
 
-from app.api.payment.schemas import PaymentBase, PaymentProductBase
+from app.api.payment.schemas import (
+    PaymentBase,
+    PaymentProductBase,
+    PaymentRecipientBase,
+)
 
 if TYPE_CHECKING:
     from app.api.application.models import Applications
@@ -23,6 +36,13 @@ class PaymentProducts(PaymentProductBase, table=True):
     """Link table for payment products with snapshot of product at purchase time."""
 
     __tablename__ = "payment_products"
+    __table_args__ = (
+        ForeignKeyConstraint(
+            ["payment_recipient_id", "payment_id"],
+            ["payment_recipients.id", "payment_recipients.payment_id"],
+            name="fk_payment_product_recipient_payment",
+        ),
+    )
 
     created_at: datetime = Field(
         default_factory=lambda: datetime.now(UTC),
@@ -30,15 +50,61 @@ class PaymentProducts(PaymentProductBase, table=True):
             DateTime(timezone=True), server_default=func.now(), nullable=False
         ),
     )
-
     # Relationships
     payment: "Payments" = Relationship(back_populates="products_snapshot")
     product: "Products" = Relationship(back_populates="payment_products")
-    attendee: "Attendees" = Relationship(back_populates="payment_products")
+    attendee: Optional["Attendees"] = Relationship(back_populates="payment_products")
+    recipient: Optional["PaymentRecipients"] = Relationship(
+        back_populates="products",
+        sa_relationship_kwargs={
+            "primaryjoin": "PaymentProducts.payment_recipient_id == PaymentRecipients.id",
+            "foreign_keys": "PaymentProducts.payment_recipient_id",
+        },
+    )
 
     @property
     def attendee_name(self) -> str | None:
+        if self.recipient:
+            return self.recipient.name
         return self.attendee.name if self.attendee else None
+
+    @property
+    def recipient_key(self) -> str | None:
+        return self.recipient.recipient_key if self.recipient else None
+
+
+class PaymentRecipients(PaymentRecipientBase, table=True):
+    """Immutable recipient snapshot for one payment attempt."""
+
+    __tablename__ = "payment_recipients"
+    __table_args__ = (
+        UniqueConstraint(
+            "payment_id", "recipient_key", name="uq_payment_recipient_payment_key"
+        ),
+        UniqueConstraint("id", "payment_id", name="uq_payment_recipient_id_payment"),
+        CheckConstraint(
+            "recipient_key <> ''", name="ck_payment_recipient_key_nonempty"
+        ),
+    )
+
+    id: uuid.UUID = Field(
+        default_factory=uuid.uuid4,
+        sa_column=Column(UUID(as_uuid=True), primary_key=True),
+    )
+    created_at: datetime = Field(
+        default_factory=lambda: datetime.now(UTC),
+        sa_column=Column(
+            DateTime(timezone=True), server_default=func.now(), nullable=False
+        ),
+    )
+    payment: "Payments" = Relationship(back_populates="recipients")
+    products: list["PaymentProducts"] = Relationship(
+        back_populates="recipient",
+        sa_relationship_kwargs={
+            "primaryjoin": "PaymentRecipients.id == PaymentProducts.payment_recipient_id",
+            "foreign_keys": "PaymentProducts.payment_recipient_id",
+        },
+    )
 
 
 class Payments(PaymentBase, table=True):
@@ -110,6 +176,10 @@ class Payments(PaymentBase, table=True):
         back_populates="payment",
         sa_relationship_kwargs={"cascade": "all, delete-orphan"},
     )
+    recipients: list["PaymentRecipients"] = Relationship(
+        back_populates="payment",
+        sa_relationship_kwargs={"cascade": "all, delete-orphan"},
+    )
     coupon: Optional["Coupons"] = Relationship(back_populates="payments")
     group: Optional["Groups"] = Relationship(back_populates="payments")
     installments: list["PaymentInstallments"] = Relationship(
@@ -150,6 +220,8 @@ class Payments(PaymentBase, table=True):
         """
         if self.application is not None and self.application.human is not None:
             return self.application.human.email
+        if self.buyer_snapshot and self.buyer_snapshot.get("buyer_email"):
+            return str(self.buyer_snapshot["buyer_email"])
         attendee = self._buyer_attendee()
         if attendee is not None:
             if attendee.human is not None:
@@ -162,6 +234,8 @@ class Payments(PaymentBase, table=True):
         """Display name of the person who paid (see buyer_email for resolution)."""
         if self.application is not None and self.application.human is not None:
             return self.application.human.display_name
+        if self.buyer_snapshot and self.buyer_snapshot.get("buyer_name"):
+            return str(self.buyer_snapshot["buyer_name"])
         attendee = self._buyer_attendee()
         if attendee is not None:
             if attendee.human is not None:

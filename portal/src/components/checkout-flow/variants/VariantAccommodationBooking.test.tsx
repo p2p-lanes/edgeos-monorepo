@@ -45,6 +45,8 @@ const checkoutValue = {
   setAccommodationGuestCount: vi.fn(),
   setAccommodationGuestName: vi.fn(),
   previewToken: null as string | null,
+  salesFlowId: "flow-application",
+  salesFlowSlug: "application",
   submitMode: "application" as "application" | "open-ticketing",
 }
 
@@ -113,6 +115,8 @@ beforeEach(() => {
   vi.clearAllMocks()
   checkoutValue.submitMode = "application"
   checkoutValue.previewToken = null
+  checkoutValue.salesFlowId = "flow-application"
+  checkoutValue.salesFlowSlug = "application"
   listCheckoutAccommodations.mockResolvedValue(OFFER)
   listPortalAccommodations.mockResolvedValue(OFFER)
   checkAccommodationAvailability.mockResolvedValue([])
@@ -128,6 +132,7 @@ describe("VariantAccommodationBooking: which endpoint it calls", () => {
     await waitFor(() => expect(listPortalAccommodations).toHaveBeenCalled())
     expect(listPortalAccommodations).toHaveBeenCalledWith({
       popupId: "popup-1",
+      salesFlowId: "flow-application",
     })
     expect(listCheckoutAccommodations).not.toHaveBeenCalled()
 
@@ -144,6 +149,7 @@ describe("VariantAccommodationBooking: which endpoint it calls", () => {
     await waitFor(() => expect(listCheckoutAccommodations).toHaveBeenCalled())
     expect(listCheckoutAccommodations).toHaveBeenCalledWith({
       slug: "tech-summit-2025",
+      flowSlug: "application",
       xCheckoutPreviewToken: undefined,
     })
     expect(listPortalAccommodations).not.toHaveBeenCalled()
@@ -165,6 +171,7 @@ describe("VariantAccommodationBooking: which endpoint it calls", () => {
     await waitFor(() => expect(listCheckoutAccommodations).toHaveBeenCalled())
     expect(listCheckoutAccommodations).toHaveBeenCalledWith({
       slug: "tech-summit-2025",
+      flowSlug: "application",
       xCheckoutPreviewToken: "preview-abc",
     })
   })
@@ -179,7 +186,35 @@ describe("VariantAccommodationBooking: which endpoint it calls", () => {
     )
     expect(checkPortalAccommodationAvailability).toHaveBeenCalledWith({
       popupId: "popup-1",
+      salesFlowId: "flow-application",
       requestBody: { check_in: "2026-08-25", check_out: "2026-08-27" },
     })
+  })
+
+  it("fetches a fresh offer when the selected flow changes", async () => {
+    const view = renderStep()
+    await waitFor(() =>
+      expect(listPortalAccommodations).toHaveBeenCalledTimes(1),
+    )
+
+    checkoutValue.salesFlowId = "flow-partner"
+    checkoutValue.salesFlowSlug = "partner"
+    view.rerender(
+      <VariantAccommodationBooking
+        products={[]}
+        stepType="housing"
+        templateConfig={null}
+      />,
+    )
+
+    await waitFor(() =>
+      expect(listPortalAccommodations).toHaveBeenCalledTimes(2),
+    )
+    expect(
+      listPortalAccommodations.mock.calls.map(([request]) => request),
+    ).toEqual([
+      { popupId: "popup-1", salesFlowId: "flow-application" },
+      { popupId: "popup-1", salesFlowId: "flow-partner" },
+    ])
   })
 })

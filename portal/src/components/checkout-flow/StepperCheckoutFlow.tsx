@@ -16,7 +16,10 @@ import CheckoutToast from "./CheckoutToast"
 import DynamicProductStep from "./DynamicProductStep"
 import { deriveCheckoutSections } from "./deriveCheckoutSections"
 import { shouldUseDynamicStep } from "./registries/stepRegistry"
-import { CONTENT_ONLY_TEMPLATES } from "./registries/variantRegistry"
+import {
+  CONTENT_ONLY_TEMPLATES,
+  PRODUCT_INDEPENDENT_TEMPLATES,
+} from "./registries/templateClassification"
 import type { ScrollyCheckoutFlowProps } from "./ScrollyCheckoutFlow"
 import SectionHeader from "./SectionHeader"
 import StepFootnotes from "./StepFootnotes"
@@ -331,7 +334,7 @@ export default function StepperCheckoutFlow({
     const activeId = sections[active]?.id
     const btn = activeId ? pillRefs.current.get(activeId) : undefined
     const nav = navRef.current
-    if (btn && nav) {
+    if (btn && typeof nav?.scrollTo === "function") {
       const target = btn.offsetLeft + btn.offsetWidth / 2 - nav.clientWidth / 2
       nav.scrollTo({ left: Math.max(0, target), behavior: "smooth" })
     }
@@ -501,13 +504,16 @@ export default function StepperCheckoutFlow({
   const currentTemplate = current?.config?.template
   const isCurrentContentOnly =
     !!currentTemplate && CONTENT_ONLY_TEMPLATES.has(currentTemplate)
+  const isCurrentProductIndependent =
+    !!currentTemplate && PRODUCT_INDEPENDENT_TEMPLATES.has(currentTemplate)
   const isIntro = !isLast && active === 0 && isCurrentContentOnly
   // Amanita's own renderers (catalog/buyer/confirm) each wrap their content in
   // SectionShell, which already draws the step's title and description in the
   // skin's design — the generic header above them duplicates both, in the
   // default theme's colors. Content-only templates render bare variants with
   // no SectionShell, so they keep it or they'd have no title at all.
-  const contentOwnsHeader = isAmanita && !isCurrentContentOnly
+  const contentOwnsHeader =
+    isAmanita && !isCurrentContentOnly && !isCurrentProductIndependent
   const introConfig = (current?.config?.template_config ?? {}) as {
     cta_label?: string
     cta_hint?: string
@@ -555,11 +561,19 @@ export default function StepperCheckoutFlow({
     // filtered out of `sections` above and surfaced via the FAQs drawer.)
     const isContentOnlyTemplate =
       !!config?.template && CONTENT_ONLY_TEMPLATES.has(config.template)
+    const isProductIndependentTemplate =
+      !!config?.template && PRODUCT_INDEPENDENT_TEMPLATES.has(config.template)
     const isProductStep =
       (stepType === "passes" || stepType === "tickets" || !!config) &&
-      !isContentOnlyTemplate
+      !isContentOnlyTemplate &&
+      !isProductIndependentTemplate
     if (isProductStep && isAmanita && config) {
-      return <AmanitaCatalogSection stepConfig={config} />
+      return (
+        <AmanitaCatalogSection
+          stepConfig={config}
+          isFirstSection={isFirstSection}
+        />
+      )
     }
     if (stepType === "passes" || stepType === "tickets") {
       if (shouldUseDynamicStep(config ?? undefined)) {

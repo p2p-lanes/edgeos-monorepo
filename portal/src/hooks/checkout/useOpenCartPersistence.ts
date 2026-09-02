@@ -4,6 +4,7 @@ import { type MutableRefObject, useCallback, useEffect, useRef } from "react"
 import { CheckoutService } from "@/client"
 import { getProductAvailability } from "@/lib/product-availability"
 import type {
+  CheckoutRecipientDraft,
   CheckoutStep,
   SelectedDynamicItem,
   SelectedMealPlanItem,
@@ -14,6 +15,7 @@ import type {
   CartSelectionState,
   RestorationSetters,
 } from "./useCartPersistence"
+import { buildPersistedPassSelections } from "./useCartPersistence"
 
 /**
  * What we persist in localStorage per popup slug.
@@ -29,8 +31,12 @@ interface OpenCartLocalStorage {
 }
 
 /** Minimal CartState fields we need for serialization / deserialization. */
-interface CartItemsSnapshot {
-  passes: { attendee_id: string; product_id: string; quantity: number }[]
+export interface CartItemsSnapshot {
+  passes: (
+    | { attendee_id: string; product_id: string; quantity: number }
+    | { recipient_key: string; product_id: string; quantity: number }
+  )[]
+  recipients: CheckoutRecipientDraft[]
   housing: {
     product_id: string
     check_in: string
@@ -78,6 +84,10 @@ interface CartItemsSnapshot {
 interface UseOpenCartPersistenceParams {
   /** The popup slug — used as localStorage key and in API calls */
   popupSlug: string
+  /** Canonical flow used for every anonymous cart operation. */
+  flowSlug: string
+  /** Enables persistence only for the anonymous checkout surface. */
+  enabled: boolean
   /** Mutable ref that the provider keeps in sync with latest selection state */
   selectionStateRef: MutableRefObject<CartSelectionState>
   /** Products for availability validation during restore */
@@ -121,14 +131,19 @@ export interface OpenCartRestorationHandle {
   restorationPromise: Promise<void>
 }
 
-function localStorageKey(slug: string): string {
-  return `open-cart:${slug}`
+export function getOpenCartScope(popupSlug: string, flowSlug?: string | null) {
+  return {
+    storageKey: flowSlug
+      ? `open-cart:${popupSlug}:${flowSlug}`
+      : `open-cart:${popupSlug}`,
+    isNamedFlow: Boolean(flowSlug),
+  }
 }
 
-function readLocalStorage(slug: string): OpenCartLocalStorage | null {
+function readLocalStorage(storageKey: string): OpenCartLocalStorage | null {
   if (typeof window === "undefined") return null
   try {
-    const raw = window.localStorage.getItem(localStorageKey(slug))
+    const raw = window.localStorage.getItem(storageKey)
     if (!raw) return null
     return JSON.parse(raw) as OpenCartLocalStorage
   } catch {
@@ -136,32 +151,62 @@ function readLocalStorage(slug: string): OpenCartLocalStorage | null {
   }
 }
 
-function writeLocalStorage(slug: string, data: OpenCartLocalStorage): void {
+function writeLocalStorage(
+  storageKey: string,
+  data: OpenCartLocalStorage,
+): void {
   if (typeof window === "undefined") return
   try {
-    window.localStorage.setItem(localStorageKey(slug), JSON.stringify(data))
+    window.localStorage.setItem(storageKey, JSON.stringify(data))
   } catch {
     // Quota exceeded or private-mode — silently ignore
   }
 }
 
-function clearLocalStorage(slug: string): void {
+function clearLocalStorage(storageKey: string): void {
   if (typeof window === "undefined") return
   try {
-    window.localStorage.removeItem(localStorageKey(slug))
+    window.localStorage.removeItem(storageKey)
   } catch {
     // ignore
   }
 }
 
+function restoreScopedOpenCart(
+  popupSlug: string,
+  flowSlug: string,
+  cid: string,
+  sig: string,
+) {
+  return CheckoutService.restoreFlowCart({
+    slug: popupSlug,
+    flowSlug,
+    cid,
+    sig,
+  })
+}
+
+function upsertScopedOpenCart(
+  popupSlug: string,
+  flowSlug: string,
+  email: string,
+  items: CartItemsSnapshot,
+) {
+  const requestBody = { email, items }
+  return CheckoutService.upsertFlowCart({
+    slug: popupSlug,
+    flowSlug,
+    requestBody,
+  })
+}
+
 /** Build a CartItemsSnapshot from the selection state ref. Mirrors useCartPersistence.buildCartState. */
-function buildItemsSnapshot(state: CartSelectionState): CartItemsSnapshot {
+export function buildItemsSnapshot(
+  state: CartSelectionState,
+): CartItemsSnapshot {
+  const recipientSelections = buildPersistedPassSelections(state.selectedPasses)
   return {
-    passes: state.selectedPasses.map((p) => ({
-      attendee_id: p.attendeeId,
-      product_id: p.productId,
-      quantity: p.quantity,
-    })),
+    ...recipientSelections,
     housing: state.housing
       ? {
           product_id: state.housing.productId,
@@ -212,10 +257,11 @@ function buildItemsSnapshot(state: CartSelectionState): CartItemsSnapshot {
 }
 
 /** Returns true if there is at least one product selected in the cart state. */
-function hasCartItems(state: CartSelectionState): boolean {
+export function hasCartItems(state: CartSelectionState): boolean {
   return (
     state.selectedPasses.length > 0 ||
     state.housing !== null ||
+    state.accommodations.length > 0 ||
     state.merch.length > 0 ||
     state.patron !== null ||
     state.selectedMealPlans.length > 0 ||
@@ -224,7 +270,7 @@ function hasCartItems(state: CartSelectionState): boolean {
 }
 
 /** Apply a saved CartItemsSnapshot to the UI state, validating product availability. */
-function hydrateFromSnapshot(
+export function hydrateFromSnapshot(
   snapshot: CartItemsSnapshot,
   products: ProductsPass[],
   housingPricePerDay: boolean,
@@ -238,7 +284,12 @@ function hydrateFromSnapshot(
     setInsurance,
     setDynamicItems,
     setPromoCode,
+    restorePassRecipients,
   } = restorationSetters
+
+  if (snapshot.passes.length > 0 && restorePassRecipients) {
+    restorePassRecipients(snapshot.recipients ?? [], snapshot.passes)
+  }
 
   // Restore housing — skip products that are sold_out / ended / upcoming.
   if (snapshot.housing) {
@@ -373,6 +424,8 @@ function hydrateFromSnapshot(
 
 export function useOpenCartPersistence({
   popupSlug,
+  flowSlug,
+  enabled,
   selectionStateRef,
   products,
   housingPricePerDay,
@@ -384,6 +437,7 @@ export function useOpenCartPersistence({
   cid: cidParam = null,
   sig: sigParam = null,
 }: UseOpenCartPersistenceParams) {
+  const scope = getOpenCartScope(popupSlug, flowSlug)
   // Track the backend cart id and restore token across renders without
   // causing re-renders (these only update localStorage, not UI).
   const cartMetaRef = useRef<{
@@ -412,10 +466,32 @@ export function useOpenCartPersistence({
       restorationResolveRef.current = resolve
     }),
   )
+  const previousScopeRef = useRef(scope.storageKey)
+
+  if (previousScopeRef.current !== scope.storageKey) {
+    previousScopeRef.current = scope.storageKey
+    if (debounceRef.current) {
+      clearTimeout(debounceRef.current)
+      debounceRef.current = null
+    }
+    cartMetaRef.current = { cartId: null, restoreToken: null }
+    inFlightUpsertRef.current = Promise.resolve()
+    hasRestoredCheckoutRef.current = false
+    paymentCompleteRef.current = false
+    restorationPromiseRef.current = new Promise<void>((resolve) => {
+      restorationResolveRef.current = resolve
+    })
+  }
 
   // --- Restore: signed-link takes precedence over localStorage ---
   // biome-ignore lint/correctness/useExhaustiveDependencies: one-shot restore; products must be stable before hydrating
   useEffect(() => {
+    const restorationScope = scope.storageKey
+    const resolveRestoration = restorationResolveRef.current
+    if (!enabled) {
+      resolveRestoration?.()
+      return
+    }
     if (hasRestoredCheckoutRef.current) return
 
     // P5 fix: when products have not loaded yet, we cannot restore — do NOT
@@ -427,10 +503,10 @@ export function useOpenCartPersistence({
 
     // On success step, clear localStorage and do not restore.
     if (initialStep === "success") {
-      clearLocalStorage(popupSlug)
+      clearLocalStorage(scope.storageKey)
       paymentCompleteRef.current = true
       // Resolve immediately — nothing to wait for.
-      restorationResolveRef.current?.()
+      resolveRestoration?.()
       return
     }
 
@@ -438,12 +514,9 @@ export function useOpenCartPersistence({
     if (cidParam && sigParam) {
       // Resolve restorationPromise only AFTER the async call settles so that
       // the release effect sees the populated cartMetaRef (P1 fix).
-      CheckoutService.restoreOpenCart({
-        slug: popupSlug,
-        cid: cidParam,
-        sig: sigParam,
-      })
+      restoreScopedOpenCart(popupSlug, flowSlug, cidParam, sigParam)
         .then((openCart) => {
+          if (previousScopeRef.current !== restorationScope) return
           // Persist the backend meta so the debounced save can merge with it
           cartMetaRef.current = {
             cartId: openCart.id,
@@ -451,7 +524,7 @@ export function useOpenCartPersistence({
           }
           // Update localStorage with the restored data so same-browser
           // navigation continues from the same state.
-          writeLocalStorage(popupSlug, {
+          writeLocalStorage(scope.storageKey, {
             items: openCart.items as CartItemsSnapshot,
             cartId: openCart.id,
             restoreToken: openCart.restore_token ?? null,
@@ -464,8 +537,9 @@ export function useOpenCartPersistence({
           )
         })
         .catch(() => {
+          if (previousScopeRef.current !== restorationScope) return
           // 403 (bad signature) or 404 (no cart / no secret) — fall back to localStorage
-          const saved = readLocalStorage(popupSlug)
+          const saved = readLocalStorage(scope.storageKey)
           if (saved) {
             cartMetaRef.current = {
               cartId: saved.cartId,
@@ -482,13 +556,13 @@ export function useOpenCartPersistence({
         .finally(() => {
           // cartMetaRef is now populated (or fallback localStorage applied).
           // Signal the release effect that it can safely read cartMetaRef.
-          restorationResolveRef.current?.()
+          resolveRestoration?.()
         })
       return
     }
 
     // localStorage same-browser restore
-    const saved = readLocalStorage(popupSlug)
+    const saved = readLocalStorage(scope.storageKey)
     if (saved) {
       cartMetaRef.current = {
         cartId: saved.cartId,
@@ -516,20 +590,18 @@ export function useOpenCartPersistence({
       ) {
         // Signal restoration done before the token-refresh kick, because the
         // existing cartId+null token is sufficient proof for the release call.
-        restorationResolveRef.current?.()
+        resolveRestoration?.()
 
         inFlightUpsertRef.current = inFlightUpsertRef.current.then(() =>
-          CheckoutService.upsertOpenCart({
-            slug: popupSlug,
-            requestBody: { email: buyerEmail, items: saved.items },
-          })
+          upsertScopedOpenCart(popupSlug, flowSlug, buyerEmail, saved.items)
             .then((openCart) => {
+              if (previousScopeRef.current !== restorationScope) return
               if (openCart.restore_token) {
                 cartMetaRef.current = {
                   cartId: openCart.id,
                   restoreToken: openCart.restore_token,
                 }
-                writeLocalStorage(popupSlug, {
+                writeLocalStorage(scope.storageKey, {
                   items: saved.items,
                   cartId: openCart.id,
                   restoreToken: openCart.restore_token,
@@ -542,16 +614,17 @@ export function useOpenCartPersistence({
         )
       } else {
         // No token-refresh needed — signal restoration done immediately.
-        restorationResolveRef.current?.()
+        resolveRestoration?.()
       }
     } else {
       // No localStorage data — nothing to restore.
-      restorationResolveRef.current?.()
+      resolveRestoration?.()
     }
-  }, [products, popupSlug, initialStep])
+  }, [enabled, products, popupSlug, flowSlug, scope.storageKey, initialStep])
 
   // --- Debounced save: localStorage + backend upsert ---
   const scheduleSave = useCallback(() => {
+    if (!enabled) return
     if (!hasRestoredCheckoutRef.current) return
     if (paymentCompleteRef.current) return
 
@@ -568,15 +641,17 @@ export function useOpenCartPersistence({
     // the buyer reaches the "your information" step and enters an email.
     if (!hasCartItems(state)) return
 
+    const saveScope = scope.storageKey
     if (debounceRef.current) {
       clearTimeout(debounceRef.current)
     }
 
     debounceRef.current = setTimeout(() => {
+      if (previousScopeRef.current !== saveScope) return
       const items = buildItemsSnapshot(selectionStateRef.current)
 
       // Save to localStorage immediately (synchronous, fast)
-      writeLocalStorage(popupSlug, {
+      writeLocalStorage(scope.storageKey, {
         items,
         cartId: cartMetaRef.current.cartId,
         restoreToken: cartMetaRef.current.restoreToken,
@@ -589,17 +664,15 @@ export function useOpenCartPersistence({
       // Serialize through inFlightUpsertRef so this call cannot race the
       // mount restore-refresh upsert and clobber cartMetaRef (P4 fix).
       inFlightUpsertRef.current = inFlightUpsertRef.current.then(() =>
-        CheckoutService.upsertOpenCart({
-          slug: popupSlug,
-          requestBody: { email, items },
-        })
+        upsertScopedOpenCart(popupSlug, flowSlug, email, items)
           .then((openCart) => {
+            if (previousScopeRef.current !== saveScope) return
             cartMetaRef.current = {
               cartId: openCart.id,
               restoreToken: openCart.restore_token ?? null,
             }
             // Update localStorage with the backend ids
-            writeLocalStorage(popupSlug, {
+            writeLocalStorage(scope.storageKey, {
               items,
               cartId: openCart.id,
               restoreToken: openCart.restore_token ?? null,
@@ -611,7 +684,10 @@ export function useOpenCartPersistence({
       )
     }, 800)
   }, [
+    enabled,
     popupSlug,
+    flowSlug,
+    scope.storageKey,
     buyerEmail,
     selectionStateRef,
     hasRestoredCheckoutRef,
@@ -634,14 +710,15 @@ export function useOpenCartPersistence({
       clearTimeout(debounceRef.current)
       debounceRef.current = null
     }
-    clearLocalStorage(popupSlug)
+    clearLocalStorage(scope.storageKey)
     cartMetaRef.current = { cartId: null, restoreToken: null }
-  }, [popupSlug])
+  }, [scope.storageKey])
 
   // --- Synchronous flush: cancel debounce and persist immediately ---
   // Called by usePaymentSubmit at the START of submitPayment (open-ticketing mode)
   // so that cartMetaRef has fresh cid/restore_token before the purchase body is built.
   const flushSave = useCallback(async (): Promise<void> => {
+    if (!enabled) return
     if (!hasRestoredCheckoutRef.current) return
     if (paymentCompleteRef.current) return
 
@@ -658,10 +735,11 @@ export function useOpenCartPersistence({
     if (!hasCartItems(state)) return
 
     const items = buildItemsSnapshot(state)
+    const saveScope = scope.storageKey
 
     // Synchronous localStorage write — guarantees cid is readable even if the
     // backend call below fails.
-    writeLocalStorage(popupSlug, {
+    writeLocalStorage(scope.storageKey, {
       items,
       cartId: cartMetaRef.current.cartId,
       restoreToken: cartMetaRef.current.restoreToken,
@@ -671,10 +749,7 @@ export function useOpenCartPersistence({
     const FLUSH_TIMEOUT_MS = 1500
     try {
       const openCart = await Promise.race([
-        CheckoutService.upsertOpenCart({
-          slug: popupSlug,
-          requestBody: { email, items },
-        }),
+        upsertScopedOpenCart(popupSlug, flowSlug, email, items),
         new Promise<never>((_, reject) =>
           setTimeout(
             () => reject(new Error("flush timeout")),
@@ -682,12 +757,13 @@ export function useOpenCartPersistence({
           ),
         ),
       ])
+      if (previousScopeRef.current !== saveScope) return
       cartMetaRef.current = {
         cartId: openCart.id,
         restoreToken: openCart.restore_token ?? null,
       }
       // Update localStorage with the fresh ids so the purchase body picks them up
-      writeLocalStorage(popupSlug, {
+      writeLocalStorage(scope.storageKey, {
         items,
         cartId: openCart.id,
         restoreToken: openCart.restore_token ?? null,
@@ -700,7 +776,10 @@ export function useOpenCartPersistence({
       )
     }
   }, [
+    enabled,
     popupSlug,
+    flowSlug,
+    scope.storageKey,
     buyerEmail,
     selectionStateRef,
     hasRestoredCheckoutRef,

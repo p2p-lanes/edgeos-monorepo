@@ -7,6 +7,7 @@ from app.api.application.schemas import ApplicationStatus
 from app.api.human.models import Humans
 from app.api.popup.models import Popups
 from app.api.tenant.models import Tenants
+from tests._flow_helpers import application_flow_id
 
 
 def _make_human(db: Session, tenant: Tenants, *, suffix: str) -> Humans:
@@ -30,6 +31,7 @@ def _make_application(
     status: ApplicationStatus,
 ) -> Applications:
     application = Applications(
+        sales_flow_id=application_flow_id(db, popup.id),
         tenant_id=tenant.id,
         popup_id=popup.id,
         human_id=human.id,

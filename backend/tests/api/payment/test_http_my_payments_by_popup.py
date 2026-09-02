@@ -21,13 +21,14 @@ from sqlmodel import Session
 
 from app.api.application.models import Applications
 from app.api.application.schemas import ApplicationStatus
-from app.api.attendee.models import Attendees
+from app.api.attendee.models import AttendeeProducts, Attendees
 from app.api.human.models import Humans
 from app.api.payment.models import PaymentProducts, Payments
 from app.api.payment.schemas import PaymentStatus
 from app.api.popup.models import Popups
 from app.api.tenant.models import Tenants
 from app.core.security import create_access_token
+from tests._flow_helpers import application_flow_id
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -75,6 +76,7 @@ def _make_app_payment(
 ) -> Payments:
     """Create an application-linked payment owned by human."""
     application = Applications(
+        sales_flow_id=application_flow_id(db, popup.id),
         id=uuid.uuid4(),
         tenant_id=tenant.id,
         popup_id=popup.id,
@@ -230,6 +232,131 @@ class TestListMyPaymentsByPopupHttp:
         body = response.json()
         assert body["paging"]["total"] == 1
         assert body["results"][0]["id"] == str(payment.id)
+
+    def test_compatibility_owner_cannot_see_buyer_unit_details(
+        self, client: TestClient, db: Session, tenant_a: Tenants
+    ) -> None:
+        popup = _make_popup(db, tenant_a, suffix="compatibility-unit-authority")
+        compatibility_owner = _make_human(db, tenant_a, suffix="compatibility-owner")
+        buyer = _make_human(db, tenant_a, suffix="buyer")
+        payment = _make_direct_payment(db, tenant_a, popup, compatibility_owner)
+        payment.buyer_human_id = buyer.id
+        line = payment.products_snapshot[0]
+        unit = AttendeeProducts(
+            tenant_id=tenant_a.id,
+            attendee_id=None,
+            product_id=line.product_id,
+            payment_id=payment.id,
+            payment_product_id=line.id,
+            unit_index=0,
+            check_in_code="BUYERONLY",
+            product_category_snapshot="parking",
+            requires_check_in_snapshot=True,
+        )
+        db.add_all([payment, unit])
+        db.commit()
+
+        response = client.get(
+            _payments_url(popup.id), headers=_auth(compatibility_owner)
+        )
+
+        assert response.status_code == 200, response.text
+        result = response.json()["results"][0]
+        assert result["id"] == str(payment.id)
+        assert result["products_snapshot"][0]["units"] == []
+
+    def test_legacy_status_and_non_ticket_snapshot_remain_visible(
+        self, client: TestClient, db: Session, tenant_a: Tenants
+    ) -> None:
+        """The portal projection receives legacy provenance and raw payment status."""
+        popup = _make_popup(db, tenant_a, suffix="d-legacy-projection")
+        human = _make_human(db, tenant_a, suffix="d-legacy-projection")
+        payment = _make_direct_payment(db, tenant_a, popup, human)
+        payment.status = "provider_delayed"
+        payment.sales_flow_id = None
+        db.add(payment)
+        db.commit()
+
+        response = client.get(_payments_url(popup.id), headers=_auth(human))
+
+        assert response.status_code == 200
+        result = response.json()["results"][0]
+        assert result["status"] == "provider_delayed"
+        assert result["sales_flow_id"] is None
+        assert result["products_snapshot"] == [
+            {
+                "product_name": "Direct Product",
+                "product_category": "standard",
+                "requires_check_in_snapshot": None,
+                "quantity": 1,
+                "product_price": "50.00",
+                "product_currency": "USD",
+                "attendee_name": "Direct Buyer",
+                "product_description": None,
+                "effective_unit_price": None,
+                "product_id": result["products_snapshot"][0]["product_id"],
+                "attendee_id": result["products_snapshot"][0]["attendee_id"],
+                "payment_recipient_id": None,
+                "recipient_key": None,
+                "created_at": result["products_snapshot"][0]["created_at"],
+                "units": [],
+            }
+        ]
+
+    def test_direct_payment_reusing_application_attendee_remains_buyer_owned(
+        self, client: TestClient, db: Session, tenant_a: Tenants
+    ) -> None:
+        """Direct payment history follows the buyer's real attendee identity."""
+        popup = _make_popup(db, tenant_a, suffix="d-reused-attendee")
+        human = _make_human(db, tenant_a, suffix="d-reused-attendee")
+        application = Applications(
+            sales_flow_id=application_flow_id(db, popup.id),
+            tenant_id=tenant_a.id,
+            popup_id=popup.id,
+            human_id=human.id,
+            status=ApplicationStatus.ACCEPTED.value,
+        )
+        db.add(application)
+        db.flush()
+        attendee = Attendees(
+            tenant_id=tenant_a.id,
+            application_id=application.id,
+            popup_id=popup.id,
+            human_id=human.id,
+            name="Application Buyer",
+            category="main",
+        )
+        payment = Payments(
+            tenant_id=tenant_a.id,
+            application_id=None,
+            popup_id=popup.id,
+            status=PaymentStatus.APPROVED.value,
+            amount=Decimal("50"),
+            currency="USD",
+        )
+        product = _make_product(db, tenant_a, popup, suffix="reused-attendee")
+        db.add_all([attendee, payment])
+        db.flush()
+        db.add(
+            PaymentProducts(
+                tenant_id=tenant_a.id,
+                payment_id=payment.id,
+                product_id=product.id,
+                attendee_id=attendee.id,
+                quantity=1,
+                product_name="Direct Product",
+                product_price=Decimal("50"),
+                product_category="standard",
+                product_currency="USD",
+            )
+        )
+        db.commit()
+
+        response = client.get(_payments_url(popup.id), headers=_auth(human))
+
+        assert response.status_code == 200, response.text
+        assert response.json()["paging"]["total"] == 1
+        assert response.json()["results"][0]["id"] == str(payment.id)
 
     def test_both_legs_no_duplicates(
         self, client: TestClient, db: Session, tenant_a: Tenants

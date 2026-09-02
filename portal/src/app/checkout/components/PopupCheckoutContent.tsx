@@ -6,7 +6,6 @@ import { Home, UserRound } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { type CSSProperties, useEffect, useRef, useState } from "react"
 import { useTranslation } from "react-i18next"
-import { resolvePopupCheckoutPolicy } from "@/checkout/popupCheckoutPolicy"
 import { ApiError, ApplicationsService, type PopupPublic } from "@/client"
 import ScrollyCheckoutFlow from "@/components/checkout-flow/ScrollyCheckoutFlow"
 import { SidebarProvider } from "@/components/Sidebar/SidebarComponents"
@@ -48,6 +47,7 @@ export const PopupCheckoutContent = ({
   groupId = null,
   inviteId = null,
   referralId = null,
+  salesFlowId = null,
   requiresManualApproval = false,
 }: {
   popup: PopupPublic
@@ -55,16 +55,25 @@ export const PopupCheckoutContent = ({
   groupId?: string | null
   inviteId?: string | null
   referralId?: string | null
+  salesFlowId?: string | null
   requiresManualApproval?: boolean
 }) => {
+  // Whether this gathering asks anybody to apply. The anonymous checkout only
+  // fetches an application schema where that is true.
+  const takesApplications = popup.takes_applications !== false
   const { t } = useTranslation()
-  const policy = resolvePopupCheckoutPolicy(popup)
   const isAuthenticated = useIsAuthenticated()
+  const { getRelevantApplication } = useApplication()
+  const fallbackApplication = getRelevantApplication()
+  const checkoutSalesFlowId =
+    salesFlowId ?? fallbackApplication?.sales_flow_id ?? null
+  const existingApplication = checkoutSalesFlowId
+    ? getRelevantApplication(checkoutSalesFlowId)
+    : fallbackApplication
   const { data: applicationSchema, isLoading: isLoadingApplicationSchema } =
     useApplicationSchema(
-      policy.saleType === "application" && isAuthenticated
-        ? popup.id
-        : undefined,
+      takesApplications && isAuthenticated ? popup.id : undefined,
+      checkoutSalesFlowId ?? undefined,
     )
   const {
     checkoutState,
@@ -75,25 +84,23 @@ export const PopupCheckoutContent = ({
     joinGroupAsApplicant,
   } = useCheckoutState({
     popupId: popup.id,
-    saleType: resolvePopupCheckoutPolicy(popup).saleType,
+    saleType: takesApplications ? "application" : "direct",
     groupId,
     inviteId,
     referralId,
+    salesFlowId: checkoutSalesFlowId,
     schema: applicationSchema,
   })
   const queryClient = useQueryClient()
   const { user } = useAuth()
-  const { getRelevantApplication } = useApplication()
   const { getCity, setCityPreselected } = useCityProvider()
   const router = useRouter()
   const hasSkippedForm = useRef(false)
-  const attendees = useResolvedAttendees()
-  const existingApplication = getRelevantApplication()
-
+  const attendees = useResolvedAttendees(checkoutSalesFlowId)
   // Companion-on-someone-else's-application detection. Only active when the
   // user arrived via a group invite link (groupId set) and is authenticated;
   // the participation endpoint is portal-only and would 401 otherwise.
-  const isGroupFlow = !!groupId && policy.saleType === "application"
+  const isGroupFlow = !!groupId && takesApplications
   const { data: participation } = useQuery({
     queryKey: queryKeys.participation.byPopup(popup.id),
     queryFn: () =>
@@ -187,19 +194,20 @@ export const PopupCheckoutContent = ({
 
   useEffect(() => {
     if (hasSkippedForm.current) return
-    if (policy.saleType !== "direct") return
+    if (takesApplications) return
     if (!isAuthenticated) return
 
     hasSkippedForm.current = true
     setCheckoutState("passes")
-  }, [policy.saleType, isAuthenticated, setCheckoutState])
+  }, [takesApplications, isAuthenticated, setCheckoutState])
 
   useEffect(() => {
     if (hasSkippedForm.current) return
-    // Branch guarded by sale_type=application. Direct-checkout (landing_mode=checkout)
-    // only resolves direct-sale popups (backend resolve_active_direct_popup_slug),
-    // so this redirect to /portal is structurally unreachable in checkout mode.
-    if (policy.saleType !== "application") return
+    // Branch guarded on the gathering taking applications. Direct-checkout
+    // (landing_mode=checkout) only resolves gatherings that sell (backend
+    // resolve_active_direct_popup_slug), so this redirect to /portal is
+    // structurally unreachable in checkout mode.
+    if (!takesApplications) return
     if (!existingApplication || checkoutState !== "form") return
     // In a group flow, wait for participation to resolve and never auto-skip a
     // companion — the CompanionSwitchPrompt drives that case.
@@ -223,12 +231,9 @@ export const PopupCheckoutContent = ({
       return
     }
 
-    // Existing applicant clicking a group link: persist the group membership on
-    // their current application. This both auto-accepts an in-progress
-    // application (otherwise payment 403s "Application must be accepted before
-    // purchasing products") AND links the group so its discount is applied
-    // server-side — without the link the group discount only ever shows
-    // client-side and the payment is charged the full amount.
+    // Existing applicant clicking an auto-approved group link: persist the group
+    // membership so the backend applies its approval policy and discount. Manual
+    // groups return above while the application is still in review.
     // Include "accepted" so an application auto-accepted by a prior invite still
     // picks up the group discount. Limited to statuses the backend allows
     // updating (draft/pending_fee/in review/accepted); rejected/withdrawn fall
@@ -245,7 +250,7 @@ export const PopupCheckoutContent = ({
 
     setCheckoutState("passes")
   }, [
-    policy.saleType,
+    takesApplications,
     existingApplication,
     checkoutState,
     setCheckoutState,
@@ -268,18 +273,13 @@ export const PopupCheckoutContent = ({
   const handleChangeEmailForDirectCheckout = () => {
     localStorage.removeItem("token")
     dispatchAuthChange()
-    queryClient.removeQueries({ queryKey: queryKeys.profile.current })
-    queryClient.removeQueries({ queryKey: queryKeys.applications.mine() })
-    queryClient.removeQueries({ queryKey: queryKeys.cart.byPopup(popup.id) })
-    queryClient.removeQueries({
-      queryKey: queryKeys.purchases.byPopup(popup.id),
-    })
+    queryClient.clear()
     hasSkippedForm.current = false
     setCheckoutState("form")
   }
 
   const directSessionBanner =
-    policy.saleType === "direct" && user?.email ? (
+    !takesApplications && user?.email ? (
       <div className="flex justify-end">
         <Popover>
           <PopoverTrigger asChild>
@@ -312,7 +312,7 @@ export const PopupCheckoutContent = ({
       </div>
     ) : null
 
-  if (policy.saleType === "application") {
+  if (takesApplications) {
     if (!isAuthenticated) {
       return (
         <div
@@ -327,16 +327,12 @@ export const PopupCheckoutContent = ({
     }
   }
 
-  if (
-    policy.saleType === "direct" &&
-    checkoutState === "form" &&
-    isAuthenticated
-  ) {
+  if (!takesApplications && checkoutState === "form" && isAuthenticated) {
     return <Loader />
   }
 
   if (
-    policy.saleType === "application" &&
+    takesApplications &&
     isAuthenticated &&
     checkoutState === "form" &&
     !existingApplication &&
@@ -403,8 +399,17 @@ export const PopupCheckoutContent = ({
           } as CSSProperties
         }
       >
-        <PassesProvider attendees={attendees} restoreFromCart>
-          <CheckoutProvider initialStep="passes" openCartPopupSlug={popup.slug}>
+        <PassesProvider
+          attendees={attendees}
+          restoreFromCart
+          flowType="application"
+          salesFlowId={checkoutSalesFlowId}
+        >
+          <CheckoutProvider
+            initialStep="passes"
+            flowType="application"
+            salesFlowId={checkoutSalesFlowId}
+          >
             <div
               className={`h-dvh overflow-y-auto no-scrollbar ${background.className}`}
               style={background.style}

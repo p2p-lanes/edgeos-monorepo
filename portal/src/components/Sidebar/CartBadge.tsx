@@ -53,7 +53,7 @@ const CartBadge = () => {
           </span>
         </button>
       </PopoverTrigger>
-      <PopoverContent align="end" className="w-64 p-3">
+      <PopoverContent align="end" className="portal-chrome w-64 p-3">
         <p className="mb-2 text-sm font-medium text-foreground">
           {t("cartBadge.title")}
         </p>
@@ -63,7 +63,7 @@ const CartBadge = () => {
           ))}
         </ul>
         <Link
-          href={`/portal/${city.slug}/passes/buy`}
+          href={`/portal/${city.slug}/shop`}
           className={cn(buttonVariants({ size: "sm" }), "w-full")}
         >
           {t("cartBadge.go_to_checkout")}

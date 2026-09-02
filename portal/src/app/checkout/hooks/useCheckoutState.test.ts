@@ -1,9 +1,48 @@
-import { ApiError, type ApplicationPublic } from "@/client"
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
+import { act, renderHook, waitFor } from "@testing-library/react"
+import { createElement, type ReactNode } from "react"
+import { vi } from "vitest"
+import { ApiError, type ApplicationPublic, ApplicationsService } from "@/client"
 import type { ApplicationFormSchema } from "@/types/form-schema"
-import {
+import useCheckoutState, {
   buildCheckoutApplicationMutationPayload,
+  findCheckoutApplication,
   readCheckoutSubmitError,
+  upsertCheckoutApplication,
 } from "./useCheckoutState"
+
+vi.mock("@/client", () => ({
+  ApiError: class ApiError extends Error {
+    body: unknown
+    status: number
+
+    constructor(
+      _request: unknown,
+      response: { body: unknown; status: number },
+      message: string,
+    ) {
+      super(message)
+      this.body = response.body
+      this.status = response.status
+    }
+  },
+  ApplicationsService: {
+    createMyApplication: vi.fn(),
+    listMyApplications: vi.fn(),
+    updateMyApplication: vi.fn(),
+  },
+  HumansService: {},
+}))
+
+vi.mock("react-i18next", () => ({
+  useTranslation: () => ({ t: (key: string) => key }),
+}))
+
+vi.mock("sonner", () => ({ toast: { success: vi.fn() } }))
+
+vi.mock("./useCookies", () => ({
+  default: () => ({ getCookie: vi.fn(), setCookie: vi.fn() }),
+}))
 
 const schema: ApplicationFormSchema = {
   base_fields: {
@@ -111,6 +150,21 @@ describe("buildCheckoutApplicationMutationPayload", () => {
     })
   })
 
+  it("includes the selected flow in create payloads", () => {
+    const result = buildCheckoutApplicationMutationPayload({
+      popupId: "popup-1",
+      salesFlowId: "flow-selected",
+      values: { first_name: "Taylor" },
+      schema,
+      existingApplication: null,
+    })
+
+    expect(result.kind).toBe("create")
+    expect(result.payload).toEqual(
+      expect.objectContaining({ sales_flow_id: "flow-selected" }),
+    )
+  })
+
   it("builds update payloads from checkout-visible base and custom fields", () => {
     const existingApplication = {
       id: "app-1",
@@ -137,6 +191,154 @@ describe("buildCheckoutApplicationMutationPayload", () => {
         },
         status: "in review",
       },
+    })
+  })
+})
+
+describe("findCheckoutApplication", () => {
+  it("does not select another application from the same popup", () => {
+    const applications = [
+      {
+        id: "application-main",
+        popup_id: "popup-1",
+        sales_flow_id: "flow-main",
+      },
+      {
+        id: "application-partner",
+        popup_id: "popup-1",
+        sales_flow_id: "flow-partner",
+      },
+    ] as ApplicationPublic[]
+
+    expect(
+      findCheckoutApplication(applications, "popup-1", "flow-partner")?.id,
+    ).toBe("application-partner")
+    expect(
+      findCheckoutApplication(applications, "popup-1", "flow-missing"),
+    ).toBeUndefined()
+    expect(findCheckoutApplication(applications, "popup-1")).toBeUndefined()
+  })
+})
+
+describe("upsertCheckoutApplication", () => {
+  it("preserves applications from other flows", () => {
+    const main = {
+      id: "application-main",
+      popup_id: "popup-1",
+      sales_flow_id: "flow-main",
+      status: "accepted",
+    } as ApplicationPublic
+    const partner = {
+      id: "application-partner",
+      popup_id: "popup-1",
+      sales_flow_id: "flow-partner",
+      status: "in review",
+    } as ApplicationPublic
+
+    expect(upsertCheckoutApplication([main], partner)).toEqual([partner, main])
+    expect(
+      upsertCheckoutApplication([main, partner], {
+        ...partner,
+        status: "accepted",
+      }),
+    ).toEqual([{ ...partner, status: "accepted" }, main])
+  })
+})
+
+describe("useCheckoutState update flow identity", () => {
+  function createQueryClient() {
+    return new QueryClient({
+      defaultOptions: {
+        queries: { retry: false, staleTime: Number.POSITIVE_INFINITY },
+        mutations: { retry: false },
+      },
+    })
+  }
+
+  function createWrapper(queryClient: QueryClient) {
+    return function Wrapper({ children }: { children: ReactNode }) {
+      return createElement(
+        QueryClientProvider,
+        { client: queryClient },
+        children,
+      )
+    }
+  }
+
+  beforeEach(() => vi.clearAllMocks())
+
+  it("updates the application selected by sales flow when a popup has two applications", async () => {
+    const queryClient = createQueryClient()
+    const main = {
+      id: "application-main",
+      popup_id: "popup-1",
+      sales_flow_id: "flow-main",
+      status: "draft",
+    } as ApplicationPublic
+    const partner = {
+      id: "application-partner",
+      popup_id: "popup-1",
+      sales_flow_id: "flow-partner",
+      status: "draft",
+    } as ApplicationPublic
+    queryClient.setQueryData(["applications", "mine"], [main, partner])
+    vi.mocked(ApplicationsService.updateMyApplication).mockResolvedValue(
+      partner,
+    )
+
+    const { result } = renderHook(
+      () =>
+        useCheckoutState({
+          popupId: "popup-1",
+          saleType: "application",
+          salesFlowId: "flow-partner",
+          schema,
+        }),
+      { wrapper: createWrapper(queryClient) },
+    )
+
+    await act(async () => result.current.handleSubmit({}))
+
+    expect(ApplicationsService.updateMyApplication).toHaveBeenCalledWith(
+      expect.objectContaining({
+        popupId: "popup-1",
+        salesFlowId: "flow-partner",
+      }),
+    )
+  })
+
+  it("uses the selected sales flow when joining a group as an applicant", async () => {
+    const queryClient = createQueryClient()
+    const partner = {
+      id: "application-partner",
+      popup_id: "popup-1",
+      sales_flow_id: "flow-partner",
+      status: "draft",
+    } as ApplicationPublic
+    vi.mocked(ApplicationsService.updateMyApplication).mockResolvedValue(
+      partner,
+    )
+
+    const { result } = renderHook(
+      () =>
+        useCheckoutState({
+          popupId: "popup-1",
+          saleType: "application",
+          groupId: "group-1",
+          salesFlowId: "flow-partner",
+          schema,
+        }),
+      { wrapper: createWrapper(queryClient) },
+    )
+
+    act(() => result.current.joinGroupAsApplicant())
+
+    await waitFor(() => {
+      expect(ApplicationsService.updateMyApplication).toHaveBeenCalledWith({
+        popupId: "popup-1",
+        salesFlowId: "flow-partner",
+        requestBody: { group_id: "group-1" },
+      })
     })
   })
 })

@@ -20,6 +20,22 @@ const VIRTUAL_FIELD_I18N_KEYS: Record<string, string> = {
   gender_specify: "form.gender_specify",
 }
 
+export function resolveApplicationUpdateSalesFlowId(
+  application: ApplicationPublic,
+  selectedSalesFlowId?: string | null,
+): string {
+  if (!application.sales_flow_id) {
+    throw new Error("Application sales flow is required for updates")
+  }
+  if (
+    selectedSalesFlowId &&
+    selectedSalesFlowId !== application.sales_flow_id
+  ) {
+    throw new Error("Selected sales flow does not match the application")
+  }
+  return application.sales_flow_id
+}
+
 /** Resolve a form field name to its user-facing label. Falls back to the
  * raw name so we never show `undefined` if the schema drifts. */
 function resolveFieldLabel(
@@ -49,6 +65,16 @@ interface UseSubmitApplicationArgs {
   }
   /** Referral UUID carried from /r/{code} — passed to createMyApplication (REQ-GR-009). */
   referralId?: string | null
+  /**
+   * Explicit target sales flow chosen via the FlowPicker (sdd/sales-flows
+   * D6 URL scheme, task 9.4). Omitted keeps the backend's primary-flow
+   * resolution.
+   */
+  salesFlowId?: string | null
+  /**
+   * True when the popup has more than one application flow (rel-001
+   * correction). Gates the create-vs-update branch below — see there.
+   */
 }
 
 /** Owns the create-or-update mutation, the "submit" and "save draft" flows,
@@ -61,6 +87,7 @@ export function useSubmitApplication({
   application,
   validate,
   referralId,
+  salesFlowId,
 }: UseSubmitApplicationArgs) {
   const { t, i18n } = useTranslation()
   const router = useRouter()
@@ -75,9 +102,26 @@ export function useSubmitApplication({
 
   const submitMutation = useMutation({
     mutationFn: async (status: "draft" | "in review") => {
+      // `application` is the one belonging to the door being submitted
+      // for, or null (sdd/sales-flows-rediseno). That is what makes this a
+      // plain question again.
+      //
+      // It used to be popup-scoped, so with more than one flow it could
+      // not be proven to belong here, and this branch always created
+      // instead — leaning on the backend's per-human-per-flow guard to
+      // reject a same-flow resubmit with a 400 rather than overwrite the
+      // wrong application. That trade is no longer needed, and keeping it
+      // would now break editing a draft: the application in hand IS this
+      // door's, so creating a second one is exactly what the guard
+      // refuses.
       if (application?.id) {
+        const updateSalesFlowId = resolveApplicationUpdateSalesFlowId(
+          application,
+          salesFlowId,
+        )
         return ApplicationsService.updateMyApplication({
           popupId: popup.id,
+          salesFlowId: updateSalesFlowId,
           requestBody: splitForUpdate({ values, status, schema }),
         })
       }
@@ -89,6 +133,7 @@ export function useSubmitApplication({
           status,
           schema,
           referralId,
+          salesFlowId,
         }),
       })
     },

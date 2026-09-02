@@ -4,7 +4,6 @@ import { Plus } from "lucide-react"
 import { useState } from "react"
 import { AttendeeModal } from "@/app/portal/[popupSlug]/passes/components/AttendeeModal"
 import type { AttendeeCategoryPublic } from "@/client"
-import useAttendee from "@/hooks/useAttendee"
 import { useAttendeeCategories } from "@/hooks/useAttendeeCategories"
 import { cn } from "@/lib/utils"
 import { useCityProvider } from "@/providers/cityProvider"
@@ -14,6 +13,7 @@ import type { AttendeePassState } from "@/types/Attendee"
 interface AddAttendeeButtonsProps {
   onAttendeeAdded?: (attendeeId: string) => void
   className?: string
+  allowedCategoryIds?: string[] | null
 }
 
 function resolveLabel(cat: AttendeeCategoryPublic): string {
@@ -28,13 +28,13 @@ function resolveLabel(cat: AttendeeCategoryPublic): string {
 export default function AddAttendeeButtons({
   onAttendeeAdded,
   className,
+  allowedCategoryIds,
 }: AddAttendeeButtonsProps) {
   const { getCity } = useCityProvider()
   const city = getCity()
   const popupId = city?.id ? String(city.id) : ""
   const { categories } = useAttendeeCategories(popupId)
-  const { attendeePasses: attendees } = usePassesProvider()
-  const { addAttendee, loading } = useAttendee()
+  const { attendeePasses: attendees, addRecipientDraft } = usePassesProvider()
 
   const [selectedCategory, setSelectedCategory] =
     useState<AttendeeCategoryPublic | null>(null)
@@ -54,6 +54,7 @@ export default function AddAttendeeButtons({
   const available = categories.filter((c) => {
     if (c.is_primary) return false
     if (c.enabled_in_passes_flow === false) return false
+    if (allowedCategoryIds && !allowedCategoryIds.includes(c.id)) return false
     const max = c.max_per_application
     if (max == null) return true
     const current = countByCategoryId.get(c.id) ?? 0
@@ -66,15 +67,21 @@ export default function AddAttendeeButtons({
     data: AttendeePassState & { category_id?: string },
   ) => {
     if (!selectedCategory) return
-    const result = await addAttendee({
+    const recipientKey = `draft:${crypto.randomUUID()}`
+    const email = data.email?.trim()
+    const attendeeId = addRecipientDraft({
+      recipient_key: recipientKey,
       name: data.name ?? "",
-      email: data.email ?? "",
+      ...(email ? { email } : {}),
       category_id: data.category_id ?? selectedCategory.id,
-      gender: data.gender ?? "",
-      additional_data: data.additional_data,
+      profile_snapshot: {
+        ...(data.additional_data ?? {}),
+        category: selectedCategory.key,
+        gender: data.gender ?? "",
+      },
     })
     setSelectedCategory(null)
-    if (result?.id && onAttendeeAdded) onAttendeeAdded(result.id)
+    onAttendeeAdded?.(attendeeId)
   }
 
   return (
@@ -84,7 +91,6 @@ export default function AddAttendeeButtons({
           key={cat.id}
           type="button"
           onClick={() => setSelectedCategory(cat)}
-          disabled={loading}
           className={cn(
             "flex items-center gap-1.5 text-pass-text hover:text-pass-title transition-colors whitespace-nowrap disabled:opacity-50",
             className,

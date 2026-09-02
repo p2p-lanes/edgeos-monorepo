@@ -5,8 +5,10 @@ from typing import Annotated
 
 from fastapi import APIRouter, HTTPException, Query, status
 from fastapi.responses import Response
+from sqlmodel import select
 
 from app.api.attendee import crud
+from app.api.attendee.models import AttendeeProducts
 from app.api.attendee.schemas import (
     AttendeeCreate,
     AttendeeListItem,
@@ -30,6 +32,7 @@ from app.api.check_in.crud import (
     record_check_in,
 )
 from app.api.check_in.schemas import CheckInPayload
+from app.api.product.models import Products
 from app.api.shared.response import ListModel, PaginationLimit, PaginationSkip, Paging
 from app.core.dependencies.users import (
     AdminOrApiKey_AttendeesWrite,
@@ -42,9 +45,15 @@ from app.core.dependencies.users import (
     TenantSession,
     needs,
 )
+from app.core.logging import get_request_id
 from app.utils.tabular_export import safe_tabular_cell
 
 router = APIRouter(prefix="/attendees", tags=["attendees"])
+
+
+class StaffTicketPublic(TicketPublic):
+    attendee: TicketAttendeeSnapshot | None = None
+
 
 # Pagination type for portal attendees endpoint (max 100 per page)
 _AttendeeLimit = Annotated[
@@ -168,6 +177,9 @@ def _build_attendee_with_origin(
                     last_scan_by_ticket.get(ap.id) if last_scan_by_ticket else None
                 ),
                 purchase_metadata=ap.purchase_metadata,
+                product_category_snapshot=ap.product_category_snapshot,
+                requires_check_in_snapshot=ap.requires_check_in_snapshot,
+                revoked_at=ap.revoked_at,
             )
         )
     origin = "application" if attendee.application_id is not None else "direct_sale"
@@ -212,6 +224,28 @@ def _attendee_response(db, attendee_id: uuid.UUID) -> AttendeeWithOriginPublic:
     return _build_attendee_with_origin(attendee, last_scan_by_ticket)
 
 
+def _get_my_attendee(
+    db,
+    *,
+    attendee_id: uuid.UUID,
+    popup_id: uuid.UUID,
+    current_human,
+):
+    attendee = crud.attendees_crud.get_for_human_popup(
+        db,
+        attendee_id=attendee_id,
+        human_id=current_human.id,
+        popup_id=popup_id,
+        tenant_id=current_human.tenant_id,
+    )
+    if attendee is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Attendee not found",
+        )
+    return attendee
+
+
 # ---------------------------------------------------------------------------
 # Portal human-scoped attendee endpoints (CAP-B, CAP-C)
 # ---------------------------------------------------------------------------
@@ -238,7 +272,12 @@ async def list_my_attendees_by_popup(
     Requires OTP-authenticated Human token.
     """
     attendees, total = crud.attendees_crud.find_by_human_popup(
-        db, human_id=current_human.id, popup_id=popup_id, skip=skip, limit=limit
+        db,
+        human_id=current_human.id,
+        popup_id=popup_id,
+        skip=skip,
+        limit=limit,
+        tenant_id=current_human.tenant_id,
     )
     # Single aggregation across every ticket on the page so the portal can flag
     # already-scanned QR codes without N+1 lookups per attendee.
@@ -267,20 +306,28 @@ async def create_my_attendee_for_popup(
     """Create a companion attendee (spouse/child) for the current Human's application.
 
     Requires:
-    - Application popup (sale_type check enforced as defense-in-depth)
+    - A gathering where somebody applies (defense-in-depth; the application
+      lookup below is the real gate)
     - Valid accepted Application for (current_human, popup_id)
 
-    Returns 422 with code='application_required' if no application exists or the
-    popup is not an application popup.
+    Returns 422 with code='application_required' if no application exists or
+    nobody applies to this gathering at all.
     """
+    raise HTTPException(
+        status_code=status.HTTP_410_GONE,
+        detail="Companion attendees are created after approval",
+    )
+
     from app.api.application.crud import applications_crud
     from app.api.popup.guards import ensure_popup_writable
     from app.api.popup.models import Popups
-    from app.api.shared.enums import SaleType
+    from app.api.sales_flow.crud import popup_takes_applications
 
-    # Validate popup exists and is an application popup
+    # Asked of the doors: a gathering that sells through its main way in can
+    # still review applicants through another, and those applicants are
+    # entitled to bring a companion.
     popup = db.get(Popups, popup_id)
-    if popup is None or getattr(popup, "sale_type", None) == SaleType.direct.value:
+    if popup is None or not popup_takes_applications(db, popup_id):
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail=[
@@ -332,16 +379,13 @@ async def create_my_attendee_for_popup(
                 ],
             )
         if category_row.max_per_application is not None:
-            from sqlmodel import func, select  # noqa: PLC0415
-
-            from app.api.attendee.models import Attendees as _Attendees  # noqa: PLC0415
-
-            count = db.exec(
-                select(func.count()).where(
-                    _Attendees.application_id == application.id,
-                    _Attendees.category_id == category_row.id,
-                )
-            ).one()
+            count = crud.attendees_crud.count_party_by_category(
+                db,
+                human_id=current_human.id,
+                popup_id=popup_id,
+                category_id=category_row.id,
+                tenant_id=current_human.tenant_id,
+            )
             if count >= category_row.max_per_application:
                 raise HTTPException(
                     status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
@@ -365,6 +409,28 @@ async def create_my_attendee_for_popup(
         # Legacy fallback: category string provided directly (deprecated path)
         effective_category = attendee_in.category or "main"
         effective_category_id = None
+
+    # The mirror of the 409 that stops a companion creating their own
+    # application (`application/router.py`). That one guards the direction
+    # where the companion acts; this guards the direction where someone
+    # acts on them.
+    #
+    # `create_internal` associates by email — it finds the Human with that
+    # address and stamps their id on the row. Adding someone who is already at
+    # this gathering would give one person two attendee records: two QR codes,
+    # two directory entries, and stock spendable twice
+    # (sdd/sales-flows-rediseno).
+    if attendee_in.email:
+        existing_human_id = crud.attendees_crud._find_human_id_by_email(
+            db, attendee_in.email, application.tenant_id
+        )
+        if existing_human_id is not None and crud.attendees_crud.human_attends_popup(
+            db, existing_human_id, popup_id
+        ):
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="This person is already attending this event.",
+            )
 
     attendee = crud.attendees_crud.create_internal(
         session=db,
@@ -399,34 +465,13 @@ async def update_my_attendee_for_popup(
     db: HumanTenantSession,
     current_human: CurrentHuman,
 ) -> AttendeeWithOriginPublic:
-    """Update a companion attendee using the dual-path auth predicate.
-
-    Authorization: attendee.popup_id == popup_id AND (
-        attendee.human_id == current_human.id
-        OR attendee.application.human_id == current_human.id
-    ).
-    Returns 404 if attendee not found, popup_id mismatch, or predicate fails
-    (do not expose existence to unauthorized callers).
-    """
-    from app.api.application.models import Applications
-
-    attendee = crud.attendees_crud.get(db, attendee_id)
-
-    if attendee is None or attendee.popup_id != popup_id:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Attendee not found"
-        )
-
-    # Dual-path auth predicate
-    owned = attendee.human_id == current_human.id
-    if not owned and attendee.application_id is not None:
-        application = db.get(Applications, attendee.application_id)
-        owned = application is not None and application.human_id == current_human.id
-
-    if not owned:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Attendee not found"
-        )
+    """Update a self, explicitly managed, or legacy-owned Attendee."""
+    attendee = _get_my_attendee(
+        db,
+        attendee_id=attendee_id,
+        popup_id=popup_id,
+        current_human=current_human,
+    )
 
     from app.api.popup.crud import popups_crud
     from app.api.popup.guards import ensure_popup_writable
@@ -469,34 +514,19 @@ async def update_my_meal_plan_ticket(
     dietary_restriction, special_request) for a week whose sale window is still
     open. Does not change products, price, stock, or the payment snapshot.
 
-    Authorization: same dual-path predicate as update_my_attendee_for_popup —
-    attendee.popup_id == popup_id AND (attendee.human_id == current_human.id OR
-    attendee.application.human_id == current_human.id). Returns 404 (never 403)
-    on any failure so existence is not leaked to unauthorized callers.
+    Authorization uses the same centralized self-or-manager compatibility
+    predicate as all other portal Attendee operations.
 
     Errors from the CRUD layer: 404 (ticket/product not found), 409
     meal_plan_week_locked (week closed), 422 not_meal_plan_ticket or
     invalid_meal_plan_choice.
     """
-    from app.api.application.models import Applications
-
-    attendee = crud.attendees_crud.get(db, attendee_id)
-
-    if attendee is None or attendee.popup_id != popup_id:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Attendee not found"
-        )
-
-    # Dual-path auth predicate
-    owned = attendee.human_id == current_human.id
-    if not owned and attendee.application_id is not None:
-        application = db.get(Applications, attendee.application_id)
-        owned = application is not None and application.human_id == current_human.id
-
-    if not owned:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Attendee not found"
-        )
+    _get_my_attendee(
+        db,
+        attendee_id=attendee_id,
+        popup_id=popup_id,
+        current_human=current_human,
+    )
 
     from app.api.popup.crud import popups_crud
     from app.api.popup.guards import ensure_popup_writable
@@ -530,25 +560,12 @@ async def delete_my_attendee_for_popup(
     Returns 404 if attendee not found or predicate fails.
     Returns 400 with code='attendee_has_products' if attendee has purchased products.
     """
-    from app.api.application.models import Applications
-
-    attendee = crud.attendees_crud.get(db, attendee_id)
-
-    if attendee is None or attendee.popup_id != popup_id:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Attendee not found"
-        )
-
-    # Dual-path auth predicate
-    owned = attendee.human_id == current_human.id
-    if not owned and attendee.application_id is not None:
-        application = db.get(Applications, attendee.application_id)
-        owned = application is not None and application.human_id == current_human.id
-
-    if not owned:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Attendee not found"
-        )
+    attendee = _get_my_attendee(
+        db,
+        attendee_id=attendee_id,
+        popup_id=popup_id,
+        current_human=current_human,
+    )
 
     from app.api.popup.crud import popups_crud
     from app.api.popup.guards import ensure_popup_writable
@@ -820,6 +837,7 @@ async def add_attendee_ticket(
         items=[(line.product_id, line.quantity) for line in body.items],
         tenant_id=attendee.tenant_id,
         actor=actor_from_user(current_user),
+        grant_key=get_request_id(),
     )
 
     return _attendee_response(db, attendee_id)
@@ -880,7 +898,7 @@ async def remove_attendee_ticket(
     return _attendee_response(db, attendee_id)
 
 
-@router.post("/check-in/{code}", response_model=TicketPublic)
+@router.post("/check-in/{code}", response_model=StaffTicketPublic)
 async def post_check_in(
     code: str,
     payload: CheckInPayload,
@@ -890,7 +908,7 @@ async def post_check_in(
         uuid.UUID,
         Query(description="Popup the scanner is operating in"),
     ],
-) -> TicketPublic:
+) -> StaffTicketPublic:
     """Record a check-in event and return enriched TicketPublic (BO - scanner endpoint).
 
     POST replaces the former GET — the endpoint now mutates state by inserting a
@@ -910,35 +928,35 @@ async def post_check_in(
 
     Code is matched case-insensitively (uppercased before lookup).
     """
-    result = crud.attendees_crud.get_by_check_in_code(db, code.upper())
+    ticket = db.exec(
+        select(AttendeeProducts)
+        .join(Products, AttendeeProducts.product_id == Products.id)  # type: ignore[arg-type]
+        .where(
+            AttendeeProducts.check_in_code == code.upper(),
+            AttendeeProducts.revoked_at.is_(None),
+            Products.popup_id == popup_id,
+        )
+        .with_for_update(of=AttendeeProducts)
+    ).first()
 
-    if not result:
+    if ticket is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Ticket not found",
         )
 
-    ticket, attendee, product = result
-
-    # Reject codes from a different popup. We treat cross-popup access as
-    # "not found" rather than a distinct error to keep the response uniform
-    # with the way every other popup-scoped route handles non-matching rows.
-    if attendee.popup_id != popup_id:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Ticket not found",
-        )
+    attendee = ticket.attendee
+    product = ticket.product
 
     # Reject codes belonging to non-scannable products (e.g. merch, lodging).
     # The migration generates a check_in_code for every attendee_products row to
     # keep the column NOT NULL, but only `requires_check_in=true` products are
     # legitimate scan targets.
-    if not product.requires_check_in:
+    if ticket.requires_check_in_snapshot is not True:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Product does not require check-in",
         )
-
     # Record the check-in event; actor is the current user
     record_check_in(
         db,
@@ -951,15 +969,12 @@ async def post_check_in(
     # Build scan summary from ticket_events (single aggregation query).
     summary = get_check_in_summary(db, ticket.id)
 
-    return TicketPublic(
+    return StaffTicketPublic(
         id=ticket.id,
         check_in_code=ticket.check_in_code,
         payment_id=ticket.payment_id,
-        attendee=TicketAttendeeSnapshot(
-            id=attendee.id,
-            name=attendee.name,
-            email=attendee.email,
-            category=attendee.category,
+        attendee=(
+            TicketAttendeeSnapshot.model_validate(attendee) if attendee else None
         ),
         product=TicketProductSnapshot(
             id=product.id,

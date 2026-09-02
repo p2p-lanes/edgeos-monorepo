@@ -28,10 +28,12 @@ from app.api.application.models import Applications
 from app.api.application.schemas import ApplicationStatus
 from app.api.attendee.models import AttendeeProducts, Attendees
 from app.api.human.models import Humans
+from app.api.payment.models import PaymentProducts, Payments
 from app.api.popup.models import Popups
 from app.api.product.models import Products
 from app.api.tenant.models import Tenants
 from app.core.security import create_access_token
+from tests._flow_helpers import application_flow_id
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -101,6 +103,7 @@ def _make_application(
     db: Session, tenant: Tenants, popup: Popups, human: Humans
 ) -> Applications:
     application = Applications(
+        sales_flow_id=application_flow_id(db, popup.id),
         id=uuid.uuid4(),
         tenant_id=tenant.id,
         popup_id=popup.id,
@@ -155,6 +158,60 @@ def _make_ticket(
     db.commit()
     db.refresh(ticket)
     return ticket
+
+
+def _make_ownerless_unit(
+    db: Session,
+    tenant: Tenants,
+    popup: Popups,
+    human: Humans,
+    *,
+    revoked: bool = False,
+) -> AttendeeProducts:
+    from datetime import UTC, datetime
+
+    product = _make_product(db, tenant, popup, requires_check_in=False)
+    product.category = "parking"
+    payment = Payments(
+        tenant_id=tenant.id,
+        popup_id=popup.id,
+        buyer_human_id=human.id,
+        status="approved",
+        amount=Decimal("25"),
+        currency="USD",
+    )
+    db.add(payment)
+    db.flush()
+    line = PaymentProducts(
+        tenant_id=tenant.id,
+        payment_id=payment.id,
+        product_id=product.id,
+        attendee_id=None,
+        quantity=1,
+        product_name=product.name,
+        product_price=product.price,
+        product_category="parking",
+        requires_check_in_snapshot=True,
+        product_currency="USD",
+    )
+    db.add(line)
+    db.flush()
+    unit = AttendeeProducts(
+        tenant_id=tenant.id,
+        attendee_id=None,
+        product_id=product.id,
+        payment_id=payment.id,
+        payment_product_id=line.id,
+        unit_index=0,
+        check_in_code=f"PK{uuid.uuid4().hex[:6].upper()}",
+        product_category_snapshot="parking",
+        requires_check_in_snapshot=True,
+        revoked_at=datetime.now(UTC) if revoked else None,
+    )
+    db.add(unit)
+    db.commit()
+    db.refresh(unit)
+    return unit
 
 
 # ---------------------------------------------------------------------------
@@ -234,6 +291,34 @@ class TestGetMyCheckInOptions:
         ticket_ids = [t["attendee_product_id"] for t in body["tickets"]]
         assert str(ticket.id) in ticket_ids
 
+    def test_returns_buyer_owned_ownerless_unit_and_order_details(
+        self, client: TestClient, db: Session, tenant_a: Tenants
+    ) -> None:
+        popup = _make_self_check_in_popup(db, tenant_a)
+        human = _make_human(db, tenant_a)
+        unit = _make_ownerless_unit(db, tenant_a, popup, human)
+
+        options = client.get(
+            f"/api/v1/check-ins/my/{popup.slug}/options", headers=_human_auth(human)
+        )
+        assert options.status_code == 200, options.text
+        ticket = options.json()["tickets"][0]
+        assert ticket["attendee_product_id"] == str(unit.id)
+        assert ticket["attendee_name"] is None
+        assert ticket["attendee_category"] is None
+        assert ticket["product_category"] == "parking"
+
+        orders = client.get(
+            f"/api/v1/payments/my/popup/{popup.id}", headers=_human_auth(human)
+        )
+        assert orders.status_code == 200, orders.text
+        payload = orders.json()["results"][0]["products_snapshot"][0]["units"][0]
+        assert payload["id"] == str(unit.id)
+        assert payload["attendee_id"] is None
+        assert payload["check_in_code"] == unit.check_in_code
+        assert payload["active"] is True
+        assert payload["requires_check_in"] is True
+
     def test_returns_404_when_popup_disabled(
         self,
         client: TestClient,
@@ -272,7 +357,7 @@ class TestGetMyCheckInOptions:
 
 
 class TestConfirmMyCheckIn:
-    def test_happy_path_then_duplicate_returns_409(
+    def test_happy_path_then_repeat_appends_history(
         self,
         client: TestClient,
         db: Session,
@@ -296,13 +381,64 @@ class TestConfirmMyCheckIn:
         assert body["checked_in"] is True
         assert body["checked_in_at"] is not None
 
-        # Second confirm is rejected as duplicate.
         second = client.post(
             f"/api/v1/check-ins/my/{popup.slug}",
             json={"attendee_product_id": str(ticket.id)},
             headers=_human_auth(human),
         )
-        assert second.status_code == 409, second.text
+        assert second.status_code == 200, second.text
+
+    def test_ownerless_repeat_appends_history_without_creating_attendee(
+        self, client: TestClient, db: Session, tenant_a: Tenants
+    ) -> None:
+        from sqlmodel import func, select
+
+        from app.api.check_in.models import CheckIn
+
+        popup = _make_self_check_in_popup(db, tenant_a)
+        human = _make_human(db, tenant_a)
+        unit = _make_ownerless_unit(db, tenant_a, popup, human)
+        attendee_count = db.exec(select(func.count()).select_from(Attendees)).one()
+
+        for _ in range(2):
+            response = client.post(
+                f"/api/v1/check-ins/my/{popup.slug}",
+                json={"attendee_product_id": str(unit.id)},
+                headers=_human_auth(human),
+            )
+            assert response.status_code == 200, response.text
+            assert response.json()["attendee_name"] is None
+
+        assert (
+            db.exec(
+                select(func.count())
+                .select_from(CheckIn)
+                .where(CheckIn.attendee_product_id == unit.id)
+            ).one()
+            == 2
+        )
+        assert (
+            db.exec(select(func.count()).select_from(Attendees)).one() == attendee_count
+        )
+
+    def test_revoked_ownerless_unit_is_hidden_and_rejected(
+        self, client: TestClient, db: Session, tenant_a: Tenants
+    ) -> None:
+        popup = _make_self_check_in_popup(db, tenant_a)
+        human = _make_human(db, tenant_a)
+        unit = _make_ownerless_unit(db, tenant_a, popup, human, revoked=True)
+
+        options = client.get(
+            f"/api/v1/check-ins/my/{popup.slug}/options", headers=_human_auth(human)
+        )
+        response = client.post(
+            f"/api/v1/check-ins/my/{popup.slug}",
+            json={"attendee_product_id": str(unit.id)},
+            headers=_human_auth(human),
+        )
+
+        assert options.json()["tickets"] == []
+        assert response.status_code == 404
 
     def test_returns_404_when_ticket_belongs_to_another_human(
         self,

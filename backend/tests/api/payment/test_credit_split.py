@@ -21,6 +21,7 @@ class _FakeProduct:
 class _FakeAttendeeProduct:
     def __init__(self, product: _FakeProduct) -> None:
         self.product = product
+        self.revoked_at = None
 
 
 class _FakeAttendee:

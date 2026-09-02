@@ -73,15 +73,14 @@ def _make_attendee(
     return attendee
 
 
-def _make_ticket(
-    db: Session, tenant: Tenants, popup: Popups, attendee: Attendees
-) -> None:
+def _make_ticket(db, tenant, popup, attendee, category="ticket"):
     product = Products(
         tenant_id=tenant.id,
         popup_id=popup.id,
         name="Filters Ticket",
         slug=f"filters-ticket-{uuid.uuid4().hex[:8]}",
         price=Decimal("10.00"),
+        category=category,
     )
     db.add(product)
     db.flush()
@@ -91,6 +90,7 @@ def _make_ticket(
             attendee_id=attendee.id,
             product_id=product.id,
             check_in_code=f"FLT{uuid.uuid4().hex[:8].upper()}",
+            product_category_snapshot=category,
         )
     )
     db.commit()
@@ -212,8 +212,10 @@ class TestAttendeeListFilters:
         popup = _make_popup(db, tenant_a)
         admin = _make_admin(db, tenant_a)
         with_ticket = _make_attendee(db, tenant_a, popup)
+        with_participant = _make_attendee(db, tenant_a, popup)
         without_ticket = _make_attendee(db, tenant_a, popup)
         _make_ticket(db, tenant_a, popup, with_ticket)
+        _make_ticket(db, tenant_a, popup, with_participant, "meal_plan")
 
         response = _list(
             client, admin, tenant_a, popup, _one("has_tickets", "eq", True)
@@ -223,7 +225,7 @@ class TestAttendeeListFilters:
         response = _list(
             client, admin, tenant_a, popup, _one("has_tickets", "eq", False)
         )
-        assert _ids(response) == {str(without_ticket.id)}
+        assert _ids(response) == {str(with_participant.id), str(without_ticket.id)}
 
     def test_match_all_vs_any(
         self, db: Session, tenant_a: Tenants, client: TestClient

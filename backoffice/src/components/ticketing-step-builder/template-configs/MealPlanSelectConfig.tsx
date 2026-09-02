@@ -739,6 +739,8 @@ export function MealPlanSelectConfig({
     }))
   }, [productsData])
 
+  const participantProducts = productList
+
   const productsById = useMemo(() => {
     const map = new Map<string, PickerProduct>()
     for (const p of productList) {
@@ -800,7 +802,8 @@ export function MealPlanSelectConfig({
     updateConfig({ sections: reordered })
   }
 
-  const noMealPlanProducts = !productsLoading && productList.length === 0
+  const noMealPlanProducts =
+    !productsLoading && participantProducts.length === 0
 
   return (
     <div className="flex flex-col gap-5">
@@ -855,7 +858,7 @@ export function MealPlanSelectConfig({
                   <SortableSectionCard
                     key={section.key}
                     section={section}
-                    availableProducts={productList}
+                    availableProducts={participantProducts}
                     productsById={productsById}
                     onUpdate={(updates) =>
                       handleSectionUpdate(section.key, updates)

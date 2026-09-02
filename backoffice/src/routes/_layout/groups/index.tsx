@@ -16,6 +16,7 @@ import { DataTable, SortableHeader } from "@/components/Common/DataTable"
 import { EmptyState } from "@/components/Common/EmptyState"
 import { QueryErrorBoundary } from "@/components/Common/QueryErrorBoundary"
 import { WorkspaceAlert } from "@/components/Common/WorkspaceAlert"
+import { FlowNameCell } from "@/components/forms/FlowNameCell"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Button } from "@/components/ui/button"
 import {
@@ -222,11 +223,23 @@ function GroupActionsMenu({ group }: { group: GroupPublic }) {
   )
 }
 
+function FlowCell({ group }: { group: GroupPublic }) {
+  const { selectedPopupId } = useWorkspace()
+  return <FlowNameCell popupId={selectedPopupId} flowId={group.sales_flow_id} />
+}
+
 const columns: ColumnDef<GroupPublic>[] = [
   {
     accessorKey: "name",
     header: ({ column }) => <SortableHeader label="Name" column={column} />,
     cell: ({ row }) => <span className="font-medium">{row.original.name}</span>,
+  },
+  {
+    // Two groups can look the same and send their members through
+    // different forms, with different acceptance emails.
+    accessorKey: "sales_flow_id",
+    header: "Sales flow",
+    cell: ({ row }) => <FlowCell group={row.original} />,
   },
   {
     accessorKey: "discount_percentage",

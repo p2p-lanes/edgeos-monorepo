@@ -4,7 +4,7 @@ from decimal import Decimal
 from enum import Enum
 from typing import ClassVar
 
-from pydantic import BaseModel, ConfigDict, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, EmailStr, field_validator, model_validator
 from pydantic import Field as PydanticField
 from sqlalchemy import Integer, Numeric, String, Text
 from sqlalchemy.dialects import postgresql as pg
@@ -109,7 +109,13 @@ class PaymentProductBase(SQLModel):
     tenant_id: uuid.UUID = Field(foreign_key="tenants.id", index=True)
     payment_id: uuid.UUID = Field(foreign_key="payments.id", index=True)
     product_id: uuid.UUID = Field(foreign_key="products.id", index=True)
-    attendee_id: uuid.UUID = Field(foreign_key="attendees.id", index=True)
+    attendee_id: uuid.UUID | None = Field(
+        default=None, foreign_key="attendees.id", index=True, nullable=True
+    )
+    payment_recipient_id: uuid.UUID | None = Field(
+        default=None,
+        sa_column=Column(pg.UUID(as_uuid=True), nullable=True, index=True),
+    )
     quantity: int = Field(default=1)
 
     # Snapshot of product at time of purchase
@@ -121,6 +127,7 @@ class PaymentProductBase(SQLModel):
         sa_column=Column(Numeric(10, 2), nullable=True),
     )
     product_category: str
+    requires_check_in_snapshot: bool | None = Field(default=None, nullable=True)
     product_currency: str = Field(
         default="USD",
         sa_column=Column(String(3), nullable=False, server_default="USD"),
@@ -134,6 +141,54 @@ class PaymentProductBase(SQLModel):
     )
 
 
+class PaymentRecipientBase(SQLModel):
+    """Attempt-local recipient identity and profile snapshot."""
+
+    tenant_id: uuid.UUID = Field(foreign_key="tenants.id", index=True)
+    payment_id: uuid.UUID = Field(foreign_key="payments.id")
+    recipient_key: str = Field(max_length=255)
+    human_id: uuid.UUID | None = Field(
+        default=None, foreign_key="humans.id", index=True, nullable=True
+    )
+    existing_attendee_id: uuid.UUID | None = Field(
+        default=None, foreign_key="attendees.id", index=True, nullable=True
+    )
+    attendee_id: uuid.UUID | None = Field(
+        default=None, foreign_key="attendees.id", index=True, nullable=True
+    )
+    name: str
+    email: str | None = Field(default=None, nullable=True)
+    category_id: uuid.UUID | None = Field(
+        default=None, foreign_key="attendee_categories.id", nullable=True
+    )
+    profile_snapshot: dict = Field(
+        default_factory=dict,
+        sa_column=Column(JSONB, nullable=False, server_default="{}"),
+    )
+
+
+class PaymentRecipientRequest(BaseModel):
+    """Stable recipient identity and profile supplied for one payment attempt."""
+
+    recipient_key: str = PydanticField(min_length=1, max_length=255)
+    human_id: uuid.UUID | None = None
+    existing_attendee_id: uuid.UUID | None = None
+    name: str = PydanticField(min_length=1)
+    email: EmailStr | None = None
+    category_id: uuid.UUID | None = None
+    profile_snapshot: dict = PydanticField(default_factory=dict)
+
+    model_config = ConfigDict(str_strip_whitespace=True)
+
+
+class PaymentRecipientResponse(PaymentRecipientRequest):
+    id: uuid.UUID
+    attendee_id: uuid.UUID | None = None
+    created_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
 class PaymentBase(SQLModel):
     """Base payment schema."""
 
@@ -142,6 +197,17 @@ class PaymentBase(SQLModel):
         default=None, foreign_key="applications.id", index=True, nullable=True
     )
     popup_id: uuid.UUID = Field(foreign_key="popups.id", index=True)
+    buyer_human_id: uuid.UUID | None = Field(
+        default=None, foreign_key="humans.id", index=True, nullable=True
+    )
+    # Sales flow this payment was made under. Nullable, backfilled to the
+    # popup's default flow (sdd/sales-flows slice 4). Provenance only per
+    # design D7 — read for background/reporting partitioning (e.g. the
+    # reminder dispatcher), never for a request-path authorization, pricing,
+    # or eligibility rule.
+    sales_flow_id: uuid.UUID | None = Field(
+        default=None, foreign_key="sales_flows.id", nullable=True, index=True
+    )
     external_id: str | None = Field(default=None, nullable=True)
     status: str = Field(default=PaymentStatus.PENDING.value, index=True)
     amount: Decimal = Field(
@@ -223,7 +289,10 @@ class PaymentProductRequest(BaseModel):
     """Product selection for payment."""
 
     product_id: uuid.UUID
-    attendee_id: uuid.UUID
+    attendee_id: uuid.UUID | None = None
+    recipient_key: str | None = PydanticField(
+        default=None, min_length=1, max_length=255
+    )
     quantity: int = 1
     unit_price_override: Decimal | None = None
     # Per-purchase metadata blob. Currently populated by the meal_plan_select
@@ -233,27 +302,43 @@ class PaymentProductRequest(BaseModel):
     # metadata.
     purchase_metadata: dict | None = None
 
+    model_config = ConfigDict(extra="forbid")
+
     @model_validator(mode="after")
-    def validate_unit_price_override(self) -> "PaymentProductRequest":
+    def validate_request(self) -> "PaymentProductRequest":
         """Structural validation: unit_price_override must be non-negative if provided."""
+        if self.attendee_id is not None and self.recipient_key is not None:
+            raise ValueError("attendee_id and recipient_key cannot both be set")
         if self.unit_price_override is not None and self.unit_price_override < 0:
             raise ValueError("unit_price_override must be non-negative")
         return self
+
+
+class PaymentProductUnitResponse(BaseModel):
+    id: uuid.UUID
+    attendee_id: uuid.UUID | None = None
+    check_in_code: str
+    active: bool
+    requires_check_in: bool
 
 
 class PaymentProductResponse(BaseModel):
     """Payment product snapshot in response."""
 
     product_id: uuid.UUID
-    attendee_id: uuid.UUID
+    attendee_id: uuid.UUID | None
+    payment_recipient_id: uuid.UUID | None = None
+    recipient_key: str | None = None
     quantity: int
     product_name: str
     product_description: str | None = None
     product_price: Decimal
     effective_unit_price: Decimal | None = None
     product_category: str
+    requires_check_in_snapshot: bool | None = None
     product_currency: str
     attendee_name: str | None = None
+    units: list[PaymentProductUnitResponse] = PydanticField(default_factory=list)
     created_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
@@ -269,9 +354,12 @@ class PaymentCreate(BaseModel):
     application_id: uuid.UUID | None = None
     popup_id: uuid.UUID | None = None
     products: list[PaymentProductRequest]
+    recipients: list[PaymentRecipientRequest] = PydanticField(default_factory=list)
     coupon_code: str | None = None
     edit_passes: bool = False
     insurance: bool = False
+
+    model_config = ConfigDict(extra="forbid")
 
     @field_validator("products", mode="before")
     @classmethod
@@ -287,6 +375,16 @@ class PaymentCreate(BaseModel):
     def validate_source(self) -> "PaymentCreate":
         if self.application_id is None and self.popup_id is None:
             raise ValueError("Either application_id or popup_id is required")
+        recipient_keys = [recipient.recipient_key for recipient in self.recipients]
+        if len(recipient_keys) != len(set(recipient_keys)):
+            raise ValueError("recipient_key values must be unique")
+        missing = {
+            product.recipient_key
+            for product in self.products
+            if product.recipient_key is not None
+        } - set(recipient_keys)
+        if missing:
+            raise ValueError("Every recipient_key must reference a supplied recipient")
         return self
 
 
@@ -323,6 +421,7 @@ class PaymentPublic(PaymentBase):
 
     id: uuid.UUID
     products_snapshot: list[PaymentProductResponse] = []
+    recipients: list[PaymentRecipientResponse] = PydanticField(default_factory=list)
     buyer_email: str | None = None
     buyer_name: str | None = None
     created_at: datetime | None = None
@@ -363,6 +462,8 @@ class ApplicationFeeCreate(BaseModel):
     """Schema for creating an application fee payment."""
 
     application_id: uuid.UUID
+
+    model_config = ConfigDict(extra="forbid")
 
 
 class SimpleFIPriceDetails(BaseModel):

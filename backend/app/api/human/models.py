@@ -37,7 +37,10 @@ class Humans(HumanBase, table=True):
     applications: list["Applications"] = Relationship(back_populates="human")
 
     # Attendee records linked to this human (includes spouse attendees they later claimed)
-    attendees: list["Attendees"] = Relationship(back_populates="human")
+    attendees: list["Attendees"] = Relationship(
+        back_populates="human",
+        sa_relationship_kwargs={"foreign_keys": "Attendees.human_id"},
+    )
 
     # Groups where this human is a leader
     led_groups: list["Groups"] = Relationship(

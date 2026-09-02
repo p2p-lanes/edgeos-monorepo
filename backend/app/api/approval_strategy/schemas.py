@@ -24,8 +24,14 @@ class ApprovalStrategyBase(SQLModel):
     for a specific popup.
     """
 
-    popup_id: uuid.UUID = Field(foreign_key="popups.id", index=True, unique=True)
+    popup_id: uuid.UUID = Field(foreign_key="popups.id", index=True)
     tenant_id: uuid.UUID = Field(foreign_key="tenants.id", index=True)
+    # sdd/sales-flows-rediseno slice 6: a strategy belongs to exactly one
+    # flow, so two application flows can review their applicants
+    # differently. There is no popup-shared tier.
+    sales_flow_id: uuid.UUID = Field(
+        foreign_key="sales_flows.id", nullable=False, index=True
+    )
 
     strategy_type: ApprovalStrategyType = ApprovalStrategyType.ANY_REVIEWER
 
@@ -73,6 +79,7 @@ class ApprovalStrategyPublic(BaseModel):
     id: uuid.UUID
     popup_id: uuid.UUID
     tenant_id: uuid.UUID
+    sales_flow_id: uuid.UUID
 
     strategy_type: ApprovalStrategyType
     required_approvals: int

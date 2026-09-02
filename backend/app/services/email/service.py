@@ -16,7 +16,7 @@ from loguru import logger
 from premailer import transform
 from sqlmodel import Session
 
-from app.api.email_template.schemas import EmailTemplateType
+from app.api.email_template.schemas import EmailTemplateType, TemplateScope
 from app.core.config import settings
 from app.services.email.templates import (
     TEMPLATE_TYPE_TO_FILE,
@@ -51,6 +51,7 @@ from app.services.email.templates import (
 )
 
 if TYPE_CHECKING:
+    from app.api.email_template.models import EmailTemplates
     from app.api.payment.models import Payments
 
 
@@ -207,10 +208,33 @@ class EmailService:
         template_type: EmailTemplateType | str,
         context: Mapping[str, Any],
         popup_id: uuid.UUID | None = None,
+        sales_flow_id: uuid.UUID | None = None,
         tenant_id: uuid.UUID | None = None,
         db_session: Session | None = None,
     ) -> tuple[str, str | None]:
         """Render email using DB-stored custom template or file-based fallback.
+
+        Every type has exactly ONE tier that owns it, decided by
+        `get_template_scope` — there is no chain between tiers. Mails a
+        sale produces belong to the flow that made the sale; mails a
+        gathering produces belong to the gathering; login codes belong to
+        the tenant. A missing row in the owning tier means the template
+        shipped with the product, and never someone else's customization.
+
+        Slice 6 collapsed the old flow -> popup -> tenant chain by deleting
+        the popup tier outright. That silently stopped 16 of 19
+        popup-scoped types resolving anything at all, because their senders
+        never had a `sales_flow_id` to give. The tier is back, but as the
+        owner of the types that genuinely have no flow rather than as a
+        fallback for the ones that do.
+
+        A custom template row that FAILS to render (bad Jinja syntax,
+        SSTI-sandbox violation, etc.) falls through to the shipped file
+        template instead of raising and blocking the send outright — a
+        broken customization must never take down the transactional email
+        itself. The error is logged with the offending template's id so an
+        operator can find and fix it; the file template is the final
+        backstop and is expected to always render.
 
         Returns:
             Tuple of (rendered_html, custom_subject_or_none)
@@ -218,45 +242,58 @@ class EmailService:
         template_type_enum = coerce_email_template_type(template_type)
         template_scope = get_template_scope(template_type_enum)
 
-        if db_session and template_scope == "tenant" and tenant_id:
+        custom = None
+        if db_session:
             from app.api.email_template.crud import email_template_crud
 
-            custom = email_template_crud.get_active_tenant_template(
-                db_session, tenant_id, template_type_enum.value
-            )
-            if custom:
-                rendered_html = self.render_custom_template(
-                    custom.html_content, context
+            if template_scope == TemplateScope.FLOW and sales_flow_id:
+                custom = email_template_crud.get_active_flow_template(
+                    db_session, sales_flow_id, template_type_enum.value
                 )
-                rendered_subject = None
-                if custom.subject:
-                    env = SandboxedEnvironment(undefined=SilentUndefined)
-                    rendered_subject = env.from_string(custom.subject).render(**context)
-                return rendered_html, rendered_subject
-
-        if db_session and template_scope == "popup" and popup_id:
-            from app.api.email_template.crud import email_template_crud
-
-            custom = email_template_crud.get_active_popup_template(
-                db_session, popup_id, template_type_enum.value
-            )
-            if custom:
-                rendered_html = self.render_custom_template(
-                    custom.html_content, context
+            elif template_scope == TemplateScope.POPUP and popup_id:
+                custom = email_template_crud.get_active_popup_template(
+                    db_session, popup_id, template_type_enum.value
                 )
-                rendered_subject = None
-                if custom.subject:
-                    env = SandboxedEnvironment(undefined=SilentUndefined)
-                    rendered_subject = env.from_string(custom.subject).render(**context)
-                return rendered_html, rendered_subject
+            elif template_scope == TemplateScope.TENANT and tenant_id:
+                custom = email_template_crud.get_active_tenant_template(
+                    db_session, tenant_id, template_type_enum.value
+                )
 
-        # Fallback to file-based template
+        if custom:
+            try:
+                return self._render_custom(custom, context)
+            except Exception:
+                logger.error(
+                    "Custom template {} ({}) failed to render, "
+                    "falling back to the template shipped with the product",
+                    custom.id,
+                    template_scope,
+                )
+
+        # Fallback to the template shipped with the product
         file_path = TEMPLATE_TYPE_TO_FILE.get(template_type_enum)
         if not file_path:
             raise ValueError(f"No file mapping for template type: {template_type_enum}")
 
         rendered_html = self.render_template(file_path, context)
         return rendered_html, None
+
+    def _render_custom(
+        self, custom: "EmailTemplates", context: Mapping[str, Any]
+    ) -> tuple[str, str | None]:
+        """Render a DB-stored custom template's HTML and (optional) subject.
+
+        Shared by both tiers `render_with_fallback` tries (flow and
+        tenant) — extracted from a duplicated block (sdd/sales-flows
+        slice 10 review follow-up). Pure refactor: identical output to the
+        inlined version it replaces.
+        """
+        rendered_html = self.render_custom_template(custom.html_content, context)
+        rendered_subject = None
+        if custom.subject:
+            env = SandboxedEnvironment(undefined=SilentUndefined)
+            rendered_subject = env.from_string(custom.subject).render(**context)
+        return rendered_html, rendered_subject
 
     def render_template(self, template_name: str, context: Mapping[str, Any]) -> str:
         """
@@ -362,6 +399,7 @@ class EmailService:
         db_session: Session | None = None,
         template_type: EmailTemplateType | str | None = None,
         popup_id: uuid.UUID | None = None,
+        sales_flow_id: uuid.UUID | None = None,
         application_id: uuid.UUID | None = None,
         payment_id: uuid.UUID | None = None,
         human_id: uuid.UUID | None = None,
@@ -399,6 +437,7 @@ class EmailService:
             error=error,
             template_type=template_type,
             popup_id=popup_id,
+            sales_flow_id=sales_flow_id,
             application_id=application_id,
             payment_id=payment_id,
             human_id=human_id,
@@ -416,6 +455,7 @@ class EmailService:
         error: str | None,
         template_type: EmailTemplateType | str | None,
         popup_id: uuid.UUID | None,
+        sales_flow_id: uuid.UUID | None = None,
         application_id: uuid.UUID | None,
         payment_id: uuid.UUID | None,
         human_id: uuid.UUID | None,
@@ -451,6 +491,7 @@ class EmailService:
                     to_email=recipient,
                     status=status,
                     popup_id=popup_id,
+                    sales_flow_id=sales_flow_id,
                     application_id=application_id,
                     payment_id=payment_id,
                     human_id=human_id,
@@ -728,6 +769,7 @@ class EmailService:
         from_address: str | None = None,
         from_name: str | None = None,
         popup_id: uuid.UUID | None = None,
+        sales_flow_id: uuid.UUID | None = None,
         tenant_id: uuid.UUID | None = None,
         db_session: Session | None = None,
     ) -> bool:
@@ -741,6 +783,7 @@ class EmailService:
             from_address=from_address,
             from_name=from_name,
             popup_id=popup_id,
+            sales_flow_id=sales_flow_id,
             db_session=db_session,
         )
 
@@ -752,6 +795,7 @@ class EmailService:
         from_address: str | None = None,
         from_name: str | None = None,
         popup_id: uuid.UUID | None = None,
+        sales_flow_id: uuid.UUID | None = None,
         db_session: Session | None = None,
     ) -> bool:
         """Send application accepted email."""
@@ -764,6 +808,7 @@ class EmailService:
             from_address=from_address,
             from_name=from_name,
             popup_id=popup_id,
+            sales_flow_id=sales_flow_id,
             db_session=db_session,
         )
 
@@ -775,6 +820,7 @@ class EmailService:
         from_address: str | None = None,
         from_name: str | None = None,
         popup_id: uuid.UUID | None = None,
+        sales_flow_id: uuid.UUID | None = None,
         db_session: Session | None = None,
     ) -> bool:
         """Send application rejected email."""
@@ -787,6 +833,7 @@ class EmailService:
             from_address=from_address,
             from_name=from_name,
             popup_id=popup_id,
+            sales_flow_id=sales_flow_id,
             db_session=db_session,
         )
 
@@ -798,6 +845,7 @@ class EmailService:
         from_address: str | None = None,
         from_name: str | None = None,
         popup_id: uuid.UUID | None = None,
+        sales_flow_id: uuid.UUID | None = None,
         db_session: Session | None = None,
     ) -> bool:
         """Send application accepted email with scholarship discount (no cash incentive)."""
@@ -810,6 +858,7 @@ class EmailService:
             from_address=from_address,
             from_name=from_name,
             popup_id=popup_id,
+            sales_flow_id=sales_flow_id,
             db_session=db_session,
         )
 
@@ -821,6 +870,7 @@ class EmailService:
         from_address: str | None = None,
         from_name: str | None = None,
         popup_id: uuid.UUID | None = None,
+        sales_flow_id: uuid.UUID | None = None,
         db_session: Session | None = None,
     ) -> bool:
         """Send application accepted email with scholarship discount and cash incentive grant."""
@@ -833,6 +883,7 @@ class EmailService:
             from_address=from_address,
             from_name=from_name,
             popup_id=popup_id,
+            sales_flow_id=sales_flow_id,
             db_session=db_session,
         )
 
@@ -844,6 +895,7 @@ class EmailService:
         from_address: str | None = None,
         from_name: str | None = None,
         popup_id: uuid.UUID | None = None,
+        sales_flow_id: uuid.UUID | None = None,
         db_session: Session | None = None,
     ) -> bool:
         """Send application accepted email when scholarship request was not approved."""
@@ -856,6 +908,7 @@ class EmailService:
             from_address=from_address,
             from_name=from_name,
             popup_id=popup_id,
+            sales_flow_id=sales_flow_id,
             db_session=db_session,
         )
 
@@ -867,6 +920,7 @@ class EmailService:
         from_address: str | None = None,
         from_name: str | None = None,
         popup_id: uuid.UUID | None = None,
+        sales_flow_id: uuid.UUID | None = None,
         db_session: Session | None = None,
         attachments: list[EmailAttachment] | None = None,
     ) -> bool:
@@ -880,10 +934,21 @@ class EmailService:
             from_address=from_address,
             from_name=from_name,
             popup_id=popup_id,
+            sales_flow_id=sales_flow_id,
             db_session=db_session,
             attachments=attachments,
         )
 
+    # sdd/sales-flows slice 10 boundary: only the three reminder methods below
+    # (`send_abandoned_cart`, `send_purchase_reminder`,
+    # `send_abandoned_application`) thread `sales_flow_id` through to
+    # `render_with_fallback`/`_record_email_log` — that's the reminder
+    # dispatcher's own flow-tier scope (`reminder_dispatch.py`), not a
+    # partial rollout. The other ~15 email types on this service (payment
+    # confirmations, application lifecycle, check-in, etc.) intentionally
+    # keep their pre-slice-10 signatures; the flow-tier resolution machinery
+    # in `render_with_fallback`/`_send_with_fallback`/`send_email` is generic
+    # and any future caller can pass `sales_flow_id` when it gets a consumer.
     async def send_abandoned_cart(
         self,
         to: str,
@@ -892,6 +957,7 @@ class EmailService:
         from_address: str | None = None,
         from_name: str | None = None,
         popup_id: uuid.UUID | None = None,
+        sales_flow_id: uuid.UUID | None = None,
         db_session: Session | None = None,
         application_id: uuid.UUID | None = None,
         payment_id: uuid.UUID | None = None,
@@ -907,6 +973,7 @@ class EmailService:
             from_address=from_address,
             from_name=from_name,
             popup_id=popup_id,
+            sales_flow_id=sales_flow_id,
             db_session=db_session,
             application_id=application_id,
             payment_id=payment_id,
@@ -921,6 +988,7 @@ class EmailService:
         from_address: str | None = None,
         from_name: str | None = None,
         popup_id: uuid.UUID | None = None,
+        sales_flow_id: uuid.UUID | None = None,
         db_session: Session | None = None,
         application_id: uuid.UUID | None = None,
         human_id: uuid.UUID | None = None,
@@ -935,6 +1003,7 @@ class EmailService:
             from_address=from_address,
             from_name=from_name,
             popup_id=popup_id,
+            sales_flow_id=sales_flow_id,
             db_session=db_session,
             application_id=application_id,
             human_id=human_id,
@@ -948,6 +1017,7 @@ class EmailService:
         from_address: str | None = None,
         from_name: str | None = None,
         popup_id: uuid.UUID | None = None,
+        sales_flow_id: uuid.UUID | None = None,
         db_session: Session | None = None,
         application_id: uuid.UUID | None = None,
         human_id: uuid.UUID | None = None,
@@ -962,6 +1032,7 @@ class EmailService:
             from_address=from_address,
             from_name=from_name,
             popup_id=popup_id,
+            sales_flow_id=sales_flow_id,
             db_session=db_session,
             application_id=application_id,
             human_id=human_id,
@@ -975,6 +1046,7 @@ class EmailService:
         from_address: str | None = None,
         from_name: str | None = None,
         popup_id: uuid.UUID | None = None,
+        sales_flow_id: uuid.UUID | None = None,
         db_session: Session | None = None,
     ) -> bool:
         """Send pass modification confirmed email."""
@@ -987,6 +1059,7 @@ class EmailService:
             from_address=from_address,
             from_name=from_name,
             popup_id=popup_id,
+            sales_flow_id=sales_flow_id,
             db_session=db_session,
         )
 
@@ -1187,6 +1260,7 @@ class EmailService:
         from_address: str | None = None,
         from_name: str | None = None,
         popup_id: uuid.UUID | None = None,
+        sales_flow_id: uuid.UUID | None = None,
         tenant_id: uuid.UUID | None = None,
         db_session: Session | None = None,
         attachments: list[EmailAttachment] | None = None,
@@ -1199,9 +1273,12 @@ class EmailService:
         """Send email using DB custom template if available, else file-based fallback."""
         try:
             enriched_context: Mapping[str, Any] = context
-            template_scope = get_template_scope(template_type)
 
-            if template_scope == "popup" and popup_id and db_session:
+            # Keyed on having a popup, not on who owns the template. A
+            # flow-scoped mail still needs the gathering's name and
+            # branding, and gating this on the scope would have quietly
+            # stripped that when the scopes split.
+            if popup_id and db_session:
                 enriched_context = _enrich_with_popup_data(
                     dict(context), popup_id, db_session
                 )
@@ -1213,6 +1290,7 @@ class EmailService:
                 template_type,
                 enriched_context,
                 popup_id=popup_id,
+                sales_flow_id=sales_flow_id,
                 tenant_id=resolved_tenant_id,
                 db_session=db_session,
             )
@@ -1230,6 +1308,7 @@ class EmailService:
                 db_session=db_session,
                 template_type=template_type,
                 popup_id=popup_id,
+                sales_flow_id=sales_flow_id,
                 application_id=application_id,
                 payment_id=payment_id,
                 human_id=human_id,

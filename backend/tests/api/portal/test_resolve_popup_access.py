@@ -1,18 +1,15 @@
 """Tests for resolve_popup_access CRUD logic — CAP-A.
 
-TDD phase: RED — tests written BEFORE the implementation.
-The function does not exist yet, so all tests must FAIL.
-
-Covers all 10 spec scenarios (one per ladder step / edge case):
+Covers all 10 spec scenarios (one per access result / edge case):
 1. Accepted application → allowed, source=application
 2. Submitted application → denied, reason=application_pending
 3. In-review application → denied, reason=application_pending
 4. Rejected application → denied, reason=application_rejected
-5. No application, but direct attendee row → allowed, source=attendee
-6. No application, no attendee, but payment → allowed, source=payment
-7. No application, no attendee, no payment, but companion → allowed, source=companion
+5. Bare direct attendee → denied, reason=no_access
+6. Payment ancestry → denied, reason=no_access
+7. Bare companion → denied, reason=no_access
 8. No match at all → denied, reason=no_access
-9. Ladder short-circuits: submitted application + direct attendees → denied (step 2 wins)
+9. Submitted application + bare attendee → application_pending
 10. Cross-tenant: wrong popup → denied, reason=no_access
 """
 
@@ -28,6 +25,7 @@ from app.api.payment.models import Payments
 from app.api.payment.schemas import PaymentStatus
 from app.api.popup.models import Popups
 from app.api.tenant.models import Tenants
+from tests._flow_helpers import application_flow_id
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -69,6 +67,7 @@ def _make_application(
     from app.api.application.models import Applications
 
     application = Applications(
+        sales_flow_id=application_flow_id(db, popup.id),
         id=uuid.uuid4(),
         tenant_id=tenant.id,
         popup_id=popup.id,
@@ -117,6 +116,7 @@ def _make_companion_attendee(
     from app.api.application.models import Applications
 
     application = Applications(
+        sales_flow_id=application_flow_id(db, popup.id),
         id=uuid.uuid4(),
         tenant_id=tenant.id,
         popup_id=popup.id,
@@ -160,6 +160,7 @@ def _make_payment_for_human(
     # Application owned by human with a non-standard status (withdrawn) so that
     # Steps 1-3 don't fire. Steps 1-3 only check accepted/submitted/in-review/rejected.
     application = Applications(
+        sales_flow_id=application_flow_id(db, popup.id),
         id=uuid.uuid4(),
         tenant_id=tenant.id,
         popup_id=popup.id,
@@ -269,10 +270,9 @@ class TestResolvePopupAccess:
         assert result.application_status == "rejected"
         assert result.reason == "application_rejected"
 
-    def test_no_application_but_attendee_grants_access(
+    def test_bare_attendee_does_not_grant_access(
         self, db: Session, tenant_a: Tenants
     ) -> None:
-        """Ladder step 4: no application, but direct attendee → allowed, source=attendee."""
         from app.api.application.crud import applications_crud
 
         popup = _make_popup(db, tenant_a, suffix="att-acc")
@@ -282,15 +282,14 @@ class TestResolvePopupAccess:
 
         result = applications_crud.resolve_popup_access(db, human.id, popup.id)
 
-        assert result.allowed is True
-        assert result.source == "attendee"
+        assert result.allowed is False
+        assert result.source is None
         assert result.application_status is None
-        assert result.reason is None
+        assert result.reason == "no_access"
 
-    def test_no_application_no_attendee_payment_grants_access(
+    def test_payment_ancestry_does_not_grant_access(
         self, db: Session, tenant_a: Tenants
     ) -> None:
-        """Ladder step 5: no application, no own attendee, but payment → allowed, source=payment."""
         from app.api.application.crud import applications_crud
 
         popup = _make_popup(db, tenant_a, suffix="pay-acc")
@@ -300,13 +299,14 @@ class TestResolvePopupAccess:
 
         result = applications_crud.resolve_popup_access(db, human.id, popup.id)
 
-        assert result.allowed is True
-        assert result.source == "payment"
+        assert result.allowed is False
+        assert result.source is None
         assert result.application_status is None
-        assert result.reason is None
+        assert result.reason == "no_access"
 
-    def test_companion_grants_access(self, db: Session, tenant_a: Tenants) -> None:
-        """Ladder step 6: companion attendee on another's application → allowed, source=companion."""
+    def test_bare_companion_does_not_grant_access(
+        self, db: Session, tenant_a: Tenants
+    ) -> None:
         from app.api.application.crud import applications_crud
 
         popup = _make_popup(db, tenant_a, suffix="comp-acc")
@@ -317,10 +317,10 @@ class TestResolvePopupAccess:
 
         result = applications_crud.resolve_popup_access(db, companion.id, popup.id)
 
-        assert result.allowed is True
-        assert result.source == "companion"
+        assert result.allowed is False
+        assert result.source is None
         assert result.application_status is None
-        assert result.reason is None
+        assert result.reason == "no_access"
 
     def test_no_match_returns_no_access(self, db: Session, tenant_a: Tenants) -> None:
         """Ladder step 7: no match → denied, reason=no_access."""

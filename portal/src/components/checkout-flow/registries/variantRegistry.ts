@@ -13,6 +13,11 @@ import VariantTicketCard from "../variants/VariantTicketCard"
 import VariantTicketSelect from "../variants/VariantTicketSelect"
 import VariantYouTubeVideo from "../variants/VariantYouTubeVideo"
 
+export {
+  CONTENT_ONLY_TEMPLATES,
+  PRODUCT_INDEPENDENT_TEMPLATES,
+} from "./templateClassification"
+
 export interface VariantProps {
   products: ProductsPass[]
   stepType: string
@@ -38,21 +43,3 @@ export const VARIANT_REGISTRY: Record<string, ComponentType<VariantProps>> = {
   "rich-text": VariantRichText,
   hero: VariantHero,
 }
-
-/**
- * Templates that render without a product list.
- *
- * `accommodation-booking` is here for a different reason than the rest: it is
- * not content, it sells something, but its inventory lives outside
- * `products` (the shadow products are hidden from the portal on purpose), so
- * the "no products, no step" guard would otherwise hide a step that has
- * plenty to show.
- */
-export const CONTENT_ONLY_TEMPLATES = new Set([
-  "accommodation-booking",
-  "youtube-video",
-  "image-gallery",
-  "faqs",
-  "rich-text",
-  "hero",
-])

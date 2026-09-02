@@ -489,10 +489,14 @@ function PaymentSubRow({ row }: { row: Row<PaymentPublic> }) {
 
   const byAttendee = products.reduce<
     Record<string, { name: string; items: (typeof products)[number][] }>
-  >((acc, p) => {
-    const key = p.attendee_id
+  >((acc, p, index) => {
+    const key = p.attendee_id ?? `pending-${index}`
     if (!acc[key]) {
-      acc[key] = { name: p.attendee_name || "Unknown", items: [] }
+      acc[key] = {
+        name:
+          p.attendee_name || (p.attendee_id ? "Unknown" : "Pending recipient"),
+        items: [],
+      }
     }
     acc[key].items.push(p)
     return acc

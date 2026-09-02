@@ -21,6 +21,7 @@ from app.api.popup.models import Popups
 from app.api.popup.schemas import PopupStatus
 from app.api.tenant.models import Tenants
 from app.core.security import create_access_token
+from tests._flow_helpers import group_flow_id
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -62,6 +63,7 @@ def _make_human(db: Session, tenant: Tenants, email: str | None = None) -> Human
 
 def _make_group(db: Session, tenant: Tenants, popup: Popups) -> Groups:
     g = Groups(
+        sales_flow_id=group_flow_id(db, popup.id),
         tenant_id=tenant.id,
         popup_id=popup.id,
         name=f"Member Group {uuid.uuid4().hex[:6]}",

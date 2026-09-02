@@ -1,6 +1,6 @@
 import { useCallback, useMemo, useState } from "react"
 import type { TicketingStepPublic } from "@/client"
-import { CONTENT_ONLY_TEMPLATES } from "@/components/checkout-flow/registries/variantRegistry"
+import { PRODUCT_INDEPENDENT_TEMPLATES } from "@/components/checkout-flow/registries/templateClassification"
 import type { CheckoutStep } from "@/types/checkout"
 import type { ProductsPass } from "@/types/Products"
 
@@ -10,6 +10,7 @@ interface UseCheckoutStepsParams {
   productsByStepId: Map<string, ProductsPass[]>
   selectedPassesCount: number
   dynamicItemsCount: number
+  productIndependentItemsCount?: number
   isEditing: boolean
   buyerInfoComplete?: boolean
 }
@@ -43,7 +44,7 @@ function toCheckoutStep(stepType: string): CheckoutStep | null {
  * Rules (in priority order):
  * 1. If is_enabled=false → hidden.
  * 2. Structural steps (confirm, buyer, tickets) → always visible when enabled.
- * 3. Content-only template steps → always visible when enabled (no products).
+ * 3. Product-independent template steps → always visible when enabled.
  * 4. All others → visible iff the resolver map has ≥1 product for this step.
  */
 function isStepVisible(
@@ -59,8 +60,11 @@ function isStepVisible(
   ) {
     return true
   }
-  // Content-only templates have no product requirement.
-  if (stepConfig.template && CONTENT_ONLY_TEMPLATES.has(stepConfig.template)) {
+  // Content and external-inventory templates have no catalog requirement.
+  if (
+    stepConfig.template &&
+    PRODUCT_INDEPENDENT_TEMPLATES.has(stepConfig.template)
+  ) {
     return true
   }
   // All other steps require at least one resolved product.
@@ -73,6 +77,7 @@ export function useCheckoutSteps({
   productsByStepId,
   selectedPassesCount,
   dynamicItemsCount,
+  productIndependentItemsCount = 0,
   isEditing,
   buyerInfoComplete = true,
 }: UseCheckoutStepsParams) {
@@ -126,7 +131,8 @@ export function useCheckoutSteps({
       if (
         targetIndex > 0 &&
         selectedPassesCount === 0 &&
-        dynamicItemsCount === 0
+        dynamicItemsCount === 0 &&
+        productIndependentItemsCount === 0
       ) {
         return false
       }
@@ -141,6 +147,7 @@ export function useCheckoutSteps({
     [
       selectedPassesCount,
       dynamicItemsCount,
+      productIndependentItemsCount,
       availableSteps,
       isEditing,
       buyerInfoComplete,

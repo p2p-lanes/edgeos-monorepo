@@ -2889,6 +2889,29 @@ export const ApplicantParticipationSchema = {
     description: 'Response when human is the main applicant.'
 } as const;
 
+export const ApplicationAccessSourceSchema = {
+    properties: {
+        kind: {
+            type: 'string',
+            enum: ['group', 'invite', 'referral'],
+            title: 'Kind'
+        },
+        id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Id'
+        },
+        label: {
+            type: 'string',
+            title: 'Label'
+        }
+    },
+    type: 'object',
+    required: ['kind', 'id', 'label'],
+    title: 'ApplicationAccessSource',
+    description: 'Resolved source through which an application was accessed.'
+} as const;
+
 export const ApplicationAdminCreateSchema = {
     properties: {
         popup_id: {
@@ -3018,6 +3041,18 @@ export const ApplicationAdminCreateSchema = {
                 }
             ],
             title: 'Group Id'
+        },
+        sales_flow_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Sales Flow Id'
         }
     },
     type: 'object',
@@ -3270,6 +3305,18 @@ export const ApplicationCreateSchema = {
             ],
             title: 'Group Id'
         },
+        sales_flow_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Sales Flow Id'
+        },
         invite_id: {
             anyOf: [
                 {
@@ -3339,6 +3386,7 @@ export const ApplicationFeeCreateSchema = {
             title: 'Application Id'
         }
     },
+    additionalProperties: false,
     type: 'object',
     required: ['application_id'],
     title: 'ApplicationFeeCreate',
@@ -3453,6 +3501,11 @@ export const ApplicationPublicSchema = {
             ],
             title: 'Group Id'
         },
+        sales_flow_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Sales Flow Id'
+        },
         referral: {
             anyOf: [
                 {
@@ -3498,6 +3551,13 @@ export const ApplicationPublicSchema = {
                 }
             ],
             title: 'Referred By Name'
+        },
+        access_sources: {
+            items: {
+                '$ref': '#/components/schemas/ApplicationAccessSource'
+            },
+            type: 'array',
+            title: 'Access Sources'
         },
         info_not_shared: {
             items: {
@@ -3730,7 +3790,7 @@ export const ApplicationPublicSchema = {
         }
     },
     type: 'object',
-    required: ['id', 'tenant_id', 'popup_id', 'human_id', 'status'],
+    required: ['id', 'tenant_id', 'popup_id', 'human_id', 'sales_flow_id', 'status'],
     title: 'ApplicationPublic',
     description: 'Application schema for API responses.'
 } as const;
@@ -4275,6 +4335,11 @@ export const ApprovalStrategyPublicSchema = {
             format: 'uuid',
             title: 'Tenant Id'
         },
+        sales_flow_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Sales Flow Id'
+        },
         strategy_type: {
             '$ref': '#/components/schemas/ApprovalStrategyType'
         },
@@ -4332,7 +4397,7 @@ export const ApprovalStrategyPublicSchema = {
         }
     },
     type: 'object',
-    required: ['id', 'popup_id', 'tenant_id', 'strategy_type', 'required_approvals', 'accept_threshold', 'reject_threshold', 'strong_yes_weight', 'yes_weight', 'no_weight', 'strong_no_weight'],
+    required: ['id', 'popup_id', 'tenant_id', 'sales_flow_id', 'strategy_type', 'required_approvals', 'accept_threshold', 'reject_threshold', 'strong_yes_weight', 'yes_weight', 'no_weight', 'strong_no_weight'],
     title: 'ApprovalStrategyPublic',
     description: 'ApprovalStrategy schema for API responses.'
 } as const;
@@ -5026,8 +5091,15 @@ export const AttendeeProductPublicSchema = {
             title: 'Id'
         },
         attendee_id: {
-            type: 'string',
-            format: 'uuid',
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
             title: 'Attendee Id'
         },
         product_id: {
@@ -5112,6 +5184,40 @@ export const AttendeeProductPublicSchema = {
                 }
             ],
             title: 'Purchase Metadata'
+        },
+        product_category_snapshot: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Product Category Snapshot'
+        },
+        requires_check_in_snapshot: {
+            anyOf: [
+                {
+                    type: 'boolean'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Requires Check In Snapshot'
+        },
+        revoked_at: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Revoked At'
         }
     },
     additionalProperties: false,
@@ -6230,6 +6336,11 @@ export const BaseFieldConfigPublicSchema = {
             format: 'uuid',
             title: 'Popup Id'
         },
+        sales_flow_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Sales Flow Id'
+        },
         field_name: {
             type: 'string',
             title: 'Field Name'
@@ -6316,7 +6427,7 @@ export const BaseFieldConfigPublicSchema = {
         }
     },
     type: 'object',
-    required: ['id', 'tenant_id', 'popup_id', 'field_name'],
+    required: ['id', 'tenant_id', 'popup_id', 'sales_flow_id', 'field_name'],
     title: 'BaseFieldConfigPublic'
 } as const;
 
@@ -7011,8 +7122,28 @@ export const CartItemMerchSchema = {
 export const CartItemPassSchema = {
     properties: {
         attendee_id: {
-            type: 'string',
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
             title: 'Attendee Id'
+        },
+        recipient_key: {
+            anyOf: [
+                {
+                    type: 'string',
+                    maxLength: 255,
+                    minLength: 1
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Recipient Key'
         },
         product_id: {
             type: 'string',
@@ -7025,7 +7156,7 @@ export const CartItemPassSchema = {
         }
     },
     type: 'object',
-    required: ['attendee_id', 'product_id'],
+    required: ['product_id'],
     title: 'CartItemPass',
     description: 'Pass selection in cart.'
 } as const;
@@ -7170,8 +7301,14 @@ export const CartStateSchema = {
                 '$ref': '#/components/schemas/CartItemPass'
             },
             type: 'array',
-            title: 'Passes',
-            default: []
+            title: 'Passes'
+        },
+        recipients: {
+            items: {
+                '$ref': '#/components/schemas/PaymentRecipientRequest'
+            },
+            type: 'array',
+            title: 'Recipients'
         },
         housing: {
             anyOf: [
@@ -7702,12 +7839,29 @@ export const CheckoutPreviewRequestSchema = {
             type: 'boolean',
             title: 'Insurance',
             default: false
+        },
+        buyer: {
+            anyOf: [
+                {
+                    '$ref': '#/components/schemas/BuyerInfo'
+                },
+                {
+                    type: 'null'
+                }
+            ]
+        },
+        recipients: {
+            items: {
+                '$ref': '#/components/schemas/PaymentRecipientRequest'
+            },
+            type: 'array',
+            title: 'Recipients'
         }
     },
     type: 'object',
     required: ['products'],
     title: 'CheckoutPreviewRequest',
-    description: 'Request schema for POST /checkout/{slug}/preview.'
+    description: 'Request schema for POST /checkout/{slug}/{flow_slug}/preview.'
 } as const;
 
 export const CheckoutPreviewResponseSchema = {
@@ -7783,10 +7937,41 @@ export const CheckoutPreviewResponseSchema = {
         currency: {
             type: 'string',
             title: 'Currency'
+        },
+        selected_flow: {
+            '$ref': '#/components/schemas/SelectedSalesFlow'
+        },
+        kind: {
+            type: 'string',
+            enum: ['estimate', 'definitive'],
+            title: 'Kind'
+        },
+        quote_token: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Quote Token'
+        },
+        quote_expires_at: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Quote Expires At'
         }
     },
     type: 'object',
-    required: ['lines', 'discountable_amount', 'non_discountable_amount', 'post_discount_amount', 'total', 'currency'],
+    required: ['lines', 'discountable_amount', 'non_discountable_amount', 'post_discount_amount', 'total', 'currency', 'selected_flow', 'kind'],
     title: 'CheckoutPreviewResponse',
     description: 'Server-computed price breakdown for anonymous checkout (no side effects).'
 } as const;
@@ -8023,6 +8208,9 @@ export const CheckoutRuntimeResponseSchema = {
         popup: {
             '$ref': '#/components/schemas/PopupPublic'
         },
+        selected_flow: {
+            '$ref': '#/components/schemas/SelectedSalesFlow'
+        },
         products: {
             items: {
                 '$ref': '#/components/schemas/CheckoutRuntimeProduct'
@@ -8063,12 +8251,46 @@ export const CheckoutRuntimeResponseSchema = {
                 }
             ],
             title: 'Form Schema'
+        },
+        empty_catalog_reason: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Empty Catalog Reason'
+        },
+        flow_type: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Flow Type'
+        },
+        theme_config: {
+            anyOf: [
+                {
+                    additionalProperties: true,
+                    type: 'object'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Theme Config'
         }
     },
     type: 'object',
-    required: ['popup', 'products', 'buyer_form', 'ticketing_steps'],
+    required: ['popup', 'selected_flow', 'products', 'buyer_form', 'ticketing_steps'],
     title: 'CheckoutRuntimeResponse',
-    description: 'Full response for GET /checkout/{slug}/runtime.'
+    description: 'Full response for GET /checkout/{slug}/{flow_slug}/runtime.'
 } as const;
 
 export const CheckoutShareMetaSchema = {
@@ -8121,7 +8343,7 @@ export const CheckoutShareMetaSchema = {
     title: 'CheckoutShareMeta',
     description: `Tiny, unauthenticated projection for social/OpenGraph share previews.
 
-Returned by the public \`\`/{slug}/share\`\` endpoint so social crawlers (which
+Returned by the public \`\`/{slug}/{flow_slug}/share\`\` endpoint so social crawlers (which
 send no JWT) can render the popup name, tagline/location snippet and cover
 image without loading the full checkout runtime payload.`
 } as const;
@@ -8159,12 +8381,92 @@ export const CompanionParticipationSchema = {
     description: "Response when human is a companion on someone else's application."
 } as const;
 
+export const CopyFormToFlowRequestSchema = {
+    properties: {
+        source_flow_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Source Flow Id'
+        }
+    },
+    type: 'object',
+    title: 'CopyFormToFlowRequest',
+    description: `sdd/sales-flows task 14.1: HTTP body for the copy-form-to-flow
+backoffice action. \`source_flow_id\` omitted copies the popup-shared
+tier; a specific flow id copies exactly that flow's own rows.`
+} as const;
+
+export const CopyFormToFlowResponseSchema = {
+    properties: {
+        sections: {
+            type: 'integer',
+            title: 'Sections'
+        },
+        base_fields: {
+            type: 'integer',
+            title: 'Base Fields'
+        },
+        fields: {
+            type: 'integer',
+            title: 'Fields'
+        }
+    },
+    type: 'object',
+    required: ['sections', 'base_fields', 'fields'],
+    title: 'CopyFormToFlowResponse'
+} as const;
+
+export const CopyStepsToFlowRequestSchema = {
+    properties: {
+        source_flow_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Source Flow Id'
+        }
+    },
+    type: 'object',
+    required: ['source_flow_id'],
+    title: 'CopyStepsToFlowRequest',
+    description: 'Which flow to copy the checkout steps from.'
+} as const;
+
+export const CopyStepsToFlowResponseSchema = {
+    properties: {
+        steps: {
+            type: 'integer',
+            title: 'Steps'
+        }
+    },
+    type: 'object',
+    required: ['steps'],
+    title: 'CopyStepsToFlowResponse'
+} as const;
+
 export const CouponCreateSchema = {
     properties: {
         popup_id: {
             type: 'string',
             format: 'uuid',
             title: 'Popup Id'
+        },
+        sales_flow_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Sales Flow Id'
         },
         code: {
             type: 'string',
@@ -8233,6 +8535,11 @@ export const CouponPublicSchema = {
             format: 'uuid',
             title: 'Popup Id'
         },
+        sales_flow_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Sales Flow Id'
+        },
         code: {
             type: 'string',
             title: 'Code'
@@ -8294,7 +8601,7 @@ export const CouponPublicSchema = {
         }
     },
     type: 'object',
-    required: ['tenant_id', 'popup_id', 'code', 'id'],
+    required: ['tenant_id', 'popup_id', 'sales_flow_id', 'code', 'id'],
     title: 'CouponPublic',
     description: 'Coupon schema for API responses.'
 } as const;
@@ -8382,6 +8689,18 @@ export const CouponValidateSchema = {
             format: 'uuid',
             title: 'Popup Id'
         },
+        sales_flow_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Sales Flow Id'
+        },
         code: {
             type: 'string',
             title: 'Code'
@@ -8402,6 +8721,17 @@ export const CouponValidatePublicRequestSchema = {
         code: {
             type: 'string',
             title: 'Code'
+        },
+        flow_slug: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Flow Slug'
         }
     },
     type: 'object',
@@ -8827,6 +9157,18 @@ export const EmailTemplateCreateSchema = {
             ],
             title: 'Popup Id'
         },
+        sales_flow_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Sales Flow Id'
+        },
         template_type: {
             type: 'string',
             title: 'Template Type'
@@ -8880,6 +9222,18 @@ export const EmailTemplatePublicSchema = {
                 }
             ],
             title: 'Popup Id'
+        },
+        sales_flow_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Sales Flow Id'
         },
         template_type: {
             type: 'string',
@@ -12033,12 +12387,99 @@ export const ExportPreviewColumnSchema = {
     title: 'ExportPreviewColumn'
 } as const;
 
+export const FlowSettingsByTypeSchema = {
+    properties: {
+        settings: {
+            additionalProperties: {
+                items: {
+                    type: 'string'
+                },
+                type: 'array'
+            },
+            type: 'object',
+            title: 'Settings'
+        }
+    },
+    type: 'object',
+    required: ['settings'],
+    title: 'FlowSettingsByType',
+    description: `Which settings each kind of flow can use.
+
+What a kind of flow decides is not a set of preset values — it is which
+questions are worth asking at all. A flow nobody applies to has no
+application fee to charge and no half-finished draft to chase; one that
+never sells anonymously has nowhere to redirect a buyer and nothing to
+sign on the way.
+
+Served rather than duplicated in the backoffice. That knowledge already
+decides what gets seeded (\`fields_for\`) and what a copy carries across, so
+a second copy deciding what gets rendered would eventually disagree with
+it — and the screen would offer a setting the server would never keep.`
+} as const;
+
+export const FlowStartPreviewSchema = {
+    properties: {
+        flow_type: {
+            '$ref': '#/components/schemas/SalesFlowType'
+        },
+        source_kind: {
+            type: 'string',
+            title: 'Source Kind'
+        },
+        source_name: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Source Name'
+        },
+        starts_with: {
+            additionalProperties: true,
+            type: 'object',
+            title: 'Starts With'
+        },
+        left_empty: {
+            items: {
+                type: 'string'
+            },
+            type: 'array',
+            title: 'Left Empty'
+        },
+        not_carried_over: {
+            items: {
+                type: 'string'
+            },
+            type: 'array',
+            title: 'Not Carried Over'
+        }
+    },
+    type: 'object',
+    required: ['flow_type', 'source_kind', 'starts_with', 'left_empty', 'not_carried_over'],
+    title: 'FlowStartPreview',
+    description: `What a way in would begin with, before anyone commits to opening it.
+
+Computed by the same code that seeds the flow, so a screen cannot promise
+something creation will not deliver. Deriving this in the frontend would
+mean a second opinion about which settings a kind of door can read, and
+the two would eventually disagree — at which point the preview becomes the
+most confident wrong thing on screen.`
+} as const;
+
 export const FormFieldCreateSchema = {
     properties: {
         popup_id: {
             type: 'string',
             format: 'uuid',
             title: 'Popup Id'
+        },
+        sales_flow_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Sales Flow Id'
         },
         label: {
             type: 'string',
@@ -12166,7 +12607,7 @@ export const FormFieldCreateSchema = {
         }
     },
     type: 'object',
-    required: ['popup_id', 'label'],
+    required: ['popup_id', 'sales_flow_id', 'label'],
     title: 'FormFieldCreate'
 } as const;
 
@@ -12186,6 +12627,11 @@ export const FormFieldPublicSchema = {
             type: 'string',
             format: 'uuid',
             title: 'Popup Id'
+        },
+        sales_flow_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Sales Flow Id'
         },
         name: {
             type: 'string',
@@ -12362,7 +12808,7 @@ export const FormFieldPublicSchema = {
         }
     },
     type: 'object',
-    required: ['id', 'tenant_id', 'popup_id', 'name', 'label', 'field_type'],
+    required: ['id', 'tenant_id', 'popup_id', 'sales_flow_id', 'name', 'label', 'field_type'],
     title: 'FormFieldPublic'
 } as const;
 
@@ -12529,6 +12975,11 @@ export const FormSectionCreateSchema = {
             format: 'uuid',
             title: 'Popup Id'
         },
+        sales_flow_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Sales Flow Id'
+        },
         label: {
             type: 'string',
             title: 'Label'
@@ -12555,7 +13006,7 @@ export const FormSectionCreateSchema = {
         }
     },
     type: 'object',
-    required: ['popup_id', 'label'],
+    required: ['popup_id', 'sales_flow_id', 'label'],
     title: 'FormSectionCreate'
 } as const;
 
@@ -12581,6 +13032,11 @@ export const FormSectionPublicSchema = {
             type: 'string',
             format: 'uuid',
             title: 'Popup Id'
+        },
+        sales_flow_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Sales Flow Id'
         },
         label: {
             type: 'string',
@@ -12619,7 +13075,7 @@ export const FormSectionPublicSchema = {
         }
     },
     type: 'object',
-    required: ['id', 'tenant_id', 'popup_id', 'label'],
+    required: ['id', 'tenant_id', 'popup_id', 'sales_flow_id', 'label'],
     title: 'FormSectionPublic'
 } as const;
 
@@ -12813,8 +13269,15 @@ export const GrantedPaymentInfoSchema = {
             title: 'Payment Id'
         },
         application_id: {
-            type: 'string',
-            format: 'uuid',
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
             title: 'Application Id'
         },
         human_id: {
@@ -12968,6 +13431,18 @@ export const GroupCreateSchema = {
             type: 'string',
             format: 'uuid',
             title: 'Popup Id'
+        },
+        sales_flow_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Sales Flow Id'
         },
         name: {
             type: 'string',
@@ -13441,6 +13916,11 @@ export const GroupPublicSchema = {
             format: 'uuid',
             title: 'Popup Id'
         },
+        sales_flow_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Sales Flow Id'
+        },
         name: {
             type: 'string',
             title: 'Name'
@@ -13547,7 +14027,7 @@ export const GroupPublicSchema = {
         }
     },
     type: 'object',
-    required: ['tenant_id', 'popup_id', 'name', 'slug', 'id'],
+    required: ['tenant_id', 'popup_id', 'sales_flow_id', 'name', 'slug', 'id'],
     title: 'GroupPublic',
     description: 'Group schema for API responses.'
 } as const;
@@ -13677,6 +14157,11 @@ export const GroupWithMembersSchema = {
             format: 'uuid',
             title: 'Popup Id'
         },
+        sales_flow_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Sales Flow Id'
+        },
         name: {
             type: 'string',
             title: 'Name'
@@ -13791,7 +14276,7 @@ export const GroupWithMembersSchema = {
         }
     },
     type: 'object',
-    required: ['tenant_id', 'popup_id', 'name', 'slug', 'id'],
+    required: ['tenant_id', 'popup_id', 'sales_flow_id', 'name', 'slug', 'id'],
     title: 'GroupWithMembers',
     description: 'Group with members list.'
 } as const;
@@ -14946,6 +15431,18 @@ export const InviteCreateSchema = {
             format: 'uuid',
             title: 'Popup Id'
         },
+        sales_flow_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Sales Flow Id'
+        },
         token: {
             anyOf: [
                 {
@@ -15108,6 +15605,11 @@ export const InvitePublicSchema = {
             format: 'uuid',
             title: 'Popup Id'
         },
+        sales_flow_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Sales Flow Id'
+        },
         token: {
             type: 'string',
             title: 'Token'
@@ -15228,7 +15730,7 @@ export const InvitePublicSchema = {
         }
     },
     type: 'object',
-    required: ['id', 'popup_id', 'token', 'discount_percentage', 'auto_approve', 'express_checkout', 'current_uses', 'created_at', 'updated_at'],
+    required: ['id', 'popup_id', 'sales_flow_id', 'token', 'discount_percentage', 'auto_approve', 'express_checkout', 'current_uses', 'created_at', 'updated_at'],
     title: 'InvitePublic',
     description: `Full link detail — admin, or the owning attendee for their own link.
 
@@ -16135,6 +16637,42 @@ export const ListModel_ProductPublic_Schema = {
     title: 'ListModel[ProductPublic]'
 } as const;
 
+export const ListModel_SalesFlowPortalPublic_Schema = {
+    properties: {
+        results: {
+            items: {
+                '$ref': '#/components/schemas/SalesFlowPortalPublic'
+            },
+            type: 'array',
+            title: 'Results'
+        },
+        paging: {
+            '$ref': '#/components/schemas/Paging'
+        }
+    },
+    type: 'object',
+    required: ['results', 'paging'],
+    title: 'ListModel[SalesFlowPortalPublic]'
+} as const;
+
+export const ListModel_SalesFlowPublic_Schema = {
+    properties: {
+        results: {
+            items: {
+                '$ref': '#/components/schemas/SalesFlowPublic'
+            },
+            type: 'array',
+            title: 'Results'
+        },
+        paging: {
+            '$ref': '#/components/schemas/Paging'
+        }
+    },
+    type: 'object',
+    required: ['results', 'paging'],
+    title: 'ListModel[SalesFlowPublic]'
+} as const;
+
 export const ListModel_SavedViewPublic_Schema = {
     properties: {
         results: {
@@ -16318,6 +16856,11 @@ export const MyGroupPublicSchema = {
             format: 'uuid',
             title: 'Popup Id'
         },
+        sales_flow_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Sales Flow Id'
+        },
         name: {
             type: 'string',
             title: 'Name'
@@ -16429,7 +16972,7 @@ export const MyGroupPublicSchema = {
         }
     },
     type: 'object',
-    required: ['tenant_id', 'popup_id', 'name', 'slug', 'id'],
+    required: ['tenant_id', 'popup_id', 'sales_flow_id', 'name', 'slug', 'id'],
     title: 'MyGroupPublic',
     description: "Group public schema augmented with the viewer's role (portal)."
 } as const;
@@ -16445,6 +16988,11 @@ export const MyGroupWithMembersSchema = {
             type: 'string',
             format: 'uuid',
             title: 'Popup Id'
+        },
+        sales_flow_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Sales Flow Id'
         },
         name: {
             type: 'string',
@@ -16565,7 +17113,7 @@ export const MyGroupWithMembersSchema = {
         }
     },
     type: 'object',
-    required: ['tenant_id', 'popup_id', 'name', 'slug', 'id'],
+    required: ['tenant_id', 'popup_id', 'sales_flow_id', 'name', 'slug', 'id'],
     title: 'MyGroupWithMembers',
     description: 'Group with members and viewer role (portal detail).'
 } as const;
@@ -16709,7 +17257,7 @@ export const OpenCartPublicSchema = {
     description: `Anonymous open-checkout cart response.
 
 \`restore_token\` is the HMAC for the signed restore link
-(GET /checkout/{slug}/cart?cid=<id>&sig=<restore_token>). It is only
+(GET /checkout/{slug}/{flow_slug}/cart?cid=<id>&sig=<restore_token>). It is only
 present when the popup configures an open_checkout_signing_secret; the
 client stores it to rebuild the cart on a later visit.`
 } as const;
@@ -16740,6 +17288,13 @@ export const OpenTicketingPurchaseCreateSchema = {
             type: 'array',
             minItems: 1,
             title: 'Products'
+        },
+        recipients: {
+            items: {
+                '$ref': '#/components/schemas/PaymentRecipientRequest'
+            },
+            type: 'array',
+            title: 'Recipients'
         },
         buyer: {
             '$ref': '#/components/schemas/BuyerInfo'
@@ -16828,12 +17383,23 @@ export const OpenTicketingPurchaseCreateSchema = {
                 }
             ],
             title: 'Sig'
+        },
+        quote_token: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Quote Token'
         }
     },
     type: 'object',
     required: ['products', 'buyer'],
     title: 'OpenTicketingPurchaseCreate',
-    description: 'Request schema for POST /checkout/{slug}/purchase.'
+    description: 'Request schema for POST /checkout/{slug}/{flow_slug}/purchase.'
 } as const;
 
 export const OpenTicketingPurchaseResponseSchema = {
@@ -16875,7 +17441,7 @@ export const OpenTicketingPurchaseResponseSchema = {
     type: 'object',
     required: ['payment_id', 'status', 'checkout_url', 'amount', 'currency'],
     title: 'OpenTicketingPurchaseResponse',
-    description: 'Response schema for POST /checkout/{slug}/purchase.'
+    description: 'Response schema for POST /checkout/{slug}/{flow_slug}/purchase.'
 } as const;
 
 export const PagingSchema = {
@@ -16943,6 +17509,13 @@ export const PaymentCreateSchema = {
             type: 'array',
             title: 'Products'
         },
+        recipients: {
+            items: {
+                '$ref': '#/components/schemas/PaymentRecipientRequest'
+            },
+            type: 'array',
+            title: 'Recipients'
+        },
         coupon_code: {
             anyOf: [
                 {
@@ -16965,6 +17538,7 @@ export const PaymentCreateSchema = {
             default: false
         }
     },
+    additionalProperties: false,
     type: 'object',
     required: ['products'],
     title: 'PaymentCreate',
@@ -17126,9 +17700,29 @@ export const PaymentProductRequest_InputSchema = {
             title: 'Product Id'
         },
         attendee_id: {
-            type: 'string',
-            format: 'uuid',
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
             title: 'Attendee Id'
+        },
+        recipient_key: {
+            anyOf: [
+                {
+                    type: 'string',
+                    maxLength: 255,
+                    minLength: 1
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Recipient Key'
         },
         quantity: {
             type: 'integer',
@@ -17163,8 +17757,9 @@ export const PaymentProductRequest_InputSchema = {
             title: 'Purchase Metadata'
         }
     },
+    additionalProperties: false,
     type: 'object',
-    required: ['product_id', 'attendee_id'],
+    required: ['product_id'],
     title: 'PaymentProductRequest',
     description: 'Product selection for payment.'
 } as const;
@@ -17177,9 +17772,29 @@ export const PaymentProductRequest_OutputSchema = {
             title: 'Product Id'
         },
         attendee_id: {
-            type: 'string',
-            format: 'uuid',
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
             title: 'Attendee Id'
+        },
+        recipient_key: {
+            anyOf: [
+                {
+                    type: 'string',
+                    maxLength: 255,
+                    minLength: 1
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Recipient Key'
         },
         quantity: {
             type: 'integer',
@@ -17211,8 +17826,9 @@ export const PaymentProductRequest_OutputSchema = {
             title: 'Purchase Metadata'
         }
     },
+    additionalProperties: false,
     type: 'object',
-    required: ['product_id', 'attendee_id'],
+    required: ['product_id'],
     title: 'PaymentProductRequest',
     description: 'Product selection for payment.'
 } as const;
@@ -17225,9 +17841,39 @@ export const PaymentProductResponseSchema = {
             title: 'Product Id'
         },
         attendee_id: {
-            type: 'string',
-            format: 'uuid',
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
             title: 'Attendee Id'
+        },
+        payment_recipient_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Payment Recipient Id'
+        },
+        recipient_key: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Recipient Key'
         },
         quantity: {
             type: 'integer',
@@ -17269,6 +17915,17 @@ export const PaymentProductResponseSchema = {
             type: 'string',
             title: 'Product Category'
         },
+        requires_check_in_snapshot: {
+            anyOf: [
+                {
+                    type: 'boolean'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Requires Check In Snapshot'
+        },
         product_currency: {
             type: 'string',
             title: 'Product Currency'
@@ -17284,6 +17941,13 @@ export const PaymentProductResponseSchema = {
             ],
             title: 'Attendee Name'
         },
+        units: {
+            items: {
+                '$ref': '#/components/schemas/PaymentProductUnitResponse'
+            },
+            type: 'array',
+            title: 'Units'
+        },
         created_at: {
             type: 'string',
             format: 'date-time',
@@ -17294,6 +17958,43 @@ export const PaymentProductResponseSchema = {
     required: ['product_id', 'attendee_id', 'quantity', 'product_name', 'product_price', 'product_category', 'product_currency', 'created_at'],
     title: 'PaymentProductResponse',
     description: 'Payment product snapshot in response.'
+} as const;
+
+export const PaymentProductUnitResponseSchema = {
+    properties: {
+        id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Id'
+        },
+        attendee_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Attendee Id'
+        },
+        check_in_code: {
+            type: 'string',
+            title: 'Check In Code'
+        },
+        active: {
+            type: 'boolean',
+            title: 'Active'
+        },
+        requires_check_in: {
+            type: 'boolean',
+            title: 'Requires Check In'
+        }
+    },
+    type: 'object',
+    required: ['id', 'check_in_code', 'active', 'requires_check_in'],
+    title: 'PaymentProductUnitResponse'
 } as const;
 
 export const PaymentPublicSchema = {
@@ -17319,6 +18020,30 @@ export const PaymentPublicSchema = {
             type: 'string',
             format: 'uuid',
             title: 'Popup Id'
+        },
+        buyer_human_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Buyer Human Id'
+        },
+        sales_flow_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Sales Flow Id'
         },
         external_id: {
             anyOf: [
@@ -17544,6 +18269,13 @@ export const PaymentPublicSchema = {
             title: 'Products Snapshot',
             default: []
         },
+        recipients: {
+            items: {
+                '$ref': '#/components/schemas/PaymentRecipientResponse'
+            },
+            type: 'array',
+            title: 'Recipients'
+        },
         buyer_email: {
             anyOf: [
                 {
@@ -17595,6 +18327,173 @@ export const PaymentPublicSchema = {
     required: ['tenant_id', 'popup_id', 'id'],
     title: 'PaymentPublic',
     description: 'Payment schema for API responses.'
+} as const;
+
+export const PaymentRecipientRequestSchema = {
+    properties: {
+        recipient_key: {
+            type: 'string',
+            maxLength: 255,
+            minLength: 1,
+            title: 'Recipient Key'
+        },
+        human_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Human Id'
+        },
+        existing_attendee_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Existing Attendee Id'
+        },
+        name: {
+            type: 'string',
+            minLength: 1,
+            title: 'Name'
+        },
+        email: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'email'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Email'
+        },
+        category_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Category Id'
+        },
+        profile_snapshot: {
+            additionalProperties: true,
+            type: 'object',
+            title: 'Profile Snapshot'
+        }
+    },
+    type: 'object',
+    required: ['recipient_key', 'name'],
+    title: 'PaymentRecipientRequest',
+    description: 'Stable recipient identity and profile supplied for one payment attempt.'
+} as const;
+
+export const PaymentRecipientResponseSchema = {
+    properties: {
+        recipient_key: {
+            type: 'string',
+            maxLength: 255,
+            minLength: 1,
+            title: 'Recipient Key'
+        },
+        human_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Human Id'
+        },
+        existing_attendee_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Existing Attendee Id'
+        },
+        name: {
+            type: 'string',
+            minLength: 1,
+            title: 'Name'
+        },
+        email: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'email'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Email'
+        },
+        category_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Category Id'
+        },
+        profile_snapshot: {
+            additionalProperties: true,
+            type: 'object',
+            title: 'Profile Snapshot'
+        },
+        id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Id'
+        },
+        attendee_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Attendee Id'
+        },
+        created_at: {
+            type: 'string',
+            format: 'date-time',
+            title: 'Created At'
+        }
+    },
+    type: 'object',
+    required: ['recipient_key', 'name', 'id', 'created_at'],
+    title: 'PaymentRecipientResponse'
 } as const;
 
 export const PaymentSourceSchema = {
@@ -17808,7 +18707,7 @@ export const PendingReleaseOpenRequestSchema = {
     type: 'object',
     required: ['email', 'cid', 'sig'],
     title: 'PendingReleaseOpenRequest',
-    description: `Request body for POST /checkout/{slug}/pending/release (anonymous surface).
+    description: `Request body for POST /checkout/{slug}/{flow_slug}/pending/release (anonymous surface).
 
 cid + sig constitute the cart continuity proof (HMAC). email is the buyer's
 address used as the payment lookup key (must match the cart's stored email).`
@@ -18504,6 +19403,16 @@ export const PopupAdminSchema = {
             type: 'string',
             format: 'uuid',
             title: 'Id'
+        },
+        takes_applications: {
+            type: 'boolean',
+            title: 'Takes Applications',
+            default: true
+        },
+        sells_directly: {
+            type: 'boolean',
+            title: 'Sells Directly',
+            default: false
         }
     },
     type: 'object',
@@ -19149,6 +20058,16 @@ export const PopupPublicSchema = {
             '$ref': '#/components/schemas/CheckoutMode',
             default: 'pass_system'
         },
+        takes_applications: {
+            type: 'boolean',
+            title: 'Takes Applications',
+            default: true
+        },
+        sells_directly: {
+            type: 'boolean',
+            title: 'Sells Directly',
+            default: false
+        },
         start_date: {
             anyOf: [
                 {
@@ -19282,6 +20201,28 @@ export const PopupPublicSchema = {
                 }
             ],
             title: 'Invoice Company Name'
+        },
+        invoice_company_address: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Invoice Company Address'
+        },
+        invoice_company_email: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Invoice Company Email'
         },
         requires_application_fee: {
             type: 'boolean',
@@ -19494,6 +20435,18 @@ export const PopupReviewerCreateSchema = {
             format: 'uuid',
             title: 'User Id'
         },
+        sales_flow_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Sales Flow Id'
+        },
         is_required: {
             type: 'boolean',
             title: 'Is Required',
@@ -19508,7 +20461,11 @@ export const PopupReviewerCreateSchema = {
     type: 'object',
     required: ['user_id'],
     title: 'PopupReviewerCreate',
-    description: 'Schema for adding a reviewer to a popup.'
+    description: `Schema for adding a reviewer to a popup.
+
+\`sales_flow_id\` omitted (None) adds a popup-shared reviewer; providing
+it adds a reviewer scoped exclusively to that flow (sdd/sales-flows D4)
+and switches the flow's \`reviewers_mode\` to 'override'.`
 } as const;
 
 export const PopupReviewerPublicSchema = {
@@ -19532,6 +20489,18 @@ export const PopupReviewerPublicSchema = {
             type: 'string',
             format: 'uuid',
             title: 'Tenant Id'
+        },
+        sales_flow_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Sales Flow Id'
         },
         is_required: {
             type: 'boolean',
@@ -20777,6 +21746,7 @@ export const ProductBatchItemSchema = {
             default: true
         }
     },
+    additionalProperties: false,
     type: 'object',
     required: ['name', 'price'],
     title: 'ProductBatchItem',
@@ -21218,6 +22188,7 @@ export const ProductCreateSchema = {
             default: true
         }
     },
+    additionalProperties: false,
     type: 'object',
     required: ['popup_id', 'name', 'price'],
     title: 'ProductCreate',
@@ -21237,6 +22208,31 @@ export const ProductLineSchema = {
             title: 'Quantity',
             default: 1
         },
+        attendee_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Attendee Id'
+        },
+        recipient_key: {
+            anyOf: [
+                {
+                    type: 'string',
+                    maxLength: 255,
+                    minLength: 1
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Recipient Key'
+        },
         purchase_metadata: {
             anyOf: [
                 {
@@ -21250,6 +22246,7 @@ export const ProductLineSchema = {
             title: 'Purchase Metadata'
         }
     },
+    additionalProperties: false,
     type: 'object',
     required: ['product_id'],
     title: 'ProductLine',
@@ -21705,6 +22702,7 @@ export const ProductUpdateSchema = {
             title: 'Discountable'
         }
     },
+    additionalProperties: false,
     type: 'object',
     title: 'ProductUpdate',
     description: 'Product schema for updates.'
@@ -22549,6 +23547,1616 @@ export const SaleTypeSchema = {
 Enum is extensible for future types (e.g. waitlist, lottery, registration).`
 } as const;
 
+export const SalesFlowCreateSchema = {
+    properties: {
+        popup_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Popup Id'
+        },
+        start_from: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Start From'
+        },
+        type: {
+            '$ref': '#/components/schemas/SalesFlowType',
+            default: 'application'
+        },
+        slug: {
+            type: 'string',
+            title: 'Slug'
+        },
+        name: {
+            type: 'string',
+            title: 'Name'
+        },
+        visibility: {
+            '$ref': '#/components/schemas/SalesFlowVisibility',
+            default: 'portal_listed'
+        },
+        is_default: {
+            type: 'boolean',
+            title: 'Is Default',
+            default: false
+        },
+        order: {
+            type: 'integer',
+            title: 'Order',
+            default: 0
+        },
+        reviewers_mode: {
+            '$ref': '#/components/schemas/SalesFlowReviewersMode',
+            default: 'inherit'
+        },
+        identity_mode: {
+            '$ref': '#/components/schemas/SalesFlowIdentityMode',
+            default: 'portal_auth'
+        },
+        application_layout: {
+            anyOf: [
+                {
+                    '$ref': '#/components/schemas/ApplicationLayout'
+                },
+                {
+                    type: 'null'
+                }
+            ]
+        },
+        requires_application_fee: {
+            anyOf: [
+                {
+                    type: 'boolean'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Requires Application Fee'
+        },
+        application_fee_amount: {
+            anyOf: [
+                {
+                    type: 'number'
+                },
+                {
+                    type: 'string',
+                    pattern: '^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Application Fee Amount'
+        },
+        allows_scholarship: {
+            anyOf: [
+                {
+                    type: 'boolean'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Allows Scholarship'
+        },
+        allows_incentive: {
+            anyOf: [
+                {
+                    type: 'boolean'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Allows Incentive'
+        },
+        allows_coupons: {
+            anyOf: [
+                {
+                    type: 'boolean'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Allows Coupons'
+        },
+        insurance_enabled: {
+            anyOf: [
+                {
+                    type: 'boolean'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Insurance Enabled'
+        },
+        insurance_percentage: {
+            anyOf: [
+                {
+                    type: 'number'
+                },
+                {
+                    type: 'string',
+                    pattern: '^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Insurance Percentage'
+        },
+        contribution_enabled: {
+            anyOf: [
+                {
+                    type: 'boolean'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Contribution Enabled'
+        },
+        contribution_percentage: {
+            anyOf: [
+                {
+                    type: 'number'
+                },
+                {
+                    type: 'string',
+                    pattern: '^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Contribution Percentage'
+        },
+        contribution_label: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Contribution Label'
+        },
+        contribution_description: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Contribution Description'
+        },
+        installments_enabled: {
+            anyOf: [
+                {
+                    type: 'boolean'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Installments Enabled'
+        },
+        installments_deadline: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Installments Deadline'
+        },
+        installments_max: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Installments Max'
+        },
+        installments_interval: {
+            anyOf: [
+                {
+                    '$ref': '#/components/schemas/InstallmentInterval'
+                },
+                {
+                    type: 'null'
+                }
+            ]
+        },
+        installments_interval_count: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Installments Interval Count'
+        },
+        invites_enabled: {
+            anyOf: [
+                {
+                    type: 'boolean'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Invites Enabled'
+        },
+        referrals_enabled: {
+            anyOf: [
+                {
+                    type: 'boolean'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Referrals Enabled'
+        },
+        max_referrals_per_attendee: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Max Referrals Per Attendee'
+        },
+        checkin_pass_lead_days: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Checkin Pass Lead Days'
+        },
+        open_checkout_success_url: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Open Checkout Success Url'
+        },
+        open_checkout_cancel_url: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Open Checkout Cancel Url'
+        },
+        open_checkout_signing_secret: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Open Checkout Signing Secret'
+        },
+        abandoned_cart_delay_days: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Abandoned Cart Delay Days'
+        },
+        abandoned_cart_repeat_days: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Abandoned Cart Repeat Days'
+        },
+        abandoned_cart_max_count: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Abandoned Cart Max Count'
+        },
+        purchase_reminder_delay_days: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Purchase Reminder Delay Days'
+        },
+        purchase_reminder_repeat_days: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Purchase Reminder Repeat Days'
+        },
+        purchase_reminder_max_count: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Purchase Reminder Max Count'
+        },
+        abandoned_application_delay_days: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Abandoned Application Delay Days'
+        },
+        abandoned_application_repeat_days: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Abandoned Application Repeat Days'
+        },
+        abandoned_application_max_count: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Abandoned Application Max Count'
+        },
+        restriction_rule: {
+            anyOf: [
+                {
+                    additionalProperties: true,
+                    type: 'object'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Restriction Rule'
+        },
+        theme_config: {
+            anyOf: [
+                {
+                    additionalProperties: true,
+                    type: 'object'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Theme Config'
+        }
+    },
+    type: 'object',
+    required: ['popup_id', 'slug', 'name'],
+    title: 'SalesFlowCreate',
+    description: 'Sales flow creation payload (BO). tenant_id is derived server-side.'
+} as const;
+
+export const SalesFlowIdentityModeSchema = {
+    type: 'string',
+    enum: ['portal_auth', 'anonymous'],
+    title: 'SalesFlowIdentityMode',
+    description: `portal_auth is the only implemented mode in v1; anonymous is reserved
+for a future ticket-code lookup flow (spec: upsale-flow).`
+} as const;
+
+export const SalesFlowPortalPublicSchema = {
+    properties: {
+        id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Id'
+        },
+        slug: {
+            type: 'string',
+            title: 'Slug'
+        },
+        name: {
+            type: 'string',
+            title: 'Name'
+        },
+        order: {
+            type: 'integer',
+            title: 'Order'
+        },
+        type: {
+            '$ref': '#/components/schemas/SalesFlowType'
+        },
+        price_summary: {
+            anyOf: [
+                {
+                    '$ref': '#/components/schemas/SalesFlowPriceSummary'
+                },
+                {
+                    type: 'null'
+                }
+            ]
+        }
+    },
+    type: 'object',
+    required: ['id', 'slug', 'name', 'order', 'type'],
+    title: 'SalesFlowPortalPublic',
+    description: `What a buyer is told about a way in.
+
+Deliberately NOT \`SalesFlowPublic\`. That one extends \`SalesFlowBase\`, so it
+carries every configuration column a flow owns — including
+\`open_checkout_signing_secret\`, the HMAC key that signs the order payload
+an external thank-you page verifies. The portal listing is readable by any
+authenticated human of the tenant, which handed each of them the key to
+forge a completed order against that page.
+
+The portal needs a door's name, its slug and the order to list them in.
+Anything a flow decides about selling is the organiser's business, so it is
+added here one field at a time, on purpose, or not at all.`
+} as const;
+
+export const SalesFlowPriceKindSchema = {
+    type: 'string',
+    enum: ['fixed', 'from'],
+    title: 'SalesFlowPriceKind'
+} as const;
+
+export const SalesFlowPriceSummarySchema = {
+    properties: {
+        amount: {
+            type: 'string',
+            pattern: '^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$',
+            title: 'Amount'
+        },
+        currency: {
+            type: 'string',
+            title: 'Currency'
+        },
+        kind: {
+            '$ref': '#/components/schemas/SalesFlowPriceKind'
+        }
+    },
+    type: 'object',
+    required: ['amount', 'currency', 'kind'],
+    title: 'SalesFlowPriceSummary',
+    description: 'A price display fact that is safe to publish with a Portal flow.'
+} as const;
+
+export const SalesFlowPublicSchema = {
+    properties: {
+        tenant_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Tenant Id'
+        },
+        popup_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Popup Id'
+        },
+        type: {
+            '$ref': '#/components/schemas/SalesFlowType',
+            default: 'application'
+        },
+        slug: {
+            type: 'string',
+            title: 'Slug'
+        },
+        name: {
+            type: 'string',
+            title: 'Name'
+        },
+        visibility: {
+            '$ref': '#/components/schemas/SalesFlowVisibility',
+            default: 'portal_listed'
+        },
+        is_default: {
+            type: 'boolean',
+            title: 'Is Default',
+            default: false
+        },
+        order: {
+            type: 'integer',
+            title: 'Order',
+            default: 0
+        },
+        reviewers_mode: {
+            '$ref': '#/components/schemas/SalesFlowReviewersMode',
+            default: 'inherit'
+        },
+        identity_mode: {
+            '$ref': '#/components/schemas/SalesFlowIdentityMode',
+            default: 'portal_auth'
+        },
+        status: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Status'
+        },
+        restriction_rule: {
+            anyOf: [
+                {
+                    additionalProperties: true,
+                    type: 'object'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Restriction Rule'
+        },
+        theme_config: {
+            anyOf: [
+                {
+                    additionalProperties: true,
+                    type: 'object'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Theme Config'
+        },
+        application_layout: {
+            anyOf: [
+                {
+                    '$ref': '#/components/schemas/ApplicationLayout'
+                },
+                {
+                    type: 'null'
+                }
+            ]
+        },
+        requires_application_fee: {
+            anyOf: [
+                {
+                    type: 'boolean'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Requires Application Fee'
+        },
+        application_fee_amount: {
+            anyOf: [
+                {
+                    type: 'string',
+                    pattern: '^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Application Fee Amount'
+        },
+        allows_scholarship: {
+            anyOf: [
+                {
+                    type: 'boolean'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Allows Scholarship'
+        },
+        allows_incentive: {
+            anyOf: [
+                {
+                    type: 'boolean'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Allows Incentive'
+        },
+        allows_coupons: {
+            anyOf: [
+                {
+                    type: 'boolean'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Allows Coupons'
+        },
+        insurance_enabled: {
+            anyOf: [
+                {
+                    type: 'boolean'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Insurance Enabled'
+        },
+        insurance_percentage: {
+            anyOf: [
+                {
+                    type: 'string',
+                    pattern: '^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Insurance Percentage'
+        },
+        contribution_enabled: {
+            anyOf: [
+                {
+                    type: 'boolean'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Contribution Enabled'
+        },
+        contribution_percentage: {
+            anyOf: [
+                {
+                    type: 'string',
+                    pattern: '^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Contribution Percentage'
+        },
+        contribution_label: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Contribution Label'
+        },
+        contribution_description: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Contribution Description'
+        },
+        installments_enabled: {
+            anyOf: [
+                {
+                    type: 'boolean'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Installments Enabled'
+        },
+        installments_deadline: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Installments Deadline'
+        },
+        installments_max: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Installments Max'
+        },
+        installments_interval: {
+            anyOf: [
+                {
+                    '$ref': '#/components/schemas/InstallmentInterval'
+                },
+                {
+                    type: 'null'
+                }
+            ]
+        },
+        installments_interval_count: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Installments Interval Count'
+        },
+        invites_enabled: {
+            anyOf: [
+                {
+                    type: 'boolean'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Invites Enabled'
+        },
+        referrals_enabled: {
+            anyOf: [
+                {
+                    type: 'boolean'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Referrals Enabled'
+        },
+        max_referrals_per_attendee: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Max Referrals Per Attendee'
+        },
+        checkin_pass_lead_days: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Checkin Pass Lead Days'
+        },
+        open_checkout_success_url: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Open Checkout Success Url'
+        },
+        open_checkout_cancel_url: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Open Checkout Cancel Url'
+        },
+        open_checkout_signing_secret: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Open Checkout Signing Secret'
+        },
+        abandoned_cart_delay_days: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Abandoned Cart Delay Days'
+        },
+        abandoned_cart_repeat_days: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Abandoned Cart Repeat Days'
+        },
+        abandoned_cart_max_count: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Abandoned Cart Max Count'
+        },
+        purchase_reminder_delay_days: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Purchase Reminder Delay Days'
+        },
+        purchase_reminder_repeat_days: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Purchase Reminder Repeat Days'
+        },
+        purchase_reminder_max_count: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Purchase Reminder Max Count'
+        },
+        abandoned_application_delay_days: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Abandoned Application Delay Days'
+        },
+        abandoned_application_repeat_days: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Abandoned Application Repeat Days'
+        },
+        abandoned_application_max_count: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Abandoned Application Max Count'
+        },
+        id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Id'
+        },
+        created_at: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Created At'
+        },
+        updated_at: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Updated At'
+        }
+    },
+    type: 'object',
+    required: ['tenant_id', 'popup_id', 'slug', 'name', 'id'],
+    title: 'SalesFlowPublic',
+    description: 'Sales flow schema for API responses.'
+} as const;
+
+export const SalesFlowReadinessSchema = {
+    properties: {
+        flow_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Flow Id'
+        },
+        enabled_step_count: {
+            type: 'integer',
+            title: 'Enabled Step Count'
+        },
+        offered_product_count: {
+            type: 'integer',
+            title: 'Offered Product Count'
+        },
+        form_field_count: {
+            type: 'integer',
+            title: 'Form Field Count'
+        },
+        has_approval_strategy: {
+            type: 'boolean',
+            title: 'Has Approval Strategy'
+        },
+        blockers: {
+            items: {
+                type: 'string'
+            },
+            type: 'array',
+            title: 'Blockers'
+        },
+        warnings: {
+            items: {
+                type: 'string'
+            },
+            type: 'array',
+            title: 'Warnings'
+        }
+    },
+    type: 'object',
+    required: ['flow_id', 'enabled_step_count', 'offered_product_count', 'form_field_count', 'has_approval_strategy', 'blockers', 'warnings'],
+    title: 'SalesFlowReadiness',
+    description: `What a flow is missing before it can sell
+(sdd/sales-flows-rediseno slice 8).
+
+\`blockers\` and \`warnings\` carry machine codes, not sentences. The
+backoffice owns the wording, and a code that nobody renders yet is
+still a code the API can add without breaking a client.`
+} as const;
+
+export const SalesFlowReviewersModeSchema = {
+    type: 'string',
+    enum: ['inherit', 'override'],
+    title: 'SalesFlowReviewersMode',
+    description: 'Whether a flow uses the popup-level reviewer list or its own (D4).'
+} as const;
+
+export const SalesFlowStatusSchema = {
+    type: 'string',
+    enum: ['closed'],
+    title: 'SalesFlowStatus',
+    description: `A flow's own standing, when it differs from the gathering's.
+
+One value, and that is the point. \`resolve_flow\` reads
+\`flow.status or popup.status\`, so a flow that named itself active would
+keep selling into an event that had ended — the column can only ever be
+used to close something, never to hold it open.
+
+NULL is the normal state and means the flow follows the gathering. It is
+also how a closed flow is reopened.`
+} as const;
+
+export const SalesFlowTypeSchema = {
+    type: 'string',
+    enum: ['application', 'direct', 'upsale'],
+    title: 'SalesFlowType',
+    description: "Sale model of a flow. Mirrors PopupBase.sale_type plus 'upsale'."
+} as const;
+
+export const SalesFlowUpdateSchema = {
+    properties: {
+        status: {
+            anyOf: [
+                {
+                    '$ref': '#/components/schemas/SalesFlowStatus'
+                },
+                {
+                    type: 'null'
+                }
+            ]
+        },
+        type: {
+            anyOf: [
+                {
+                    '$ref': '#/components/schemas/SalesFlowType'
+                },
+                {
+                    type: 'null'
+                }
+            ]
+        },
+        slug: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Slug'
+        },
+        name: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Name'
+        },
+        visibility: {
+            anyOf: [
+                {
+                    '$ref': '#/components/schemas/SalesFlowVisibility'
+                },
+                {
+                    type: 'null'
+                }
+            ]
+        },
+        is_default: {
+            anyOf: [
+                {
+                    type: 'boolean'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Is Default'
+        },
+        order: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Order'
+        },
+        reviewers_mode: {
+            anyOf: [
+                {
+                    '$ref': '#/components/schemas/SalesFlowReviewersMode'
+                },
+                {
+                    type: 'null'
+                }
+            ]
+        },
+        identity_mode: {
+            anyOf: [
+                {
+                    '$ref': '#/components/schemas/SalesFlowIdentityMode'
+                },
+                {
+                    type: 'null'
+                }
+            ]
+        },
+        application_layout: {
+            anyOf: [
+                {
+                    '$ref': '#/components/schemas/ApplicationLayout'
+                },
+                {
+                    type: 'null'
+                }
+            ]
+        },
+        requires_application_fee: {
+            anyOf: [
+                {
+                    type: 'boolean'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Requires Application Fee'
+        },
+        application_fee_amount: {
+            anyOf: [
+                {
+                    type: 'number'
+                },
+                {
+                    type: 'string',
+                    pattern: '^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Application Fee Amount'
+        },
+        allows_scholarship: {
+            anyOf: [
+                {
+                    type: 'boolean'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Allows Scholarship'
+        },
+        allows_incentive: {
+            anyOf: [
+                {
+                    type: 'boolean'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Allows Incentive'
+        },
+        allows_coupons: {
+            anyOf: [
+                {
+                    type: 'boolean'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Allows Coupons'
+        },
+        insurance_enabled: {
+            anyOf: [
+                {
+                    type: 'boolean'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Insurance Enabled'
+        },
+        insurance_percentage: {
+            anyOf: [
+                {
+                    type: 'number'
+                },
+                {
+                    type: 'string',
+                    pattern: '^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Insurance Percentage'
+        },
+        contribution_enabled: {
+            anyOf: [
+                {
+                    type: 'boolean'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Contribution Enabled'
+        },
+        contribution_percentage: {
+            anyOf: [
+                {
+                    type: 'number'
+                },
+                {
+                    type: 'string',
+                    pattern: '^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Contribution Percentage'
+        },
+        contribution_label: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Contribution Label'
+        },
+        contribution_description: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Contribution Description'
+        },
+        installments_enabled: {
+            anyOf: [
+                {
+                    type: 'boolean'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Installments Enabled'
+        },
+        installments_deadline: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Installments Deadline'
+        },
+        installments_max: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Installments Max'
+        },
+        installments_interval: {
+            anyOf: [
+                {
+                    '$ref': '#/components/schemas/InstallmentInterval'
+                },
+                {
+                    type: 'null'
+                }
+            ]
+        },
+        installments_interval_count: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Installments Interval Count'
+        },
+        invites_enabled: {
+            anyOf: [
+                {
+                    type: 'boolean'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Invites Enabled'
+        },
+        referrals_enabled: {
+            anyOf: [
+                {
+                    type: 'boolean'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Referrals Enabled'
+        },
+        max_referrals_per_attendee: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Max Referrals Per Attendee'
+        },
+        checkin_pass_lead_days: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Checkin Pass Lead Days'
+        },
+        open_checkout_success_url: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Open Checkout Success Url'
+        },
+        open_checkout_cancel_url: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Open Checkout Cancel Url'
+        },
+        open_checkout_signing_secret: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Open Checkout Signing Secret'
+        },
+        abandoned_cart_delay_days: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Abandoned Cart Delay Days'
+        },
+        abandoned_cart_repeat_days: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Abandoned Cart Repeat Days'
+        },
+        abandoned_cart_max_count: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Abandoned Cart Max Count'
+        },
+        purchase_reminder_delay_days: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Purchase Reminder Delay Days'
+        },
+        purchase_reminder_repeat_days: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Purchase Reminder Repeat Days'
+        },
+        purchase_reminder_max_count: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Purchase Reminder Max Count'
+        },
+        abandoned_application_delay_days: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Abandoned Application Delay Days'
+        },
+        abandoned_application_repeat_days: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Abandoned Application Repeat Days'
+        },
+        abandoned_application_max_count: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Abandoned Application Max Count'
+        },
+        restriction_rule: {
+            anyOf: [
+                {
+                    additionalProperties: true,
+                    type: 'object'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Restriction Rule'
+        },
+        theme_config: {
+            anyOf: [
+                {
+                    additionalProperties: true,
+                    type: 'object'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Theme Config'
+        }
+    },
+    type: 'object',
+    title: 'SalesFlowUpdate',
+    description: 'Partial update payload (BO). Only provided fields are applied.'
+} as const;
+
+export const SalesFlowVisibilitySchema = {
+    type: 'string',
+    enum: ['portal_listed', 'direct_url_only'],
+    title: 'SalesFlowVisibility',
+    description: `Listing-only switch (Design D-URL): never affects access, only whether
+the flow appears in the portal's flow listing for its popup.`
+} as const;
+
 export const SavedViewCreateSchema = {
     properties: {
         popup_id: {
@@ -22711,6 +25319,31 @@ export const ScholarshipDecisionStatusSchema = {
     description: 'Scholarship outcomes an administrator may assign.'
 } as const;
 
+export const SelectedSalesFlowSchema = {
+    properties: {
+        id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Id'
+        },
+        slug: {
+            type: 'string',
+            title: 'Slug'
+        },
+        name: {
+            type: 'string',
+            title: 'Name'
+        },
+        type: {
+            '$ref': '#/components/schemas/SalesFlowType'
+        }
+    },
+    type: 'object',
+    required: ['id', 'slug', 'name', 'type'],
+    title: 'SelectedSalesFlow',
+    description: 'Safe checkout identity for the flow selected by the server.'
+} as const;
+
 export const SelfCheckInOptionsSchema = {
     properties: {
         popup: {
@@ -22771,11 +25404,25 @@ export const SelfCheckInResultSchema = {
             title: 'Attendee Product Id'
         },
         attendee_name: {
-            type: 'string',
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
             title: 'Attendee Name'
         },
         attendee_category: {
-            type: 'string',
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
             title: 'Attendee Category'
         },
         product_name: {
@@ -22815,7 +25462,7 @@ export const SelfCheckInResultSchema = {
         }
     },
     type: 'object',
-    required: ['attendee_product_id', 'attendee_name', 'attendee_category', 'product_name', 'checked_in', 'checked_in_at'],
+    required: ['attendee_product_id', 'product_name', 'checked_in', 'checked_in_at'],
     title: 'SelfCheckInResult'
 } as const;
 
@@ -22827,11 +25474,25 @@ export const SelfCheckInTicketSchema = {
             title: 'Attendee Product Id'
         },
         attendee_name: {
-            type: 'string',
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
             title: 'Attendee Name'
         },
         attendee_category: {
-            type: 'string',
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
             title: 'Attendee Category'
         },
         product_name: {
@@ -22878,7 +25539,7 @@ export const SelfCheckInTicketSchema = {
         }
     },
     type: 'object',
-    required: ['attendee_product_id', 'attendee_name', 'attendee_category', 'product_name', 'checked_in'],
+    required: ['attendee_product_id', 'product_name', 'checked_in'],
     title: 'SelfCheckInTicket'
 } as const;
 
@@ -22948,6 +25609,77 @@ Mirrors SimpleFi's \`\`redirect_urls.success_behavior\`\`:
 - manual: the buyer clicks a button on SimpleFi's checkout to continue
   (SimpleFi's default, and ours).
 - automatic: SimpleFi redirects the buyer immediately after approval.`
+} as const;
+
+export const StaffTicketPublicSchema = {
+    properties: {
+        id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Id'
+        },
+        check_in_code: {
+            type: 'string',
+            title: 'Check In Code'
+        },
+        payment_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Payment Id'
+        },
+        attendee: {
+            anyOf: [
+                {
+                    '$ref': '#/components/schemas/TicketAttendeeSnapshot'
+                },
+                {
+                    type: 'null'
+                }
+            ]
+        },
+        product: {
+            '$ref': '#/components/schemas/TicketProductSnapshot'
+        },
+        total_scans: {
+            type: 'integer',
+            title: 'Total Scans',
+            default: 0
+        },
+        first_scan_at: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'First Scan At'
+        },
+        last_scan_at: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Last Scan At'
+        }
+    },
+    type: 'object',
+    required: ['id', 'check_in_code', 'product'],
+    title: 'StaffTicketPublic'
 } as const;
 
 export const TaskAppSchema = {
@@ -23751,8 +26483,14 @@ export const TaskVisibilitySchema = {
 
 export const TemplateScopeSchema = {
     type: 'string',
-    enum: ['tenant', 'popup'],
-    title: 'TemplateScope'
+    enum: ['tenant', 'popup', 'flow'],
+    title: 'TemplateScope',
+    description: `Who owns a template, and therefore where the send path looks for it.
+
+Exactly one tier per type — a scope is not a chain
+(sdd/sales-flows-rediseno R1). FLOW covers the mails a sale produces,
+POPUP the ones a gathering produces regardless of how anyone bought,
+and TENANT the ones that belong to no gathering at all.`
 } as const;
 
 export const TemplateTypeInfoSchema = {
@@ -25234,82 +27972,17 @@ export const TicketProductSnapshotSchema = {
     description: 'Minimal product data embedded in a TicketPublic response.'
 } as const;
 
-export const TicketPublicSchema = {
-    properties: {
-        id: {
-            type: 'string',
-            format: 'uuid',
-            title: 'Id'
-        },
-        check_in_code: {
-            type: 'string',
-            title: 'Check In Code'
-        },
-        payment_id: {
-            anyOf: [
-                {
-                    type: 'string',
-                    format: 'uuid'
-                },
-                {
-                    type: 'null'
-                }
-            ],
-            title: 'Payment Id'
-        },
-        attendee: {
-            '$ref': '#/components/schemas/TicketAttendeeSnapshot'
-        },
-        product: {
-            '$ref': '#/components/schemas/TicketProductSnapshot'
-        },
-        total_scans: {
-            type: 'integer',
-            title: 'Total Scans',
-            default: 0
-        },
-        first_scan_at: {
-            anyOf: [
-                {
-                    type: 'string',
-                    format: 'date-time'
-                },
-                {
-                    type: 'null'
-                }
-            ],
-            title: 'First Scan At'
-        },
-        last_scan_at: {
-            anyOf: [
-                {
-                    type: 'string',
-                    format: 'date-time'
-                },
-                {
-                    type: 'null'
-                }
-            ],
-            title: 'Last Scan At'
-        }
-    },
-    type: 'object',
-    required: ['id', 'check_in_code', 'attendee', 'product'],
-    title: 'TicketPublic',
-    description: `Full public representation of a single ticket (AttendeeProducts row).
-
-Returned by POST /attendees/check-in/{code}.
-Embeds attendee + product snapshots for scanner UIs without extra round-trips.
-Enriched with scan summary fields from ticket_events so frontend/staff can
-apply check-in policy at runtime (single-scan, scan-every-time, etc.).`
-} as const;
-
 export const TicketingStepCreateSchema = {
     properties: {
         popup_id: {
             type: 'string',
             format: 'uuid',
             title: 'Popup Id'
+        },
+        sales_flow_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Sales Flow Id'
         },
         step_type: {
             type: 'string',
@@ -25413,7 +28086,7 @@ export const TicketingStepCreateSchema = {
         }
     },
     type: 'object',
-    required: ['popup_id', 'step_type', 'title'],
+    required: ['popup_id', 'sales_flow_id', 'step_type', 'title'],
     title: 'TicketingStepCreate'
 } as const;
 
@@ -25433,6 +28106,11 @@ export const TicketingStepPublicSchema = {
             type: 'string',
             format: 'uuid',
             title: 'Popup Id'
+        },
+        sales_flow_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Sales Flow Id'
         },
         step_type: {
             type: 'string',
@@ -25541,7 +28219,7 @@ export const TicketingStepPublicSchema = {
         }
     },
     type: 'object',
-    required: ['id', 'tenant_id', 'popup_id', 'step_type', 'title'],
+    required: ['id', 'tenant_id', 'popup_id', 'sales_flow_id', 'step_type', 'title'],
     title: 'TicketingStepPublic'
 } as const;
 

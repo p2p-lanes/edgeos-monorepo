@@ -56,7 +56,7 @@ export function MobilePopupSwitcher() {
           <ChevronsUpDown className="h-3.5 w-3.5 shrink-0 opacity-60" />
         </button>
       </PopoverTrigger>
-      <PopoverContent align="end" className="w-56 p-1">
+      <PopoverContent align="end" className="portal-chrome w-56 p-1">
         {popups.map((popup) => (
           <button
             key={popup.slug}

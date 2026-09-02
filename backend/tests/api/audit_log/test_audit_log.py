@@ -106,6 +106,9 @@ class TestRecordAndFind:
         entity_a = uuid.uuid4()
         entity_b = uuid.uuid4()
         actor = _actor()
+        _, remove_count_before = audit_logs_crud.find(
+            db, action=AuditAction.TICKET_REMOVE, popup_id=popup_tenant_a.id
+        )
 
         audit_logs_crud.record(
             db,
@@ -141,7 +144,7 @@ class TestRecordAndFind:
         by_action, total_action = audit_logs_crud.find(
             db, action=AuditAction.TICKET_REMOVE, popup_id=popup_tenant_a.id
         )
-        assert total_action == 1
+        assert total_action == remove_count_before + 1
         assert by_action[0].entity_id == entity_b
 
 
@@ -201,7 +204,7 @@ class TestTicketEventWiring:
         assert logs[0].details is not None
         assert logs[0].details["products"][0]["product_id"] == str(product.id)
 
-    def test_remove_emits_log_that_survives_ticket_deletion(
+    def test_remove_emits_log_and_revokes_the_unit(
         self, db: Session, tenant_a: Tenants, popup_tenant_a: Popups
     ) -> None:
         product = _make_product(db, tenant_a, popup_tenant_a)
@@ -215,7 +218,9 @@ class TestTicketEventWiring:
             actor=_actor(),
         )
 
-        assert db.get(AttendeeProducts, ticket.id) is None
+        removed = db.get(AttendeeProducts, ticket.id)
+        assert removed is not None
+        assert removed.revoked_at is not None
         logs, total = audit_logs_crud.find(db, entity_id=attendee.id)
         assert total == 1
         assert logs[0].action == AuditAction.TICKET_REMOVE

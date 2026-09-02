@@ -363,9 +363,7 @@ def _xlsx_bytes(headers: list[str], rows: list[list[Any]]) -> bytes:
         )
     header_cells = []
     for header in headers:
-        cell = WriteOnlyCell(
-            sheet, value=safe_tabular_cell(header, spreadsheet=True)
-        )
+        cell = WriteOnlyCell(sheet, value=safe_tabular_cell(header, spreadsheet=True))
         cell.font = Font(bold=True, color="FFFFFF")
         cell.fill = PatternFill("solid", fgColor="334155")
         header_cells.append(cell)

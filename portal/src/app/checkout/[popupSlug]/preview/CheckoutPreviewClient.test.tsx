@@ -13,20 +13,36 @@ import { type CheckoutRuntimeResponse, CheckoutService } from "@/client"
 import { PREVIEW_MESSAGE_SOURCE } from "@/lib/checkout-preview"
 import CheckoutPreviewClient from "./CheckoutPreviewClient"
 
+const runtimeProps = vi.hoisted(() => vi.fn())
+const themeProps = vi.hoisted(() => vi.fn())
+
 vi.mock("@/client", () => ({
-  CheckoutService: { getRuntime: vi.fn() },
+  CheckoutService: { getFlowRuntime: vi.fn() },
+}))
+
+vi.mock("next/navigation", () => ({
+  useSearchParams: () => new URLSearchParams("flow=main"),
 }))
 
 // The checkout tree itself is covered elsewhere; here it only needs to be
 // identifiable when it renders.
 vi.mock("@/components/checkout-flow/OpenCheckoutRuntime", () => ({
-  OpenCheckoutRuntime: () => <div data-testid="checkout" />,
+  OpenCheckoutRuntime: (props: Record<string, unknown>) => {
+    runtimeProps(props)
+    return <div data-testid="checkout" />
+  },
+}))
+vi.mock("@/providers/themeProvider", () => ({
+  default: ({ children, ...props }: { children: ReactNode }) => {
+    themeProps(props)
+    return <>{children}</>
+  },
 }))
 vi.mock("../CheckoutShell", () => ({
   CheckoutShell: ({ children }: { children: ReactNode }) => <>{children}</>,
 }))
 
-const getRuntime = vi.mocked(CheckoutService.getRuntime)
+const getFlowRuntime = vi.mocked(CheckoutService.getFlowRuntime)
 
 function renderPreview() {
   const client = new QueryClient({
@@ -65,8 +81,9 @@ function postState(source: Window, previewToken = "token-123") {
 const realParent = Object.getOwnPropertyDescriptor(window, "parent")
 
 beforeEach(() => {
-  getRuntime.mockResolvedValue({
+  getFlowRuntime.mockResolvedValue({
     popup: { id: "popup-1" },
+    theme_config: { primary_color: "#123456" },
     products: [],
     ticketing_steps: [],
     // A stand-in: what the runtime holds is the checkout's business, not this
@@ -88,12 +105,25 @@ describe("CheckoutPreviewClient", () => {
     postState(embedder)
 
     expect(await screen.findByTestId("checkout")).toBeTruthy()
-    expect(getRuntime).toHaveBeenCalledWith(
+    expect(getFlowRuntime).toHaveBeenCalledWith(
       expect.objectContaining({
         slug: "amanita",
+        flowSlug: "main",
         xCheckoutPreviewToken: "token-123",
       }),
     )
+    expect(runtimeProps).toHaveBeenCalledWith(
+      expect.objectContaining({
+        popupSlug: "amanita",
+        flowSlug: "main",
+        previewMode: true,
+        previewToken: "token-123",
+      }),
+    )
+    expect(themeProps).toHaveBeenCalledWith({
+      config: { primary_color: "#123456" },
+      scope: "local",
+    })
   })
 
   it("announces itself to the embedder so the token is sent without a reload", () => {
@@ -116,13 +146,13 @@ describe("CheckoutPreviewClient", () => {
 
     postState(window, "smuggled-token")
 
-    await waitFor(() => expect(getRuntime).not.toHaveBeenCalled())
+    await waitFor(() => expect(getFlowRuntime).not.toHaveBeenCalled())
   })
 
   it("says so when opened outside the backoffice instead of spinning", () => {
     renderPreview()
 
     expect(screen.getByText("Nothing to preview here")).toBeTruthy()
-    expect(getRuntime).not.toHaveBeenCalled()
+    expect(getFlowRuntime).not.toHaveBeenCalled()
   })
 })

@@ -2,7 +2,8 @@ import { usePathname, useRouter } from "next/navigation"
 import { useCallback } from "react"
 import { useTranslation } from "react-i18next"
 import useResources from "@/hooks/useResources"
-import type { Resource } from "@/types/resources"
+import { trackPortalTelemetry } from "@/lib/portal-telemetry"
+import type { Resource, ResourceGroup } from "@/types/resources"
 import { Separator } from "../ui/separator"
 import { Tooltip, TooltipContent, TooltipTrigger } from "../ui/tooltip"
 import GroupsResources from "./Groups/GroupsResources"
@@ -25,6 +26,13 @@ const statusColor = (status: string) => {
   if (status === "withdrawn") return "bg-slate-300 text-slate-700"
   return "bg-gray-100 text-gray-800"
 }
+
+const resourceGroups: ResourceGroup[] = [
+  "general",
+  "participation",
+  "commerce",
+  "community",
+]
 
 const ResourceItem: React.FC<{
   resource: Resource
@@ -50,7 +58,7 @@ const ResourceItem: React.FC<{
         </TooltipTrigger>
         <TooltipContent
           side="right"
-          className="hidden group-data-[collapsible=icon]:block"
+          className="portal-sidebar hidden group-data-[collapsible=icon]:block"
         >
           {resource.name}{" "}
           {resource.status === "soon" ? t("sidebar.coming_soon") : ""}
@@ -76,12 +84,13 @@ const ResourceItem: React.FC<{
 
 const ResourcesMenu = () => {
   const { t } = useTranslation()
-  const { resources } = useResources()
+  const { resources, doorName } = useResources()
   const router = useRouter()
   const pathname = usePathname()
 
   const handleNavigate = useCallback(
     (path: string) => {
+      trackPortalTelemetry("portal_navigation")
       router.push(path)
     },
     [router],
@@ -89,25 +98,52 @@ const ResourcesMenu = () => {
 
   return (
     <SidebarContent>
-      <SidebarGroup>
-        <SidebarGroupLabel>{t("sidebar.your_participation")}</SidebarGroupLabel>
-        <SidebarGroupContent>
-          <SidebarMenu>
-            {resources
-              .filter((resource) => resource.status !== "hidden")
-              .map((resource) => (
-                <ResourceItem
-                  key={resource.name}
-                  resource={resource}
-                  onNavigate={handleNavigate}
-                  pathname={pathname}
-                />
-              ))}
-            <Separator className="my-4" />
-            <GroupsResources onNavigate={handleNavigate} />
-          </SidebarMenu>
-        </SidebarGroupContent>
-      </SidebarGroup>
+      <nav aria-label={t("sidebar.navigation")}>
+        {resourceGroups.map((group) => {
+          const groupResources = resources.filter(
+            (resource) =>
+              resource.status !== "hidden" &&
+              (resource.group ?? "general") === group,
+          )
+
+          if (groupResources.length === 0) return null
+
+          const groupLabelId = `portal-navigation-${group}`
+
+          return (
+            <SidebarGroup key={group} aria-labelledby={groupLabelId}>
+              <SidebarGroupLabel asChild>
+                <h2
+                  id={groupLabelId}
+                  className="px-2 text-[11px] font-semibold tracking-[0.08em] text-sidebar-foreground/60 uppercase"
+                >
+                  {group === "general" && doorName
+                    ? doorName
+                    : t(`sidebar.${group}`)}
+                </h2>
+              </SidebarGroupLabel>
+              <SidebarGroupContent className="pt-1">
+                <SidebarMenu>
+                  {groupResources.map((resource) => (
+                    <ResourceItem
+                      key={resource.name}
+                      resource={resource}
+                      onNavigate={handleNavigate}
+                      pathname={pathname}
+                    />
+                  ))}
+                  {group === "community" && (
+                    <>
+                      <Separator className="my-4" />
+                      <GroupsResources onNavigate={handleNavigate} />
+                    </>
+                  )}
+                </SidebarMenu>
+              </SidebarGroupContent>
+            </SidebarGroup>
+          )
+        })}
+      </nav>
     </SidebarContent>
   )
 }

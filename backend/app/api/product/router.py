@@ -14,7 +14,13 @@ from app.api.product.schemas import (
     ProductUpdate,
 )
 from app.api.shared.enums import UserRole
-from app.api.shared.response import ListModel, PaginationLimit, PaginationSkip, Paging
+from app.api.shared.response import (
+    MAX_PAGE_LIMIT,
+    ListModel,
+    PaginationLimit,
+    PaginationSkip,
+    Paging,
+)
 from app.api.translation.service import (
     TRANSLATABLE_FIELDS,
     apply_translation_overlay,
@@ -385,8 +391,9 @@ async def delete_product(
 @router.get("/portal/products", response_model=ListModel[ProductPublic])
 async def list_portal_products(
     db: HumanTenantSession,
-    _: CurrentHuman,
+    current_human: CurrentHuman,
     popup_id: uuid.UUID | None = None,
+    sales_flow_id: uuid.UUID | None = None,
     is_active: bool | None = None,
     category: str | None = None,
     skip: PaginationSkip = 0,
@@ -398,14 +405,53 @@ async def list_portal_products(
         # Ended popups keep their products visible here: the portal recap
         # views still need them, and purchasing is blocked at the payment,
         # cart, and application layers.
-        products, total = crud.products_crud.find_by_popup(
-            db,
-            popup_id=popup_id,
-            skip=skip,
-            limit=limit,
-            is_active=is_active,
-            category=category,
+        # Catalog-read enforcement (design D5/D6, D3 amendment, sdd/sales-flows
+        # slice 12): scoped to a single popup, so its default flow gives a
+        # well-defined restriction context. No-op (legacy fixture popup, no
+        # provisioned default flow — same degrade precedent as elsewhere in
+        # this series) when the popup predates task 5.0. Unscoped listings
+        # (below) span multiple popups and have no single flow to resolve
+        # against, so they stay outside this filter — a disclosed, narrower
+        # scope than the flow-aware checkout runtime.
+        from app.api.sales_flow.crud import sales_flows_crud
+        from app.services.restrictions.context import build_context
+        from app.services.restrictions.enforcement import filter_allowed_products
+
+        find_kwargs = {
+            "popup_id": popup_id,
+            "is_active": is_active,
+            "category": category,
+        }
+        flow = (
+            sales_flows_crud.get(db, sales_flow_id)
+            if sales_flow_id is not None
+            else sales_flows_crud.get_default_flow(db, popup_id)
         )
+        if sales_flow_id is not None and (flow is None or flow.popup_id != popup_id):
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Not found",
+            )
+        popup = None
+        if flow is not None:
+            from app.api.popup.crud import popups_crud
+
+            popup = popups_crud.get(db, popup_id)
+
+        if flow is not None and popup is not None:
+            # rel-001/risk-002: filter-then-paginate so total is the
+            # filtered count, not the raw pre-filter one.
+            all_products, _ = crud.products_crud.find_by_popup(
+                db, skip=0, limit=MAX_PAGE_LIMIT, **find_kwargs
+            )
+            context = build_context(db, popup, flow, human=current_human)
+            filtered = filter_allowed_products(db, flow, popup, all_products, context)
+            total = len(filtered)
+            products = filtered[skip : skip + limit]
+        else:
+            products, total = crud.products_crud.find_by_popup(
+                db, skip=skip, limit=limit, **find_kwargs
+            )
     else:
         # Same read-only contract without popup_id: ended-popup products are
         # excluded so they cannot be enumerated through the unscoped listing.

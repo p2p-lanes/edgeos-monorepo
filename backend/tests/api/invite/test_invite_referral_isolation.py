@@ -20,6 +20,7 @@ from app.api.invite.models import Invites
 from app.api.popup.models import Popups
 from app.api.tenant.models import Tenants
 from app.api.user.models import Users
+from tests._flow_helpers import invite_flow_id
 
 
 def _auth(token: str) -> dict[str, str]:
@@ -55,11 +56,13 @@ def _make_human(db: Session, tenant: Tenants) -> Humans:
 
 def _make_portal_link(db: Session, popup: Popups, referrer: Humans) -> Invites:
     link = Invites(
+        sales_flow_id=invite_flow_id(db, popup.id),
         tenant_id=popup.tenant_id,
         popup_id=popup.id,
         referrer_human_id=referrer.id,
         token=f"ref-{uuid.uuid4().hex[:12]}",
         express_checkout=True,
+        auto_approve=True,
         discount_percentage=Decimal("0"),
     )
     db.add(link)
@@ -70,6 +73,7 @@ def _make_portal_link(db: Session, popup: Popups, referrer: Humans) -> Invites:
 
 def _make_admin_invite(db: Session, popup: Popups, creator: Users) -> Invites:
     invite = Invites(
+        sales_flow_id=invite_flow_id(db, popup.id),
         tenant_id=popup.tenant_id,
         popup_id=popup.id,
         token=f"tok-{uuid.uuid4().hex[:16]}",

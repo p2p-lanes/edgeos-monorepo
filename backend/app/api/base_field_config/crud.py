@@ -12,16 +12,21 @@ from app.api.form_section.models import FormSections
 from app.api.shared.crud import BaseCRUD
 
 if TYPE_CHECKING:
-    from app.api.popup.models import Popups
+    from app.api.sales_flow.schemas import EffectiveFlowConfig
 
 SCHOLARSHIP_FIELDS = frozenset(
     {"scholarship_request", "scholarship_details", "scholarship_video_url"}
 )
 
 
-def field_applies_to_popup(field_name: str, popup: "Popups") -> bool:
-    """Return True if the given base field is allowed by the popup's flags."""
-    if field_name in SCHOLARSHIP_FIELDS and not popup.allows_scholarship:
+def field_applies_to_flow(field_name: str, config: "EffectiveFlowConfig") -> bool:
+    """Whether a base field is asked at all, given what its flow decided.
+
+    Base field configs belong to a flow, so the flag that hides one has to
+    come from the same flow — asking the popup meant a scholarship question
+    appeared or vanished on every way in at once.
+    """
+    if field_name in SCHOLARSHIP_FIELDS and not config.allows_scholarship:
         return False
     return True
 
@@ -76,9 +81,14 @@ class BaseFieldConfigsCRUD(
     def find_by_popup(
         self, session: Session, popup_id: uuid.UUID
     ) -> list[BaseFieldConfigs]:
-        # Order by (section.order, position) so callers that don't regroup still
-        # render fields in the same visual order as the form builder: sections
-        # stay together instead of being interleaved by raw position value.
+        """Returns ALL configs for the popup regardless of `sales_flow_id`
+        (admin/legacy management surface — untouched by sdd/sales-flows
+        slice 6 — see `find_by_flow` for one flow's own configs).
+
+        Order by (section.order, position) so callers that don't regroup still
+        render fields in the same visual order as the form builder: sections
+        stay together instead of being interleaved by raw position value.
+        """
         statement = (
             select(BaseFieldConfigs)
             .outerjoin(
@@ -90,29 +100,46 @@ class BaseFieldConfigsCRUD(
         )
         return list(session.exec(statement).all())
 
+    def find_by_flow(
+        self, session: Session, flow_id: uuid.UUID
+    ) -> list[BaseFieldConfigs]:
+        """The base-field configs of `flow_id` — no fallback (slice 3)."""
+        statement = (
+            select(BaseFieldConfigs)
+            .outerjoin(
+                FormSections,
+                BaseFieldConfigs.section_id == FormSections.id,  # type: ignore[arg-type]
+            )
+            .where(BaseFieldConfigs.sales_flow_id == flow_id)
+            .order_by(FormSections.order, BaseFieldConfigs.position)  # type: ignore[arg-type]
+        )
+        return list(session.exec(statement).all())
+
     def create_defaults_for_popup(
         self,
         session: Session,
         popup_id: uuid.UUID,
         tenant_id: uuid.UUID,
+        sales_flow_id: uuid.UUID,
         section_map: dict[str, uuid.UUID],
     ) -> list[BaseFieldConfigs]:
-        """Create one BaseFieldConfig per base field for a popup.
+        """Create one BaseFieldConfig per base field, owned by one flow.
 
-        Idempotent: existing (popup_id, field_name) rows are left untouched.
-        This matters when a feature flag is toggled on, off, and back on —
-        configs persist across the off cycle and must not be re-inserted.
+        `sales_flow_id` is required (sdd/sales-flows-rediseno slice 3): a
+        config belongs to a flow's form, and popup creation passes the
+        default flow it just provisioned.
 
-        Args:
-            session: DB session
-            popup_id: The popup to create configs for
-            tenant_id: Tenant owning the popup
-            section_map: Maps section keys (e.g. "profile") to FormSection UUIDs
+        Idempotent: existing (sales_flow_id, field_name) rows are left
+        untouched. This matters when a feature flag is toggled on, off, and
+        back on — configs persist across the off cycle and must not be
+        re-inserted.
         """
         existing_names = {
             c.field_name
             for c in session.exec(
-                select(BaseFieldConfigs).where(BaseFieldConfigs.popup_id == popup_id)
+                select(BaseFieldConfigs).where(
+                    BaseFieldConfigs.sales_flow_id == sales_flow_id
+                )
             ).all()
         }
 
@@ -127,6 +154,7 @@ class BaseFieldConfigsCRUD(
             config = BaseFieldConfigs(
                 tenant_id=tenant_id,
                 popup_id=popup_id,
+                sales_flow_id=sales_flow_id,
                 field_name=field_name,
                 section_id=section_map.get(section_key),
                 position=definition.get("default_position", 0),

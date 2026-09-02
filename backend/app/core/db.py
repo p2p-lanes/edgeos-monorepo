@@ -8,7 +8,7 @@ from dateutil.parser import parse as parse_datetime
 from loguru import logger
 from sqlmodel import Session, create_engine, select
 
-from app.api.shared.enums import HumanRating, UserRole
+from app.api.shared.enums import HumanRating, SaleType, UserRole
 from app.core.config import settings
 
 engine = create_engine(
@@ -89,6 +89,7 @@ def _seed_users(session: Session, seed_data: dict, tenant_id) -> None:
 
 
 def _seed_popups(session: Session, seed_data: dict, tenant_id) -> dict:
+    from app.api.sales_flow.crud import sales_flows_crud
     from app.models import Popups
 
     popup_map: dict[str, Popups] = {}
@@ -108,6 +109,9 @@ def _seed_popups(session: Session, seed_data: dict, tenant_id) -> dict:
                 slug=popup_data["slug"],
                 status=popup_data.get("status", "draft"),
                 allows_coupons=popup_data.get("allows_coupons", False),
+                invoice_company_name=popup_data.get("invoice_company_name"),
+                invoice_company_address=popup_data.get("invoice_company_address"),
+                invoice_company_email=popup_data.get("invoice_company_email"),
                 start_date=(
                     parse_datetime(popup_data["start_date"])
                     if popup_data.get("start_date")
@@ -120,6 +124,21 @@ def _seed_popups(session: Session, seed_data: dict, tenant_id) -> dict:
                 ),
             )
             session.add(popup)
+            session.flush()  # get the popup id without committing
+
+            # Dev-seeded popups receive the same compatibility default as
+            # popups created through the API. This seed bypasses
+            # PopupsCRUD.create, so it provisions that flow itself in the
+            # same transaction.
+            sales_flows_crud.provision_default_flow(
+                session,
+                popup_id=popup.id,
+                tenant_id=tenant_id,
+                # From the seed file, not from the column it lands in: what a
+                # gathering's first door does is a fact about the door.
+                sale_type=popup_data.get("sale_type", SaleType.application.value),
+            )
+
             session.commit()
             session.refresh(popup)
             popup_map[popup_key] = popup
@@ -132,6 +151,7 @@ def _seed_base_field_configs(session: Session, popup_map: dict, tenant_id) -> No
     from app.api.base_field_config.constants import DEFAULT_SECTIONS
     from app.api.base_field_config.crud import base_field_configs_crud
     from app.api.base_field_config.models import BaseFieldConfigs
+    from app.api.sales_flow.crud import sales_flows_crud
     from app.models import FormSections
 
     for popup_key, popup in popup_map.items():
@@ -139,6 +159,11 @@ def _seed_base_field_configs(session: Session, popup_map: dict, tenant_id) -> No
             select(BaseFieldConfigs).where(BaseFieldConfigs.popup_id == popup.id)
         ).first()
         if existing_configs:
+            continue
+
+        default_flow = sales_flows_crud.get_default_flow(session, popup.id)
+        if default_flow is None:
+            logger.warning(f"Skipping form seed for {popup_key}: no default sales flow")
             continue
 
         default_section_map = {}
@@ -155,6 +180,7 @@ def _seed_base_field_configs(session: Session, popup_map: dict, tenant_id) -> No
                 section = FormSections(
                     tenant_id=tenant_id,
                     popup_id=popup.id,
+                    sales_flow_id=default_flow.id,
                     label=section_def["label"],
                     order=section_def["order"],
                     protected=True,
@@ -167,12 +193,17 @@ def _seed_base_field_configs(session: Session, popup_map: dict, tenant_id) -> No
                 logger.info(f"Default section created: {section.label} for {popup_key}")
 
         base_field_configs_crud.create_defaults_for_popup(
-            session, popup.id, tenant_id, default_section_map
+            session,
+            popup.id,
+            tenant_id,
+            default_flow.id,
+            default_section_map,
         )
         logger.info(f"Base field configs created for {popup_key}")
 
 
 def _seed_ticketing_steps(session: Session, popup_map: dict, tenant_id) -> None:
+    from app.api.sales_flow.crud import sales_flows_crud
     from app.api.ticketing_step.constants import seed_ticketing_steps_for_popup
     from app.models import TicketingSteps
 
@@ -183,17 +214,26 @@ def _seed_ticketing_steps(session: Session, popup_map: dict, tenant_id) -> None:
         if existing:
             continue
 
+        default_flow = sales_flows_crud.get_default_flow(session, popup.id)
+        if default_flow is None:
+            logger.warning(
+                f"Skipping ticketing-step seed for {popup_key}: no default sales flow"
+            )
+            continue
+
         seed_ticketing_steps_for_popup(
             session,
             popup_id=popup.id,
             tenant_id=tenant_id,
-            sale_type=str(popup.sale_type) if popup.sale_type else None,
+            sales_flow_id=default_flow.id,
+            flow_type=default_flow.type,
         )
         logger.info(f"Ticketing steps seeded for {popup_key}")
 
 
 def _seed_approval_strategies(session: Session, popup_map: dict, tenant_id) -> None:
     from app.api.approval_strategy.schemas import ApprovalStrategyType
+    from app.api.sales_flow.crud import sales_flows_crud
     from app.models import ApprovalStrategies
 
     for popup_key, popup in popup_map.items():
@@ -201,9 +241,20 @@ def _seed_approval_strategies(session: Session, popup_map: dict, tenant_id) -> N
             select(ApprovalStrategies).where(ApprovalStrategies.popup_id == popup.id)
         ).first()
         if not existing_strategy:
+            default_flow = sales_flows_crud.get_default_flow(session, popup.id)
+            if default_flow is None:
+                logger.warning(
+                    f"Skipping approval strategy for {popup_key}: no default flow"
+                )
+                continue
+            # Only application flows review anything; a direct-sale or
+            # upsale flow never produces an application to review.
+            if default_flow.type != "application":
+                continue
             strategy = ApprovalStrategies(
                 tenant_id=tenant_id,
                 popup_id=popup.id,
+                sales_flow_id=default_flow.id,
                 strategy_type=ApprovalStrategyType.AUTO_ACCEPT,
             )
             session.add(strategy)
@@ -366,6 +417,7 @@ def _seed_products(
 def _seed_form_sections(
     session: Session, seed_data: dict, popup_map: dict, tenant_id
 ) -> dict:
+    from app.api.sales_flow.crud import sales_flows_crud
     from app.models import FormSections
 
     section_map: dict[str, FormSections] = {}
@@ -388,9 +440,17 @@ def _seed_form_sections(
         if existing_section:
             section_map[section_key] = existing_section
         else:
+            default_flow = sales_flows_crud.get_default_flow(session, popup.id)
+            if default_flow is None:
+                logger.warning(
+                    f"Skipping form section {section_data['label']}: "
+                    f"{popup_key} has no default sales flow"
+                )
+                continue
             section = FormSections(
                 tenant_id=tenant_id,
                 popup_id=popup.id,
+                sales_flow_id=default_flow.id,
                 label=section_data["label"],
                 description=section_data.get("description"),
                 order=section_data.get("order", 0),
@@ -408,6 +468,7 @@ def _seed_form_sections(
 def _seed_form_fields(
     session: Session, seed_data: dict, popup_map: dict, section_map: dict, tenant_id
 ) -> None:
+    from app.api.sales_flow.crud import sales_flows_crud
     from app.models import FormFields
 
     for field_data in seed_data.get("form_fields", []):
@@ -431,9 +492,17 @@ def _seed_form_fields(
             )
         ).first()
         if not existing_field:
+            default_flow = sales_flows_crud.get_default_flow(session, popup.id)
+            if default_flow is None:
+                logger.warning(
+                    f"Skipping form field {field_data['name']}: "
+                    "popup has no default sales flow"
+                )
+                continue
             field = FormFields(
                 tenant_id=tenant_id,
                 popup_id=popup.id,
+                sales_flow_id=default_flow.id,
                 name=field_data["name"],
                 label=field_data["label"],
                 field_type=field_data.get("field_type", "text"),
@@ -452,6 +521,7 @@ def _seed_form_fields(
 def _seed_coupons(
     session: Session, seed_data: dict, popup_map: dict, tenant_id
 ) -> dict:
+    from app.api.sales_flow.crud import sales_flows_crud
     from app.models import Coupons
 
     coupon_map: dict[str, Coupons] = {}
@@ -473,9 +543,18 @@ def _seed_coupons(
         if existing_coupon:
             coupon_map[map_key] = existing_coupon
         else:
+            # Every coupon discounts a flow (sdd/sales-flows-rediseno),
+            # and seeded popups are provisioned with a default one.
+            default_flow = sales_flows_crud.get_default_flow(session, popup.id)
+            if default_flow is None:
+                raise RuntimeError(
+                    f"seeded popup {popup.slug} has no default sales flow"
+                )
+
             coupon = Coupons(
                 tenant_id=tenant_id,
                 popup_id=popup.id,
+                sales_flow_id=default_flow.id,
                 code=code,
                 discount_value=coupon_data["discount_value"],
                 max_uses=coupon_data.get("max_uses"),
@@ -541,6 +620,7 @@ def _seed_humans(session: Session, seed_data: dict, tenant_id) -> dict:
 def _seed_groups(
     session: Session, seed_data: dict, popup_map: dict, human_map: dict, tenant_id
 ) -> dict:
+    from app.api.sales_flow.crud import sales_flows_crud
     from app.models import GroupLeaders, GroupMembers, Groups
 
     group_map: dict[str, Groups] = {}
@@ -562,9 +642,19 @@ def _seed_groups(
         if existing_group:
             group_map[group_key] = existing_group
         else:
+            # Every group applies through a flow
+            # (sdd/sales-flows-rediseno), and seeded popups are provisioned
+            # with a default one.
+            default_flow = sales_flows_crud.get_default_flow(session, popup.id)
+            if default_flow is None:
+                raise RuntimeError(
+                    f"seeded popup {popup.slug} has no default sales flow"
+                )
+
             group = Groups(
                 tenant_id=tenant_id,
                 popup_id=popup.id,
+                sales_flow_id=default_flow.id,
                 name=group_data["name"],
                 slug=group_data["slug"],
                 description=group_data.get("description"),
@@ -635,6 +725,7 @@ def _seed_applications(
     product_map: dict,
     tenant_id,
 ) -> tuple[dict, dict]:
+    from app.api.sales_flow.crud import sales_flows_crud
     from app.models import Applications, AttendeeProducts, Attendees
 
     application_map: dict[str, Applications] = {}
@@ -679,10 +770,17 @@ def _seed_applications(
         if status == "accepted":
             accepted_at = datetime.now(UTC)
 
+        # Every application belongs to a flow (sdd/sales-flows-rediseno F4),
+        # and seeded popups are provisioned with a default one.
+        default_flow = sales_flows_crud.get_default_flow(session, popup.id)
+        if default_flow is None:
+            raise RuntimeError(f"seeded popup {popup.slug} has no default sales flow")
+
         application = Applications(
             tenant_id=tenant_id,
             popup_id=popup.id,
             human_id=human.id,
+            sales_flow_id=default_flow.id,
             group_id=group_id,
             referral=app_data.get("referral"),
             status=status,
@@ -741,6 +839,8 @@ def _seed_applications(
                 if product:
                     from app.api.attendee.crud import generate_check_in_code
 
+                    if (product.category or "").lower() != "ticket":
+                        continue
                     quantity = prod_data.get("quantity", 1)
                     for _ in range(quantity):
                         attendee_product = AttendeeProducts(
@@ -749,6 +849,8 @@ def _seed_applications(
                             attendee_id=attendee.id,
                             product_id=product.id,
                             check_in_code=generate_check_in_code(""),
+                            product_category_snapshot=product.category,
+                            requires_check_in_snapshot=product.requires_check_in,
                         )
                         session.add(attendee_product)
                     session.commit()
@@ -817,6 +919,7 @@ def _seed_payments(
             tenant_id=tenant_id,
             application_id=application.id,
             popup_id=application.popup_id,
+            buyer_human_id=application.human_id,
             status=payment_data.get("status", "pending"),
             amount=Decimal(payment_data.get("amount", "0")),
             currency=payment_data.get("currency", "USD"),
@@ -857,7 +960,6 @@ def _seed_payments(
                 continue
 
             attendee = attendees[attendee_index]
-
             existing_pp = session.exec(
                 select(PaymentProducts).where(
                     PaymentProducts.payment_id == payment.id,
@@ -872,20 +974,25 @@ def _seed_payments(
                 tenant_id=tenant_id,
                 payment_id=payment.id,
                 product_id=product.id,
-                attendee_id=attendee.id,
+                attendee_id=(
+                    attendee.id
+                    if (product.category or "").lower() == "ticket"
+                    else None
+                ),
                 quantity=quantity,
                 product_name=product.name,
                 product_description=product.description,
                 product_price=product.price,
                 product_category=product.category,
                 product_currency="USD",
+                requires_check_in_snapshot=product.requires_check_in,
             )
             session.add(payment_product)
             session.commit()
 
 
-def _seed_accommodation_step(session: Session, popup) -> None:
-    """Point the popup's housing step at the accommodation-booking template.
+def _seed_accommodation_step(session: Session, popup, sales_flow_id: uuid.UUID) -> None:
+    """Point one sales flow's housing step at the accommodation template.
 
     A popup without an *enabled* step on that template cannot sell rooms at
     all (the backend refuses the lines, not just the UI), so seeded
@@ -903,6 +1010,7 @@ def _seed_accommodation_step(session: Session, popup) -> None:
     already = session.exec(
         select(TicketingSteps).where(
             TicketingSteps.popup_id == popup.id,
+            TicketingSteps.sales_flow_id == sales_flow_id,
             TicketingSteps.template == ACCOMMODATION_STEP_TEMPLATE,
         )
     ).first()
@@ -912,6 +1020,7 @@ def _seed_accommodation_step(session: Session, popup) -> None:
     step = session.exec(
         select(TicketingSteps).where(
             TicketingSteps.popup_id == popup.id,
+            TicketingSteps.sales_flow_id == sales_flow_id,
             TicketingSteps.step_type == HOUSING_STEP_TYPE,
             TicketingSteps.template == "housing-date",
         )
@@ -1107,7 +1216,13 @@ def _seed_accommodations(
             )
 
     for popup in seeded_popups.values():
-        _seed_accommodation_step(session, popup)
+        from app.api.sales_flow.crud import sales_flows_crud
+
+        flow = sales_flows_crud.get_default_flow(session, popup.id)
+        if flow is None:
+            logger.warning(f"No default sales flow for accommodation seed {popup.slug}")
+            continue
+        _seed_accommodation_step(session, popup, flow.id)
 
     return accommodation_map
 
@@ -1159,10 +1274,9 @@ def _seed_accommodation_bookings(
         BookingStatus,
     )
     from app.api.accommodation.models import AccommodationBookings, AccommodationUnits
-    from app.api.attendee.crud import generate_check_in_code
     from app.api.payment.schemas import PaymentStatus
     from app.api.product.schemas import CATEGORY_HOUSING
-    from app.models import AttendeeProducts, PaymentProducts, Payments
+    from app.models import PaymentProducts, Payments, Products
 
     def _already_seeded(accommodation, entry: dict) -> bool:
         """Match on what the entry pins down, so a re-run adds nothing.
@@ -1268,7 +1382,9 @@ def _seed_accommodation_bookings(
         # Prices the stay and rewrites the line's metadata with the quote and
         # the frozen names, exactly as a real checkout would.
         try:
-            resolved = accommodation_payments.resolve_lines(session, popup, [line])
+            resolved = accommodation_payments.resolve_lines(
+                session, popup, application.sales_flow_id, [line]
+            )
         except Exception as exc:  # noqa: BLE001 - a bad seed entry is not fatal
             logger.warning(f"Cannot seed booking {entry['key']}: {exc}")
             continue
@@ -1280,6 +1396,8 @@ def _seed_accommodation_bookings(
             tenant_id=tenant_id,
             application_id=application.id,
             popup_id=popup.id,
+            buyer_human_id=application.human_id,
+            sales_flow_id=application.sales_flow_id,
             status=(
                 PaymentStatus.APPROVED.value
                 if confirmed
@@ -1294,6 +1412,15 @@ def _seed_accommodation_bookings(
         )
         session.add(payment)
         session.flush()
+
+        product = session.get(Products, accommodation.product_id)
+        if product is None:
+            session.delete(payment)
+            session.flush()
+            logger.warning(
+                f"Cannot seed booking {entry['key']}: missing shadow product"
+            )
+            continue
 
         try:
             bookings = accommodation_payments.create_holds(
@@ -1325,6 +1452,7 @@ def _seed_accommodation_bookings(
             product_description=accommodation.description,
             product_price=accommodation.default_nightly_price,
             product_category=CATEGORY_HOUSING,
+            requires_check_in_snapshot=product.requires_check_in,
             product_currency=popup.currency,
             effective_unit_price=quote.total,
             purchase_metadata=line.purchase_metadata,
@@ -1336,21 +1464,9 @@ def _seed_accommodation_bookings(
         )
 
         if confirmed:
-            # The pass is what the portal reads; without it the guest has paid
-            # for a stay they cannot see.
-            session.add(
-                AttendeeProducts(
-                    tenant_id=tenant_id,
-                    attendee_id=attendee.id,
-                    product_id=accommodation.product_id,
-                    check_in_code=generate_check_in_code(""),
-                    payment_id=payment.id,
-                    purchase_metadata=line.purchase_metadata,
-                )
-            )
-            for booking in bookings:
-                booking.attendee_id = attendee.id
-                session.add(booking)
+            from app.api.payment.crud import payments_crud
+
+            payments_crud._reconcile_payment_fulfillment(session, payment)
         elif cancelled:
             accommodation_payments.release_for_payment(
                 session, payment.id, cancelled=True

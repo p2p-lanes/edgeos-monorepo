@@ -1,8 +1,21 @@
 "use client"
 
-import { type ReactNode, useEffect, useMemo } from "react"
+import {
+  type CSSProperties,
+  createContext,
+  type ReactNode,
+  useContext,
+  useEffect,
+  useMemo,
+} from "react"
 import { buildGoogleFontsUrl, toCssFontFamily } from "@/lib/google-font"
-import { useCityProvider } from "./cityProvider"
+import { CityContext } from "./cityProvider"
+
+const ThemeScopeContext = createContext<CSSProperties | undefined>(undefined)
+
+export function useThemeScopeStyle() {
+  return useContext(ThemeScopeContext)
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Design-token theme system.
@@ -70,7 +83,7 @@ interface ThemeColors {
   card_foreground_color?: string
 }
 
-interface ThemeConfig {
+export interface ThemeConfig {
   colors?: ThemeColors & Record<string, string | undefined>
   typography?: ThemeTypography
   radius?: string
@@ -279,10 +292,36 @@ function buildThemeStyles(
   return styles
 }
 
-export default function ThemeProvider({ children }: { children: ReactNode }) {
-  const { getCity } = useCityProvider()
-  const city = getCity()
-  const themeConfig = city?.theme_config as ThemeConfig | null | undefined
+export default function ThemeProvider({
+  children,
+  config,
+  scope = "document",
+}: {
+  children: ReactNode
+  /**
+   * The theme to apply instead of the gathering's own.
+   *
+   * A sales flow chooses how its checkout looks
+   * (sdd/sales-flows-rediseno), and outside checkout no flow is in scope,
+   * so the gathering's theme dresses its own pages. Passing this REPLACES
+   * the gathering's rather than layering on top: two writers to the same
+   * CSS variables would depend on effect ordering, and React runs child
+   * effects before parent ones.
+   */
+  config?: ThemeConfig | null
+  /** Applies flow tokens to the checkout subtree instead of the document. */
+  scope?: "document" | "local"
+}) {
+  // The raw context, not `useCityProvider`, which throws when there is no
+  // CityProvider above. The checkout mounts this provider with an explicit
+  // `config` and has no CityProvider of its own, so demanding one would
+  // take the page down to read a value it was never going to use.
+  const cityContext = useContext(CityContext)
+  const city = cityContext?.getCity()
+  const themeConfig =
+    config !== undefined
+      ? config
+      : (city?.theme_config as ThemeConfig | null | undefined)
 
   const themeStyles = useMemo(
     () => buildThemeStyles(themeConfig),
@@ -295,6 +334,8 @@ export default function ThemeProvider({ children }: { children: ReactNode }) {
   // them. Cleanup removes the overrides when the provider unmounts or the
   // theme changes, restoring the globals.css defaults.
   useEffect(() => {
+    if (scope !== "document") return
+
     const root = document.documentElement
     const keys = Object.keys(themeStyles)
     if (keys.length === 0) return
@@ -343,7 +384,13 @@ export default function ThemeProvider({ children }: { children: ReactNode }) {
         }
       }
     }
-  }, [themeStyles])
+  }, [scope, themeStyles])
+
+  const fontSize = themeStyles["--theme-font-base-size"]
+  const localStyles: CSSProperties = {
+    ...themeStyles,
+    ...(fontSize ? { fontSize } : {}),
+  }
 
   // Load the picked families from Google. Separate from the effect above
   // because it keys off the raw family names, not the derived CSS values, and
@@ -397,5 +444,17 @@ export default function ThemeProvider({ children }: { children: ReactNode }) {
     }
   }, [themeConfig?.typography])
 
-  return <>{children}</>
+  if (scope === "local") {
+    return (
+      <ThemeScopeContext.Provider value={localStyles}>
+        <div style={localStyles}>{children}</div>
+      </ThemeScopeContext.Provider>
+    )
+  }
+
+  return (
+    <ThemeScopeContext.Provider value={undefined}>
+      {children}
+    </ThemeScopeContext.Provider>
+  )
 }

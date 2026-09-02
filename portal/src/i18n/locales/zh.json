@@ -58,7 +58,95 @@
     "no_active_popups": "暂无活动",
     "no_active_popups_description": "目前没有可用的活动。请稍后再来查看。",
     "no_profile": "没有可用的个人资料数据。",
-    "no_profile_contact": "如果您认为这是错误，请联系支持团队。"
+    "no_profile_contact": "如果您认为这是错误，请联系支持团队。",
+    "direct_sales_title": "购买选项",
+    "direct_sales_description": "请选择适用于此活动的选项。",
+    "door_generic": "你的申请",
+    "door_status": {
+      "accepted": "已接受",
+      "in_review": "审核中",
+      "draft": "草稿",
+      "rejected": "未通过",
+      "none": "开放"
+    },
+    "door_action": {
+      "passes": "查看我的通行证",
+      "application": "查看申请",
+      "apply": "申请"
+    }
+  },
+  "shop": {
+    "title": "商店",
+    "description": "请选择可用选项。",
+    "catalog": "可用选项",
+    "application": "申请",
+    "direct": "直接购买",
+    "upsale": "为您提供",
+    "open": "查看选项",
+    "source": "来源：{{source}}",
+    "eligibility": {
+      "application": "仅向已获批准的申请人提供",
+      "direct": "向所有参与者提供",
+      "upsale": "完成符合条件的购买后可用"
+    },
+    "price_from": "起价 {{price}}",
+    "price_unavailable": "价格暂不可用",
+    "empty_title": "目前没有可用选项",
+    "empty_description": "请稍后回来查看新选项。",
+    "approval_required_title": "需要批准",
+    "approval_required_description": "您的申请获得批准后，才能购买此选项。",
+    "approval_required_cta": "查看申请",
+    "estimated_total": "预估总额",
+    "definitive_total": "总额"
+  },
+  "orders": {
+    "title": "订单",
+    "description": "您在此活动中的付款记录。",
+    "empty_title": "暂无订单",
+    "empty_description": "您的付款记录将显示在这里。",
+    "total": "总计",
+    "lines": "订单项目",
+    "line_quantity": "数量：{{count}}",
+    "legacy_purchase": "历史购买记录",
+    "invoice": "发票",
+    "download_invoice_error": "下载发票失败，请重试。",
+    "status": {
+      "approved": "已批准",
+      "pending": "待处理",
+      "rejected": "已拒绝",
+      "expired": "已过期",
+      "cancelled": "已取消",
+      "unknown": "付款状态未知"
+    }
+  },
+  "people": {
+    "title": "人员",
+    "description": "您可以为此活动管理的人员。",
+    "primary": "主要参与者",
+    "dependent": "受抚养人",
+    "can_manage": "由您管理",
+    "empty_title": "暂无人员",
+    "empty_description": "您管理的人员将显示在这里。"
+  },
+  "tickets_access": {
+    "title": "票券和访问权限",
+    "description": "您的有效活动票券和签到项目。",
+    "empty_title": "暂无票券或签到项目",
+    "empty_description": "有效活动票券和签到项目将显示在这里。",
+    "purchased_by_you": "由您购买",
+    "show_code": "显示 {{ticket}} 的签到码",
+    "checked_in": "已签到",
+    "active": "可签到",
+    "access_active": "访问权限有效",
+    "code_title": "签到码",
+    "code_description": "签到时请使用此代码。",
+    "duration": {
+      "day": "活动单日通行权限",
+      "week": "活动每周通行权限",
+      "month": "活动每月通行权限",
+      "full": "活动全程通行权限"
+    },
+    "qr_alt": "二维码"
   },
   "auth": {
     "sign_up_or_log_in": "注册或登录",
@@ -114,6 +202,8 @@
   "application": {
     "unavailable": "申请不可用",
     "unavailable_description": "此活动的申请表尚未配置。",
+    "flow_picker_title": "选择您的申请方式",
+    "flow_picker_description": "此活动有多个申请通道，请选择一个以继续。",
     "step_of": "第 {{current}} 步，共 {{total}} 步",
     "existing_found": "发现已有申请",
     "existing_description": "我们发现了与您电子邮件关联的先前申请。",
@@ -229,7 +319,19 @@
     "cart": {
       "close_aria": "关闭购物车",
       "empty_title": "您的购物车是空的",
-      "empty_description": "请返回并选择一些通行证以继续。"
+      "empty_description": "请返回并选择一些通行证以继续。",
+      "unknown_attendee": "未知参与者",
+      "passes": "通行证",
+      "housing": "住宿",
+      "full_stay": "完整住宿期",
+      "merchandise": "周边商品",
+      "patron_contribution": "赞助贡献",
+      "community_support": "社区支持",
+      "meal_plans": "餐饮计划",
+      "pass_protection": "通行证保障",
+      "pass_protection_description": "涵盖所有通行证",
+      "promo_code": "优惠码",
+      "promo_code_expired": "您的优惠码已失效"
     },
     "actions": {
       "pay": "支付",
@@ -263,6 +365,46 @@
         "next_image_aria": "下一张图片"
       }
     },
+    "accommodation": {
+      "default_notice": "住宿费用需在结账时全额支付，且不可退款。",
+      "in_cart": "已加入购物车",
+      "sleeps": "可住 {{count}} 人",
+      "nights_one": "{{count}} 晚",
+      "nights_other": "{{count}} 晚",
+      "monthly_rate": "月租价格",
+      "per_night": "晚",
+      "includes_tax": "包含 {{amount}} 住宿税",
+      "remove": "移除",
+      "select": "选择",
+      "only_left_one": "仅剩 {{count}} 间",
+      "only_left_other": "仅剩 {{count}} 间",
+      "guests_label": "住客",
+      "guests_one": "{{count}} 位住客",
+      "guests_other": "{{count}} 位住客",
+      "guest_name_placeholder": "住客 {{number}} 的全名",
+      "no_rooms": "此结账流程暂无可用住宿。",
+      "check_in": "入住",
+      "check_out": "退房",
+      "who_is_staying": "入住人员",
+      "cart_title": "住宿",
+      "bed_count": "{{count}} 张{{type}}",
+      "bed_types": {
+        "king": "特大床",
+        "queen": "大床",
+        "double": "双人床",
+        "single": "单人床",
+        "bunk": "双层床",
+        "sofa": "沙发床"
+      },
+      "unavailable": {
+        "sold_out": "所选日期已订满",
+        "min_stay_not_met": "需要延长住宿天数",
+        "outside_bookable_window": "所选日期不可预订",
+        "over_capacity": "无法容纳您的同行人数",
+        "inactive": "不可预订",
+        "default": "所选日期不可预订"
+      }
+    },
     "contribution": {
       "fallbackLabel": "活动贡献费",
       "fallbackDescription": "支持活动的举办"
@@ -274,6 +416,7 @@
     "coupon_no_longer_valid": "This coupon is no longer available. Your total has been updated. Please review and try again.",
     "payment_error": "Something went wrong with your payment. Please try again.",
     "no_products": "此步骤暂无可用产品。",
+    "not_eligible_for_flow": "此结账流程不适用于您的账户。",
     "no_images": "此步骤暂无可用图片。",
     "no_video": "此步骤暂无可用视频。",
     "no_passes": "暂无可用通行证。",
@@ -284,12 +427,17 @@
     "step_config_error_detail": "此步骤未分配模板。请联系管理员。",
     "previous_payment_completed": "您之前的付款已完成。",
     "pending_payment_wait": "您有一笔待处理的付款，请等待几分钟。",
-    "payment_cancel_failed": "我们无法处理您的付款，请重试。"
+    "payment_cancel_failed": "我们无法处理您的付款，请重试。",
+    "flow_restriction_violated": "您不符合通过此渠道购买的条件。",
+    "product_not_in_flow": "此商品无法通过此渠道购买。"
   },
   "openCheckout": {
     "loading": "正在加载结账...",
     "unavailable_title": "结账不可用",
     "unavailable_description": "此链接无效或此活动已不可用。",
+    "sign_in_required_title": "需要登录",
+    "sign_in_required_description": "此结账页面仅面向现有参与者。请登录门户账户以继续。",
+    "sign_in_required_cta": "登录",
     "tickets_title": "门票",
     "tickets_subtitle": "选择您要购买的门票数量。",
     "coupon_title": "优惠券",
@@ -312,12 +460,20 @@
     "thank_you_total": "总计",
     "previous_payment_completed": "您之前的付款已完成。",
     "payment_cancel_failed": "我们无法处理您的付款，请重试。",
-    "pending_payment_wait": "您有一笔待处理的付款，请等待几分钟。"
+    "pending_payment_wait": "您有一笔待处理的付款，请等待几分钟。",
+    "flow_restriction_violated": "您不符合通过此渠道购买的条件。",
+    "product_not_in_flow": "此商品无法通过此渠道购买。"
   },
   "passes": {
     "your_passes": "我的通行证",
+    "companion_attending": "您以同行人身份参加。",
+    "companion_attending_city": "您以同行人身份参加 {{city}}。",
+    "companion_no_passes": "尚未分配通行证。请稍后再查看。",
+    "companion_waiting_acceptance": "申请通过后即可查看通行证。",
     "buy_passes": "购买通行证",
     "your_passes_description": "在这里查看和管理您的订单。",
+    "upsale_title": "为您推荐",
+    "upsale_description": "为您的购买提供的专属附加项目。",
     "loading_passes": "正在加载通行证信息...",
     "add_spouse": "添加配偶",
     "add_children": "添加子女",
@@ -384,7 +540,7 @@
     }
   },
   "attendees": {
-    "title": "参与者名录",
+    "title": "名录",
     "description": "联系您的朋友以计划日程、寻找合住住所或一起组织活动。*此名录仅包含自愿选择分享其信息的人的资料。",
     "search_placeholder": "按姓名、邮箱、组织搜索...",
     "export_csv": "导出参与者CSV",
@@ -437,8 +593,18 @@
     "coming_soon": "（即将推出）",
     "soon_badge": "即将推出",
     "application": "申请",
+    "navigation": "门户导航",
+    "mobile_navigation": "门户导航菜单",
+    "general": "常规",
+    "participation": "参与",
+    "commerce": "购物",
+    "community": "社区",
+    "shop": "商店",
+    "orders": "订单",
+    "people": "人员",
+    "tickets_access": "门票和访问权限",
     "passes": "通行证",
-    "attendee_directory": "参与者名录",
+    "attendee_directory": "名录",
     "companion": "同伴",
     "status": "状态",
     "groups": "团体",
@@ -501,7 +667,7 @@
     "application": "申请",
     "passes": "通行证",
     "buy": "购买",
-    "attendees": "参与者名录",
+    "attendees": "名录",
     "groups": "团体",
     "profile": "个人资料"
   },
@@ -828,7 +994,7 @@
       "visibility_private": "私密(仅限受邀者)",
       "visibility_unlisted": "不公开列出(隐藏,可分享链接)",
       "host_label": "显示的主办方(可选)",
-      "host_placeholder_default": "{{name}}(默认)",
+      "host_placeholder_popup": "{{name}}",
       "host_placeholder_optional": "可选",
       "host_use_popup": "使用 {{name}}",
       "host_use_me": "使用我的姓名",

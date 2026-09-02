@@ -146,6 +146,9 @@ class FormFieldsCRUD(BaseCRUD[FormFields, FormFieldCreate, FormFieldUpdate]):
         limit: int = 100,
         search: str | None = None,
     ) -> tuple[list[FormFields], int]:
+        """Returns ALL fields for the popup regardless of `sales_flow_id`
+        (admin/legacy management surface — untouched by sdd/sales-flows
+        slice 6 — see `find_by_flow` for one flow's own fields)."""
         statement = (
             select(FormFields)
             .outerjoin(FormSections, FormFields.section_id == FormSections.id)
@@ -154,6 +157,42 @@ class FormFieldsCRUD(BaseCRUD[FormFields, FormFieldCreate, FormFieldUpdate]):
         )
 
         # Apply text search if provided
+        if search:
+            search_term = f"%{search}%"
+            statement = statement.where(
+                or_(
+                    col(FormFields.label).ilike(search_term),
+                    col(FormFields.name).ilike(search_term),
+                    col(FormFields.field_type).ilike(search_term),
+                )
+            )
+
+        count_statement = select(func.count()).select_from(statement.subquery())
+        total = session.exec(count_statement).one()
+
+        statement = statement.offset(skip).limit(limit)
+        results = list(session.exec(statement).all())
+
+        return results, total
+
+    def find_by_flow(
+        self,
+        session: Session,
+        flow_id: uuid.UUID,
+        skip: int = 0,
+        limit: int = 100,
+        search: str | None = None,
+    ) -> tuple[list[FormFields], int]:
+        """The form fields of `flow_id` — the only way to read a flow's form
+        (sdd/sales-flows-rediseno slice 3). Empty means the flow has no
+        fields, never that it should borrow another flow's."""
+        statement = (
+            select(FormFields)
+            .outerjoin(FormSections, FormFields.section_id == FormSections.id)
+            .where(FormFields.sales_flow_id == flow_id)
+            .order_by(FormSections.order, FormFields.position)  # type: ignore[arg-type]
+        )
+
         if search:
             search_term = f"%{search}%"
             statement = statement.where(
@@ -239,8 +278,17 @@ class FormFieldsCRUD(BaseCRUD[FormFields, FormFieldCreate, FormFieldUpdate]):
         custom_fields: dict[str, Any] | None,
         skip_required: bool = False,
         is_express_checkout: bool = False,
+        sales_flow_id: uuid.UUID | None = None,
     ) -> tuple[bool, list[str]]:
         """Validate custom_fields against form field definitions.
+
+        `sales_flow_id` names the form the applicant actually filled in. A
+        form belongs to one flow (sdd/sales-flows-rediseno), so validating
+        against the popup meant validating against EVERY flow's fields at
+        once: someone applying through a partner door was told a question
+        from the general door was missing, one they were never shown and had
+        no way to answer. Omitted keeps the popup-wide behaviour for callers
+        that have no flow.
 
         When ``skip_required`` is True, presence/emptiness checks on required
         fields are bypassed (used for draft saves), but type and constraint
@@ -255,15 +303,25 @@ class FormFieldsCRUD(BaseCRUD[FormFields, FormFieldCreate, FormFieldUpdate]):
         if custom_fields is None:
             custom_fields = {}
 
-        # Get all form fields for this popup
-        fields, _ = self.find_by_popup(session, popup_id, skip=0, limit=1000)
+        # The fields of the form that was actually shown.
+        if sales_flow_id is not None:
+            fields, _ = self.find_by_flow(session, sales_flow_id, skip=0, limit=1000)
+        else:
+            fields, _ = self.find_by_popup(session, popup_id, skip=0, limit=1000)
         field_map = {f.name: f for f in fields}
 
         # Hidden sections aren't asked on the portal, so skip required-field
         # validation for fields belonging to them.
         from app.api.form_section.crud import form_sections_crud
 
-        sections, _ = form_sections_crud.find_by_popup(session, popup_id, limit=None)
+        if sales_flow_id is not None:
+            sections, _ = form_sections_crud.find_by_flow(
+                session, sales_flow_id, limit=None
+            )
+        else:
+            sections, _ = form_sections_crud.find_by_popup(
+                session, popup_id, limit=None
+            )
         hidden_section_ids = {s.id for s in sections if s.hidden}
 
         # When the request comes from the /groups Express Checkout, only
@@ -422,12 +480,16 @@ class FormFieldsCRUD(BaseCRUD[FormFields, FormFieldCreate, FormFieldUpdate]):
     ) -> set[str]:
         """Names of custom fields the portal form currently renders.
 
-        Mirrors ``build_schema_for_popup`` visibility: fields in hidden
+        Mirrors ``build_schema_for_flow`` visibility: fields in hidden
         sections are excluded. When ``is_express_checkout`` is True, the set
         is further restricted to the sections the Express Checkout mini-form
         renders. Stored answers outside this set (deleted, renamed, or hidden
         fields) are never part of a portal payload, so update paths must
         preserve them instead of treating their absence as a cleared value.
+
+        Deliberately popup-scoped (not flow-aware) — untouched by
+        sdd/sales-flows slice 6, same as ``find_by_popup``/
+        ``validate_custom_fields``/``validate_base_fields``.
         """
         from app.api.form_section.crud import form_sections_crud
 
@@ -453,28 +515,36 @@ class FormFieldsCRUD(BaseCRUD[FormFields, FormFieldCreate, FormFieldUpdate]):
             names.add(field.name)
         return names
 
-    def build_schema_for_popup(
-        self, session: Session, popup_id: uuid.UUID
+    def build_schema_for_flow(
+        self,
+        session: Session,
+        popup_id: uuid.UUID,
+        flow_id: uuid.UUID,
     ) -> dict[str, Any]:
-        """Build a JSON Schema-like structure for a popup's form fields.
+        """Build a JSON Schema-like structure for a sales flow's form.
+
+        Sections, base fields and custom fields all come from `flow_id`'s
+        own rows (sdd/sales-flows-rediseno slice 3). Nothing is inherited,
+        so a flow with no form produces an empty schema rather than
+        another flow's.
 
         This returns a schema that includes:
         - Base fields: human profile + application-level fields (source of truth)
-        - Custom form fields defined for the popup
+        - Custom form fields defined for the flow
         Each base field includes a `target` indicating where the data lives:
         - "human": stored on the Human entity
         - "application": stored on the Application entity
         """
-        fields, _ = self.find_by_popup(session, popup_id, skip=0, limit=1000)
+        fields, _ = self.find_by_flow(session, flow_id, skip=0, limit=1000)
 
         # Load popup for interpolating help_text
         popup = session.get(Popups, popup_id)
         popup_name = popup.name if popup else "the event"
 
-        # Load sections for this popup
+        # Load this flow's own sections.
         from app.api.form_section.crud import form_sections_crud
 
-        db_sections, _ = form_sections_crud.find_by_popup(session, popup_id, limit=None)
+        db_sections, _ = form_sections_crud.find_by_flow(session, flow_id, limit=None)
 
         # Hidden sections are dropped from the schema entirely (and so are
         # their fields). The data + section row stay in the DB so the admin
@@ -488,10 +558,17 @@ class FormFieldsCRUD(BaseCRUD[FormFields, FormFieldCreate, FormFieldUpdate]):
         from app.api.base_field_config.constants import BASE_FIELD_DEFINITIONS
         from app.api.base_field_config.crud import (
             base_field_configs_crud,
-            field_applies_to_popup,
+            field_applies_to_flow,
+        )
+        from app.api.sales_flow.resolver import config_for
+
+        flow_config = (
+            config_for(session, sales_flow_id=flow_id, popup_id=popup.id)
+            if popup
+            else None
         )
 
-        db_configs = base_field_configs_crud.find_by_popup(session, popup_id)
+        db_configs = base_field_configs_crud.find_by_flow(session, flow_id)
 
         base_fields: dict[str, Any] = {}
         for config in db_configs:
@@ -503,7 +580,9 @@ class FormFieldsCRUD(BaseCRUD[FormFields, FormFieldCreate, FormFieldUpdate]):
             # a flag off, but we stop surfacing them until it's re-enabled.
             # Sections left empty by this filter are skipped by the portal
             # (it drops sections with no base/custom fields).
-            if popup and not field_applies_to_popup(config.field_name, popup):
+            if flow_config and not field_applies_to_flow(
+                config.field_name, flow_config
+            ):
                 continue
             if config.section_id and config.section_id in hidden_section_ids:
                 continue
@@ -570,6 +649,125 @@ class FormFieldsCRUD(BaseCRUD[FormFields, FormFieldCreate, FormFieldUpdate]):
             "base_fields": base_fields,
             "custom_fields": custom_fields,
             "sections": sections,
+        }
+
+    def copy_form_to_flow(
+        self,
+        session: Session,
+        *,
+        popup_id: uuid.UUID,
+        tenant_id: uuid.UUID,
+        target_flow_id: uuid.UUID,
+        source_flow_id: uuid.UUID,
+    ) -> dict[str, int]:
+        """Copy a form (sections + base field configs + custom fields) from
+                a source into `target_flow_id` as independent rows.
+
+        This is how a flow gets a form without inheriting one
+                (sdd/sales-flows-rediseno R3): copying is an explicit one-time
+                event, after which the two flows are independent and editing either
+                never affects the other. `source_flow_id` names the flow to copy
+                from and copies exactly its own rows — copying an empty flow yields
+                an empty target, which is the honest answer. HTTP endpoint:
+                POST /form-fields/copy-to-flow/{target_flow_id}; the backoffice
+                surfaces it as a confirm dialog on the flow detail page.
+
+                The target's existing flow-tier rows are deleted first (same
+                transaction), so this genuinely REPLACES rather than appends —
+                matching the confirm dialog's promise.
+
+                Returns a count of copied rows per table for caller/test assertions.
+        """
+        from app.api.base_field_config.crud import base_field_configs_crud
+        from app.api.base_field_config.models import BaseFieldConfigs
+        from app.api.form_section.crud import form_sections_crud
+
+        source_sections, _ = form_sections_crud.find_by_flow(
+            session, source_flow_id, limit=None
+        )
+        source_configs = base_field_configs_crud.find_by_flow(session, source_flow_id)
+        source_fields, _ = self.find_by_flow(session, source_flow_id, limit=1000)
+
+        # Clear the target's existing own rows first (replace, not append).
+        # FK-safe order: fields/configs reference section_id, so delete
+        # them before their sections.
+        existing_fields, _ = self.find_by_flow(session, target_flow_id, limit=1000)
+        existing_configs = base_field_configs_crud.find_by_flow(session, target_flow_id)
+        existing_sections, _ = form_sections_crud.find_by_flow(
+            session, target_flow_id, limit=None
+        )
+        for row in (*existing_fields, *existing_configs, *existing_sections):
+            session.delete(row)
+        session.flush()
+
+        section_id_map: dict[uuid.UUID, uuid.UUID] = {}
+        for section in source_sections:
+            new_section = FormSections(
+                tenant_id=tenant_id,
+                popup_id=popup_id,
+                sales_flow_id=target_flow_id,
+                label=section.label,
+                description=section.description,
+                order=section.order,
+                protected=section.protected,
+                hidden=section.hidden,
+                kind=section.kind,
+            )
+            session.add(new_section)
+            session.flush()
+            section_id_map[section.id] = new_section.id
+
+        for config in source_configs:
+            session.add(
+                BaseFieldConfigs(
+                    tenant_id=tenant_id,
+                    popup_id=popup_id,
+                    sales_flow_id=target_flow_id,
+                    field_name=config.field_name,
+                    section_id=section_id_map.get(config.section_id)
+                    if config.section_id
+                    else None,
+                    position=config.position,
+                    required=config.required,
+                    label=config.label,
+                    placeholder=config.placeholder,
+                    help_text=config.help_text,
+                    options=config.options,
+                    field_type=config.field_type,
+                )
+            )
+
+        for field in source_fields:
+            session.add(
+                FormFields(
+                    tenant_id=tenant_id,
+                    popup_id=popup_id,
+                    sales_flow_id=target_flow_id,
+                    name=field.name,
+                    label=field.label,
+                    short_label=field.short_label,
+                    field_type=field.field_type,
+                    section_id=section_id_map.get(field.section_id)
+                    if field.section_id
+                    else None,
+                    position=field.position,
+                    required=field.required,
+                    options=field.options,
+                    placeholder=field.placeholder,
+                    help_text=field.help_text,
+                    min_date=field.min_date,
+                    max_date=field.max_date,
+                    config=dict(field.config) if field.config else None,
+                    width=field.width,
+                )
+            )
+
+        session.commit()
+
+        return {
+            "sections": len(source_sections),
+            "base_fields": len(source_configs),
+            "fields": len(source_fields),
         }
 
 

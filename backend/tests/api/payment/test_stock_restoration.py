@@ -32,6 +32,7 @@ from app.api.popup.models import Popups
 from app.api.product.crud import products_crud
 from app.api.product.models import Products
 from app.api.tenant.models import Tenants
+from tests._flow_helpers import application_flow_id
 
 # ---------------------------------------------------------------------------
 # Fixtures / Helpers
@@ -92,6 +93,7 @@ def _make_pending_payment(
     from app.api.application.schemas import ApplicationStatus
 
     application = Applications(
+        sales_flow_id=application_flow_id(db, popup.id),
         tenant_id=tenant.id,
         popup_id=popup.id,
         human_id=human.id,
@@ -337,18 +339,13 @@ class TestUpdateStatusCancelledRejectedRestoration:
             f"Expected remaining=6 after reject, got {refreshed.total_stock_remaining}"
         )
 
-    def test_cancel_from_approved_does_not_restore_stock(
+    def test_cancel_from_approved_restores_commercial_quantity(
         self,
         db: Session,
         tenant_a: Tenants,
         popup_tenant_a: Popups,
     ) -> None:
-        """APPROVED → CANCELLED: stock NOT restored (refund flow, out of scope).
-
-        Per design §4.2 and proposal locked decisions: APPROVED→CANCELLED is the
-        refund flow. Stock restoration is intentionally NOT wired for this path.
-        This test documents the gap is intentional.
-        """
+        """APPROVED → CANCELLED restores the immutable commercial quantity."""
         product = _make_product(
             db, tenant_a, popup_tenant_a, total_stock_cap=10, total_stock_remaining=10
         )
@@ -369,6 +366,7 @@ class TestUpdateStatusCancelledRejectedRestoration:
         db.add(human)
         db.flush()
         application = Applications(
+            sales_flow_id=application_flow_id(db, popup_tenant_a.id),
             tenant_id=tenant_a.id,
             popup_id=popup_tenant_a.id,
             human_id=human.id,
@@ -413,18 +411,11 @@ class TestUpdateStatusCancelledRejectedRestoration:
         db.commit()
         db.refresh(payment)
 
-        stock_before_cancel = db.get(Products, product.id).total_stock_remaining
-
         payments_crud.update_status(db, payment.id, PaymentStatus.CANCELLED)
 
         db.expire_all()
         refreshed = db.get(Products, product.id)
-        # APPROVED → CANCELLED: stock must NOT change (no restoration expected)
-        assert refreshed.total_stock_remaining == stock_before_cancel, (
-            f"APPROVED→CANCELLED must NOT restore stock. "
-            f"Expected {stock_before_cancel}, got {refreshed.total_stock_remaining}. "
-            "This is the intentional refund-flow gap (see design §4.2)."
-        )
+        assert refreshed.total_stock_remaining == 10
 
     def test_cancel_idempotency_already_cancelled(
         self,

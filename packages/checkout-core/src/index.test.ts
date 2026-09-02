@@ -31,7 +31,7 @@ describe("@edgeos/checkout-core public surface", () => {
 
   it("drives a full flow end-to-end through the barrel", async () => {
     const client = sdk.createCheckoutClient(
-      { slug: "demo" },
+      { slug: "demo", flowSlug: "checkout" },
       {
         request: async <T>(_m: string, path: string): Promise<T> =>
           (path.endsWith("/purchase")

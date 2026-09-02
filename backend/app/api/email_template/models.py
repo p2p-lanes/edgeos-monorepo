@@ -15,6 +15,14 @@ if TYPE_CHECKING:
 
 
 class EmailTemplates(EmailTemplateBase, table=True):
+    """sdd/sales-flows slice 10: `sales_flow_id` adds a flow tier on top of
+    the pre-existing popup/tenant tiers. Two-tier partial-unique shape
+    (see migration `66d0a714e001_add_flow_id_email_templates_and_logs.py`):
+    a flow-scoped row (`sales_flow_id IS NOT NULL`) and the popup-shared row
+    of the same type (`sales_flow_id IS NULL`) are disjoint tiers and never
+    collide with each other.
+    """
+
     __tablename__ = "email_templates"
     __table_args__ = (
         Index(
@@ -22,7 +30,14 @@ class EmailTemplates(EmailTemplateBase, table=True):
             "popup_id",
             "template_type",
             unique=True,
-            postgresql_where=text("popup_id IS NOT NULL"),
+            postgresql_where=text("popup_id IS NOT NULL AND sales_flow_id IS NULL"),
+        ),
+        Index(
+            "uq_email_template_flow_scope_type",
+            "sales_flow_id",
+            "template_type",
+            unique=True,
+            postgresql_where=text("sales_flow_id IS NOT NULL"),
         ),
         Index(
             "uq_email_template_tenant_scope_type",
@@ -32,7 +47,8 @@ class EmailTemplates(EmailTemplateBase, table=True):
             postgresql_where=text("popup_id IS NULL"),
         ),
         CheckConstraint(
-            "(template_type IN ('login_code_human') AND popup_id IS NULL) "
+            "(template_type IN ('login_code_human') "
+            "AND popup_id IS NULL AND sales_flow_id IS NULL) "
             "OR (template_type NOT IN ('login_code_human') AND popup_id IS NOT NULL)",
             name="ck_email_templates_scope",
         ),

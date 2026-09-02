@@ -47,18 +47,17 @@ from app.api.accommodation.models import (  # noqa: E402
     Accommodations,
     AccommodationUnits,
 )
-from app.api.attendee.crud import generate_check_in_code  # noqa: E402
 from app.api.payment.schemas import PaymentStatus  # noqa: E402
 from app.api.popup.models import Popups  # noqa: E402
 from app.api.product.schemas import CATEGORY_HOUSING  # noqa: E402
 from app.core.db import engine  # noqa: E402
 from app.models import (  # noqa: E402
     Applications,
-    AttendeeProducts,
     Attendees,
     Humans,
     PaymentProducts,
     Payments,
+    Products,
 )
 
 
@@ -162,7 +161,9 @@ def main() -> None:
         # Prices the stay and rejects anything the checkout would reject:
         # min stay, capacity, the bookable window, a property the step does
         # not offer.
-        resolved = accommodation_payments.resolve_lines(session, popup, [line])
+        resolved = accommodation_payments.resolve_lines(
+            session, popup, application.sales_flow_id, [line]
+        )
         quote = resolved[0].quote
         prop = session.get(AccommodationProperties, room.property_id)
 
@@ -183,6 +184,8 @@ def main() -> None:
             tenant_id=popup.tenant_id,
             application_id=application.id,
             popup_id=popup.id,
+            buyer_human_id=application.human_id,
+            sales_flow_id=application.sales_flow_id,
             status=PaymentStatus.APPROVED.value,
             amount=quote.total,
             currency=popup.currency,
@@ -190,6 +193,10 @@ def main() -> None:
         )
         session.add(payment)
         session.flush()
+
+        product = session.get(Products, room.product_id)
+        if product is None:
+            fail(f"room {room.name!r} has no shadow product")
 
         # Raises 409 if the room was taken while we were quoting it; the
         # exclusion constraint is what decides, not this script.
@@ -214,6 +221,7 @@ def main() -> None:
                 product_description=room.description,
                 product_price=room.default_nightly_price,
                 product_category=CATEGORY_HOUSING,
+                requires_check_in_snapshot=product.requires_check_in,
                 product_currency=popup.currency,
                 effective_unit_price=quote.total,
                 purchase_metadata=line.purchase_metadata,
@@ -224,21 +232,9 @@ def main() -> None:
             session, payment_id=payment.id, bookings=bookings
         )
 
-        # The pass is what the portal reads. Without it the guest has paid for
-        # a stay they cannot see.
-        session.add(
-            AttendeeProducts(
-                tenant_id=popup.tenant_id,
-                attendee_id=attendee.id,
-                product_id=room.product_id,
-                check_in_code=generate_check_in_code(""),
-                payment_id=payment.id,
-                purchase_metadata=line.purchase_metadata,
-            )
-        )
-        for booking in bookings:
-            booking.attendee_id = attendee.id
-            session.add(booking)
+        from app.api.payment.crud import payments_crud
+
+        payments_crud._reconcile_payment_fulfillment(session, payment)
 
         session.commit()
 

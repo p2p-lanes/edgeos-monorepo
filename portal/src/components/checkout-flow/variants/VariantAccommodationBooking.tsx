@@ -18,9 +18,10 @@
  */
 
 import { useQuery } from "@tanstack/react-query"
+import type { TFunction } from "i18next"
 import { BedDouble, Check, Info, Loader2, Users } from "lucide-react"
 import Image from "next/image"
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import { useTranslation } from "react-i18next"
 import {
   type AccommodationOffer,
@@ -45,9 +46,6 @@ import {
 } from "@/types/checkout"
 import type { VariantProps } from "../registries/variantRegistry"
 
-const DEFAULT_NOTICE =
-  "Accommodation is paid in full at checkout and is non-refundable."
-
 interface AccommodationTemplateConfig {
   layout: "grid" | "list"
   showPropertyHeaders: boolean
@@ -57,6 +55,7 @@ interface AccommodationTemplateConfig {
 
 function parseConfig(
   raw: VariantProps["templateConfig"],
+  defaultNotice: string,
 ): AccommodationTemplateConfig {
   const config = (raw ?? {}) as Record<string, unknown>
   return {
@@ -66,7 +65,7 @@ function parseConfig(
     noticeText:
       typeof config.notice_text === "string" && config.notice_text.trim()
         ? config.notice_text
-        : DEFAULT_NOTICE,
+        : defaultNotice,
   }
 }
 
@@ -103,12 +102,15 @@ function bookableBounds(rooms: PublicAccommodation[]): {
   }
 }
 
-function bedSummary(room: PublicAccommodation): string {
+function bedSummary(room: PublicAccommodation, t: TFunction): string {
   const beds = room.beds ?? []
   if (beds.length === 0) return ""
   return beds
-    .map(
-      (bed) => `${bed.count} ${bed.type.replace(/^./, (c) => c.toUpperCase())}`,
+    .map((bed) =>
+      t("checkout.accommodation.bed_count", {
+        count: bed.count,
+        type: t(`checkout.accommodation.bed_types.${bed.type}`),
+      }),
     )
     .join(" · ")
 }
@@ -119,23 +121,26 @@ function bedSummary(room: PublicAccommodation): string {
  * The codes are the backend's stable `REASON_*` strings; an unrecognised one
  * degrades to a neutral sentence rather than showing a raw identifier.
  */
-function unavailableCopy(reason: string | null | undefined): string | null {
+function unavailableCopy(
+  reason: string | null | undefined,
+  t: TFunction,
+): string | null {
   switch (reason) {
     case null:
     case undefined:
       return null
     case "sold_out":
-      return "Fully booked for these dates"
+      return t("checkout.accommodation.unavailable.sold_out")
     case "min_stay_not_met":
-      return "Needs a longer stay"
+      return t("checkout.accommodation.unavailable.min_stay_not_met")
     case "outside_bookable_window":
-      return "Not available on these dates"
+      return t("checkout.accommodation.unavailable.outside_bookable_window")
     case "over_capacity":
-      return "Too small for your party"
+      return t("checkout.accommodation.unavailable.over_capacity")
     case "inactive":
-      return "Not available"
+      return t("checkout.accommodation.unavailable.inactive")
     default:
-      return "Not available for these dates"
+      return t("checkout.accommodation.unavailable.default")
   }
 }
 
@@ -160,10 +165,11 @@ function RoomCard({
   onSelect,
   onRemove,
 }: RoomCardProps) {
+  const { t } = useTranslation()
   const cover = room.images?.[0]?.url
   const quote = availability?.quote
-  const blocked = unavailableCopy(availability?.unavailable_reason)
-  const beds = bedSummary(room)
+  const blocked = unavailableCopy(availability?.unavailable_reason, t)
+  const beds = bedSummary(room, t)
 
   return (
     <div
@@ -192,7 +198,7 @@ function RoomCard({
           {selected && (
             <span className="flex shrink-0 items-center gap-1 text-xs font-medium text-primary">
               <Check className="h-3.5 w-3.5" />
-              In cart
+              {t("checkout.accommodation.in_cart")}
             </span>
           )}
         </div>
@@ -200,7 +206,9 @@ function RoomCard({
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
           <span className="flex items-center gap-1">
             <Users className="h-3.5 w-3.5" />
-            Sleeps {room.guest_capacity}
+            {t("checkout.accommodation.sleeps", {
+              count: room.guest_capacity,
+            })}
           </span>
           {beds && (
             <span className="flex items-center gap-1">
@@ -221,27 +229,30 @@ function RoomCard({
                 {formatCurrency(Number(quote.total), currency)}
               </span>
               <span className="text-xs text-muted-foreground">
-                {nights} night{nights === 1 ? "" : "s"}
-                {quote.applied_rule === "long_stay" && " · monthly rate"}
+                {t("checkout.accommodation.nights", { count: nights })}
+                {quote.applied_rule === "long_stay" &&
+                  ` · ${t("checkout.accommodation.monthly_rate")}`}
               </span>
             </div>
           ) : (
             <span className="text-sm text-muted-foreground">
-              {formatCurrency(Number(room.default_nightly_price), currency)} /
-              night
+              {formatCurrency(Number(room.default_nightly_price), currency)} /{" "}
+              {t("checkout.accommodation.per_night")}
             </span>
           )}
 
           {quote && Number(quote.tax) > 0 && (
             <p className="text-xs text-muted-foreground">
-              Includes {formatCurrency(Number(quote.tax), currency)} lodging tax
+              {t("checkout.accommodation.includes_tax", {
+                amount: formatCurrency(Number(quote.tax), currency),
+              })}
             </p>
           )}
 
           <div className="mt-3">
             {selected ? (
               <Button variant="outline" className="w-full" onClick={onRemove}>
-                Remove
+                {t("checkout.accommodation.remove")}
               </Button>
             ) : (
               <Button
@@ -252,7 +263,7 @@ function RoomCard({
                 {isPending ? (
                   <Loader2 className="h-4 w-4 animate-spin" />
                 ) : (
-                  (blocked ?? "Select")
+                  (blocked ?? t("checkout.accommodation.select"))
                 )}
               </Button>
             )}
@@ -262,7 +273,9 @@ function RoomCard({
             availability.available > 0 &&
             availability.available <= 3 && (
               <p className="mt-2 text-center text-xs text-amber-600">
-                Only {availability.available} left
+                {t("checkout.accommodation.only_left", {
+                  count: availability.available,
+                })}
               </p>
             )}
         </div>
@@ -281,6 +294,7 @@ function GuestBlock({
   room: PublicAccommodation | undefined
   requireGuestNames: boolean
 }) {
+  const { t } = useTranslation()
   const { setAccommodationGuestCount, setAccommodationGuestName } =
     useCheckout()
   const capacity = room?.guest_capacity ?? item.guestCount
@@ -297,7 +311,7 @@ function GuestBlock({
         </div>
         <div className="flex items-center gap-2">
           <Label htmlFor={`guests-${item.accommodationId}`} className="text-xs">
-            Guests
+            {t("checkout.accommodation.guests_label")}
           </Label>
           <Input
             id={`guests-${item.accommodationId}`}
@@ -325,7 +339,9 @@ function GuestBlock({
               // Positional slots: a guest has no id until the booking exists,
               // and this UI never reorders them.
               key={index}
-              placeholder={`Guest ${index + 1} full name`}
+              placeholder={t("checkout.accommodation.guest_name_placeholder", {
+                number: index + 1,
+              })}
               value={guest}
               onChange={(event) =>
                 setAccommodationGuestName(
@@ -356,10 +372,16 @@ export default function VariantAccommodationBooking({
     removeAccommodation,
     clearAccommodationsOutsideStay,
     previewToken,
+    salesFlowId,
+    salesFlowSlug,
     submitMode,
   } = useCheckout()
 
-  const config = useMemo(() => parseConfig(templateConfig), [templateConfig])
+  const config = useMemo(
+    () =>
+      parseConfig(templateConfig, t("checkout.accommodation.default_notice")),
+    [templateConfig, t],
+  )
   const city = getCity()
   const slug = city?.slug ?? ""
   const popupId = city?.id ?? ""
@@ -369,7 +391,9 @@ export default function VariantAccommodationBooking({
   // `sale_type=direct` popups; an application popup's rooms live behind the
   // logged-in portal ones, exactly as its products do.
   const isOpenCheckout = submitMode === "open-ticketing"
-  const canFetch = isOpenCheckout ? !!slug : !!popupId
+  const canFetch = isOpenCheckout
+    ? !!slug && !!salesFlowSlug
+    : !!popupId && !!salesFlowId
 
   const { data: offer, isLoading: offerLoading } = useQuery<AccommodationOffer>(
     {
@@ -378,15 +402,21 @@ export default function VariantAccommodationBooking({
         submitMode,
         slug,
         popupId,
+        salesFlowSlug,
+        salesFlowId,
         previewToken,
       ],
       queryFn: () =>
         isOpenCheckout
           ? CheckoutService.listCheckoutAccommodations({
               slug,
+              flowSlug: salesFlowSlug!,
               xCheckoutPreviewToken: previewToken ?? undefined,
             })
-          : AccommodationsService.listPortalAccommodations({ popupId }),
+          : AccommodationsService.listPortalAccommodations({
+              popupId,
+              salesFlowId: salesFlowId!,
+            }),
       enabled: canFetch,
       staleTime: 60_000,
       // A popup with the step turned off answers 404; retrying will not change
@@ -400,6 +430,17 @@ export default function VariantAccommodationBooking({
 
   const [checkIn, setCheckIn] = useState("")
   const [checkOut, setCheckOut] = useState("")
+  const accommodationScope = isOpenCheckout
+    ? `open:${slug}:${salesFlowSlug ?? ""}`
+    : `portal:${popupId}:${salesFlowId ?? ""}`
+  const previousAccommodationScopeRef = useRef(accommodationScope)
+
+  useEffect(() => {
+    if (previousAccommodationScopeRef.current === accommodationScope) return
+    previousAccommodationScopeRef.current = accommodationScope
+    setCheckIn("")
+    setCheckOut("")
+  }, [accommodationScope])
 
   /**
    * The shortest stay that any room here accepts.
@@ -440,6 +481,9 @@ export default function VariantAccommodationBooking({
       submitMode,
       slug,
       popupId,
+      salesFlowSlug,
+      salesFlowId,
+      previewToken,
       checkIn,
       checkOut,
     ],
@@ -447,11 +491,13 @@ export default function VariantAccommodationBooking({
       isOpenCheckout
         ? CheckoutService.checkAccommodationAvailability({
             slug,
+            flowSlug: salesFlowSlug!,
             xCheckoutPreviewToken: previewToken ?? undefined,
             requestBody: { check_in: checkIn, check_out: checkOut },
           })
         : AccommodationsService.checkPortalAccommodationAvailability({
             popupId,
+            salesFlowId: salesFlowId!,
             requestBody: { check_in: checkIn, check_out: checkOut },
           }),
     enabled: canFetch && datesReady,
@@ -535,7 +581,9 @@ export default function VariantAccommodationBooking({
   if (rooms.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-12 text-center">
-        <p className="mb-6 text-gray-500">{t("checkout.no_products")}</p>
+        <p className="mb-6 text-gray-500">
+          {t("checkout.accommodation.no_rooms")}
+        </p>
         <Button variant="outline" onClick={onSkip}>
           {t("common.continue")}
         </Button>
@@ -548,7 +596,9 @@ export default function VariantAccommodationBooking({
       <div className="rounded-2xl border bg-card p-4">
         <div className="grid gap-3 sm:grid-cols-2">
           <div className="flex flex-col gap-1.5">
-            <Label htmlFor="stay-check-in">Check-in</Label>
+            <Label htmlFor="stay-check-in">
+              {t("checkout.accommodation.check_in")}
+            </Label>
             <DatePicker
               id="stay-check-in"
               value={checkIn}
@@ -569,7 +619,9 @@ export default function VariantAccommodationBooking({
             />
           </div>
           <div className="flex flex-col gap-1.5">
-            <Label htmlFor="stay-check-out">Check-out</Label>
+            <Label htmlFor="stay-check-out">
+              {t("checkout.accommodation.check_out")}
+            </Label>
             <DatePicker
               id="stay-check-out"
               value={checkOut}
@@ -588,7 +640,7 @@ export default function VariantAccommodationBooking({
 
         {datesReady && (
           <p className="mt-3 text-sm text-muted-foreground">
-            {nights} night{nights === 1 ? "" : "s"} ·{" "}
+            {t("checkout.accommodation.nights", { count: nights })} ·{" "}
             {formatCheckoutDate(checkIn)} → {formatCheckoutDate(checkOut)}
             {availabilityFetching && (
               <Loader2 className="ml-2 inline h-3 w-3 animate-spin align-middle" />
@@ -637,7 +689,9 @@ export default function VariantAccommodationBooking({
 
       {cart.accommodations.length > 0 && (
         <div className="flex flex-col gap-3">
-          <h3 className="font-semibold">Who is staying</h3>
+          <h3 className="font-semibold">
+            {t("checkout.accommodation.who_is_staying")}
+          </h3>
           {cart.accommodations.map((item) => (
             <GuestBlock
               key={`${item.accommodationId}-${item.checkIn}`}

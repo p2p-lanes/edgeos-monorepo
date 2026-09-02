@@ -22,13 +22,13 @@ import {
   Palette,
   Rocket,
   Settings,
-  Share2,
   ShoppingCart,
   Sparkles,
   Tag,
   User,
   Users,
   UsersRound,
+  Workflow,
 } from "lucide-react"
 import { useMemo } from "react"
 
@@ -76,6 +76,7 @@ const onboardingItem: Item = {
 
 const popupItems: Item[] = [
   { icon: Calendar, title: "Gatherings", path: "/popups" },
+  { icon: Workflow, title: "Sales Flows", path: "/sales-flows" },
   {
     icon: Package,
     title: "Products",
@@ -91,7 +92,6 @@ const popupItems: Item[] = [
   { icon: Tag, title: "Coupons", path: "/coupons", tourId: "nav-coupons" },
   { icon: UsersRound, title: "Groups", path: "/groups" },
   { icon: Link2, title: "Invites", path: "/invites" },
-  { icon: Share2, title: "Referrals", path: "/referrals" },
   { icon: FormInput, title: "Form Builder", path: "/form-builder" },
   {
     icon: LayoutList,

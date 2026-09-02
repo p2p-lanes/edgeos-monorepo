@@ -12,25 +12,29 @@ export default function BuyPassesPage() {
   const router = useRouter()
   const { getCity } = useCityProvider()
   const city = getCity()
-  const isDirectSale = city?.sale_type === "direct"
+  const nobodyApplies = city?.takes_applications === false
 
   // Gate access via the unified access ladder; redirect on denial.
   const access = useHumanPopupAccess(city?.id ? String(city.id) : null)
 
   useEffect(() => {
-    // Direct-sale popups own their checkout flow at /checkout/[slug]; this
+    // Direct-sale popups own their checkout flow at /checkout/[slug]/checkout; this
     // route is application-only. Forward direct-sale buyers to the canonical
     // anonymous flow (which prefills buyer info when authed).
-    if (isDirectSale) {
-      router.replace(`/checkout/${params.popupSlug}`)
+    if (nobodyApplies) {
+      router.replace(`/checkout/${params.popupSlug}/checkout`)
       return
     }
     if (access.state === "denied") {
       router.replace(`/portal/${params.popupSlug}`)
     }
-  }, [access.state, isDirectSale, params.popupSlug, router])
+  }, [access.state, nobodyApplies, params.popupSlug, router])
 
-  if (isDirectSale || access.state === "loading" || access.state === "denied") {
+  if (
+    nobodyApplies ||
+    access.state === "loading" ||
+    access.state === "denied"
+  ) {
     return <Loader />
   }
 

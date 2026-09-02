@@ -14,6 +14,8 @@ from decimal import Decimal
 from fastapi.testclient import TestClient
 from sqlmodel import Session
 
+from app.api.application.models import Applications
+from app.api.application.schemas import ApplicationStatus
 from app.api.attendee.models import AttendeeProducts, Attendees
 from app.api.human.models import Humans
 from app.api.invite.models import Invites
@@ -22,6 +24,7 @@ from app.api.product.models import Products
 from app.api.tenant.models import Tenants
 from app.api.user.models import Users
 from app.core.security import create_access_token
+from tests._flow_helpers import invite_flow_id, provision_default_flow, set_link_policy
 
 
 def _human_token(human: Humans) -> str:
@@ -43,6 +46,10 @@ def _make_popup(db: Session, tenant: Tenants) -> Popups:
     db.add(popup)
     db.commit()
     db.refresh(popup)
+    # A popup created through the API is provisioned with a default flow, and
+    # every invite has to name one.
+    provision_default_flow(db, popup)
+    db.commit()
     return popup
 
 
@@ -59,7 +66,14 @@ def _make_human(db: Session, tenant: Tenants) -> Humans:
     return human
 
 
-def _give_ticket(db: Session, popup: Popups, human: Humans) -> None:
+def _give_ticket(
+    db: Session,
+    popup: Popups,
+    human: Humans,
+    *,
+    product_category: str = "ticket",
+    managed: bool = False,
+) -> None:
     """Creating a portal link is gated on actually holding a ticket."""
     product = Products(
         tenant_id=popup.tenant_id,
@@ -67,14 +81,15 @@ def _give_ticket(db: Session, popup: Popups, human: Humans) -> None:
         name="Ticket",
         slug=f"tkt-{uuid.uuid4().hex[:8]}",
         price=Decimal("0"),
-        category="ticket",
+        category=product_category,
     )
     db.add(product)
     db.flush()
     attendee = Attendees(
         tenant_id=popup.tenant_id,
         popup_id=popup.id,
-        human_id=human.id,
+        human_id=None if managed else human.id,
+        managed_by_human_id=human.id if managed else None,
         name="Uni Fied",
         email=human.email,
     )
@@ -86,6 +101,7 @@ def _give_ticket(db: Session, popup: Popups, human: Humans) -> None:
             attendee_id=attendee.id,
             product_id=product.id,
             check_in_code=uuid.uuid4().hex[:8].upper(),
+            product_category_snapshot=product_category,
         )
     )
     db.commit()
@@ -93,6 +109,7 @@ def _give_ticket(db: Session, popup: Popups, human: Humans) -> None:
 
 def _make_admin_invite(db: Session, popup: Popups, creator: Users) -> Invites:
     invite = Invites(
+        sales_flow_id=invite_flow_id(db, popup.id),
         tenant_id=popup.tenant_id,
         popup_id=popup.id,
         token=f"tok-{uuid.uuid4().hex[:16]}",
@@ -148,6 +165,60 @@ class TestPortalLinkEndpoints:
 
         assert resp.status_code == 403, resp.json()
 
+    def test_portal_link_access_matrix(
+        self, client: TestClient, db: Session, tenant_a: Tenants
+    ) -> None:
+        def create_link(popup: Popups, human: Humans):
+            return client.post(
+                "/api/v1/portal/invites",
+                json={"popup_id": str(popup.id)},
+                headers=_auth(_human_token(human)),
+            )
+
+        accepted_popup = _make_popup(db, tenant_a)
+        accepted_human = _make_human(db, tenant_a)
+        db.add(
+            Applications(
+                tenant_id=tenant_a.id,
+                popup_id=accepted_popup.id,
+                sales_flow_id=invite_flow_id(db, accepted_popup.id),
+                human_id=accepted_human.id,
+                status=ApplicationStatus.ACCEPTED.value,
+            )
+        )
+        db.commit()
+        assert create_link(accepted_popup, accepted_human).status_code == 201
+
+        participant_popup = _make_popup(db, tenant_a)
+        participant_human = _make_human(db, tenant_a)
+        _give_ticket(
+            db,
+            participant_popup,
+            participant_human,
+            product_category="meal_plan",
+        )
+        assert create_link(participant_popup, participant_human).status_code == 403
+
+        managed_popup = _make_popup(db, tenant_a)
+        managed_human = _make_human(db, tenant_a)
+        _give_ticket(db, managed_popup, managed_human, managed=True)
+        assert create_link(managed_popup, managed_human).status_code == 403
+
+        rejected_popup = _make_popup(db, tenant_a)
+        rejected_human = _make_human(db, tenant_a)
+        _give_ticket(db, rejected_popup, rejected_human)
+        db.add(
+            Applications(
+                tenant_id=tenant_a.id,
+                popup_id=rejected_popup.id,
+                sales_flow_id=invite_flow_id(db, rejected_popup.id),
+                human_id=rejected_human.id,
+                status=ApplicationStatus.REJECTED.value,
+            )
+        )
+        db.commit()
+        assert create_link(rejected_popup, rejected_human).status_code == 201
+
     def test_second_link_for_the_same_popup_is_rejected(
         self, client: TestClient, db: Session, tenant_a: Tenants
     ) -> None:
@@ -175,7 +246,7 @@ class TestPortalLinkEndpoints:
     ) -> None:
         """max_referrals_per_attendee is the popup's call, not the attendee's."""
         popup = _make_popup(db, tenant_a)
-        popup.max_referrals_per_attendee = 3
+        set_link_policy(db, popup, max_referrals_per_attendee=3)
         db.add(popup)
         db.commit()
         human = _make_human(db, tenant_a)
@@ -288,7 +359,7 @@ class TestUnifiedPreview:
         )
         token = created.json()["token"]
 
-        popup.referrals_enabled = False
+        set_link_policy(db, popup, referrals_enabled=False)
         popup.invites_enabled = True
         db.add(popup)
         db.commit()
@@ -343,6 +414,12 @@ class TestAdminModeratesBothKinds:
         portal_only = client.get(
             f"/api/v1/invites?popup_id={popup.id}&issuer=portal", headers=headers
         )
+        admin_across_popups = client.get(
+            "/api/v1/invites?issuer=admin", headers=headers
+        )
+        portal_across_popups = client.get(
+            "/api/v1/invites?issuer=portal", headers=headers
+        )
 
         assert every.status_code == 200, every.json()
         assert len(every.json()["results"]) == 2
@@ -350,6 +427,42 @@ class TestAdminModeratesBothKinds:
         assert [r["referrer_human_id"] for r in portal_only.json()["results"]] == [
             str(human.id)
         ]
+        admin_ids = {r["id"] for r in admin_across_popups.json()["results"]}
+        portal_ids = {r["id"] for r in portal_across_popups.json()["results"]}
+        portal_link_id = every.json()["results"][0]["id"]
+        if portal_link_id == str(admin_invite.id):
+            portal_link_id = every.json()["results"][1]["id"]
+        assert str(admin_invite.id) in admin_ids
+        assert portal_link_id not in admin_ids
+        assert portal_link_id in portal_ids
+        assert str(admin_invite.id) not in portal_ids
+
+    def test_admin_cannot_disable_referral_auto_approval(
+        self,
+        client: TestClient,
+        db: Session,
+        tenant_a: Tenants,
+        admin_token_tenant_a: str,
+    ) -> None:
+        popup = _make_popup(db, tenant_a)
+        human = _make_human(db, tenant_a)
+        _give_ticket(db, popup, human)
+        created = client.post(
+            "/api/v1/portal/invites",
+            json={"popup_id": str(popup.id)},
+            headers=_auth(_human_token(human)),
+        )
+        link_id = created.json()["id"]
+
+        resp = client.patch(
+            f"/api/v1/invites/{link_id}",
+            json={"auto_approve": False},
+            headers=_auth(admin_token_tenant_a),
+        )
+
+        assert resp.status_code == 400, resp.json()
+        db.expire_all()
+        assert db.get(Invites, uuid.UUID(link_id)).auto_approve is True
 
     def test_admin_can_disable_an_attendee_link(
         self,

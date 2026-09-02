@@ -22,9 +22,18 @@ from app.api.form_section.models import FormSections
 from app.api.payment.models import Payments
 from app.api.popup.models import Popups
 from app.api.product.models import Products
+from app.api.sales_flow.models import SalesFlows
 from app.api.shared.enums import SaleType
 from app.api.tenant.models import Tenants
+from app.api.ticketing_step.constants import seed_ticketing_steps_for_popup
 from app.utils.encryption import encrypt
+from tests._flow_helpers import (
+    coupon_flow_id,
+    default_flow_id,
+    seed_default_steps,
+    set_installment_terms,
+    set_open_checkout_landing,
+)
 from tests.conftest import with_origin
 
 
@@ -37,6 +46,26 @@ def disable_purchase_rate_limit() -> None:
     """
     with patch("app.core.rate_limit.get_redis", return_value=None):
         yield
+
+
+def _default_flow(db: Session, popup: Popups):
+    """The door a checkout that names none is bought through."""
+    from app.api.sales_flow.crud import sales_flows_crud
+
+    flow = sales_flows_crud.get_default_flow(db, popup.id)
+    assert flow is not None
+    return flow
+
+
+def _set_flow_fees(db: Session, popup: Popups, **fees):
+    """Fees belong to the flow, so a test that sets them on the popup after
+    its default flow exists configures nothing the checkout reads."""
+    flow = _default_flow(db, popup)
+    for name, value in fees.items():
+        setattr(flow, name, value)
+    db.add(flow)
+    db.commit()
+    return flow
 
 
 def test_compute_open_ticketing_amounts_splits_and_totals(
@@ -53,7 +82,13 @@ def test_compute_open_ticketing_amounts_splits_and_totals(
     lines = [SimpleNamespace(product_id=product.id, quantity=2)]
 
     amounts = compute_open_ticketing_amounts(
-        db, popup, products_map, lines, coupon_code=None, insurance=False
+        db,
+        popup,
+        _default_flow(db, popup),
+        products_map,
+        lines,
+        coupon_code=None,
+        insurance=False,
     )
 
     assert amounts.discountable_amount == Decimal("240.00")
@@ -79,6 +114,7 @@ def test_compute_open_ticketing_amounts_applies_coupon(
     amounts = compute_open_ticketing_amounts(
         db,
         popup,
+        _default_flow(db, popup),
         {product.id: product},
         [SimpleNamespace(product_id=product.id, quantity=1)],
         coupon_code="HALF",
@@ -99,8 +135,9 @@ def test_compute_open_ticketing_amounts_applies_insurance(
     from app.api.payment.crud import compute_open_ticketing_amounts
 
     popup = _make_popup(db, tenant_a, slug_prefix="amt-ins")
-    popup.insurance_enabled = True
-    popup.insurance_percentage = Decimal("10")
+    _set_flow_fees(
+        db, popup, insurance_enabled=True, insurance_percentage=Decimal("10")
+    )
     product = _make_product(db, popup, price="100.00")
     product.insurance_eligible = True
     db.commit()
@@ -108,6 +145,7 @@ def test_compute_open_ticketing_amounts_applies_insurance(
     amounts = compute_open_ticketing_amounts(
         db,
         popup,
+        _default_flow(db, popup),
         {product.id: product},
         [SimpleNamespace(product_id=product.id, quantity=2)],
         coupon_code=None,
@@ -126,14 +164,16 @@ def test_compute_open_ticketing_amounts_applies_contribution(
     from app.api.payment.crud import compute_open_ticketing_amounts
 
     popup = _make_popup(db, tenant_a, slug_prefix="amt-contrib")
-    popup.contribution_enabled = True
-    popup.contribution_percentage = Decimal("5")
+    _set_flow_fees(
+        db, popup, contribution_enabled=True, contribution_percentage=Decimal("5")
+    )
     product = _make_product(db, popup, price="100.00")
     db.commit()
 
     amounts = compute_open_ticketing_amounts(
         db,
         popup,
+        _default_flow(db, popup),
         {product.id: product},
         [SimpleNamespace(product_id=product.id, quantity=1)],
         coupon_code=None,
@@ -166,6 +206,7 @@ def _make_popup(
     )
     db.add(popup)
     db.flush()
+    seed_default_steps(db, popup, sale_type=str(popup.sale_type))
     return popup
 
 
@@ -195,6 +236,15 @@ def _make_product(
     return product
 
 
+def _recipient(product: Products) -> dict[str, object]:
+    return {
+        "recipient_key": "buyer",
+        "name": "Buyer",
+        "email": f"recipient-{product.id}@test.com",
+        "profile_snapshot": {},
+    }
+
+
 def _make_coupon(
     db: Session,
     popup: Popups,
@@ -203,6 +253,7 @@ def _make_coupon(
     discount_value: int,
 ) -> Coupons:
     coupon = Coupons(
+        sales_flow_id=coupon_flow_id(db, popup.id),
         id=uuid.uuid4(),
         tenant_id=popup.tenant_id,
         popup_id=popup.id,
@@ -222,6 +273,7 @@ def _make_section(
         id=uuid.uuid4(),
         tenant_id=popup.tenant_id,
         popup_id=popup.id,
+        sales_flow_id=default_flow_id(db, popup.id),
         label=label,
         order=0,
         kind="standard",
@@ -238,6 +290,7 @@ def _make_field(
         id=uuid.uuid4(),
         tenant_id=popup.tenant_id,
         popup_id=popup.id,
+        sales_flow_id=default_flow_id(db, popup.id),
         section_id=section.id,
         name=f"first_name_{uuid.uuid4().hex[:4]}",
         label="Nombre",
@@ -250,7 +303,7 @@ def _make_field(
     return field
 
 
-def test_purchase_happy_path_creates_payment_and_attendees(
+def test_purchase_happy_path_defers_attendees_while_payment_is_pending(
     client: TestClient,
     db: Session,
     tenant_a: Tenants,
@@ -270,9 +323,16 @@ def test_purchase_happy_path_creates_payment_and_attendees(
         )
 
         response = client.post(
-            f"/api/v1/checkout/{popup.slug}/purchase",
+            f"/api/v1/checkout/{popup.slug}/checkout/purchase",
             json={
-                "products": [{"product_id": str(product.id), "quantity": 2}],
+                "products": [
+                    {
+                        "product_id": str(product.id),
+                        "quantity": 2,
+                        "recipient_key": "buyer",
+                    }
+                ],
+                "recipients": [_recipient(product)],
                 "buyer": {
                     "email": "buyer@test.com",
                     "first_name": "Matias",
@@ -295,8 +355,7 @@ def test_purchase_happy_path_creates_payment_and_attendees(
     attendees = list(
         db.exec(select(Attendees).where(Attendees.popup_id == popup.id)).all()
     )
-    # New design: 1 attendee per (human, popup), 2 AttendeeProducts rows for qty=2
-    assert len(attendees) == 1
+    assert attendees == []
 
 
 def test_purchase_persists_attribution_in_buyer_snapshot(
@@ -319,9 +378,16 @@ def test_purchase_persists_attribution_in_buyer_snapshot(
             is_installment_plan=False,
         )
         response = client.post(
-            f"/api/v1/checkout/{popup.slug}/purchase",
+            f"/api/v1/checkout/{popup.slug}/checkout/purchase",
             json={
-                "products": [{"product_id": str(product.id), "quantity": 1}],
+                "products": [
+                    {
+                        "product_id": str(product.id),
+                        "quantity": 1,
+                        "recipient_key": "buyer",
+                    }
+                ],
+                "recipients": [_recipient(product)],
                 "buyer": {
                     "email": "buyer@test.com",
                     "first_name": "Ana",
@@ -365,9 +431,16 @@ def test_purchase_without_attribution_omits_the_key(
             is_installment_plan=False,
         )
         response = client.post(
-            f"/api/v1/checkout/{popup.slug}/purchase",
+            f"/api/v1/checkout/{popup.slug}/checkout/purchase",
             json={
-                "products": [{"product_id": str(product.id), "quantity": 1}],
+                "products": [
+                    {
+                        "product_id": str(product.id),
+                        "quantity": 1,
+                        "recipient_key": "buyer",
+                    }
+                ],
+                "recipients": [_recipient(product)],
                 "buyer": {
                     "email": "buyer@test.com",
                     "first_name": "Ana",
@@ -420,9 +493,16 @@ def test_purchase_pending_open_checkout_sends_initiate_checkout_capi(
         )
 
         response = client.post(
-            f"/api/v1/checkout/{popup.slug}/purchase",
+            f"/api/v1/checkout/{popup.slug}/checkout/purchase",
             json={
-                "products": [{"product_id": str(product.id), "quantity": 2}],
+                "products": [
+                    {
+                        "product_id": str(product.id),
+                        "quantity": 2,
+                        "recipient_key": "buyer",
+                    }
+                ],
+                "recipients": [_recipient(product)],
                 "buyer": {
                     "email": "buyer@test.com",
                     "first_name": "Meta",
@@ -514,9 +594,16 @@ def test_purchase_non_pending_open_checkout_does_not_send_initiate_checkout_capi
         )
 
         response = client.post(
-            f"/api/v1/checkout/{popup.slug}/purchase",
+            f"/api/v1/checkout/{popup.slug}/checkout/purchase",
             json={
-                "products": [{"product_id": str(product.id), "quantity": 1}],
+                "products": [
+                    {
+                        "product_id": str(product.id),
+                        "quantity": 1,
+                        "recipient_key": "buyer",
+                    }
+                ],
+                "recipients": [_recipient(product)],
                 "buyer": {
                     "email": "buyer@test.com",
                     "first_name": "Meta",
@@ -566,9 +653,16 @@ def test_purchase_initiate_checkout_capi_failure_does_not_block_response(
         )
 
         response = client.post(
-            f"/api/v1/checkout/{popup.slug}/purchase",
+            f"/api/v1/checkout/{popup.slug}/checkout/purchase",
             json={
-                "products": [{"product_id": str(product.id), "quantity": 1}],
+                "products": [
+                    {
+                        "product_id": str(product.id),
+                        "quantity": 1,
+                        "recipient_key": "buyer",
+                    }
+                ],
+                "recipients": [_recipient(product)],
                 "buyer": {
                     "email": "buyer@test.com",
                     "first_name": "Meta",
@@ -587,7 +681,7 @@ def test_purchase_unknown_slug_returns_404(
     client: TestClient, tenant_a: Tenants
 ) -> None:
     response = client.post(
-        "/api/v1/checkout/does-not-exist/purchase",
+        "/api/v1/checkout/does-not-exist/checkout/purchase",
         json={
             "products": [{"product_id": str(uuid.uuid4()), "quantity": 1}],
             "buyer": {
@@ -602,7 +696,7 @@ def test_purchase_unknown_slug_returns_404(
     assert response.status_code == 404, response.text
 
 
-def test_purchase_application_popup_returns_403(
+def test_purchase_application_popup_returns_404(
     client: TestClient,
     db: Session,
     tenant_a: Tenants,
@@ -614,9 +708,12 @@ def test_purchase_application_popup_returns_403(
     db.commit()
 
     response = client.post(
-        f"/api/v1/checkout/{popup.slug}/purchase",
+        f"/api/v1/checkout/{popup.slug}/checkout/purchase",
         json={
-            "products": [{"product_id": str(product.id), "quantity": 1}],
+            "products": [
+                {"product_id": str(product.id), "quantity": 1, "recipient_key": "buyer"}
+            ],
+            "recipients": [_recipient(product)],
             "buyer": {
                 "email": "buyer@test.com",
                 "first_name": "Matias",
@@ -626,7 +723,7 @@ def test_purchase_application_popup_returns_403(
         },
         headers={"X-Tenant-Id": str(tenant_a.id)},
     )
-    assert response.status_code == 403, response.text
+    assert response.status_code == 404, response.text
 
 
 def test_purchase_missing_required_field_returns_422(
@@ -641,9 +738,12 @@ def test_purchase_missing_required_field_returns_422(
     db.commit()
 
     response = client.post(
-        f"/api/v1/checkout/{popup.slug}/purchase",
+        f"/api/v1/checkout/{popup.slug}/checkout/purchase",
         json={
-            "products": [{"product_id": str(product.id), "quantity": 1}],
+            "products": [
+                {"product_id": str(product.id), "quantity": 1, "recipient_key": "buyer"}
+            ],
+            "recipients": [_recipient(product)],
             "buyer": {
                 "email": "buyer@test.com",
                 "first_name": "Matias",
@@ -671,9 +771,16 @@ def test_purchase_provider_failure_returns_502(
         mock_get_client.return_value.create_payment.side_effect = RuntimeError("boom")
 
         response = client.post(
-            f"/api/v1/checkout/{popup.slug}/purchase",
+            f"/api/v1/checkout/{popup.slug}/checkout/purchase",
             json={
-                "products": [{"product_id": str(product.id), "quantity": 1}],
+                "products": [
+                    {
+                        "product_id": str(product.id),
+                        "quantity": 1,
+                        "recipient_key": "buyer",
+                    }
+                ],
+                "recipients": [_recipient(product)],
                 "buyer": {
                     "email": "buyer@test.com",
                     "first_name": "Matias",
@@ -706,9 +813,16 @@ def test_zero_amount_purchase_attempts_capi_when_email_fails(
         patch("app.services.simplefi.get_simplefi_client") as mock_get_client,
     ):
         response = client.post(
-            f"/api/v1/checkout/{popup.slug}/purchase",
+            f"/api/v1/checkout/{popup.slug}/checkout/purchase",
             json={
-                "products": [{"product_id": str(product.id), "quantity": 1}],
+                "products": [
+                    {
+                        "product_id": str(product.id),
+                        "quantity": 1,
+                        "recipient_key": "buyer",
+                    }
+                ],
+                "recipients": [_recipient(product)],
                 "buyer": {
                     "email": "buyer@test.com",
                     "first_name": "Matias",
@@ -735,7 +849,9 @@ def test_zero_amount_purchase_returns_custom_success_redirect_url(
     popup's custom open-checkout success URL in redirect_url for the portal to
     redirect to. checkout_url stays empty (no provider checkout)."""
     popup = _make_popup(db, tenant_a, slug_prefix="free-redirect")
-    popup.open_checkout_success_url = "https://brand.example.com/thank-you"
+    set_open_checkout_landing(
+        db, popup, success_url="https://brand.example.com/thank-you"
+    )
     db.add(popup)
     product = _make_product(db, popup, price="75.00")
     _make_coupon(db, popup, code="FREEPASS", discount_value=100)
@@ -743,9 +859,16 @@ def test_zero_amount_purchase_returns_custom_success_redirect_url(
 
     with patch("app.services.simplefi.get_simplefi_client") as mock_get_client:
         response = client.post(
-            f"/api/v1/checkout/{popup.slug}/purchase",
+            f"/api/v1/checkout/{popup.slug}/checkout/purchase",
             json={
-                "products": [{"product_id": str(product.id), "quantity": 1}],
+                "products": [
+                    {
+                        "product_id": str(product.id),
+                        "quantity": 1,
+                        "recipient_key": "buyer",
+                    }
+                ],
+                "recipients": [_recipient(product)],
                 "buyer": {
                     "email": "buyer@test.com",
                     "first_name": "Matias",
@@ -788,8 +911,12 @@ def test_paid_purchase_signs_order_payload_into_simplefi_success_url(
     HMAC-signed order snapshot, so the external thank-you page can verify it."""
     secret = "amanita-secret"
     popup = _make_popup(db, tenant_a, slug_prefix="paid-signed")
-    popup.open_checkout_success_url = "https://brand.example.com/thank-you"
-    popup.open_checkout_signing_secret = secret
+    set_open_checkout_landing(
+        db,
+        popup,
+        success_url="https://brand.example.com/thank-you",
+        signing_secret=secret,
+    )
     db.add(popup)
     product = _make_product(db, popup, price="120.00")
     db.commit()
@@ -802,9 +929,16 @@ def test_paid_purchase_signs_order_payload_into_simplefi_success_url(
             is_installment_plan=False,
         )
         response = client.post(
-            f"/api/v1/checkout/{popup.slug}/purchase",
+            f"/api/v1/checkout/{popup.slug}/checkout/purchase",
             json={
-                "products": [{"product_id": str(product.id), "quantity": 2}],
+                "products": [
+                    {
+                        "product_id": str(product.id),
+                        "quantity": 2,
+                        "recipient_key": "buyer",
+                    }
+                ],
+                "recipients": [_recipient(product)],
                 "buyer": {
                     "email": "buyer@test.com",
                     "first_name": "Matias",
@@ -844,8 +978,12 @@ def test_signed_redirect_substitutes_locale_placeholder(
     popup language before signing (e.g. .../{locale}/gracias → .../es/gracias)."""
     secret = "amanita-secret"
     popup = _make_popup(db, tenant_a, slug_prefix="locale-signed")
-    popup.open_checkout_success_url = "https://amanita.example.com/{locale}/gracias"
-    popup.open_checkout_signing_secret = secret
+    set_open_checkout_landing(
+        db,
+        popup,
+        success_url="https://amanita.example.com/{locale}/gracias",
+        signing_secret=secret,
+    )
     popup.default_language = "es"  # fallback; the request locale must win
     db.add(popup)
     product = _make_product(db, popup, price="120.00")
@@ -859,9 +997,16 @@ def test_signed_redirect_substitutes_locale_placeholder(
             is_installment_plan=False,
         )
         response = client.post(
-            f"/api/v1/checkout/{popup.slug}/purchase",
+            f"/api/v1/checkout/{popup.slug}/checkout/purchase",
             json={
-                "products": [{"product_id": str(product.id), "quantity": 1}],
+                "products": [
+                    {
+                        "product_id": str(product.id),
+                        "quantity": 1,
+                        "recipient_key": "buyer",
+                    }
+                ],
+                "recipients": [_recipient(product)],
                 "buyer": {
                     "email": "buyer@test.com",
                     "first_name": "Ana",
@@ -884,6 +1029,83 @@ def test_signed_redirect_substitutes_locale_placeholder(
     assert parse_qs(urlparse(success_url).query)["lang"] == ["en"]
 
 
+def test_each_flow_lands_its_buyers_on_its_own_page(
+    client: TestClient,
+    db: Session,
+    tenant_a: Tenants,
+) -> None:
+    """Two ways into one event can hand their buyers to two different pages.
+
+    The reason the landing config moved off the popup: a partner selling
+    through their own flow sends buyers back to the partner's site, while the
+    event's own checkout keeps its own thank-you. Reading the popup made both
+    answer the same, whatever each flow had been configured with.
+    """
+    secret = "partner-secret"
+    popup = _make_popup(db, tenant_a, slug_prefix="two-landings")
+    set_open_checkout_landing(
+        db, popup, success_url="https://event.example.com/thanks", signing_secret=secret
+    )
+    partner = SalesFlows(
+        tenant_id=popup.tenant_id,
+        popup_id=popup.id,
+        slug=f"partner-{uuid.uuid4().hex[:6]}",
+        name="Partner",
+        type=SaleType.direct.value,
+        open_checkout_success_url="https://partner.example.com/gracias",
+        open_checkout_signing_secret=secret,
+    )
+    db.add(partner)
+    db.flush()
+    # A flow sells what its steps offer (R6), so a bare one refuses every
+    # product with `product_not_in_flow` long before any redirect is built.
+    seed_ticketing_steps_for_popup(
+        db,
+        popup_id=popup.id,
+        tenant_id=popup.tenant_id,
+        sales_flow_id=partner.id,
+        flow_type=partner.type,
+    )
+    product = _make_product(db, popup, price="50.00")
+    db.commit()
+
+    with patch("app.services.simplefi.get_simplefi_client") as mock_get_client:
+        mock_get_client.return_value.create_payment.return_value = SimpleNamespace(
+            id="sf_partner_1",
+            status="pending",
+            checkout_url="https://simplefi.test/checkout/partner",
+            is_installment_plan=False,
+        )
+        response = client.post(
+            f"/api/v1/checkout/{popup.slug}/{partner.slug}/purchase",
+            json={
+                "products": [
+                    {
+                        "product_id": str(product.id),
+                        "quantity": 1,
+                        "recipient_key": "buyer",
+                    }
+                ],
+                "recipients": [_recipient(product)],
+                "buyer": {
+                    "email": "buyer@test.com",
+                    "first_name": "Matias",
+                    "last_name": "Walter",
+                    "form_data": {},
+                },
+            },
+            headers={"X-Tenant-Id": str(tenant_a.id)},
+        )
+
+        assert response.status_code == 200, response.text
+        success_url = mock_get_client.return_value.create_payment.call_args.kwargs[
+            "success_path"
+        ]
+
+    assert success_url.startswith("https://partner.example.com/gracias")
+    assert "event.example.com" not in success_url
+
+
 def test_signed_redirect_forwards_lang_on_fixed_path_success_url(
     client: TestClient,
     db: Session,
@@ -894,8 +1116,12 @@ def test_signed_redirect_forwards_lang_on_fixed_path_success_url(
     so signature verification is untouched."""
     secret = "amanita-secret"
     popup = _make_popup(db, tenant_a, slug_prefix="lang-fixed-path")
-    popup.open_checkout_success_url = "https://amanita.example.com/gracias"
-    popup.open_checkout_signing_secret = secret
+    set_open_checkout_landing(
+        db,
+        popup,
+        success_url="https://amanita.example.com/gracias",
+        signing_secret=secret,
+    )
     db.add(popup)
     product = _make_product(db, popup, price="120.00")
     db.commit()
@@ -908,9 +1134,16 @@ def test_signed_redirect_forwards_lang_on_fixed_path_success_url(
             is_installment_plan=False,
         )
         response = client.post(
-            f"/api/v1/checkout/{popup.slug}/purchase",
+            f"/api/v1/checkout/{popup.slug}/checkout/purchase",
             json={
-                "products": [{"product_id": str(product.id), "quantity": 1}],
+                "products": [
+                    {
+                        "product_id": str(product.id),
+                        "quantity": 1,
+                        "recipient_key": "buyer",
+                    }
+                ],
+                "recipients": [_recipient(product)],
                 "buyer": {
                     "email": "buyer@test.com",
                     "first_name": "Ana",
@@ -942,8 +1175,12 @@ def test_zero_amount_purchase_signs_order_payload_into_redirect_url(
     when the popup configures a signing secret."""
     secret = "amanita-secret"
     popup = _make_popup(db, tenant_a, slug_prefix="free-signed")
-    popup.open_checkout_success_url = "https://brand.example.com/thank-you"
-    popup.open_checkout_signing_secret = secret
+    set_open_checkout_landing(
+        db,
+        popup,
+        success_url="https://brand.example.com/thank-you",
+        signing_secret=secret,
+    )
     db.add(popup)
     product = _make_product(db, popup, price="75.00")
     _make_coupon(db, popup, code="FREEPASS", discount_value=100)
@@ -951,9 +1188,16 @@ def test_zero_amount_purchase_signs_order_payload_into_redirect_url(
 
     with patch("app.services.simplefi.get_simplefi_client") as mock_get_client:
         response = client.post(
-            f"/api/v1/checkout/{popup.slug}/purchase",
+            f"/api/v1/checkout/{popup.slug}/checkout/purchase",
             json={
-                "products": [{"product_id": str(product.id), "quantity": 1}],
+                "products": [
+                    {
+                        "product_id": str(product.id),
+                        "quantity": 1,
+                        "recipient_key": "buyer",
+                    }
+                ],
+                "recipients": [_recipient(product)],
                 "buyer": {
                     "email": "buyer@test.com",
                     "first_name": "Matias",
@@ -1001,9 +1245,16 @@ def test_paid_purchase_injects_order_data_into_portal_thank_you(
             is_installment_plan=False,
         )
         response = client.post(
-            f"/api/v1/checkout/{popup.slug}/purchase",
+            f"/api/v1/checkout/{popup.slug}/checkout/purchase",
             json={
-                "products": [{"product_id": str(product.id), "quantity": 2}],
+                "products": [
+                    {
+                        "product_id": str(product.id),
+                        "quantity": 2,
+                        "recipient_key": "buyer",
+                    }
+                ],
+                "recipients": [_recipient(product)],
                 "buyer": {
                     "email": "buyer@test.com",
                     "first_name": "Matias",
@@ -1043,9 +1294,16 @@ def test_zero_amount_purchase_injects_order_data_into_portal_thank_you(
 
     with patch("app.services.simplefi.get_simplefi_client") as mock_get_client:
         response = client.post(
-            f"/api/v1/checkout/{popup.slug}/purchase",
+            f"/api/v1/checkout/{popup.slug}/checkout/purchase",
             json={
-                "products": [{"product_id": str(product.id), "quantity": 1}],
+                "products": [
+                    {
+                        "product_id": str(product.id),
+                        "quantity": 1,
+                        "recipient_key": "buyer",
+                    }
+                ],
+                "recipients": [_recipient(product)],
                 "buyer": {
                     "email": "buyer@test.com",
                     "first_name": "Matias",
@@ -1086,9 +1344,12 @@ def test_purchase_with_ended_sale_window_returns_422(
     db.commit()
 
     response = client.post(
-        f"/api/v1/checkout/{popup.slug}/purchase",
+        f"/api/v1/checkout/{popup.slug}/checkout/purchase",
         json={
-            "products": [{"product_id": str(product.id), "quantity": 1}],
+            "products": [
+                {"product_id": str(product.id), "quantity": 1, "recipient_key": "buyer"}
+            ],
+            "recipients": [_recipient(product)],
             "buyer": {
                 "email": "buyer@test.com",
                 "first_name": "Matias",
@@ -1100,7 +1361,7 @@ def test_purchase_with_ended_sale_window_returns_422(
     )
 
     assert response.status_code == 422, response.text
-    assert "not on sale" in response.json()["detail"]
+    assert response.json()["detail"] == {"code": "quote_unavailable"}
 
 
 def test_purchase_with_upcoming_sale_window_returns_422(
@@ -1119,9 +1380,12 @@ def test_purchase_with_upcoming_sale_window_returns_422(
     db.commit()
 
     response = client.post(
-        f"/api/v1/checkout/{popup.slug}/purchase",
+        f"/api/v1/checkout/{popup.slug}/checkout/purchase",
         json={
-            "products": [{"product_id": str(product.id), "quantity": 1}],
+            "products": [
+                {"product_id": str(product.id), "quantity": 1, "recipient_key": "buyer"}
+            ],
+            "recipients": [_recipient(product)],
             "buyer": {
                 "email": "buyer@test.com",
                 "first_name": "Matias",
@@ -1133,7 +1397,7 @@ def test_purchase_with_upcoming_sale_window_returns_422(
     )
 
     assert response.status_code == 422, response.text
-    assert "not on sale" in response.json()["detail"]
+    assert response.json()["detail"] == {"code": "quote_unavailable"}
 
 
 def test_purchase_rate_limit_returns_429(
@@ -1153,9 +1417,16 @@ def test_purchase_rate_limit_returns_429(
 
     with patch("app.core.rate_limit.get_redis", return_value=mock_redis):
         response = client.post(
-            f"/api/v1/checkout/{popup.slug}/purchase",
+            f"/api/v1/checkout/{popup.slug}/checkout/purchase",
             json={
-                "products": [{"product_id": str(product.id), "quantity": 1}],
+                "products": [
+                    {
+                        "product_id": str(product.id),
+                        "quantity": 1,
+                        "recipient_key": "buyer",
+                    }
+                ],
+                "recipients": [_recipient(product)],
                 "buyer": {
                     "email": "buyer@test.com",
                     "first_name": "Matias",
@@ -1203,9 +1474,16 @@ def test_purchase_resolves_per_tenant(
         )
 
         response = client.post(
-            f"/api/v1/checkout/{popup.slug}/purchase",
+            f"/api/v1/checkout/{popup.slug}/checkout/purchase",
             json={
-                "products": [{"product_id": str(product.id), "quantity": 1}],
+                "products": [
+                    {
+                        "product_id": str(product.id),
+                        "quantity": 1,
+                        "recipient_key": "buyer",
+                    }
+                ],
+                "recipients": [_recipient(product)],
                 "buyer": {
                     "email": "buyer@test.com",
                     "first_name": "Test",
@@ -1226,7 +1504,7 @@ def test_purchase_unknown_origin_returns_404(
 ) -> None:
     """No Origin and no X-Tenant-Id → 404 from resolver, no payment created."""
     response = client.post(
-        "/api/v1/checkout/summer-fest/purchase",
+        "/api/v1/checkout/summer-fest/checkout/purchase",
         json={
             "products": [{"product_id": str(uuid.uuid4()), "quantity": 1}],
             "buyer": {
@@ -1248,11 +1526,15 @@ def test_purchase_creates_installment_plan_when_popup_enabled(
     """Open-ticketing checkout must honor the popup's installments config —
     the same eligibility the pass-purchase path applies."""
     popup = _make_popup(db, tenant_a, slug_prefix="instplan")
-    popup.installments_enabled = True
-    popup.installments_deadline = datetime.now(UTC) + timedelta(days=365)
-    popup.installments_max = 6
-    popup.installments_interval = "month"
-    popup.installments_interval_count = 1
+    set_installment_terms(
+        db,
+        popup,
+        installments_enabled=True,
+        installments_deadline=datetime.now(UTC) + timedelta(days=365),
+        installments_max=6,
+        installments_interval="month",
+        installments_interval_count=1,
+    )
     product = _make_product(db, popup, price="300.00")
     db.commit()
 
@@ -1265,9 +1547,16 @@ def test_purchase_creates_installment_plan_when_popup_enabled(
         )
 
         response = client.post(
-            f"/api/v1/checkout/{popup.slug}/purchase",
+            f"/api/v1/checkout/{popup.slug}/checkout/purchase",
             json={
-                "products": [{"product_id": str(product.id), "quantity": 1}],
+                "products": [
+                    {
+                        "product_id": str(product.id),
+                        "quantity": 1,
+                        "recipient_key": "buyer",
+                    }
+                ],
+                "recipients": [_recipient(product)],
                 "buyer": {
                     "email": "plan-buyer@test.com",
                     "first_name": "Plan",
@@ -1318,9 +1607,16 @@ def test_purchase_one_shot_when_installments_deadline_too_close(
         )
 
         response = client.post(
-            f"/api/v1/checkout/{popup.slug}/purchase",
+            f"/api/v1/checkout/{popup.slug}/checkout/purchase",
             json={
-                "products": [{"product_id": str(product.id), "quantity": 1}],
+                "products": [
+                    {
+                        "product_id": str(product.id),
+                        "quantity": 1,
+                        "recipient_key": "buyer",
+                    }
+                ],
+                "recipients": [_recipient(product)],
                 "buyer": {
                     "email": "oneshot-buyer@test.com",
                     "first_name": "One",
@@ -1387,9 +1683,16 @@ def test_purchase_backfills_blank_fields_on_a_preexisting_human(
             is_installment_plan=False,
         )
         response = client.post(
-            f"/api/v1/checkout/{popup.slug}/purchase",
+            f"/api/v1/checkout/{popup.slug}/checkout/purchase",
             json={
-                "products": [{"product_id": str(product.id), "quantity": 1}],
+                "products": [
+                    {
+                        "product_id": str(product.id),
+                        "quantity": 1,
+                        "recipient_key": "buyer",
+                    }
+                ],
+                "recipients": [_recipient(product)],
                 "buyer": {
                     "email": email,
                     "first_name": "Ana",

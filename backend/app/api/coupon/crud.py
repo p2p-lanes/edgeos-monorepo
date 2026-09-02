@@ -30,18 +30,35 @@ class CouponsCRUD(BaseCRUD[Coupons, CouponCreate, CouponUpdate]):
         popup_slug: str,
         code: str,
         tenant_id: uuid.UUID,
+        flow_slug: str | None = None,
     ) -> "CouponValidatePublicResponse":
         """Validate a coupon code for an anonymous (public) checkout request.
 
         Rules:
-        - Resolves popup by (slug, tenant_id); popup must have sale_type="direct" (else 403).
+        - Resolves popup by (slug, tenant_id); unknown popup -> uniform 400
+          (never reveals popup existence).
+        - Resolves the sales flow (default flow when `flow_slug` is omitted)
+          through the same `resolve_flow` contract every other checkout
+          surface uses (sdd/sales-flows slice 9/11 — coherent gate order):
+          unknown `flow_slug`, inactive popup/flow, a flow whose type is
+          neither `direct` nor `upsale`, or a popup missing its default flow
+          all raise internally (404/403/500) but are caught here and
+          collapsed to the uniform 400 below. This replaces the old raw
+          `popup.sale_type != "direct"` check with a flow-level gate (a
+          popup can now have flows of mixed type), without leaking flow
+          state to an anonymous caller.
+        - `allows_coupons` is read from the resolved flow, which owns it
+          since sdd/sales-flows-rediseno slice 7.
+        - The code is looked up within that flow: a coupon belongs to one
+          flow, so the same word can mean a different discount in another.
         - ANY failure state (not found, inactive, expired, maxed-out) raises 400
           with the UNIFORM message "Invalid or expired coupon" — never differentiates.
         - On success, returns CouponValidatePublicResponse.
         """
         from app.api.coupon.schemas import CouponValidatePublicResponse
         from app.api.popup.models import Popups
-        from app.api.shared.enums import SaleType
+        from app.api.sales_flow.resolver import build_effective_config, resolve_flow
+        from app.api.sales_flow.schemas import SalesFlowType
 
         popup = session.exec(
             select(Popups).where(
@@ -57,21 +74,47 @@ class CouponsCRUD(BaseCRUD[Coupons, CouponCreate, CouponUpdate]):
                 detail=_PUBLIC_COUPON_ERROR,
             )
 
-        if popup.sale_type != SaleType.direct.value:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="This endpoint is only available for direct-sale popups",
+        # sdd/sales-flows slice 12 note (disclosed asymmetry, no design
+        # instruction to change it): unlike the checkout runtime and
+        # purchase endpoints, this resolver call is deliberately NOT
+        # followed by `assert_upsale_eligible`. Coupon validation is a
+        # metadata lookup (does this code exist and what discount does it
+        # give) — it never creates a payment, reveals attendee/purchase
+        # data, or grants access to the flow itself. An anonymous caller
+        # validating a coupon against an upsale-type flow learns nothing
+        # they couldn't learn by inspecting the discount on any other flow;
+        # the actual eligibility gate still applies at purchase time
+        # (`create_open_ticketing_payment` / `create_payment`), which is the
+        # only place a coupon's discount can turn into money moving.
+        try:
+            flow = resolve_flow(
+                session,
+                popup,
+                flow_slug,
+                require_types={SalesFlowType.direct, SalesFlowType.upsale},
             )
+        except HTTPException as exc:
+            # Every resolver failure (unknown slug, inactive, wrong type,
+            # missing default flow) collapses to the same uniform error —
+            # an anonymous caller must not be able to distinguish flow
+            # states from the coupon states below.
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=_PUBLIC_COUPON_ERROR,
+            ) from exc
 
-        if not popup.allows_coupons:
+        effective = build_effective_config(flow, popup)
+        if not effective.allows_coupons:
             # Uniform error — don't reveal that coupons exist but are disabled
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail=_PUBLIC_COUPON_ERROR,
             )
 
-        # Attempt coupon lookup — any failure → uniform 400
-        coupon = self.get_by_code(session, code, popup.id)
+        # Attempt coupon lookup — any failure → uniform 400. Scoped to the
+        # resolved flow: a code written for one flow was never meant to be
+        # spent in another (sdd/sales-flows-rediseno).
+        coupon = self.get_by_code(session, code, flow.id)
         if coupon is None:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
@@ -112,34 +155,56 @@ class CouponsCRUD(BaseCRUD[Coupons, CouponCreate, CouponUpdate]):
         )
 
     def get_by_code(
-        self, session: Session, code: str, popup_id: uuid.UUID
+        self, session: Session, code: str, flow_id: uuid.UUID
     ) -> Coupons | None:
-        """Get a coupon by code and popup_id."""
+        """Get a coupon by code within one flow.
+
+        Keyed on the flow rather than the popup: the same word can mean a
+        different discount in two flows, and a coupon written for one of
+        them was never meant to be spent in the other.
+        """
         statement = select(Coupons).where(
-            Coupons.code == code.upper(), Coupons.popup_id == popup_id
+            Coupons.code == code.upper(), Coupons.sales_flow_id == flow_id
         )
         return session.exec(statement).first()
 
     def validate_coupon(
-        self, session: Session, code: str, popup_id: uuid.UUID
+        self,
+        session: Session,
+        code: str,
+        popup_id: uuid.UUID,
+        flow_id: uuid.UUID,
     ) -> Coupons:
-        """
-        Validate a coupon code and return it if valid.
+        """Validate a coupon code within one flow and return it if valid.
+
+        `flow_id` is required (sdd/sales-flows-rediseno). It used to be
+        optional and every caller omitted it, so `allows_coupons` was
+        answered against the popup's default flow however the buyer had
+        actually arrived — a flow with coupons switched off still took them.
+        A flow that does not belong to `popup_id` is refused rather than
+        degraded to the popup's own value.
 
         Raises:
-            HTTPException: If coupons are disabled for the popup, or the coupon
-            is invalid, expired, or maxed out.
+            HTTPException: If coupons are disabled for the flow, or the
+            coupon is invalid, expired, or maxed out.
         """
-        from app.api.popup.models import Popups
+        from app.api.sales_flow.crud import sales_flows_crud
+        from app.api.sales_flow.resolver import build_effective_config
 
-        popup = session.get(Popups, popup_id)
-        if popup is not None and not popup.allows_coupons:
+        flow = sales_flows_crud.get(session, flow_id)
+        if flow is None or flow.popup_id != popup_id:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Sales flow not found for this popup",
+            )
+
+        if not build_effective_config(flow).allows_coupons:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Coupons are not enabled for this event",
             )
 
-        coupon = self.get_by_code(session, code, popup_id)
+        coupon = self.get_by_code(session, code, flow_id)
 
         if not coupon:
             raise HTTPException(

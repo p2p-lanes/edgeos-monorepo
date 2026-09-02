@@ -30,6 +30,7 @@ from app.api.human.models import Humans
 from app.api.popup.models import Popups
 from app.api.product.models import Products
 from app.api.tenant.models import Tenants
+from tests._flow_helpers import application_flow_id
 
 # ---------------------------------------------------------------------------
 # Helpers (mirror tests/api/application/test_attendee_directory.py)
@@ -106,6 +107,7 @@ def _application(
     info_not_shared: list[str] | None = None,
 ) -> Applications:
     app = Applications(
+        sales_flow_id=application_flow_id(db, popup.id),
         id=uuid.uuid4(),
         tenant_id=popup.tenant_id,
         popup_id=popup.id,
@@ -151,6 +153,7 @@ def _attendee(
                     tenant_id=popup.tenant_id,
                     attendee_id=attendee.id,
                     product_id=prod.id,
+                    product_category_snapshot="ticket",
                     check_in_code=uuid.uuid4().hex[:10].upper(),
                 )
             )

@@ -9,9 +9,15 @@ Scenarios:
 import uuid
 from datetime import UTC, datetime
 
+import pytest
 from fastapi.testclient import TestClient
+from sqlmodel import Session
 
 from app.api.popup.models import Popups
+from app.api.product.models import Products
+from app.api.tenant.models import Tenants
+
+TYPE_INPUTS = ("access", "participant", "order", "missing", None, "unsupported")
 
 
 def _admin_headers(token: str) -> dict[str, str]:
@@ -25,6 +31,95 @@ def _create_product_payload(popup_id: uuid.UUID, *, suffix: str) -> dict:
         "price": "50.00",
         "category": "ticket",
     }
+
+
+@pytest.mark.parametrize("endpoint", ["create", "batch"])
+@pytest.mark.parametrize("fulfillment_type", TYPE_INPUTS)
+def test_product_create_and_batch_enforce_fulfillment_type(
+    endpoint: str,
+    fulfillment_type: str | None,
+    client: TestClient,
+    admin_token_tenant_a: str,
+    superadmin_token: str,
+    popup_tenant_a: Popups,
+    tenant_a: Tenants,
+) -> None:
+    item = _create_product_payload(popup_tenant_a.id, suffix=str(fulfillment_type))
+    if fulfillment_type != "missing":
+        item["fulfillment_type"] = fulfillment_type
+    batch = endpoint == "batch"
+    if batch:
+        item.pop("popup_id")
+    response = client.post(
+        "/api/v1/products/batch" if batch else "/api/v1/products",
+        headers=(
+            {**_admin_headers(superadmin_token), "X-Tenant-Id": str(tenant_a.id)}
+            if batch
+            else _admin_headers(admin_token_tenant_a)
+        ),
+        json={"popup_id": str(popup_tenant_a.id), "products": [item]}
+        if batch
+        else item,
+    )
+    valid = fulfillment_type == "missing"
+    assert response.status_code == ((207 if batch else 201) if valid else 422), (
+        response.text
+    )
+    if valid:
+        body = response.json()[0] if batch else response.json()
+        assert "fulfillment_type" not in body
+
+
+def test_product_public_omits_fulfillment_type(
+    client: TestClient,
+    db: Session,
+    admin_token_tenant_a: str,
+    popup_tenant_a: Popups,
+    tenant_a: Tenants,
+) -> None:
+    product = Products(
+        tenant_id=tenant_a.id,
+        popup_id=popup_tenant_a.id,
+        name="Legacy unclassified product",
+        slug=f"legacy-unclassified-{uuid.uuid4().hex[:8]}",
+        price=10,
+    )
+    db.add(product)
+    db.commit()
+    response = client.get(
+        f"/api/v1/products/{product.id}",
+        headers=_admin_headers(admin_token_tenant_a),
+    )
+    assert response.status_code == 200, response.text
+    assert "fulfillment_type" not in response.json()
+
+
+def test_product_patch_rejects_fulfillment_type(
+    client: TestClient,
+    admin_token_tenant_a: str,
+    popup_tenant_a: Popups,
+) -> None:
+    created = client.post(
+        "/api/v1/products",
+        headers=_admin_headers(admin_token_tenant_a),
+        json=_create_product_payload(popup_tenant_a.id, suffix="patch-type"),
+    )
+    assert created.status_code == 201, created.text
+    product_id = created.json()["id"]
+    omitted = client.patch(
+        f"/api/v1/products/{product_id}",
+        headers=_admin_headers(admin_token_tenant_a),
+        json={"name": "Renamed without classification"},
+    )
+    assert omitted.status_code == 200, omitted.text
+    assert "fulfillment_type" not in omitted.json()
+    for invalid in (None, "unsupported", "order"):
+        rejected = client.patch(
+            f"/api/v1/products/{product_id}",
+            headers=_admin_headers(admin_token_tenant_a),
+            json={"fulfillment_type": invalid},
+        )
+        assert rejected.status_code == 422, rejected.text
 
 
 # ---------------------------------------------------------------------------

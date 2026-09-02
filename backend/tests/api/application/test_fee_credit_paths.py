@@ -32,6 +32,12 @@ from app.api.popup.models import Popups
 from app.api.shared.enums import HumanRating, SaleType
 from app.api.tenant.models import Tenants
 from app.core.security import create_access_token
+from tests._flow_helpers import (
+    application_flow_id,
+    default_flow_id,
+    group_flow_id,
+    provision_default_flow,
+)
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -58,6 +64,7 @@ def _make_fee_popup(
     )
     db.add(popup)
     db.flush()
+    provision_default_flow(db, popup)
     return popup
 
 
@@ -104,6 +111,7 @@ def _make_application(
     status: str = ApplicationStatus.IN_REVIEW.value,
 ) -> Applications:
     application = Applications(
+        sales_flow_id=application_flow_id(db, popup.id),
         tenant_id=tenant.id,
         popup_id=popup.id,
         human_id=human.id,
@@ -285,6 +293,7 @@ class TestFeeCreditPaths:
         strategy = ApprovalStrategies(
             tenant_id=tenant_a.id,
             popup_id=popup.id,
+            sales_flow_id=default_flow_id(db, popup.id),
             strategy_type=ApprovalStrategyType.AUTO_ACCEPT,
         )
         db.add(strategy)
@@ -322,10 +331,12 @@ class TestFeeCreditPaths:
 
         # Create an open group for this popup
         group = Groups(
+            sales_flow_id=group_flow_id(db, popup.id),
             tenant_id=tenant_a.id,
             popup_id=popup.id,
             name=f"FeeGroup {uuid.uuid4().hex[:6]}",
             slug=f"feegroup-{uuid.uuid4().hex[:6]}",
+            auto_approve_applications=True,
         )
         db.add(group)
         db.commit()
@@ -336,6 +347,7 @@ class TestFeeCreditPaths:
         response = client.patch(
             f"/api/v1/applications/my/{popup.id}",
             json={"group_id": str(group.id)},
+            params={"sales_flow_id": str(application.sales_flow_id)},
             headers={
                 "Authorization": f"Bearer {human_token}",
                 "X-Tenant-Id": str(tenant_a.id),
@@ -349,6 +361,42 @@ class TestFeeCreditPaths:
         db.expire_all()
         db.refresh(application)
         _assert_credit_granted(db, application, human, Decimal("75.00"))
+
+    def test_manual_group_join_keeps_existing_application_in_review(
+        self, db: Session, tenant_a: Tenants, client: TestClient
+    ) -> None:
+        popup = _make_fee_popup(db, tenant_a)
+        human = _make_human(db, tenant_a)
+        application = _make_application(
+            db, tenant_a, popup, human, status=ApplicationStatus.IN_REVIEW.value
+        )
+        _make_approved_fee_payment(db, tenant_a, popup, application)
+        group = Groups(
+            tenant_id=tenant_a.id,
+            popup_id=popup.id,
+            sales_flow_id=application.sales_flow_id,
+            name=f"ManualGroup {uuid.uuid4().hex[:6]}",
+            slug=f"manualgroup-{uuid.uuid4().hex[:6]}",
+            auto_approve_applications=False,
+        )
+        db.add(group)
+        db.commit()
+
+        human_token = create_access_token(subject=human.id, token_type="human")
+        response = client.patch(
+            f"/api/v1/applications/my/{popup.id}",
+            json={"group_id": str(group.id)},
+            params={"sales_flow_id": str(application.sales_flow_id)},
+            headers={
+                "Authorization": f"Bearer {human_token}",
+                "X-Tenant-Id": str(tenant_a.id),
+            },
+        )
+
+        assert response.status_code == 200, response.text
+        assert response.json()["status"] == ApplicationStatus.IN_REVIEW.value
+        db.refresh(application)
+        assert application.fee_credit_granted is False
 
     def test_rejection_is_noop_across_paths(
         self, db: Session, tenant_a: Tenants

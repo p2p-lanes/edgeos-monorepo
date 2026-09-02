@@ -58,7 +58,95 @@
     "no_active_popups": "Engir virkir viðburðir",
     "no_active_popups_description": "Engir virkir viðburðir eru í boði núna. Vinsamlegast athugaðu aftur síðar.",
     "no_profile": "Engar prófílupplýsingar í boði.",
-    "no_profile_contact": "Vinsamlegast hafðu samband við þjónustudeild ef þú telur þetta vera villu."
+    "no_profile_contact": "Vinsamlegast hafðu samband við þjónustudeild ef þú telur þetta vera villu.",
+    "direct_sales_title": "Kaupmöguleikar",
+    "direct_sales_description": "Veldu einn af tiltækum möguleikum fyrir þennan viðburð.",
+    "door_generic": "Umsóknin þín",
+    "door_status": {
+      "accepted": "Samþykkt",
+      "in_review": "Í yfirferð",
+      "draft": "Drög",
+      "rejected": "Ekki samþykkt",
+      "none": "Opin"
+    },
+    "door_action": {
+      "passes": "Skoða passana mína",
+      "application": "Skoða umsókn",
+      "apply": "Sækja um"
+    }
+  },
+  "shop": {
+    "title": "Verslun",
+    "description": "Veldu tiltækan möguleika.",
+    "catalog": "Tiltækir möguleikar",
+    "application": "Umsókn",
+    "direct": "Bein kaup",
+    "upsale": "Í boði fyrir þig",
+    "open": "Skoða möguleika",
+    "source": "Uppruni: {{source}}",
+    "eligibility": {
+      "application": "Í boði fyrir samþykkta umsækjendur",
+      "direct": "Í boði fyrir alla þátttakendur",
+      "upsale": "Í boði eftir gjaldgeng kaup"
+    },
+    "price_from": "Frá {{price}}",
+    "price_unavailable": "Verð ekki í boði",
+    "empty_title": "Ekkert í boði núna",
+    "empty_description": "Athugaðu aftur síðar fyrir nýja möguleika.",
+    "approval_required_title": "Samþykki er krafist",
+    "approval_required_description": "Umsóknin þín verður að vera samþykkt áður en þú getur keypt þennan möguleika.",
+    "approval_required_cta": "Skoða umsókn",
+    "estimated_total": "Áætluð heildarupphæð",
+    "definitive_total": "Heildarupphæð"
+  },
+  "orders": {
+    "title": "Pantanir",
+    "description": "Greiðsluferill þinn fyrir þennan viðburð.",
+    "empty_title": "Engar pantanir enn",
+    "empty_description": "Greiðsluferillinn þinn birtist hér.",
+    "total": "Samtals",
+    "lines": "Vörur í pöntun",
+    "line_quantity": "Magn: {{count}}",
+    "legacy_purchase": "Eldri kaup",
+    "invoice": "Reikningur",
+    "download_invoice_error": "Mistókst að hlaða niður reikningi. Reyndu aftur.",
+    "status": {
+      "approved": "Samþykkt",
+      "pending": "Í bið",
+      "rejected": "Hafnað",
+      "expired": "Útrunnið",
+      "cancelled": "Hætt við",
+      "unknown": "Óþekkt greiðslustaða"
+    }
+  },
+  "people": {
+    "title": "Fólk",
+    "description": "Fólk sem þú getur stýrt fyrir þennan viðburð.",
+    "primary": "Aðalþátttakandi",
+    "dependent": "Aðstandandi",
+    "can_manage": "Stýrt af þér",
+    "empty_title": "Ekkert fólk enn",
+    "empty_description": "Fólkið sem þú stýrir birtist hér."
+  },
+  "tickets_access": {
+    "title": "Passar og aðgangur",
+    "description": "Virkir viðburðamiðar og innritunarvörur þínar.",
+    "empty_title": "Engir miðar eða innritunarvörur enn",
+    "empty_description": "Virkir viðburðamiðar og innritunarvörur birtast hér.",
+    "purchased_by_you": "Keypt af þér",
+    "show_code": "Sýna innritunarkóða fyrir {{ticket}}",
+    "checked_in": "Innritað",
+    "active": "Tilbúið fyrir innritun",
+    "access_active": "Virkur aðgangur",
+    "code_title": "Innritunarkóði",
+    "code_description": "Notaðu þennan kóða við innritun.",
+    "duration": {
+      "day": "Daglegur aðgangur að viðburði",
+      "week": "Vikulegur aðgangur að viðburði",
+      "month": "Mánaðarlegur aðgangur að viðburði",
+      "full": "Fullur aðgangur að viðburði"
+    },
+    "qr_alt": "QR-kóði"
   },
   "auth": {
     "sign_up_or_log_in": "Skráðu þig eða innskráðu",
@@ -114,6 +202,8 @@
   "application": {
     "unavailable": "Umsókn ekki í boði",
     "unavailable_description": "Umsóknarformið fyrir þennan viðburð er ekki enn stillt.",
+    "flow_picker_title": "Veldu hvernig þú vilt sækja um",
+    "flow_picker_description": "Þessi viðburður hefur fleiri en eina umsóknarleið. Veldu eina til að halda áfram.",
     "step_of": "Skref {{current}} af {{total}}",
     "existing_found": "Fyrri umsókn fundin",
     "existing_description": "Við fundum fyrri umsókn tengda við netfangið þitt.",
@@ -220,7 +310,19 @@
     "cart": {
       "close_aria": "Loka körfu",
       "empty_title": "Karfan þín er tóm",
-      "empty_description": "Vinsamlegast farðu til baka og veldu passa til að halda áfram."
+      "empty_description": "Vinsamlegast farðu til baka og veldu passa til að halda áfram.",
+      "unknown_attendee": "Óþekktur þátttakandi",
+      "passes": "Passar",
+      "housing": "Húsnæði",
+      "full_stay": "Öll dvölin",
+      "merchandise": "Vörur",
+      "patron_contribution": "Framlag styrktaraðila",
+      "community_support": "Stuðningur við samfélagið",
+      "meal_plans": "Matarpakkar",
+      "pass_protection": "Passavernd",
+      "pass_protection_description": "Vernd fyrir alla passa",
+      "promo_code": "Afsláttarkóði",
+      "promo_code_expired": "Afsláttarkóðinn þinn er ekki lengur gildur"
     },
     "actions": {
       "pay": "Greiða",
@@ -253,6 +355,46 @@
         "next_image_aria": "Næsta mynd"
       }
     },
+    "accommodation": {
+      "default_notice": "Gisting er greidd að fullu við greiðslu og fæst ekki endurgreidd.",
+      "in_cart": "Í körfu",
+      "sleeps": "Rúmar {{count}} gesti",
+      "nights_one": "{{count}} nótt",
+      "nights_other": "{{count}} nætur",
+      "monthly_rate": "mánaðargjald",
+      "per_night": "nótt",
+      "includes_tax": "Innifelur {{amount}} í gistináttaskatt",
+      "remove": "Fjarlægja",
+      "select": "Velja",
+      "only_left_one": "Aðeins {{count}} eftir",
+      "only_left_other": "Aðeins {{count}} eftir",
+      "guests_label": "Gestir",
+      "guests_one": "{{count}} gestur",
+      "guests_other": "{{count}} gestir",
+      "guest_name_placeholder": "Fullt nafn gests {{number}}",
+      "no_rooms": "Engin gisting er í boði fyrir þessa greiðsluleið.",
+      "check_in": "Innritun",
+      "check_out": "Útritun",
+      "who_is_staying": "Hverjir gista",
+      "cart_title": "Gisting",
+      "bed_count": "{{count}} {{type}}",
+      "bed_types": {
+        "king": "king-size rúm",
+        "queen": "queen-size rúm",
+        "double": "tvíbreitt rúm",
+        "single": "einbreitt rúm",
+        "bunk": "koja",
+        "sofa": "svefnsófi"
+      },
+      "unavailable": {
+        "sold_out": "Fullbókað á þessum dagsetningum",
+        "min_stay_not_met": "Krefst lengri dvalar",
+        "outside_bookable_window": "Ekki í boði á þessum dagsetningum",
+        "over_capacity": "Ekki nægilegt pláss fyrir hópinn",
+        "inactive": "Ekki í boði",
+        "default": "Ekki í boði á þessum dagsetningum"
+      }
+    },
     "contribution": {
       "fallbackLabel": "Viðbót við viðburð",
       "fallbackDescription": "Styður við framkvæmd viðburðarins"
@@ -264,6 +406,7 @@
     "coupon_no_longer_valid": "This coupon is no longer available. Your total has been updated. Please review and try again.",
     "payment_error": "Something went wrong with your payment. Please try again.",
     "no_products": "Engar vörur í boði fyrir þetta skref.",
+    "not_eligible_for_flow": "Þessi greiðsluleið er ekki í boði fyrir reikninginn þinn.",
     "no_images": "Engar myndir í boði fyrir þetta skref.",
     "no_video": "Ekkert myndband í boði fyrir þetta skref.",
     "no_passes": "Engir passar í boði.",
@@ -274,12 +417,17 @@
     "step_config_error_detail": "Ekkert sniðmát er tengt þessu skrefi. Hafðu samband við stjórnanda.",
     "previous_payment_completed": "Fyrri greiðsla þín var lokið.",
     "pending_payment_wait": "Þú ert með greiðslu í bið. Bíddu í nokkrar mínútur.",
-    "payment_cancel_failed": "Okkur tókst ekki að afgreiða greiðsluna. Reyndu aftur."
+    "payment_cancel_failed": "Okkur tókst ekki að afgreiða greiðsluna. Reyndu aftur.",
+    "flow_restriction_violated": "Þú uppfyllir ekki skilyrði til að kaupa í gegnum þessa leið.",
+    "product_not_in_flow": "Þessi vara er ekki í boði í gegnum þessa leið."
   },
   "openCheckout": {
     "loading": "Hleður greiðslu...",
     "unavailable_title": "Greiðsla ekki í boði",
     "unavailable_description": "Þessi tengill er ógildur eða viðburðurinn er ekki lengur í boði.",
+    "sign_in_required_title": "Innskráning nauðsynleg",
+    "sign_in_required_description": "Þessi greiðslusíða er fyrir skráða þátttakendur. Skráðu þig inn á gáttina þína til að halda áfram.",
+    "sign_in_required_cta": "Skrá inn",
     "tickets_title": "Miðar",
     "tickets_subtitle": "Veldu hversu marga miða þú vilt kaupa.",
     "coupon_title": "Afsláttarkóði",
@@ -302,12 +450,20 @@
     "thank_you_total": "Samtals",
     "previous_payment_completed": "Fyrri greiðsla þín var lokið.",
     "payment_cancel_failed": "Okkur tókst ekki að afgreiða greiðsluna. Reyndu aftur.",
-    "pending_payment_wait": "Þú ert með greiðslu í bið. Bíddu í nokkrar mínútur."
+    "pending_payment_wait": "Þú ert með greiðslu í bið. Bíddu í nokkrar mínútur.",
+    "flow_restriction_violated": "Þú uppfyllir ekki skilyrði til að kaupa í gegnum þessa leið.",
+    "product_not_in_flow": "Þessi vara er ekki í boði í gegnum þessa leið."
   },
   "passes": {
     "your_passes": "Passarnir þínir",
+    "companion_attending": "Þú mætir sem fylgdarmaður.",
+    "companion_attending_city": "Þú mætir á {{city}} sem fylgdarmaður.",
+    "companion_no_passes": "Engir passar hafa verið úthlutaðir enn. Athugaðu aftur síðar.",
+    "companion_waiting_acceptance": "Passar verða aðgengilegir þegar umsóknin hefur verið samþykkt.",
     "buy_passes": "Kaupa passa",
     "your_passes_description": "Skoðaðu og stjórnaðu pöntuninni þinni hér.",
+    "upsale_title": "Meira fyrir þig",
+    "upsale_description": "Sérstakar viðbætur í boði fyrir kaupin þín.",
     "loading_passes": "Hleður passaupplýsingum...",
     "add_spouse": "Bæta við maka",
     "add_children": "Bæta við börnum",
@@ -374,7 +530,7 @@
     }
   },
   "attendees": {
-    "title": "Þátttakendaskrá",
+    "title": "Skrá",
     "description": "Hafðu samband við vini þína til að skipuleggja stefnumót, finna sameiginlegt húsnæði eða skipuleggja athafnir saman. *Þessi skrá inniheldur aðeins upplýsingar þeirra sem hafa sjálfviljugir samþykkt að deila upplýsingum sínum.",
     "search_placeholder": "Leita eftir nafni, netfangi, stofnun...",
     "export_csv": "Flytja þátttakendur út sem CSV",
@@ -427,8 +583,18 @@
     "coming_soon": "(Væntanlegt)",
     "soon_badge": "Bráðum",
     "application": "Umsókn",
+    "navigation": "Leiðsögn á vefgátt",
+    "mobile_navigation": "Leiðsögn á vefgátt",
+    "general": "Almennt",
+    "participation": "Þátttaka",
+    "commerce": "Verslun",
+    "community": "Samfélag",
+    "shop": "Verslun",
+    "orders": "Pantanir",
+    "people": "Fólk",
+    "tickets_access": "Passar og aðgangur",
     "passes": "Passar",
-    "attendee_directory": "Þátttakendaskrá",
+    "attendee_directory": "Skrá",
     "companion": "Förunautur",
     "status": "Staða",
     "groups": "Hópar",
@@ -491,7 +657,7 @@
     "application": "Umsókn",
     "passes": "Passar",
     "buy": "Kaupa",
-    "attendees": "Þátttakendaskrá",
+    "attendees": "Skrá",
     "groups": "Hópar",
     "profile": "Prófíll"
   },
@@ -818,7 +984,7 @@
       "visibility_private": "Einkamál (aðeins boðnum)",
       "visibility_unlisted": "Óskráð (falinn, deilanlegur tengill)",
       "host_label": "Birtur gestgjafi (valfrjálst)",
-      "host_placeholder_default": "{{name}} (sjálfgefið)",
+      "host_placeholder_popup": "{{name}}",
       "host_placeholder_optional": "Valfrjálst",
       "host_use_popup": "Nota {{name}}",
       "host_use_me": "Nota nafnið mitt",

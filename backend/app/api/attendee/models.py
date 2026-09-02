@@ -2,7 +2,7 @@ import uuid
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Optional
 
-from sqlalchemy import Index
+from sqlalchemy import CheckConstraint, Index, text
 from sqlalchemy.dialects.postgresql import UUID
 from sqlmodel import Column, DateTime, Field, Relationship, func
 
@@ -22,9 +22,42 @@ class AttendeeProducts(AttendeeProductsBase, table=True):
     """Link table for attendee products with quantity."""
 
     __tablename__ = "attendee_products"
-
+    __table_args__ = (
+        CheckConstraint(
+            "(payment_product_id IS NULL) = (unit_index IS NULL)",
+            name="ck_attendee_product_lineage_pair",
+        ),
+        CheckConstraint(
+            "unit_index IS NULL OR unit_index >= 0",
+            name="ck_attendee_product_unit_index_nonnegative",
+        ),
+        Index(
+            "ux_attendee_product_payment_product_unit",
+            "payment_product_id",
+            "unit_index",
+            unique=True,
+            postgresql_where=text("payment_product_id IS NOT NULL"),
+        ),
+        CheckConstraint(
+            "attendee_id IS NOT NULL OR payment_product_id IS NOT NULL",
+            name="ck_attendee_product_owner_or_lineage",
+        ),
+        Index(
+            "ix_attendee_products_active_attendee_category",
+            "attendee_id",
+            "product_category_snapshot",
+            postgresql_where=text("revoked_at IS NULL AND attendee_id IS NOT NULL"),
+        ),
+        Index(
+            "ix_attendee_products_active_scannable",
+            "check_in_code",
+            postgresql_where=text(
+                "revoked_at IS NULL AND requires_check_in_snapshot IS TRUE"
+            ),
+        ),
+    )
     # Relationships
-    attendee: "Attendees" = Relationship(back_populates="attendee_products")
+    attendee: Optional["Attendees"] = Relationship(back_populates="attendee_products")
     product: "Products" = Relationship(back_populates="attendee_products")
 
 
@@ -43,6 +76,9 @@ class Attendees(AttendeeBase, table=True):
             UUID(as_uuid=True),
             primary_key=True,
         ),
+    )
+    managed_by_human_id: uuid.UUID | None = Field(
+        default=None, foreign_key="humans.id", index=True, nullable=True
     )
 
     created_at: datetime = Field(
@@ -67,7 +103,13 @@ class Attendees(AttendeeBase, table=True):
     popup: "Popups" = Relationship(back_populates="attendees")
     human: "Humans" = Relationship(
         back_populates="attendees",
-        sa_relationship_kwargs={"lazy": "selectin"},
+        sa_relationship_kwargs={
+            "lazy": "selectin",
+            "foreign_keys": "Attendees.human_id",
+        },
+    )
+    manager: Optional["Humans"] = Relationship(
+        sa_relationship_kwargs={"foreign_keys": "Attendees.managed_by_human_id"}
     )
     attendee_products: list["AttendeeProducts"] = Relationship(
         back_populates="attendee",

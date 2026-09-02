@@ -1,7 +1,9 @@
 import { useQueryClient } from "@tanstack/react-query"
-import { type MutableRefObject, useCallback, useEffect } from "react"
+import { type MutableRefObject, useCallback, useEffect, useRef } from "react"
 import {
+  type CartItemPass,
   type CartState,
+  EMPTY_CART,
   useCart,
   useClearCart,
   useSaveCart,
@@ -10,6 +12,7 @@ import { checkAndClearPurchasePending } from "@/hooks/usePaymentRedirect"
 import { getProductAvailability } from "@/lib/product-availability"
 import { queryKeys } from "@/lib/query-keys"
 import type {
+  CheckoutRecipientDraft,
   CheckoutStep,
   SelectedAccommodationItem,
   SelectedDynamicItem,
@@ -35,6 +38,79 @@ export interface CartSelectionState {
   currentStep: CheckoutStep
 }
 
+export interface PersistedPassSelections {
+  passes: CartItemPass[]
+  recipients: CheckoutRecipientDraft[]
+}
+
+export function buildPersistedPassSelections(
+  selectedPasses: SelectedPassItem[],
+): PersistedPassSelections {
+  const recipients = new Map<string, CheckoutRecipientDraft>()
+  const passes = selectedPasses.map((pass) => {
+    if (pass.recipient) {
+      recipients.set(pass.recipient.recipient_key, pass.recipient)
+      return {
+        recipient_key: pass.recipient.recipient_key,
+        product_id: pass.productId,
+        quantity: pass.quantity,
+      }
+    }
+    return {
+      attendee_id: pass.attendeeId,
+      product_id: pass.productId,
+      quantity: pass.quantity,
+    }
+  })
+  return { passes, recipients: [...recipients.values()] }
+}
+
+export function buildPersistedCartState(state: CartSelectionState): CartState {
+  const recipientSelections = buildPersistedPassSelections(state.selectedPasses)
+  return {
+    ...recipientSelections,
+    housing: state.housing
+      ? {
+          product_id: state.housing.productId,
+          check_in: state.housing.checkIn,
+          check_out: state.housing.checkOut,
+          quantity: state.housing.quantity,
+        }
+      : null,
+    merch: state.merch.map((item) => ({
+      product_id: item.productId,
+      quantity: item.quantity,
+    })),
+    patron: state.patron
+      ? {
+          product_id: state.patron.productId,
+          amount: state.patron.amount,
+          is_custom_amount: state.patron.isCustomAmount,
+        }
+      : null,
+    meal_plans: state.selectedMealPlans.map((item) => ({
+      attendee_id: item.attendeeId,
+      product_id: item.productId,
+      daily_choices: item.dailyChoices,
+      dietary_restriction: item.dietaryRestriction,
+      special_request: item.specialRequest,
+    })),
+    // Saved, but deliberately not restored. A stay is a dated server quote and
+    // a room in a cart is not held. Restoring it would claim stale inventory is
+    // still bookable; the snapshot remains useful for abandoned-cart review.
+    accommodations: state.accommodations.map((item) => ({
+      accommodation_id: item.accommodationId,
+      check_in: item.checkIn,
+      check_out: item.checkOut,
+      guest_count: item.guestCount,
+      guests: item.guests.filter(Boolean),
+    })),
+    promo_code: state.promoCodeValid ? state.promoCode : null,
+    insurance: state.insurance,
+    current_step: state.currentStep !== "success" ? state.currentStep : null,
+  }
+}
+
 export interface RestorationSetters {
   setHousing: (item: SelectedHousingItem | null) => void
   setAccommodations: (items: SelectedAccommodationItem[]) => void
@@ -44,11 +120,16 @@ export interface RestorationSetters {
   setInsurance: (value: boolean) => void
   setDynamicItems: (items: Record<string, SelectedDynamicItem[]>) => void
   setPromoCode?: (code: string) => void
+  restorePassRecipients?: (
+    recipients: CheckoutRecipientDraft[],
+    passes: PersistedPassSelections["passes"],
+  ) => void
 }
 
 interface UseCartPersistenceParams {
   enabled?: boolean
   cityId: string | null
+  salesFlowId?: string | null
   initialStep: CheckoutStep
   products: ProductsPass[]
   housingPricePerDay: boolean
@@ -62,6 +143,7 @@ interface UseCartPersistenceParams {
 export function useCartPersistence({
   enabled = true,
   cityId,
+  salesFlowId,
   initialStep,
   products,
   housingPricePerDay,
@@ -72,66 +154,34 @@ export function useCartPersistence({
 }: UseCartPersistenceParams) {
   const queryClient = useQueryClient()
   const effectiveCityId = enabled ? cityId : null
+  const restorationScope = `${cityId ?? ""}:${salesFlowId ?? ""}`
+  const previousRestorationScopeRef = useRef(restorationScope)
+
+  // A provider can survive client-side navigation between two doors of the
+  // same gathering. Reset before restoration effects run so the old flow's
+  // one-shot guards cannot suppress the new flow's cart.
+  if (previousRestorationScopeRef.current !== restorationScope) {
+    previousRestorationScopeRef.current = restorationScope
+    hasRestoredCheckoutRef.current = false
+    paymentCompleteRef.current = false
+  }
 
   // Cart API hooks (internalized)
-  const { data: savedCart, isSuccess: cartLoaded } = useCart(effectiveCityId)
-  const { save, saveImmediate, cancelPendingSave } =
-    useSaveCart(effectiveCityId)
-  const clearCartMutation = useClearCart(effectiveCityId)
+  const { data: savedCart, isSuccess: cartLoaded } = useCart(
+    effectiveCityId,
+    salesFlowId,
+  )
+  const { save, saveImmediate, cancelPendingSave } = useSaveCart(
+    effectiveCityId,
+    salesFlowId,
+  )
+  const clearCartMutation = useClearCart(effectiveCityId, salesFlowId)
 
   // --- Build CartState from the ref's current value ---
-  const buildCartState = useCallback((): CartState => {
-    const s = selectionStateRef.current
-    return {
-      passes: s.selectedPasses.map((p) => ({
-        attendee_id: p.attendeeId,
-        product_id: p.productId,
-        quantity: p.quantity,
-      })),
-      housing: s.housing
-        ? {
-            product_id: s.housing.productId,
-            check_in: s.housing.checkIn,
-            check_out: s.housing.checkOut,
-            quantity: s.housing.quantity,
-          }
-        : null,
-      merch: s.merch.map((m) => ({
-        product_id: m.productId,
-        quantity: m.quantity,
-      })),
-      patron: s.patron
-        ? {
-            product_id: s.patron.productId,
-            amount: s.patron.amount,
-            is_custom_amount: s.patron.isCustomAmount,
-          }
-        : null,
-      meal_plans: s.selectedMealPlans.map((m) => ({
-        attendee_id: m.attendeeId,
-        product_id: m.productId,
-        daily_choices: m.dailyChoices,
-        dietary_restriction: m.dietaryRestriction,
-        special_request: m.specialRequest,
-      })),
-      // Saved, but deliberately not restored below. Two reasons: the price
-      // of a stay is a server quote for specific dates, so a stored total is
-      // only as good as the minute it was taken; and a room in a cart is not
-      // held in inventory, so restoring one would show a bookable room that
-      // may already be gone. Saving it is still worth it — the abandoned-cart
-      // view in the backoffice is how an operator sees what a buyer wanted.
-      accommodations: s.accommodations.map((a) => ({
-        accommodation_id: a.accommodationId,
-        check_in: a.checkIn,
-        check_out: a.checkOut,
-        guest_count: a.guestCount,
-        guests: a.guests.filter(Boolean),
-      })),
-      promo_code: s.promoCodeValid ? s.promoCode : null,
-      insurance: s.insurance,
-      current_step: s.currentStep !== "success" ? s.currentStep : null,
-    }
-  }, [selectionStateRef])
+  const buildCartState = useCallback(
+    (): CartState => buildPersistedCartState(selectionStateRef.current),
+    [selectionStateRef],
+  )
 
   // --- Save cart immediately (for checkpoints) ---
   const saveCart = useCallback(() => {
@@ -196,18 +246,8 @@ export function useCartPersistence({
       clearCartMutation.mutate(undefined, {
         onSettled: () => {
           queryClient.setQueryData<CartState>(
-            queryKeys.cart.byPopup(cityId ?? ""),
-            {
-              passes: [],
-              housing: null,
-              merch: [],
-              patron: null,
-              meal_plans: [],
-              accommodations: [],
-              promo_code: null,
-              insurance: false,
-              current_step: null,
-            },
+            queryKeys.cart.byPopup(cityId ?? "", salesFlowId),
+            { ...EMPTY_CART },
           )
         },
       })
@@ -349,6 +389,7 @@ export function useCartPersistence({
     initialStep,
     cancelPendingSave,
     cityId,
+    salesFlowId,
     clearCartMutation.mutate,
     hasRestoredCheckoutRef,
     paymentCompleteRef,

@@ -246,6 +246,9 @@ def test_denorm_null_product_guard(
     mock_ap.payment_id = None
     mock_ap.product = None  # simulate unloaded / orphaned relationship
     mock_ap.purchase_metadata = None
+    mock_ap.product_category_snapshot = None
+    mock_ap.requires_check_in_snapshot = None
+    mock_ap.revoked_at = None
 
     # Patch the ORM relationship on the loaded attendee
     from sqlmodel import select

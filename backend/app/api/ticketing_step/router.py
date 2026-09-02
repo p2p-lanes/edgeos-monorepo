@@ -8,9 +8,12 @@ from app.api.shared.enums import UserRole
 from app.api.shared.response import ListModel, PaginationLimit, PaginationSkip, Paging
 from app.api.ticketing_step import crud
 from app.api.ticketing_step.schemas import (
+    CopyStepsToFlowRequest,
+    CopyStepsToFlowResponse,
     TicketingStepCreate,
     TicketingStepPublic,
     TicketingStepUpdate,
+    validate_template_config,
 )
 from app.api.translation.service import (
     apply_ticketing_step_overlay,
@@ -37,9 +40,18 @@ async def list_portal_ticketing_steps(
     _: CurrentHuman,
     popup_id: uuid.UUID,
     accept_language: Annotated[str | None, Header(alias="Accept-Language")] = None,
+    sales_flow_id: uuid.UUID | None = None,
 ) -> ListModel[TicketingStepPublic]:
-    """List enabled ticketing steps for a popup (portal-facing)."""
-    steps = crud.ticketing_steps_crud.find_portal_by_popup(db, popup_id=popup_id)
+    """List the enabled ticketing steps of one sales flow (portal-facing).
+
+    Resolves the flow named by `sales_flow_id` (sdd/sales-flows D6 URL
+    scheme — must belong to this popup, mirrors `_get_flow_or_404`), or the
+    popup's primary flow when omitted. The resolved flow's own steps are
+    the answer: since slice 2 nothing is inherited, so an empty list means
+    this flow has no steps.
+    """
+    flow = _resolve_flow_or_404(db, popup_id, sales_flow_id)
+    steps = crud.ticketing_steps_crud.find_portal_by_flow(db, flow.id)
     lang = parse_accept_language(accept_language)
     translations_map = (
         get_translations_bulk(db, "ticketing_step", [s.id for s in steps], lang)
@@ -62,12 +74,21 @@ async def list_ticketing_steps(
     db: AdminOrApiKeySession_TicketingStepsRead,
     _: AdminOrApiKey_TicketingStepsRead,
     popup_id: uuid.UUID | None = None,
+    sales_flow_id: uuid.UUID | None = None,
     skip: PaginationSkip = 0,
     limit: PaginationLimit = 100,
 ) -> ListModel[TicketingStepPublic]:
+    """List ticketing steps.
+
+    With `popup_id`, returns the step list of one flow: the one named by
+    `sales_flow_id`, or the popup's primary flow when omitted. That list is
+    exactly what the flow owns — since slice 2 there is no shared tier to
+    fall back to.
+    """
     if popup_id:
-        steps, total = crud.ticketing_steps_crud.find_by_popup(
-            db, popup_id=popup_id, skip=skip, limit=limit
+        flow = _resolve_flow_or_404(db, popup_id, sales_flow_id)
+        steps, total = crud.ticketing_steps_crud.find_by_flow(
+            db, flow.id, skip=skip, limit=limit
         )
     else:
         steps, total = crud.ticketing_steps_crud.find(db, skip=skip, limit=limit)
@@ -93,6 +114,45 @@ async def get_ticketing_step(
         )
 
     return TicketingStepPublic.model_validate(step)
+
+
+def _get_flow_or_404(db, popup_id: uuid.UUID, flow_id: uuid.UUID):
+    """Verify a sales flow exists and belongs to this popup.
+
+    Mirrors app.api.popup_reviewer.router._get_flow_or_404 (sdd/sales-flows
+    D4) — prevents cross-popup flow injection via a client-supplied
+    sales_flow_id.
+    """
+    from app.api.sales_flow.crud import sales_flows_crud
+
+    flow = sales_flows_crud.get(db, flow_id)
+    if not flow or flow.popup_id != popup_id:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Sales flow not found for this popup",
+        )
+    return flow
+
+
+def _resolve_flow_or_404(db, popup_id: uuid.UUID, flow_id: uuid.UUID | None):
+    """The flow a step read is scoped to: the requested one, or the popup's
+    default flow when none was named.
+
+    A missing compatibility default makes the legacy, unscoped step list
+    unavailable rather than silently empty.
+    """
+    if flow_id is not None:
+        return _get_flow_or_404(db, popup_id, flow_id)
+
+    from app.api.sales_flow.crud import sales_flows_crud
+
+    default_flow = sales_flows_crud.get_default_flow(db, popup_id)
+    if default_flow is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Sales flow not found",
+        )
+    return default_flow
 
 
 def _validate_accommodation_properties_fk(
@@ -195,6 +255,36 @@ def _validate_template_config_fk(
         )
 
 
+def _validate_meal_product_references(
+    template: str | None,
+    template_config: dict | None,
+    popup_id: uuid.UUID,
+    db,
+) -> None:
+    if template != "meal-plan-select" or not template_config:
+        return
+
+    product_ids = {
+        uuid.UUID(str(product["product_id"]))
+        for section in template_config.get("sections") or []
+        for product in section.get("products") or []
+    }
+    if not product_ids:
+        return
+
+    from app.api.product.crud import products_crud
+
+    products = products_crud.get_by_ids(db, list(product_ids))
+    if len(products) != len(product_ids) or any(
+        product.popup_id != popup_id or (product.category or "").lower() != "meal_plan"
+        for product in products.values()
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="One or more meal plan products are invalid",
+        )
+
+
 @router.post(
     "", response_model=TicketingStepPublic, status_code=status.HTTP_201_CREATED
 )
@@ -216,12 +306,20 @@ async def create_ticketing_step(
     else:
         tenant_id = current_user.tenant_id
 
-    # Singleton guard: only one enabled patron-preset step per popup.
+    _get_flow_or_404(db, step_in.popup_id, step_in.sales_flow_id)
+
+    # Singleton guard: one enabled patron-preset step per flow
+    # (sdd/sales-flows-rediseno slice 2).
     if step_in.template == "patron-preset" and step_in.is_enabled:
-        crud.ticketing_steps_crud._assert_no_active_patron_preset(db, step_in.popup_id)
+        crud.ticketing_steps_crud._assert_no_active_patron_preset(
+            db, step_in.sales_flow_id
+        )
 
     # FK existence check for attendee_categories in template_config (Pattern B, ADR-5)
     _validate_template_config_fk(
+        step_in.template, step_in.template_config, step_in.popup_id, db
+    )
+    _validate_meal_product_references(
         step_in.template, step_in.template_config, step_in.popup_id, db
     )
 
@@ -275,12 +373,31 @@ async def update_ticketing_step(
         )
 
     # FK existence check for attendee_categories in template_config (Pattern B, ADR-5)
-    effective_template = step_in.template or step.template
-    effective_config = (
-        step_in.template_config if step_in.template_config is not None else None
+    effective_template = (
+        step_in.template if "template" in step_in.model_fields_set else step.template
     )
+    effective_config = (
+        step_in.template_config
+        if "template_config" in step_in.model_fields_set
+        else step.template_config
+    )
+    if {"template", "template_config"} & step_in.model_fields_set:
+        try:
+            effective_config = validate_template_config(
+                effective_template, effective_config
+            )
+        except ValueError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=str(exc),
+            ) from exc
+        if "template_config" in step_in.model_fields_set:
+            step_in.template_config = effective_config
     if effective_config is not None:
         _validate_template_config_fk(
+            effective_template, effective_config, step.popup_id, db
+        )
+        _validate_meal_product_references(
             effective_template, effective_config, step.popup_id, db
         )
 
@@ -320,3 +437,49 @@ async def delete_ticketing_step(
 
     delete_translations_for_entity(db, "ticketing_step", step.id)
     crud.ticketing_steps_crud.delete(db, step)
+
+
+@router.post("/copy-to-flow/{target_flow_id}", response_model=CopyStepsToFlowResponse)
+async def copy_steps_to_flow(
+    target_flow_id: uuid.UUID,
+    body: CopyStepsToFlowRequest,
+    db: AdminOrApiKeySession_TicketingStepsWrite,
+    _current_user: AdminOrApiKey_TicketingStepsWrite,
+) -> CopyStepsToFlowResponse:
+    """Copy another flow's checkout steps into `target_flow_id`.
+
+    How a new flow gets a checkout without inheriting one
+    (sdd/sales-flows-rediseno R3). The target's own steps are replaced, so
+    calling twice does not append. `source_flow_id` must belong to the same
+    popup and have the same type as the target — an incompatible flow is
+    rejected rather than silently ignored.
+    """
+    from app.api.sales_flow.crud import sales_flows_crud
+
+    target_flow = sales_flows_crud.get(db, target_flow_id)
+    if not target_flow:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Sales flow not found",
+        )
+
+    source_flow = sales_flows_crud.get(db, body.source_flow_id)
+    if not source_flow or source_flow.popup_id != target_flow.popup_id:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Sales flow not found for this popup",
+        )
+    if source_flow.type != target_flow.type:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Source sales flow must have the same type as the target flow",
+        )
+
+    copied = crud.ticketing_steps_crud.copy_steps_to_flow(
+        db,
+        tenant_id=target_flow.tenant_id,
+        popup_id=target_flow.popup_id,
+        target_flow_id=target_flow.id,
+        source_flow_id=source_flow.id,
+    )
+    return CopyStepsToFlowResponse(steps=copied)

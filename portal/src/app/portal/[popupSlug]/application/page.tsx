@@ -8,21 +8,32 @@ import { toast } from "sonner"
 import type { ApplicationPublic } from "@/client"
 import { Loader } from "@/components/ui/Loader"
 import { useApplicationSchema } from "@/hooks/useApplicationSchema"
+import { usePortalSalesFlows } from "@/hooks/usePortalSalesFlows"
 import { useApplication } from "@/providers/applicationProvider"
 import { useCityProvider } from "@/providers/cityProvider"
 import { useFileUpload } from "../events/lib/useFileUpload"
 import { DynamicApplicationForm } from "./components/dynamic-application-form"
 import { ExistingApplicationCard } from "./components/existing-application-card"
+import { FlowPicker } from "./components/FlowPicker"
 import { FeePaymentBanner } from "./components/fee-payment-banner"
 import { FormHeader } from "./components/form-header"
 import { SectionSeparator } from "./components/section-separator"
+import { resolveApplicationFlowId } from "./lib/resolveApplicationFlowId"
+import { resolvedApplicationDestination } from "./lib/resolvedApplicationDestination"
+import { shouldRedirectToStatus } from "./lib/shouldRedirectToStatus"
 
-function useFormInitData() {
+/**
+ * @param application The application selected for the current way in.
+ *   Without it,
+ *   someone holding two applications would resume editing whichever the
+ *   provider picked, and could overwrite the wrong one
+ *   (sdd/sales-flows-rediseno).
+ */
+function useFormInitData(application: ApplicationPublic | null) {
   const { getCity, getPopups } = useCityProvider()
-  const { applications, getRelevantApplication } = useApplication()
+  const { applications } = useApplication()
   const city = getCity()
   const popups = getPopups()
-  const application = getRelevantApplication()
 
   return useMemo(() => {
     if (!city || !applications) return { application: null, importSource: null }
@@ -62,7 +73,6 @@ export default function FormPage() {
   const { getCity } = useCityProvider()
   const { getRelevantApplication } = useApplication()
   const city = getCity()
-  const application = getRelevantApplication()
   const router = useRouter()
   const searchParams = useSearchParams()
   // Capture once on mount so a later URL change doesn't tear down the fee
@@ -73,12 +83,66 @@ export default function FormPage() {
   // Referral UUID carried from /r/{code} consumption page (REQ-GR-009)
   const referralId = searchParams.get("referral_id")
 
+  // Which way into the gathering this form is for. Entry links carry a
+  // readable flow slug; authenticated portal handoffs carry the internal id.
+  // Both resolve to the id required by the application API.
+  const flowIdentifier = searchParams.get("flow")
+  const [flowSelection, setFlowSelection] = useState<{
+    identifier: string | null
+    flowId: string | null
+  }>({ identifier: flowIdentifier, flowId: null })
+  // A selection belongs only to the URL identifier that produced it. Reading
+  // it through that identifier drops flow A synchronously when the mounted
+  // page starts resolving flow B, before redirect effects can observe A.
+  const selectedFlowId =
+    flowSelection.identifier === flowIdentifier ? flowSelection.flowId : null
+  // Declared after the door, not before it: asking which application this
+  // is without saying which way in used to answer with whichever came last.
+  const application =
+    flowIdentifier && !selectedFlowId
+      ? null
+      : getRelevantApplication(selectedFlowId)
+  // Resolved independently of the <FlowPicker> element below (not via its
+  // onResolved callback): the terminal-status guards further down need this
+  // before we know whether it's even safe to reach the JSX that mounts
+  // FlowPicker. Same query, shared cache — no extra request.
+  const { data: portalFlows } = usePortalSalesFlows(city?.id)
+  useEffect(() => {
+    if (!portalFlows) return
+    const resolvedFlowId = resolveApplicationFlowId(flowIdentifier, portalFlows)
+    setFlowSelection((current) => {
+      if (resolvedFlowId) {
+        if (
+          current.identifier === flowIdentifier &&
+          current.flowId === resolvedFlowId
+        ) {
+          return current
+        }
+        return { identifier: flowIdentifier, flowId: resolvedFlowId }
+      }
+      return current.identifier === flowIdentifier
+        ? current
+        : { identifier: flowIdentifier, flowId: null }
+    })
+  }, [flowIdentifier, portalFlows])
+  // Whether a door still has to be picked before the form means anything.
+  // Its only job now is holding the form back: without a door, the schema
+  // query could show the wrong questions.
+  //
+  // It used to gate the terminal-status redirect too, because `application`
+  // was resolved by human and gathering and might belong to another door —
+  // redirecting on it could send someone away from a door they had not
+  // applied through. That is decided per door now, so the redirect asks
+  // about the status and nothing else. `null` while the flows load.
+  const needsFlowChoice = portalFlows ? portalFlows.length > 1 : null
+
   const {
     data: schema,
     isLoading: schemaLoading,
     isError,
-  } = useApplicationSchema(city?.id)
-  const { application: existingApp, importSource } = useFormInitData()
+  } = useApplicationSchema(city?.id, selectedFlowId)
+  const { application: existingApp, importSource } =
+    useFormInitData(application)
 
   const [showImport, setShowImport] = useState(false)
   const [importedData, setImportedData] = useState<ApplicationPublic | null>(
@@ -92,20 +156,27 @@ export default function FormPage() {
     }
   }, [importSource, existingApp])
 
-  // Resolved applications are no longer accessible from the form.
-  // draft/pending_fee/in review stay editable so the applicant can still finish,
-  // retry the fee payment, or update details while the application is under review.
+  // `?flow=` can name a way in that takes no applications — a direct-sale
+  // flow, or one the organiser has since unlisted. The id was trusted on
+  // sight, so the form rendered for a door the picker was still asking
+  // about: an empty card with a Submit button under an unanswered question.
+  // An id the picker does not offer is dropped, and the picker asks.
   useEffect(() => {
-    if (
-      application &&
-      (application.status === "accepted" || application.status === "rejected")
-    ) {
-      router.replace(`/portal/${city?.slug}`)
-    }
+    if (!portalFlows || !selectedFlowId) return
+    if (portalFlows.some((flow) => flow.id === selectedFlowId)) return
+    setFlowSelection({ identifier: flowIdentifier, flowId: null })
+  }, [flowIdentifier, portalFlows, selectedFlowId])
+
+  // Resolved applications are no longer accessible from the form.
+  // draft/pending_fee/in review stay editable so the applicant can still
+  // finish, retry the fee payment, or update details while under review.
+  useEffect(() => {
+    if (!application || !shouldRedirectToStatus(application.status)) return
+    router.replace(resolvedApplicationDestination(city?.slug, application))
   }, [application, city, router])
 
   useEffect(() => {
-    if (city?.sale_type === "direct") {
+    if (city?.takes_applications === false) {
       router.replace(`/portal/${city.slug}`)
     }
   }, [city, router])
@@ -134,7 +205,7 @@ export default function FormPage() {
     return <Loader />
   }
 
-  if (city.sale_type === "direct") {
+  if (city.takes_applications === false) {
     return <Loader />
   }
 
@@ -142,12 +213,10 @@ export default function FormPage() {
     return <Loader />
   }
 
-  // Resolved applications never render the form. The effect above redirects to
-  // the portal home; show a loader meanwhile to avoid flashing it.
-  if (
-    application?.status === "accepted" ||
-    application?.status === "rejected"
-  ) {
+  // Resolved applications never render the form. The effect above
+  // redirects to the portal home; show a loader meanwhile so it does not
+  // flash. Same check as the effect, from the same function.
+  if (shouldRedirectToStatus(application?.status)) {
     return <Loader />
   }
 
@@ -196,15 +265,25 @@ export default function FormPage() {
         <FormHeader />
         <SectionSeparator />
       </div>
-      <FileUploadProvider value={uploadFile}>
-        <DynamicApplicationForm
-          key={existingApp?.id ?? importedData?.id ?? "new"}
-          schema={schema}
-          existingApplication={prefillData}
-          popup={city}
-          referralId={referralId}
-        />
-      </FileUploadProvider>
+      <FlowPicker
+        popupId={city.id}
+        selectedFlowId={selectedFlowId}
+        onSelect={(flowId) =>
+          setFlowSelection({ identifier: flowIdentifier, flowId })
+        }
+      />
+      {needsFlowChoice && !selectedFlowId ? null : (
+        <FileUploadProvider value={uploadFile}>
+          <DynamicApplicationForm
+            key={existingApp?.id ?? importedData?.id ?? "new"}
+            schema={schema}
+            existingApplication={prefillData}
+            popup={city}
+            referralId={referralId}
+            salesFlowId={selectedFlowId}
+          />
+        </FileUploadProvider>
+      )}
     </main>
   )
 }

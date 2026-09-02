@@ -61,6 +61,7 @@ const mockListProductCategories = vi.mocked(
   ProductsService.listProductCategories,
 )
 const mockCreateProduct = vi.mocked(ProductsService.createProduct)
+const mockUpdateProduct = vi.mocked(ProductsService.updateProduct)
 const mockListProducts = vi.mocked(ProductsService.listProducts)
 
 const POPUP_BASE = {
@@ -83,6 +84,22 @@ function makeWrapper() {
   )
 }
 
+function editProduct() {
+  return {
+    id: "product-existing",
+    tenant_id: "tenant-1",
+    popup_id: "popup-1",
+    name: "Existing product",
+    slug: "existing-product",
+    price: "50.00",
+    category: "other",
+    is_active: true,
+    exclusive: false,
+    insurance_eligible: false,
+    requires_check_in: false,
+  } as Parameters<typeof ProductForm>[0]["defaultValues"]
+}
+
 // RED tests — Phase 8.2: attendee_category removal + requires_check_in toggle
 describe("ProductForm — ticket-as-first-class-entity (Phase 8.2)", () => {
   beforeEach(() => {
@@ -101,6 +118,58 @@ describe("ProductForm — ticket-as-first-class-entity (Phase 8.2)", () => {
 
     mockGetPopup.mockResolvedValue(
       POPUP_BASE as Awaited<ReturnType<typeof PopupsService.getPopup>>,
+    )
+    mockUpdateProduct.mockResolvedValue(
+      editProduct() as Awaited<
+        ReturnType<typeof ProductsService.updateProduct>
+      >,
+    )
+  })
+
+  it("does not expose a fulfillment control when creating a product", async () => {
+    render(<ProductForm onSuccess={vi.fn()} />, { wrapper: makeWrapper() })
+
+    await screen.findByPlaceholderText(/product name/i)
+    expect(
+      screen.queryByRole("combobox", { name: /fulfillment type/i }),
+    ).not.toBeInTheDocument()
+  })
+
+  it("creates a product without a fulfillment payload field", async () => {
+    const user = userEvent.setup()
+    render(<ProductForm onSuccess={vi.fn()} />, { wrapper: makeWrapper() })
+    await user.type(
+      await screen.findByPlaceholderText(/product name/i),
+      "Untyped",
+    )
+    await user.type(screen.getByPlaceholderText("100.00"), "50")
+
+    await user.click(screen.getByRole("button", { name: /create product/i }))
+
+    await waitFor(() => expect(mockCreateProduct).toHaveBeenCalledOnce())
+    expect(mockCreateProduct.mock.calls[0]?.[0].requestBody).not.toHaveProperty(
+      "fulfillment_type",
+    )
+  })
+
+  it("edits a product without exposing or submitting fulfillment", async () => {
+    const user = userEvent.setup()
+    render(<ProductForm defaultValues={editProduct()} onSuccess={vi.fn()} />, {
+      wrapper: makeWrapper(),
+    })
+    await user.type(
+      await screen.findByPlaceholderText(/product name/i),
+      " renamed",
+    )
+    expect(
+      screen.queryByRole("combobox", { name: /fulfillment type/i }),
+    ).not.toBeInTheDocument()
+
+    await user.click(screen.getByRole("button", { name: /save changes/i }))
+
+    await waitFor(() => expect(mockUpdateProduct).toHaveBeenCalledOnce())
+    expect(mockUpdateProduct.mock.calls[0]?.[0].requestBody).not.toHaveProperty(
+      "fulfillment_type",
     )
   })
 

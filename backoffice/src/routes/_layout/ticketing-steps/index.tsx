@@ -10,7 +10,13 @@ import { arrayMove } from "@dnd-kit/sortable"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { createFileRoute, useNavigate } from "@tanstack/react-router"
 import { Eye, Loader2 } from "lucide-react"
-import { useCallback, useEffect, useMemo, useState } from "react"
+import {
+  type ReactNode,
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+} from "react"
 
 import {
   PopupsService,
@@ -18,6 +24,7 @@ import {
   TicketingStepsService,
 } from "@/client"
 import { WorkspaceAlert } from "@/components/Common/WorkspaceAlert"
+import { FlowScopeBar } from "@/components/SalesFlows/FlowScopeBar"
 import { NewStepPanel } from "@/components/ticketing-step-builder/NewStepPanel"
 import { StepCanvas } from "@/components/ticketing-step-builder/StepCanvas"
 import { StepDetailPanel } from "@/components/ticketing-step-builder/StepDetailPanel"
@@ -27,16 +34,46 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { useWorkspace } from "@/contexts/WorkspaceContext"
 import useAuth from "@/hooks/useAuth"
 import useCustomToast from "@/hooks/useCustomToast"
+import { rememberFlow, useFlowScope } from "@/hooks/useFlowScope"
 import { createErrorHandler } from "@/utils"
 
 interface TicketingStepsSearch {
   step?: string
+  flow?: string
+}
+
+export function TicketingStepsHeader({
+  onPreview,
+  scopeBar,
+}: {
+  onPreview: () => void
+  scopeBar: ReactNode
+}) {
+  return (
+    <>
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight">Ticketing Steps</h1>
+          <p className="text-muted-foreground">
+            Drag to reorder steps, toggle to enable/disable, click the title to
+            rename
+          </p>
+        </div>
+        <Button variant="outline" onClick={onPreview} className="shrink-0">
+          <Eye className="mr-2 h-4 w-4" />
+          Preview checkout
+        </Button>
+      </div>
+      {scopeBar}
+    </>
+  )
 }
 
 export const Route = createFileRoute("/_layout/ticketing-steps/")({
   component: TicketingStepsPage,
   validateSearch: (raw: Record<string, unknown>): TicketingStepsSearch => ({
     ...(typeof raw.step === "string" && raw.step ? { step: raw.step } : {}),
+    ...(typeof raw.flow === "string" && raw.flow ? { flow: raw.flow } : {}),
   }),
   head: () => ({
     meta: [{ title: "Ticketing Steps - EdgeOS" }],
@@ -72,7 +109,7 @@ function TicketingStepsPage() {
 function TicketingStepsContent({ popupId }: { popupId: string }) {
   const queryClient = useQueryClient()
   const navigate = useNavigate()
-  const { step } = Route.useSearch()
+  const { step, flow: flowParam } = Route.useSearch()
   const { showErrorToast } = useCustomToast()
 
   const [adding, setAdding] = useState(false)
@@ -93,13 +130,34 @@ function TicketingStepsContent({ popupId }: { popupId: string }) {
     enabled: !!popupId,
   })
 
+  // The step list belongs to one flow, and the URL says which. Landing
+  // here without a `flow` adopts the remembered or default one and writes
+  // it into the URL, so the address always describes what is on screen.
+  const adoptFlow = useCallback(
+    (flowId: string) => {
+      navigate({
+        to: "/ticketing-steps",
+        search: { flow: flowId },
+        replace: true,
+      })
+    },
+    [navigate],
+  )
+  const {
+    flows,
+    activeFlowId,
+    isLoading: flowsLoading,
+  } = useFlowScope(popupId, flowParam, adoptFlow)
+
   const { data: stepsData, isLoading } = useQuery({
-    queryKey: ["ticketing-steps", popupId],
+    queryKey: ["ticketing-steps", popupId, activeFlowId],
     queryFn: () =>
       TicketingStepsService.listTicketingSteps({
         popupId,
+        salesFlowId: activeFlowId,
         limit: 100,
       }),
+    enabled: !!activeFlowId,
   })
 
   const steps = useMemo(() => {
@@ -160,17 +218,35 @@ function TicketingStepsContent({ popupId }: { popupId: string }) {
 
   const selectStep = (id: string) => {
     setAdding(false)
-    navigate({ to: "/ticketing-steps", search: { step: id } })
+    navigate({
+      to: "/ticketing-steps",
+      search: { step: id, ...(flowParam ? { flow: flowParam } : {}) },
+    })
   }
 
   const clearSelection = () => {
     setAdding(false)
-    navigate({ to: "/ticketing-steps", search: {} })
+    navigate({
+      to: "/ticketing-steps",
+      search: flowParam ? { flow: flowParam } : {},
+    })
   }
 
   const startAdding = () => {
     setAdding(true)
-    navigate({ to: "/ticketing-steps", search: {} })
+    navigate({
+      to: "/ticketing-steps",
+      search: flowParam ? { flow: flowParam } : {},
+    })
+  }
+
+  // Switching flows re-scopes the whole step list — clear any selection
+  // from the previous flow's list rather than risk pointing at a step id
+  // that does not belong to the newly selected flow.
+  const selectFlow = (flowId: string) => {
+    setAdding(false)
+    rememberFlow(popupId, flowId)
+    navigate({ to: "/ticketing-steps", search: { flow: flowId } })
   }
 
   const selectedStep = step ? steps.find((s) => s.id === step) : undefined
@@ -193,23 +269,19 @@ function TicketingStepsContent({ popupId }: { popupId: string }) {
     <div className="flex flex-col gap-6">
       {/* Page header. Preview belongs here rather than in a step's editor:
           it shows the whole checkout, starting where a buyer would. */}
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">Ticketing Steps</h1>
-          <p className="text-muted-foreground">
-            Drag to reorder steps, toggle to enable/disable, click the title to
-            rename
-          </p>
-        </div>
-        <Button
-          variant="outline"
-          onClick={() => setPreviewOpen(true)}
-          className="shrink-0"
-        >
-          <Eye className="mr-2 h-4 w-4" />
-          Preview checkout
-        </Button>
-      </div>
+      <TicketingStepsHeader
+        onPreview={() => setPreviewOpen(true)}
+        scopeBar={
+          <FlowScopeBar
+            popupId={popupId}
+            flows={flows}
+            activeFlowId={activeFlowId}
+            onSelect={selectFlow}
+            isLoading={flowsLoading}
+            resource="checkout steps"
+          />
+        }
+      />
 
       <div className="flex flex-col gap-6 md:flex-row md:items-start">
         {/* Journey rail */}
@@ -233,9 +305,10 @@ function TicketingStepsContent({ popupId }: { popupId: string }) {
 
         {/* Detail pane */}
         <div className="min-w-0 flex-1">
-          {adding ? (
+          {adding && activeFlowId ? (
             <NewStepPanel
               popupId={popupId}
+              salesFlowId={activeFlowId}
               nextOrder={orderedSteps.length}
               confirmStepId={steps.find((s) => s.step_type === "confirm")?.id}
               onCreated={(id) => selectStep(id)}
@@ -264,6 +337,7 @@ function TicketingStepsContent({ popupId }: { popupId: string }) {
           onOpenChange={setPreviewOpen}
           popupId={popupId}
           popupSlug={popup?.slug}
+          flowSlug={flows.find((flow) => flow.id === activeFlowId)?.slug}
           supportedLanguages={popup?.supported_languages ?? []}
           defaultLanguage={popup?.default_language}
           step={draftStep}

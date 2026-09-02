@@ -25,6 +25,7 @@ from app.api.product.models import Products
 from app.api.shared.enums import SaleType
 from app.api.tenant.models import Tenants
 from app.api.ticketing_step.models import TicketingSteps
+from tests._flow_helpers import default_flow_id
 from tests.conftest import with_origin
 
 # ---------------------------------------------------------------------------
@@ -51,6 +52,16 @@ def _make_direct_popup(
         currency=currency,
     )
     db.add(popup)
+    db.flush()
+    # sdd/sales-flows slice 9: the runtime endpoint now resolves a flow
+    # (default when none is given in the URL) — provision one directly,
+    # mirroring task 5.0's real PopupsCRUD.create provisioning, since this
+    # helper bypasses that CRUD.
+    from app.api.sales_flow.crud import sales_flows_crud
+
+    sales_flows_crud.provision_default_flow(
+        db, popup_id=popup.id, tenant_id=tenant.id, sale_type=SaleType.direct.value
+    )
     db.flush()
     return popup
 
@@ -87,11 +98,13 @@ def _make_form_section(
     order: int = 0,
     label: str = "Buyer Info",
     hidden: bool = False,
+    sales_flow_id=None,
 ) -> FormSections:
     section = FormSections(
         id=uuid.uuid4(),
         tenant_id=popup.tenant_id,
         popup_id=popup.id,
+        sales_flow_id=sales_flow_id or default_flow_id(db, popup.id),
         label=label,
         order=order,
         hidden=hidden,
@@ -109,11 +122,13 @@ def _make_form_field(
     name: str = "first_name",
     label: str = "Nombre",
     required: bool = True,
+    sales_flow_id=None,
 ) -> FormFields:
     field = FormFields(
         id=uuid.uuid4(),
         tenant_id=popup.tenant_id,
         popup_id=popup.id,
+        sales_flow_id=sales_flow_id or default_flow_id(db, popup.id),
         section_id=section.id,
         name=f"{name}_{uuid.uuid4().hex[:4]}",
         label=label,
@@ -134,12 +149,23 @@ def _make_ticketing_step(
     title: str = "Select Tickets",
     order: int = 0,
     is_enabled: bool = True,
+    product_category: str | None = "ticket",
+    sales_flow_id: uuid.UUID | None = None,
 ) -> TicketingSteps:
+    # Every step belongs to a flow (slice 2). Unless a test is specifically
+    # about a second flow, that flow is the popup's default one.
+    if sales_flow_id is None:
+        from app.api.sales_flow.crud import sales_flows_crud
+
+        sales_flow_id = sales_flows_crud.get_default_flow(db, popup.id).id
+
     step = TicketingSteps(
         id=uuid.uuid4(),
         tenant_id=popup.tenant_id,
         popup_id=popup.id,
+        sales_flow_id=sales_flow_id,
         step_type=step_type,
+        product_category=product_category,
         title=title,
         order=order,
         is_enabled=is_enabled,
@@ -166,7 +192,7 @@ def test_runtime_valid_direct_popup(
     db.commit()
 
     response = client.get(
-        f"/api/v1/checkout/{popup.slug}/runtime",
+        f"/api/v1/checkout/{popup.slug}/checkout/runtime",
         headers={"X-Tenant-Id": str(tenant_a.id)},
     )
 
@@ -222,7 +248,7 @@ def test_runtime_includes_attendee_categories(
     db.commit()
 
     response = client.get(
-        f"/api/v1/checkout/{popup.slug}/runtime",
+        f"/api/v1/checkout/{popup.slug}/checkout/runtime",
         headers={"X-Tenant-Id": str(tenant_a.id)},
     )
 
@@ -237,11 +263,12 @@ def test_runtime_products_use_popup_currency(
 ) -> None:
     """Runtime products inherit the popup currency."""
     popup = _make_direct_popup(db, tenant_a, currency="ARS")
+    _make_ticketing_step(db, popup)
     _make_product(db, popup, name="ARS Ticket")
     db.commit()
 
     response = client.get(
-        f"/api/v1/checkout/{popup.slug}/runtime",
+        f"/api/v1/checkout/{popup.slug}/checkout/runtime",
         headers={"X-Tenant-Id": str(tenant_a.id)},
     )
 
@@ -265,13 +292,63 @@ def test_runtime_only_enabled_ticketing_steps(
     db.commit()
 
     response = client.get(
-        f"/api/v1/checkout/{popup.slug}/runtime",
+        f"/api/v1/checkout/{popup.slug}/checkout/runtime",
         headers={"X-Tenant-Id": str(tenant_a.id)},
     )
 
     assert response.status_code == 200, response.text
     body = response.json()
     assert [step["title"] for step in body["ticketing_steps"]] == ["Visible Step"]
+
+
+def test_runtime_returns_only_the_resolved_flows_steps(
+    client: TestClient, db: Session, tenant_a: Tenants
+) -> None:
+    """The primary flow runtime resolves the popup's primary flow and
+    returns exactly its steps (sdd/sales-flows-rediseno slice 2). Another
+    flow's list must never appear."""
+    from app.api.sales_flow.crud import sales_flows_crud
+    from app.api.sales_flow.models import SalesFlows
+
+    popup = _make_direct_popup(db, tenant_a)
+    default_flow = sales_flows_crud.get_default_flow(db, popup.id)
+    flow = SalesFlows(
+        tenant_id=tenant_a.id,
+        popup_id=popup.id,
+        type="direct",
+        slug="a-flow-owned-step",
+        name="Flow",
+    )
+    db.add(flow)
+    db.flush()
+
+    _make_ticketing_step(
+        db,
+        popup,
+        step_type="tickets",
+        title="Default Flow Step",
+        sales_flow_id=default_flow.id,
+    )
+    _make_ticketing_step(
+        db,
+        popup,
+        step_type="buyer",
+        title="Flow-Owned Step",
+        order=1,
+        sales_flow_id=flow.id,
+    )
+    db.commit()
+
+    response = client.get(
+        f"/api/v1/checkout/{popup.slug}/{default_flow.slug}/runtime",
+        headers={"X-Tenant-Id": str(tenant_a.id)},
+    )
+
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert [step["title"] for step in body["ticketing_steps"]] == [
+        "Default Flow Step"
+    ], "Another flow's steps must never leak into the resolved flow's runtime"
 
 
 def test_runtime_excludes_hidden_sections_and_their_fields(
@@ -289,7 +366,7 @@ def test_runtime_excludes_hidden_sections_and_their_fields(
     db.commit()
 
     response = client.get(
-        f"/api/v1/checkout/{popup.slug}/runtime",
+        f"/api/v1/checkout/{popup.slug}/checkout/runtime",
         headers={"X-Tenant-Id": str(tenant_a.id)},
     )
 
@@ -339,16 +416,25 @@ def test_runtime_unknown_slug_returns_404(
 ) -> None:
     """Unknown popup slug returns 404."""
     response = client.get(
-        "/api/v1/checkout/does-not-exist-xyz/runtime",
+        "/api/v1/checkout/does-not-exist-xyz/checkout/runtime",
         headers={"X-Tenant-Id": str(tenant_a.id)},
     )
     assert response.status_code == 404, response.text
 
 
-def test_runtime_application_popup_returns_403(
+def test_runtime_application_popup_asks_an_anonymous_caller_to_sign_in(
     client: TestClient, db: Session, tenant_a: Tenants
 ) -> None:
-    """Application popup returns 403 (only direct-sale popups served)."""
+    """An application flow is served, but only to the people it accepted.
+
+    It used to be refused by type. That asked the wrong question: what
+    separates an anonymous purchase from an application-backed one is who
+    is buying (sdd/sales-flows-rediseno). 401 rather than 403 because no
+    credentials were presented at all — the same signal an upsale flow
+    gives.
+    """
+    from app.api.sales_flow.crud import sales_flows_crud
+
     slug = f"app-boot-{uuid.uuid4().hex[:8]}"
     popup = Popups(
         id=uuid.uuid4(),
@@ -359,13 +445,20 @@ def test_runtime_application_popup_returns_403(
         status="active",
     )
     db.add(popup)
+    db.flush()
+    sales_flows_crud.provision_default_flow(
+        db,
+        popup_id=popup.id,
+        tenant_id=tenant_a.id,
+        sale_type=SaleType.application.value,
+    )
     db.commit()
 
     response = client.get(
-        f"/api/v1/checkout/{popup.slug}/runtime",
+        f"/api/v1/checkout/{popup.slug}/attendee/runtime",
         headers={"X-Tenant-Id": str(tenant_a.id)},
     )
-    assert response.status_code == 403, response.text
+    assert response.status_code == 401, response.text
 
 
 def test_runtime_inactive_direct_popup_returns_403(
@@ -376,7 +469,7 @@ def test_runtime_inactive_direct_popup_returns_403(
     db.commit()
 
     response = client.get(
-        f"/api/v1/checkout/{popup.slug}/runtime",
+        f"/api/v1/checkout/{popup.slug}/checkout/runtime",
         headers={"X-Tenant-Id": str(tenant_a.id)},
     )
     assert response.status_code == 403, response.text
@@ -387,12 +480,13 @@ def test_runtime_only_active_products(
 ) -> None:
     """Only active products are included in the response."""
     popup = _make_direct_popup(db, tenant_a)
+    _make_ticketing_step(db, popup)
     _make_product(db, popup, name="Active GA", is_active=True)
     _make_product(db, popup, name="Inactive VIP", is_active=False)
     db.commit()
 
     response = client.get(
-        f"/api/v1/checkout/{popup.slug}/runtime",
+        f"/api/v1/checkout/{popup.slug}/checkout/runtime",
         headers={"X-Tenant-Id": str(tenant_a.id)},
     )
 
@@ -409,12 +503,13 @@ def test_runtime_exposes_sold_out_override(
     """Products carry sold_out_override so the portal can hide manually
     sold-out products instead of deriving on_sale as available."""
     popup = _make_direct_popup(db, tenant_a)
+    _make_ticketing_step(db, popup)
     _make_product(db, popup, name="Sold Out GA", sold_out_override=True)
     _make_product(db, popup, name="Available VIP")
     db.commit()
 
     response = client.get(
-        f"/api/v1/checkout/{popup.slug}/runtime",
+        f"/api/v1/checkout/{popup.slug}/checkout/runtime",
         headers={"X-Tenant-Id": str(tenant_a.id)},
     )
 
@@ -437,7 +532,7 @@ def test_runtime_rate_limit_triggers_429(
 
     with patch("app.core.rate_limit.get_redis", return_value=mock_redis):
         response = client.get(
-            f"/api/v1/checkout/{popup.slug}/runtime",
+            f"/api/v1/checkout/{popup.slug}/checkout/runtime",
             headers={"X-Forwarded-For": "8.8.8.8", "X-Tenant-Id": str(tenant_a.id)},
         )
 
@@ -457,7 +552,7 @@ def test_runtime_resolves_per_tenant_slug_collision(
 ) -> None:
     """Slug collision: origin resolves to tenant A → tenant A's popup returned."""
     response = client.get(
-        "/api/v1/checkout/summer-fest/runtime",
+        "/api/v1/checkout/summer-fest/checkout/runtime",
         headers=with_origin("test-tenant-a.localhost"),
     )
 
@@ -493,7 +588,7 @@ def test_runtime_cross_tenant_slug_returns_404(
     db.commit()
 
     response = client.get(
-        f"/api/v1/checkout/{unique_slug}/runtime",
+        f"/api/v1/checkout/{unique_slug}/checkout/runtime",
         headers=with_origin("test-tenant-a.localhost"),
     )
 
@@ -504,7 +599,7 @@ def test_runtime_unknown_origin_returns_404(
     client: TestClient,
 ) -> None:
     """No Origin header and no X-Tenant-Id → 404 from resolver."""
-    response = client.get("/api/v1/checkout/summer-fest/runtime")
+    response = client.get("/api/v1/checkout/summer-fest/checkout/runtime")
     assert response.status_code == 404, response.text
 
 
@@ -515,7 +610,7 @@ def test_runtime_x_tenant_id_fallback(
 ) -> None:
     """No Origin header, X-Tenant-Id present → returns correct popup."""
     response = client.get(
-        "/api/v1/checkout/summer-fest/runtime",
+        "/api/v1/checkout/summer-fest/checkout/runtime",
         headers={"X-Tenant-Id": str(tenant_a.id)},
     )
 
