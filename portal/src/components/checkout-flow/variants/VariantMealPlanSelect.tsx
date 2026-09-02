@@ -52,11 +52,7 @@ type MealPlanProduct = SharedMealPlanProduct<ProductsPass>
 export function participantMealProducts(
   products: ProductsPass[],
 ): ProductsPass[] {
-  return products.filter(
-    (product) =>
-      product.category === "meal_plan" &&
-      product.fulfillment_type === "participant",
-  )
+  return products.filter((product) => product.category === "meal_plan")
 }
 
 /** Identifies which (attendee, product) cell is expanded for editing. */

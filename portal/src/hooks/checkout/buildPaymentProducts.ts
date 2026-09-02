@@ -120,34 +120,20 @@ export function buildPaymentProducts({
   const passIdentity = (
     pass: SelectedPassItem,
   ): Pick<PaymentProductRequest, "attendee_id" | "recipient_key"> => {
-    if (pass.product.fulfillment_type === "order") return {}
     const attendee = attendeePasses.find(
       (candidate) => candidate.id === pass.attendeeId,
     )
-    const embeddedRecipient =
-      pass.product.fulfillment_type === "access" ||
-      pass.product.fulfillment_type === "participant"
-        ? recipientForAttendee(attendee ?? pass.attendee)
-        : undefined
     return recipientIdentity(
       pass.attendeeId,
-      pass.recipient ?? embeddedRecipient,
+      pass.recipient ?? recipientForAttendee(attendee ?? pass.attendee),
     )
   }
 
   const attendeeProductIdentity = (
     attendee: AttendeePassState,
-    product: SelectedPassItem["product"],
+    _product: SelectedPassItem["product"],
     selectedPass?: SelectedPassItem,
   ): Pick<PaymentProductRequest, "attendee_id" | "recipient_key"> => {
-    if (product.fulfillment_type === "order") return {}
-    if (
-      (product.fulfillment_type === null ||
-        product.fulfillment_type === undefined) &&
-      !selectedPass
-    ) {
-      return { attendee_id: attendee.id }
-    }
     return recipientIdentity(
       attendee.id,
       selectedPass?.recipient ?? recipientForAttendee(attendee),

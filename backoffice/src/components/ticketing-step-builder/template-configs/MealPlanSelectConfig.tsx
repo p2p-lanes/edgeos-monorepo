@@ -26,7 +26,7 @@ import {
 } from "lucide-react"
 import { useMemo, useState } from "react"
 
-import { type FulfillmentType, ProductsService } from "@/client"
+import { ProductsService } from "@/client"
 import { Button } from "@/components/ui/button"
 import { DatePicker } from "@/components/ui/date-picker"
 import { Input } from "@/components/ui/input"
@@ -133,7 +133,6 @@ interface PickerProduct {
   slug: string
   is_active: boolean
   category: string
-  fulfillment_type: FulfillmentType | null
 }
 
 // ---------------------------------------------------------------------------
@@ -392,18 +391,6 @@ function MealPlanProductCard({
           <X className="h-3.5 w-3.5" />
         </Button>
       </div>
-
-      {pickerProduct && pickerProduct.fulfillment_type !== "participant" && (
-        <p
-          role="alert"
-          aria-label="Invalid meal product fulfillment"
-          className="text-xs text-destructive flex items-center gap-1"
-        >
-          <AlertTriangle className="h-3 w-3" />
-          This configured product is not participant fulfillment. Remove or
-          replace it before saving.
-        </p>
-      )}
 
       {/* Coverage dates */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
@@ -749,14 +736,10 @@ export function MealPlanSelectConfig({
       slug: p.slug,
       is_active: p.is_active ?? true,
       category: p.category ?? "",
-      fulfillment_type: p.fulfillment_type ?? null,
     }))
   }, [productsData])
 
-  const participantProducts = useMemo(
-    () => productList.filter((p) => p.fulfillment_type === "participant"),
-    [productList],
-  )
+  const participantProducts = productList
 
   const productsById = useMemo(() => {
     const map = new Map<string, PickerProduct>()

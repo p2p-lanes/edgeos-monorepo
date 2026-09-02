@@ -16,7 +16,6 @@ import {
 } from "lucide-react"
 import { useEffect, useMemo, useRef, useState } from "react"
 import {
-  type FulfillmentType,
   PopupsService,
   type ProductCreate,
   type ProductPublic,
@@ -93,28 +92,6 @@ const TICKET_DURATIONS: { value: TicketDuration; label: string }[] = [
   { value: "week", label: "Week Pass" },
   { value: "month", label: "Month Pass" },
   { value: "full", label: "Full Event" },
-]
-
-const FULFILLMENT_TYPES: {
-  value: FulfillmentType
-  label: string
-  description: string
-}[] = [
-  {
-    value: "access",
-    label: "Access",
-    description: "Grants event access to one participant.",
-  },
-  {
-    value: "participant",
-    label: "Participant",
-    description: "Stores per-participant metadata without granting access.",
-  },
-  {
-    value: "order",
-    label: "Order",
-    description: "Owned once at the order level.",
-  },
 ]
 
 export function ProductForm({ defaultValues, onSuccess }: ProductFormProps) {
@@ -225,9 +202,6 @@ export function ProductForm({ defaultValues, onSuccess }: ProductFormProps) {
       image_url: defaultValues?.image_url ?? "",
       images: defaultValues?.images ?? [],
       category: (defaultValues?.category ?? "ticket") as ProductCategory,
-      fulfillment_type: (defaultValues?.fulfillment_type ?? "") as
-        | FulfillmentType
-        | "",
       duration_type: (defaultValues?.duration_type ?? "full") as TicketDuration,
       requires_check_in:
         defaultValues?.requires_check_in ??
@@ -294,19 +268,14 @@ export function ProductForm({ defaultValues, onSuccess }: ProductFormProps) {
           insurance_eligible: value.insurance_eligible,
           discountable: value.discountable,
         }
-        if (value.fulfillment_type) {
-          update.fulfillment_type = value.fulfillment_type
-        }
         updateMutation.mutate(update)
       } else {
         if (!selectedPopupId) {
           showErrorToast("Please select a gathering first")
           return
         }
-        if (!value.fulfillment_type) return
         createMutation.mutate({
           popup_id: selectedPopupId,
-          fulfillment_type: value.fulfillment_type,
           name: value.name,
           price: effectivePrice,
           compare_price: effectiveComparePrice ?? undefined,
@@ -456,58 +425,6 @@ export function ProductForm({ defaultValues, onSuccess }: ProductFormProps) {
                 )}
               </form.Field>
             </div>
-
-            <form.Field
-              name="fulfillment_type"
-              validators={{
-                onSubmit: ({ value }) =>
-                  !isEdit && !value
-                    ? "Fulfillment type is required"
-                    : undefined,
-              }}
-            >
-              {(field) => (
-                <div className="space-y-2">
-                  <Label htmlFor="fulfillment_type">
-                    Fulfillment type {!isEdit && "(required)"}
-                  </Label>
-                  <p
-                    id="fulfillment_type_help"
-                    className="text-xs text-muted-foreground"
-                  >
-                    Choose how purchases are owned and fulfilled.
-                  </p>
-                  <Select
-                    value={field.state.value}
-                    onValueChange={(value) =>
-                      field.handleChange(value as FulfillmentType)
-                    }
-                    disabled={readOnly}
-                  >
-                    <SelectTrigger
-                      id="fulfillment_type"
-                      aria-label="Fulfillment type"
-                      aria-describedby="fulfillment_type_help"
-                    >
-                      <SelectValue placeholder="Select fulfillment type" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {FULFILLMENT_TYPES.map((option) => (
-                        <SelectItem key={option.value} value={option.value}>
-                          <span className="flex flex-col items-start">
-                            <span>{option.label}</span>
-                            <span className="text-xs text-muted-foreground">
-                              {option.description}
-                            </span>
-                          </span>
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <FieldError errors={field.state.meta.errors} />
-                </div>
-              )}
-            </form.Field>
 
             <Separator />
 

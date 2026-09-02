@@ -625,7 +625,7 @@ export type AttendeeListItem = {
  */
 export type AttendeeProductPublic = {
     id: string;
-    attendee_id: string;
+    attendee_id: (string | null);
     product_id: string;
     check_in_code: string;
     payment_id?: (string | null);
@@ -637,6 +637,9 @@ export type AttendeeProductPublic = {
     purchase_metadata?: ({
     [key: string]: unknown;
 } | null);
+    product_category_snapshot?: (string | null);
+    requires_check_in_snapshot?: (boolean | null);
+    revoked_at?: (string | null);
 };
 
 /**
@@ -2161,8 +2164,6 @@ export type FormSectionUpdate = {
     hidden?: (boolean | null);
 };
 
-export type FulfillmentType = 'access' | 'participant' | 'order';
-
 /**
  * A single family, trimmed to what the picker actually renders.
  *
@@ -3259,9 +3260,19 @@ export type PaymentProductResponse = {
     product_price: string;
     effective_unit_price?: (string | null);
     product_category: string;
+    requires_check_in_snapshot?: (boolean | null);
     product_currency: string;
     attendee_name?: (string | null);
+    units?: Array<PaymentProductUnitResponse>;
     created_at: string;
+};
+
+export type PaymentProductUnitResponse = {
+    id: string;
+    attendee_id?: (string | null);
+    check_in_code: string;
+    active: boolean;
+    requires_check_in: boolean;
 };
 
 /**
@@ -3846,7 +3857,6 @@ export type ProductBatch = {
  */
 export type ProductBatchItem = {
     name: string;
-    fulfillment_type: FulfillmentType;
     slug?: (string | null);
     price: (number | string);
     compare_price?: (number | string | null);
@@ -3895,7 +3905,6 @@ export type ProductBatchResult = {
     discountable?: boolean;
     sold_out_override?: boolean;
     id: string;
-    fulfillment_type?: (FulfillmentType | null);
     success: boolean;
     err_msg?: (string | null);
     row_number: number;
@@ -3917,7 +3926,6 @@ export type ProductBreakdownItem = {
  */
 export type ProductCreate = {
     popup_id: string;
-    fulfillment_type: FulfillmentType;
     name: string;
     slug?: (string | null);
     price: (number | string);
@@ -3981,7 +3989,6 @@ export type ProductPublic = {
     discountable?: boolean;
     sold_out_override?: boolean;
     id: string;
-    fulfillment_type?: (FulfillmentType | null);
 };
 
 /**
@@ -3996,7 +4003,6 @@ export type ProductSoldOutUpdate = {
  */
 export type ProductUpdate = {
     name?: (string | null);
-    fulfillment_type?: FulfillmentType;
     slug?: (string | null);
     price?: (number | string | null);
     compare_price?: (number | string | null);
@@ -4045,7 +4051,6 @@ export type ProductWithQuantity = {
     discountable?: boolean;
     sold_out_override?: boolean;
     id: string;
-    fulfillment_type?: (FulfillmentType | null);
     quantity?: number;
 };
 
@@ -4486,8 +4491,8 @@ export type SelfCheckInRequest = {
 
 export type SelfCheckInResult = {
     attendee_product_id: string;
-    attendee_name: string;
-    attendee_category: string;
+    attendee_name?: (string | null);
+    attendee_category?: (string | null);
     product_name: string;
     product_category?: (string | null);
     duration_type?: (string | null);
@@ -4497,8 +4502,8 @@ export type SelfCheckInResult = {
 
 export type SelfCheckInTicket = {
     attendee_product_id: string;
-    attendee_name: string;
-    attendee_category: string;
+    attendee_name?: (string | null);
+    attendee_category?: (string | null);
     product_name: string;
     product_category?: (string | null);
     duration_type?: (string | null);
@@ -4526,6 +4531,17 @@ export type SendTestRequest = {
  * - automatic: SimpleFi redirects the buyer immediately after approval.
  */
 export type SimpleFiSuccessBehavior = 'manual' | 'automatic';
+
+export type StaffTicketPublic = {
+    id: string;
+    check_in_code: string;
+    payment_id?: (string | null);
+    attendee?: (TicketAttendeeSnapshot | null);
+    product: TicketProductSnapshot;
+    total_scans?: number;
+    first_scan_at?: (string | null);
+    last_scan_at?: (string | null);
+};
 
 /**
  * Which surface a task relates to. Optional (NULL = unspecified).
@@ -4993,25 +5009,6 @@ export type TicketProductSnapshot = {
     category?: (string | null);
     start_date?: (string | null);
     end_date?: (string | null);
-};
-
-/**
- * Full public representation of a single ticket (AttendeeProducts row).
- *
- * Returned by POST /attendees/check-in/{code}.
- * Embeds attendee + product snapshots for scanner UIs without extra round-trips.
- * Enriched with scan summary fields from ticket_events so frontend/staff can
- * apply check-in policy at runtime (single-scan, scan-every-time, etc.).
- */
-export type TicketPublic = {
-    id: string;
-    check_in_code: string;
-    payment_id?: (string | null);
-    attendee: TicketAttendeeSnapshot;
-    product: TicketProductSnapshot;
-    total_scans?: number;
-    first_scan_at?: (string | null);
-    last_scan_at?: (string | null);
 };
 
 /**
@@ -5853,7 +5850,7 @@ export type AttendeesPostCheckInData = {
     xTenantId?: (string | null);
 };
 
-export type AttendeesPostCheckInResponse = (TicketPublic);
+export type AttendeesPostCheckInResponse = (StaffTicketPublic);
 
 export type AttendeesGetTicketsByEmailData = {
     email: string;

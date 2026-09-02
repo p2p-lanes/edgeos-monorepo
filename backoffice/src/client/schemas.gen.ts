@@ -2768,8 +2768,15 @@ export const AttendeeProductPublicSchema = {
             title: 'Id'
         },
         attendee_id: {
-            type: 'string',
-            format: 'uuid',
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
             title: 'Attendee Id'
         },
         product_id: {
@@ -2854,6 +2861,40 @@ export const AttendeeProductPublicSchema = {
                 }
             ],
             title: 'Purchase Metadata'
+        },
+        product_category_snapshot: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Product Category Snapshot'
+        },
+        requires_check_in_snapshot: {
+            anyOf: [
+                {
+                    type: 'boolean'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Requires Check In Snapshot'
+        },
+        revoked_at: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Revoked At'
         }
     },
     additionalProperties: false,
@@ -10045,12 +10086,6 @@ export const FormSectionUpdateSchema = {
     title: 'FormSectionUpdate'
 } as const;
 
-export const FulfillmentTypeSchema = {
-    type: 'string',
-    enum: ['access', 'participant', 'order'],
-    title: 'FulfillmentType'
-} as const;
-
 export const GoogleFontSchema = {
     properties: {
         family: {
@@ -14387,6 +14422,7 @@ export const PaymentCreateSchema = {
             default: false
         }
     },
+    additionalProperties: false,
     type: 'object',
     required: ['products'],
     title: 'PaymentCreate',
@@ -14605,6 +14641,7 @@ export const PaymentProductRequest_InputSchema = {
             title: 'Purchase Metadata'
         }
     },
+    additionalProperties: false,
     type: 'object',
     required: ['product_id'],
     title: 'PaymentProductRequest',
@@ -14673,6 +14710,7 @@ export const PaymentProductRequest_OutputSchema = {
             title: 'Purchase Metadata'
         }
     },
+    additionalProperties: false,
     type: 'object',
     required: ['product_id'],
     title: 'PaymentProductRequest',
@@ -14761,6 +14799,17 @@ export const PaymentProductResponseSchema = {
             type: 'string',
             title: 'Product Category'
         },
+        requires_check_in_snapshot: {
+            anyOf: [
+                {
+                    type: 'boolean'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Requires Check In Snapshot'
+        },
         product_currency: {
             type: 'string',
             title: 'Product Currency'
@@ -14776,6 +14825,13 @@ export const PaymentProductResponseSchema = {
             ],
             title: 'Attendee Name'
         },
+        units: {
+            items: {
+                '$ref': '#/components/schemas/PaymentProductUnitResponse'
+            },
+            type: 'array',
+            title: 'Units'
+        },
         created_at: {
             type: 'string',
             format: 'date-time',
@@ -14786,6 +14842,43 @@ export const PaymentProductResponseSchema = {
     required: ['product_id', 'attendee_id', 'quantity', 'product_name', 'product_price', 'product_category', 'product_currency', 'created_at'],
     title: 'PaymentProductResponse',
     description: 'Payment product snapshot in response.'
+} as const;
+
+export const PaymentProductUnitResponseSchema = {
+    properties: {
+        id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Id'
+        },
+        attendee_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Attendee Id'
+        },
+        check_in_code: {
+            type: 'string',
+            title: 'Check In Code'
+        },
+        active: {
+            type: 'boolean',
+            title: 'Active'
+        },
+        requires_check_in: {
+            type: 'boolean',
+            title: 'Requires Check In'
+        }
+    },
+    type: 'object',
+    required: ['id', 'check_in_code', 'active', 'requires_check_in'],
+    title: 'PaymentProductUnitResponse'
 } as const;
 
 export const PaymentPublicSchema = {
@@ -18341,9 +18434,6 @@ export const ProductBatchItemSchema = {
             type: 'string',
             title: 'Name'
         },
-        fulfillment_type: {
-            '$ref': '#/components/schemas/FulfillmentType'
-        },
         slug: {
             anyOf: [
                 {
@@ -18514,8 +18604,9 @@ export const ProductBatchItemSchema = {
             default: true
         }
     },
+    additionalProperties: false,
     type: 'object',
-    required: ['name', 'fulfillment_type', 'price'],
+    required: ['name', 'price'],
     title: 'ProductBatchItem',
     description: 'Single product in a batch import (popup_id is top-level).'
 } as const;
@@ -18705,16 +18796,6 @@ export const ProductBatchResultSchema = {
             format: 'uuid',
             title: 'Id'
         },
-        fulfillment_type: {
-            anyOf: [
-                {
-                    '$ref': '#/components/schemas/FulfillmentType'
-                },
-                {
-                    type: 'null'
-                }
-            ]
-        },
         success: {
             type: 'boolean',
             title: 'Success'
@@ -18779,9 +18860,6 @@ export const ProductCreateSchema = {
             type: 'string',
             format: 'uuid',
             title: 'Popup Id'
-        },
-        fulfillment_type: {
-            '$ref': '#/components/schemas/FulfillmentType'
         },
         name: {
             type: 'string',
@@ -18957,8 +19035,9 @@ export const ProductCreateSchema = {
             default: true
         }
     },
+    additionalProperties: false,
     type: 'object',
-    required: ['popup_id', 'fulfillment_type', 'name', 'price'],
+    required: ['popup_id', 'name', 'price'],
     title: 'ProductCreate',
     description: 'Product schema for creation.'
 } as const;
@@ -19002,6 +19081,7 @@ export const ProductLineSchema = {
             title: 'Recipient Key'
         }
     },
+    additionalProperties: false,
     type: 'object',
     required: ['product_id'],
     title: 'ProductLine',
@@ -19192,16 +19272,6 @@ export const ProductPublicSchema = {
             type: 'string',
             format: 'uuid',
             title: 'Id'
-        },
-        fulfillment_type: {
-            anyOf: [
-                {
-                    '$ref': '#/components/schemas/FulfillmentType'
-                },
-                {
-                    type: 'null'
-                }
-            ]
         }
     },
     type: 'object',
@@ -19239,10 +19309,6 @@ export const ProductUpdateSchema = {
                 }
             ],
             title: 'Name'
-        },
-        fulfillment_type: {
-            '$ref': '#/components/schemas/FulfillmentType',
-            title: 'Fulfillment Type'
         },
         slug: {
             anyOf: [
@@ -19460,6 +19526,7 @@ export const ProductUpdateSchema = {
             title: 'Discountable'
         }
     },
+    additionalProperties: false,
     type: 'object',
     title: 'ProductUpdate',
     description: 'Product schema for updates.'
@@ -19649,16 +19716,6 @@ export const ProductWithQuantitySchema = {
             type: 'string',
             format: 'uuid',
             title: 'Id'
-        },
-        fulfillment_type: {
-            anyOf: [
-                {
-                    '$ref': '#/components/schemas/FulfillmentType'
-                },
-                {
-                    type: 'null'
-                }
-            ]
         },
         quantity: {
             type: 'integer',
@@ -21932,11 +21989,25 @@ export const SelfCheckInResultSchema = {
             title: 'Attendee Product Id'
         },
         attendee_name: {
-            type: 'string',
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
             title: 'Attendee Name'
         },
         attendee_category: {
-            type: 'string',
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
             title: 'Attendee Category'
         },
         product_name: {
@@ -21976,7 +22047,7 @@ export const SelfCheckInResultSchema = {
         }
     },
     type: 'object',
-    required: ['attendee_product_id', 'attendee_name', 'attendee_category', 'product_name', 'checked_in', 'checked_in_at'],
+    required: ['attendee_product_id', 'product_name', 'checked_in', 'checked_in_at'],
     title: 'SelfCheckInResult'
 } as const;
 
@@ -21988,11 +22059,25 @@ export const SelfCheckInTicketSchema = {
             title: 'Attendee Product Id'
         },
         attendee_name: {
-            type: 'string',
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
             title: 'Attendee Name'
         },
         attendee_category: {
-            type: 'string',
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
             title: 'Attendee Category'
         },
         product_name: {
@@ -22039,7 +22124,7 @@ export const SelfCheckInTicketSchema = {
         }
     },
     type: 'object',
-    required: ['attendee_product_id', 'attendee_name', 'attendee_category', 'product_name', 'checked_in'],
+    required: ['attendee_product_id', 'product_name', 'checked_in'],
     title: 'SelfCheckInTicket'
 } as const;
 
@@ -22109,6 +22194,77 @@ Mirrors SimpleFi's \`\`redirect_urls.success_behavior\`\`:
 - manual: the buyer clicks a button on SimpleFi's checkout to continue
   (SimpleFi's default, and ours).
 - automatic: SimpleFi redirects the buyer immediately after approval.`
+} as const;
+
+export const StaffTicketPublicSchema = {
+    properties: {
+        id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Id'
+        },
+        check_in_code: {
+            type: 'string',
+            title: 'Check In Code'
+        },
+        payment_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Payment Id'
+        },
+        attendee: {
+            anyOf: [
+                {
+                    '$ref': '#/components/schemas/TicketAttendeeSnapshot'
+                },
+                {
+                    type: 'null'
+                }
+            ]
+        },
+        product: {
+            '$ref': '#/components/schemas/TicketProductSnapshot'
+        },
+        total_scans: {
+            type: 'integer',
+            title: 'Total Scans',
+            default: 0
+        },
+        first_scan_at: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'First Scan At'
+        },
+        last_scan_at: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Last Scan At'
+        }
+    },
+    type: 'object',
+    required: ['id', 'check_in_code', 'product'],
+    title: 'StaffTicketPublic'
 } as const;
 
 export const TaskAppSchema = {
@@ -24399,76 +24555,6 @@ export const TicketProductSnapshotSchema = {
     required: ['id', 'name', 'price'],
     title: 'TicketProductSnapshot',
     description: 'Minimal product data embedded in a TicketPublic response.'
-} as const;
-
-export const TicketPublicSchema = {
-    properties: {
-        id: {
-            type: 'string',
-            format: 'uuid',
-            title: 'Id'
-        },
-        check_in_code: {
-            type: 'string',
-            title: 'Check In Code'
-        },
-        payment_id: {
-            anyOf: [
-                {
-                    type: 'string',
-                    format: 'uuid'
-                },
-                {
-                    type: 'null'
-                }
-            ],
-            title: 'Payment Id'
-        },
-        attendee: {
-            '$ref': '#/components/schemas/TicketAttendeeSnapshot'
-        },
-        product: {
-            '$ref': '#/components/schemas/TicketProductSnapshot'
-        },
-        total_scans: {
-            type: 'integer',
-            title: 'Total Scans',
-            default: 0
-        },
-        first_scan_at: {
-            anyOf: [
-                {
-                    type: 'string',
-                    format: 'date-time'
-                },
-                {
-                    type: 'null'
-                }
-            ],
-            title: 'First Scan At'
-        },
-        last_scan_at: {
-            anyOf: [
-                {
-                    type: 'string',
-                    format: 'date-time'
-                },
-                {
-                    type: 'null'
-                }
-            ],
-            title: 'Last Scan At'
-        }
-    },
-    type: 'object',
-    required: ['id', 'check_in_code', 'attendee', 'product'],
-    title: 'TicketPublic',
-    description: `Full public representation of a single ticket (AttendeeProducts row).
-
-Returned by POST /attendees/check-in/{code}.
-Embeds attendee + product snapshots for scanner UIs without extra round-trips.
-Enriched with scan summary fields from ticket_events so frontend/staff can
-apply check-in policy at runtime (single-scan, scan-every-time, etc.).`
 } as const;
 
 export const TicketingStepCreateSchema = {

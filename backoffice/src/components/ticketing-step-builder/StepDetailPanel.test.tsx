@@ -3,11 +3,7 @@ import { render, screen, waitFor } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 
-import type {
-  FulfillmentType,
-  ProductPublic,
-  TicketingStepPublic,
-} from "@/client"
+import type { ProductPublic, TicketingStepPublic } from "@/client"
 import {
   AttendeeCategoriesService,
   FormFieldsService,
@@ -67,11 +63,11 @@ const baseStep: TicketingStepPublic = {
   emoji: null,
 }
 
-const fulfillmentProducts: ProductPublic[] = [
-  ["product-access", "Access Pass", "access"],
-  ["product-participant", "Participant Meal", "participant"],
-  ["product-order", "Order Merchandise", "order"],
-].map(([id, name, fulfillmentType]) => ({
+const products: ProductPublic[] = [
+  ["product-access", "Access Pass"],
+  ["product-participant", "Participant Meal"],
+  ["product-order", "Order Merchandise"],
+].map(([id, name]) => ({
   id,
   tenant_id: "tenant-1",
   popup_id: "popup-1",
@@ -80,7 +76,6 @@ const fulfillmentProducts: ProductPublic[] = [
   price: "10.00",
   category: "mixed",
   is_active: true,
-  fulfillment_type: fulfillmentType as FulfillmentType,
 }))
 
 function renderPanel(step = baseStep) {
@@ -107,15 +102,18 @@ describe("StepDetailPanel", () => {
     } as Awaited<ReturnType<typeof PopupsService.getPopup>>)
     vi.mocked(ProductsService.listProductCategories).mockResolvedValue([])
     vi.mocked(ProductsService.listProducts).mockResolvedValue({
-      results: fulfillmentProducts,
-      count: fulfillmentProducts.length,
+      results: products,
+      paging: { limit: 200, offset: 0, total: products.length },
     })
     vi.mocked(
       AttendeeCategoriesService.listAttendeeCategories,
-    ).mockResolvedValue({ results: [], count: 0 })
+    ).mockResolvedValue({
+      results: [],
+      paging: { limit: 100, offset: 0, total: 0 },
+    })
     vi.mocked(FormFieldsService.listFormFields).mockResolvedValue({
       results: [],
-      count: 0,
+      paging: { limit: 100, offset: 0, total: 0 },
     })
   })
 
@@ -165,7 +163,7 @@ describe("StepDetailPanel", () => {
     await user.click(
       await screen.findByRole("button", { name: "Assign product" }),
     )
-    for (const product of fulfillmentProducts) {
+    for (const product of products) {
       await user.click(
         screen.getByRole("button", { name: new RegExp(product.name) }),
       )
@@ -180,7 +178,7 @@ describe("StepDetailPanel", () => {
             template_config: expect.objectContaining({
               sections: [
                 expect.objectContaining({
-                  product_ids: fulfillmentProducts.map((product) => product.id),
+                  product_ids: products.map((product) => product.id),
                 }),
               ],
             }),

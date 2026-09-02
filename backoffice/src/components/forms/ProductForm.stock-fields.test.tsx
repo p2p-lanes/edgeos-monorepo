@@ -161,11 +161,6 @@ describe("ProductForm — two-field stock layout (6.5)", () => {
       await user.clear(maxPerOrderInput)
       await user.type(maxPerOrderInput, "3")
 
-      await user.click(
-        screen.getByRole("combobox", { name: "Fulfillment type" }),
-      )
-      await user.click(screen.getByRole("option", { name: /^Access/ }))
-
       await user.click(screen.getByRole("button", { name: /create product/i }))
 
       await waitFor(() => {
@@ -197,11 +192,6 @@ describe("ProductForm — two-field stock layout (6.5)", () => {
       await user.type(screen.getByPlaceholderText("100.00"), "50")
 
       // Leave both stock fields empty
-
-      await user.click(
-        screen.getByRole("combobox", { name: "Fulfillment type" }),
-      )
-      await user.click(screen.getByRole("option", { name: /^Access/ }))
 
       await user.click(screen.getByRole("button", { name: /create product/i }))
 

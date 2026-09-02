@@ -1791,7 +1791,7 @@ export class AttendeesService {
      * @param data.popupId Popup the scanner is operating in
      * @param data.requestBody
      * @param data.xTenantId
-     * @returns TicketPublic Successful Response
+     * @returns StaffTicketPublic Successful Response
      * @throws ApiError
      */
     public static postCheckIn(data: AttendeesPostCheckInData): CancelablePromise<AttendeesPostCheckInResponse> {

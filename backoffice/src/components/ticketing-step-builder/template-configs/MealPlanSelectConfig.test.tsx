@@ -3,7 +3,7 @@ import { render, screen, waitFor } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 
-import type { FulfillmentType, ProductPublic } from "@/client"
+import type { ProductPublic } from "@/client"
 import { ProductsService } from "@/client"
 import { MealPlanSelectConfig } from "./MealPlanSelectConfig"
 
@@ -18,11 +18,11 @@ vi.mock("@/client", async (importOriginal) => {
 })
 
 const products: ProductPublic[] = [
-  ["participant-product", "Participant Meal", "participant"],
-  ["access-product", "Access Meal", "access"],
-  ["order-product", "Order Meal", "order"],
-  ["legacy-product", "Legacy Meal", null],
-].map(([id, name, fulfillmentType]) => ({
+  ["participant-product", "Participant Meal"],
+  ["access-product", "Access Meal"],
+  ["order-product", "Order Meal"],
+  ["legacy-product", "Legacy Meal"],
+].map(([id, name]) => ({
   id,
   tenant_id: "tenant-1",
   popup_id: "popup-1",
@@ -31,7 +31,6 @@ const products: ProductPublic[] = [
   price: "25.00",
   category: "meal_plan",
   is_active: true,
-  fulfillment_type: fulfillmentType as FulfillmentType | null,
 }))
 
 function mealConfig(productIds: string[] = []) {
@@ -73,11 +72,11 @@ describe("MealPlanSelectConfig", () => {
   beforeEach(() => {
     vi.mocked(ProductsService.listProducts).mockResolvedValue({
       results: products,
-      count: products.length,
+      paging: { limit: 200, offset: 0, total: products.length },
     })
   })
 
-  it("offers only participant products as new meal references", async () => {
+  it("offers all meal-plan products", async () => {
     const user = userEvent.setup()
     const onChange = renderConfig()
 
@@ -90,9 +89,9 @@ describe("MealPlanSelectConfig", () => {
     const participantChoice = screen.getByRole("button", {
       name: /Participant Meal/,
     })
-    expect(screen.queryByText("Access Meal")).not.toBeInTheDocument()
-    expect(screen.queryByText("Order Meal")).not.toBeInTheDocument()
-    expect(screen.queryByText("Legacy Meal")).not.toBeInTheDocument()
+    expect(screen.getByText("Access Meal")).toBeInTheDocument()
+    expect(screen.getByText("Order Meal")).toBeInTheDocument()
+    expect(screen.getByText("Legacy Meal")).toBeInTheDocument()
     expect(ProductsService.listProducts).toHaveBeenCalledWith({
       popupId: "popup-1",
       limit: 200,
@@ -114,16 +113,12 @@ describe("MealPlanSelectConfig", () => {
     )
   })
 
-  it("keeps configured non-participant and legacy products visible for repair", async () => {
+  it("keeps configured meal-plan products visible without legacy warnings", async () => {
     const onChange = renderConfig(["access-product", "legacy-product"])
 
     expect(await screen.findByText("Access Meal")).toBeInTheDocument()
     expect(screen.getByText("Legacy Meal")).toBeInTheDocument()
-    expect(
-      screen.getAllByRole("alert", {
-        name: "Invalid meal product fulfillment",
-      }),
-    ).toHaveLength(2)
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument()
     expect(onChange).not.toHaveBeenCalled()
   })
 

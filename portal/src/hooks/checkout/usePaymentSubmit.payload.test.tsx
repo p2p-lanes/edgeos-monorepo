@@ -58,10 +58,7 @@ const product = {
   is_active: true,
 } satisfies ProductsPass
 
-const typedProduct = (
-  id: string,
-  fulfillment_type: ProductsPass["fulfillment_type"],
-): ProductsPass => ({ ...product, id, fulfillment_type })
+const typedProduct = (id: string): ProductsPass => ({ ...product, id })
 
 const attendee = {
   tenant_id: "tenant-1",
@@ -265,8 +262,8 @@ describe("usePaymentSubmit public purchase payload", () => {
       id: "recipient:managed-family",
       recipient,
     }
-    const accessProduct = typedProduct("access-pass", "access")
-    const orderProduct = typedProduct("parking-order", "order")
+    const accessProduct = typedProduct("access-pass")
+    const orderProduct = typedProduct("parking-order")
     const mixedPasses = [accessProduct, orderProduct].map(
       (selectedProduct) => ({
         productId: selectedProduct.id,
@@ -282,7 +279,7 @@ describe("usePaymentSubmit public purchase payload", () => {
       {
         productId: "participant-meal",
         product: {
-          ...typedProduct("participant-meal", "participant"),
+          ...typedProduct("participant-meal"),
           category: "meal_plan",
         },
         attendeeId: restoredAttendee.id,
@@ -291,7 +288,7 @@ describe("usePaymentSubmit public purchase payload", () => {
         specialRequest: null,
       },
     ] satisfies SelectedMealPlanItem[]
-    const sideProduct = typedProduct("ownerless-extra", "order")
+    const sideProduct = typedProduct("ownerless-extra")
     const { result } = renderPaymentSubmit("merch-store", {
       submitMode,
       passes: mixedPasses,
@@ -322,7 +319,11 @@ describe("usePaymentSubmit public purchase payload", () => {
         recipient_key: "managed-family",
         quantity: 1,
       },
-      { product_id: "parking-order", quantity: 1 },
+      {
+        product_id: "parking-order",
+        recipient_key: "managed-family",
+        quantity: 1,
+      },
     ])
     expect(
       requestBody.products.filter(

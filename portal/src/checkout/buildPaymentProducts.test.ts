@@ -18,7 +18,6 @@ function createProduct(overrides: Partial<ProductsPass>): ProductsPass {
     popup_id: overrides.popup_id ?? "popup-1",
     attendee_category_id: overrides.attendee_category_id ?? null,
     category: overrides.category ?? "ticket",
-    fulfillment_type: overrides.fulfillment_type,
     duration_type: overrides.duration_type ?? "week",
     is_active: overrides.is_active ?? true,
     price: overrides.price ?? 100,
@@ -359,29 +358,26 @@ describe("buildPaymentProducts recipient payloads", () => {
     expect(result.recipients).toEqual([])
   })
 
-  it("routes mixed typed passes by fulfillment ownership", () => {
+  it("routes selected passes by recipient lineage rather than product fields", () => {
     const access = recipientPass(
       "access-ticket",
       "recipient:linked",
       linkedRecipient,
-      { fulfillment_type: "access" },
     )
     const participant = recipientPass(
       "participant-ticket",
       "recipient:managed-spouse",
       managedRecipient,
-      { fulfillment_type: "participant" },
     )
     const participantFromAttendee = { ...participant, recipient: undefined }
     const orderRecipient = {
       ...managedRecipient,
-      recipient_key: "unused-order-recipient",
+      recipient_key: "order-recipient",
     }
     const order = recipientPass(
       "order-product",
-      "recipient:unused-order-recipient",
+      "recipient:order",
       orderRecipient,
-      { fulfillment_type: "order" },
     )
 
     const result = buildProducts({
@@ -397,9 +393,13 @@ describe("buildPaymentProducts recipient payloads", () => {
     ).toEqual([
       ["access-ticket", undefined, "human:human-1"],
       ["participant-ticket", undefined, "managed-spouse"],
-      ["order-product", undefined, undefined],
+      ["order-product", undefined, "order-recipient"],
     ])
-    expect(result.recipients).toEqual([linkedRecipient, managedRecipient])
+    expect(result.recipients).toEqual([
+      linkedRecipient,
+      managedRecipient,
+      orderRecipient,
+    ])
   })
 })
 
