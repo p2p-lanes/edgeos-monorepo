@@ -9,6 +9,12 @@ export default defineConfig({
   envDir: path.resolve(__dirname, ".."),
   server: {
     open: false,
+    proxy: {
+      "/api/ai": {
+        target: process.env.AI_SERVICE_URL ?? "http://localhost:3002",
+        changeOrigin: true,
+      },
+    },
   },
   resolve: {
     alias: {

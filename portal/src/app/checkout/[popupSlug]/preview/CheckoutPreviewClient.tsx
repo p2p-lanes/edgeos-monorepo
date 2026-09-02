@@ -160,6 +160,7 @@ export default function CheckoutPreviewClient({
           popupSlug={popupSlug}
           flowSlug={flowSlug}
           previewMode
+          previewToken={state.previewToken}
         />
       </CheckoutShell>
     </ThemeProvider>

@@ -4,10 +4,8 @@ import { useTranslation } from "react-i18next"
 import type { TicketingStepPublic } from "@/client"
 import { Button } from "@/components/ui/button"
 import { useCheckout } from "@/providers/checkoutProvider"
-import {
-  CONTENT_ONLY_TEMPLATES,
-  VARIANT_REGISTRY,
-} from "./registries/variantRegistry"
+import { PRODUCT_INDEPENDENT_TEMPLATES } from "./registries/templateClassification"
+import { VARIANT_REGISTRY } from "./registries/variantRegistry"
 import EditPassesToggle from "./shared/EditPassesToggle"
 
 interface DynamicProductStepProps {
@@ -59,8 +57,8 @@ export default function DynamicProductStep({
 
   const filtered = getProductsForStep(stepConfig)
 
-  const isContentOnly = stepConfig.template
-    ? CONTENT_ONLY_TEMPLATES.has(stepConfig.template)
+  const isProductIndependent = stepConfig.template
+    ? PRODUCT_INDEPENDENT_TEMPLATES.has(stepConfig.template)
     : false
 
   // Explicit error state for non-ticket product steps missing a template.
@@ -68,7 +66,7 @@ export default function DynamicProductStep({
   if (
     !stepConfig.template &&
     stepConfig.step_type !== "tickets" &&
-    !isContentOnly
+    !isProductIndependent
   ) {
     // Only show error when there are products to display but no template.
     // When filtered is empty, show the standard empty state below.
@@ -95,7 +93,7 @@ export default function DynamicProductStep({
 
   if (
     !VariantComponent ||
-    (!isContentOnly && !stepOffersSomething(stepConfig, filtered))
+    (!isProductIndependent && !stepOffersSomething(stepConfig, filtered))
   ) {
     // An empty step has more than one cause, and showing the same blank
     // message for all of them is what hid the original bug: a buyer turned

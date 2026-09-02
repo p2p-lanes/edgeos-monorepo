@@ -310,7 +310,19 @@
     "cart": {
       "close_aria": "Loka körfu",
       "empty_title": "Karfan þín er tóm",
-      "empty_description": "Vinsamlegast farðu til baka og veldu passa til að halda áfram."
+      "empty_description": "Vinsamlegast farðu til baka og veldu passa til að halda áfram.",
+      "unknown_attendee": "Óþekktur þátttakandi",
+      "passes": "Passar",
+      "housing": "Húsnæði",
+      "full_stay": "Öll dvölin",
+      "merchandise": "Vörur",
+      "patron_contribution": "Framlag styrktaraðila",
+      "community_support": "Stuðningur við samfélagið",
+      "meal_plans": "Matarpakkar",
+      "pass_protection": "Passavernd",
+      "pass_protection_description": "Vernd fyrir alla passa",
+      "promo_code": "Afsláttarkóði",
+      "promo_code_expired": "Afsláttarkóðinn þinn er ekki lengur gildur"
     },
     "actions": {
       "pay": "Greiða",
@@ -341,6 +353,46 @@
         "enlarge_aria": "Stækka {{name}}",
         "previous_image_aria": "Fyrri mynd",
         "next_image_aria": "Næsta mynd"
+      }
+    },
+    "accommodation": {
+      "default_notice": "Gisting er greidd að fullu við greiðslu og fæst ekki endurgreidd.",
+      "in_cart": "Í körfu",
+      "sleeps": "Rúmar {{count}} gesti",
+      "nights_one": "{{count}} nótt",
+      "nights_other": "{{count}} nætur",
+      "monthly_rate": "mánaðargjald",
+      "per_night": "nótt",
+      "includes_tax": "Innifelur {{amount}} í gistináttaskatt",
+      "remove": "Fjarlægja",
+      "select": "Velja",
+      "only_left_one": "Aðeins {{count}} eftir",
+      "only_left_other": "Aðeins {{count}} eftir",
+      "guests_label": "Gestir",
+      "guests_one": "{{count}} gestur",
+      "guests_other": "{{count}} gestir",
+      "guest_name_placeholder": "Fullt nafn gests {{number}}",
+      "no_rooms": "Engin gisting er í boði fyrir þessa greiðsluleið.",
+      "check_in": "Innritun",
+      "check_out": "Útritun",
+      "who_is_staying": "Hverjir gista",
+      "cart_title": "Gisting",
+      "bed_count": "{{count}} {{type}}",
+      "bed_types": {
+        "king": "king-size rúm",
+        "queen": "queen-size rúm",
+        "double": "tvíbreitt rúm",
+        "single": "einbreitt rúm",
+        "bunk": "koja",
+        "sofa": "svefnsófi"
+      },
+      "unavailable": {
+        "sold_out": "Fullbókað á þessum dagsetningum",
+        "min_stay_not_met": "Krefst lengri dvalar",
+        "outside_bookable_window": "Ekki í boði á þessum dagsetningum",
+        "over_capacity": "Ekki nægilegt pláss fyrir hópinn",
+        "inactive": "Ekki í boði",
+        "default": "Ekki í boði á þessum dagsetningum"
       }
     },
     "contribution": {

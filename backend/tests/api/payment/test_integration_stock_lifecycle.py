@@ -448,14 +448,14 @@ class TestCancelRejectRestoration:
         product_after = db.get(Products, product.id)
         assert product_after.total_stock_remaining == 5  # 3 + 2
 
-    def test_cancel_approved_payment_does_not_restore_stock(
+    def test_cancel_approved_payment_restores_stock(
         self,
         client: TestClient,
         db: Session,
         tenant_a: Tenants,
         admin_user_tenant_a: Users,
     ) -> None:
-        """APPROVED → CANCELLED: explicitly out-of-scope refund flow, no restoration."""
+        """APPROVED -> CANCELLED restores the immutable commercial quantity."""
         popup = _make_direct_popup(db, tenant_a)
         product = _make_product(
             db,
@@ -488,8 +488,7 @@ class TestCancelRejectRestoration:
 
         db.expire_all()
         product_after = db.get(Products, product.id)
-        # Stock must NOT be restored for APPROVED → CANCELLED
-        assert product_after.total_stock_remaining == 6
+        assert product_after.total_stock_remaining == 10
 
 
 # ---------------------------------------------------------------------------

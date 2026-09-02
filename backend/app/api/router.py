@@ -2,7 +2,10 @@ from fastapi import APIRouter
 
 from app.api import (
     access,
+    accommodation,
     admin_api_key,
+    ai_conversation,
+    ai_execution,
     api_key,
     application,
     application_review,
@@ -15,6 +18,7 @@ from app.api import (
     cart,
     checkout,
     coupon,
+    custom_export,
     dashboard,
     email_log,
     email_template,
@@ -45,6 +49,9 @@ from app.api import (
     upload,
     user,
 )
+from app.api.accommodation.portal_router import (
+    portal_router as accommodation_portal_router,
+)
 from app.api.application.router import portal_router
 from app.api.check_in import router as check_in_router
 from app.api.group.router import portal_router as group_portal_router
@@ -59,6 +66,8 @@ api_router.include_router(trial.router)
 api_router.include_router(human.router)
 api_router.include_router(api_key.router)
 api_router.include_router(admin_api_key.router)
+api_router.include_router(ai_conversation.router)
+api_router.include_router(ai_execution.router)
 # Discovery endpoints (whoami / docs / openapi.json) MUST register BEFORE the
 # admin CRUD router so the static paths win over the /{id} catch-all on the
 # shared /third-party-apps prefix.
@@ -69,6 +78,8 @@ api_router.include_router(attendee_category.router)
 
 # Popup-related resources
 api_router.include_router(product.router)
+api_router.include_router(accommodation.router)
+api_router.include_router(accommodation_portal_router)
 api_router.include_router(publishable_key.router)
 api_router.include_router(coupon.router)
 api_router.include_router(group.router)
@@ -120,8 +131,9 @@ api_router.include_router(track.router)
 # Task tracker (in-app product task board)
 api_router.include_router(task.router)
 
-# Dashboard
+# Dashboard and custom exports
 api_router.include_router(dashboard.router)
+api_router.include_router(custom_export.router)
 
 # Ticket events (scan history)
 api_router.include_router(check_in_router.router)

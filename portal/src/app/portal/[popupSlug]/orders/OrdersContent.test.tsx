@@ -281,7 +281,9 @@ describe("OrdersContent", () => {
       />,
     )
 
-    const invoiceButton = screen.getByRole("button", { name: "Invoice" })
+    const invoiceButton = screen.getByRole("button", {
+      name: "Invoice",
+    }) as HTMLButtonElement
     fireEvent.click(invoiceButton)
 
     expect(fetchMock).toHaveBeenCalledWith(
@@ -325,7 +327,9 @@ describe("OrdersContent", () => {
       />,
     )
 
-    const invoiceButton = screen.getByRole("button", { name: "Invoice" })
+    const invoiceButton = screen.getByRole("button", {
+      name: "Invoice",
+    }) as HTMLButtonElement
     fireEvent.click(invoiceButton)
 
     await waitFor(() =>

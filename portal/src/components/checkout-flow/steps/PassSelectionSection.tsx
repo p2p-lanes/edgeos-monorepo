@@ -30,7 +30,6 @@ import { deriveProductState, type ProductSaleState } from "@/lib/product-state"
 import { cn } from "@/lib/utils"
 import { useApplication } from "@/providers/applicationProvider"
 import { useCheckout } from "@/providers/checkoutProvider"
-import { useCityProvider } from "@/providers/cityProvider"
 import { usePassesProvider } from "@/providers/passesProvider"
 import type { AttendeeCategory, AttendeePassState } from "@/types/Attendee"
 import { formatCurrency, formatPrice } from "@/types/checkout"
@@ -143,7 +142,6 @@ export default function PassSelectionSection() {
     usePassesProvider()
   const { editCredit, editPassesEnabled, checkoutMode } = useCheckout()
   const { getRelevantApplication } = useApplication()
-  const { getCity } = useCityProvider()
   const [focusedAttendeeId, setFocusedAttendeeId] = useState<string | null>(
     null,
   )

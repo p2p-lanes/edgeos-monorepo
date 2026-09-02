@@ -47,6 +47,7 @@ export const PopupCheckoutContent = ({
   groupId = null,
   inviteId = null,
   referralId = null,
+  salesFlowId = null,
   requiresManualApproval = false,
 }: {
   popup: PopupPublic
@@ -54,6 +55,7 @@ export const PopupCheckoutContent = ({
   groupId?: string | null
   inviteId?: string | null
   referralId?: string | null
+  salesFlowId?: string | null
   requiresManualApproval?: boolean
 }) => {
   // Whether this gathering asks anybody to apply. The anonymous checkout only
@@ -61,9 +63,17 @@ export const PopupCheckoutContent = ({
   const takesApplications = popup.takes_applications !== false
   const { t } = useTranslation()
   const isAuthenticated = useIsAuthenticated()
+  const { getRelevantApplication } = useApplication()
+  const fallbackApplication = getRelevantApplication()
+  const checkoutSalesFlowId =
+    salesFlowId ?? fallbackApplication?.sales_flow_id ?? null
+  const existingApplication = checkoutSalesFlowId
+    ? getRelevantApplication(checkoutSalesFlowId)
+    : fallbackApplication
   const { data: applicationSchema, isLoading: isLoadingApplicationSchema } =
     useApplicationSchema(
       takesApplications && isAuthenticated ? popup.id : undefined,
+      checkoutSalesFlowId ?? undefined,
     )
   const {
     checkoutState,
@@ -78,24 +88,15 @@ export const PopupCheckoutContent = ({
     groupId,
     inviteId,
     referralId,
+    salesFlowId: checkoutSalesFlowId,
     schema: applicationSchema,
   })
   const queryClient = useQueryClient()
   const { user } = useAuth()
-  const { getRelevantApplication } = useApplication()
   const { getCity, setCityPreselected } = useCityProvider()
   const router = useRouter()
   const hasSkippedForm = useRef(false)
-  const attendees = useResolvedAttendees()
-  // Left without a door on purpose. This is the anonymous checkout, whose
-  // flow travels as a path segment rather than `?flow=`, and whose buyers
-  // have no application at all — it is read here only to notice someone who
-  // already bought or is a companion on somebody else's. An application
-  // flow reaching this page is handed to the portal instead
-  // (ApplicationCheckoutRedirect), so the ambiguity this would resolve
-  // cannot arise here (sdd/sales-flows-rediseno).
-  const existingApplication = getRelevantApplication()
-
+  const attendees = useResolvedAttendees(checkoutSalesFlowId)
   // Companion-on-someone-else's-application detection. Only active when the
   // user arrived via a group invite link (groupId set) and is authenticated;
   // the participation endpoint is portal-only and would 401 otherwise.
@@ -230,12 +231,9 @@ export const PopupCheckoutContent = ({
       return
     }
 
-    // Existing applicant clicking a group link: persist the group membership on
-    // their current application. This both auto-accepts an in-progress
-    // application (otherwise payment 403s "Application must be accepted before
-    // purchasing products") AND links the group so its discount is applied
-    // server-side — without the link the group discount only ever shows
-    // client-side and the payment is charged the full amount.
+    // Existing applicant clicking an auto-approved group link: persist the group
+    // membership so the backend applies its approval policy and discount. Manual
+    // groups return above while the application is still in review.
     // Include "accepted" so an application auto-accepted by a prior invite still
     // picks up the group discount. Limited to statuses the backend allows
     // updating (draft/pending_fee/in review/accepted); rejected/withdrawn fall
@@ -401,8 +399,17 @@ export const PopupCheckoutContent = ({
           } as CSSProperties
         }
       >
-        <PassesProvider attendees={attendees} restoreFromCart>
-          <CheckoutProvider initialStep="passes" openCartPopupSlug={popup.slug}>
+        <PassesProvider
+          attendees={attendees}
+          restoreFromCart
+          flowType="application"
+          salesFlowId={checkoutSalesFlowId}
+        >
+          <CheckoutProvider
+            initialStep="passes"
+            flowType="application"
+            salesFlowId={checkoutSalesFlowId}
+          >
             <div
               className={`h-dvh overflow-y-auto no-scrollbar ${background.className}`}
               style={background.style}

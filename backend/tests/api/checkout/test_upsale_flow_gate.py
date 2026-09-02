@@ -69,10 +69,22 @@ def _make_upsale_flow(db: Session, popup: Popups, *, slug: str) -> SalesFlows:
 
 
 def _make_purchase_body(product: Products, *, email: str) -> dict:
-    return {
-        "products": [{"product_id": str(product.id), "quantity": 1}],
+    line = {"product_id": str(product.id), "quantity": 1}
+    body = {
+        "products": [line],
         "buyer": {"email": email, "first_name": "Test", "last_name": "Buyer"},
     }
+    if product.category == "ticket":
+        line["recipient_key"] = "buyer"
+        body["recipients"] = [
+            {
+                "recipient_key": "buyer",
+                "name": "Test Buyer",
+                "email": email,
+                "profile_snapshot": {},
+            }
+        ]
+    return body
 
 
 def _make_human(db: Session, tenant: Tenants, *, suffix: str) -> Humans:
@@ -98,6 +110,7 @@ def _grant_approved_payment(
         name="GA Ticket",
         slug=f"ga-{uuid.uuid4().hex[:6]}",
         price=Decimal("50"),
+        category="ticket",
     )
     db.add(product)
     db.flush()
@@ -138,6 +151,10 @@ def _grant_approved_payment(
         )
     )
     db.flush()
+    from app.api.payment.crud import payments_crud
+
+    payments_crud._reconcile_payment_fulfillment(db, payment)
+    db.flush()
 
 
 def _grant_admin_products(
@@ -150,6 +167,7 @@ def _grant_admin_products(
         name="Granted Ticket",
         slug=f"granted-{uuid.uuid4().hex[:6]}",
         price=Decimal("50"),
+        category="ticket",
     )
     db.add(product)
     db.flush()
@@ -172,6 +190,7 @@ def _grant_admin_products(
             product_id=product.id,
             check_in_code=f"GRANT-{uuid.uuid4().hex[:8]}",
             payment_id=None,
+            product_category_snapshot="ticket",
         )
     )
     db.flush()
@@ -287,17 +306,9 @@ class TestUpsalePurchaseGate:
         db.commit()
 
         response = client.post(
-            f"/api/v1/checkout/{popup.slug}/purchase",
-            params={"flow_slug": flow.slug},
+            f"/api/v1/checkout/{popup.slug}/{flow.slug}/purchase",
             headers={"X-Tenant-Id": str(tenant_a.id)},
-            json={
-                "products": [{"product_id": str(product.id), "quantity": 1}],
-                "buyer": {
-                    "email": "anon-buyer@test.com",
-                    "first_name": "Anon",
-                    "last_name": "Buyer",
-                },
-            },
+            json=_make_purchase_body(product, email="anon-buyer@test.com"),
         )
         assert response.status_code == 401, response.text
 
@@ -318,8 +329,7 @@ class TestUpsalePurchaseGate:
         db.commit()
 
         response = client.post(
-            f"/api/v1/checkout/{popup.slug}/purchase",
-            params={"flow_slug": flow.slug},
+            f"/api/v1/checkout/{popup.slug}/{flow.slug}/purchase",
             headers={
                 "X-Tenant-Id": str(tenant_a.id),
                 "Authorization": f"Bearer {_human_token(human)}",
@@ -365,6 +375,8 @@ class TestFlowScopedProductPurchase:
         from app.api.ticketing_step.models import TicketingSteps
 
         popup = _make_direct_popup(db, tenant_a, slug_prefix="fp-bypass")
+        default_flow = sales_flows_crud.get_default_flow(db, popup.id)
+        assert default_flow is not None
         upsale_flow = _make_upsale_flow(db, popup, slug="addon")
         human = _make_human(db, tenant_a, suffix="fp-eligible")
         _grant_approved_payment(db, tenant_a, popup, human)
@@ -393,7 +405,7 @@ class TestFlowScopedProductPurchase:
         # Rejected through the default (direct) flow: none of its steps
         # offer this category.
         default_response = client.post(
-            f"/api/v1/checkout/{popup.slug}/purchase",
+            f"/api/v1/checkout/{popup.slug}/{default_flow.slug}/purchase",
             headers={"X-Tenant-Id": str(tenant_a.id)},
             json=_make_purchase_body(product, email="bypass-attempt@test.com"),
         )
@@ -402,8 +414,7 @@ class TestFlowScopedProductPurchase:
 
         # Purchasable through the upsale flow by an eligible human.
         upsale_response = client.post(
-            f"/api/v1/checkout/{popup.slug}/purchase",
-            params={"flow_slug": upsale_flow.slug},
+            f"/api/v1/checkout/{popup.slug}/{upsale_flow.slug}/purchase",
             headers={
                 "X-Tenant-Id": str(tenant_a.id),
                 "Authorization": f"Bearer {_human_token(human)}",

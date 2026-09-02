@@ -1,6 +1,6 @@
 // @vitest-environment node
 
-import { describe, expect, it } from "vitest"
+import { describe, expect, it, vi } from "vitest"
 import { CHECKOUT_MODE } from "@/checkout/popupCheckoutPolicy"
 import type { ProductWithQuantity } from "@/client"
 import {
@@ -15,6 +15,12 @@ import {
 import type { AttendeePassState } from "@/types/Attendee"
 import type { CheckoutRecipientPassState } from "@/types/checkout"
 import type { ProductsPass } from "@/types/Products"
+
+vi.mock("@/hooks/useCartApi", () => ({ useCart: vi.fn() }))
+vi.mock("@/hooks/useGetPassesData", () => ({ default: vi.fn() }))
+vi.mock("@/hooks/useGetPurchases", () => ({ usePurchasesQuery: vi.fn() }))
+vi.mock("@/providers/cityProvider", () => ({ useCityProvider: vi.fn() }))
+vi.mock("@/providers/discountProvider", () => ({ useDiscount: vi.fn() }))
 
 // ---------------------------------------------------------------------------
 // Helper that correctly propagates null (createProduct uses ?? which replaces null)

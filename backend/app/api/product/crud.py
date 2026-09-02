@@ -89,7 +89,14 @@ class ProductsCRUD(BaseCRUD[Products, ProductCreate, ProductUpdate]):
         from sqlalchemy import or_
         from sqlmodel import func
 
-        statement = select(Products).where(col(Products.deleted_at).is_(None))
+        # Shadow products (products.managed_by) back an accommodation and are
+        # written only by app/api/accommodation/crud.py. They are never listed:
+        # an admin must not edit one by hand, and the portal reaches them
+        # through the accommodation endpoints, not by product category.
+        statement = select(Products).where(
+            col(Products.deleted_at).is_(None),
+            col(Products.managed_by).is_(None),
+        )
         for field, value in filters.items():
             if value is not None:
                 statement = statement.where(getattr(Products, field) == value)
@@ -139,6 +146,8 @@ class ProductsCRUD(BaseCRUD[Products, ProductCreate, ProductUpdate]):
             .join(Popups, Products.popup_id == Popups.id)  # type: ignore[arg-type]
             .where(
                 col(Products.deleted_at).is_(None),
+                # Accommodation shadow products are never listed (see find()).
+                col(Products.managed_by).is_(None),
                 Popups.status != PopupStatus.ended,
             )
         )
@@ -202,9 +211,14 @@ class ProductsCRUD(BaseCRUD[Products, ProductCreate, ProductUpdate]):
         sort_order: str = "desc",
     ) -> tuple[list[Products], int]:
         """Find live (non-deleted) products by popup_id with optional filters."""
+        # Shadow products (products.managed_by) back an accommodation and are
+        # written only by app/api/accommodation/crud.py. They are never listed:
+        # an admin must not edit one by hand, and the portal reaches them
+        # through the accommodation endpoints, not by product category.
         statement = select(Products).where(
             Products.popup_id == popup_id,
             col(Products.deleted_at).is_(None),
+            col(Products.managed_by).is_(None),
         )
 
         if is_active is not None:

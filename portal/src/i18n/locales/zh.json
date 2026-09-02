@@ -319,7 +319,19 @@
     "cart": {
       "close_aria": "关闭购物车",
       "empty_title": "您的购物车是空的",
-      "empty_description": "请返回并选择一些通行证以继续。"
+      "empty_description": "请返回并选择一些通行证以继续。",
+      "unknown_attendee": "未知参与者",
+      "passes": "通行证",
+      "housing": "住宿",
+      "full_stay": "完整住宿期",
+      "merchandise": "周边商品",
+      "patron_contribution": "赞助贡献",
+      "community_support": "社区支持",
+      "meal_plans": "餐饮计划",
+      "pass_protection": "通行证保障",
+      "pass_protection_description": "涵盖所有通行证",
+      "promo_code": "优惠码",
+      "promo_code_expired": "您的优惠码已失效"
     },
     "actions": {
       "pay": "支付",
@@ -351,6 +363,46 @@
         "enlarge_aria": "放大 {{name}}",
         "previous_image_aria": "上一张图片",
         "next_image_aria": "下一张图片"
+      }
+    },
+    "accommodation": {
+      "default_notice": "住宿费用需在结账时全额支付，且不可退款。",
+      "in_cart": "已加入购物车",
+      "sleeps": "可住 {{count}} 人",
+      "nights_one": "{{count}} 晚",
+      "nights_other": "{{count}} 晚",
+      "monthly_rate": "月租价格",
+      "per_night": "晚",
+      "includes_tax": "包含 {{amount}} 住宿税",
+      "remove": "移除",
+      "select": "选择",
+      "only_left_one": "仅剩 {{count}} 间",
+      "only_left_other": "仅剩 {{count}} 间",
+      "guests_label": "住客",
+      "guests_one": "{{count}} 位住客",
+      "guests_other": "{{count}} 位住客",
+      "guest_name_placeholder": "住客 {{number}} 的全名",
+      "no_rooms": "此结账流程暂无可用住宿。",
+      "check_in": "入住",
+      "check_out": "退房",
+      "who_is_staying": "入住人员",
+      "cart_title": "住宿",
+      "bed_count": "{{count}} 张{{type}}",
+      "bed_types": {
+        "king": "特大床",
+        "queen": "大床",
+        "double": "双人床",
+        "single": "单人床",
+        "bunk": "双层床",
+        "sofa": "沙发床"
+      },
+      "unavailable": {
+        "sold_out": "所选日期已订满",
+        "min_stay_not_met": "需要延长住宿天数",
+        "outside_bookable_window": "所选日期不可预订",
+        "over_capacity": "无法容纳您的同行人数",
+        "inactive": "不可预订",
+        "default": "所选日期不可预订"
       }
     },
     "contribution": {

@@ -1,6 +1,19 @@
-import { describe, expect, it } from "vitest"
+import { describe, expect, it, vi } from "vitest"
 import type { TicketingStepPublic } from "@/client"
 import { stepOffersSomething } from "./DynamicProductStep"
+
+vi.mock("@/client", () => ({
+  AccommodationsService: {
+    checkAccommodationAvailability: vi.fn(),
+    checkPortalAccommodationAvailability: vi.fn(),
+    listCheckoutAccommodations: vi.fn(),
+    listPortalAccommodations: vi.fn(),
+  },
+  CheckoutService: {
+    checkAccommodationAvailability: vi.fn(),
+    listCheckoutAccommodations: vi.fn(),
+  },
+}))
 
 function makeStep(
   templateConfig: Record<string, unknown> | null,

@@ -413,7 +413,8 @@ const PassesProvider = ({
   const city = getCity()
   const checkoutPolicy = resolveFlowCheckoutPolicy(flowType)
   const cityId = city?.id ? String(city.id) : null
-  const previousCityIdRef = useRef(cityId)
+  const checkoutScope = `${cityId ?? ""}:${salesFlowId ?? ""}`
+  const previousCheckoutScopeRef = useRef(checkoutScope)
   const hasInitializedRef = useRef(false)
   const hasRestoredCartRef = useRef(false)
   const { data: savedCartPasses } = useCart(
@@ -441,15 +442,15 @@ const PassesProvider = ({
   const prevProductsRef = useRef(products)
   const prevPurchasesMapRef = useRef(purchasesMap)
 
-  // Reset when city changes so stale data doesn't persist
+  // A sales flow is a complete cart boundary, even when the popup is unchanged.
   useEffect(() => {
-    if (previousCityIdRef.current === cityId) return
-    previousCityIdRef.current = cityId
+    if (previousCheckoutScopeRef.current === checkoutScope) return
+    previousCheckoutScopeRef.current = checkoutScope
     setAttendeePasses([])
     hasInitializedRef.current = false
     hasRestoredCartRef.current = false
     setIsEditing(false)
-  }, [cityId])
+  }, [checkoutScope])
 
   // Stable toggleProduct — reads discount & editing from refs, never recreated
   const toggleProduct = useCallback(

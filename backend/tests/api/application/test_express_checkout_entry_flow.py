@@ -172,7 +172,7 @@ def _make_referral(db: Session, popup: Popups, referrer: Humans) -> Invites:
         popup_id=popup.id,
         referrer_human_id=referrer.id,
         token=f"ref-{uuid.uuid4().hex[:12]}",
-        auto_approve=False,
+        auto_approve=True,
         express_checkout=True,
         discount_percentage=Decimal("0"),
     )
@@ -273,6 +273,7 @@ class TestExpressCheckoutEntryFlow:
         resp = client.patch(
             f"/api/v1/applications/my/{popup.id}",
             json={"first_name": "Edited", "status": "in review"},
+            params={"sales_flow_id": created.json()["sales_flow_id"]},
             headers=_auth(_human_token(human)),
         )
 

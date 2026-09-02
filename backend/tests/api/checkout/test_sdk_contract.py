@@ -185,7 +185,21 @@ def test_sdk_journey_via_publishable_key_matches_core_types(
         purchase = client.post(
             f"/api/v1/checkout/{popup.slug}/checkout/purchase",
             json={
-                "products": [{"product_id": str(product.id), "quantity": 2}],
+                "products": [
+                    {
+                        "product_id": str(product.id),
+                        "quantity": 2,
+                        "recipient_key": "buyer",
+                    }
+                ],
+                "recipients": [
+                    {
+                        "recipient_key": "buyer",
+                        "name": "Ada Lovelace",
+                        "email": "buyer@acme.example",
+                        "profile_snapshot": {field.name: "Ada"},
+                    }
+                ],
                 "coupon_code": "HALF",
                 "buyer": {
                     "email": "buyer@acme.example",

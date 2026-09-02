@@ -176,6 +176,14 @@ class ApplicationReviewerOption(BaseModel):
     email: str | None = None
 
 
+class ApplicationAccessSource(BaseModel):
+    """Resolved source through which an application was accessed."""
+
+    kind: Literal["group", "invite", "referral"]
+    id: uuid.UUID
+    label: str
+
+
 class ApplicationPublic(BaseModel):
     """Application schema for API responses."""
 
@@ -197,6 +205,7 @@ class ApplicationPublic(BaseModel):
     invite_id: uuid.UUID | None = None
     referral_id: uuid.UUID | None = None
     referred_by_name: str | None = None
+    access_sources: list[ApplicationAccessSource] = PydanticField(default_factory=list)
     info_not_shared: list[str] = []
     status: str
     custom_fields: dict = {}
@@ -528,6 +537,8 @@ APPLICATION_FILTER_FIELDS: dict[str, FilterField] = {
     "skipped_by_me": FilterField("boolean", frozenset({"eq"})),
     "reviewed_by_me": FilterField("boolean", frozenset({"eq"})),
     "reviewed_by": FilterField("uuid", frozenset({"eq", "neq"})),
+    "invite_id": FilterField("uuid", frozenset({"eq", "neq"})),
+    "referral_id": FilterField("uuid", frozenset({"eq", "neq"})),
 }
 # Backwards-compat operator map derived from the registry.
 APPLICATION_FILTER_FIELD_OPS: dict[str, set[str]] = {

@@ -8,6 +8,7 @@
     "build": "tsc -p tsconfig.build.json && vite build",
     "lint": "biome check --write --unsafe --no-errors-on-unmatched --files-ignore-unknown=true ./",
     "preview": "vite preview",
+    "test:ai": "vitest run src/components/ai",
     "test:e2e": "vitest run --config vitest.e2e.config.ts",
     "generate-client": "openapi-ts"
   },
@@ -15,6 +16,7 @@
     "@dnd-kit/core": "^6.3.1",
     "@dnd-kit/sortable": "^10.0.0",
     "@dnd-kit/utilities": "^3.2.2",
+    "@ai-sdk/react": "^4.0.80",
     "@edgeos/shared-events": "workspace:*",
     "@edgeos/shared-form-ui": "workspace:*",
     "@fontsource-variable/geist": "^5.2.9",
@@ -42,6 +44,7 @@
     "@tanstack/react-router": "^1.131.50",
     "@tanstack/react-table": "^8.21.3",
     "@tanstack/react-virtual": "^3.13.18",
+    "ai": "^7.0.77",
     "axios": "1.13.2",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",

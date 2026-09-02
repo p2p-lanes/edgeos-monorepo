@@ -238,6 +238,8 @@ class TestCheckinPassTiming:
                 product_id=product.id,
                 quantity=1,
                 check_in_code=f"code-{uuid.uuid4().hex[:8]}",
+                product_category_snapshot="ticket",
+                requires_check_in_snapshot=True,
             )
         )
         db.commit()
@@ -310,6 +312,8 @@ class TestCheckinPassTiming:
                 product_id=product.id,
                 quantity=1,
                 check_in_code=f"code-{uuid.uuid4().hex[:8]}",
+                product_category_snapshot="ticket",
+                requires_check_in_snapshot=True,
             )
         )
         db.commit()

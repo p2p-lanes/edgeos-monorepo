@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest"
 import type { AttendeePassState } from "@/types/Attendee"
 import type {
   CheckoutRecipientDraft,
+  SelectedAccommodationItem,
   SelectedDynamicItem,
   SelectedMealPlanItem,
   SelectedPassItem,
@@ -92,6 +93,7 @@ function renderPaymentSubmit(
     passes?: SelectedPassItem[]
     attendees?: AttendeePassState[]
     mealPlans?: SelectedMealPlanItem[]
+    accommodations?: SelectedAccommodationItem[]
     dynamicItems?: Record<string, SelectedDynamicItem[]>
   } = {},
 ) {
@@ -107,6 +109,7 @@ function renderPaymentSubmit(
       attendeePasses: options.attendees ?? [attendee],
       selectedPasses: options.passes ?? selectedPasses,
       housing: null,
+      accommodations: options.accommodations ?? [],
       merch: [],
       patron: null,
       selectedMealPlans: options.mealPlans ?? [],
@@ -344,15 +347,61 @@ describe("usePaymentSubmit public purchase payload", () => {
       recipient_key: "managed-family",
       quantity: 1,
     })
-    expect(mealLine.purchase_metadata).toEqual(
-      submitMode === "application"
-        ? {
-            daily_choices: { "2026-09-01": "veggie" },
-            dietary_restriction: "vegetarian",
-            special_request: null,
-          }
-        : undefined,
-    )
+    expect(mealLine.purchase_metadata).toEqual({
+      daily_choices: { "2026-09-01": "veggie" },
+      dietary_restriction: "vegetarian",
+      special_request: null,
+    })
+  })
+
+  it("keeps two stays with the same room product as distinct metadata lines", async () => {
+    const stay = (checkIn: string, checkOut: string) =>
+      ({
+        accommodationId: "room-1",
+        productId: "room-product",
+        name: "Double room",
+        propertyId: "property-1",
+        propertyName: "Hotel",
+        checkIn,
+        checkOut,
+        nights: 2,
+        guestCount: 1,
+        guests: ["Taylor Buyer"],
+        subtotal: 100,
+        tax: 10,
+        totalPrice: 110,
+      }) satisfies SelectedAccommodationItem
+    const { result } = renderPaymentSubmit("merch-store", {
+      passes: [],
+      accommodations: [
+        stay("2026-09-01", "2026-09-03"),
+        stay("2026-09-10", "2026-09-12"),
+      ],
+    })
+
+    await act(async () => {
+      await result.current.submitPayment()
+    })
+
+    const lines = purchaseOpenTicketing.mock.calls[0][0].requestBody.products
+    expect(lines).toHaveLength(2)
+    expect(
+      lines.map(
+        (line: { purchase_metadata: unknown }) => line.purchase_metadata,
+      ),
+    ).toEqual([
+      expect.objectContaining({
+        check_in: "2026-09-01",
+        check_out: "2026-09-03",
+      }),
+      expect.objectContaining({
+        check_in: "2026-09-10",
+        check_out: "2026-09-12",
+      }),
+    ])
+    expect(
+      lines.every((line: { attendee_id?: string }) => !line.attendee_id),
+    ).toBe(true)
   })
 
   it("invalidates the popup upsale catalog after an approved payment", async () => {

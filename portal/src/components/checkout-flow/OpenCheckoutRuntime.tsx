@@ -50,6 +50,9 @@ interface OpenCheckoutRuntimeProps {
   /** Renders for the backoffice live preview instead of a real buyer: no
    *  payment, no analytics, no attribution, no favicon takeover. */
   previewMode?: boolean
+  /** Only set by the backoffice preview; unlocks draft popups on the
+   *  read-only public endpoints the steps call for themselves. */
+  previewToken?: string | null
 }
 
 function toProductsPass(product: CheckoutRuntimeProduct): ProductsPass {
@@ -149,6 +152,7 @@ export function OpenCheckoutRuntime({
   prefilledBuyer,
   showQuoteStatus = false,
   previewMode = false,
+  previewToken = null,
 }: OpenCheckoutRuntimeProps) {
   const { t } = useTranslation()
   const flowScopeStyle = useThemeScopeStyle()
@@ -258,8 +262,10 @@ export function OpenCheckoutRuntime({
             <PassesProvider
               attendees={attendees}
               restoreFromCart={false}
+              flowType={runtime.flow_type ?? null}
               productsOverride={products}
               purchasesOverride={[]}
+              salesFlowId={runtime.selected_flow.id}
             >
               <CheckoutProvider
                 initialStep="passes"
@@ -294,7 +300,11 @@ export function OpenCheckoutRuntime({
                 submitMode="open-ticketing"
                 submitPopupSlug={popupSlug}
                 previewMode={previewMode}
+                previewToken={previewToken}
               >
+                {/* A preview is rendered inside the backoffice. Replacing the
+                    iframe tab's favicon would replace the backoffice favicon,
+                    not a buyer-facing checkout favicon. */}
                 {!previewMode && (
                   <FaviconOverride
                     url={
@@ -318,6 +328,10 @@ export function OpenCheckoutRuntime({
                       />
                     </div>
                   }
+                  brandLogoUrl={
+                    (popup as { icon_url?: string | null }).icon_url ?? null
+                  }
+                  brandLabel={popup.name}
                 />
               </CheckoutProvider>
             </PassesProvider>

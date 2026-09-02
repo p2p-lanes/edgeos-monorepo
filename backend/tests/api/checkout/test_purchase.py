@@ -236,6 +236,15 @@ def _make_product(
     return product
 
 
+def _recipient(product: Products) -> dict[str, object]:
+    return {
+        "recipient_key": "buyer",
+        "name": "Buyer",
+        "email": f"recipient-{product.id}@test.com",
+        "profile_snapshot": {},
+    }
+
+
 def _make_coupon(
     db: Session,
     popup: Popups,
@@ -294,7 +303,7 @@ def _make_field(
     return field
 
 
-def test_purchase_happy_path_creates_payment_and_attendees(
+def test_purchase_happy_path_defers_attendees_while_payment_is_pending(
     client: TestClient,
     db: Session,
     tenant_a: Tenants,
@@ -314,9 +323,16 @@ def test_purchase_happy_path_creates_payment_and_attendees(
         )
 
         response = client.post(
-            f"/api/v1/checkout/{popup.slug}/purchase",
+            f"/api/v1/checkout/{popup.slug}/checkout/purchase",
             json={
-                "products": [{"product_id": str(product.id), "quantity": 2}],
+                "products": [
+                    {
+                        "product_id": str(product.id),
+                        "quantity": 2,
+                        "recipient_key": "buyer",
+                    }
+                ],
+                "recipients": [_recipient(product)],
                 "buyer": {
                     "email": "buyer@test.com",
                     "first_name": "Matias",
@@ -339,8 +355,7 @@ def test_purchase_happy_path_creates_payment_and_attendees(
     attendees = list(
         db.exec(select(Attendees).where(Attendees.popup_id == popup.id)).all()
     )
-    # New design: 1 attendee per (human, popup), 2 AttendeeProducts rows for qty=2
-    assert len(attendees) == 1
+    assert attendees == []
 
 
 def test_purchase_persists_attribution_in_buyer_snapshot(
@@ -363,9 +378,16 @@ def test_purchase_persists_attribution_in_buyer_snapshot(
             is_installment_plan=False,
         )
         response = client.post(
-            f"/api/v1/checkout/{popup.slug}/purchase",
+            f"/api/v1/checkout/{popup.slug}/checkout/purchase",
             json={
-                "products": [{"product_id": str(product.id), "quantity": 1}],
+                "products": [
+                    {
+                        "product_id": str(product.id),
+                        "quantity": 1,
+                        "recipient_key": "buyer",
+                    }
+                ],
+                "recipients": [_recipient(product)],
                 "buyer": {
                     "email": "buyer@test.com",
                     "first_name": "Ana",
@@ -409,9 +431,16 @@ def test_purchase_without_attribution_omits_the_key(
             is_installment_plan=False,
         )
         response = client.post(
-            f"/api/v1/checkout/{popup.slug}/purchase",
+            f"/api/v1/checkout/{popup.slug}/checkout/purchase",
             json={
-                "products": [{"product_id": str(product.id), "quantity": 1}],
+                "products": [
+                    {
+                        "product_id": str(product.id),
+                        "quantity": 1,
+                        "recipient_key": "buyer",
+                    }
+                ],
+                "recipients": [_recipient(product)],
                 "buyer": {
                     "email": "buyer@test.com",
                     "first_name": "Ana",
@@ -464,9 +493,16 @@ def test_purchase_pending_open_checkout_sends_initiate_checkout_capi(
         )
 
         response = client.post(
-            f"/api/v1/checkout/{popup.slug}/purchase",
+            f"/api/v1/checkout/{popup.slug}/checkout/purchase",
             json={
-                "products": [{"product_id": str(product.id), "quantity": 2}],
+                "products": [
+                    {
+                        "product_id": str(product.id),
+                        "quantity": 2,
+                        "recipient_key": "buyer",
+                    }
+                ],
+                "recipients": [_recipient(product)],
                 "buyer": {
                     "email": "buyer@test.com",
                     "first_name": "Meta",
@@ -558,9 +594,16 @@ def test_purchase_non_pending_open_checkout_does_not_send_initiate_checkout_capi
         )
 
         response = client.post(
-            f"/api/v1/checkout/{popup.slug}/purchase",
+            f"/api/v1/checkout/{popup.slug}/checkout/purchase",
             json={
-                "products": [{"product_id": str(product.id), "quantity": 1}],
+                "products": [
+                    {
+                        "product_id": str(product.id),
+                        "quantity": 1,
+                        "recipient_key": "buyer",
+                    }
+                ],
+                "recipients": [_recipient(product)],
                 "buyer": {
                     "email": "buyer@test.com",
                     "first_name": "Meta",
@@ -610,9 +653,16 @@ def test_purchase_initiate_checkout_capi_failure_does_not_block_response(
         )
 
         response = client.post(
-            f"/api/v1/checkout/{popup.slug}/purchase",
+            f"/api/v1/checkout/{popup.slug}/checkout/purchase",
             json={
-                "products": [{"product_id": str(product.id), "quantity": 1}],
+                "products": [
+                    {
+                        "product_id": str(product.id),
+                        "quantity": 1,
+                        "recipient_key": "buyer",
+                    }
+                ],
+                "recipients": [_recipient(product)],
                 "buyer": {
                     "email": "buyer@test.com",
                     "first_name": "Meta",
@@ -631,7 +681,7 @@ def test_purchase_unknown_slug_returns_404(
     client: TestClient, tenant_a: Tenants
 ) -> None:
     response = client.post(
-        "/api/v1/checkout/does-not-exist/purchase",
+        "/api/v1/checkout/does-not-exist/checkout/purchase",
         json={
             "products": [{"product_id": str(uuid.uuid4()), "quantity": 1}],
             "buyer": {
@@ -646,7 +696,7 @@ def test_purchase_unknown_slug_returns_404(
     assert response.status_code == 404, response.text
 
 
-def test_purchase_application_popup_returns_403(
+def test_purchase_application_popup_returns_404(
     client: TestClient,
     db: Session,
     tenant_a: Tenants,
@@ -658,9 +708,12 @@ def test_purchase_application_popup_returns_403(
     db.commit()
 
     response = client.post(
-        f"/api/v1/checkout/{popup.slug}/purchase",
+        f"/api/v1/checkout/{popup.slug}/checkout/purchase",
         json={
-            "products": [{"product_id": str(product.id), "quantity": 1}],
+            "products": [
+                {"product_id": str(product.id), "quantity": 1, "recipient_key": "buyer"}
+            ],
+            "recipients": [_recipient(product)],
             "buyer": {
                 "email": "buyer@test.com",
                 "first_name": "Matias",
@@ -670,7 +723,7 @@ def test_purchase_application_popup_returns_403(
         },
         headers={"X-Tenant-Id": str(tenant_a.id)},
     )
-    assert response.status_code == 403, response.text
+    assert response.status_code == 404, response.text
 
 
 def test_purchase_missing_required_field_returns_422(
@@ -685,9 +738,12 @@ def test_purchase_missing_required_field_returns_422(
     db.commit()
 
     response = client.post(
-        f"/api/v1/checkout/{popup.slug}/purchase",
+        f"/api/v1/checkout/{popup.slug}/checkout/purchase",
         json={
-            "products": [{"product_id": str(product.id), "quantity": 1}],
+            "products": [
+                {"product_id": str(product.id), "quantity": 1, "recipient_key": "buyer"}
+            ],
+            "recipients": [_recipient(product)],
             "buyer": {
                 "email": "buyer@test.com",
                 "first_name": "Matias",
@@ -715,9 +771,16 @@ def test_purchase_provider_failure_returns_502(
         mock_get_client.return_value.create_payment.side_effect = RuntimeError("boom")
 
         response = client.post(
-            f"/api/v1/checkout/{popup.slug}/purchase",
+            f"/api/v1/checkout/{popup.slug}/checkout/purchase",
             json={
-                "products": [{"product_id": str(product.id), "quantity": 1}],
+                "products": [
+                    {
+                        "product_id": str(product.id),
+                        "quantity": 1,
+                        "recipient_key": "buyer",
+                    }
+                ],
+                "recipients": [_recipient(product)],
                 "buyer": {
                     "email": "buyer@test.com",
                     "first_name": "Matias",
@@ -750,9 +813,16 @@ def test_zero_amount_purchase_attempts_capi_when_email_fails(
         patch("app.services.simplefi.get_simplefi_client") as mock_get_client,
     ):
         response = client.post(
-            f"/api/v1/checkout/{popup.slug}/purchase",
+            f"/api/v1/checkout/{popup.slug}/checkout/purchase",
             json={
-                "products": [{"product_id": str(product.id), "quantity": 1}],
+                "products": [
+                    {
+                        "product_id": str(product.id),
+                        "quantity": 1,
+                        "recipient_key": "buyer",
+                    }
+                ],
+                "recipients": [_recipient(product)],
                 "buyer": {
                     "email": "buyer@test.com",
                     "first_name": "Matias",
@@ -789,9 +859,16 @@ def test_zero_amount_purchase_returns_custom_success_redirect_url(
 
     with patch("app.services.simplefi.get_simplefi_client") as mock_get_client:
         response = client.post(
-            f"/api/v1/checkout/{popup.slug}/purchase",
+            f"/api/v1/checkout/{popup.slug}/checkout/purchase",
             json={
-                "products": [{"product_id": str(product.id), "quantity": 1}],
+                "products": [
+                    {
+                        "product_id": str(product.id),
+                        "quantity": 1,
+                        "recipient_key": "buyer",
+                    }
+                ],
+                "recipients": [_recipient(product)],
                 "buyer": {
                     "email": "buyer@test.com",
                     "first_name": "Matias",
@@ -852,9 +929,16 @@ def test_paid_purchase_signs_order_payload_into_simplefi_success_url(
             is_installment_plan=False,
         )
         response = client.post(
-            f"/api/v1/checkout/{popup.slug}/purchase",
+            f"/api/v1/checkout/{popup.slug}/checkout/purchase",
             json={
-                "products": [{"product_id": str(product.id), "quantity": 2}],
+                "products": [
+                    {
+                        "product_id": str(product.id),
+                        "quantity": 2,
+                        "recipient_key": "buyer",
+                    }
+                ],
+                "recipients": [_recipient(product)],
                 "buyer": {
                     "email": "buyer@test.com",
                     "first_name": "Matias",
@@ -913,9 +997,16 @@ def test_signed_redirect_substitutes_locale_placeholder(
             is_installment_plan=False,
         )
         response = client.post(
-            f"/api/v1/checkout/{popup.slug}/purchase",
+            f"/api/v1/checkout/{popup.slug}/checkout/purchase",
             json={
-                "products": [{"product_id": str(product.id), "quantity": 1}],
+                "products": [
+                    {
+                        "product_id": str(product.id),
+                        "quantity": 1,
+                        "recipient_key": "buyer",
+                    }
+                ],
+                "recipients": [_recipient(product)],
                 "buyer": {
                     "email": "buyer@test.com",
                     "first_name": "Ana",
@@ -986,9 +1077,16 @@ def test_each_flow_lands_its_buyers_on_its_own_page(
             is_installment_plan=False,
         )
         response = client.post(
-            f"/api/v1/checkout/{popup.slug}/purchase?flow_slug={partner.slug}",
+            f"/api/v1/checkout/{popup.slug}/{partner.slug}/purchase",
             json={
-                "products": [{"product_id": str(product.id), "quantity": 1}],
+                "products": [
+                    {
+                        "product_id": str(product.id),
+                        "quantity": 1,
+                        "recipient_key": "buyer",
+                    }
+                ],
+                "recipients": [_recipient(product)],
                 "buyer": {
                     "email": "buyer@test.com",
                     "first_name": "Matias",
@@ -1036,9 +1134,16 @@ def test_signed_redirect_forwards_lang_on_fixed_path_success_url(
             is_installment_plan=False,
         )
         response = client.post(
-            f"/api/v1/checkout/{popup.slug}/purchase",
+            f"/api/v1/checkout/{popup.slug}/checkout/purchase",
             json={
-                "products": [{"product_id": str(product.id), "quantity": 1}],
+                "products": [
+                    {
+                        "product_id": str(product.id),
+                        "quantity": 1,
+                        "recipient_key": "buyer",
+                    }
+                ],
+                "recipients": [_recipient(product)],
                 "buyer": {
                     "email": "buyer@test.com",
                     "first_name": "Ana",
@@ -1083,9 +1188,16 @@ def test_zero_amount_purchase_signs_order_payload_into_redirect_url(
 
     with patch("app.services.simplefi.get_simplefi_client") as mock_get_client:
         response = client.post(
-            f"/api/v1/checkout/{popup.slug}/purchase",
+            f"/api/v1/checkout/{popup.slug}/checkout/purchase",
             json={
-                "products": [{"product_id": str(product.id), "quantity": 1}],
+                "products": [
+                    {
+                        "product_id": str(product.id),
+                        "quantity": 1,
+                        "recipient_key": "buyer",
+                    }
+                ],
+                "recipients": [_recipient(product)],
                 "buyer": {
                     "email": "buyer@test.com",
                     "first_name": "Matias",
@@ -1133,9 +1245,16 @@ def test_paid_purchase_injects_order_data_into_portal_thank_you(
             is_installment_plan=False,
         )
         response = client.post(
-            f"/api/v1/checkout/{popup.slug}/purchase",
+            f"/api/v1/checkout/{popup.slug}/checkout/purchase",
             json={
-                "products": [{"product_id": str(product.id), "quantity": 2}],
+                "products": [
+                    {
+                        "product_id": str(product.id),
+                        "quantity": 2,
+                        "recipient_key": "buyer",
+                    }
+                ],
+                "recipients": [_recipient(product)],
                 "buyer": {
                     "email": "buyer@test.com",
                     "first_name": "Matias",
@@ -1175,9 +1294,16 @@ def test_zero_amount_purchase_injects_order_data_into_portal_thank_you(
 
     with patch("app.services.simplefi.get_simplefi_client") as mock_get_client:
         response = client.post(
-            f"/api/v1/checkout/{popup.slug}/purchase",
+            f"/api/v1/checkout/{popup.slug}/checkout/purchase",
             json={
-                "products": [{"product_id": str(product.id), "quantity": 1}],
+                "products": [
+                    {
+                        "product_id": str(product.id),
+                        "quantity": 1,
+                        "recipient_key": "buyer",
+                    }
+                ],
+                "recipients": [_recipient(product)],
                 "buyer": {
                     "email": "buyer@test.com",
                     "first_name": "Matias",
@@ -1218,9 +1344,12 @@ def test_purchase_with_ended_sale_window_returns_422(
     db.commit()
 
     response = client.post(
-        f"/api/v1/checkout/{popup.slug}/purchase",
+        f"/api/v1/checkout/{popup.slug}/checkout/purchase",
         json={
-            "products": [{"product_id": str(product.id), "quantity": 1}],
+            "products": [
+                {"product_id": str(product.id), "quantity": 1, "recipient_key": "buyer"}
+            ],
+            "recipients": [_recipient(product)],
             "buyer": {
                 "email": "buyer@test.com",
                 "first_name": "Matias",
@@ -1251,9 +1380,12 @@ def test_purchase_with_upcoming_sale_window_returns_422(
     db.commit()
 
     response = client.post(
-        f"/api/v1/checkout/{popup.slug}/purchase",
+        f"/api/v1/checkout/{popup.slug}/checkout/purchase",
         json={
-            "products": [{"product_id": str(product.id), "quantity": 1}],
+            "products": [
+                {"product_id": str(product.id), "quantity": 1, "recipient_key": "buyer"}
+            ],
+            "recipients": [_recipient(product)],
             "buyer": {
                 "email": "buyer@test.com",
                 "first_name": "Matias",
@@ -1285,9 +1417,16 @@ def test_purchase_rate_limit_returns_429(
 
     with patch("app.core.rate_limit.get_redis", return_value=mock_redis):
         response = client.post(
-            f"/api/v1/checkout/{popup.slug}/purchase",
+            f"/api/v1/checkout/{popup.slug}/checkout/purchase",
             json={
-                "products": [{"product_id": str(product.id), "quantity": 1}],
+                "products": [
+                    {
+                        "product_id": str(product.id),
+                        "quantity": 1,
+                        "recipient_key": "buyer",
+                    }
+                ],
+                "recipients": [_recipient(product)],
                 "buyer": {
                     "email": "buyer@test.com",
                     "first_name": "Matias",
@@ -1335,9 +1474,16 @@ def test_purchase_resolves_per_tenant(
         )
 
         response = client.post(
-            f"/api/v1/checkout/{popup.slug}/purchase",
+            f"/api/v1/checkout/{popup.slug}/checkout/purchase",
             json={
-                "products": [{"product_id": str(product.id), "quantity": 1}],
+                "products": [
+                    {
+                        "product_id": str(product.id),
+                        "quantity": 1,
+                        "recipient_key": "buyer",
+                    }
+                ],
+                "recipients": [_recipient(product)],
                 "buyer": {
                     "email": "buyer@test.com",
                     "first_name": "Test",
@@ -1358,7 +1504,7 @@ def test_purchase_unknown_origin_returns_404(
 ) -> None:
     """No Origin and no X-Tenant-Id → 404 from resolver, no payment created."""
     response = client.post(
-        "/api/v1/checkout/summer-fest/purchase",
+        "/api/v1/checkout/summer-fest/checkout/purchase",
         json={
             "products": [{"product_id": str(uuid.uuid4()), "quantity": 1}],
             "buyer": {
@@ -1401,9 +1547,16 @@ def test_purchase_creates_installment_plan_when_popup_enabled(
         )
 
         response = client.post(
-            f"/api/v1/checkout/{popup.slug}/purchase",
+            f"/api/v1/checkout/{popup.slug}/checkout/purchase",
             json={
-                "products": [{"product_id": str(product.id), "quantity": 1}],
+                "products": [
+                    {
+                        "product_id": str(product.id),
+                        "quantity": 1,
+                        "recipient_key": "buyer",
+                    }
+                ],
+                "recipients": [_recipient(product)],
                 "buyer": {
                     "email": "plan-buyer@test.com",
                     "first_name": "Plan",
@@ -1454,9 +1607,16 @@ def test_purchase_one_shot_when_installments_deadline_too_close(
         )
 
         response = client.post(
-            f"/api/v1/checkout/{popup.slug}/purchase",
+            f"/api/v1/checkout/{popup.slug}/checkout/purchase",
             json={
-                "products": [{"product_id": str(product.id), "quantity": 1}],
+                "products": [
+                    {
+                        "product_id": str(product.id),
+                        "quantity": 1,
+                        "recipient_key": "buyer",
+                    }
+                ],
+                "recipients": [_recipient(product)],
                 "buyer": {
                     "email": "oneshot-buyer@test.com",
                     "first_name": "One",
@@ -1523,9 +1683,16 @@ def test_purchase_backfills_blank_fields_on_a_preexisting_human(
             is_installment_plan=False,
         )
         response = client.post(
-            f"/api/v1/checkout/{popup.slug}/purchase",
+            f"/api/v1/checkout/{popup.slug}/checkout/purchase",
             json={
-                "products": [{"product_id": str(product.id), "quantity": 1}],
+                "products": [
+                    {
+                        "product_id": str(product.id),
+                        "quantity": 1,
+                        "recipient_key": "buyer",
+                    }
+                ],
+                "recipients": [_recipient(product)],
                 "buyer": {
                     "email": email,
                     "first_name": "Ana",

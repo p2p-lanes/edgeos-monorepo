@@ -94,7 +94,7 @@ function Dashboard() {
   })
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="@container/dashboard flex flex-col gap-6">
       {!isContextReady && <WorkspaceAlert resource="dashboard data" />}
 
       {isError && (
@@ -158,7 +158,7 @@ function Dashboard() {
       </section>
 
       {/* Application Pipeline + Recent Activity — side by side */}
-      <section className="grid gap-4 lg:grid-cols-2">
+      <section className="grid gap-4 @3xl/dashboard:grid-cols-2">
         <div>
           <SectionTitle>Pipeline</SectionTitle>
           <ApplicationFunnelChart
@@ -241,7 +241,7 @@ function NeedsAttention({
         <AlertTriangle className="h-3.5 w-3.5" />
         Needs Attention
       </h2>
-      <div className="grid gap-2 md:grid-cols-2 lg:grid-cols-3">
+      <div className="grid gap-2 @xl/dashboard:grid-cols-2 @3xl/dashboard:grid-cols-3">
         {items.map((item) => (
           <Link key={item.href} to={item.href}>
             <Card className="transition-colors hover:bg-muted/50 cursor-pointer py-0">

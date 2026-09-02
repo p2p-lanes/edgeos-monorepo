@@ -1,5 +1,5 @@
 import { useQueryClient } from "@tanstack/react-query"
-import { type MutableRefObject, useCallback, useEffect } from "react"
+import { type MutableRefObject, useCallback, useEffect, useRef } from "react"
 import {
   type CartItemPass,
   type CartState,
@@ -14,6 +14,7 @@ import { queryKeys } from "@/lib/query-keys"
 import type {
   CheckoutRecipientDraft,
   CheckoutStep,
+  SelectedAccommodationItem,
   SelectedDynamicItem,
   SelectedHousingItem,
   SelectedMealPlanItem,
@@ -26,6 +27,7 @@ import type { ProductsPass } from "@/types/Products"
 export interface CartSelectionState {
   selectedPasses: SelectedPassItem[]
   housing: SelectedHousingItem | null
+  accommodations: SelectedAccommodationItem[]
   merch: SelectedMerchItem[]
   patron: SelectedPatronItem | null
   selectedMealPlans: SelectedMealPlanItem[]
@@ -63,8 +65,55 @@ export function buildPersistedPassSelections(
   return { passes, recipients: [...recipients.values()] }
 }
 
+export function buildPersistedCartState(state: CartSelectionState): CartState {
+  const recipientSelections = buildPersistedPassSelections(state.selectedPasses)
+  return {
+    ...recipientSelections,
+    housing: state.housing
+      ? {
+          product_id: state.housing.productId,
+          check_in: state.housing.checkIn,
+          check_out: state.housing.checkOut,
+          quantity: state.housing.quantity,
+        }
+      : null,
+    merch: state.merch.map((item) => ({
+      product_id: item.productId,
+      quantity: item.quantity,
+    })),
+    patron: state.patron
+      ? {
+          product_id: state.patron.productId,
+          amount: state.patron.amount,
+          is_custom_amount: state.patron.isCustomAmount,
+        }
+      : null,
+    meal_plans: state.selectedMealPlans.map((item) => ({
+      attendee_id: item.attendeeId,
+      product_id: item.productId,
+      daily_choices: item.dailyChoices,
+      dietary_restriction: item.dietaryRestriction,
+      special_request: item.specialRequest,
+    })),
+    // Saved, but deliberately not restored. A stay is a dated server quote and
+    // a room in a cart is not held. Restoring it would claim stale inventory is
+    // still bookable; the snapshot remains useful for abandoned-cart review.
+    accommodations: state.accommodations.map((item) => ({
+      accommodation_id: item.accommodationId,
+      check_in: item.checkIn,
+      check_out: item.checkOut,
+      guest_count: item.guestCount,
+      guests: item.guests.filter(Boolean),
+    })),
+    promo_code: state.promoCodeValid ? state.promoCode : null,
+    insurance: state.insurance,
+    current_step: state.currentStep !== "success" ? state.currentStep : null,
+  }
+}
+
 export interface RestorationSetters {
   setHousing: (item: SelectedHousingItem | null) => void
+  setAccommodations: (items: SelectedAccommodationItem[]) => void
   setMerch: (items: SelectedMerchItem[]) => void
   setPatron: (item: SelectedPatronItem | null) => void
   setMealPlans: (items: SelectedMealPlanItem[]) => void
@@ -105,6 +154,17 @@ export function useCartPersistence({
 }: UseCartPersistenceParams) {
   const queryClient = useQueryClient()
   const effectiveCityId = enabled ? cityId : null
+  const restorationScope = `${cityId ?? ""}:${salesFlowId ?? ""}`
+  const previousRestorationScopeRef = useRef(restorationScope)
+
+  // A provider can survive client-side navigation between two doors of the
+  // same gathering. Reset before restoration effects run so the old flow's
+  // one-shot guards cannot suppress the new flow's cart.
+  if (previousRestorationScopeRef.current !== restorationScope) {
+    previousRestorationScopeRef.current = restorationScope
+    hasRestoredCheckoutRef.current = false
+    paymentCompleteRef.current = false
+  }
 
   // Cart API hooks (internalized)
   const { data: savedCart, isSuccess: cartLoaded } = useCart(
@@ -118,44 +178,10 @@ export function useCartPersistence({
   const clearCartMutation = useClearCart(effectiveCityId, salesFlowId)
 
   // --- Build CartState from the ref's current value ---
-  const buildCartState = useCallback((): CartState => {
-    const state = selectionStateRef.current
-    const recipientSelections = buildPersistedPassSelections(
-      state.selectedPasses,
-    )
-    return {
-      ...recipientSelections,
-      housing: state.housing
-        ? {
-            product_id: state.housing.productId,
-            check_in: state.housing.checkIn,
-            check_out: state.housing.checkOut,
-            quantity: state.housing.quantity,
-          }
-        : null,
-      merch: state.merch.map((item) => ({
-        product_id: item.productId,
-        quantity: item.quantity,
-      })),
-      patron: state.patron
-        ? {
-            product_id: state.patron.productId,
-            amount: state.patron.amount,
-            is_custom_amount: state.patron.isCustomAmount,
-          }
-        : null,
-      meal_plans: state.selectedMealPlans.map((item) => ({
-        attendee_id: item.attendeeId,
-        product_id: item.productId,
-        daily_choices: item.dailyChoices,
-        dietary_restriction: item.dietaryRestriction,
-        special_request: item.specialRequest,
-      })),
-      promo_code: state.promoCodeValid ? state.promoCode : null,
-      insurance: state.insurance,
-      current_step: state.currentStep !== "success" ? state.currentStep : null,
-    }
-  }, [selectionStateRef])
+  const buildCartState = useCallback(
+    (): CartState => buildPersistedCartState(selectionStateRef.current),
+    [selectionStateRef],
+  )
 
   // --- Save cart immediately (for checkpoints) ---
   const saveCart = useCallback(() => {
@@ -220,7 +246,7 @@ export function useCartPersistence({
       clearCartMutation.mutate(undefined, {
         onSettled: () => {
           queryClient.setQueryData<CartState>(
-            queryKeys.cart.byPopup(cityId ?? ""),
+            queryKeys.cart.byPopup(cityId ?? "", salesFlowId),
             { ...EMPTY_CART },
           )
         },
@@ -363,6 +389,7 @@ export function useCartPersistence({
     initialStep,
     cancelPendingSave,
     cityId,
+    salesFlowId,
     clearCartMutation.mutate,
     hasRestoredCheckoutRef,
     paymentCompleteRef,

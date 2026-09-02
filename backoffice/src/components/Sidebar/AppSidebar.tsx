@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query"
 import {
+  BedDouble,
   Building2,
   Calendar,
   CalendarDays,
@@ -81,6 +82,12 @@ const popupItems: Item[] = [
     title: "Products",
     path: "/products",
     tourId: "nav-products",
+  },
+  {
+    icon: BedDouble,
+    title: "Accommodations",
+    path: "/accommodations",
+    tourId: "nav-accommodations",
   },
   { icon: Tag, title: "Coupons", path: "/coupons", tourId: "nav-coupons" },
   { icon: UsersRound, title: "Groups", path: "/groups" },

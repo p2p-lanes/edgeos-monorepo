@@ -62,6 +62,7 @@ def _make_portal_link(db: Session, popup: Popups, referrer: Humans) -> Invites:
         referrer_human_id=referrer.id,
         token=f"ref-{uuid.uuid4().hex[:12]}",
         express_checkout=True,
+        auto_approve=True,
         discount_percentage=Decimal("0"),
     )
     db.add(link)

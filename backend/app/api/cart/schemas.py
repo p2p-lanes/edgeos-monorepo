@@ -68,6 +68,26 @@ class CartItemMealPlan(BaseModel):
     special_request: str | None = None
 
 
+class CartItemAccommodation(BaseModel):
+    """A room the buyer picked, as it survives a page reload.
+
+    Keyed by ``accommodation_id`` rather than by the shadow ``product_id``:
+    the product is an implementation detail of how the booking travels
+    through payments, and resolving it at purchase time means a cart saved
+    before a room was re-synced still points at the right room.
+
+    Guests are stored as plain names: the buyer types nothing else about
+    them, and the ``{name: ...}`` shape the purchase needs is built when the
+    payment is submitted.
+    """
+
+    accommodation_id: str
+    check_in: str
+    check_out: str
+    guest_count: int | None = None
+    guests: list[str] = []
+
+
 class CartState(BaseModel):
     """Full cart state stored as JSONB."""
 
@@ -77,6 +97,7 @@ class CartState(BaseModel):
     merch: list[CartItemMerch] = []
     patron: CartItemPatron | None = None
     meal_plans: list[CartItemMealPlan] = []
+    accommodations: list[CartItemAccommodation] = []
     promo_code: str | None = None
     insurance: bool = False
     current_step: str | None = None

@@ -8,9 +8,8 @@ build_effective_config` — its first production consumer), and the
 sales_flow_id, recipient_key)`.
 
 Coverage:
-- A flow-level cadence override wins over the popup's inherited default for
-  that flow only; a sibling flow inheriting the popup's cadence (NULL on the
-  flow) is unaffected.
+- A flow-level cadence applies only to that flow; the default flow's copied
+  popup cadence remains unaffected.
 - Two flows of the same popup, same buyer email: abandoned-cart reminder
   history is independent per flow (the dedupe key's flow dimension).
 - Dedupe across the backfill boundary: a legacy `email_logs` row with
@@ -243,7 +242,7 @@ def test_dedupe_history_is_independent_per_flow_for_same_buyer_email(
 ) -> None:
     now = datetime.now(UTC)
     popup, default_flow = _make_popup(db, tenant_a, abandoned_cart_delay_days=1)
-    flow_b = _make_flow(db, tenant_a, popup, slug="flow-b")
+    flow_b = _make_flow(db, tenant_a, popup, slug="flow-b", abandoned_cart_delay_days=1)
 
     shared_human = _make_human(db, tenant_a)
     _make_payment(

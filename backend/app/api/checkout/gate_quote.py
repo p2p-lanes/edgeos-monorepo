@@ -42,6 +42,7 @@ class GateQuote:
     amounts: Any
     response: CheckoutPreviewResponse
     fingerprint: str
+    accommodation_lines: list[Any]
 
 
 def selected_flow(flow: "SalesFlows") -> SelectedSalesFlow:
@@ -196,9 +197,18 @@ def evaluate_gate_quote(
     if require_complete and not complete:
         _unavailable()
 
+    from app.api.accommodation import payments as accommodation_payments
     from app.api.payment.crud import compute_open_ticketing_amounts
 
     products_map = {product.id: product for product in products}
+    accommodation_lines = accommodation_payments.resolve_lines(
+        session, popup, flow.id, lines
+    )
+    accommodation_prices = accommodation_payments.line_prices(accommodation_lines)
+    accommodation_quotes = {
+        entry.index: entry.quote.model_dump(mode="json")
+        for entry in accommodation_lines
+    }
     amounts = compute_open_ticketing_amounts(
         session,
         popup,
@@ -207,6 +217,7 @@ def evaluate_gate_quote(
         lines,
         coupon_code=coupon_code,
         insurance=insurance,
+        line_prices=accommodation_prices,
     )
     fingerprint = _fingerprint(
         popup, flow, lines, products, buyer, current_human, amounts
@@ -215,7 +226,12 @@ def evaluate_gate_quote(
         _quote_token(fingerprint, popup.id, flow.id) if complete else (None, None)
     )
     response = CheckoutPreviewResponse(
-        lines=[CheckoutPreviewLine(**vars(line)) for line in amounts.lines],
+        lines=[
+            CheckoutPreviewLine(
+                **vars(line), accommodation_quote=accommodation_quotes.get(index)
+            )
+            for index, line in enumerate(amounts.lines)
+        ],
         discountable_amount=amounts.discountable_amount,
         non_discountable_amount=amounts.non_discountable_amount,
         coupon_code=amounts.coupon_code,
@@ -231,7 +247,7 @@ def evaluate_gate_quote(
         quote_token=token,
         quote_expires_at=expires_at,
     )
-    return GateQuote(products, amounts, response, fingerprint)
+    return GateQuote(products, amounts, response, fingerprint, accommodation_lines)
 
 
 def assert_quote_current(token: str, gate: GateQuote) -> None:

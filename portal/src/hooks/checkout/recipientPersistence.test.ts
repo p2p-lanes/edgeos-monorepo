@@ -31,6 +31,9 @@ function selection(
     attendeeId,
     attendee: {
       id: attendeeId,
+      tenant_id: "tenant-1",
+      popup_id: "popup-1",
+      name: "Test attendee",
       products: [],
       recipient,
     } as CheckoutRecipientPassState,
@@ -49,6 +52,7 @@ function state(selectedPasses: SelectedPassItem[]) {
     merch: [],
     patron: null,
     selectedMealPlans: [],
+    accommodations: [],
     dynamicItems: {},
     promoCode: "",
     promoCodeValid: false,
@@ -97,6 +101,8 @@ describe("recipient draft persistence", () => {
   it("keeps a stable linked-Human buyer key and profile", () => {
     const attendee = {
       id: "buyer-attendee",
+      tenant_id: "tenant-1",
+      popup_id: "popup-1",
       human_id: "human-buyer",
       name: "Alex Buyer",
       email: "alex@example.com",
@@ -104,6 +110,7 @@ describe("recipient draft persistence", () => {
       category: "main",
       gender: "nonbinary",
       additional_data: { residence: "Lisbon" },
+      products: [],
     } as CheckoutRecipientPassState
 
     const recipient = buildCheckoutRecipientDraft(attendee)
@@ -136,6 +143,8 @@ describe("recipient draft persistence", () => {
     }
     const attendee = {
       id: "recipient:managed-spouse",
+      tenant_id: "tenant-1",
+      popup_id: "popup-1",
       name: recipient.name,
       products: [],
       recipient,
@@ -206,6 +215,7 @@ describe("recipient draft persistence", () => {
 
     hydrateFromSnapshot(snapshot, [product], false, {
       setHousing: vi.fn(),
+      setAccommodations: vi.fn(),
       setMerch: vi.fn(),
       setPatron: vi.fn(),
       setMealPlans: vi.fn(),

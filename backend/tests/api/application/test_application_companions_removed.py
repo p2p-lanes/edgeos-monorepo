@@ -150,6 +150,7 @@ def test_portal_draft_submit_update_does_not_materialize_attendees(
     submitted = client.patch(
         f"/api/v1/applications/my/{popup.id}",
         headers=_portal_headers(human),
+        params={"sales_flow_id": created.json()["sales_flow_id"]},
         json={"status": "in review"},
     )
 

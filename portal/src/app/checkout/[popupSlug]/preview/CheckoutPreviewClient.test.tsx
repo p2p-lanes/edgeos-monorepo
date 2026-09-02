@@ -13,6 +13,9 @@ import { type CheckoutRuntimeResponse, CheckoutService } from "@/client"
 import { PREVIEW_MESSAGE_SOURCE } from "@/lib/checkout-preview"
 import CheckoutPreviewClient from "./CheckoutPreviewClient"
 
+const runtimeProps = vi.hoisted(() => vi.fn())
+const themeProps = vi.hoisted(() => vi.fn())
+
 vi.mock("@/client", () => ({
   CheckoutService: { getFlowRuntime: vi.fn() },
 }))
@@ -24,7 +27,16 @@ vi.mock("next/navigation", () => ({
 // The checkout tree itself is covered elsewhere; here it only needs to be
 // identifiable when it renders.
 vi.mock("@/components/checkout-flow/OpenCheckoutRuntime", () => ({
-  OpenCheckoutRuntime: () => <div data-testid="checkout" />,
+  OpenCheckoutRuntime: (props: Record<string, unknown>) => {
+    runtimeProps(props)
+    return <div data-testid="checkout" />
+  },
+}))
+vi.mock("@/providers/themeProvider", () => ({
+  default: ({ children, ...props }: { children: ReactNode }) => {
+    themeProps(props)
+    return <>{children}</>
+  },
 }))
 vi.mock("../CheckoutShell", () => ({
   CheckoutShell: ({ children }: { children: ReactNode }) => <>{children}</>,
@@ -71,6 +83,7 @@ const realParent = Object.getOwnPropertyDescriptor(window, "parent")
 beforeEach(() => {
   getFlowRuntime.mockResolvedValue({
     popup: { id: "popup-1" },
+    theme_config: { primary_color: "#123456" },
     products: [],
     ticketing_steps: [],
     // A stand-in: what the runtime holds is the checkout's business, not this
@@ -99,6 +112,18 @@ describe("CheckoutPreviewClient", () => {
         xCheckoutPreviewToken: "token-123",
       }),
     )
+    expect(runtimeProps).toHaveBeenCalledWith(
+      expect.objectContaining({
+        popupSlug: "amanita",
+        flowSlug: "main",
+        previewMode: true,
+        previewToken: "token-123",
+      }),
+    )
+    expect(themeProps).toHaveBeenCalledWith({
+      config: { primary_color: "#123456" },
+      scope: "local",
+    })
   })
 
   it("announces itself to the embedder so the token is sent without a reload", () => {

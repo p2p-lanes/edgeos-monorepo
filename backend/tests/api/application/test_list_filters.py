@@ -20,10 +20,11 @@ from app.api.application.models import Applications
 from app.api.application.schemas import ApplicationStatus
 from app.api.application_review.models import ApplicationReviewSkips
 from app.api.human.models import Humans
+from app.api.invite.models import Invites
 from app.api.popup.models import Popups
 from app.api.tenant.models import Tenants
 from app.api.user.models import Users
-from tests._flow_helpers import application_flow_id
+from tests._flow_helpers import application_flow_id, invite_flow_id
 from tests.api.application_review.test_pending_reviews import (
     _auth,
     _make_admin,
@@ -51,6 +52,8 @@ def _make_application(
     scholarship_request: bool = False,
     scholarship_status: str | None = None,
     scholarship_video_url: str | None = None,
+    invite_id: uuid.UUID | None = None,
+    referral_id: uuid.UUID | None = None,
 ) -> Applications:
     human = Humans(
         tenant_id=tenant.id,
@@ -76,6 +79,8 @@ def _make_application(
         scholarship_request=scholarship_request,
         scholarship_status=scholarship_status,
         scholarship_video_url=scholarship_video_url,
+        invite_id=invite_id,
+        referral_id=referral_id,
     )
     db.add(application)
     db.commit()
@@ -133,6 +138,58 @@ def _one(field: str, op: str, value=None) -> dict:
 
 
 class TestApplicationListFilters:
+    def test_link_attribution_ids(
+        self, db: Session, tenant_a: Tenants, client: TestClient
+    ) -> None:
+        popup = _make_popup(db, tenant_a)
+        admin = _make_admin(db, tenant_a)
+        referrer = Humans(
+            tenant_id=tenant_a.id,
+            email=f"filter-referrer-{uuid.uuid4().hex[:8]}@test.com",
+        )
+        db.add(referrer)
+        db.flush()
+        flow_id = invite_flow_id(db, popup.id)
+        invite = Invites(
+            tenant_id=tenant_a.id,
+            popup_id=popup.id,
+            sales_flow_id=flow_id,
+            token=f"filter-invite-{uuid.uuid4().hex[:8]}",
+            created_by=admin.id,
+        )
+        referral = Invites(
+            tenant_id=tenant_a.id,
+            popup_id=popup.id,
+            sales_flow_id=flow_id,
+            token=f"filter-referral-{uuid.uuid4().hex[:8]}",
+            referrer_human_id=referrer.id,
+            auto_approve=True,
+        )
+        db.add(invite)
+        db.add(referral)
+        db.flush()
+        invite_application = _make_application(db, tenant_a, popup, invite_id=invite.id)
+        referral_application = _make_application(
+            db, tenant_a, popup, referral_id=referral.id
+        )
+        _make_application(db, tenant_a, popup)
+
+        invite_response = _list(
+            client, admin, tenant_a, popup, _one("invite_id", "eq", str(invite.id))
+        )
+        referral_response = _list(
+            client,
+            admin,
+            tenant_a,
+            popup,
+            _one("referral_id", "eq", str(referral.id)),
+        )
+
+        assert _ids(invite_response) == {str(invite_application.id)}
+        assert invite_response.json()["paging"]["total"] == 1
+        assert _ids(referral_response) == {str(referral_application.id)}
+        assert referral_response.json()["paging"]["total"] == 1
+
     def test_status_eq(
         self, db: Session, tenant_a: Tenants, client: TestClient
     ) -> None:

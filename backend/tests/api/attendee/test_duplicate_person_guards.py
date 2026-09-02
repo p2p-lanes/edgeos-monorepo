@@ -1,11 +1,8 @@
-"""Both add-a-companion routes refuse someone who is already at the gathering.
+"""Application companion creation refuses someone already at the gathering.
 
 One person at one event is one attendee row. Two rows means two QR codes, two
-directory entries, and stock spendable twice. These are the two routes that
-add a person by email:
-
-- POST /attendees/my/popup/{popup_id}
-- POST /applications/my/{popup_id}/attendees
+directory entries, and stock spendable twice. The active application route adds
+a person by email at POST /applications/my/{popup_id}/attendees.
 
 An application brings its own attendee row with it, so POST /applications has
 to ask the same question before it creates one.
@@ -99,7 +96,7 @@ def _count_rows(db: Session, popup: Popups, human: Humans) -> int:
 
 
 class TestAttendeeRoute:
-    """POST /attendees/my/popup/{popup_id}"""
+    """Duplicate guards on POST /applications/my/{popup_id}/attendees."""
 
     def test_refuses_someone_who_got_here_by_buying(
         self, client: TestClient, db: Session, tenant_a: Tenants
@@ -124,7 +121,7 @@ class TestAttendeeRoute:
         db.commit()
 
         response = client.post(
-            f"/api/v1/attendees/my/popup/{popup.id}",
+            f"/api/v1/applications/my/{popup.id}/attendees",
             headers=_auth(holder),
             json={
                 "name": "Already Here",
@@ -163,7 +160,7 @@ class TestAttendeeRoute:
         db.commit()
 
         response = client.post(
-            f"/api/v1/attendees/my/popup/{popup.id}",
+            f"/api/v1/applications/my/{popup.id}/attendees",
             headers=_auth(second_holder),
             json={
                 "name": "Already Here",
@@ -185,7 +182,7 @@ class TestAttendeeRoute:
         db.commit()
 
         response = client.post(
-            f"/api/v1/attendees/my/popup/{popup.id}",
+            f"/api/v1/applications/my/{popup.id}/attendees",
             headers=_auth(holder),
             json={
                 "name": "Brand New",
@@ -194,7 +191,7 @@ class TestAttendeeRoute:
             },
         )
 
-        assert response.status_code == 200, response.text
+        assert response.status_code == 201, response.text
 
 
 class TestApplicationRoute:
@@ -389,7 +386,7 @@ class TestRowsWithoutAHumanStamp:
         db.commit()
 
         response = client.post(
-            f"/api/v1/attendees/my/popup/{popup.id}",
+            f"/api/v1/applications/my/{popup.id}/attendees",
             headers=_auth(holder),
             json={
                 "name": "Already Here",

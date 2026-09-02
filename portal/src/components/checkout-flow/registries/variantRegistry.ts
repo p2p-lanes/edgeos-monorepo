@@ -1,5 +1,6 @@
 import type { ComponentType } from "react"
 import type { ProductsPass } from "@/types/Products"
+import VariantAccommodationBooking from "../variants/VariantAccommodationBooking"
 import VariantFaqs from "../variants/VariantFaqs"
 import VariantHero from "../variants/VariantHero"
 import VariantHousingDate from "../variants/VariantHousingDate"
@@ -11,6 +12,11 @@ import VariantRichText from "../variants/VariantRichText"
 import VariantTicketCard from "../variants/VariantTicketCard"
 import VariantTicketSelect from "../variants/VariantTicketSelect"
 import VariantYouTubeVideo from "../variants/VariantYouTubeVideo"
+
+export {
+  CONTENT_ONLY_TEMPLATES,
+  PRODUCT_INDEPENDENT_TEMPLATES,
+} from "./templateClassification"
 
 export interface VariantProps {
   products: ProductsPass[]
@@ -28,6 +34,7 @@ export const VARIANT_REGISTRY: Record<string, ComponentType<VariantProps>> = {
   "ticket-card": VariantTicketCard,
   "patron-preset": VariantPatronPreset,
   "housing-date": VariantHousingDate,
+  "accommodation-booking": VariantAccommodationBooking,
   "merch-image": VariantMerchImage,
   "meal-plan-select": VariantMealPlanSelect,
   "youtube-video": VariantYouTubeVideo,
@@ -36,11 +43,3 @@ export const VARIANT_REGISTRY: Record<string, ComponentType<VariantProps>> = {
   "rich-text": VariantRichText,
   hero: VariantHero,
 }
-
-export const CONTENT_ONLY_TEMPLATES = new Set([
-  "youtube-video",
-  "image-gallery",
-  "faqs",
-  "rich-text",
-  "hero",
-])

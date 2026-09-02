@@ -5,12 +5,14 @@ from decimal import Decimal
 from fastapi.testclient import TestClient
 from sqlmodel import Session
 
+from app.api.application.models import Applications
 from app.api.attendee.models import Attendees
 from app.api.human.models import Humans
 from app.api.payment.models import PaymentProducts, Payments
 from app.api.payment.schemas import PaymentStatus
 from app.api.popup.models import Popups
 from app.api.product.models import Products
+from app.api.sales_flow.crud import sales_flows_crud
 from app.api.tenant.models import Tenants
 
 
@@ -25,6 +27,10 @@ def _create_popup(db: Session, tenant: Tenants, *, suffix: str) -> Popups:
         tenant_id=tenant.id,
     )
     db.add(popup)
+    db.flush()
+    sales_flows_crud.provision_default_flow(
+        db, popup_id=popup.id, tenant_id=tenant.id, sale_type="direct"
+    )
     db.commit()
     db.refresh(popup)
     return popup
@@ -392,6 +398,52 @@ class TestPaymentListSearch:
         payload = response.json()
         assert payload["paging"]["total"] == 1
         assert payload["results"][0]["id"] == str(payment.id)
+
+    def test_search_matches_application_buyer_email(
+        self,
+        client: TestClient,
+        db: Session,
+        tenant_a: Tenants,
+        admin_token_tenant_a: str,
+    ) -> None:
+        popup = _create_popup(db, tenant_a, suffix="application-buyer")
+        human = _create_human(db, tenant_a, email="david@example.com")
+        application = Applications(
+            tenant_id=tenant_a.id,
+            popup_id=popup.id,
+            human_id=human.id,
+            sales_flow_id=sales_flows_crud.get_default_flow(db, popup.id).id,
+            status="accepted",
+        )
+        db.add(application)
+        db.commit()
+        db.refresh(application)
+
+        payment = Payments(
+            tenant_id=tenant_a.id,
+            popup_id=popup.id,
+            application_id=application.id,
+            external_id="APPLICATION-BUYER-MATCH",
+            status=PaymentStatus.APPROVED.value,
+            amount=Decimal("125.00"),
+            currency="USD",
+            source="SimpleFI",
+        )
+        db.add(payment)
+        db.commit()
+        db.refresh(payment)
+
+        response = client.get(
+            "/api/v1/payments",
+            params={"popup_id": str(popup.id), "search": "david@example.com"},
+            headers=_admin_headers(admin_token_tenant_a),
+        )
+
+        assert response.status_code == 200
+        payload = response.json()
+        assert payload["paging"]["total"] == 1
+        assert payload["results"][0]["id"] == str(payment.id)
+        assert payload["results"][0]["buyer_email"] == "david@example.com"
 
     def test_response_exposes_buyer_email_and_name(
         self,

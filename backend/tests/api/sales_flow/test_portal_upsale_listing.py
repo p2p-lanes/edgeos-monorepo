@@ -16,7 +16,7 @@ from decimal import Decimal
 from fastapi.testclient import TestClient
 from sqlmodel import Session
 
-from app.api.attendee.models import Attendees
+from app.api.attendee.models import AttendeeProducts, Attendees
 from app.api.human.models import Humans
 from app.api.payment.models import PaymentProducts, Payments
 from app.api.payment.schemas import PaymentStatus
@@ -101,17 +101,30 @@ def _grant_approved_payment(
     )
     db.add(payment)
     db.flush()
+    payment_product = PaymentProducts(
+        tenant_id=tenant.id,
+        payment_id=payment.id,
+        product_id=product.id,
+        attendee_id=attendee.id,
+        quantity=1,
+        product_name=product.name,
+        product_price=product.price,
+        product_category="ticket",
+        product_currency="USD",
+    )
+    db.add(payment_product)
+    db.flush()
     db.add(
-        PaymentProducts(
+        AttendeeProducts(
             tenant_id=tenant.id,
-            payment_id=payment.id,
-            product_id=product.id,
             attendee_id=attendee.id,
-            quantity=1,
-            product_name=product.name,
-            product_price=product.price,
-            product_category="ticket",
-            product_currency="USD",
+            product_id=product.id,
+            payment_id=payment.id,
+            payment_product_id=payment_product.id,
+            unit_index=0,
+            check_in_code=f"upsale-{uuid.uuid4().hex[:8]}",
+            product_category_snapshot="ticket",
+            requires_check_in_snapshot=False,
         )
     )
     db.flush()

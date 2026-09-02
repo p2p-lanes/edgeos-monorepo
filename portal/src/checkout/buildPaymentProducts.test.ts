@@ -575,6 +575,8 @@ describe("X.2 S-PAY-C: pass_system 2 attendees — tickets use per-attendee atte
       merch: [],
       patron: null,
       dynamicItems: {},
+      isEditing: false,
+      appCredit: 0,
       checkoutMode: CHECKOUT_MODE.PASS_SYSTEM,
     })
 

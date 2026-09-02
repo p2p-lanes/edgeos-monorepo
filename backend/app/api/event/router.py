@@ -1086,6 +1086,13 @@ async def get_public_event_share_meta(
     dependencies=[
         Depends(RateLimit(limit=120, window_sec=60, key_prefix="rl:events-public-ics")),
     ],
+    response_class=Response,
+    responses={
+        status.HTTP_200_OK: {
+            "description": "Public iCalendar feed",
+            "content": {"text/calendar": {"schema": {"type": "string"}}},
+        }
+    },
 )
 async def public_calendar_ics(
     db: SessionDep,
@@ -2767,7 +2774,16 @@ async def delete_portal_invitation(
 # ---------------------------------------------------------------------------
 
 
-@router.get("/{event_id}/ics")
+@router.get(
+    "/{event_id}/ics",
+    response_class=Response,
+    responses={
+        status.HTTP_200_OK: {
+            "description": "Event iCalendar file",
+            "content": {"text/calendar": {"schema": {"type": "string"}}},
+        }
+    },
+)
 async def export_event_ics(
     event_id: uuid.UUID,
     db: AdminOrApiKeySession_EventsRead,
@@ -3844,7 +3860,16 @@ async def cancel_portal_event(
     return _to_public(updated)
 
 
-@router.get("/portal/events/{event_id}/ics")
+@router.get(
+    "/portal/events/{event_id}/ics",
+    response_class=Response,
+    responses={
+        status.HTTP_200_OK: {
+            "description": "Event iCalendar file",
+            "content": {"text/calendar": {"schema": {"type": "string"}}},
+        }
+    },
+)
 async def export_portal_event_ics(
     event_id: uuid.UUID,
     db: HumanTenantSession,

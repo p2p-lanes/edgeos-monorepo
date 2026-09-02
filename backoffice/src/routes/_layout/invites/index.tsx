@@ -1,8 +1,8 @@
 import { keepPreviousData, useQuery } from "@tanstack/react-query"
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router"
-import type { ColumnDef } from "@tanstack/react-table"
+import type { ColumnDef, PaginationState } from "@tanstack/react-table"
 import { Info, Link2, Plus } from "lucide-react"
-import { Suspense, useState } from "react"
+import { Suspense, useEffect, useState } from "react"
 
 import { type InvitePublic, InvitesService } from "@/client"
 import { CopyLinkButton } from "@/components/Common/CopyLinkButton"
@@ -12,6 +12,7 @@ import { QueryErrorBoundary } from "@/components/Common/QueryErrorBoundary"
 import { WorkspaceAlert } from "@/components/Common/WorkspaceAlert"
 import { FlowNameCell } from "@/components/forms/FlowNameCell"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
+import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
 import { useWorkspace } from "@/contexts/WorkspaceContext"
@@ -26,7 +27,7 @@ import { getInvitePortalUrl, getPortalBaseUrl } from "@/lib/portal-urls"
 /** Who made the link. The backend has answered for both since referrals
  *  stopped being their own table — an attendee's link is an invite that
  *  carries a referrer instead of a creator. */
-type Issuer = "all" | "admin" | "portal"
+export type Issuer = "all" | "admin" | "portal"
 
 const ISSUERS: { value: Issuer; label: string }[] = [
   { value: "all", label: "All links" },
@@ -34,11 +35,11 @@ const ISSUERS: { value: Issuer; label: string }[] = [
   { value: "portal", label: "Shared by attendees" },
 ]
 
-function getInvitesQueryOptions(
+export function getInvitesQueryOptions(
   popupId: string | null,
   page: number,
   pageSize: number,
-  issuer: Issuer,
+  issuer: Issuer = "all",
 ) {
   return {
     queryFn: () =>
@@ -50,6 +51,12 @@ function getInvitesQueryOptions(
       }),
     queryKey: ["invites", { popupId, page, pageSize, issuer }],
   }
+}
+
+export function resetPaginationForIssuerChange(
+  pagination: PaginationState,
+): PaginationState {
+  return { ...pagination, pageIndex: 0 }
 }
 
 export const Route = createFileRoute("/_layout/invites/")({
@@ -91,7 +98,12 @@ const columns: ColumnDef<InvitePublic>[] = [
     accessorKey: "token",
     header: ({ column }) => <SortableHeader label="Token" column={column} />,
     cell: ({ row }) => (
-      <span className="font-mono text-sm">{row.original.token}</span>
+      <span className="inline-flex items-center gap-2">
+        <span className="font-mono text-sm">{row.original.token}</span>
+        {row.original.is_disabled && (
+          <Badge variant="destructive">Disabled</Badge>
+        )}
+      </span>
     ),
   },
   {
@@ -160,7 +172,7 @@ const columns: ColumnDef<InvitePublic>[] = [
   },
 ]
 
-function InvitesTableContent({ popupId }: { popupId: string | null }) {
+export function InvitesTableContent({ popupId }: { popupId: string | null }) {
   const navigate = useNavigate()
   const searchParams = Route.useSearch()
   const { pagination, setPagination } = useTableSearchParams(
@@ -169,14 +181,23 @@ function InvitesTableContent({ popupId }: { popupId: string | null }) {
   )
 
   const [issuer, setIssuer] = useState<Issuer>("all")
+  const [isResettingIssuerPage, setIsResettingIssuerPage] = useState(false)
+  const pageIndex = isResettingIssuerPage ? 0 : pagination.pageIndex
+
+  useEffect(() => {
+    if (isResettingIssuerPage && pagination.pageIndex === 0) {
+      setIsResettingIssuerPage(false)
+    }
+  }, [isResettingIssuerPage, pagination.pageIndex])
+
+  const handleIssuerChange = (nextIssuer: Issuer) => {
+    setIsResettingIssuerPage(true)
+    setIssuer(nextIssuer)
+    setPagination(resetPaginationForIssuerChange(pagination))
+  }
 
   const { data: invites } = useQuery({
-    ...getInvitesQueryOptions(
-      popupId,
-      pagination.pageIndex,
-      pagination.pageSize,
-      issuer,
-    ),
+    ...getInvitesQueryOptions(popupId, pageIndex, pagination.pageSize, issuer),
     placeholderData: keepPreviousData,
   })
 
@@ -191,7 +212,7 @@ function InvitesTableContent({ popupId }: { popupId: string | null }) {
             type="button"
             size="sm"
             variant={issuer === option.value ? "default" : "outline"}
-            onClick={() => setIssuer(option.value)}
+            onClick={() => handleIssuerChange(option.value)}
           >
             {option.label}
           </Button>
@@ -209,7 +230,7 @@ function InvitesTableContent({ popupId }: { popupId: string | null }) {
         }
         serverPagination={{
           total: invites.paging.total,
-          pagination: pagination,
+          pagination: { ...pagination, pageIndex },
           onPaginationChange: setPagination,
         }}
         emptyState={

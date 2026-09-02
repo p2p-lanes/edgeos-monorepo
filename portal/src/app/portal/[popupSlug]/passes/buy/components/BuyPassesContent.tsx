@@ -44,7 +44,7 @@ export function resolveLegacyShopRoute(
   }
 }
 
-function ApplicationPassesCheckout({
+export function ApplicationPassesCheckout({
   flowId,
   flowSlug,
 }: {
@@ -68,6 +68,7 @@ function ApplicationPassesCheckout({
       attendees={attendees}
       restoreFromCart
       flowType="application"
+      salesFlowId={flowId}
     >
       <CheckoutProvider
         initialStep="passes"

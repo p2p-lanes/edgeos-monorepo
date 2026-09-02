@@ -1,4 +1,4 @@
-"""Repro test: POST /applications/my with group_id must create a main attendee."""
+"""Group applications defer attendee materialization until fulfillment."""
 
 import uuid
 
@@ -19,12 +19,12 @@ from tests._flow_helpers import (
 )
 
 
-def test_group_application_creates_main_attendee(
+def test_group_application_defers_main_attendee(
     client: TestClient,
     db: Session,
     tenant_a: Tenants,
 ) -> None:
-    """POST /applications/my with group_id must auto-accept and create a main attendee."""
+    """Auto-accepting a group application must not invent an attendee."""
     popup = Popups(
         name=f"Group Test {uuid.uuid4().hex[:8]}",
         slug=f"group-test-{uuid.uuid4().hex[:8]}",
@@ -82,13 +82,6 @@ def test_group_application_creates_main_attendee(
     db_attendees = db.exec(
         select(Attendees).where(Attendees.application_id == app_id)
     ).all()
-    assert len(db_attendees) == 1, (
-        f"Expected exactly 1 main attendee, got {len(db_attendees)}"
-    )
-    attendee = db_attendees[0]
-    assert attendee.human_id == human.id
-    assert attendee.category_id == main_cat.id
-
+    assert db_attendees == []
     assert "attendees" in data
-    assert len(data["attendees"]) == 1
-    assert data["attendees"][0]["id"] == str(attendee.id)
+    assert data["attendees"] == []

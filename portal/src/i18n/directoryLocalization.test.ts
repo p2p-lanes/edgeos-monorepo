@@ -6,13 +6,14 @@ import zh from "./locales/zh.json"
 
 describe("Directory localization", () => {
   it("keeps the attendee navigation, title, and breadcrumb on their existing keys", () => {
+    const locales = { en, es, is, zh }
     for (const [locale, labels] of Object.entries({
       en: ["Directory", "Directory", "Directory"],
       es: ["Directorio", "Directorio", "Directorio"],
       is: ["Skrá", "Skrá", "Skrá"],
       zh: ["名录", "名录", "名录"],
     })) {
-      const messages = { en, es, is, zh }[locale]
+      const messages = locales[locale as keyof typeof locales]
 
       expect([
         messages.sidebar.attendee_directory,

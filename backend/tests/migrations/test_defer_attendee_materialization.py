@@ -11,6 +11,7 @@ from sqlmodel import Session, text
 
 from app.api.attendee.models import AttendeeProducts, Attendees
 from app.api.payment.models import PaymentProducts, PaymentRecipients, Payments
+from app.api.sales_flow.models import SalesFlows
 
 REVISION = "d9c7b4e2a1f8"
 MIGRATION_FILENAME = f"{REVISION}_defer_attendee_materialization.py"
@@ -69,7 +70,7 @@ def test_sqlmodel_metadata_registers_nullable_lineage_and_constraints() -> None:
     assert ("payment_product_id", "unit_index") in ticket_unique
     assert (
         "ck_payment_product_fulfillment_identity_compatibility"
-        in payment_product_checks
+        not in payment_product_checks
     )
     assert "ck_payment_product_has_recipient_or_attendee" not in payment_product_checks
     assert (
@@ -78,9 +79,9 @@ def test_sqlmodel_metadata_registers_nullable_lineage_and_constraints() -> None:
     ) in recipient_foreign_keys
 
 
-def test_migration_downgrade_upgrade_cycle_and_rls(test_engine) -> None:
+def test_migration_downgrade_upgrade_cycle_and_rls(migration_test_engine) -> None:
     cfg = Config("alembic.ini")
-    with test_engine.begin() as connection:
+    with migration_test_engine.begin() as connection:
         cfg.attributes["connection"] = connection
         command.downgrade(cfg, "7a4e2f8c9d01")
         assert "payment_recipients" not in inspect(connection).get_table_names()
@@ -115,8 +116,10 @@ def test_migration_downgrade_upgrade_cycle_and_rls(test_engine) -> None:
 
 
 def test_backfill_is_idempotent_and_preserves_ambiguous_manager(
-    db: Session, tenant_a, popup_tenant_a, default_flow_tenant_a
+    migration_test_engine, migration_tenant_popup_ids
 ) -> None:
+    tenant_id, popup_id = migration_tenant_popup_ids
+    db = Session(migration_test_engine)
     module = _load_migration_module()
     keys = (
         "app_human",
@@ -135,11 +138,21 @@ def test_backfill_is_idempotent_and_preserves_ambiguous_manager(
         "pp3",
     )
     ids = dict(zip(keys, (uuid.uuid4() for _ in keys), strict=True))
+    flow = SalesFlows(
+        id=uuid.uuid4(),
+        tenant_id=tenant_id,
+        popup_id=popup_id,
+        slug=f"defer-backfill-{uuid.uuid4().hex[:8]}",
+        name="Deferred backfill",
+        type="direct",
+    )
+    db.add(flow)
+    db.commit()
     params = {
         **ids,
-        "tenant": tenant_a.id,
-        "popup": popup_tenant_a.id,
-        "flow": default_flow_tenant_a.id,
+        "tenant": tenant_id,
+        "popup": popup_id,
+        "flow": flow.id,
         "slug": f"backfill-pass-{ids['product'].hex[:8]}",
     }
     try:
@@ -213,3 +226,6 @@ def test_backfill_is_idempotent_and_preserves_ambiguous_manager(
             params,
         )
         db.commit()
+        db.delete(flow)
+        db.commit()
+        db.close()

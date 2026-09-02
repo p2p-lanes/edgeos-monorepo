@@ -20,6 +20,22 @@ const VIRTUAL_FIELD_I18N_KEYS: Record<string, string> = {
   gender_specify: "form.gender_specify",
 }
 
+export function resolveApplicationUpdateSalesFlowId(
+  application: ApplicationPublic,
+  selectedSalesFlowId?: string | null,
+): string {
+  if (!application.sales_flow_id) {
+    throw new Error("Application sales flow is required for updates")
+  }
+  if (
+    selectedSalesFlowId &&
+    selectedSalesFlowId !== application.sales_flow_id
+  ) {
+    throw new Error("Selected sales flow does not match the application")
+  }
+  return application.sales_flow_id
+}
+
 /** Resolve a form field name to its user-facing label. Falls back to the
  * raw name so we never show `undefined` if the schema drifts. */
 function resolveFieldLabel(
@@ -99,8 +115,13 @@ export function useSubmitApplication({
       // door's, so creating a second one is exactly what the guard
       // refuses.
       if (application?.id) {
+        const updateSalesFlowId = resolveApplicationUpdateSalesFlowId(
+          application,
+          salesFlowId,
+        )
         return ApplicationsService.updateMyApplication({
           popupId: popup.id,
+          salesFlowId: updateSalesFlowId,
           requestBody: splitForUpdate({ values, status, schema }),
         })
       }

@@ -414,6 +414,12 @@ class TestAdminModeratesBothKinds:
         portal_only = client.get(
             f"/api/v1/invites?popup_id={popup.id}&issuer=portal", headers=headers
         )
+        admin_across_popups = client.get(
+            "/api/v1/invites?issuer=admin", headers=headers
+        )
+        portal_across_popups = client.get(
+            "/api/v1/invites?issuer=portal", headers=headers
+        )
 
         assert every.status_code == 200, every.json()
         assert len(every.json()["results"]) == 2
@@ -421,6 +427,42 @@ class TestAdminModeratesBothKinds:
         assert [r["referrer_human_id"] for r in portal_only.json()["results"]] == [
             str(human.id)
         ]
+        admin_ids = {r["id"] for r in admin_across_popups.json()["results"]}
+        portal_ids = {r["id"] for r in portal_across_popups.json()["results"]}
+        portal_link_id = every.json()["results"][0]["id"]
+        if portal_link_id == str(admin_invite.id):
+            portal_link_id = every.json()["results"][1]["id"]
+        assert str(admin_invite.id) in admin_ids
+        assert portal_link_id not in admin_ids
+        assert portal_link_id in portal_ids
+        assert str(admin_invite.id) not in portal_ids
+
+    def test_admin_cannot_disable_referral_auto_approval(
+        self,
+        client: TestClient,
+        db: Session,
+        tenant_a: Tenants,
+        admin_token_tenant_a: str,
+    ) -> None:
+        popup = _make_popup(db, tenant_a)
+        human = _make_human(db, tenant_a)
+        _give_ticket(db, popup, human)
+        created = client.post(
+            "/api/v1/portal/invites",
+            json={"popup_id": str(popup.id)},
+            headers=_auth(_human_token(human)),
+        )
+        link_id = created.json()["id"]
+
+        resp = client.patch(
+            f"/api/v1/invites/{link_id}",
+            json={"auto_approve": False},
+            headers=_auth(admin_token_tenant_a),
+        )
+
+        assert resp.status_code == 400, resp.json()
+        db.expire_all()
+        assert db.get(Invites, uuid.UUID(link_id)).auto_approve is True
 
     def test_admin_can_disable_an_attendee_link(
         self,

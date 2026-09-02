@@ -37,6 +37,8 @@ let mockUser: {
 let mockApplications: ApplicationPublic[] | null = null
 let mockCategories: AttendeeCategoryPublic[] | undefined
 
+vi.mock("@/client", () => ({}))
+
 vi.mock("@/hooks/useAuth", () => ({
   default: () => ({ user: mockUser }),
 }))
@@ -45,6 +47,10 @@ vi.mock("@/hooks/useHumanAttendeesQuery", () => ({
   default: (popupId: string | null) => mockUseHumanAttendeesQuery(popupId),
 }))
 
+vi.mock("@/hooks/useCartApi", () => ({ useCart: vi.fn() }))
+vi.mock("@/hooks/useGetPassesData", () => ({ default: vi.fn() }))
+vi.mock("@/hooks/useGetPurchases", () => ({ usePurchasesQuery: vi.fn() }))
+
 vi.mock("@/hooks/useAttendeeCategories", () => ({
   useAttendeeCategories: () => ({ categories: mockCategories }),
 }))
@@ -52,8 +58,14 @@ vi.mock("@/hooks/useAttendeeCategories", () => ({
 vi.mock("@/providers/applicationProvider", () => ({
   useApplication: () => ({
     applications: mockApplications,
-    getRelevantApplication: () =>
-      mockApplications?.length === 1 ? mockApplications[0] : null,
+    getRelevantApplication: (salesFlowId?: string) =>
+      salesFlowId
+        ? (mockApplications?.find(
+            (application) => application.sales_flow_id === salesFlowId,
+          ) ?? null)
+        : mockApplications?.length === 1
+          ? mockApplications[0]
+          : null,
   }),
 }))
 
@@ -214,6 +226,34 @@ describe("useResolvedAttendees", () => {
         },
       },
     })
+  })
+
+  it("uses the selected flow when a virtual attendee needs application identity", () => {
+    mockCity = {
+      id: "popup-1",
+      sale_type: "application",
+      checkout_mode: "pass_system",
+      takes_applications: true,
+    }
+    mockApplications = [
+      {
+        id: "application-main",
+        popup_id: "popup-1",
+        human_id: "human-1",
+        sales_flow_id: "flow-main",
+      },
+      {
+        id: "application-partner",
+        popup_id: "popup-1",
+        human_id: "human-1",
+        sales_flow_id: "flow-partner",
+      },
+    ] as ApplicationPublic[]
+    mockUseHumanAttendeesQuery.mockReturnValue({ data: [] })
+
+    const { result } = renderHook(() => useResolvedAttendees("flow-partner"))
+
+    expect(result.current[0]?.application_id).toBe("application-partner")
   })
 
   it.each([

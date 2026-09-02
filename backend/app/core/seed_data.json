@@ -872,5 +872,1196 @@
         { "product_slug": "day-pass", "attendee_index": 0, "quantity": 3 }
       ]
     }
+  ],
+
+  "accommodation_images": [
+    {
+      "key": "resort-pool-loungers",
+      "popup_key": "tech-summit",
+      "url": "https://images.unsplash.com/photo-1566073771259-6a8506099945?auto=format&fit=crop&w=1600&h=1067&q=80",
+      "filename": "resort-pool-loungers.jpg",
+      "width": 1600,
+      "height": 1067
+    },
+    {
+      "key": "villa-night-pool",
+      "popup_key": "tech-summit",
+      "url": "https://images.unsplash.com/photo-1571896349842-33c89424de2d?auto=format&fit=crop&w=1600&h=1067&q=80",
+      "filename": "villa-night-pool.jpg",
+      "width": 1600,
+      "height": 1067
+    },
+    {
+      "key": "arcadia-classic-room",
+      "popup_key": "tech-summit",
+      "url": "https://images.unsplash.com/photo-1590490360182-c33d57733427?auto=format&fit=crop&w=1600&h=1067&q=80",
+      "filename": "arcadia-classic-room.jpg",
+      "width": 1600,
+      "height": 1067
+    },
+    {
+      "key": "arcadia-double-room",
+      "popup_key": "tech-summit",
+      "url": "https://images.unsplash.com/photo-1618773928121-c32242e63f39?auto=format&fit=crop&w=1600&h=1067&q=80",
+      "filename": "arcadia-double-room.jpg",
+      "width": 1600,
+      "height": 1067
+    },
+    {
+      "key": "arcadia-suite-terrace",
+      "popup_key": "tech-summit",
+      "url": "https://images.unsplash.com/photo-1611892440504-42a792e24d32?auto=format&fit=crop&w=1600&h=1067&q=80",
+      "filename": "arcadia-suite-terrace.jpg",
+      "width": 1600,
+      "height": 1067
+    },
+    {
+      "key": "arcadia-single-room",
+      "popup_key": "tech-summit",
+      "url": "https://images.unsplash.com/photo-1631049307264-da0ec9d70304?auto=format&fit=crop&w=1600&h=1067&q=80",
+      "filename": "arcadia-single-room.jpg",
+      "width": 1600,
+      "height": 1067
+    },
+    {
+      "key": "residences-living-bright",
+      "popup_key": "tech-summit",
+      "url": "https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?auto=format&fit=crop&w=1600&h=1067&q=80",
+      "filename": "residences-living-bright.jpg",
+      "width": 1600,
+      "height": 1067
+    },
+    {
+      "key": "residences-open-plan",
+      "popup_key": "tech-summit",
+      "url": "https://images.unsplash.com/photo-1560448204-e02f11c3d0e2?auto=format&fit=crop&w=1600&h=1067&q=80",
+      "filename": "residences-open-plan.jpg",
+      "width": 1600,
+      "height": 1067
+    },
+    {
+      "key": "arcadia-twin-window",
+      "popup_key": "tech-summit",
+      "url": "https://images.unsplash.com/photo-1582719478250-c89cae4dc85b?auto=format&fit=crop&w=1600&h=1067&q=80",
+      "filename": "arcadia-twin-window.jpg",
+      "width": 1600,
+      "height": 1067
+    },
+    {
+      "key": "glamping-bed-lakeview",
+      "popup_key": "tech-summit",
+      "url": "https://images.unsplash.com/photo-1596394516093-501ba68a0ba6?auto=format&fit=crop&w=1600&h=1067&q=80",
+      "filename": "glamping-bed-lakeview.jpg",
+      "width": 1600,
+      "height": 1067
+    },
+    {
+      "key": "glamping-rooftop-view",
+      "popup_key": "tech-summit",
+      "url": "https://images.unsplash.com/photo-1445019980597-93fa8acb246c?auto=format&fit=crop&w=1600&h=1067&q=80",
+      "filename": "glamping-rooftop-view.jpg",
+      "width": 1600,
+      "height": 1067
+    },
+    {
+      "key": "resort-palms-dusk",
+      "popup_key": "tech-summit",
+      "url": "https://images.unsplash.com/photo-1551882547-ff40c63fe5fa?auto=format&fit=crop&w=1600&h=1067&q=80",
+      "filename": "resort-palms-dusk.jpg",
+      "width": 1600,
+      "height": 1067
+    },
+    {
+      "key": "resort-deck-pool",
+      "popup_key": "tech-summit",
+      "url": "https://images.unsplash.com/photo-1584132967334-10e028bd69f7?auto=format&fit=crop&w=1600&h=1067&q=80",
+      "filename": "resort-deck-pool.jpg",
+      "width": 1600,
+      "height": 1067
+    },
+    {
+      "key": "residences-glass-bedroom",
+      "popup_key": "tech-summit",
+      "url": "https://images.unsplash.com/photo-1578683010236-d716f9a3f461?auto=format&fit=crop&w=1600&h=1067&q=80",
+      "filename": "residences-glass-bedroom.jpg",
+      "width": 1600,
+      "height": 1067
+    },
+    {
+      "key": "arcadia-suite-bed",
+      "popup_key": "tech-summit",
+      "url": "https://images.unsplash.com/photo-1505693416388-ac5ce068fe85?auto=format&fit=crop&w=1600&h=1067&q=80",
+      "filename": "arcadia-suite-bed.jpg",
+      "width": 1600,
+      "height": 1067
+    },
+    {
+      "key": "arcadia-twin-accent",
+      "popup_key": "tech-summit",
+      "url": "https://images.unsplash.com/photo-1540518614846-7eded433c457?auto=format&fit=crop&w=1600&h=1067&q=80",
+      "filename": "arcadia-twin-accent.jpg",
+      "width": 1600,
+      "height": 1067
+    },
+    {
+      "key": "residences-living-blue",
+      "popup_key": "tech-summit",
+      "url": "https://images.unsplash.com/photo-1493809842364-78817add7ffb?auto=format&fit=crop&w=1600&h=1067&q=80",
+      "filename": "residences-living-blue.jpg",
+      "width": 1600,
+      "height": 1067
+    },
+    {
+      "key": "hostel-common-room",
+      "popup_key": "tech-summit",
+      "url": "https://images.unsplash.com/photo-1502672260266-1c1ef2d93688?auto=format&fit=crop&w=1600&h=1067&q=80",
+      "filename": "hostel-common-room.jpg",
+      "width": 1600,
+      "height": 1067
+    },
+    {
+      "key": "villa-pool-dusk",
+      "popup_key": "tech-summit",
+      "url": "https://images.unsplash.com/photo-1416331108676-a22ccb276e35?auto=format&fit=crop&w=1600&h=1067&q=80",
+      "filename": "villa-pool-dusk.jpg",
+      "width": 1600,
+      "height": 1067
+    },
+    {
+      "key": "pine-ridge-cabin-forest",
+      "popup_key": "tech-summit",
+      "url": "https://images.unsplash.com/photo-1449158743715-0a90ebb6d2d8?auto=format&fit=crop&w=1600&h=1067&q=80",
+      "filename": "pine-ridge-cabin-forest.jpg",
+      "width": 1600,
+      "height": 1067
+    },
+    {
+      "key": "pine-ridge-lodge-lake",
+      "popup_key": "tech-summit",
+      "url": "https://images.unsplash.com/photo-1510798831971-661eb04b3739?auto=format&fit=crop&w=1600&h=1067&q=80",
+      "filename": "pine-ridge-lodge-lake.jpg",
+      "width": 1600,
+      "height": 1067
+    },
+    {
+      "key": "glamping-tent-interior",
+      "popup_key": "tech-summit",
+      "url": "https://images.unsplash.com/photo-1504280390367-361c6d9f38f4?auto=format&fit=crop&w=1600&h=1067&q=80",
+      "filename": "glamping-tent-interior.jpg",
+      "width": 1600,
+      "height": 1067
+    },
+    {
+      "key": "glamping-tents-night",
+      "popup_key": "tech-summit",
+      "url": "https://images.unsplash.com/photo-1537565266759-34bbc16be345?auto=format&fit=crop&w=1600&h=1067&q=80",
+      "filename": "glamping-tents-night.jpg",
+      "width": 1600,
+      "height": 1067
+    },
+    {
+      "key": "hostel-dorm-bunks",
+      "popup_key": "tech-summit",
+      "url": "https://images.unsplash.com/photo-1555854877-bab0e564b8d5?auto=format&fit=crop&w=1600&h=1067&q=80",
+      "filename": "hostel-dorm-bunks.jpg",
+      "width": 1600,
+      "height": 1067
+    },
+    {
+      "key": "pine-ridge-cabin-living",
+      "popup_key": "tech-summit",
+      "url": "https://images.unsplash.com/photo-1618221195710-dd6b41faaea6?auto=format&fit=crop&w=1600&h=1067&q=80",
+      "filename": "pine-ridge-cabin-living.jpg",
+      "width": 1600,
+      "height": 1067
+    },
+    {
+      "key": "residences-building-dusk",
+      "popup_key": "tech-summit",
+      "url": "https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=1600&h=1067&q=80",
+      "filename": "residences-building-dusk.jpg",
+      "width": 1600,
+      "height": 1067
+    },
+    {
+      "key": "residences-loft-living",
+      "popup_key": "tech-summit",
+      "url": "https://images.unsplash.com/photo-1600607687939-ce8a6c25118c?auto=format&fit=crop&w=1600&h=1067&q=80",
+      "filename": "residences-loft-living.jpg",
+      "width": 1600,
+      "height": 1067
+    },
+    {
+      "key": "pine-ridge-lodge-living",
+      "popup_key": "tech-summit",
+      "url": "https://images.unsplash.com/photo-1600566753086-00f18fb6b3ea?auto=format&fit=crop&w=1600&h=1067&q=80",
+      "filename": "pine-ridge-lodge-living.jpg",
+      "width": 1600,
+      "height": 1067
+    },
+    {
+      "key": "residences-studio-corner",
+      "popup_key": "tech-summit",
+      "url": "https://images.unsplash.com/photo-1586023492125-27b2c045efd7?auto=format&fit=crop&w=1600&h=1067&q=80",
+      "filename": "residences-studio-corner.jpg",
+      "width": 1600,
+      "height": 1067
+    },
+    {
+      "key": "residences-living-gallery",
+      "popup_key": "tech-summit",
+      "url": "https://images.unsplash.com/photo-1600210492486-724fe5c67fb0?auto=format&fit=crop&w=1600&h=1067&q=80",
+      "filename": "residences-living-gallery.jpg",
+      "width": 1600,
+      "height": 1067
+    },
+    {
+      "key": "arcadia-bathroom-tub",
+      "popup_key": "tech-summit",
+      "url": "https://images.unsplash.com/photo-1521783593447-5702b9bfd267?auto=format&fit=crop&w=1600&h=1067&q=80",
+      "filename": "arcadia-bathroom-tub.jpg",
+      "width": 1600,
+      "height": 1067
+    },
+    {
+      "key": "villa-white-modern",
+      "popup_key": "tech-summit",
+      "url": "https://images.unsplash.com/photo-1613977257363-707ba9348227?auto=format&fit=crop&w=1600&h=1067&q=80",
+      "filename": "villa-white-modern.jpg",
+      "width": 1600,
+      "height": 1067
+    },
+    {
+      "key": "resort-tropical-pool",
+      "popup_key": "tech-summit",
+      "url": "https://images.unsplash.com/photo-1520250497591-112f2f40a3f4?auto=format&fit=crop&w=1600&h=1067&q=80",
+      "filename": "resort-tropical-pool.jpg",
+      "width": 1600,
+      "height": 1067
+    },
+    {
+      "key": "arcadia-facade",
+      "popup_key": "tech-summit",
+      "url": "https://images.unsplash.com/photo-1517840901100-8179e982acb7?auto=format&fit=crop&w=1600&h=1067&q=80",
+      "filename": "arcadia-facade.jpg",
+      "width": 1600,
+      "height": 1067
+    },
+    {
+      "key": "residences-dining",
+      "popup_key": "tech-summit",
+      "url": "https://images.unsplash.com/photo-1560185007-cde436f6a4d0?auto=format&fit=crop&w=1600&h=1067&q=80",
+      "filename": "residences-dining.jpg",
+      "width": 1600,
+      "height": 1067
+    },
+    {
+      "key": "arcadia-desk-bed",
+      "popup_key": "tech-summit",
+      "url": "https://images.unsplash.com/photo-1590073242678-70ee3fc28e8e?auto=format&fit=crop&w=1600&h=1067&q=80",
+      "filename": "arcadia-desk-bed.jpg",
+      "width": 1600,
+      "height": 1067
+    }
+  ],
+  "accommodation_properties": [
+    {
+      "key": "arcadia",
+      "popup_key": "tech-summit",
+      "name": "Hotel Arcadia",
+      "address": "14 Harbour Road, Marina Bay",
+      "description": "Four-star hotel a ten-minute walk from the venue. Breakfast included, late check-out on request.",
+      "contact_name": "Marta Ibanez",
+      "contact_email": "stay@hotelarcadia.example",
+      "tax_percentage": "10.00",
+      "sort_order": 0
+    },
+    {
+      "key": "pine-ridge",
+      "popup_key": "tech-summit",
+      "name": "Pine Ridge Cabins",
+      "address": "Forest Route 7, Pine Ridge",
+      "description": "Timber cabins in the woods, twenty minutes out of town. Shuttle to the venue twice a day.",
+      "contact_name": "Tomas Berg",
+      "contact_email": "hello@pineridgecabins.example",
+      "tax_percentage": "5.00",
+      "sort_order": 1
+    },
+    {
+      "key": "summit-residences",
+      "popup_key": "tech-summit",
+      "name": "Summit Residences",
+      "address": "88 Tech Park Avenue, Marina Bay",
+      "description": "Serviced apartments next to the conference centre. Kitchen, laundry and desk in every unit - built for long stays.",
+      "contact_name": "Priya Raman",
+      "contact_email": "bookings@summitresidences.example",
+      "tax_percentage": "12.00",
+      "sort_order": 2
+    },
+    {
+      "key": "riverside-glamping",
+      "popup_key": "tech-summit",
+      "name": "Riverside Glamping",
+      "address": "River Trail Km 4, Willow Creek",
+      "description": "Furnished tents and geodesic domes by the river. Open for the week of the summit only.",
+      "contact_name": "Noa Fischer",
+      "contact_email": "camp@riversideglamping.example",
+      "tax_percentage": null,
+      "sort_order": 3
+    },
+    {
+      "key": "hive-hostel",
+      "popup_key": "tech-summit",
+      "name": "The Hive Hostel",
+      "address": "3 Old Market Lane, Marina Bay",
+      "description": "Budget beds in the old town, five stops from the venue. Shared kitchen and a very loud coffee machine.",
+      "contact_name": "Sam Okafor",
+      "contact_email": "front.desk@thehivehostel.example",
+      "tax_percentage": null,
+      "sort_order": 4
+    }
+  ],
+  "accommodations": [
+    {
+      "key": "arcadia-single",
+      "popup_key": "tech-summit",
+      "property_key": "arcadia",
+      "name": "Classic Single",
+      "kind": "room",
+      "guest_capacity": 1,
+      "beds": [
+        {
+          "type": "single",
+          "count": 1
+        }
+      ],
+      "default_nightly_price": "110.00",
+      "bookable_from": "2026-06-12",
+      "bookable_to": "2026-06-24",
+      "unit_labels": [
+        "101",
+        "102",
+        "103",
+        "104",
+        "105",
+        "106",
+        "107",
+        "108"
+      ],
+      "image_keys": [
+        "arcadia-single-room",
+        "arcadia-desk-bed",
+        "arcadia-bathroom-tub"
+      ],
+      "description": "Compact room with a single bed, a desk and a street view.",
+      "sort_order": 0
+    },
+    {
+      "key": "arcadia-double",
+      "popup_key": "tech-summit",
+      "property_key": "arcadia",
+      "name": "Classic Double",
+      "kind": "room",
+      "guest_capacity": 2,
+      "beds": [
+        {
+          "type": "queen",
+          "count": 1
+        }
+      ],
+      "default_nightly_price": "165.00",
+      "bookable_from": "2026-06-12",
+      "bookable_to": "2026-06-24",
+      "unit_labels": [
+        "201",
+        "202",
+        "203",
+        "204",
+        "205",
+        "206",
+        "207",
+        "208",
+        "209",
+        "210",
+        "211",
+        "212"
+      ],
+      "image_keys": [
+        "arcadia-double-room",
+        "arcadia-classic-room",
+        "arcadia-bathroom-tub"
+      ],
+      "description": "Queen bed, sitting area and a full bathroom. The workhorse room of the hotel.",
+      "sort_order": 1
+    },
+    {
+      "key": "arcadia-twin",
+      "popup_key": "tech-summit",
+      "property_key": "arcadia",
+      "name": "Deluxe Twin",
+      "kind": "room",
+      "guest_capacity": 2,
+      "beds": [
+        {
+          "type": "single",
+          "count": 2
+        }
+      ],
+      "default_nightly_price": "180.00",
+      "bookable_from": "2026-06-12",
+      "bookable_to": "2026-06-24",
+      "unit_labels": [
+        "301",
+        "302",
+        "303",
+        "304",
+        "305",
+        "306"
+      ],
+      "image_keys": [
+        "arcadia-twin-accent",
+        "arcadia-twin-window"
+      ],
+      "description": "Two single beds for colleagues travelling together. Corner rooms on the quiet side of the building.",
+      "sort_order": 2
+    },
+    {
+      "key": "arcadia-suite",
+      "popup_key": "tech-summit",
+      "property_key": "arcadia",
+      "name": "Arcadia Suite",
+      "kind": "room",
+      "guest_capacity": 3,
+      "beds": [
+        {
+          "type": "king",
+          "count": 1
+        },
+        {
+          "type": "sofa",
+          "count": 1
+        }
+      ],
+      "default_nightly_price": "340.00",
+      "bookable_from": "2026-06-12",
+      "bookable_to": "2026-06-24",
+      "unit_labels": [
+        "401",
+        "402",
+        "403",
+        "404"
+      ],
+      "image_keys": [
+        "arcadia-suite-terrace",
+        "arcadia-suite-bed",
+        "arcadia-bathroom-tub"
+      ],
+      "description": "Top-floor suite with a private terrace, a separate living room and a soaking tub.",
+      "min_stay_override": 2,
+      "sort_order": 3,
+      "price_rules": [
+        {
+          "label": "Summit peak nights",
+          "start_date": "2026-06-15",
+          "end_date": "2026-06-19",
+          "nightly_price": "395.00",
+          "priority": 10
+        }
+      ]
+    },
+    {
+      "key": "pine-cabin",
+      "popup_key": "tech-summit",
+      "property_key": "pine-ridge",
+      "name": "Forest Cabin",
+      "kind": "cabin",
+      "guest_capacity": 2,
+      "beds": [
+        {
+          "type": "double",
+          "count": 1
+        }
+      ],
+      "default_nightly_price": "140.00",
+      "bookable_from": "2026-06-12",
+      "bookable_to": "2026-06-24",
+      "unit_labels": [
+        "Cabin 1",
+        "Cabin 2",
+        "Cabin 3",
+        "Cabin 4",
+        "Cabin 5",
+        "Cabin 6"
+      ],
+      "image_keys": [
+        "pine-ridge-cabin-forest",
+        "pine-ridge-cabin-living",
+        "pine-ridge-lodge-lake"
+      ],
+      "description": "One-room timber cabin with a wood stove and a porch. No wifi, on purpose.",
+      "min_stay_override": 2,
+      "sort_order": 0
+    },
+    {
+      "key": "pine-lodge",
+      "popup_key": "tech-summit",
+      "property_key": "pine-ridge",
+      "name": "Family Lodge",
+      "kind": "cabin",
+      "guest_capacity": 5,
+      "beds": [
+        {
+          "type": "queen",
+          "count": 1
+        },
+        {
+          "type": "bunk",
+          "count": 2
+        }
+      ],
+      "default_nightly_price": "260.00",
+      "bookable_from": "2026-06-12",
+      "bookable_to": "2026-06-24",
+      "unit_labels": [
+        "Lodge A",
+        "Lodge B",
+        "Lodge C"
+      ],
+      "image_keys": [
+        "pine-ridge-lodge-lake",
+        "pine-ridge-lodge-living",
+        "pine-ridge-cabin-living"
+      ],
+      "description": "Two-bedroom lodge sleeping five, with a kitchen and a lake view from the deck.",
+      "min_stay_override": 3,
+      "sort_order": 1
+    },
+    {
+      "key": "residences-studio",
+      "popup_key": "tech-summit",
+      "property_key": "summit-residences",
+      "name": "Studio Apartment",
+      "kind": "studio",
+      "guest_capacity": 2,
+      "beds": [
+        {
+          "type": "queen",
+          "count": 1
+        }
+      ],
+      "default_nightly_price": "150.00",
+      "bookable_from": "2026-06-12",
+      "bookable_to": "2026-06-28",
+      "unit_labels": [
+        "S-01",
+        "S-02",
+        "S-03",
+        "S-04",
+        "S-05",
+        "S-06",
+        "S-07",
+        "S-08",
+        "S-09",
+        "S-10"
+      ],
+      "image_keys": [
+        "residences-studio-corner",
+        "residences-dining",
+        "residences-living-bright"
+      ],
+      "description": "Open-plan studio with a kitchenette, a washer and a proper desk.",
+      "long_stay_price": "115.00",
+      "sort_order": 0
+    },
+    {
+      "key": "residences-two-bed",
+      "popup_key": "tech-summit",
+      "property_key": "summit-residences",
+      "name": "Two-Bedroom Apartment",
+      "kind": "apartment",
+      "guest_capacity": 4,
+      "beds": [
+        {
+          "type": "king",
+          "count": 1
+        },
+        {
+          "type": "single",
+          "count": 2
+        }
+      ],
+      "default_nightly_price": "285.00",
+      "bookable_from": "2026-06-12",
+      "bookable_to": "2026-06-28",
+      "unit_labels": [
+        "A-01",
+        "A-02",
+        "A-03",
+        "A-04",
+        "A-05"
+      ],
+      "image_keys": [
+        "residences-open-plan",
+        "residences-living-bright",
+        "residences-living-blue",
+        "residences-living-gallery"
+      ],
+      "description": "Separate bedrooms, a full kitchen and a living room that fits a whiteboard.",
+      "long_stay_price": "220.00",
+      "min_stay_override": 2,
+      "sort_order": 1
+    },
+    {
+      "key": "residences-penthouse",
+      "popup_key": "tech-summit",
+      "property_key": "summit-residences",
+      "name": "Penthouse Loft",
+      "kind": "apartment",
+      "guest_capacity": 4,
+      "beds": [
+        {
+          "type": "king",
+          "count": 1
+        },
+        {
+          "type": "sofa",
+          "count": 2
+        }
+      ],
+      "default_nightly_price": "420.00",
+      "bookable_from": "2026-06-12",
+      "bookable_to": "2026-06-28",
+      "unit_labels": [
+        "PH-1",
+        "PH-2"
+      ],
+      "image_keys": [
+        "residences-loft-living",
+        "residences-glass-bedroom",
+        "residences-building-dusk"
+      ],
+      "description": "Double-height loft on the top floor, with a terrace over the tech park.",
+      "min_stay_override": 3,
+      "sort_order": 2
+    },
+    {
+      "key": "glamping-tent",
+      "popup_key": "tech-summit",
+      "property_key": "riverside-glamping",
+      "name": "Safari Tent",
+      "kind": "tent",
+      "guest_capacity": 2,
+      "beds": [
+        {
+          "type": "double",
+          "count": 1
+        }
+      ],
+      "default_nightly_price": "85.00",
+      "bookable_from": "2026-06-14",
+      "bookable_to": "2026-06-21",
+      "unit_labels": [
+        "Tent 1",
+        "Tent 2",
+        "Tent 3",
+        "Tent 4",
+        "Tent 5",
+        "Tent 6",
+        "Tent 7",
+        "Tent 8"
+      ],
+      "image_keys": [
+        "glamping-tent-interior",
+        "glamping-tents-night",
+        "glamping-bed-lakeview"
+      ],
+      "description": "Canvas tent on a wooden platform, a real bed, and a shared bathhouse fifty metres away.",
+      "sort_order": 0,
+      "price_rules": [
+        {
+          "label": "Midweek deal",
+          "start_date": "2026-06-16",
+          "end_date": "2026-06-17",
+          "nightly_price": "65.00",
+          "priority": 5
+        }
+      ]
+    },
+    {
+      "key": "glamping-dome",
+      "popup_key": "tech-summit",
+      "property_key": "riverside-glamping",
+      "name": "Stargazer Dome",
+      "kind": "tent",
+      "guest_capacity": 2,
+      "beds": [
+        {
+          "type": "queen",
+          "count": 1
+        }
+      ],
+      "default_nightly_price": "125.00",
+      "bookable_from": "2026-06-14",
+      "bookable_to": "2026-06-21",
+      "unit_labels": [
+        "Dome 1",
+        "Dome 2",
+        "Dome 3",
+        "Dome 4"
+      ],
+      "image_keys": [
+        "glamping-tents-night",
+        "glamping-bed-lakeview",
+        "glamping-rooftop-view"
+      ],
+      "description": "Geodesic dome with a transparent panel over the bed. Private shower, no phone signal.",
+      "min_stay_override": 2,
+      "sort_order": 1
+    },
+    {
+      "key": "hostel-dorm",
+      "popup_key": "tech-summit",
+      "property_key": "hive-hostel",
+      "name": "Shared Dorm Bed",
+      "kind": "other",
+      "guest_capacity": 1,
+      "beds": [
+        {
+          "type": "bunk",
+          "count": 1
+        }
+      ],
+      "default_nightly_price": "42.00",
+      "bookable_from": "2026-06-12",
+      "bookable_to": "2026-06-24",
+      "unit_labels": [
+        "Bed 01",
+        "Bed 02",
+        "Bed 03",
+        "Bed 04",
+        "Bed 05",
+        "Bed 06",
+        "Bed 07",
+        "Bed 08",
+        "Bed 09",
+        "Bed 10",
+        "Bed 11",
+        "Bed 12",
+        "Bed 13",
+        "Bed 14",
+        "Bed 15",
+        "Bed 16"
+      ],
+      "image_keys": [
+        "hostel-dorm-bunks",
+        "hostel-common-room"
+      ],
+      "description": "One bunk in a mixed eight-bed dorm. Locker, reading light and a power socket per bed.",
+      "sort_order": 0
+    },
+    {
+      "key": "hostel-twin",
+      "popup_key": "tech-summit",
+      "property_key": "hive-hostel",
+      "name": "Private Twin",
+      "kind": "room",
+      "guest_capacity": 2,
+      "beds": [
+        {
+          "type": "single",
+          "count": 2
+        }
+      ],
+      "default_nightly_price": "95.00",
+      "bookable_from": "2026-06-12",
+      "bookable_to": "2026-06-24",
+      "unit_labels": [
+        "H-1",
+        "H-2",
+        "H-3",
+        "H-4"
+      ],
+      "image_keys": [
+        "hostel-common-room",
+        "arcadia-desk-bed"
+      ],
+      "description": "Private room with two single beds and a shared bathroom down the hall.",
+      "sort_order": 1
+    }
+  ],
+
+  "accommodation_bookings": [
+    {
+      "key": "alice-double",
+      "popup_key": "tech-summit",
+      "accommodation_key": "arcadia-double",
+      "check_in": "2026-06-15",
+      "check_out": "2026-06-20",
+      "mode": "purchase",
+      "application_key": "alice-techsummit",
+      "attendee_index": 0,
+      "guests": [
+        "Alice Johnson"
+      ]
+    },
+    {
+      "key": "bob-twin",
+      "popup_key": "tech-summit",
+      "accommodation_key": "arcadia-twin",
+      "check_in": "2026-06-14",
+      "check_out": "2026-06-21",
+      "mode": "purchase",
+      "application_key": "bob-techsummit",
+      "attendee_index": 0,
+      "guests": [
+        "Bob Smith",
+        "Sarah Smith"
+      ]
+    },
+    {
+      "key": "david-lodge",
+      "popup_key": "tech-summit",
+      "accommodation_key": "pine-lodge",
+      "check_in": "2026-06-13",
+      "check_out": "2026-06-21",
+      "mode": "purchase",
+      "application_key": "david-techsummit",
+      "attendee_index": 0,
+      "guests": [
+        "David Brown",
+        "Maria Brown",
+        "Tommy Brown",
+        "Lisa Brown"
+      ]
+    },
+    {
+      "key": "grace-studio",
+      "popup_key": "tech-summit",
+      "accommodation_key": "residences-studio",
+      "check_in": "2026-06-12",
+      "check_out": "2026-06-24",
+      "mode": "purchase",
+      "application_key": "grace-techsummit",
+      "attendee_index": 0,
+      "guests": [
+        "Grace Lee"
+      ]
+    },
+    {
+      "key": "alice-tent",
+      "popup_key": "tech-summit",
+      "accommodation_key": "glamping-tent",
+      "check_in": "2026-06-16",
+      "check_out": "2026-06-18",
+      "mode": "purchase",
+      "application_key": "alice-techsummit",
+      "attendee_index": 0,
+      "guests": [
+        "Alice Johnson"
+      ]
+    },
+    {
+      "key": "bob-dome-hold",
+      "popup_key": "tech-summit",
+      "accommodation_key": "glamping-dome",
+      "check_in": "2026-06-18",
+      "check_out": "2026-06-20",
+      "mode": "pending",
+      "application_key": "bob-techsummit",
+      "attendee_index": 1,
+      "guests": [
+        "Sarah Smith"
+      ]
+    },
+    {
+      "key": "keynote-cabin",
+      "popup_key": "tech-summit",
+      "accommodation_key": "pine-cabin",
+      "check_in": "2026-06-14",
+      "check_out": "2026-06-19",
+      "mode": "staff",
+      "unit_label": "Cabin 1",
+      "primary_guest_name": "Yuki Tanaka",
+      "primary_guest_email": "yuki.tanaka@example.com",
+      "guest_count": 1,
+      "notes": "Keynote speaker - comped by the organisers."
+    },
+    {
+      "key": "crew-penthouse",
+      "popup_key": "tech-summit",
+      "accommodation_key": "residences-penthouse",
+      "check_in": "2026-06-13",
+      "check_out": "2026-06-22",
+      "mode": "staff",
+      "unit_label": "PH-1",
+      "primary_guest_name": "Production crew",
+      "guest_count": 4,
+      "notes": "Production crew, booked by phone."
+    },
+    {
+      "key": "arcadia-101-repaint",
+      "popup_key": "tech-summit",
+      "accommodation_key": "arcadia-single",
+      "check_in": "2026-06-10",
+      "check_out": "2026-06-16",
+      "mode": "block",
+      "unit_label": "101",
+      "notes": "Repainting"
+    },
+    {
+      "key": "arcadia-102-repaint",
+      "popup_key": "tech-summit",
+      "accommodation_key": "arcadia-single",
+      "check_in": "2026-06-10",
+      "check_out": "2026-06-16",
+      "mode": "block",
+      "unit_label": "102",
+      "notes": "Repainting"
+    },
+    {
+      "key": "grace-twin-cancelled",
+      "popup_key": "tech-summit",
+      "accommodation_key": "hostel-twin",
+      "check_in": "2026-06-15",
+      "check_out": "2026-06-17",
+      "mode": "cancelled",
+      "application_key": "grace-techsummit",
+      "attendee_index": 0,
+      "guests": [
+        "Grace Lee"
+      ],
+      "notes": "Guest moved to the Studio Apartment."
+    },
+    {
+      "key": "double-212-leak",
+      "popup_key": "tech-summit",
+      "accommodation_key": "arcadia-double",
+      "check_in": "2026-06-16",
+      "check_out": "2026-06-22",
+      "mode": "block",
+      "unit_label": "212",
+      "notes": "Leaking shower"
+    },
+    {
+      "key": "double-alice-early",
+      "popup_key": "tech-summit",
+      "accommodation_key": "arcadia-double",
+      "check_in": "2026-06-12",
+      "check_out": "2026-06-15",
+      "mode": "purchase",
+      "application_key": "alice-techsummit",
+      "attendee_index": 0,
+      "guests": [
+        "Alice Johnson"
+      ]
+    },
+    {
+      "key": "double-bob-mid",
+      "popup_key": "tech-summit",
+      "accommodation_key": "arcadia-double",
+      "check_in": "2026-06-13",
+      "check_out": "2026-06-18",
+      "mode": "purchase",
+      "application_key": "bob-techsummit",
+      "attendee_index": 0,
+      "guests": [
+        "Bob Smith",
+        "Sarah Smith"
+      ]
+    },
+    {
+      "key": "double-bob-late",
+      "popup_key": "tech-summit",
+      "accommodation_key": "arcadia-double",
+      "check_in": "2026-06-19",
+      "check_out": "2026-06-24",
+      "mode": "purchase",
+      "application_key": "bob-techsummit",
+      "attendee_index": 0,
+      "guests": [
+        "Bob Smith"
+      ]
+    },
+    {
+      "key": "double-david-early",
+      "popup_key": "tech-summit",
+      "accommodation_key": "arcadia-double",
+      "check_in": "2026-06-12",
+      "check_out": "2026-06-16",
+      "mode": "purchase",
+      "application_key": "david-techsummit",
+      "attendee_index": 0,
+      "guests": [
+        "David Brown",
+        "Maria Brown"
+      ]
+    },
+    {
+      "key": "double-david-late",
+      "popup_key": "tech-summit",
+      "accommodation_key": "arcadia-double",
+      "check_in": "2026-06-17",
+      "check_out": "2026-06-22",
+      "mode": "purchase",
+      "application_key": "david-techsummit",
+      "attendee_index": 0,
+      "guests": [
+        "David Brown"
+      ]
+    },
+    {
+      "key": "double-grace-mid",
+      "popup_key": "tech-summit",
+      "accommodation_key": "arcadia-double",
+      "check_in": "2026-06-14",
+      "check_out": "2026-06-19",
+      "mode": "purchase",
+      "application_key": "grace-techsummit",
+      "attendee_index": 0,
+      "guests": [
+        "Grace Lee"
+      ]
+    },
+    {
+      "key": "double-grace-late",
+      "popup_key": "tech-summit",
+      "accommodation_key": "arcadia-double",
+      "check_in": "2026-06-20",
+      "check_out": "2026-06-24",
+      "mode": "purchase",
+      "application_key": "grace-techsummit",
+      "attendee_index": 0,
+      "guests": [
+        "Grace Lee"
+      ]
+    },
+    {
+      "key": "double-haddad",
+      "popup_key": "tech-summit",
+      "accommodation_key": "arcadia-double",
+      "check_in": "2026-06-12",
+      "check_out": "2026-06-18",
+      "mode": "staff",
+      "primary_guest_name": "Fatima Haddad",
+      "guest_count": 2,
+      "notes": "Booked by phone."
+    },
+    {
+      "key": "double-novakova",
+      "popup_key": "tech-summit",
+      "accommodation_key": "arcadia-double",
+      "check_in": "2026-06-12",
+      "check_out": "2026-06-14",
+      "mode": "staff",
+      "primary_guest_name": "Katarina Novakova",
+      "guest_count": 1,
+      "notes": "Booked by phone."
+    },
+    {
+      "key": "double-chen",
+      "popup_key": "tech-summit",
+      "accommodation_key": "arcadia-double",
+      "check_in": "2026-06-13",
+      "check_out": "2026-06-19",
+      "mode": "staff",
+      "primary_guest_name": "Mei-Ling Chen",
+      "guest_count": 2,
+      "notes": "Booked by phone."
+    },
+    {
+      "key": "double-almeida",
+      "popup_key": "tech-summit",
+      "accommodation_key": "arcadia-double",
+      "check_in": "2026-06-14",
+      "check_out": "2026-06-20",
+      "mode": "staff",
+      "primary_guest_name": "Lucas Almeida",
+      "guest_count": 2,
+      "notes": "Booked by phone."
+    },
+    {
+      "key": "double-byrne",
+      "popup_key": "tech-summit",
+      "accommodation_key": "arcadia-double",
+      "check_in": "2026-06-15",
+      "check_out": "2026-06-21",
+      "mode": "staff",
+      "primary_guest_name": "Ronan Byrne",
+      "guest_count": 2,
+      "notes": "Booked by phone."
+    },
+    {
+      "key": "double-ramirez",
+      "popup_key": "tech-summit",
+      "accommodation_key": "arcadia-double",
+      "check_in": "2026-06-18",
+      "check_out": "2026-06-23",
+      "mode": "staff",
+      "primary_guest_name": "Diego Ramirez",
+      "guest_count": 2,
+      "notes": "Booked by phone."
+    },
+    {
+      "key": "double-adeyemi",
+      "popup_key": "tech-summit",
+      "accommodation_key": "arcadia-double",
+      "check_in": "2026-06-19",
+      "check_out": "2026-06-24",
+      "mode": "staff",
+      "primary_guest_name": "Olu Adeyemi",
+      "guest_count": 2,
+      "notes": "Booked by phone."
+    },
+    {
+      "key": "double-nair",
+      "popup_key": "tech-summit",
+      "accommodation_key": "arcadia-double",
+      "check_in": "2026-06-21",
+      "check_out": "2026-06-24",
+      "mode": "staff",
+      "primary_guest_name": "Priya Nair",
+      "guest_count": 1,
+      "notes": "Booked by phone."
+    },
+    {
+      "key": "double-hold-midweek",
+      "popup_key": "tech-summit",
+      "accommodation_key": "arcadia-double",
+      "check_in": "2026-06-16",
+      "check_out": "2026-06-19",
+      "mode": "pending",
+      "application_key": "alice-techsummit",
+      "attendee_index": 0,
+      "guests": [
+        "Alice Johnson"
+      ]
+    },
+    {
+      "key": "double-hold-weekend",
+      "popup_key": "tech-summit",
+      "accommodation_key": "arcadia-double",
+      "check_in": "2026-06-22",
+      "check_out": "2026-06-24",
+      "mode": "pending",
+      "application_key": "grace-techsummit",
+      "attendee_index": 0,
+      "guests": [
+        "Grace Lee"
+      ]
+    },
+    {
+      "key": "double-bob-cancelled",
+      "popup_key": "tech-summit",
+      "accommodation_key": "arcadia-double",
+      "check_in": "2026-06-13",
+      "check_out": "2026-06-17",
+      "mode": "cancelled",
+      "application_key": "bob-techsummit",
+      "attendee_index": 1,
+      "guests": [
+        "Sarah Smith"
+      ],
+      "notes": "Changed to the Deluxe Twin."
+    }
   ]
 }

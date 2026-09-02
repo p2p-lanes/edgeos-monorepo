@@ -149,6 +149,10 @@ class ProductLine(BaseModel):
     quantity: int = Field(ge=1, default=1)
     attendee_id: uuid.UUID | None = None
     recipient_key: str | None = Field(default=None, min_length=1, max_length=255)
+    # Per-purchase blob, same contract as the authenticated flow.
+    # Accommodation booking metadata carries dates and guests, never a price;
+    # the server always computes the authoritative quote.
+    purchase_metadata: dict[str, Any] | None = None
 
     model_config = ConfigDict(extra="forbid")
 
@@ -269,6 +273,9 @@ class CheckoutPreviewLine(BaseModel):
     unit_price: Decimal
     line_total: Decimal
     discountable: bool
+    # Night-by-night breakdown when this line is an accommodation
+    # booking, so the checkout can show what makes up the total.
+    accommodation_quote: dict[str, Any] | None = None
 
 
 class CheckoutPreviewResponse(BaseModel):

@@ -334,7 +334,19 @@
     "cart": {
       "close_aria": "Close cart",
       "empty_title": "Your cart is empty",
-      "empty_description": "Please go back and select some passes to continue."
+      "empty_description": "Please go back and select some passes to continue.",
+      "unknown_attendee": "Unknown attendee",
+      "passes": "Passes",
+      "housing": "Housing",
+      "full_stay": "Full stay",
+      "merchandise": "Merchandise",
+      "patron_contribution": "Patron Contribution",
+      "community_support": "Community Support",
+      "meal_plans": "Meal Plans",
+      "pass_protection": "Pass Protection",
+      "pass_protection_description": "Coverage for all passes",
+      "promo_code": "Promo Code",
+      "promo_code_expired": "Your promo code is no longer valid"
     },
     "actions": {
       "pay": "Pay",
@@ -368,6 +380,46 @@
         "next_image_aria": "Next image"
       }
     },
+    "accommodation": {
+      "default_notice": "Accommodation is paid in full at checkout and is non-refundable.",
+      "in_cart": "In cart",
+      "sleeps": "Sleeps {{count}}",
+      "nights_one": "{{count}} night",
+      "nights_other": "{{count}} nights",
+      "monthly_rate": "monthly rate",
+      "per_night": "night",
+      "includes_tax": "Includes {{amount}} lodging tax",
+      "remove": "Remove",
+      "select": "Select",
+      "only_left_one": "Only {{count}} left",
+      "only_left_other": "Only {{count}} left",
+      "guests_label": "Guests",
+      "guests_one": "{{count}} guest",
+      "guests_other": "{{count}} guests",
+      "guest_name_placeholder": "Guest {{number}} full name",
+      "no_rooms": "No accommodation is available for this checkout.",
+      "check_in": "Check-in",
+      "check_out": "Check-out",
+      "who_is_staying": "Who is staying",
+      "cart_title": "Accommodation",
+      "bed_count": "{{count}} {{type}}",
+      "bed_types": {
+        "king": "King bed",
+        "queen": "Queen bed",
+        "double": "Double bed",
+        "single": "Single bed",
+        "bunk": "Bunk bed",
+        "sofa": "Sofa bed"
+      },
+      "unavailable": {
+        "sold_out": "Fully booked for these dates",
+        "min_stay_not_met": "Needs a longer stay",
+        "outside_bookable_window": "Not available on these dates",
+        "over_capacity": "Too small for your party",
+        "inactive": "Not available",
+        "default": "Not available for these dates"
+      }
+    },
     "contribution": {
       "fallbackLabel": "Event contribution",
       "fallbackDescription": "Helps fund the event"
@@ -395,6 +447,7 @@
     "flow_restriction_violated": "You are not eligible to purchase from this flow.",
     "product_not_in_flow": "This product is not available through this flow.",
     "amanita": {
+      "hero_headline": "4 days of music, art, yoga and workshops",
       "buyer_kicker": "Your details",
       "buyer_title": "You're one step away!",
       "buyer_intro": "Just a few details to issue your tickets — then all that's left is to confirm.",

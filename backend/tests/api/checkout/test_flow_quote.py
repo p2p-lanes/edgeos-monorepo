@@ -59,19 +59,32 @@ def _preview(
     coupon_code: str | None = None,
     token: str | None = None,
 ):
-    params = {"flow_slug": flow.slug} if flow else None
+    flow_slug = flow.slug if flow else "checkout"
     headers = {"X-Tenant-Id": str(tenant.id)}
     if token:
         headers["Authorization"] = f"Bearer {token}"
     body = {
-        "products": [{"product_id": str(product.id), "quantity": quantity}],
+        "products": [
+            {
+                "product_id": str(product.id),
+                "quantity": quantity,
+                "recipient_key": "buyer",
+            }
+        ],
+        "recipients": [
+            {
+                "recipient_key": "buyer",
+                "name": "Quote Buyer",
+                "email": "quote-recipient@test.com",
+                "profile_snapshot": {},
+            }
+        ],
         "coupon_code": coupon_code,
     }
     if buyer is not None:
         body["buyer"] = buyer
     return client.post(
-        f"/api/v1/checkout/{popup.slug}/preview",
-        params=params,
+        f"/api/v1/checkout/{popup.slug}/{flow_slug}/preview",
         headers=headers,
         json=body,
     )
@@ -103,7 +116,7 @@ def test_runtime_and_quote_keep_named_flow_over_compatible_default(
     assert quote.json()["selected_flow"]["id"] == str(named.id)
 
 
-def test_omitted_flow_uses_only_default_and_never_another_flow(
+def test_default_flow_slug_never_falls_back_to_another_flow(
     client: TestClient, db: Session, tenant_a: Tenants
 ) -> None:
     popup = _make_popup(db, tenant_a, slug_prefix="no-default-quote")
@@ -117,10 +130,11 @@ def test_omitted_flow_uses_only_default_and_never_another_flow(
     compatible = _preview(client, popup, tenant_a, product)
     assert compatible.json()["selected_flow"]["id"] == str(default_flow.id)
 
-    default_flow.is_default = False
-    db.add(default_flow)
-    db.commit()
-    omitted = _preview(client, popup, tenant_a, product)
+    omitted = client.post(
+        f"/api/v1/checkout/{popup.slug}/missing-flow/preview",
+        headers={"X-Tenant-Id": str(tenant_a.id)},
+        json={"products": [{"product_id": str(product.id), "quantity": 1}]},
+    )
 
     assert omitted.status_code == 404
     assert omitted.json()["detail"] == "Not found"
@@ -201,11 +215,24 @@ def test_complete_context_gets_definitive_quote_with_purchase_parity(
             is_installment_plan=False,
         )
         purchase = client.post(
-            f"/api/v1/checkout/{popup.slug}/purchase",
-            params={"flow_slug": flow.slug},
+            f"/api/v1/checkout/{popup.slug}/{flow.slug}/purchase",
             headers={"X-Tenant-Id": str(tenant_a.id)},
             json={
-                "products": [{"product_id": str(product.id), "quantity": 1}],
+                "products": [
+                    {
+                        "product_id": str(product.id),
+                        "quantity": 1,
+                        "recipient_key": "buyer",
+                    }
+                ],
+                "recipients": [
+                    {
+                        "recipient_key": "buyer",
+                        "name": "Quote Buyer",
+                        "email": "quote-recipient@test.com",
+                        "profile_snapshot": {},
+                    }
+                ],
                 "buyer": _buyer(form_data={field.name: "VIP"}),
                 "coupon_code": coupon.code,
                 "quote_token": quote["quote_token"],
@@ -260,10 +287,24 @@ def test_stale_quote_requotes_without_creating_charge(
     db.commit()
     with patch("app.services.simplefi.get_simplefi_client") as simplefi:
         purchase = client.post(
-            f"/api/v1/checkout/{popup.slug}/purchase",
+            f"/api/v1/checkout/{popup.slug}/checkout/purchase",
             headers={"X-Tenant-Id": str(tenant_a.id)},
             json={
-                "products": [{"product_id": str(product.id), "quantity": 1}],
+                "products": [
+                    {
+                        "product_id": str(product.id),
+                        "quantity": 1,
+                        "recipient_key": "buyer",
+                    }
+                ],
+                "recipients": [
+                    {
+                        "recipient_key": "buyer",
+                        "name": "Quote Buyer",
+                        "email": "quote-recipient@test.com",
+                        "profile_snapshot": {},
+                    }
+                ],
                 "buyer": _buyer("stale@test.com"),
                 "quote_token": preview.json()["quote_token"],
             },

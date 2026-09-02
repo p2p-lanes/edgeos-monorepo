@@ -179,7 +179,18 @@ def _purchase_create(
     *, email: str, products: list[Products], form_data: dict | None = None
 ) -> OpenTicketingPurchaseCreate:
     return OpenTicketingPurchaseCreate(
-        products=[ProductLine(product_id=p.id, quantity=1) for p in products],
+        products=[
+            ProductLine(product_id=p.id, quantity=1, recipient_key="buyer")
+            for p in products
+        ],
+        recipients=[
+            {
+                "recipient_key": "buyer",
+                "name": "Test Buyer",
+                "email": email,
+                "profile_snapshot": form_data or {},
+            }
+        ],
         buyer=BuyerInfo(
             email=email, first_name="Test", last_name="Buyer", form_data=form_data or {}
         ),
@@ -216,7 +227,7 @@ class TestOpenTicketingRestrictionGate:
 
         with pytest.raises(HTTPException) as exc_info:
             payments_crud.create_open_ticketing_payment(
-                db, obj=obj, popup=popup, tenant=tenant_a
+                db, obj=obj, popup=popup, tenant=tenant_a, flow_slug=flow.slug
             )
         assert exc_info.value.status_code == 403
         assert exc_info.value.detail == {"code": "flow_restriction_violated"}
@@ -252,7 +263,7 @@ class TestOpenTicketingRestrictionGate:
         )
 
         payment, _checkout_url, _redirect = payments_crud.create_open_ticketing_payment(
-            db, obj=obj, popup=popup, tenant=tenant_a
+            db, obj=obj, popup=popup, tenant=tenant_a, flow_slug=flow.slug
         )
         assert payment.id is not None
         assert payment.sales_flow_id == flow.id
@@ -278,7 +289,11 @@ class TestOpenTicketingRestrictionGate:
 
         with pytest.raises(HTTPException) as exc_info:
             payments_crud.create_open_ticketing_payment(
-                db, obj=obj, popup=popup, tenant=tenant_a
+                db,
+                obj=obj,
+                popup=popup,
+                tenant=tenant_a,
+                flow_slug=default_flow.slug,
             )
         assert exc_info.value.status_code == 403
         assert exc_info.value.detail == {"code": "product_not_in_flow"}
@@ -296,7 +311,7 @@ class TestOpenTicketingRestrictionGate:
             email=f"norule-{uuid.uuid4().hex[:8]}@test.com", products=[product]
         )
         payment, _checkout_url, _redirect = payments_crud.create_open_ticketing_payment(
-            db, obj=obj, popup=popup, tenant=tenant_a
+            db, obj=obj, popup=popup, tenant=tenant_a, flow_slug=flow.slug
         )
         assert payment.sales_flow_id == flow.id
 

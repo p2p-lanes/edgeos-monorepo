@@ -234,6 +234,7 @@ class TestScholarshipRequest:
         requested = client.patch(
             f"/api/v1/applications/my/{popup.id}",
             headers=headers,
+            params={"sales_flow_id": created.json()["sales_flow_id"]},
             json={"scholarship_request": True},
         )
         assert requested.status_code == 200, requested.text
@@ -242,6 +243,7 @@ class TestScholarshipRequest:
         withdrawn = client.patch(
             f"/api/v1/applications/my/{popup.id}",
             headers=headers,
+            params={"sales_flow_id": created.json()["sales_flow_id"]},
             json={"scholarship_request": False},
         )
         assert withdrawn.status_code == 200, withdrawn.text
@@ -275,6 +277,7 @@ class TestScholarshipRequest:
         updated = client.patch(
             f"/api/v1/applications/my/{popup.id}",
             headers={"Authorization": f"Bearer {human_token}"},
+            params={"sales_flow_id": str(application.sales_flow_id)},
             json={"scholarship_details": "Updated supporting information"},
         )
 

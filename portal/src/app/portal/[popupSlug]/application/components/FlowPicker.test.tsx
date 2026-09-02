@@ -141,8 +141,11 @@ describe("useSubmitApplication create-vs-update (rel-001 correction)", () => {
     return createElement(QueryClientProvider, { client: queryClient }, children)
   }
 
-  it("updates when the popup has no flow ambiguity (single/zero-flow)", async () => {
-    const existing = { id: "app-1" } as ApplicationPublic
+  it("updates an unambiguous application using its sales flow", async () => {
+    const existing = {
+      id: "app-1",
+      sales_flow_id: "flow-a",
+    } as ApplicationPublic
     const { result } = renderHook(
       () =>
         useSubmitApplication({
@@ -157,7 +160,9 @@ describe("useSubmitApplication create-vs-update (rel-001 correction)", () => {
 
     await act(async () => result.current.handleDraft())
 
-    expect(ApplicationsService.updateMyApplication).toHaveBeenCalled()
+    expect(ApplicationsService.updateMyApplication).toHaveBeenCalledWith(
+      expect.objectContaining({ salesFlowId: "flow-a" }),
+    )
     expect(ApplicationsService.createMyApplication).not.toHaveBeenCalled()
   })
 
@@ -191,7 +196,11 @@ describe("useSubmitApplication create-vs-update (rel-001 correction)", () => {
   })
 
   it("edits this door's own draft instead of opening a second one", async () => {
-    const existing = { id: "app-1" } as ApplicationPublic
+    const applications = [
+      { id: "app-1", sales_flow_id: "flow-a" },
+      { id: "app-2", sales_flow_id: "flow-b" },
+    ] as ApplicationPublic[]
+    const existing = applications[1]
     const { result } = renderHook(
       () =>
         useSubmitApplication({
@@ -207,7 +216,9 @@ describe("useSubmitApplication create-vs-update (rel-001 correction)", () => {
 
     await act(async () => result.current.handleDraft())
 
-    expect(ApplicationsService.updateMyApplication).toHaveBeenCalled()
+    expect(ApplicationsService.updateMyApplication).toHaveBeenCalledWith(
+      expect.objectContaining({ salesFlowId: "flow-b" }),
+    )
     expect(ApplicationsService.createMyApplication).not.toHaveBeenCalled()
   })
 })

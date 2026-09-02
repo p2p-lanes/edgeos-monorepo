@@ -106,6 +106,7 @@ def _make_referral(
         token=f"ref{uuid.uuid4().hex[:8]}",
         discount_percentage=discount_percentage,
         express_checkout=True,
+        auto_approve=True,
         is_disabled=is_disabled,
     )
     db.add(referral)
@@ -356,12 +357,12 @@ class TestReferralDiscountAtPayment:
 
         assert payment.amount == Decimal("80.00")
 
-    def test_disabled_referral_grants_no_discount(
+    def test_disabled_referral_preserves_existing_applicant_discount(
         self,
         db: Session,
         tenant_a: Tenants,
     ) -> None:
-        """An admin-disabled referral stops discounting immediately."""
+        """Disabling blocks new uses without changing an existing applicant."""
         popup = _make_popup(db, tenant_a)
         referrer = _make_human(db, tenant_a)
         buyer = _make_human(db, tenant_a)
@@ -381,4 +382,4 @@ class TestReferralDiscountAtPayment:
 
         payment = _create_payment(db, application, product, attendee)
 
-        assert payment.amount == Decimal("100.00")
+        assert payment.amount == Decimal("80.00")

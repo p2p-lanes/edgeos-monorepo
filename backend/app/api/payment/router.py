@@ -473,7 +473,18 @@ async def get_payment(
     return PaymentPublic.model_validate(payment)
 
 
-@router.get("/{payment_id}/invoice")
+@router.get(
+    "/{payment_id}/invoice",
+    response_class=Response,
+    responses={
+        status.HTTP_200_OK: {
+            "description": "Payment invoice PDF",
+            "content": {
+                "application/pdf": {"schema": {"type": "string", "format": "binary"}}
+            },
+        }
+    },
+)
 async def get_payment_invoice(
     payment_id: uuid.UUID,
     db: AdminOrApiKeySession_PaymentsRead,
@@ -791,6 +802,15 @@ async def list_my_payments(
 @router.get(
     "/my/{payment_id}/invoice",
     dependencies=[needs("portal:payments:read")],
+    response_class=Response,
+    responses={
+        status.HTTP_200_OK: {
+            "description": "Payment invoice PDF",
+            "content": {
+                "application/pdf": {"schema": {"type": "string", "format": "binary"}}
+            },
+        }
+    },
 )
 async def get_my_invoice(
     payment_id: uuid.UUID,

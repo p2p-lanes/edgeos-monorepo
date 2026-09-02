@@ -94,7 +94,7 @@ def test_upsert_open_cart_creates_cart_and_returns_restore_token(
     db.commit()
 
     response = client.put(
-        f"/api/v1/checkout/{popup.slug}/cart",
+        f"/api/v1/checkout/{popup.slug}/checkout/cart",
         json={"email": "buyer@test.com", "items": _items(product, promo_code="X10")},
         headers={"X-Tenant-Id": str(tenant_a.id)},
     )
@@ -147,7 +147,7 @@ def test_open_cart_converges_with_authenticated_cart(
 
     # Then the open-checkout upsert for the same email resolves to that cart.
     response = client.put(
-        f"/api/v1/checkout/{popup.slug}/cart",
+        f"/api/v1/checkout/{popup.slug}/checkout/cart",
         json={"email": "buyer@test.com", "items": _items(product, promo_code="A")},
         headers={"X-Tenant-Id": str(tenant_a.id)},
     )
@@ -168,7 +168,7 @@ def test_upsert_open_cart_without_secret_has_null_restore_token(
     db.commit()
 
     response = client.put(
-        f"/api/v1/checkout/{popup.slug}/cart",
+        f"/api/v1/checkout/{popup.slug}/checkout/cart",
         json={"email": "buyer@test.com", "items": _items(product)},
         headers={"X-Tenant-Id": str(tenant_a.id)},
     )
@@ -187,12 +187,12 @@ def test_upsert_open_cart_is_idempotent_per_email(
     db.commit()
 
     first = client.put(
-        f"/api/v1/checkout/{popup.slug}/cart",
+        f"/api/v1/checkout/{popup.slug}/checkout/cart",
         json={"email": "buyer@test.com", "items": _items(product, promo_code="A")},
         headers={"X-Tenant-Id": str(tenant_a.id)},
     )
     second = client.put(
-        f"/api/v1/checkout/{popup.slug}/cart",
+        f"/api/v1/checkout/{popup.slug}/checkout/cart",
         json={"email": "buyer@test.com", "items": _items(product, promo_code="B")},
         headers={"X-Tenant-Id": str(tenant_a.id)},
     )
@@ -224,12 +224,12 @@ def test_upsert_open_cart_email_is_case_insensitive(
     db.commit()
 
     first = client.put(
-        f"/api/v1/checkout/{popup.slug}/cart",
+        f"/api/v1/checkout/{popup.slug}/checkout/cart",
         json={"email": "Buyer@Test.com", "items": _items(product, promo_code="A")},
         headers={"X-Tenant-Id": str(tenant_a.id)},
     )
     second = client.put(
-        f"/api/v1/checkout/{popup.slug}/cart",
+        f"/api/v1/checkout/{popup.slug}/checkout/cart",
         json={"email": "BUYER@test.com", "items": _items(product, promo_code="B")},
         headers={"X-Tenant-Id": str(tenant_a.id)},
     )
@@ -256,13 +256,13 @@ def test_restore_open_cart_with_valid_signature_returns_items(
     db.commit()
 
     created = client.put(
-        f"/api/v1/checkout/{popup.slug}/cart",
+        f"/api/v1/checkout/{popup.slug}/checkout/cart",
         json={"email": "buyer@test.com", "items": _items(product, promo_code="X10")},
         headers={"X-Tenant-Id": str(tenant_a.id)},
     ).json()
 
     response = client.get(
-        f"/api/v1/checkout/{popup.slug}/cart",
+        f"/api/v1/checkout/{popup.slug}/checkout/cart",
         params={"cid": created["id"], "sig": created["restore_token"]},
         headers={"X-Tenant-Id": str(tenant_a.id)},
     )
@@ -285,13 +285,13 @@ def test_restore_open_cart_invalid_signature_returns_403(
     db.commit()
 
     created = client.put(
-        f"/api/v1/checkout/{popup.slug}/cart",
+        f"/api/v1/checkout/{popup.slug}/checkout/cart",
         json={"email": "buyer@test.com", "items": _items(product)},
         headers={"X-Tenant-Id": str(tenant_a.id)},
     ).json()
 
     response = client.get(
-        f"/api/v1/checkout/{popup.slug}/cart",
+        f"/api/v1/checkout/{popup.slug}/checkout/cart",
         params={"cid": created["id"], "sig": "tampered"},
         headers={"X-Tenant-Id": str(tenant_a.id)},
     )
@@ -311,13 +311,13 @@ def test_restore_open_cart_without_secret_returns_404(
     db.commit()
 
     created = client.put(
-        f"/api/v1/checkout/{popup.slug}/cart",
+        f"/api/v1/checkout/{popup.slug}/checkout/cart",
         json={"email": "buyer@test.com", "items": _items(product)},
         headers={"X-Tenant-Id": str(tenant_a.id)},
     ).json()
 
     response = client.get(
-        f"/api/v1/checkout/{popup.slug}/cart",
+        f"/api/v1/checkout/{popup.slug}/checkout/cart",
         params={"cid": created["id"], "sig": "anything"},
         headers={"X-Tenant-Id": str(tenant_a.id)},
     )
@@ -337,7 +337,7 @@ def test_restore_open_cart_unknown_cid_returns_404(
     valid_sig = build_cart_restore_token(missing_cid, "s3cr3t")
 
     response = client.get(
-        f"/api/v1/checkout/{popup.slug}/cart",
+        f"/api/v1/checkout/{popup.slug}/checkout/cart",
         params={"cid": missing_cid, "sig": valid_sig},
         headers={"X-Tenant-Id": str(tenant_a.id)},
     )

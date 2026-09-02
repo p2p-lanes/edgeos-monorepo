@@ -19,7 +19,9 @@ import uuid
 from fastapi.testclient import TestClient
 from sqlmodel import Session
 
+from app.api.application.models import Applications
 from app.api.human.models import Humans
+from app.api.popup.models import Popups
 from app.api.sales_flow.models import SalesFlows
 from app.api.tenant.models import Tenants
 from app.core.security import create_access_token
@@ -268,3 +270,199 @@ class TestMyApplicationSurfaceWithMultiFlowApplications:
         )
         assert participation_resp.status_code == 200, participation_resp.text
         assert participation_resp.json()["type"] == "applicant"
+
+
+class TestFlowScopedPortalUpdate:
+    @staticmethod
+    def _create_application(
+        client: TestClient,
+        token: str,
+        popup_id: str,
+        sales_flow_id: uuid.UUID | None = None,
+    ) -> dict:
+        payload = {
+            "popup_id": popup_id,
+            "first_name": "Pat",
+            "last_name": "Doe",
+            "status": "draft",
+        }
+        if sales_flow_id is not None:
+            payload["sales_flow_id"] = str(sales_flow_id)
+        response = client.post(
+            "/api/v1/applications/my", headers=_headers(token), json=payload
+        )
+        assert response.status_code == 201, response.text
+        return response.json()
+
+    @staticmethod
+    def _make_flow(db: Session, tenant: Tenants, popup_id: str) -> SalesFlows:
+        flow = SalesFlows(
+            tenant_id=tenant.id,
+            popup_id=uuid.UUID(popup_id),
+            slug=f"update-{uuid.uuid4().hex[:8]}",
+            name="Update target",
+            type="application",
+        )
+        db.add(flow)
+        db.commit()
+        db.refresh(flow)
+        return flow
+
+    def test_selected_flow_updates_only_its_application(
+        self,
+        client: TestClient,
+        db: Session,
+        tenant_a: Tenants,
+        admin_token_tenant_a: str,
+    ) -> None:
+        popup_id = _create_popup_via_api(client, admin_token_tenant_a)
+        secondary_flow = self._make_flow(db, tenant_a, popup_id)
+        token = _make_human_token(db, tenant_a)
+        default_application = self._create_application(client, token, popup_id)
+        secondary_application = self._create_application(
+            client, token, popup_id, secondary_flow.id
+        )
+
+        response = client.patch(
+            f"/api/v1/applications/my/{popup_id}",
+            headers=_headers(token),
+            params={"sales_flow_id": str(secondary_flow.id)},
+            json={"referral": "secondary-only"},
+        )
+
+        assert response.status_code == 200, response.text
+        assert response.json()["id"] == secondary_application["id"]
+        db.expire_all()
+        default_row = db.get(Applications, uuid.UUID(default_application["id"]))
+        secondary_row = db.get(Applications, uuid.UUID(secondary_application["id"]))
+        assert default_row is not None
+        assert secondary_row is not None
+        assert default_row.referral is None
+        assert secondary_row.referral == "secondary-only"
+
+    def test_missing_sales_flow_id_is_rejected(
+        self,
+        client: TestClient,
+        db: Session,
+        tenant_a: Tenants,
+        admin_token_tenant_a: str,
+    ) -> None:
+        popup_id = _create_popup_via_api(client, admin_token_tenant_a)
+        token = _make_human_token(db, tenant_a)
+        application = self._create_application(client, token, popup_id)
+
+        response = client.patch(
+            f"/api/v1/applications/my/{popup_id}",
+            headers=_headers(token),
+            json={"referral": "must-not-change"},
+        )
+
+        assert response.status_code == 422, response.text
+        db.expire_all()
+        row = db.get(Applications, uuid.UUID(application["id"]))
+        assert row is not None
+        assert row.referral is None
+
+    def test_unknown_sales_flow_id_does_not_update_an_application(
+        self,
+        client: TestClient,
+        db: Session,
+        tenant_a: Tenants,
+        admin_token_tenant_a: str,
+    ) -> None:
+        popup_id = _create_popup_via_api(client, admin_token_tenant_a)
+        token = _make_human_token(db, tenant_a)
+        application = self._create_application(client, token, popup_id)
+
+        response = client.patch(
+            f"/api/v1/applications/my/{popup_id}",
+            headers=_headers(token),
+            params={"sales_flow_id": str(uuid.uuid4())},
+            json={"referral": "must-not-change"},
+        )
+
+        assert response.status_code == 404, response.text
+        db.expire_all()
+        row = db.get(Applications, uuid.UUID(application["id"]))
+        assert row is not None
+        assert row.referral is None
+
+    def test_flow_from_another_popup_cannot_redirect_the_update(
+        self,
+        client: TestClient,
+        db: Session,
+        tenant_a: Tenants,
+        admin_token_tenant_a: str,
+    ) -> None:
+        popup_id = _create_popup_via_api(client, admin_token_tenant_a)
+        other_popup_id = _create_popup_via_api(client, admin_token_tenant_a)
+        token = _make_human_token(db, tenant_a)
+        target = self._create_application(client, token, popup_id)
+        other = self._create_application(client, token, other_popup_id)
+
+        response = client.patch(
+            f"/api/v1/applications/my/{popup_id}",
+            headers=_headers(token),
+            params={"sales_flow_id": other["sales_flow_id"]},
+            json={"referral": "must-not-change"},
+        )
+
+        assert response.status_code == 404, response.text
+        db.expire_all()
+        target_row = db.get(Applications, uuid.UUID(target["id"]))
+        other_row = db.get(Applications, uuid.UUID(other["id"]))
+        assert target_row is not None
+        assert other_row is not None
+        assert target_row.referral is None
+        assert other_row.referral is None
+
+    def test_another_human_cannot_update_the_selected_application(
+        self,
+        client: TestClient,
+        db: Session,
+        tenant_a: Tenants,
+        admin_token_tenant_a: str,
+    ) -> None:
+        popup_id = _create_popup_via_api(client, admin_token_tenant_a)
+        owner_token = _make_human_token(db, tenant_a)
+        attacker_token = _make_human_token(db, tenant_a)
+        application = self._create_application(client, owner_token, popup_id)
+
+        response = client.patch(
+            f"/api/v1/applications/my/{popup_id}",
+            headers=_headers(attacker_token),
+            params={"sales_flow_id": application["sales_flow_id"]},
+            json={"referral": "must-not-change"},
+        )
+
+        assert response.status_code == 404, response.text
+        db.expire_all()
+        row = db.get(Applications, uuid.UUID(application["id"]))
+        assert row is not None
+        assert row.referral is None
+
+    def test_flow_from_another_tenant_is_not_visible(
+        self,
+        client: TestClient,
+        db: Session,
+        tenant_a: Tenants,
+        popup_tenant_b: Popups,
+        default_flow_tenant_b: SalesFlows,
+        admin_token_tenant_a: str,
+    ) -> None:
+        popup_id = _create_popup_via_api(client, admin_token_tenant_a)
+        token = _make_human_token(db, tenant_a)
+        application = self._create_application(client, token, popup_id)
+
+        response = client.patch(
+            f"/api/v1/applications/my/{popup_tenant_b.id}",
+            headers=_headers(token),
+            params={"sales_flow_id": str(default_flow_tenant_b.id)},
+            json={"referral": "must-not-change"},
+        )
+
+        assert response.status_code == 404, response.text
+        db.expire_all()
+        row = db.get(Applications, uuid.UUID(application["id"]))
+        assert row is not None
+        assert row.referral is None

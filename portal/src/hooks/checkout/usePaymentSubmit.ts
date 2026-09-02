@@ -22,6 +22,7 @@ import { queryKeys } from "@/lib/query-keys"
 import type { AttendeePassState } from "@/types/Attendee"
 import type {
   CheckoutStep,
+  SelectedAccommodationItem,
   SelectedDynamicItem,
   SelectedHousingItem,
   SelectedMealPlanItem,
@@ -46,6 +47,7 @@ interface UsePaymentSubmitParams {
   attendeePasses: AttendeePassState[]
   selectedPasses: SelectedPassItem[]
   housing: SelectedHousingItem | null
+  accommodations: SelectedAccommodationItem[]
   merch: SelectedMerchItem[]
   patron: SelectedPatronItem | null
   selectedMealPlans: SelectedMealPlanItem[]
@@ -90,10 +92,11 @@ interface PaymentSubmitResult {
   error?: string
 }
 
-function buildOpenTicketingProductLines(
+export function buildOpenTicketingProductLines(
   products: PaymentProductRequest[],
 ): ProductLine[] {
-  const lines = new Map<string, ProductLine>()
+  const lines: ProductLine[] = []
+  const mergeableLineIndexes = new Map<string, number>()
 
   for (const product of products) {
     const identity = product.recipient_key
@@ -108,12 +111,25 @@ function buildOpenTicketingProductLines(
         : ["ownerless"]
     const key = JSON.stringify([product.product_id, ...identityKey])
     const quantity = product.quantity ?? 1
-    const existing = lines.get(key)
+    const purchaseMetadata = product.purchase_metadata ?? undefined
+    const existingIndex = mergeableLineIndexes.get(key)
 
-    if (existing) {
+    // Metadata describes one concrete purchase unit. Even byte-identical
+    // accommodation blobs stay separate because every room line gets its own
+    // unit; different dates must never collapse behind the same product id.
+    if (purchaseMetadata !== undefined) {
+      lines.push({
+        product_id: product.product_id,
+        ...identity,
+        quantity,
+        purchase_metadata: purchaseMetadata,
+      })
+    } else if (existingIndex !== undefined) {
+      const existing = lines[existingIndex]
       existing.quantity = (existing.quantity ?? 1) + quantity
     } else {
-      lines.set(key, {
+      mergeableLineIndexes.set(key, lines.length)
+      lines.push({
         product_id: product.product_id,
         ...identity,
         quantity,
@@ -121,7 +137,7 @@ function buildOpenTicketingProductLines(
     }
   }
 
-  return [...lines.values()]
+  return lines
 }
 
 export function usePaymentSubmit({
@@ -134,6 +150,7 @@ export function usePaymentSubmit({
   attendeePasses,
   selectedPasses,
   housing,
+  accommodations,
   merch,
   patron,
   selectedMealPlans,
@@ -207,6 +224,7 @@ export function usePaymentSubmit({
     const hasAnyCartSelection =
       selectedPasses.length > 0 ||
       !!housing ||
+      accommodations.length > 0 ||
       merch.length > 0 ||
       !!patron ||
       selectedMealPlans.length > 0 ||
@@ -245,6 +263,7 @@ export function usePaymentSubmit({
         attendeePasses,
         selectedPasses,
         housing,
+        accommodations,
         merch,
         patron,
         selectedMealPlans,
@@ -253,6 +272,7 @@ export function usePaymentSubmit({
         appCredit,
         checkoutMode,
         editPassesEnabled,
+        submitMode,
       })
 
       const result =
@@ -481,6 +501,7 @@ export function usePaymentSubmit({
     selectedPasses,
     merch,
     housing,
+    accommodations,
     patron,
     selectedMealPlans,
     dynamicItems,

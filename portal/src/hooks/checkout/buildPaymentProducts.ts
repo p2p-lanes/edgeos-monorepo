@@ -8,6 +8,7 @@ import type {
 } from "@/client"
 import type { AttendeePassState } from "@/types/Attendee"
 import type {
+  SelectedAccommodationItem,
   SelectedDynamicItem,
   SelectedHousingItem,
   SelectedMealPlanItem,
@@ -20,6 +21,7 @@ interface BuildPaymentProductsParams {
   attendeePasses: AttendeePassState[]
   selectedPasses: SelectedPassItem[]
   housing: SelectedHousingItem | null
+  accommodations?: SelectedAccommodationItem[]
   merch: SelectedMerchItem[]
   patron: SelectedPatronItem | null
   selectedMealPlans?: SelectedMealPlanItem[]
@@ -28,6 +30,7 @@ interface BuildPaymentProductsParams {
   appCredit: string | number | null | undefined
   checkoutMode?: CheckoutMode
   editPassesEnabled?: boolean
+  submitMode?: "application" | "open-ticketing"
 }
 
 interface BuildPaymentProductsResult {
@@ -72,11 +75,13 @@ function detectMonthUpgrade(attendeePasses: AttendeePassState[]): boolean {
  * - Month upgrade mode (month selected with existing week/day)
  * - Day pass quantity deltas (quantity - original_quantity)
  * - Housing, merch, and patron products
+ * - Accommodation bookings (priced server-side from their dates)
  */
 export function buildPaymentProducts({
   attendeePasses,
   selectedPasses,
   housing,
+  accommodations = [],
   merch,
   patron,
   selectedMealPlans = [],
@@ -85,6 +90,7 @@ export function buildPaymentProducts({
   appCredit,
   checkoutMode = CHECKOUT_MODE.PASS_SYSTEM,
   editPassesEnabled = false,
+  submitMode = "application",
 }: BuildPaymentProductsParams): BuildPaymentProductsResult {
   const isMonthUpgrade =
     editPassesEnabled &&
@@ -92,6 +98,14 @@ export function buildPaymentProducts({
     detectMonthUpgrade(attendeePasses)
   const products: PaymentProductRequest[] = []
   const recipients = new Map<string, PaymentRecipientRequest>()
+  const accommodationAttendeeId =
+    submitMode === "application"
+      ? attendeePasses.find(
+          (attendee) =>
+            !attendee.id.startsWith("open-buyer-") &&
+            !attendee.id.startsWith("recipient:"),
+        )?.id
+      : undefined
   const selectedPassesByIdentity = new Map(
     selectedPasses.map((pass) => [
       `${pass.attendeeId}:${pass.productId}`,
@@ -251,6 +265,32 @@ export function buildPaymentProducts({
           })
         }
       }
+    }
+
+    // Add accommodations: one line per booked room, pointing at that room's
+    // shadow product. No price travels: the backend re-quotes the stay from
+    // the dates in `purchase_metadata` and charges that, so a tampered price
+    // has nothing to tamper with. `quantity` must be 1, because a second room is a
+    // second line, because each one is assigned its own unit.
+    for (const item of accommodations) {
+      products.push({
+        product_id: item.productId,
+        ...(accommodationAttendeeId
+          ? { attendee_id: accommodationAttendeeId }
+          : {}),
+        quantity: 1,
+        purchase_metadata: {
+          kind: "accommodation_booking",
+          accommodation_id: item.accommodationId,
+          check_in: item.checkIn,
+          check_out: item.checkOut,
+          guest_count: item.guestCount,
+          guests: item.guests
+            .map((name) => name.trim())
+            .filter(Boolean)
+            .map((name) => ({ name })),
+        },
+      })
     }
 
     // Add meal plans — one PaymentProductRequest per (attendee, weekly product),

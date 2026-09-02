@@ -15,6 +15,374 @@ export type AbandonedCartPublic = {
 };
 
 /**
+ * Per-accommodation answer to "can I book these dates, and for how much".
+ *
+ * ``available`` is a count, not a boolean: the checkout shows "3 left".
+ * ``unavailable_reason`` explains a zero so the UI can say *why* (too short
+ * a stay, outside the bookable window, sold out).
+ */
+export type AccommodationAvailability = {
+    accommodation_id: string;
+    available: number;
+    quote?: (AccommodationQuote | null);
+    unavailable_reason?: (string | null);
+};
+
+export type AccommodationAvailabilityRequest = {
+    check_in: string;
+    check_out: string;
+    guest_count?: (number | null);
+};
+
+/**
+ * Take a whole room type off the market for a range.
+ *
+ * One booking per unit, so the calendar shows the block on every row and
+ * the exclusion constraint keeps guests out.
+ */
+export type AccommodationBlockRange = {
+    popup_id: string;
+    accommodation_id: string;
+    check_in: string;
+    check_out: string;
+    kind?: BookingKind;
+    notes?: (string | null);
+};
+
+/**
+ * Staff-created booking (comp, block, maintenance).
+ *
+ * ``unit_id`` is optional: without it the backend picks a free unit of the
+ * accommodation with the same best-fit logic the checkout uses.
+ */
+export type AccommodationBookingCreate = {
+    popup_id: string;
+    accommodation_id: string;
+    unit_id?: (string | null);
+    kind?: BookingKind;
+    check_in: string;
+    check_out: string;
+    guest_count?: (number | null);
+    guests?: Array<BookingGuest>;
+    primary_guest_name?: (string | null);
+    primary_guest_email?: (string | null);
+    notes?: (string | null);
+    ignore_restrictions?: boolean;
+};
+
+export type AccommodationBookingPublic = {
+    tenant_id: string;
+    popup_id: string;
+    accommodation_id: string;
+    unit_id: string;
+    kind?: BookingKind;
+    status?: BookingStatus;
+    check_in: string;
+    check_out: string;
+    guest_count?: (number | null);
+    guests?: Array<{
+        [key: string]: unknown;
+    }>;
+    primary_guest_name?: (string | null);
+    primary_guest_email?: (string | null);
+    attendee_id?: (string | null);
+    human_id?: (string | null);
+    payment_id?: (string | null);
+    payment_product_id?: (string | null);
+    price_snapshot?: ({
+    [key: string]: unknown;
+} | null);
+    hold_expires_at?: (string | null);
+    notes?: (string | null);
+    created_by_user_id?: (string | null);
+    created_at?: string;
+    updated_at?: string;
+    id: string;
+    nights?: number;
+};
+
+export type AccommodationBookingUpdate = {
+    unit_id?: (string | null);
+    status?: (BookingStatus | null);
+    guest_count?: (number | null);
+    guests?: (Array<BookingGuest> | null);
+    primary_guest_name?: (string | null);
+    primary_guest_email?: (string | null);
+    notes?: (string | null);
+};
+
+/**
+ * Selects room types by attribute instead of by id.
+ *
+ * Exists so an operator (or an agent over MCP) can say "every room in this
+ * property" without first listing them.
+ */
+export type AccommodationBulkFilter = {
+    popup_id: string;
+    property_id?: (string | null);
+    kind?: (AccommodationKind | null);
+    is_active?: (boolean | null);
+};
+
+/**
+ * Re-price many room types at once.
+ *
+ * Without a date range this moves ``default_nightly_price``; with one it
+ * creates (or replaces) a date-range rule per room type, which is how a
+ * "high season +20%" is expressed.
+ */
+export type AccommodationBulkPrice = {
+    ids?: (Array<(string)> | null);
+    filter?: (AccommodationBulkFilter | null);
+    mode?: BulkPriceMode;
+    value: (number | string);
+    start_date?: (string | null);
+    end_date?: (string | null);
+    label?: (string | null);
+    priority?: number;
+};
+
+/**
+ * Apply one patch to many room types.
+ *
+ * Named ``...Request`` rather than ``...Update`` on purpose: this is the
+ * envelope of a bulk endpoint, not a PATCH body. The PATCH body it carries
+ * is ``patch``, and that one is a real ``*Update`` schema.
+ */
+export type AccommodationBulkUpdateRequest = {
+    ids?: (Array<(string)> | null);
+    filter?: (AccommodationBulkFilter | null);
+    patch: AccommodationUpdate;
+};
+
+export type AccommodationCalendar = {
+    date_from: string;
+    date_to: string;
+    properties?: Array<CalendarProperty>;
+};
+
+export type AccommodationCreate = {
+    popup_id: string;
+    property_id: string;
+    name: string;
+    kind?: AccommodationKind;
+    description?: (string | null);
+    guest_capacity?: number;
+    beds?: Array<BedSpec>;
+    default_nightly_price: (number | string);
+    long_stay_price?: (number | string | null);
+    min_stay_override?: (number | null);
+    bookable_from: string;
+    bookable_to: string;
+    visible_in_checkout?: boolean;
+    is_active?: boolean;
+    sort_order?: number;
+    units_count?: (number | null);
+    unit_label_prefix?: (string | null);
+    image_ids?: (Array<(string)> | null);
+};
+
+/**
+ * Copy a room type, optionally with its units and price rules.
+ */
+export type AccommodationDuplicate = {
+    name?: (string | null);
+    copy_units?: boolean;
+    units_count?: (number | null);
+    copy_price_rules?: boolean;
+    copy_images?: boolean;
+};
+
+export type AccommodationImageCreate = {
+    popup_id: string;
+    url: string;
+    filename?: (string | null);
+    width?: (number | null);
+    height?: (number | null);
+};
+
+export type AccommodationImagePublic = {
+    id: string;
+    url: string;
+    filename?: (string | null);
+    width?: (number | null);
+    height?: (number | null);
+};
+
+/**
+ * Physical shape of an accommodation type. Presentational only.
+ */
+export type AccommodationKind = 'room' | 'apartment' | 'studio' | 'tent' | 'cabin' | 'other';
+
+/**
+ * Everything the accommodation step needs to render before dates exist.
+ */
+export type AccommodationOffer = {
+    properties?: Array<PublicAccommodationProperty>;
+    accommodations?: Array<PublicAccommodation>;
+    currency?: (string | null);
+};
+
+export type AccommodationPriceRuleCreate = {
+    label?: (string | null);
+    start_date: string;
+    end_date: string;
+    nightly_price: (number | string);
+    priority?: number;
+};
+
+export type AccommodationPriceRulePublic = {
+    tenant_id: string;
+    popup_id: string;
+    accommodation_id: string;
+    label?: (string | null);
+    start_date: string;
+    end_date: string;
+    nightly_price: string;
+    priority?: number;
+    created_at?: string;
+    updated_at?: string;
+    id: string;
+};
+
+export type AccommodationPriceRuleUpdate = {
+    label?: (string | null);
+    start_date?: (string | null);
+    end_date?: (string | null);
+    nightly_price?: (number | string | null);
+    priority?: (number | null);
+};
+
+export type AccommodationPropertyCreate = {
+    popup_id: string;
+    name: string;
+    address?: (string | null);
+    description?: (string | null);
+    contact_email?: (string | null);
+    contact_name?: (string | null);
+    tax_percentage?: (number | string | null);
+    is_active?: boolean;
+    sort_order?: number;
+};
+
+export type AccommodationPropertyPublic = {
+    tenant_id: string;
+    popup_id: string;
+    name: string;
+    address?: (string | null);
+    description?: (string | null);
+    contact_email?: (string | null);
+    contact_name?: (string | null);
+    tax_percentage?: (string | null);
+    is_active?: boolean;
+    sort_order?: number;
+    created_at?: string;
+    updated_at?: string;
+    id: string;
+};
+
+export type AccommodationPropertyUpdate = {
+    name?: (string | null);
+    address?: (string | null);
+    description?: (string | null);
+    contact_email?: (string | null);
+    contact_name?: (string | null);
+    tax_percentage?: (number | string | null);
+    is_active?: (boolean | null);
+    sort_order?: (number | null);
+};
+
+export type AccommodationPublic = {
+    tenant_id: string;
+    popup_id: string;
+    property_id: string;
+    product_id?: (string | null);
+    name: string;
+    kind?: AccommodationKind;
+    description?: (string | null);
+    guest_capacity?: number;
+    beds?: Array<{
+        [key: string]: unknown;
+    }>;
+    default_nightly_price: string;
+    long_stay_price?: (string | null);
+    min_stay_override?: (number | null);
+    bookable_from: string;
+    bookable_to: string;
+    visible_in_checkout?: boolean;
+    is_active?: boolean;
+    sort_order?: number;
+    deleted_at?: (string | null);
+    created_at?: string;
+    updated_at?: string;
+    id: string;
+    units?: Array<AccommodationUnitPublic>;
+    images?: Array<AccommodationImagePublic>;
+};
+
+/**
+ * Server-computed price of a stay. The client never sends prices.
+ *
+ * Stored verbatim in ``accommodation_bookings.price_snapshot`` and in the
+ * payment line's ``purchase_metadata.quote`` so a booking can always be
+ * explained after the fact, even if the rules change afterwards.
+ */
+export type AccommodationQuote = {
+    nights: Array<QuoteNight>;
+    night_count: number;
+    subtotal: string;
+    tax_percentage?: (string | null);
+    tax?: string;
+    total: string;
+    applied_rule: string;
+    currency?: (string | null);
+};
+
+/**
+ * Either explicit labels, or ``prefix`` + ``count`` -> "Room 1..N".
+ */
+export type AccommodationUnitBulkCreate = {
+    labels?: (Array<(string)> | null);
+    prefix?: (string | null);
+    count?: (number | null);
+    start_at?: number;
+};
+
+export type AccommodationUnitPublic = {
+    id: string;
+    accommodation_id: string;
+    label: string;
+    notes?: (string | null);
+    is_active: boolean;
+    sort_order: number;
+};
+
+export type AccommodationUnitUpdate = {
+    label?: (string | null);
+    notes?: (string | null);
+    is_active?: (boolean | null);
+    sort_order?: (number | null);
+};
+
+export type AccommodationUpdate = {
+    property_id?: (string | null);
+    name?: (string | null);
+    kind?: (AccommodationKind | null);
+    description?: (string | null);
+    guest_capacity?: (number | null);
+    beds?: (Array<BedSpec> | null);
+    default_nightly_price?: (number | string | null);
+    long_stay_price?: (number | string | null);
+    min_stay_override?: (number | null);
+    bookable_from?: (string | null);
+    bookable_to?: (string | null);
+    visible_in_checkout?: (boolean | null);
+    is_active?: (boolean | null);
+    sort_order?: (number | null);
+    image_ids?: (Array<(string)> | null);
+};
+
+/**
  * Request body for POST /groups/{id}/members/by-application.
  */
 export type AddMemberByApplicationRequest = {
@@ -41,7 +409,7 @@ export type status = 'added' | 'invited';
  */
 export type AdminApiKeyCreate = {
     name: string;
-    scopes: Array<('events:read' | 'events:write' | 'rsvp:write' | 'venues:read' | 'venues:write' | 'applications:read' | 'applications:write' | 'attendees:read' | 'attendees:write' | 'humans:read' | 'humans:write' | 'groups:read' | 'groups:write' | 'products:read' | 'products:write' | 'coupons:read' | 'coupons:write' | 'forms:read' | 'forms:write' | 'payments:read' | 'tracks:read' | 'tracks:write' | 'ticketing_steps:read' | 'ticketing_steps:write' | 'translations:read' | 'translations:write')>;
+    scopes: Array<('events:read' | 'events:write' | 'rsvp:write' | 'venues:read' | 'venues:write' | 'applications:read' | 'applications:write' | 'attendees:read' | 'attendees:write' | 'humans:read' | 'humans:write' | 'groups:read' | 'groups:write' | 'products:read' | 'products:write' | 'accommodations:read' | 'accommodations:write' | 'coupons:read' | 'coupons:write' | 'forms:read' | 'forms:write' | 'payments:read' | 'tracks:read' | 'tracks:write' | 'ticketing_steps:read' | 'ticketing_steps:write' | 'translations:read' | 'translations:write')>;
     expires_at?: (string | null);
 };
 
@@ -54,7 +422,7 @@ export type AdminApiKeyCreated = {
     id: string;
     name: string;
     prefix: string;
-    scopes: Array<('events:read' | 'events:write' | 'rsvp:write' | 'venues:read' | 'venues:write' | 'applications:read' | 'applications:write' | 'attendees:read' | 'attendees:write' | 'humans:read' | 'humans:write' | 'groups:read' | 'groups:write' | 'products:read' | 'products:write' | 'coupons:read' | 'coupons:write' | 'forms:read' | 'forms:write' | 'payments:read' | 'tracks:read' | 'tracks:write' | 'ticketing_steps:read' | 'ticketing_steps:write' | 'translations:read' | 'translations:write')>;
+    scopes: Array<('events:read' | 'events:write' | 'rsvp:write' | 'venues:read' | 'venues:write' | 'applications:read' | 'applications:write' | 'attendees:read' | 'attendees:write' | 'humans:read' | 'humans:write' | 'groups:read' | 'groups:write' | 'products:read' | 'products:write' | 'accommodations:read' | 'accommodations:write' | 'coupons:read' | 'coupons:write' | 'forms:read' | 'forms:write' | 'payments:read' | 'tracks:read' | 'tracks:write' | 'ticketing_steps:read' | 'ticketing_steps:write' | 'translations:read' | 'translations:write')>;
     created_at: string;
     last_used_at?: (string | null);
     expires_at?: (string | null);
@@ -69,7 +437,7 @@ export type AdminApiKeyPublic = {
     id: string;
     name: string;
     prefix: string;
-    scopes: Array<('events:read' | 'events:write' | 'rsvp:write' | 'venues:read' | 'venues:write' | 'applications:read' | 'applications:write' | 'attendees:read' | 'attendees:write' | 'humans:read' | 'humans:write' | 'groups:read' | 'groups:write' | 'products:read' | 'products:write' | 'coupons:read' | 'coupons:write' | 'forms:read' | 'forms:write' | 'payments:read' | 'tracks:read' | 'tracks:write' | 'ticketing_steps:read' | 'ticketing_steps:write' | 'translations:read' | 'translations:write')>;
+    scopes: Array<('events:read' | 'events:write' | 'rsvp:write' | 'venues:read' | 'venues:write' | 'applications:read' | 'applications:write' | 'attendees:read' | 'attendees:write' | 'humans:read' | 'humans:write' | 'groups:read' | 'groups:write' | 'products:read' | 'products:write' | 'accommodations:read' | 'accommodations:write' | 'coupons:read' | 'coupons:write' | 'forms:read' | 'forms:write' | 'payments:read' | 'tracks:read' | 'tracks:write' | 'ticketing_steps:read' | 'ticketing_steps:write' | 'translations:read' | 'translations:write')>;
     created_at: string;
     last_used_at?: (string | null);
     expires_at?: (string | null);
@@ -91,6 +459,52 @@ export type AdminGrantTicketsResponse = {
     granted: Array<GrantedPaymentInfo>;
 };
 
+export type AIConversationPublic = {
+    id: string;
+    title: string;
+    messages: Array<{
+        [key: string]: unknown;
+    }>;
+    schema_version: number;
+    revision: number;
+    created_at: string;
+    updated_at: string;
+    expires_at: string;
+    usage?: AIConversationUsageSummary;
+};
+
+export type AIConversationUpsert = {
+    messages: Array<{
+        [key: string]: unknown;
+    }>;
+};
+
+export type AIConversationUsageSummary = {
+    input_tokens?: number;
+    cached_input_tokens?: number;
+    output_tokens?: number;
+    reasoning_tokens?: number;
+    models?: Array<(string)>;
+    providers?: Array<(string)>;
+    response_count?: number;
+};
+
+export type AIExecutionClaimRequest = {
+    fingerprint: string;
+};
+
+export type AIExecutionClaimResponse = {
+    state: 'acquired' | 'pending' | 'completed';
+    result?: unknown;
+};
+
+export type state = 'acquired' | 'pending' | 'completed';
+
+export type AIExecutionCompleteRequest = {
+    fingerprint: string;
+    result: unknown;
+};
+
 export type AITranslateRequest = {
     entity_type: string;
     entity_id: string;
@@ -104,7 +518,7 @@ export type ApiKeyCreate = {
     name: string;
     popup_id: string;
     expires_at?: (string | null);
-    scopes?: Array<('events:read' | 'events:write' | 'rsvp:write' | 'venues:read' | 'venues:write' | 'applications:read' | 'applications:write' | 'attendees:read' | 'attendees:write' | 'humans:read' | 'humans:write' | 'groups:read' | 'groups:write' | 'products:read' | 'products:write' | 'coupons:read' | 'coupons:write' | 'forms:read' | 'forms:write' | 'payments:read' | 'tracks:read' | 'tracks:write' | 'ticketing_steps:read' | 'ticketing_steps:write' | 'translations:read' | 'translations:write')>;
+    scopes?: Array<('events:read' | 'events:write' | 'rsvp:write' | 'venues:read' | 'venues:write' | 'applications:read' | 'applications:write' | 'attendees:read' | 'attendees:write' | 'humans:read' | 'humans:write' | 'groups:read' | 'groups:write' | 'products:read' | 'products:write' | 'accommodations:read' | 'accommodations:write' | 'coupons:read' | 'coupons:write' | 'forms:read' | 'forms:write' | 'payments:read' | 'tracks:read' | 'tracks:write' | 'ticketing_steps:read' | 'ticketing_steps:write' | 'translations:read' | 'translations:write')>;
 };
 
 /**
@@ -116,7 +530,7 @@ export type ApiKeyCreated = {
     name: string;
     prefix: string;
     popup_id?: (string | null);
-    scopes: Array<('events:read' | 'events:write' | 'rsvp:write' | 'venues:read' | 'venues:write' | 'applications:read' | 'applications:write' | 'attendees:read' | 'attendees:write' | 'humans:read' | 'humans:write' | 'groups:read' | 'groups:write' | 'products:read' | 'products:write' | 'coupons:read' | 'coupons:write' | 'forms:read' | 'forms:write' | 'payments:read' | 'tracks:read' | 'tracks:write' | 'ticketing_steps:read' | 'ticketing_steps:write' | 'translations:read' | 'translations:write')>;
+    scopes: Array<('events:read' | 'events:write' | 'rsvp:write' | 'venues:read' | 'venues:write' | 'applications:read' | 'applications:write' | 'attendees:read' | 'attendees:write' | 'humans:read' | 'humans:write' | 'groups:read' | 'groups:write' | 'products:read' | 'products:write' | 'accommodations:read' | 'accommodations:write' | 'coupons:read' | 'coupons:write' | 'forms:read' | 'forms:write' | 'payments:read' | 'tracks:read' | 'tracks:write' | 'ticketing_steps:read' | 'ticketing_steps:write' | 'translations:read' | 'translations:write')>;
     created_at: string;
     last_used_at?: (string | null);
     expires_at?: (string | null);
@@ -132,7 +546,7 @@ export type ApiKeyPublic = {
     name: string;
     prefix: string;
     popup_id?: (string | null);
-    scopes: Array<('events:read' | 'events:write' | 'rsvp:write' | 'venues:read' | 'venues:write' | 'applications:read' | 'applications:write' | 'attendees:read' | 'attendees:write' | 'humans:read' | 'humans:write' | 'groups:read' | 'groups:write' | 'products:read' | 'products:write' | 'coupons:read' | 'coupons:write' | 'forms:read' | 'forms:write' | 'payments:read' | 'tracks:read' | 'tracks:write' | 'ticketing_steps:read' | 'ticketing_steps:write' | 'translations:read' | 'translations:write')>;
+    scopes: Array<('events:read' | 'events:write' | 'rsvp:write' | 'venues:read' | 'venues:write' | 'applications:read' | 'applications:write' | 'attendees:read' | 'attendees:write' | 'humans:read' | 'humans:write' | 'groups:read' | 'groups:write' | 'products:read' | 'products:write' | 'accommodations:read' | 'accommodations:write' | 'coupons:read' | 'coupons:write' | 'forms:read' | 'forms:write' | 'payments:read' | 'tracks:read' | 'tracks:write' | 'ticketing_steps:read' | 'ticketing_steps:write' | 'translations:read' | 'translations:write')>;
     created_at: string;
     last_used_at?: (string | null);
     expires_at?: (string | null);
@@ -147,6 +561,17 @@ export type ApplicantParticipation = {
     application_id: string;
     status: string;
 };
+
+/**
+ * Resolved source through which an application was accessed.
+ */
+export type ApplicationAccessSource = {
+    kind: 'group' | 'invite' | 'referral';
+    id: string;
+    label: string;
+};
+
+export type kind = 'group' | 'invite' | 'referral';
 
 /**
  * Application schema for admin creation.
@@ -275,6 +700,7 @@ export type ApplicationPublic = {
     invite_id?: (string | null);
     referral_id?: (string | null);
     referred_by_name?: (string | null);
+    access_sources?: Array<ApplicationAccessSource>;
     info_not_shared?: Array<(string)>;
     status: string;
     custom_fields?: {
@@ -927,6 +1353,52 @@ export type BaseFieldConfigUpdate = {
 };
 
 /**
+ * One entry of ``accommodations.beds``: "2 single beds".
+ */
+export type BedSpec = {
+    type: BedType;
+    count: number;
+};
+
+/**
+ * Bed types listed in ``accommodations.beds``.
+ */
+export type BedType = 'king' | 'queen' | 'double' | 'single' | 'bunk' | 'sofa';
+
+export type BlockRangeResult = {
+    created: number;
+    skipped: number;
+    booking_ids: Array<(string)>;
+};
+
+/**
+ * One occupant.
+ *
+ * Names are collected in the checkout and exported to the property owner,
+ * who needs them for their own registry.
+ */
+export type BookingGuest = {
+    name: string;
+};
+
+/**
+ * Why a unit is occupied.
+ *
+ * ``GUEST`` bookings come from the checkout (or are created manually by
+ * staff for comps); ``BLOCK`` / ``MAINTENANCE`` are internal and never
+ * carry a payment.
+ */
+export type BookingKind = 'guest' | 'block' | 'maintenance';
+
+/**
+ * Lifecycle of a booking.
+ *
+ * ``HOLD`` and ``CONFIRMED`` are the *blocking* states: they are the ones
+ * covered by the exclusion constraint, so only those two occupy a unit.
+ */
+export type BookingStatus = 'hold' | 'confirmed' | 'cancelled' | 'expired';
+
+/**
  * The 'report a bug' payload, open to every backoffice user.
  *
  * Produces a to-do task in the reporter's tenant scope. The reporter can
@@ -944,6 +1416,16 @@ export type BugReportCreate = {
     attachments?: Array<TaskAttachmentCreate>;
 };
 
+export type BulkPriceMode = 'set' | 'percent';
+
+/**
+ * How many rows a bulk call touched. Deliberately not the rows
+ * themselves: a bulk over a whole property would be a huge response.
+ */
+export type BulkResult = {
+    updated: number;
+};
+
 /**
  * Buyer identification and form data for open-ticketing purchase.
  */
@@ -956,6 +1438,53 @@ export type BuyerInfo = {
     };
 };
 
+export type CalendarAccommodation = {
+    id: string;
+    name: string;
+    kind: AccommodationKind;
+    guest_capacity: number;
+    units?: Array<CalendarUnit>;
+    availability_by_day?: {
+        [key: string]: (number);
+    };
+};
+
+/**
+ * One bar on the calendar.
+ */
+export type CalendarBooking = {
+    id: string;
+    unit_id: string;
+    accommodation_id: string;
+    kind: BookingKind;
+    status: BookingStatus;
+    check_in: string;
+    check_out: string;
+    nights: number;
+    guest_count?: (number | null);
+    primary_guest_name?: (string | null);
+    primary_guest_email?: (string | null);
+    payment_id?: (string | null);
+    total?: (string | null);
+    notes?: (string | null);
+};
+
+export type CalendarProperty = {
+    id: string;
+    name: string;
+    accommodations?: Array<CalendarAccommodation>;
+};
+
+/**
+ * One row of the calendar.
+ */
+export type CalendarUnit = {
+    id: string;
+    label: string;
+    is_active: boolean;
+    bookings?: Array<CalendarBooking>;
+};
+
 /**
  * Embedded human info for abandoned cart listing.
  */
@@ -964,6 +1493,26 @@ export type CartHumanInfo = {
     email: string;
     first_name?: (string | null);
     last_name?: (string | null);
+};
+
+/**
+ * A room the buyer picked, as it survives a page reload.
+ *
+ * Keyed by ``accommodation_id`` rather than by the shadow ``product_id``:
+ * the product is an implementation detail of how the booking travels
+ * through payments, and resolving it at purchase time means a cart saved
+ * before a room was re-synced still points at the right room.
+ *
+ * Guests are stored as plain names: the buyer types nothing else about
+ * them, and the ``{name: ...}`` shape the purchase needs is built when the
+ * payment is submitted.
+ */
+export type CartItemAccommodation = {
+    accommodation_id: string;
+    check_in: string;
+    check_out: string;
+    guest_count?: (number | null);
+    guests?: Array<(string)>;
 };
 
 /**
@@ -1065,6 +1614,7 @@ export type CartState = {
     merch?: Array<CartItemMerch>;
     patron?: (CartItemPatron | null);
     meal_plans?: Array<CartItemMealPlan>;
+    accommodations?: Array<CartItemAccommodation>;
     promo_code?: (string | null);
     insurance?: boolean;
     current_step?: (string | null);
@@ -1172,6 +1722,9 @@ export type CheckoutPreviewLine = {
     unit_price: string;
     line_total: string;
     discountable: boolean;
+    accommodation_quote?: ({
+    [key: string]: unknown;
+} | null);
 };
 
 /**
@@ -1206,7 +1759,7 @@ export type CheckoutPreviewResponse = {
     quote_expires_at?: (string | null);
 };
 
-export type kind = 'estimate' | 'definitive';
+export type kind2 = 'estimate' | 'definitive';
 
 /**
  * Short-lived token that unlocks the checkout runtime for a live preview.
@@ -1406,6 +1959,15 @@ export type CredentialType = 'crud' | 'readonly';
 export type CumulativeTrends = {
     tickets?: Array<TimelinePoint>;
     revenue?: Array<RevenueTimelinePoint>;
+};
+
+export type CustomExportSpec = {
+    dataset: string;
+    popup_id?: (string | null);
+    columns: Array<ExportColumn>;
+    filters?: Array<ExportFilter>;
+    format?: ExportFormat;
+    filename?: (string | null);
 };
 
 /**
@@ -1722,6 +2284,7 @@ export type EventParticipantPublic = {
     created_at?: string;
     updated_at?: string;
     id: string;
+    popup_id?: (string | null);
     first_name?: (string | null);
     last_name?: (string | null);
 };
@@ -2026,6 +2589,77 @@ export type EventVenueUpdate = {
 };
 
 export type EventVisibility = 'public' | 'private' | 'unlisted';
+
+export type ExportCatalogPublic = {
+    datasets: Array<ExportDatasetPublic>;
+    formats: Array<ExportFormat>;
+    limits: {
+        [key: string]: (number);
+    };
+};
+
+export type ExportColumn = {
+    field: string;
+    label?: (string | null);
+};
+
+export type ExportDatasetPublic = {
+    dataset: string;
+    label: string;
+    description: string;
+    scope: 'organization' | 'gathering';
+    row_label: string;
+    fields: Array<ExportFieldPublic>;
+};
+
+export type scope = 'organization' | 'gathering';
+
+export type ExportDownloadRequest = {
+    spec: CustomExportSpec;
+    fingerprint: string;
+};
+
+export type ExportFieldPublic = {
+    field: string;
+    label: string;
+    type: string;
+    sensitivity: string;
+    filter_operators: Array<(string)>;
+};
+
+export type ExportFilter = {
+    field: string;
+    operator: 'eq' | 'neq' | 'contains' | 'not_contains' | 'in' | 'is_empty' | 'not_empty' | 'gt' | 'gte' | 'lt' | 'lte' | 'before' | 'after';
+    value?: unknown;
+};
+
+export type operator = 'eq' | 'neq' | 'contains' | 'not_contains' | 'in' | 'is_empty' | 'not_empty' | 'gt' | 'gte' | 'lt' | 'lte' | 'before' | 'after';
+
+export type ExportFormat = 'csv' | 'xlsx';
+
+export type ExportPreview = {
+    title: string;
+    dataset: string;
+    dataset_label: string;
+    scope: 'organization' | 'gathering';
+    row_label: string;
+    estimated_rows: number;
+    columns: Array<ExportPreviewColumn>;
+    filters: Array<ExportFilter>;
+    warnings: Array<(string)>;
+    format: ExportFormat;
+    filename: string;
+    spec: CustomExportSpec;
+    fingerprint: string;
+    generated_at: string;
+};
+
+export type ExportPreviewColumn = {
+    field: string;
+    label: string;
+    type: string;
+    sensitivity: string;
+};
 
 /**
  * Which settings each kind of flow can use.
@@ -2834,6 +3468,26 @@ export type ListModel_AbandonedCartPublic_ = {
     paging: Paging;
 };
 
+export type ListModel_AccommodationBookingPublic_ = {
+    results: Array<AccommodationBookingPublic>;
+    paging: Paging;
+};
+
+export type ListModel_AccommodationImagePublic_ = {
+    results: Array<AccommodationImagePublic>;
+    paging: Paging;
+};
+
+export type ListModel_AccommodationPropertyPublic_ = {
+    results: Array<AccommodationPropertyPublic>;
+    paging: Paging;
+};
+
+export type ListModel_AccommodationPublic_ = {
+    results: Array<AccommodationPublic>;
+    paging: Paging;
+};
+
 export type ListModel_ApplicationCommentPublic_ = {
     results: Array<ApplicationCommentPublic>;
     paging: Paging;
@@ -3509,6 +4163,7 @@ export type PopupAdmin = {
     events_enabled?: boolean;
     self_check_in_enabled?: boolean;
     checkin_pass_lead_days?: (number | null);
+    accommodation_min_stay?: number;
     show_attendee_directory?: boolean;
     edit_passes_enabled?: boolean;
     invites_enabled?: boolean;
@@ -3589,6 +4244,7 @@ export type PopupCreate = {
     installments_interval?: InstallmentInterval;
     installments_interval_count?: number;
     checkin_pass_lead_days?: (number | null);
+    accommodation_min_stay?: number;
     abandoned_cart_delay_days?: (number | null);
     abandoned_cart_repeat_days?: (number | null);
     abandoned_cart_max_count?: (number | null);
@@ -3645,6 +4301,7 @@ export type PopupPublic = {
     contribution_description?: (string | null);
     application_layout?: ApplicationLayout;
     events_enabled?: boolean;
+    accommodation_min_stay?: number;
     show_attendee_directory?: boolean;
     edit_passes_enabled?: boolean;
     invites_enabled?: boolean;
@@ -3752,6 +4409,7 @@ export type PopupUpdate = {
     installments_interval?: (InstallmentInterval | null);
     installments_interval_count?: (number | null);
     checkin_pass_lead_days?: (number | null);
+    accommodation_min_stay?: (number | null);
     invites_enabled?: (boolean | null);
     referrals_enabled?: (boolean | null);
     group_private_events_enabled?: (boolean | null);
@@ -3904,6 +4562,7 @@ export type ProductBatchResult = {
     requires_check_in?: boolean;
     discountable?: boolean;
     sold_out_override?: boolean;
+    managed_by?: (string | null);
     id: string;
     success: boolean;
     err_msg?: (string | null);
@@ -3955,6 +4614,9 @@ export type ProductLine = {
     quantity?: number;
     attendee_id?: (string | null);
     recipient_key?: (string | null);
+    purchase_metadata?: ({
+    [key: string]: unknown;
+} | null);
 };
 
 /**
@@ -3988,6 +4650,7 @@ export type ProductPublic = {
     requires_check_in?: boolean;
     discountable?: boolean;
     sold_out_override?: boolean;
+    managed_by?: (string | null);
     id: string;
 };
 
@@ -4050,8 +4713,64 @@ export type ProductWithQuantity = {
     requires_check_in?: boolean;
     discountable?: boolean;
     sold_out_override?: boolean;
+    managed_by?: (string | null);
     id: string;
     quantity?: number;
+};
+
+/**
+ * A room type as the buyer sees it.
+ *
+ * No units: how many rooms exist, and which one a guest lands in, is the
+ * operator's business. What the checkout needs is whether *a* room is free,
+ * which is what the availability endpoint answers.
+ */
+export type PublicAccommodation = {
+    id: string;
+    property_id: string;
+    product_id?: (string | null);
+    name: string;
+    kind: AccommodationKind;
+    description?: (string | null);
+    guest_capacity: number;
+    beds?: Array<BedSpec>;
+    default_nightly_price: string;
+    long_stay_price?: (string | null);
+    min_stay: number;
+    bookable_from: string;
+    bookable_to: string;
+    images?: Array<AccommodationImagePublic>;
+};
+
+/**
+ * What a room type costs for these dates, and whether it can be had.
+ *
+ * The quote is server-computed and comes back with the availability so the
+ * checkout never multiplies a nightly price by a night count, because date-range
+ * rules and the long-stay price make that arithmetic wrong more often than
+ * it is right.
+ */
+export type PublicAccommodationAvailability = {
+    accommodation_id: string;
+    available: number;
+    unavailable_reason?: (string | null);
+    quote?: (AccommodationQuote | null);
+};
+
+/**
+ * A property as the buyer sees it.
+ *
+ * Deliberately narrower than ``AccommodationPropertyPublic``: the contact
+ * name and email belong to the operator's relationship with the owner, not
+ * to a checkout page. The tax percentage is exposed because it shows up as
+ * a line in the quote and the buyer is entitled to know why.
+ */
+export type PublicAccommodationProperty = {
+    id: string;
+    name: string;
+    address?: (string | null);
+    description?: (string | null);
+    tax_percentage?: (string | null);
 };
 
 export type PublishableKeyCreate = {
@@ -4086,6 +4805,15 @@ export type PublishableKeyPublic = {
 };
 
 export type PublishPermission = 'admin_only' | 'everyone';
+
+/**
+ * Price of a single night plus the rule that produced it.
+ */
+export type QuoteNight = {
+    date: string;
+    price: string;
+    rule: string;
+};
 
 /**
  * UI-friendly representation of the subset of RFC-5545 we support.
@@ -4838,7 +5566,7 @@ export type TenantUpdate = {
 export type ThirdPartyAppCreate = {
     name: string;
     allowed_token_scopes?: Array<('portal:*' | 'portal:profile:read' | 'portal:profile:write' | 'portal:applications:read' | 'portal:applications:write' | 'portal:attendees:write' | 'portal:payments:read' | 'portal:directory:read' | 'portal:api_keys:manage')>;
-    allowed_api_key_scopes?: Array<('events:read' | 'events:write' | 'rsvp:write' | 'venues:read' | 'venues:write' | 'applications:read' | 'applications:write' | 'attendees:read' | 'attendees:write' | 'humans:read' | 'humans:write' | 'groups:read' | 'groups:write' | 'products:read' | 'products:write' | 'coupons:read' | 'coupons:write' | 'forms:read' | 'forms:write' | 'payments:read' | 'tracks:read' | 'tracks:write' | 'ticketing_steps:read' | 'ticketing_steps:write' | 'translations:read' | 'translations:write')>;
+    allowed_api_key_scopes?: Array<('events:read' | 'events:write' | 'rsvp:write' | 'venues:read' | 'venues:write' | 'applications:read' | 'applications:write' | 'attendees:read' | 'attendees:write' | 'humans:read' | 'humans:write' | 'groups:read' | 'groups:write' | 'products:read' | 'products:write' | 'accommodations:read' | 'accommodations:write' | 'coupons:read' | 'coupons:write' | 'forms:read' | 'forms:write' | 'payments:read' | 'tracks:read' | 'tracks:write' | 'ticketing_steps:read' | 'ticketing_steps:write' | 'translations:read' | 'translations:write')>;
 };
 
 /**
@@ -4889,7 +5617,7 @@ export type ThirdPartyAppPublic = {
 export type ThirdPartyAppUpdate = {
     name?: (string | null);
     allowed_token_scopes?: (Array<('portal:*' | 'portal:profile:read' | 'portal:profile:write' | 'portal:applications:read' | 'portal:applications:write' | 'portal:attendees:write' | 'portal:payments:read' | 'portal:directory:read' | 'portal:api_keys:manage')> | null);
-    allowed_api_key_scopes?: (Array<('events:read' | 'events:write' | 'rsvp:write' | 'venues:read' | 'venues:write' | 'applications:read' | 'applications:write' | 'attendees:read' | 'attendees:write' | 'humans:read' | 'humans:write' | 'groups:read' | 'groups:write' | 'products:read' | 'products:write' | 'coupons:read' | 'coupons:write' | 'forms:read' | 'forms:write' | 'payments:read' | 'tracks:read' | 'tracks:write' | 'ticketing_steps:read' | 'ticketing_steps:write' | 'translations:read' | 'translations:write')> | null);
+    allowed_api_key_scopes?: (Array<('events:read' | 'events:write' | 'rsvp:write' | 'venues:read' | 'venues:write' | 'applications:read' | 'applications:write' | 'attendees:read' | 'attendees:write' | 'humans:read' | 'humans:write' | 'groups:read' | 'groups:write' | 'products:read' | 'products:write' | 'accommodations:read' | 'accommodations:write' | 'coupons:read' | 'coupons:write' | 'forms:read' | 'forms:write' | 'payments:read' | 'tracks:read' | 'tracks:write' | 'ticketing_steps:read' | 'ticketing_steps:write' | 'translations:read' | 'translations:write')> | null);
 };
 
 /**
@@ -5330,6 +6058,269 @@ export type VenueWeeklyHoursUpdate = {
     hours: Array<VenueWeeklyHourInput>;
 };
 
+export type AccommodationsListPropertiesData = {
+    activeOnly?: boolean;
+    popupId: string;
+    search?: (string | null);
+    xTenantId?: (string | null);
+};
+
+export type AccommodationsListPropertiesResponse = (ListModel_AccommodationPropertyPublic_);
+
+export type AccommodationsCreatePropertyData = {
+    requestBody: AccommodationPropertyCreate;
+    xTenantId?: (string | null);
+};
+
+export type AccommodationsCreatePropertyResponse = (AccommodationPropertyPublic);
+
+export type AccommodationsGetPropertyData = {
+    propertyId: string;
+    xTenantId?: (string | null);
+};
+
+export type AccommodationsGetPropertyResponse = (AccommodationPropertyPublic);
+
+export type AccommodationsUpdatePropertyData = {
+    propertyId: string;
+    requestBody: AccommodationPropertyUpdate;
+    xTenantId?: (string | null);
+};
+
+export type AccommodationsUpdatePropertyResponse = (AccommodationPropertyPublic);
+
+export type AccommodationsDeletePropertyData = {
+    propertyId: string;
+    xTenantId?: (string | null);
+};
+
+export type AccommodationsDeletePropertyResponse = (void);
+
+export type AccommodationsGetCalendarData = {
+    dateFrom: string;
+    dateTo: string;
+    popupId: string;
+    propertyId?: (string | null);
+    xTenantId?: (string | null);
+};
+
+export type AccommodationsGetCalendarResponse = (AccommodationCalendar);
+
+export type AccommodationsGetAvailabilityData = {
+    checkIn: string;
+    checkOut: string;
+    popupId: string;
+    propertyId?: (string | null);
+    xTenantId?: (string | null);
+};
+
+export type AccommodationsGetAvailabilityResponse = (Array<AccommodationAvailability>);
+
+export type AccommodationsListBookingsData = {
+    accommodationId?: (string | null);
+    dateFrom: string;
+    dateTo: string;
+    popupId: string;
+    propertyId?: (string | null);
+    search?: (string | null);
+    statuses?: (Array<BookingStatus> | null);
+    xTenantId?: (string | null);
+};
+
+export type AccommodationsListBookingsResponse = (ListModel_AccommodationBookingPublic_);
+
+export type AccommodationsCreateManualBookingData = {
+    requestBody: AccommodationBookingCreate;
+    xTenantId?: (string | null);
+};
+
+export type AccommodationsCreateManualBookingResponse = (AccommodationBookingPublic);
+
+export type AccommodationsBlockRangeData = {
+    requestBody: AccommodationBlockRange;
+    xTenantId?: (string | null);
+};
+
+export type AccommodationsBlockRangeResponse = (BlockRangeResult);
+
+export type AccommodationsUpdateBookingData = {
+    bookingId: string;
+    requestBody: AccommodationBookingUpdate;
+    xTenantId?: (string | null);
+};
+
+export type AccommodationsUpdateBookingResponse = (AccommodationBookingPublic);
+
+export type AccommodationsExportBookingsData = {
+    accommodationId?: (string | null);
+    dateFrom: string;
+    dateTo: string;
+    popupId: string;
+    propertyId?: (string | null);
+    search?: (string | null);
+    statuses?: (Array<BookingStatus> | null);
+    xTenantId?: (string | null);
+};
+
+export type AccommodationsExportBookingsResponse = (unknown);
+
+export type AccommodationsListImagesData = {
+    popupId: string;
+    xTenantId?: (string | null);
+};
+
+export type AccommodationsListImagesResponse = (ListModel_AccommodationImagePublic_);
+
+export type AccommodationsCreateImageData = {
+    requestBody: AccommodationImageCreate;
+    xTenantId?: (string | null);
+};
+
+export type AccommodationsCreateImageResponse = (AccommodationImagePublic);
+
+export type AccommodationsDeleteImageData = {
+    imageId: string;
+    xTenantId?: (string | null);
+};
+
+export type AccommodationsDeleteImageResponse = (void);
+
+export type AccommodationsUpdateUnitData = {
+    requestBody: AccommodationUnitUpdate;
+    unitId: string;
+    xTenantId?: (string | null);
+};
+
+export type AccommodationsUpdateUnitResponse = (AccommodationUnitPublic);
+
+export type AccommodationsDeleteUnitData = {
+    unitId: string;
+    xTenantId?: (string | null);
+};
+
+export type AccommodationsDeleteUnitResponse = (void);
+
+export type AccommodationsUpdatePriceRuleData = {
+    requestBody: AccommodationPriceRuleUpdate;
+    ruleId: string;
+    xTenantId?: (string | null);
+};
+
+export type AccommodationsUpdatePriceRuleResponse = (AccommodationPriceRulePublic);
+
+export type AccommodationsDeletePriceRuleData = {
+    ruleId: string;
+    xTenantId?: (string | null);
+};
+
+export type AccommodationsDeletePriceRuleResponse = (void);
+
+export type AccommodationsBulkUpdateAccommodationsData = {
+    requestBody: AccommodationBulkUpdateRequest;
+    xTenantId?: (string | null);
+};
+
+export type AccommodationsBulkUpdateAccommodationsResponse = (BulkResult);
+
+export type AccommodationsBulkPriceAccommodationsData = {
+    requestBody: AccommodationBulkPrice;
+    xTenantId?: (string | null);
+};
+
+export type AccommodationsBulkPriceAccommodationsResponse = (BulkResult);
+
+export type AccommodationsListAccommodationsData = {
+    popupId: string;
+    propertyId?: (string | null);
+    search?: (string | null);
+    xTenantId?: (string | null);
+};
+
+export type AccommodationsListAccommodationsResponse = (ListModel_AccommodationPublic_);
+
+export type AccommodationsCreateAccommodationData = {
+    requestBody: AccommodationCreate;
+    xTenantId?: (string | null);
+};
+
+export type AccommodationsCreateAccommodationResponse = (AccommodationPublic);
+
+export type AccommodationsGetAccommodationData = {
+    accommodationId: string;
+    xTenantId?: (string | null);
+};
+
+export type AccommodationsGetAccommodationResponse = (AccommodationPublic);
+
+export type AccommodationsUpdateAccommodationData = {
+    accommodationId: string;
+    requestBody: AccommodationUpdate;
+    xTenantId?: (string | null);
+};
+
+export type AccommodationsUpdateAccommodationResponse = (AccommodationPublic);
+
+export type AccommodationsDeleteAccommodationData = {
+    accommodationId: string;
+    xTenantId?: (string | null);
+};
+
+export type AccommodationsDeleteAccommodationResponse = (void);
+
+export type AccommodationsDuplicateAccommodationData = {
+    accommodationId: string;
+    requestBody: AccommodationDuplicate;
+    xTenantId?: (string | null);
+};
+
+export type AccommodationsDuplicateAccommodationResponse = (AccommodationPublic);
+
+export type AccommodationsBulkCreateUnitsData = {
+    accommodationId: string;
+    requestBody: AccommodationUnitBulkCreate;
+    xTenantId?: (string | null);
+};
+
+export type AccommodationsBulkCreateUnitsResponse = (Array<AccommodationUnitPublic>);
+
+export type AccommodationsListPriceRulesData = {
+    accommodationId: string;
+    xTenantId?: (string | null);
+};
+
+export type AccommodationsListPriceRulesResponse = (Array<AccommodationPriceRulePublic>);
+
+export type AccommodationsCreatePriceRuleData = {
+    accommodationId: string;
+    requestBody: AccommodationPriceRuleCreate;
+    xTenantId?: (string | null);
+};
+
+export type AccommodationsCreatePriceRuleResponse = (AccommodationPriceRulePublic);
+
+export type AccommodationsSetAccommodationImagesData = {
+    accommodationId: string;
+    requestBody: Array<(string)>;
+    xTenantId?: (string | null);
+};
+
+export type AccommodationsSetAccommodationImagesResponse = (Array<AccommodationImagePublic>);
+
+export type AccommodationsListPortalAccommodationsData = {
+    popupId: string;
+    salesFlowId: string;
+};
+
+export type AccommodationsListPortalAccommodationsResponse = (AccommodationOffer);
+
+export type AccommodationsCheckPortalAccommodationAvailabilityData = {
+    popupId: string;
+    requestBody: AccommodationAvailabilityRequest;
+    salesFlowId: string;
+};
+
+export type AccommodationsCheckPortalAccommodationAvailabilityResponse = (Array<PublicAccommodationAvailability>);
+
 export type AdminApiKeysCreateAdminApiKeyData = {
     requestBody: AdminApiKeyCreate;
     xTenantId?: (string | null);
@@ -5356,6 +6347,50 @@ export type AdminApiKeysRevokeAdminApiKeyData = {
 };
 
 export type AdminApiKeysRevokeAdminApiKeyResponse = (void);
+
+export type AiConversationsListAiConversationsData = {
+    xTenantId?: (string | null);
+};
+
+export type AiConversationsListAiConversationsResponse = (Array<AIConversationPublic>);
+
+export type AiConversationsGetAiConversationData = {
+    conversationId: string;
+    xTenantId?: (string | null);
+};
+
+export type AiConversationsGetAiConversationResponse = (AIConversationPublic);
+
+export type AiConversationsUpsertAiConversationData = {
+    conversationId: string;
+    requestBody: AIConversationUpsert;
+    xTenantId?: (string | null);
+};
+
+export type AiConversationsUpsertAiConversationResponse = (AIConversationPublic);
+
+export type AiConversationsDeleteAiConversationData = {
+    conversationId: string;
+    xTenantId?: (string | null);
+};
+
+export type AiConversationsDeleteAiConversationResponse = (void);
+
+export type AiExecutionsClaimAiExecutionData = {
+    requestBody: AIExecutionClaimRequest;
+    toolCallId: string;
+    xTenantId?: (string | null);
+};
+
+export type AiExecutionsClaimAiExecutionResponse = (AIExecutionClaimResponse);
+
+export type AiExecutionsCompleteAiExecutionData = {
+    requestBody: AIExecutionCompleteRequest;
+    toolCallId: string;
+    xTenantId?: (string | null);
+};
+
+export type AiExecutionsCompleteAiExecutionResponse = (void);
 
 export type ApiKeysListApiKeysResponse = (Array<ApiKeyPublic>);
 
@@ -5560,6 +6595,7 @@ export type ApplicationsGetMyApplicationResponse = (ApplicationPublic);
 export type ApplicationsUpdateMyApplicationData = {
     popupId: string;
     requestBody: ApplicationUpdate;
+    salesFlowId: string;
 };
 
 export type ApplicationsUpdateMyApplicationResponse = (ApplicationPublic);
@@ -5596,7 +6632,7 @@ export type ApplicationsExportAttendeesDirectoryCsvData = {
     q?: (string | null);
 };
 
-export type ApplicationsExportAttendeesDirectoryCsvResponse = (unknown);
+export type ApplicationsExportAttendeesDirectoryCsvResponse = (string);
 
 export type ApplicationsAddMyAttendeeData = {
     popupId: string;
@@ -5710,6 +6746,13 @@ export type AttendeeCategoriesCreateAttendeeCategoryData = {
 
 export type AttendeeCategoriesCreateAttendeeCategoryResponse = (AttendeeCategoryPublic);
 
+export type AttendeeCategoriesGetAttendeeCategoryData = {
+    categoryId: string;
+    xTenantId?: (string | null);
+};
+
+export type AttendeeCategoriesGetAttendeeCategoryResponse = (AttendeeCategoryPublic);
+
 export type AttendeeCategoriesUpdateAttendeeCategoryData = {
     categoryId: string;
     requestBody: AttendeeCategoryUpdate;
@@ -5792,6 +6835,17 @@ export type AttendeesListAttendeesData = {
 };
 
 export type AttendeesListAttendeesResponse = (ListModel_AttendeeListItem_);
+
+export type AttendeesExportAttendeesCsvData = {
+    categoryId?: (string | null);
+    filters?: (string | null);
+    hasTickets?: (boolean | null);
+    popupId: string;
+    search?: (string | null);
+    xTenantId?: (string | null);
+};
+
+export type AttendeesExportAttendeesCsvResponse = (string);
 
 export type AttendeesGetAttendeeData = {
     attendeeId: string;
@@ -6056,6 +7110,27 @@ export type CheckoutPurchaseOpenTicketingData = {
 
 export type CheckoutPurchaseOpenTicketingResponse = (OpenTicketingPurchaseResponse);
 
+export type CheckoutListCheckoutAccommodationsData = {
+    flowSlug: string;
+    slug: string;
+    xCheckoutPreviewToken?: (string | null);
+    xEdgeOsPublishableKey?: (string | null);
+    xTenantId?: (string | null);
+};
+
+export type CheckoutListCheckoutAccommodationsResponse = (AccommodationOffer);
+
+export type CheckoutCheckAccommodationAvailabilityData = {
+    flowSlug: string;
+    requestBody: AccommodationAvailabilityRequest;
+    slug: string;
+    xCheckoutPreviewToken?: (string | null);
+    xEdgeOsPublishableKey?: (string | null);
+    xTenantId?: (string | null);
+};
+
+export type CheckoutCheckAccommodationAvailabilityResponse = (Array<PublicAccommodationAvailability>);
+
 export type CheckoutUpsertFlowCartData = {
     flowSlug: string;
     requestBody: OpenCartUpsert;
@@ -6114,6 +7189,7 @@ export type CouponsListCouponsResponse = (ListModel_CouponPublic_);
 
 export type CouponsCreateCouponData = {
     requestBody: CouponCreate;
+    xEdgeOsAiToolCallId?: (string | null);
     xTenantId?: (string | null);
 };
 
@@ -6129,6 +7205,7 @@ export type CouponsGetCouponResponse = (CouponPublic);
 export type CouponsUpdateCouponData = {
     couponId: string;
     requestBody: CouponUpdate;
+    xEdgeOsAiToolCallId?: (string | null);
     xTenantId?: (string | null);
 };
 
@@ -6146,6 +7223,22 @@ export type CouponsValidateCouponData = {
 };
 
 export type CouponsValidateCouponResponse = (CouponPublic);
+
+export type CustomExportsGetExportCatalogResponse = (ExportCatalogPublic);
+
+export type CustomExportsPreviewCustomExportData = {
+    requestBody: CustomExportSpec;
+    xTenantId?: (string | null);
+};
+
+export type CustomExportsPreviewCustomExportResponse = (ExportPreview);
+
+export type CustomExportsDownloadCustomExportData = {
+    requestBody: ExportDownloadRequest;
+    xTenantId?: (string | null);
+};
+
+export type CustomExportsDownloadCustomExportResponse = (string);
 
 export type DashboardGetDashboardStatsData = {
     /**
@@ -6277,6 +7370,13 @@ export type EventParticipantsAdminAddParticipantData = {
 
 export type EventParticipantsAdminAddParticipantResponse = (EventParticipantPublic);
 
+export type EventParticipantsGetParticipantData = {
+    participantId: string;
+    xTenantId?: (string | null);
+};
+
+export type EventParticipantsGetParticipantResponse = (EventParticipantPublic);
+
 export type EventParticipantsUpdateParticipantData = {
     participantId: string;
     requestBody: EventParticipantUpdate;
@@ -6364,7 +7464,7 @@ export type EventsPublicCalendarIcsData = {
     popupId: string;
 };
 
-export type EventsPublicCalendarIcsResponse = (unknown);
+export type EventsPublicCalendarIcsResponse = (string);
 
 export type EventsListEventsData = {
     eventStatus?: (EventStatus | null);
@@ -6565,7 +7665,7 @@ export type EventsExportEventIcsData = {
     xTenantId?: (string | null);
 };
 
-export type EventsExportEventIcsResponse = (unknown);
+export type EventsExportEventIcsResponse = (string);
 
 export type EventsListPortalEventsData = {
     eventStatus?: (EventStatus | null);
@@ -6680,7 +7780,7 @@ export type EventsExportPortalEventIcsData = {
     eventId: string;
 };
 
-export type EventsExportPortalEventIcsResponse = (unknown);
+export type EventsExportPortalEventIcsResponse = (string);
 
 export type EventSettingsGetEventSettingsData = {
     popupId: string;
@@ -7470,7 +8570,7 @@ export type PaymentsGetPaymentInvoiceData = {
     xTenantId?: (string | null);
 };
 
-export type PaymentsGetPaymentInvoiceResponse = (unknown);
+export type PaymentsGetPaymentInvoiceResponse = ((Blob | File));
 
 export type PaymentsCreateMyApplicationFeeData = {
     requestBody: ApplicationFeeCreate;
@@ -7528,7 +8628,7 @@ export type PaymentsGetMyInvoiceData = {
     paymentId: string;
 };
 
-export type PaymentsGetMyInvoiceResponse = (unknown);
+export type PaymentsGetMyInvoiceResponse = ((Blob | File));
 
 export type PaymentsPreviewMyPaymentData = {
     requestBody: PaymentCreate;

@@ -10,7 +10,7 @@ from sqlalchemy import inspect, text
 
 REVISION = "c9a4e7b2d1f8"
 PREVIOUS_REVISION = "b7d3e1f8c2a4"
-HEAD_REVISION = "f4b8c2d7e1a9"
+HEAD_REVISION = "a5c8e2f7b1d4"
 TABLES = ("products", "payment_products", "attendee_products")
 INDEXES = {
     "ix_products_fulfillment_type",
@@ -140,7 +140,6 @@ def test_legacy_pre_drop_upgrade_preserves_rows(
 def test_contract_migration_is_the_single_coherent_head() -> None:
     script = ScriptDirectory.from_config(Config("alembic.ini"))
     assert script.get_heads() == [HEAD_REVISION]
-    assert script.get_revision(HEAD_REVISION).down_revision == REVISION
     assert script.get_revision(REVISION).down_revision == PREVIOUS_REVISION
     assert script.get_revision(PREVIOUS_REVISION).down_revision == "a6f4c8d2e9b1"
 

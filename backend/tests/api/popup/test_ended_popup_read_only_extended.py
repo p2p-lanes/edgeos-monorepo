@@ -161,6 +161,7 @@ class TestEndedPopupPortalWritesBlocked:
         response = client.patch(
             f"/api/v1/applications/my/{popup.id}",
             headers=_auth(human),
+            params={"sales_flow_id": str(application_flow_id(db, popup.id))},
             json={"first_name": "New Name"},
         )
 
@@ -266,8 +267,11 @@ class TestEndedPopupPortalWritesBlocked:
             json={"name": "Ended Companion", "category": "spouse"},
         )
 
-        assert response.status_code == 403, response.text
-        assert response.json()["detail"] == READ_ONLY_DETAIL
+        assert response.status_code == 410, response.text
+        assert (
+            response.json()["detail"]
+            == "Companion attendees are created after approval"
+        )
 
     def test_attendee_delete_blocked(
         self, client: TestClient, db: Session, tenant_a: Tenants

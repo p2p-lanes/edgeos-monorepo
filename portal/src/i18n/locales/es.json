@@ -334,7 +334,19 @@
     "cart": {
       "close_aria": "Cerrar carrito",
       "empty_title": "Tu carrito está vacío",
-      "empty_description": "Por favor, volvé atrás y seleccioná algunos pases para continuar."
+      "empty_description": "Por favor, volvé atrás y seleccioná algunos pases para continuar.",
+      "unknown_attendee": "Asistente desconocido",
+      "passes": "Pases",
+      "housing": "Alojamiento",
+      "full_stay": "Estadía completa",
+      "merchandise": "Productos",
+      "patron_contribution": "Contribución de patrocinio",
+      "community_support": "Apoyo a la comunidad",
+      "meal_plans": "Planes de comidas",
+      "pass_protection": "Protección de pases",
+      "pass_protection_description": "Cobertura para todos los pases",
+      "promo_code": "Código promocional",
+      "promo_code_expired": "Tu código promocional ya no es válido"
     },
     "actions": {
       "pay": "Pagar",
@@ -368,6 +380,46 @@
         "next_image_aria": "Siguiente imagen"
       }
     },
+    "accommodation": {
+      "default_notice": "El alojamiento se paga por completo al finalizar la compra y no es reembolsable.",
+      "in_cart": "En el carrito",
+      "sleeps": "Capacidad para {{count}}",
+      "nights_one": "{{count}} noche",
+      "nights_other": "{{count}} noches",
+      "monthly_rate": "tarifa mensual",
+      "per_night": "noche",
+      "includes_tax": "Incluye {{amount}} de impuesto de alojamiento",
+      "remove": "Quitar",
+      "select": "Seleccionar",
+      "only_left_one": "Solo queda {{count}}",
+      "only_left_other": "Solo quedan {{count}}",
+      "guests_label": "Huéspedes",
+      "guests_one": "{{count}} huésped",
+      "guests_other": "{{count}} huéspedes",
+      "guest_name_placeholder": "Nombre completo del huésped {{number}}",
+      "no_rooms": "No hay alojamientos disponibles para este checkout.",
+      "check_in": "Entrada",
+      "check_out": "Salida",
+      "who_is_staying": "Quiénes se alojarán",
+      "cart_title": "Alojamiento",
+      "bed_count": "{{count}} {{type}}",
+      "bed_types": {
+        "king": "cama king",
+        "queen": "cama queen",
+        "double": "cama doble",
+        "single": "cama individual",
+        "bunk": "litera",
+        "sofa": "sofá cama"
+      },
+      "unavailable": {
+        "sold_out": "Completo para estas fechas",
+        "min_stay_not_met": "Requiere una estadía más larga",
+        "outside_bookable_window": "No disponible en estas fechas",
+        "over_capacity": "Capacidad insuficiente para el grupo",
+        "inactive": "No disponible",
+        "default": "No disponible para estas fechas"
+      }
+    },
     "contribution": {
       "fallbackLabel": "Contribución al evento",
       "fallbackDescription": "Apoya la realización del evento"
@@ -395,6 +447,7 @@
     "flow_restriction_violated": "No sos elegible para comprar a través de este canal.",
     "product_not_in_flow": "Este producto no está disponible a través de este canal.",
     "amanita": {
+      "hero_headline": "4 días de música, arte, yoga y talleres",
       "buyer_kicker": "Tus datos",
       "buyer_title": "¡Estás a un paso!",
       "buyer_intro": "Un par de datos para emitir tus entradas — después, solo queda confirmar.",

@@ -1,7 +1,10 @@
+import csv
+import io
 import uuid
 from typing import Annotated
 
 from fastapi import APIRouter, HTTPException, Query, status
+from fastapi.responses import Response
 from sqlmodel import select
 
 from app.api.attendee import crud
@@ -43,6 +46,7 @@ from app.core.dependencies.users import (
     needs,
 )
 from app.core.logging import get_request_id
+from app.utils.tabular_export import safe_tabular_cell
 
 router = APIRouter(prefix="/attendees", tags=["attendees"])
 
@@ -655,6 +659,76 @@ async def list_attendees(
     )
 
 
+@router.get(
+    "/export.csv",
+    summary="Export attendees as CSV",
+    response_class=Response,
+    responses={
+        status.HTTP_200_OK: {
+            "description": "Attendees CSV",
+            "content": {"text/csv": {"schema": {"type": "string"}}},
+        }
+    },
+)
+async def export_attendees_csv(
+    db: CheckInOrApiKeySession_AttendeesRead,
+    _: CheckInOrApiKey_AttendeesRead,
+    popup_id: uuid.UUID,
+    search: str | None = None,
+    has_tickets: bool | None = None,
+    category_id: uuid.UUID | None = None,
+    filters: str | None = None,
+) -> Response:
+    """Export the selected gathering's attendees using the BO list filters."""
+    parsed_filters = parse_attendee_filters(filters)
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(["Name", "Email", "Category", "Gender", "Age group", "Product ID"])
+
+    skip = 0
+    page_size = 1000
+    while True:
+        attendees, total = crud.attendees_crud.find_by_popup(
+            db,
+            popup_id=popup_id,
+            skip=skip,
+            limit=page_size,
+            search=search,
+            has_tickets=has_tickets,
+            category_id=category_id,
+            filters=parsed_filters,
+        )
+        for attendee in attendees:
+            additional_data = attendee.additional_data or {}
+            age_group = (
+                additional_data.get("age_group") or additional_data.get("age") or ""
+            )
+            tickets = attendee.attendee_products or [None]
+            for ticket in tickets:
+                writer.writerow(
+                    [
+                        safe_tabular_cell(value)
+                        for value in (
+                            attendee.name,
+                            attendee.email or "",
+                            attendee.category,
+                            attendee.gender or "",
+                            age_group,
+                            str(ticket.product_id) if ticket else "",
+                        )
+                    ]
+                )
+        skip += len(attendees)
+        if not attendees or skip >= total:
+            break
+
+    return Response(
+        content=output.getvalue(),
+        media_type="text/csv",
+        headers={"Content-Disposition": 'attachment; filename="attendees.csv"'},
+    )
+
+
 @router.get("/{attendee_id}", response_model=AttendeeWithOriginPublic)
 async def get_attendee(
     attendee_id: uuid.UUID,
@@ -744,9 +818,10 @@ async def add_attendee_ticket(
 ) -> AttendeeWithOriginPublic:
     """Add tickets (N products × quantity) to an existing attendee (BO only).
 
-    Admin grant with no payment: tickets are materialized with payment_id NULL
-    (manual emission) and stock is decremented like any other purchase path.
-    Each product must be active and belong to the attendee's popup; the batch is
+    Admin grant with no payment: each ticket is materialized with payment_id NULL
+    (manual emission), receives its own check-in code, and decrements stock like
+    any other purchase path. Each product must be active and belong to the
+    attendee's popup; the batch is
     applied atomically (a sold-out product rolls the whole add back with 409).
     """
     attendee = crud.attendees_crud.get(db, attendee_id)

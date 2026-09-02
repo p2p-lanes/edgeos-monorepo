@@ -1,6 +1,6 @@
 import uuid
 from datetime import date
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, model_validator
 from sqlalchemy import Column
@@ -155,11 +155,66 @@ def _validate_meal_plan_select_template_config(
     return out
 
 
+class AccommodationBookingConfig(BaseModel):
+    """Typed template_config for the ``accommodation-booking`` step.
+
+    Deliberately small. This step only decides **how accommodation is offered
+    in this checkout**: which properties, how they are laid out, whether guest
+    names are collected, and the copy of the payment notice. The inventory
+    itself — rooms, units, nightly prices, photos, the booking calendar —
+    lives in the Accommodations section and is shared across steps (and, once
+    sales flows land, across flows).
+
+    ``property_ids`` empty means "every visible property", so a step works the
+    moment it is enabled instead of showing an empty screen until an admin
+    ticks boxes.
+    """
+
+    property_ids: list[uuid.UUID] = []
+    layout: Literal["grid", "list"] = "grid"
+    show_property_headers: bool = True
+    require_guest_names: bool = True
+    notice_text: str | None = None
+
+    model_config = ConfigDict(extra="allow")
+
+    @model_validator(mode="after")
+    def _validate(self) -> "AccommodationBookingConfig":
+        if len(set(self.property_ids)) != len(self.property_ids):
+            raise ValueError(
+                "accommodation-booking template_config.property_ids must be unique"
+            )
+        return self
+
+
+def _validate_accommodation_booking_template_config(
+    template: str | None,
+    template_config: dict[str, Any] | None,
+) -> dict[str, Any] | None:
+    """Validate template_config when template == 'accommodation-booking'.
+
+    Structural validation only (shape, uniqueness). Checking that each
+    property actually belongs to the popup is an FK question and lives in the
+    router, following the same split as ticket-select.
+    """
+    # `is None` rather than falsy: an explicit ``{}`` means "configured with
+    # nothing", and filling it with defaults makes the stored row say what the
+    # step actually offers instead of leaving that to whoever reads it.
+    if template != "accommodation-booking" or template_config is None:
+        return template_config
+
+    validated = AccommodationBookingConfig.model_validate(template_config)
+    return {**template_config, **validated.model_dump(mode="json")}
+
+
 def validate_template_config(
     template: str | None, template_config: dict[str, Any] | None
 ) -> dict[str, Any] | None:
     template_config = _validate_sections_in_template_config(template, template_config)
-    return _validate_meal_plan_select_template_config(template, template_config)
+    template_config = _validate_meal_plan_select_template_config(
+        template, template_config
+    )
+    return _validate_accommodation_booking_template_config(template, template_config)
 
 
 class TicketingStepBase(SQLModel):
@@ -232,10 +287,7 @@ class TicketingStepCreate(BaseModel):
 
     @model_validator(mode="after")
     def _validate_template_config(self) -> "TicketingStepCreate":
-        self.template_config = _validate_sections_in_template_config(
-            self.template, self.template_config
-        )
-        self.template_config = _validate_meal_plan_select_template_config(
+        self.template_config = validate_template_config(
             self.template, self.template_config
         )
         return self
@@ -269,10 +321,7 @@ class TicketingStepUpdate(BaseModel):
 
         # Note: when template is None (PATCH without template field), validation is skipped.
         # To trigger validation, send both template and template_config in the same request.
-        self.template_config = _validate_sections_in_template_config(
-            self.template, self.template_config
-        )
-        self.template_config = _validate_meal_plan_select_template_config(
+        self.template_config = validate_template_config(
             self.template, self.template_config
         )
         return self

@@ -293,6 +293,7 @@ class TestApprovalTransitions:
         patch_resp = client.patch(
             f"/api/v1/applications/my/{popup.id}",
             headers={"Authorization": f"Bearer {human_token}"},
+            params={"sales_flow_id": create_resp.json()["sales_flow_id"]},
             json={"status": "in review"},
         )
         assert patch_resp.status_code == 200, patch_resp.text
@@ -334,6 +335,7 @@ class TestApprovalTransitions:
         patch_resp = client.patch(
             f"/api/v1/applications/my/{popup.id}",
             headers={"Authorization": f"Bearer {human_token}"},
+            params={"sales_flow_id": create_resp.json()["sales_flow_id"]},
             json={"status": "in review"},
         )
         assert patch_resp.status_code == 200, patch_resp.text

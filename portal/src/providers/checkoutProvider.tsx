@@ -26,11 +26,12 @@ import {
   type TicketingStepPublic,
   TicketingStepsService,
 } from "@/client"
-import { CONTENT_ONLY_TEMPLATES } from "@/components/checkout-flow/registries/variantRegistry"
+import { CONTENT_ONLY_TEMPLATES } from "@/components/checkout-flow/registries/templateClassification"
 import { supportsQuantitySelector } from "@/components/ui/QuantitySelector"
 import type { StepProductResolution } from "@/hooks/checkout"
 import {
   type CartSelectionState,
+  useAccommodationSelection,
   useCartPersistence,
   useCartSummary,
   useCheckoutSteps,
@@ -60,6 +61,7 @@ import {
   type CheckoutCartSummary,
   type CheckoutRecipientPassState,
   type CheckoutStep,
+  type SelectedAccommodationItem,
   type SelectedDynamicItem,
   type SelectedPassItem,
 } from "@/types/checkout"
@@ -81,6 +83,7 @@ interface CheckoutContextValue {
    * (sdd/sales-flows-rediseno).
    */
   salesFlowId: string | null
+  salesFlowSlug: string | null
   /** How that door sells. Resolved once here so no section has to ask the
    *  gathering, which cannot answer for a door that differs from it. */
   checkoutMode: CheckoutMode
@@ -142,6 +145,31 @@ interface CheckoutContextValue {
   setMealPlanDietaryRestriction: (attendeeId: string, value: string) => void
   /** Per-attendee field — synced across every meal-plan entry for the attendee. */
   setMealPlanSpecialRequest: (attendeeId: string, value: string) => void
+  /** Put a room in the cart. The item carries the server's quote for those
+   *  exact dates; nothing here re-prices it. Adding the same room for the
+   *  same nights twice is a no-op. */
+  addAccommodation: (item: SelectedAccommodationItem) => void
+  removeAccommodation: (
+    accommodationId: string,
+    checkIn: string,
+    checkOut: string,
+  ) => void
+  setAccommodationGuestCount: (
+    accommodationId: string,
+    checkIn: string,
+    checkOut: string,
+    guestCount: number,
+  ) => void
+  setAccommodationGuestName: (
+    accommodationId: string,
+    checkIn: string,
+    checkOut: string,
+    index: number,
+    name: string,
+  ) => void
+  /** Drop rooms booked for other dates. Called when the buyer moves the stay:
+   *  their quotes were for the old nights. */
+  clearAccommodationsOutsideStay: (checkIn: string, checkOut: string) => void
   applyPromoCode: (code: string) => Promise<boolean>
   clearPromoCode: () => void
   toggleInsurance: () => void
@@ -152,6 +180,13 @@ interface CheckoutContextValue {
   /** True when the flow renders inside the backoffice live preview, where
    *  submitPayment is inert. Flows use it to label the CTA. */
   previewMode: boolean
+  /** Token to send with public reads while previewing a draft popup. */
+  previewToken: string | null
+  /** Which checkout this is. Steps that fetch for themselves need it: the
+   *  anonymous endpoints only serve `direct` popups, and an application
+   *  popup's data lives behind the logged-in portal ones. */
+  submitMode: "application" | "open-ticketing"
+
   isEditing: boolean
   toggleEditing: (editing?: boolean) => void
   editCredit: number
@@ -259,6 +294,10 @@ interface CheckoutProviderProps {
    *  checking out is inert. Exposed on the context so the flows can label the
    *  CTA accordingly. */
   previewMode?: boolean
+  /** Preview token minted for the operator. Read-only public endpoints that
+   *  serve a draft popup need it; without one they answer as they would to
+   *  any anonymous visitor. */
+  previewToken?: string | null
 }
 
 export function CheckoutProvider({
@@ -282,6 +321,7 @@ export function CheckoutProvider({
   openCartCid = null,
   openCartSig = null,
   previewMode = false,
+  previewToken = null,
 }: CheckoutProviderProps) {
   const { t } = useTranslation()
   const {
@@ -313,10 +353,17 @@ export function CheckoutProvider({
   // (sdd/sales-flows-rediseno slice 6).
   const checkoutPolicy = resolveFlowCheckoutPolicy(flowType)
   const cityId = city?.id ? String(city.id) : null
+  const checkoutScope = `${cityId ?? ""}:${salesFlowId ?? ""}`
 
   const hasRestoredCheckoutRef = useRef(false)
-  const previousCityIdRef = useRef(cityId)
+  const previousCheckoutScopeRef = useRef(checkoutScope)
   const paymentCompleteRef = useRef(false)
+  const hasRestoredStepRef = useRef(false)
+  const initialCartStepRef = useRef<string | null | undefined>(undefined)
+  const buyerRestoredRef = useRef(false)
+  const hasFiredReleaseRef = useRef(false)
+  const [pendingReleaseSettled, setPendingReleaseSettled] = useState(false)
+  const pendingReleaseSettledRef = useRef(false)
   const [buyerValues, setBuyerValues] =
     useState<Record<string, unknown>>(initialBuyerValues)
   const [buyerErrors, setBuyerErrors] = useState<Record<string, string>>({})
@@ -432,6 +479,16 @@ export function CheckoutProvider({
     setMealPlanDietaryRestriction,
     setMealPlanSpecialRequest,
   } = useMealPlanSelection(allActiveProducts)
+
+  const {
+    accommodations,
+    setAccommodations,
+    addAccommodation,
+    removeAccommodation,
+    setAccommodationGuestCount,
+    setAccommodationGuestName,
+    clearAccommodationsOutsideStay,
+  } = useAccommodationSelection()
 
   const [insurance, setInsurance] = useState(false)
   const [termsAccepted, setTermsAccepted] = useState(false)
@@ -558,11 +615,76 @@ export function CheckoutProvider({
     submitMode,
   ])
 
+  // Step management is initialized before cart restoration so a scope reset can
+  // return navigation to its first step before the new flow restores its cart.
+  const {
+    currentStep,
+    setCurrentStep,
+    availableSteps,
+    goToStep: goToStepRaw,
+    goToNextStep: goToNextStepRaw,
+    goToPreviousStep: goToPreviousStepRaw,
+    canProceedToStep: canProceedToStepFn,
+    isStepComplete: isStepCompleteFn,
+  } = useCheckoutSteps({
+    initialStep,
+    configuredSteps: configuredSteps,
+    productsByStepId,
+    selectedPassesCount: selectedPasses.length,
+    dynamicItemsCount: Object.values(dynamicItems).flat().length,
+    productIndependentItemsCount: accommodations.length,
+    isEditing,
+    buyerInfoComplete: isBuyerInfoComplete,
+  })
+
+  // Reset the complete checkout boundary before persistence effects restore the
+  // newly selected flow. Keeping this effect above useCartPersistence prevents
+  // a late reset from wiping the new flow's restored selections.
+  useEffect(() => {
+    if (previousCheckoutScopeRef.current === checkoutScope) return
+    previousCheckoutScopeRef.current = checkoutScope
+
+    hasRestoredCheckoutRef.current = false
+    paymentCompleteRef.current = false
+    buyerRestoredRef.current = false
+    hasFiredReleaseRef.current = false
+    pendingReleaseSettledRef.current = false
+    setPendingReleaseSettled(false)
+    setHousing(null)
+    setAccommodations([])
+    setMerch([])
+    setPatron(null)
+    setSelectedMealPlans([])
+    setDynamicItems({})
+    setInsurance(false)
+    setTermsAccepted(false)
+    setBuyerValues(initialBuyerValues)
+    setBuyerErrors({})
+    setBuyerGeneralError(null)
+    setVisitedSteps(new Set())
+    setForcedBuyerFieldsTouched(new Set())
+    setCheckoutToast(null)
+    hasRestoredStepRef.current = false
+    initialCartStepRef.current = undefined
+    setCurrentStep(initialStep)
+  }, [
+    checkoutScope,
+    initialBuyerValues,
+    initialStep,
+    setAccommodations,
+    setCurrentStep,
+    setHousing,
+    setMerch,
+    setPatron,
+    setSelectedMealPlans,
+  ])
+
   // Ref that holds the latest selection state for cart persistence.
   // Initialized with defaults — updated to real values after all hooks run.
   const selectionStateRef = useRef<CartSelectionState>({
     selectedPasses,
     housing,
+    accommodations,
     merch,
     patron,
     selectedMealPlans,
@@ -589,6 +711,7 @@ export function CheckoutProvider({
     selectionStateRef,
     restorationSetters: {
       setHousing,
+      setAccommodations,
       setMerch,
       setPatron,
       setMealPlans: setSelectedMealPlans,
@@ -599,12 +722,6 @@ export function CheckoutProvider({
     paymentCompleteRef,
   })
 
-  // Whether a pending-release attempt has settled (success, no-op, or error).
-  // Gates promo re-validation and auto-apply of restored promo codes so the
-  // coupon field never flashes "Invalid" before the hold is freed.
-  const [pendingReleaseSettled, setPendingReleaseSettled] = useState(false)
-  const pendingReleaseSettledRef = useRef(false)
-
   // Promo code hook — must run BEFORE useOpenCartPersistence so setPromoCode
   // is stable when passed as a restoration setter.
   const {
@@ -612,8 +729,6 @@ export function CheckoutProvider({
     promoCodeValid,
     promoCodeDiscount,
     setPromoCode,
-    setPromoCodeValid,
-    setPromoCodeDiscount,
     applyPromoCode,
     clearPromoCode,
     promoIsLoading,
@@ -633,7 +748,7 @@ export function CheckoutProvider({
 
   // Anonymous open-cart persistence (localStorage + backend upsert).
   // Only active when openCartPopupSlug is provided (open-checkout flow).
-  const openCartEnabled = !!openCartPopupSlug
+  const openCartEnabled = !!openCartPopupSlug && !!salesFlowSlug
   const openCartBuyerEmail =
     typeof buyerValues.email === "string" ? buyerValues.email : ""
 
@@ -652,6 +767,7 @@ export function CheckoutProvider({
     housingPricePerDay,
     restorationSetters: {
       setHousing,
+      setAccommodations,
       setMerch,
       setPatron,
       setMealPlans: setSelectedMealPlans,
@@ -675,7 +791,11 @@ export function CheckoutProvider({
   const buyerStorageKey = openCartPopupSlug
     ? `open-checkout-buyer:${openCartPopupSlug}:${salesFlowSlug ?? ""}`
     : null
-  const buyerRestoredRef = useRef(false)
+  const previousBuyerStorageKeyRef = useRef(buyerStorageKey)
+  if (previousBuyerStorageKeyRef.current !== buyerStorageKey) {
+    previousBuyerStorageKeyRef.current = buyerStorageKey
+    buyerRestoredRef.current = false
+  }
   useEffect(() => {
     if (!buyerStorageKey || buyerRestoredRef.current) return
     buyerRestoredRef.current = true
@@ -717,7 +837,6 @@ export function CheckoutProvider({
   //   inside useOpenCartPersistence's one-shot restore effect (runs after
   //   products load). We guard on it here so cartMetaRef is populated before
   //   we try to extract cid/sig.
-  const hasFiredReleaseRef = useRef(false)
   // biome-ignore lint/correctness/useExhaustiveDependencies: one-shot release; reads current values via refs; products.length used to re-run after restore
   useEffect(() => {
     // P5 fix: when products have not loaded yet, we cannot restore and cannot
@@ -756,6 +875,7 @@ export function CheckoutProvider({
     }
 
     hasFiredReleaseRef.current = true
+    const releaseScope = checkoutScope
 
     // P1 fix: await restorationPromise before reading cartMetaRef. On the
     // signed-link path, cartMetaRef is populated inside a Promise.then() callback
@@ -795,6 +915,7 @@ export function CheckoutProvider({
 
       releasePromise
         .then((result) => {
+          if (previousCheckoutScopeRef.current !== releaseScope) return
           if (result.released) {
             if (slug) {
               // Release succeeded — invalidate the checkout runtime so
@@ -811,6 +932,7 @@ export function CheckoutProvider({
           }
         })
         .catch((err: unknown) => {
+          if (previousCheckoutScopeRef.current !== releaseScope) return
           // Route structured errors through the existing dispatchPaymentError machinery.
           const apiBody =
             err instanceof ApiError
@@ -845,37 +967,19 @@ export function CheckoutProvider({
           // supersede backstop guards the purchase itself.
         })
         .finally(() => {
+          if (previousCheckoutScopeRef.current !== releaseScope) return
           setPendingReleaseSettled(true)
           pendingReleaseSettledRef.current = true
         })
     })
-  }, [products.length])
-
-  // Step management
-  const {
-    currentStep,
-    setCurrentStep,
-    availableSteps,
-    goToStep: goToStepRaw,
-    goToNextStep: goToNextStepRaw,
-    goToPreviousStep: goToPreviousStepRaw,
-    canProceedToStep: canProceedToStepFn,
-    isStepComplete: isStepCompleteFn,
-  } = useCheckoutSteps({
-    initialStep,
-    configuredSteps: configuredSteps,
-    productsByStepId,
-    selectedPassesCount: selectedPasses.length,
-    dynamicItemsCount: Object.values(dynamicItems).flat().length,
-    isEditing,
-    buyerInfoComplete: isBuyerInfoComplete,
-  })
+  }, [products.length, checkoutScope])
 
   // Keep selection state ref in sync — promoCode, promoCodeValid, currentStep,
   // and dynamicItems are defined after useCartPersistence, so we update each render.
   selectionStateRef.current = {
     selectedPasses,
     housing,
+    accommodations,
     merch,
     patron,
     selectedMealPlans,
@@ -896,6 +1000,7 @@ export function CheckoutProvider({
   }, [
     selectedPasses,
     housing,
+    accommodations,
     merch,
     patron,
     selectedMealPlans,
@@ -957,6 +1062,13 @@ export function CheckoutProvider({
     const mealPlansTotal = selectedMealPlans
       .filter((m) => m.product && !isNonDiscountable(m.product))
       .reduce((sum, m) => sum + (m.product?.price ?? 0), 0)
+    // Accommodation shadow products are discountable by contract. The UI
+    // carries the server quote rather than the hidden product row, so the
+    // discount base comes directly from each selected stay.
+    const accommodationsTotal = accommodations.reduce(
+      (sum, item) => sum + item.totalPrice,
+      0,
+    )
     const standardDynamicSubtotal = Object.values(dynamicItems)
       .flat()
       .filter((item) => !isNonDiscountable(item.product))
@@ -966,9 +1078,17 @@ export function CheckoutProvider({
       housingTotal +
       merchTotal +
       mealPlansTotal +
+      accommodationsTotal +
       standardDynamicSubtotal
     )
-  }, [selectedPasses, housing, merch, selectedMealPlans, dynamicItems])
+  }, [
+    selectedPasses,
+    housing,
+    accommodations,
+    merch,
+    selectedMealPlans,
+    dynamicItems,
+  ])
 
   // Non-discountable products: anything flagged `product.discountable=false`
   // (patreon products are coerced to this by the backend validator) plus the
@@ -1031,6 +1151,7 @@ export function CheckoutProvider({
   const { summary } = useCartSummary({
     selectedPasses,
     housing,
+    accommodations,
     merch,
     patron,
     mealPlans: selectedMealPlans,
@@ -1043,36 +1164,6 @@ export function CheckoutProvider({
     appCredit,
     discountValue: effectiveDiscount,
   })
-
-  // Reset state when city changes so we re-restore from new city's cart
-  useEffect(() => {
-    if (previousCityIdRef.current === cityId) return
-    previousCityIdRef.current = cityId
-
-    hasRestoredCheckoutRef.current = false
-    setHousing(null)
-    setMerch([])
-    setPatron(null)
-    setSelectedMealPlans([])
-    // P2 fix: reset dynamicItems on city change so products from city A cannot
-    // appear in the upsert body after switching to city B.
-    setDynamicItems({})
-    setPromoCode("")
-    setPromoCodeValid(false)
-    setPromoCodeDiscount(0)
-    setInsurance(false)
-    setCurrentStep("passes")
-  }, [
-    cityId,
-    setCurrentStep,
-    setHousing,
-    setMerch,
-    setPatron,
-    setSelectedMealPlans,
-    setPromoCode,
-    setPromoCodeValid,
-    setPromoCodeDiscount,
-  ])
 
   // If discounts (group, scholarship, or coupon) drop the product subtotal to
   // $0, force the insurance toggle off so the persisted line item stops
@@ -1100,9 +1191,6 @@ export function CheckoutProvider({
   // Restore current step from saved cart (after availableSteps is ready).
   // Uses a ref to capture the initial cart step — ignores subsequent saveCart() updates
   // that would otherwise revert user navigation.
-  const hasRestoredStepRef = useRef(false)
-  const initialCartStepRef = useRef<string | null | undefined>(undefined)
-
   // Capture the initial cart step exactly once when cart data first loads
   if (
     initialCartStepRef.current === undefined &&
@@ -1140,6 +1228,7 @@ export function CheckoutProvider({
     () => ({
       passes: selectedPasses,
       housing,
+      accommodations,
       merch,
       patron,
       mealPlans: selectedMealPlans,
@@ -1154,6 +1243,7 @@ export function CheckoutProvider({
     [
       selectedPasses,
       housing,
+      accommodations,
       merch,
       patron,
       selectedMealPlans,
@@ -1229,6 +1319,7 @@ export function CheckoutProvider({
     merch.length > 0 ||
     !!patron ||
     selectedMealPlans.length > 0 ||
+    accommodations.length > 0 ||
     Object.values(dynamicItems).some((items) => items.length > 0)
 
   // Dynamic item actions
@@ -1385,6 +1476,7 @@ export function CheckoutProvider({
     if (openCartEnabled) clearOpenCart()
     clearSelections()
     clearHousing()
+    setAccommodations([])
     setMerch([])
     clearPatron()
     setSelectedMealPlans([])
@@ -1397,6 +1489,7 @@ export function CheckoutProvider({
     openCartEnabled,
     clearSelections,
     clearHousing,
+    setAccommodations,
     setMerch,
     clearPatron,
     setSelectedMealPlans,
@@ -1414,6 +1507,7 @@ export function CheckoutProvider({
     attendeePasses,
     selectedPasses,
     housing,
+    accommodations,
     merch,
     patron,
     selectedMealPlans,
@@ -1458,6 +1552,7 @@ export function CheckoutProvider({
     availableSteps,
     stepConfigs: configuredSteps,
     salesFlowId: salesFlowId ?? null,
+    salesFlowSlug: salesFlowSlug ?? null,
     cart,
     summary,
     allProducts: products,
@@ -1481,6 +1576,11 @@ export function CheckoutProvider({
     updateMerchQuantity,
     setPatronAmount,
     clearPatron,
+    addAccommodation,
+    removeAccommodation,
+    setAccommodationGuestCount,
+    setAccommodationGuestName,
+    clearAccommodationsOutsideStay,
     addMealPlan,
     removeMealPlan,
     setMealPlanDailyChoice,
@@ -1494,6 +1594,8 @@ export function CheckoutProvider({
     isStepComplete: isStepCompleteFn,
     submitPayment,
     previewMode,
+    previewToken,
+    submitMode,
     isEditing,
     toggleEditing,
     editCredit,

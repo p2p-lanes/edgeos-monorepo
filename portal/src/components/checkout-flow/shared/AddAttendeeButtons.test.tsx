@@ -165,6 +165,7 @@ describe("AddAttendeeButtons", () => {
       merch: [],
       patron: null,
       selectedMealPlans: [],
+      accommodations: [],
       dynamicItems: {},
       promoCode: "",
       promoCodeValid: false,

@@ -12,12 +12,22 @@ import { readFile } from "node:fs/promises"
 import { dirname, join } from "node:path"
 import { fileURLToPath } from "node:url"
 import { render, screen } from "@testing-library/react"
-import { describe, expect, it } from "vitest"
+import { describe, expect, it, vi } from "vitest"
 import {
   CONTENT_ONLY_TEMPLATES,
-  VARIANT_REGISTRY,
-} from "../registries/variantRegistry"
+  PRODUCT_INDEPENDENT_TEMPLATES,
+} from "../registries/templateClassification"
+import { VARIANT_REGISTRY } from "../registries/variantRegistry"
 import VariantHero from "./VariantHero"
+
+vi.mock("@/client", () => ({
+  AccommodationsService: {
+    checkAccommodationAvailability: vi.fn(),
+    checkPortalAccommodationAvailability: vi.fn(),
+    listCheckoutAccommodations: vi.fn(),
+    listPortalAccommodations: vi.fn(),
+  },
+}))
 
 function renderVariant(templateConfig?: Record<string, unknown> | null) {
   return render(
@@ -72,6 +82,13 @@ describe("VariantHero", () => {
 
   it("is marked content-only (non-purchasable)", () => {
     expect(CONTENT_ONLY_TEMPLATES.has("hero")).toBe(true)
+  })
+
+  it("classifies accommodation as external inventory rather than content", () => {
+    expect(CONTENT_ONLY_TEMPLATES.has("accommodation-booking")).toBe(false)
+    expect(PRODUCT_INDEPENDENT_TEMPLATES.has("accommodation-booking")).toBe(
+      true,
+    )
   })
 
   it("gives every bullet the skin's ornament hook, unconfigured", () => {

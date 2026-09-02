@@ -34,12 +34,30 @@ export function buildOpenCheckoutPreviewRequest(
   for (const items of Object.values(cart.dynamicItems)) {
     for (const item of items) collectQuantity(quantities, item)
   }
+  const accommodationLines = cart.accommodations.map((item) => ({
+    product_id: item.productId,
+    quantity: 1,
+    purchase_metadata: {
+      kind: "accommodation_booking",
+      accommodation_id: item.accommodationId,
+      check_in: item.checkIn,
+      check_out: item.checkOut,
+      guest_count: item.guestCount,
+      guests: item.guests
+        .map((name) => name.trim())
+        .filter(Boolean)
+        .map((name) => ({ name })),
+    },
+  }))
 
   return {
-    products: [...quantities].map(([product_id, quantity]) => ({
-      product_id,
-      quantity,
-    })),
+    products: [
+      ...[...quantities].map(([product_id, quantity]) => ({
+        product_id,
+        quantity,
+      })),
+      ...accommodationLines,
+    ],
     coupon_code: cart.promoCode || null,
     insurance: cart.insurance,
   }

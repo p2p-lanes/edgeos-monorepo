@@ -57,7 +57,9 @@ function buildHumanProfileSnapshot(
  * the person from themselves everywhere else — a volunteer looking at their
  * passes saw their spouse and no sign of their own.
  */
-export function useResolvedAttendees(): CheckoutRecipientPassState[] {
+export function useResolvedAttendees(
+  salesFlowId?: string | null,
+): CheckoutRecipientPassState[] {
   const { getCity } = useCityProvider()
   const { user } = useAuth()
   const { getRelevantApplication } = useApplication()
@@ -75,7 +77,9 @@ export function useResolvedAttendees(): CheckoutRecipientPassState[] {
   const popupId = city ? String(city.id) : null
   const { data: humanAttendees } = useHumanAttendeesQuery(popupId)
   const { categories } = useAttendeeCategories(popupId ?? "")
-  const application = nobodyApplies ? null : getRelevantApplication()
+  const application = nobodyApplies
+    ? null
+    : getRelevantApplication(salesFlowId ?? undefined)
 
   if (!humanAttendees) return []
 

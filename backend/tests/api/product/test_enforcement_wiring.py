@@ -396,10 +396,20 @@ def _ot_purchase(product: Products, qty: int = 1):
         ProductLine,
     )
 
+    email = f"buyer-{uuid.uuid4().hex[:6]}@test.com"
     return OpenTicketingPurchaseCreate(
-        products=[ProductLine(product_id=product.id, quantity=qty)],
+        products=[
+            ProductLine(product_id=product.id, quantity=qty, recipient_key="buyer")
+        ],
+        recipients=[
+            {
+                "recipient_key": "buyer",
+                "name": "Test Buyer",
+                "email": email,
+            }
+        ],
         buyer=BuyerInfo(
-            email=f"buyer-{uuid.uuid4().hex[:6]}@test.com",
+            email=email,
             first_name="Test",
             last_name="Buyer",
             form_data={},
@@ -435,7 +445,11 @@ class TestOpenTicketingPaymentEnforcement:
         with patch("app.services.simplefi.get_simplefi_client") as mock_sf:
             with pytest.raises(HTTPException) as exc_info:
                 payments_crud.create_open_ticketing_payment(
-                    db, obj=obj, popup=popup, tenant=tenant_a
+                    db,
+                    obj=obj,
+                    popup=popup,
+                    tenant=tenant_a,
+                    flow_slug="checkout",
                 )
         assert exc_info.value.status_code == 422
         assert exc_info.value.detail == {"code": "quote_unavailable"}
@@ -470,7 +484,11 @@ class TestOpenTicketingPaymentEnforcement:
         with patch("app.services.simplefi.get_simplefi_client") as mock_get_client:
             mock_get_client.return_value.create_payment.return_value = simplefi_response
             payments_crud.create_open_ticketing_payment(
-                db, obj=obj, popup=popup, tenant=tenant_a
+                db,
+                obj=obj,
+                popup=popup,
+                tenant=tenant_a,
+                flow_slug="checkout",
             )
 
         db.expire_all()
@@ -507,7 +525,11 @@ class TestOpenTicketingPaymentEnforcement:
         with patch("app.services.simplefi.get_simplefi_client") as mock_get_client:
             mock_get_client.return_value.create_payment.return_value = simplefi_response
             payment, _, _ = payments_crud.create_open_ticketing_payment(
-                db, obj=obj, popup=popup, tenant=tenant_a
+                db,
+                obj=obj,
+                popup=popup,
+                tenant=tenant_a,
+                flow_slug="checkout",
             )
 
         assert payment is not None
@@ -536,7 +558,11 @@ class TestOpenTicketingPaymentEnforcement:
         with patch("app.services.simplefi.get_simplefi_client"):
             with pytest.raises(HTTPException) as exc_info:
                 payments_crud.create_open_ticketing_payment(
-                    db, obj=obj, popup=popup, tenant=tenant_a
+                    db,
+                    obj=obj,
+                    popup=popup,
+                    tenant=tenant_a,
+                    flow_slug="checkout",
                 )
         assert exc_info.value.status_code == 422
 
@@ -587,7 +613,11 @@ class TestOpenTicketingPaymentEnforcement:
                     )
                     try:
                         payments_crud.create_open_ticketing_payment(
-                            session, obj=obj, popup=popup, tenant=tenant_a
+                            session,
+                            obj=obj,
+                            popup=popup,
+                            tenant=tenant_a,
+                            flow_slug="checkout",
                         )
                         with lock:
                             successes.append(True)

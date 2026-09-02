@@ -81,6 +81,7 @@ def _give_ticket(
             tenant_id=tenant.id,
             attendee_id=attendee.id,
             product_id=product.id,
+            product_category_snapshot="ticket",
             check_in_code=uuid.uuid4().hex[:10],
         )
     )

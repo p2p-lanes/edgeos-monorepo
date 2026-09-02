@@ -41,7 +41,7 @@ def test_publishable_key_resolves_tenant(
     )
 
     resp = client.post(
-        f"/api/v1/checkout/{popup.slug}/preview",
+        f"/api/v1/checkout/{popup.slug}/checkout/preview",
         json=_preview_body(product),
         headers={
             "X-EdgeOS-Publishable-Key": raw,
@@ -64,7 +64,7 @@ def test_publishable_key_origin_not_allowed_is_403(
     )
 
     resp = client.post(
-        f"/api/v1/checkout/{popup.slug}/preview",
+        f"/api/v1/checkout/{popup.slug}/checkout/preview",
         json=_preview_body(product),
         headers={
             "X-EdgeOS-Publishable-Key": raw,
@@ -80,7 +80,7 @@ def test_invalid_publishable_key_is_401(
     popup, product = _seed(db, tenant_a)
 
     resp = client.post(
-        f"/api/v1/checkout/{popup.slug}/preview",
+        f"/api/v1/checkout/{popup.slug}/checkout/preview",
         json=_preview_body(product),
         headers={"X-EdgeOS-Publishable-Key": "pk_live_notarealkey"},
     )

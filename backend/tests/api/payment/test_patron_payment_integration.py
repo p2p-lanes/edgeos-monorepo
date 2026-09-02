@@ -302,7 +302,6 @@ class TestPatronPaymentCreation:
                 products=[
                     PaymentProductRequest(
                         product_id=product.id,
-                        attendee_id=attendee.id,
                         quantity=1,
                         unit_price_override=Decimal("5000"),
                     )
@@ -382,7 +381,6 @@ class TestPatronPaymentCreation:
                 ),
                 PaymentProductRequest(
                     product_id=patron_product.id,
-                    attendee_id=attendee.id,
                     quantity=1,
                     unit_price_override=Decimal("5000"),
                 ),
@@ -416,7 +414,6 @@ class TestPatronPaymentCreation:
                 products=[
                     PaymentProductRequest(
                         product_id=product.id,
-                        attendee_id=attendee.id,
                         quantity=1,
                         unit_price_override=Decimal("5000"),
                     )
@@ -448,7 +445,6 @@ class TestPatronPaymentCreation:
                 products=[
                     PaymentProductRequest(
                         product_id=product.id,
-                        attendee_id=attendee.id,
                         quantity=1,
                         unit_price_override=Decimal("999"),
                     )
@@ -508,7 +504,6 @@ class TestPatronPaymentCreation:
                 products=[
                     PaymentProductRequest(
                         product_id=product.id,
-                        attendee_id=attendee.id,
                         quantity=2,
                         unit_price_override=Decimal("5000"),
                     )
