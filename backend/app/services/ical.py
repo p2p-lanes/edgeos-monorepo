@@ -168,7 +168,15 @@ def build_event_ics(
     # whole series instead of just the first instance.
     if recurrence_id is None and getattr(event, "rrule", None):
         lines.append(f"RRULE:{event.rrule}")
-        exdates = getattr(event, "recurrence_exdates", None) or []
+        # recurrence_exdates is a JSONB array, so values arrive as ISO strings
+        # (not datetimes). Parse them before stamping — _fmt_utc reads .tzinfo
+        # and would otherwise raise AttributeError on a str, which the caller's
+        # try/except swallows, silently dropping the calendar invite from
+        # series-update/cancel emails. Mirrors the public ICS feed fix.
+        exdates = [
+            datetime.fromisoformat(d) if isinstance(d, str) else d
+            for d in getattr(event, "recurrence_exdates", None) or []
+        ]
         if exdates:
             lines.append(f"EXDATE:{','.join(_fmt_utc(d) for d in exdates)}")
     if description:
