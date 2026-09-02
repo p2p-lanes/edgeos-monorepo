@@ -13,10 +13,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { trackPortalTelemetry } from "@/lib/portal-telemetry"
-import type {
-  ScannableAccessHolder,
-  ScannableAccessTicket,
-} from "./accessProjection"
+import type { AccessHolder, AccessTicket } from "./accessProjection"
 
 function TicketDuration({ duration }: { duration: string | null }) {
   const { t } = useTranslation()
@@ -40,10 +37,9 @@ function TicketDuration({ duration }: { duration: string | null }) {
   ) : null
 }
 
-export function AccessContent({ access }: { access: ScannableAccessHolder[] }) {
+export function AccessContent({ access }: { access: AccessHolder[] }) {
   const { t } = useTranslation()
-  const [activeTicket, setActiveTicket] =
-    useState<ScannableAccessTicket | null>(null)
+  const [activeTicket, setActiveTicket] = useState<AccessTicket | null>(null)
 
   return (
     <section
@@ -86,7 +82,7 @@ export function AccessContent({ access }: { access: ScannableAccessHolder[] }) {
                 id={`access-holder-${holder.holderId}`}
                 className="text-base font-semibold"
               >
-                {holder.holderName}
+                {holder.holderName ?? t("tickets_access.purchased_by_you")}
               </h2>
               <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
                 <ul className="divide-y">
@@ -99,38 +95,48 @@ export function AccessContent({ access }: { access: ScannableAccessHolder[] }) {
                         <div className="flex flex-wrap items-center gap-2">
                           <Badge
                             variant={
-                              ticket.lastScanAt ? "secondary" : "default"
+                              ticket.requiresCheckIn && ticket.lastScanAt
+                                ? "secondary"
+                                : "default"
                             }
                           >
-                            {ticket.lastScanAt
-                              ? t("tickets_access.checked_in")
-                              : t("tickets_access.active")}
+                            {!ticket.requiresCheckIn
+                              ? t("tickets_access.access_active")
+                              : ticket.lastScanAt
+                                ? t("tickets_access.checked_in")
+                                : t("tickets_access.active")}
                           </Badge>
-                          <code className="rounded bg-muted px-2 py-1 text-xs text-muted-foreground">
-                            {ticket.checkInCode}
-                          </code>
+                          {ticket.requiresCheckIn && (
+                            <code className="rounded bg-muted px-2 py-1 text-xs text-muted-foreground">
+                              {ticket.checkInCode}
+                            </code>
+                          )}
                         </div>
                         <p className="mt-2 font-medium">{ticket.name}</p>
-                        <TicketDuration duration={ticket.duration} />
+                        {ticket.grantsEventAccess && (
+                          <TicketDuration duration={ticket.duration} />
+                        )}
                       </div>
-                      <button
-                        type="button"
-                        className="grid shrink-0 self-start place-items-center rounded-lg border border-slate-200 bg-white text-muted-foreground shadow-sm transition-colors hover:bg-slate-50 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:ml-auto sm:self-auto"
-                        aria-label={t("tickets_access.show_code", {
-                          ticket: ticket.name,
-                        })}
-                        onClick={() => {
-                          trackPortalTelemetry("access_code_opened")
-                          setActiveTicket(ticket)
-                        }}
-                      >
-                        <QRCodeReact
-                          aria-label={t("tickets_access.qr_alt")}
-                          value={JSON.stringify({ code: ticket.checkInCode })}
-                          size={96}
-                          level="H"
-                        />
-                      </button>
+                      {ticket.requiresCheckIn && (
+                        <button
+                          type="button"
+                          className="grid shrink-0 self-start place-items-center rounded-lg border border-slate-200 bg-white text-muted-foreground shadow-sm transition-colors hover:bg-slate-50 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:ml-auto sm:self-auto"
+                          aria-label={t("tickets_access.show_code", {
+                            ticket: ticket.name,
+                          })}
+                          onClick={() => {
+                            trackPortalTelemetry("access_code_opened")
+                            setActiveTicket(ticket)
+                          }}
+                        >
+                          <QRCodeReact
+                            aria-label={t("tickets_access.qr_alt")}
+                            value={JSON.stringify({ code: ticket.checkInCode })}
+                            size={96}
+                            level="H"
+                          />
+                        </button>
+                      )}
                     </li>
                   ))}
                 </ul>

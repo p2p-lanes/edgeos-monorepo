@@ -50,9 +50,40 @@ describe("projectOrders", () => {
             quantity: 2,
             unitPrice: "21.25",
             currency: "USD",
+            units: [],
           },
         ],
       },
+    ])
+  })
+
+  it("projects buyer-owned ownerless parking units", () => {
+    const payments = [
+      {
+        id: "parking-payment",
+        products_snapshot: [
+          {
+            units: [
+              {
+                id: "parking-unit",
+                check_in_code: "PARK1234",
+                active: true,
+                requires_check_in: true,
+              },
+              {
+                id: "revoked-parking-unit",
+                check_in_code: "REVOKED1",
+                active: false,
+                requires_check_in: true,
+              },
+            ],
+          },
+        ],
+      },
+    ] as PaymentPublic[]
+
+    expect(projectOrders(payments, false)[0]?.lines[0]?.units).toEqual([
+      { id: "parking-unit", checkInCode: "PARK1234" },
     ])
   })
 
