@@ -2,6 +2,7 @@ import { useForm } from "@tanstack/react-form"
 import { useMutation, useQueryClient } from "@tanstack/react-query"
 import { useNavigate } from "@tanstack/react-router"
 import { Calendar, Hash, Percent, Power } from "lucide-react"
+import { useRef } from "react"
 import {
   type CouponCreate,
   type CouponPublic,
@@ -45,6 +46,7 @@ export function CouponForm({ defaultValues, onSuccess }: CouponFormProps) {
   const { isOperatorOrAbove } = useAuth()
   const isEdit = !!defaultValues
   const readOnly = !isOperatorOrAbove
+  const skipBlockerRef = useRef(false)
 
   const createMutation = useMutation({
     mutationFn: (data: CouponCreate) =>
@@ -56,6 +58,7 @@ export function CouponForm({ defaultValues, onSuccess }: CouponFormProps) {
           navigate({ to: "/coupons/$id/edit", params: { id: data.id } }),
       })
       queryClient.invalidateQueries({ queryKey: ["coupons"] })
+      skipBlockerRef.current = true
       form.reset()
       onSuccess()
     },
@@ -71,6 +74,7 @@ export function CouponForm({ defaultValues, onSuccess }: CouponFormProps) {
     onSuccess: () => {
       showSuccessToast("Coupon updated successfully")
       queryClient.invalidateQueries({ queryKey: ["coupons"] })
+      skipBlockerRef.current = true
       form.reset()
       onSuccess()
     },
@@ -83,6 +87,7 @@ export function CouponForm({ defaultValues, onSuccess }: CouponFormProps) {
     onSuccess: () => {
       showSuccessToast("Coupon deleted successfully")
       queryClient.invalidateQueries({ queryKey: ["coupons"] })
+      skipBlockerRef.current = true
       navigate({ to: "/coupons" })
     },
     onError: createErrorHandler(showErrorToast),
@@ -142,7 +147,7 @@ export function CouponForm({ defaultValues, onSuccess }: CouponFormProps) {
     },
   })
 
-  const blocker = useUnsavedChanges(form)
+  const blocker = useUnsavedChanges(form, skipBlockerRef)
 
   const isPending = createMutation.isPending || updateMutation.isPending
 
