@@ -769,17 +769,9 @@ class CalendarAccommodation(BaseModel):
     name: str
     kind: AccommodationKind
     guest_capacity: int
-    is_active: bool = True
-    # The nights this room type can be sold for. Sent so the calendar can grey
-    # out everything outside it: an empty unit on a night nobody is allowed to
-    # book is not availability, and an operator reading the row as if it were
-    # will promise a stay the checkout then refuses.
-    bookable_from: date
-    bookable_to: date
     units: list[CalendarUnit] = []
     # Free units per day, keyed by ISO date: the "Available" row under each
-    # room type. Computed server-side so the client never re-derives it, and
-    # zero outside the window, so the number and the greying always agree.
+    # room type. Computed server-side so the client never re-derives it.
     availability_by_day: dict[str, int] = {}
 
 

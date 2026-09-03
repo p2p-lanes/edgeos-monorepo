@@ -1,11 +1,14 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
+import { TriangleAlert } from "lucide-react"
 import { useState } from "react"
 
 import {
   type AccommodationPublic,
   AccommodationsService,
   type BookingKind,
+  PopupsService,
 } from "@/client"
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Button } from "@/components/ui/button"
 import { DatePicker } from "@/components/ui/date-picker"
 import {
@@ -29,8 +32,10 @@ import {
 import { Switch } from "@/components/ui/switch"
 import { Textarea } from "@/components/ui/textarea"
 import useCustomToast from "@/hooks/useCustomToast"
+import { cn } from "@/lib/utils"
 import { createErrorHandler } from "@/utils"
 import { addDays, todayKey } from "./calendarLayout"
+import { checkStay, type StayProblemField } from "./stayRules"
 
 /**
  * Booking a room by hand, and taking rooms off the market.
@@ -40,6 +45,12 @@ import { addDays, todayKey } from "./calendarLayout"
  * bookings are confirmed immediately (there is no payment to wait for) and
  * may ignore the min-stay and bookable-window rules, which shape what guests
  * can buy rather than what the operator can arrange.
+ *
+ * Those rules are checked here as the operator types, and block the submit
+ * until either the dates are fixed or the override is turned on deliberately.
+ * The server checks them too and is still the authority; the point of doing
+ * it twice is that a refusal arrives as a sentence next to the field, before
+ * the button, rather than as a 422 after it.
  */
 
 const ANY_UNIT = "any"
@@ -56,6 +67,50 @@ function useRooms(popupId: string) {
     queryFn: () => AccommodationsService.listAccommodations({ popupId }),
     enabled: !!popupId,
   })
+}
+
+/**
+ * The gathering's default minimum stay, which a room type may override.
+ *
+ * Fetched rather than passed down: the dialog opens from two places and this
+ * keeps both callers from having to know the rule exists.
+ */
+function usePopupMinStay(popupId: string) {
+  const { data } = useQuery({
+    queryKey: ["popup", popupId],
+    queryFn: () => PopupsService.getPopup({ popupId }),
+    enabled: !!popupId,
+  })
+  return data?.accommodation_min_stay ?? null
+}
+
+/**
+ * The refusal, shown where the operator is already looking.
+ *
+ * It names the override by its label, because the switch below is the
+ * intended way out for a comp or a phone booking and an operator should not
+ * have to guess that.
+ */
+function StayProblemAlert({
+  title,
+  detail,
+}: {
+  title: string
+  detail: string
+}) {
+  return (
+    <Alert variant="destructive">
+      <TriangleAlert />
+      <AlertTitle>{title}</AlertTitle>
+      <AlertDescription>
+        <span>{detail}</span>
+        <span>
+          To book it anyway, turn on <strong>Ignore booking rules</strong>{" "}
+          below.
+        </span>
+      </AlertDescription>
+    </Alert>
+  )
 }
 
 function RoomSelect({
@@ -155,6 +210,19 @@ export function NewBookingDialog({
 
   const room = rooms?.results.find((item) => item.id === accommodationId)
   const units = room?.units ?? []
+  const popupMinStay = usePopupMinStay(popupId)
+
+  // Only meaningful once a room type is picked: the rules belong to it. With
+  // the override on there is nothing to report, because nothing is enforced.
+  const problem =
+    room && !ignoreRestrictions
+      ? checkStay(
+          room,
+          { checkIn, checkOut, guests: Number(guestCount) || 1 },
+          popupMinStay,
+        )
+      : null
+  const blocks = (field: StayProblemField) => problem?.field === field
 
   const create = useMutation({
     mutationFn: () =>
@@ -183,7 +251,8 @@ export function NewBookingDialog({
     onError: createErrorHandler(showErrorToast),
   })
 
-  const canSubmit = !!accommodationId && !!checkIn && checkOut > checkIn
+  const canSubmit =
+    !!accommodationId && !!checkIn && checkOut > checkIn && !problem
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -205,6 +274,8 @@ export function NewBookingDialog({
               setUnitId(ANY_UNIT)
             }}
           />
+
+          {problem && blocks("room") && <StayProblemAlert {...problem} />}
 
           <div className="flex flex-col gap-1.5">
             <Label htmlFor="booking-unit">Unit</Label>
@@ -238,6 +309,8 @@ export function NewBookingDialog({
             onCheckOut={setCheckOut}
           />
 
+          {problem && blocks("dates") && <StayProblemAlert {...problem} />}
+
           <div className="grid gap-3 sm:grid-cols-2">
             <div className="flex flex-col gap-1.5">
               <Label htmlFor="booking-guest-name">Guest name</Label>
@@ -266,8 +339,10 @@ export function NewBookingDialog({
               type="number"
               min="1"
               value={guestCount}
+              aria-invalid={blocks("guests")}
               onChange={(event) => setGuestCount(event.target.value)}
             />
+            {problem && blocks("guests") && <StayProblemAlert {...problem} />}
           </div>
 
           <div className="flex flex-col gap-1.5">
@@ -281,11 +356,17 @@ export function NewBookingDialog({
             />
           </div>
 
-          <div className="flex items-start justify-between gap-4 rounded-lg border p-3">
+          <div
+            className={cn(
+              "flex items-start justify-between gap-4 rounded-lg border p-3",
+              problem && "border-destructive/40 bg-destructive/5",
+            )}
+          >
             <div>
               <Label htmlFor="booking-ignore">Ignore booking rules</Label>
               <p className="text-xs text-muted-foreground">
-                Book outside the bookable window or below the minimum stay.
+                Book outside the bookable window, below the minimum stay, or
+                over the room's capacity.
               </p>
             </div>
             <Switch

@@ -47,80 +47,6 @@ export function eachDay(from: string, to: string): string[] {
   return Array.from({ length: total }, (_, index) => addDays(from, index))
 }
 
-/** When a room type is on sale, as the calendar needs to know it. */
-export interface BookableWindow {
-  bookable_from: string
-  bookable_to: string
-  is_active?: boolean
-}
-
-/**
- * The *nights* a room type is not on sale for, out of the visible columns.
- *
- * `bookable_to` is a check-out bound, so the last night that can be sold is
- * the day before it: half-open here as everywhere else. A room type that is
- * switched off is closed on every night, whatever its window says.
- *
- * This is the whole-cell answer, for the per-night availability numbers. The
- * unit rows below them need `closedBands` instead, because a bar does not
- * begin and end on cell boundaries.
- *
- * Keys are `YYYY-MM-DD`, which compare correctly as strings, so this needs no
- * date parsing.
- */
-export function closedDays(
-  days: string[],
-  window: BookableWindow,
-): Set<string> {
-  if (window.is_active === false) return new Set(days)
-  return new Set(
-    days.filter(
-      (day) => day < window.bookable_from || day >= window.bookable_to,
-    ),
-  )
-}
-
-/** A stretch of the row, in pixels, that is not on sale. */
-export interface ClosedBand {
-  left: number
-  width: number
-}
-
-/**
- * The closed stretches of a unit row, in the same half-day geometry as the
- * bars laid over it.
- *
- * Whole cells are the wrong unit here. A guest may check out *on*
- * `bookable_to`, and `layoutBooking` draws that departure at the midpoint of
- * that column, so greying the column entire puts grey under the last half-day
- * of a perfectly legal stay and makes it read as if the booking overran the
- * window. The open stretch is therefore exactly the span a stay covering the
- * whole window would occupy: from the middle of `bookable_from` to the middle
- * of `bookable_to`.
- */
-export function closedBands(
-  from: string,
-  to: string,
-  window: BookableWindow,
-): ClosedBand[] {
-  const total = dayOffset(to, from) * DAY_WIDTH
-  if (total <= 0) return []
-  if (window.is_active === false) return [{ left: 0, width: total }]
-
-  const clamp = (value: number) => Math.min(Math.max(value, 0), total)
-  const opens = clamp(
-    dayOffset(window.bookable_from, from) * DAY_WIDTH + HALF_DAY,
-  )
-  const closes = clamp(
-    dayOffset(window.bookable_to, from) * DAY_WIDTH + HALF_DAY,
-  )
-
-  const bands: ClosedBand[] = []
-  if (opens > 0) bands.push({ left: 0, width: opens })
-  if (closes < total) bands.push({ left: closes, width: total - closes })
-  return bands
-}
-
 export function isWeekend(key: string): boolean {
   const weekday = parseDay(key).getUTCDay()
   return weekday === 0 || weekday === 6
@@ -138,7 +64,7 @@ export function dayNumber(key: string): string {
   return String(parseDay(key).getUTCDate())
 }
 
-/** "Jun 1": compact enough for a tooltip or a label cell. */
+/** "Jun 1": short enough for a sentence, unambiguous about the month. */
 export function shortDay(key: string): string {
   return parseDay(key).toLocaleDateString("en-US", {
     month: "short",

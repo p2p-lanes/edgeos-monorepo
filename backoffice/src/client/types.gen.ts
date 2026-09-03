@@ -1443,9 +1443,6 @@ export type CalendarAccommodation = {
     name: string;
     kind: AccommodationKind;
     guest_capacity: number;
-    is_active?: boolean;
-    bookable_from: string;
-    bookable_to: string;
     units?: Array<CalendarUnit>;
     availability_by_day?: {
         [key: string]: (number);
