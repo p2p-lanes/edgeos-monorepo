@@ -42,6 +42,7 @@ import {
   HOLD_HATCH,
 } from "./bookingAppearance"
 import {
+  addDays,
   type BookableWindow,
   type ClosedBand,
   closedBands,
@@ -159,6 +160,31 @@ function DayStripes({ days, bands }: { days: string[]; bands: ClosedBand[] }) {
   )
 }
 
+/**
+ * Why a night shows no availability.
+ *
+ * The check-out day gets its own sentence. It is the one an operator queries,
+ * because stays legitimately end on it: guests leave that morning, but nobody
+ * can sleep that night, so the number is zero while the bars still reach into
+ * the column.
+ */
+function closedDayReason(
+  accommodation: CalendarAccommodation,
+  day: string,
+  isClosed: boolean,
+  free: number,
+): string {
+  if (!isClosed) return `${free} free on ${day}`
+  if (accommodation.is_active === false) {
+    return `${accommodation.name} is switched off and cannot be sold`
+  }
+  if (day === accommodation.bookable_to) {
+    return `${shortDay(day)} is the check-out day: guests can leave, but the night cannot be sold`
+  }
+  const lastNight = addDays(accommodation.bookable_to, -1)
+  return `${shortDay(day)} is outside this room's window (nights ${shortDay(accommodation.bookable_from)} to ${shortDay(lastNight)})`
+}
+
 function AvailabilityRow({
   accommodation,
   days,
@@ -170,16 +196,21 @@ function AvailabilityRow({
 }) {
   const availability = accommodation.availability_by_day ?? {}
   const unitCount = accommodation.units?.length ?? 0
-  // The window is a check-out bound, so it reads as "you can stay from A and
-  // must be out by B", which is the sentence an operator would say out loud.
-  const window = `on sale ${shortDay(accommodation.bookable_from)} to ${shortDay(accommodation.bookable_to)}`
+  // `bookable_to` is a check-out bound, so the last night that can be sold is
+  // the day before it. Saying "on sale Jun 12 to Jun 24" while greying the
+  // 24th is what makes an operator think the calendar is wrong, so the window
+  // is spelled out in nights, and the check-out day is named separately.
+  const lastNight = addDays(accommodation.bookable_to, -1)
+  const window = `nights ${shortDay(accommodation.bookable_from)} to ${shortDay(lastNight)}, check-out by ${shortDay(accommodation.bookable_to)}`
   return (
     <div className="flex border-b border-border bg-card/60">
       <div
         className="sticky left-0 z-10 shrink-0 border-r border-border bg-card px-3 py-1.5"
         style={{ width: LABEL_WIDTH }}
       >
-        <div className="truncate text-sm font-medium">{accommodation.name}</div>
+        <div className="truncate text-sm font-medium" title={window}>
+          {accommodation.name}
+        </div>
         <div className="truncate text-[11px] text-muted-foreground">
           {unitCount} unit{unitCount === 1 ? "" : "s"} · sleeps{" "}
           {accommodation.guest_capacity}
@@ -206,13 +237,7 @@ function AvailabilityRow({
                 width: DAY_WIDTH,
                 ...(isClosed ? CLOSED_DAY_HATCH : {}),
               }}
-              title={
-                isClosed
-                  ? accommodation.is_active === false
-                    ? `${accommodation.name} is switched off and cannot be sold`
-                    : `${day} is outside this room's booking window (${window})`
-                  : `${free} free on ${day}`
-              }
+              title={closedDayReason(accommodation, day, isClosed, free)}
             >
               {isClosed ? "" : free}
             </div>
