@@ -64,6 +64,15 @@ export function dayNumber(key: string): string {
   return String(parseDay(key).getUTCDate())
 }
 
+/** "Jun 1": short enough for a sentence, unambiguous about the month. */
+export function shortDay(key: string): string {
+  return parseDay(key).toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    timeZone: "UTC",
+  })
+}
+
 export function weekdayInitial(key: string): string {
   return parseDay(key)
     .toLocaleDateString("en-US", { weekday: "short", timeZone: "UTC" })
