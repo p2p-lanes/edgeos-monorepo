@@ -11,6 +11,7 @@ import { describe, expect, it } from "vitest"
 import type { CalendarBooking } from "@/client"
 import {
   addDays,
+  closedBands,
   closedDays,
   DAY_WIDTH,
   dayOffset,
@@ -210,5 +211,85 @@ describe("closedDays", () => {
     })
 
     expect(closed.size).toBe(0)
+  })
+})
+
+describe("closedBands", () => {
+  const from = "2026-03-01"
+  const to = "2026-04-01"
+  const total = 31 * DAY_WIDTH
+  const window = { bookable_from: "2026-03-10", bookable_to: "2026-03-20" }
+
+  it("opens and closes at the same midpoints a stay would", () => {
+    // The band geometry has to match `layoutBooking`, or grey lands under a
+    // legal stay. A stay covering the whole window occupies exactly the gap
+    // between the two bands.
+    const bands = closedBands(from, to, window)
+    const stay = layoutBooking(booking("2026-03-10", "2026-03-20"), from, to)
+
+    expect(bands).toHaveLength(2)
+    expect(bands[0].left + bands[0].width).toBe(stay?.left)
+    expect(bands[1].left).toBe((stay?.left ?? 0) + (stay?.width ?? 0))
+  })
+
+  it("leaves the check-out morning open, so a stay ending on bookable_to is not greyed", () => {
+    // This is the bug the bands exist for: a guest may check out on the 20th,
+    // and their bar reaches the middle of that column. Greying the column
+    // whole made a legal departure read as an overrun.
+    const bands = closedBands(from, to, window)
+    const leaving = layoutBooking(booking("2026-03-15", "2026-03-20"), from, to)
+    const departureEdge = (leaving?.left ?? 0) + (leaving?.width ?? 0)
+
+    expect(bands[1].left).toBe(departureEdge)
+    expect(bands[1].left).toBe(19 * DAY_WIDTH + DAY_WIDTH / 2)
+  })
+
+  it("covers the row end to end and nothing more", () => {
+    const bands = closedBands(from, to, window)
+    const covered = bands.reduce((sum, band) => sum + band.width, 0)
+    const open = 10 * DAY_WIDTH // the ten sellable nights, 10th to 19th
+
+    expect(covered).toBe(total - open)
+    expect(bands[1].left + bands[1].width).toBe(total)
+  })
+
+  it("greys the whole row when the room type is switched off", () => {
+    const bands = closedBands(from, to, { ...window, is_active: false })
+
+    expect(bands).toEqual([{ left: 0, width: total }])
+  })
+
+  it("greys nothing when the window covers the whole view", () => {
+    expect(
+      closedBands(from, to, {
+        bookable_from: "2026-01-01",
+        bookable_to: "2027-01-01",
+      }),
+    ).toEqual([])
+  })
+
+  it("greys the whole row when the window is elsewhere entirely", () => {
+    const before = closedBands(from, to, {
+      bookable_from: "2025-06-01",
+      bookable_to: "2025-06-30",
+    })
+    const after = closedBands(from, to, {
+      bookable_from: "2026-09-01",
+      bookable_to: "2026-09-30",
+    })
+
+    expect(before).toEqual([{ left: 0, width: total }])
+    expect(after).toEqual([{ left: 0, width: total }])
+  })
+
+  it("clips a window that starts before the view and ends inside it", () => {
+    const bands = closedBands(from, to, {
+      bookable_from: "2026-02-20",
+      bookable_to: "2026-03-05",
+    })
+
+    expect(bands).toHaveLength(1)
+    expect(bands[0].left).toBe(4 * DAY_WIDTH + DAY_WIDTH / 2)
+    expect(bands[0].left + bands[0].width).toBe(total)
   })
 })

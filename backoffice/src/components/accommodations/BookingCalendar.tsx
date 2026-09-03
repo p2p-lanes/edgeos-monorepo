@@ -42,6 +42,9 @@ import {
   HOLD_HATCH,
 } from "./bookingAppearance"
 import {
+  type BookableWindow,
+  type ClosedBand,
+  closedBands,
   closedDays,
   DAY_WIDTH,
   dayNumber,
@@ -120,35 +123,38 @@ function DayHeader({ days }: { days: string[] }) {
 }
 
 /**
- * Day stripes behind the bars: weekends, today, and the nights this room
- * cannot be sold on, drawn once per row.
+ * What sits behind the bars on a unit row: the day grid, then the stretches
+ * this room cannot be sold on.
  *
- * The closed tint is applied last and wins over the weekend and today tints,
- * because "you cannot sell this night" outranks both.
+ * The closed stretches are bands rather than tinted cells because they have
+ * to line up with the bars, which start and end on half-days. Greying the
+ * whole check-out column would put grey under the last half-day of a stay
+ * that ends exactly on `bookable_to`, which is legal, and make it read as an
+ * overrun. Drawn after the grid and before the bars, so a stay staff booked
+ * into a closed stretch still shows on top of the grey.
  */
-function DayStripes({ days, closed }: { days: string[]; closed: Set<string> }) {
+function DayStripes({ days, bands }: { days: string[]; bands: ClosedBand[] }) {
   const today = todayKey()
   return (
     <>
-      {days.map((day, index) => {
-        const isClosed = closed.has(day)
-        return (
-          <div
-            key={day}
-            className={cn(
-              "absolute top-0 bottom-0 border-r border-border/60",
-              isWeekend(day) && "bg-muted-foreground/5",
-              day === today && "bg-primary/10",
-              isClosed && CLOSED_DAY.className,
-            )}
-            style={{
-              left: index * DAY_WIDTH,
-              width: DAY_WIDTH,
-              ...(isClosed ? CLOSED_DAY_HATCH : {}),
-            }}
-          />
-        )
-      })}
+      {days.map((day, index) => (
+        <div
+          key={day}
+          className={cn(
+            "absolute top-0 bottom-0 border-r border-border/60",
+            isWeekend(day) && "bg-muted-foreground/5",
+            day === today && "bg-primary/10",
+          )}
+          style={{ left: index * DAY_WIDTH, width: DAY_WIDTH }}
+        />
+      ))}
+      {bands.map((band) => (
+        <div
+          key={band.left}
+          className={cn("absolute top-0 bottom-0", CLOSED_DAY.className)}
+          style={{ left: band.left, width: band.width, ...CLOSED_DAY_HATCH }}
+        />
+      ))}
     </>
   )
 }
@@ -224,7 +230,7 @@ function UnitRow({
   days,
   from,
   to,
-  closed,
+  window,
   onBookingClick,
   onEmptyClick,
 }: {
@@ -234,15 +240,20 @@ function UnitRow({
   days: string[]
   from: string
   to: string
-  /** Nights the room type is not on sale for; see `closedDays`. */
-  closed: Set<string>
+  /** The room type's window; a retired unit is closed regardless of it. */
+  window: BookableWindow
   onBookingClick: (booking: CalendarBooking) => void
   onEmptyClick: (day: string) => void
 }) {
   const bars = layoutBookings(bookings, from, to)
   // A retired unit is off the market whatever its room type's window says, so
-  // its whole row greys out rather than only the nights outside that window.
-  const closedHere = isActive ? closed : new Set(days)
+  // its whole row greys out rather than only the stretches outside that
+  // window.
+  const bands = closedBands(
+    from,
+    to,
+    isActive ? window : { ...window, is_active: false },
+  )
 
   const handleSurfaceClick = (event: React.MouseEvent<HTMLDivElement>) => {
     const rect = event.currentTarget.getBoundingClientRect()
@@ -280,7 +291,7 @@ function UnitRow({
         tabIndex={0}
         aria-label={`Book ${label}`}
       >
-        <DayStripes days={days} closed={closedHere} />
+        <DayStripes days={days} bands={bands} />
         {bars.map((bar) => {
           const appearance = bookingAppearance(bar.booking)
           const isHold = bar.booking.status === "hold"
@@ -513,8 +524,9 @@ export function BookingCalendar({ popupId }: { popupId: string }) {
                   </div>
 
                   {(property.accommodations ?? []).map((accommodation) => {
-                    // One set per room type, shared by its availability row
-                    // and every one of its unit rows.
+                    // The availability row counts whole nights, so it needs
+                    // the closed *days*; the unit rows measure in half-days
+                    // and derive their own bands from the same window.
                     const closed = closedDays(days, accommodation)
                     return (
                       <div key={accommodation.id}>
@@ -531,7 +543,7 @@ export function BookingCalendar({ popupId }: { popupId: string }) {
                             days={days}
                             from={from}
                             to={to}
-                            closed={closed}
+                            window={accommodation}
                             bookings={(unit.bookings ?? []).filter(
                               matchesSearch,
                             )}
