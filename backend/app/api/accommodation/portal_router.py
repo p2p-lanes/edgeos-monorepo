@@ -47,11 +47,33 @@ def _get_popup(db, popup_id: uuid.UUID) -> Popups:
     return popup
 
 
+def _get_flow(db, popup: Popups, sales_flow_id: uuid.UUID, current_human):
+    """Resolve an accessible sales flow that belongs to ``popup``."""
+    from app.api.sales_flow.crud import sales_flows_crud
+    from app.api.sales_flow.eligibility import (
+        assert_application_flow_eligible,
+        assert_upsale_eligible,
+    )
+    from app.api.sales_flow.resolver import resolve_flow
+
+    requested = sales_flows_crud.get(db, sales_flow_id)
+    if requested is None or requested.popup_id != popup.id:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Sales flow not found for this popup",
+        )
+    flow = resolve_flow(db, popup, requested.slug)
+    assert_upsale_eligible(db, flow, popup.id, popup.tenant_id, current_human)
+    assert_application_flow_eligible(db, flow, popup.tenant_id, current_human)
+    return flow
+
+
 @portal_router.get("", response_model=AccommodationOffer)
 async def list_portal_accommodations(
     db: HumanTenantSession,
-    _: CurrentHuman,
+    current_human: CurrentHuman,
     popup_id: uuid.UUID,
+    sales_flow_id: uuid.UUID,
 ) -> AccommodationOffer:
     """Room types this popup's checkout sells, before any dates are picked.
 
@@ -60,7 +82,8 @@ async def list_portal_accommodations(
     that a checkout sells rooms it does not sell.
     """
     popup = _get_popup(db, popup_id)
-    return offer_for_popup(db, popup.id, currency=popup.currency)
+    flow = _get_flow(db, popup, sales_flow_id, current_human)
+    return offer_for_popup(db, popup.id, flow.id, currency=popup.currency)
 
 
 @portal_router.post(
@@ -69,8 +92,9 @@ async def list_portal_accommodations(
 async def check_portal_accommodation_availability(
     request_in: AccommodationAvailabilityRequest,
     db: HumanTenantSession,
-    _: CurrentHuman,
+    current_human: CurrentHuman,
     popup_id: uuid.UUID,
+    sales_flow_id: uuid.UUID,
 ) -> list[PublicAccommodationAvailability]:
     """Free rooms and the price of the stay, for every room type at once.
 
@@ -78,9 +102,11 @@ async def check_portal_accommodation_availability(
     payment (``POST /payments`` on this flow), not by looking at it.
     """
     popup = _get_popup(db, popup_id)
+    flow = _get_flow(db, popup, sales_flow_id, current_human)
     return availability_for_popup(
         db,
         popup.id,
+        flow.id,
         check_in=request_in.check_in,
         check_out=request_in.check_out,
         guest_count=request_in.guest_count,

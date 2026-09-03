@@ -39,9 +39,12 @@ from app.api.attendee.models import AttendeeProducts
 from app.api.payment.models import PaymentProducts, Payments
 from app.api.payment.schemas import PaymentStatus
 from app.api.popup.models import Popups
+from app.api.sales_flow.crud import sales_flows_crud
+from app.api.sales_flow.models import SalesFlows
 from app.api.shared.enums import SaleType
 from app.api.tenant.models import Tenants
 from app.api.ticketing_step.models import TicketingSteps
+from tests._flow_helpers import seed_default_steps
 
 JUN_1 = "2026-06-01"
 JUN_8 = "2026-06-08"
@@ -73,28 +76,60 @@ def _make_popup(db: Session, tenant: Tenants, *, min_stay: int = 1) -> Popups:
     )
     db.add(popup)
     db.flush()
+    seed_default_steps(db, popup, sale_type=popup.sale_type)
     return popup
+
+
+def _default_flow(db: Session, popup: Popups) -> SalesFlows:
+    flow = sales_flows_crud.get_default_flow(db, popup.id)
+    assert flow is not None
+    return flow
+
+
+def _make_flow(db: Session, popup: Popups, slug: str) -> SalesFlows:
+    flow = SalesFlows(
+        tenant_id=popup.tenant_id,
+        popup_id=popup.id,
+        slug=slug,
+        name=slug.title(),
+        type=SaleType.direct.value,
+    )
+    db.add(flow)
+    db.flush()
+    return flow
 
 
 def _enable_step(
     db: Session,
     popup: Popups,
     *,
+    flow: SalesFlows | None = None,
     enabled: bool = True,
     config: dict | None = None,
 ) -> TicketingSteps:
-    """The accommodation step reuses the seeded ``housing`` slot."""
-    step = TicketingSteps(
-        id=uuid.uuid4(),
-        tenant_id=popup.tenant_id,
-        popup_id=popup.id,
-        step_type=HOUSING_STEP_TYPE,
-        title="Accommodation",
-        order=1,
-        is_enabled=enabled,
-        template=ACCOMMODATION_STEP_TEMPLATE,
-        template_config=config,
-    )
+    """The accommodation step reuses the default flow's seeded housing slot."""
+    flow = flow or _default_flow(db, popup)
+    step = db.exec(
+        select(TicketingSteps).where(
+            TicketingSteps.popup_id == popup.id,
+            TicketingSteps.sales_flow_id == flow.id,
+            TicketingSteps.step_type == HOUSING_STEP_TYPE,
+        )
+    ).first()
+    if step is None:
+        step = TicketingSteps(
+            id=uuid.uuid4(),
+            tenant_id=popup.tenant_id,
+            popup_id=popup.id,
+            sales_flow_id=flow.id,
+            step_type=HOUSING_STEP_TYPE,
+            title="Accommodation",
+            order=1,
+            product_category="housing",
+        )
+    step.is_enabled = enabled
+    step.template = ACCOMMODATION_STEP_TEMPLATE
+    step.template_config = config
     db.add(step)
     db.flush()
     return step
@@ -158,7 +193,31 @@ def _booking_line(accommodation, **overrides) -> dict:
     }
 
 
-def _purchase(client: TestClient, popup: Popups, tenant: Tenants, lines: list[dict]):
+def _purchase(
+    client: TestClient,
+    popup: Popups,
+    tenant: Tenants,
+    lines: list[dict],
+    *,
+    flow: SalesFlows | None = None,
+):
+    flow_slug = flow.slug if flow is not None else "checkout"
+    request_lines: list[dict] = []
+    recipients: list[dict] = []
+    for index, original in enumerate(lines):
+        line = dict(original)
+        if not line.get("attendee_id") and not line.get("recipient_key"):
+            recipient_key = f"stay-{index}"
+            line["recipient_key"] = recipient_key
+            recipients.append(
+                {
+                    "recipient_key": recipient_key,
+                    "name": f"Guest {index + 1}",
+                    "email": f"guest-{index + 1}@test.com",
+                    "profile_snapshot": {},
+                }
+            )
+        request_lines.append(line)
     with patch("app.services.simplefi.get_simplefi_client") as mock_client:
         mock_client.return_value.create_payment.return_value = SimpleNamespace(
             id=f"sf_{uuid.uuid4().hex[:8]}",
@@ -167,9 +226,10 @@ def _purchase(client: TestClient, popup: Popups, tenant: Tenants, lines: list[di
             is_installment_plan=False,
         )
         return client.post(
-            f"/api/v1/checkout/{popup.slug}/purchase",
+            f"/api/v1/checkout/{popup.slug}/{flow_slug}/purchase",
             json={
-                "products": lines,
+                "products": request_lines,
+                "recipients": recipients,
                 "buyer": {
                     "email": f"buyer-{uuid.uuid4().hex[:6]}@test.com",
                     "first_name": "Ada",
@@ -257,7 +317,7 @@ class TestPricing:
         db.commit()
 
         preview = client.post(
-            f"/api/v1/checkout/{popup.slug}/preview",
+            f"/api/v1/checkout/{popup.slug}/checkout/preview",
             json={"products": [_booking_line(accommodation)]},
             headers={"X-Tenant-Id": str(tenant_a.id)},
         )
@@ -276,12 +336,65 @@ class TestPricing:
         charged = _purchase(client, popup, tenant_a, [_booking_line(accommodation)])
         assert charged.json()["amount"] == body["total"]
 
+    def test_quote_token_detects_a_changed_accommodation_price(
+        self, client: TestClient, db: Session, tenant_a: Tenants
+    ) -> None:
+        popup = _make_popup(db, tenant_a)
+        flow = _default_flow(db, popup)
+        _enable_step(db, popup)
+        _, accommodation = _make_inventory(db, popup, nightly="100.00", tax=None)
+        db.commit()
+
+        line = _booking_line(accommodation)
+        line["recipient_key"] = "stay-0"
+        buyer = {
+            "email": "quoted@test.com",
+            "first_name": "Ada",
+            "last_name": "Lovelace",
+            "form_data": {},
+        }
+        recipients = [
+            {
+                "recipient_key": "stay-0",
+                "name": "Ada Lovelace",
+                "email": "quoted@test.com",
+                "profile_snapshot": {},
+            }
+        ]
+        preview = client.post(
+            f"/api/v1/checkout/{popup.slug}/{flow.slug}/preview",
+            json={"products": [line], "buyer": buyer, "recipients": recipients},
+            headers={"X-Tenant-Id": str(tenant_a.id)},
+        )
+        assert preview.status_code == 200, preview.text
+        assert preview.json()["quote_token"] is not None
+
+        accommodation.default_nightly_price = Decimal("180.00")
+        db.add(accommodation)
+        db.commit()
+
+        response = client.post(
+            f"/api/v1/checkout/{popup.slug}/{flow.slug}/purchase",
+            json={
+                "products": [line],
+                "buyer": buyer,
+                "recipients": recipients,
+                "quote_token": preview.json()["quote_token"],
+            },
+            headers={"X-Tenant-Id": str(tenant_a.id)},
+        )
+
+        assert response.status_code == 409
+        assert response.json()["detail"]["code"] == "requote_required"
+        assert response.json()["detail"]["fresh_quote"]["total"] == "1260.00"
+
     def test_a_coupon_applies_to_the_stay(
         self, client: TestClient, db: Session, tenant_a: Tenants
     ) -> None:
         from app.api.coupon.models import Coupons
 
         popup = _make_popup(db, tenant_a)
+        flow = _default_flow(db, popup)
         _enable_step(db, popup)
         _, accommodation = _make_inventory(db, popup, nightly="100.00", tax=None)
         db.add(
@@ -289,6 +402,7 @@ class TestPricing:
                 id=uuid.uuid4(),
                 tenant_id=popup.tenant_id,
                 popup_id=popup.id,
+                sales_flow_id=flow.id,
                 code="HALF",
                 discount_value=50,
                 is_active=True,
@@ -303,10 +417,20 @@ class TestPricing:
                 checkout_url="https://simplefi.test/c",
                 is_installment_plan=False,
             )
+            line = _booking_line(accommodation)
+            line["recipient_key"] = "stay-0"
             response = client.post(
-                f"/api/v1/checkout/{popup.slug}/purchase",
+                f"/api/v1/checkout/{popup.slug}/{flow.slug}/purchase",
                 json={
-                    "products": [_booking_line(accommodation)],
+                    "products": [line],
+                    "recipients": [
+                        {
+                            "recipient_key": "stay-0",
+                            "name": "Ada L",
+                            "email": "coupon@test.com",
+                            "profile_snapshot": {},
+                        }
+                    ],
                     "coupon_code": "HALF",
                     "buyer": {
                         "email": "coupon@test.com",
@@ -390,13 +514,37 @@ class TestHolds:
         assert response.status_code == 200, response.text
         assert response.json()["amount"] == "1400.00"
 
+        payment = db.exec(select(Payments).where(Payments.popup_id == popup.id)).one()
+        from app.api.payment.crud import payments_crud
+
+        payments_crud.approve_payment(db, payment.id)
+        db.commit()
+        db.expire_all()
+
         bookings = db.exec(
             select(AccommodationBookings).where(
                 AccommodationBookings.accommodation_id == accommodation.id
             )
         ).all()
+        payment_lines = {
+            line.id: line
+            for line in db.exec(
+                select(PaymentProducts).where(PaymentProducts.payment_id == payment.id)
+            ).all()
+        }
+        product_units = db.exec(
+            select(AttendeeProducts).where(AttendeeProducts.payment_id == payment.id)
+        ).all()
         assert len(bookings) == 2
         assert len({b.unit_id for b in bookings}) == 2
+        assert len({b.attendee_id for b in bookings}) == 2
+        assert all(
+            booking.attendee_id == payment_lines[booking.payment_product_id].attendee_id
+            for booking in bookings
+        )
+        assert {
+            (unit.payment_product_id, unit.attendee_id) for unit in product_units
+        } == {(booking.payment_product_id, booking.attendee_id) for booking in bookings}
 
     def test_different_dates_for_the_same_room_type_price_independently(
         self, client: TestClient, db: Session, tenant_a: Tenants
@@ -484,8 +632,8 @@ class TestLifecycle:
 
         from app.api.payment.crud import payments_crud
 
-        payments_crud._restore_payment_stock(db, payment)
-        db.commit()
+        payments_crud.update_status(db, payment.id, PaymentStatus.EXPIRED)
+        payments_crud.update_status(db, payment.id, PaymentStatus.EXPIRED)
         db.expire_all()
 
         booking = db.exec(
@@ -499,7 +647,7 @@ class TestLifecycle:
         again = _purchase(client, popup, tenant_a, [_booking_line(accommodation)])
         assert again.status_code == 200, again.text
 
-    def test_release_leaves_a_confirmed_stay_alone(
+    def test_cancellation_revokes_fulfillment_but_keeps_a_confirmed_stay(
         self, client: TestClient, db: Session, tenant_a: Tenants
     ) -> None:
         """A refund is a separate decision; freeing a paid room would resell
@@ -515,9 +663,15 @@ class TestLifecycle:
         from app.api.payment.crud import payments_crud
 
         payments_crud.approve_payment(db, payment.id)
-        db.commit()
-        payments_crud._restore_payment_stock(db, payment)
-        db.commit()
+        product_unit = db.exec(
+            select(AttendeeProducts).where(AttendeeProducts.payment_id == payment.id)
+        ).one()
+        assert product_unit.payment_product_id is not None
+
+        payments_crud.update_status(db, payment.id, PaymentStatus.CANCELLED)
+        db.refresh(product_unit)
+        first_revoked_at = product_unit.revoked_at
+        payments_crud.update_status(db, payment.id, PaymentStatus.CANCELLED)
         db.expire_all()
 
         booking = db.exec(
@@ -526,6 +680,9 @@ class TestLifecycle:
             )
         ).first()
         assert booking.status == BookingStatus.CONFIRMED
+        product_unit = db.get(AttendeeProducts, product_unit.id)
+        assert product_unit.revoked_at == first_revoked_at
+        assert product_unit.revoked_at is not None
 
     def test_a_failed_purchase_leaves_no_booking_behind(
         self, client: TestClient, db: Session, tenant_a: Tenants
@@ -533,6 +690,7 @@ class TestLifecycle:
         """The hold lives in the payment's transaction: if SimpleFI blows up
         after it, the room must not stay locked."""
         popup = _make_popup(db, tenant_a)
+        flow = _default_flow(db, popup)
         _enable_step(db, popup)
         _, accommodation = _make_inventory(db, popup, units=1)
         db.commit()
@@ -541,10 +699,20 @@ class TestLifecycle:
             mock_client.return_value.create_payment.side_effect = RuntimeError(
                 "gateway down"
             )
+            line = _booking_line(accommodation)
+            line["recipient_key"] = "stay-0"
             response = client.post(
-                f"/api/v1/checkout/{popup.slug}/purchase",
+                f"/api/v1/checkout/{popup.slug}/{flow.slug}/purchase",
                 json={
-                    "products": [_booking_line(accommodation)],
+                    "products": [line],
+                    "recipients": [
+                        {
+                            "recipient_key": "stay-0",
+                            "name": "Ada L",
+                            "email": "boom@test.com",
+                            "profile_snapshot": {},
+                        }
+                    ],
                     "buyer": {
                         "email": "boom@test.com",
                         "first_name": "Ada",
@@ -585,8 +753,8 @@ class TestStepGate:
         db.commit()
 
         response = _purchase(client, popup, tenant_a, [_booking_line(accommodation)])
-        assert response.status_code == 422
-        assert response.json()["detail"]["code"] == "accommodation_step_disabled"
+        assert response.status_code == 403
+        assert response.json()["detail"]["code"] == "product_not_in_flow"
 
     def test_a_property_outside_the_step_subset_is_refused(
         self, client: TestClient, db: Session, tenant_a: Tenants
@@ -612,6 +780,46 @@ class TestStepGate:
 
         response = _purchase(client, popup, tenant_a, [_booking_line(accommodation)])
         assert response.status_code == 200, response.text
+
+    def test_preview_and_purchase_refuse_a_room_from_another_flow(
+        self, client: TestClient, db: Session, tenant_a: Tenants
+    ) -> None:
+        popup = _make_popup(db, tenant_a)
+        first_flow = _default_flow(db, popup)
+        second_flow = _make_flow(db, popup, "second-stay")
+        first_property, _ = _make_inventory(db, popup)
+        second_property, second_room = _make_inventory(db, popup)
+        _enable_step(
+            db,
+            popup,
+            flow=first_flow,
+            config={"property_ids": [str(first_property.id)]},
+        )
+        _enable_step(
+            db,
+            popup,
+            flow=second_flow,
+            config={"property_ids": [str(second_property.id)]},
+        )
+        db.commit()
+
+        preview = client.post(
+            f"/api/v1/checkout/{popup.slug}/{first_flow.slug}/preview",
+            json={"products": [_booking_line(second_room)]},
+            headers={"X-Tenant-Id": str(tenant_a.id)},
+        )
+        purchase = _purchase(
+            client,
+            popup,
+            tenant_a,
+            [_booking_line(second_room)],
+            flow=first_flow,
+        )
+
+        assert preview.status_code == 422
+        assert preview.json()["detail"]["code"] == "accommodation_not_offered"
+        assert purchase.status_code == 422
+        assert purchase.json()["detail"]["code"] == "accommodation_not_offered"
 
 
 # ---------------------------------------------------------------------------
@@ -647,6 +855,21 @@ class TestValidation:
         line["product_id"] = str(cheap.id)
 
         response = _purchase(client, popup, tenant_a, [line])
+        assert response.status_code == 422
+        assert response.json()["detail"]["code"] == "accommodation_invalid_booking_data"
+
+    def test_a_booking_line_cannot_multiply_one_stay_with_quantity(
+        self, client: TestClient, db: Session, tenant_a: Tenants
+    ) -> None:
+        popup = _make_popup(db, tenant_a)
+        _enable_step(db, popup)
+        _, accommodation = _make_inventory(db, popup, units=2)
+        db.commit()
+
+        line = _booking_line(accommodation)
+        line["quantity"] = 2
+        response = _purchase(client, popup, tenant_a, [line])
+
         assert response.status_code == 422
         assert response.json()["detail"]["code"] == "accommodation_invalid_booking_data"
 
@@ -773,7 +996,7 @@ class TestValidation:
         response = _purchase(client, popup, tenant_a, [_booking_line(foreign_room)])
         # The product does not belong to this popup either, so the engine's own
         # membership check fires first; both answers are a refusal.
-        assert response.status_code == 422
+        assert response.status_code == 403
 
 
 # ---------------------------------------------------------------------------

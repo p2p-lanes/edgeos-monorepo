@@ -143,6 +143,12 @@ interface DynamicApplicationFormProps {
   popup: PopupPublic
   /** Referral UUID carried from /r/{code} — attributed on application create (REQ-GR-009). */
   referralId?: string | null
+  /**
+   * Explicit target sales flow chosen via the FlowPicker (sdd/sales-flows
+   * D6 URL scheme, task 9.4). Omitted keeps the backend's primary-flow
+   * resolution.
+   */
+  salesFlowId?: string | null
 }
 
 export function DynamicApplicationForm({
@@ -150,10 +156,14 @@ export function DynamicApplicationForm({
   existingApplication,
   popup,
   referralId,
+  salesFlowId,
 }: DynamicApplicationFormProps) {
   const { t } = useTranslation()
   const { getRelevantApplication } = useApplication()
-  const application = getRelevantApplication()
+  // The application of the door this form is for. It already receives
+  // `salesFlowId`, so asking without it would answer about another way
+  // in (sdd/sales-flows-rediseno).
+  const application = getRelevantApplication(salesFlowId)
 
   const { values, errors, handleChange, validate, progress } =
     useApplicationForm(schema, existingApplication, popup.id)
@@ -171,6 +181,7 @@ export function DynamicApplicationForm({
     application,
     validate,
     referralId,
+    salesFlowId,
   })
 
   const feeAlreadyPaid = Boolean(

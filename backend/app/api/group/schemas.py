@@ -13,6 +13,11 @@ class GroupBase(SQLModel):
 
     tenant_id: uuid.UUID = Field(foreign_key="tenants.id", index=True)
     popup_id: uuid.UUID = Field(foreign_key="popups.id", index=True)
+    # The flow this group's members apply through. Required
+    # (sdd/sales-flows-rediseno): joining produces an application, and an
+    # application always belongs to a flow. Without this a group with its
+    # own questions sent everyone through the default one.
+    sales_flow_id: uuid.UUID = Field(foreign_key="sales_flows.id", index=True)
     name: str = Field(index=True)
     slug: str = Field(index=True)
     description: str | None = Field(default=None, nullable=True, sa_type=Text())
@@ -43,6 +48,9 @@ class GroupCreate(BaseModel):
     """Group schema for creation."""
 
     popup_id: uuid.UUID
+    # Omitted means the popup's default flow, which is where every group's
+    # members landed before a group could say otherwise.
+    sales_flow_id: uuid.UUID | None = None
     name: str
     slug: str | None = None  # Auto-generated if not provided
     description: str | None = None

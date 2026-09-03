@@ -17,26 +17,24 @@ import type {
  * Higher layers (pricing driver, store) compose these.
  */
 export interface CheckoutClient {
-  /** GET /checkout/{slug}/runtime — popup, products, buyer form, steps. */
+  /** GET /checkout/{slug}/{flowSlug}/runtime — popup, products, buyer form, steps. */
   getRuntime(): Promise<CheckoutRuntimeResponse>
-  /** POST /checkout/{slug}/preview — authoritative price breakdown. */
+  /** POST /checkout/{slug}/{flowSlug}/preview — authoritative price breakdown. */
   preview(body: CheckoutPreviewRequest): Promise<CheckoutPreviewResponse>
   /** POST /coupons/validate-public — validate a code against this popup. */
   validateCoupon(code: string): Promise<CouponValidatePublicResponse>
-  /** POST /checkout/{slug}/purchase — create the payment, get the pay URL. */
+  /** POST /checkout/{slug}/{flowSlug}/purchase — create the payment, get the pay URL. */
   purchase(
     body: OpenTicketingPurchaseCreate,
   ): Promise<OpenTicketingPurchaseResponse>
-  /** PUT /checkout/{slug}/cart — persist the anonymous cart by email. */
+  /** PUT /checkout/{slug}/{flowSlug}/cart — persist the anonymous cart by email. */
   upsertCart(body: OpenCartUpsert): Promise<OpenCartPublic>
-  /** GET /checkout/{slug}/cart?cid&sig — restore a cart from a signed link. */
+  /** GET /checkout/{slug}/{flowSlug}/cart?cid&sig — restore a cart from a signed link. */
   restoreCart(cid: string, sig: string): Promise<OpenCartPublic>
 }
 
-/** Slug the client targets, plus (optionally) how to build the default transport. */
-export type CheckoutClientOptions =
-  | { slug: string; baseUrl?: string; publishableKey?: string; fetch?: typeof fetch }
-  | CheckoutClientConfig
+/** Canonical popup and sales-flow slugs plus transport configuration. */
+export type CheckoutClientOptions = CheckoutClientConfig
 
 /**
  * Build a {@link CheckoutClient} for one popup slug.
@@ -51,14 +49,19 @@ export function createCheckoutClient(
 ): CheckoutClient {
   const t = transport ?? buildDefaultTransport(config)
   const slug = encodeURIComponent(config.slug)
-  const base = `/checkout/${slug}`
+  const flowSlug = encodeURIComponent(config.flowSlug)
+  const base = `/checkout/${slug}/${flowSlug}`
 
   return {
     getRuntime() {
       return t.request<CheckoutRuntimeResponse>("GET", `${base}/runtime`)
     },
     preview(body) {
-      return t.request<CheckoutPreviewResponse>("POST", `${base}/preview`, body)
+      return t.request<CheckoutPreviewResponse>(
+        "POST",
+        `${base}/preview`,
+        body,
+      )
     },
     validateCoupon(code) {
       return t.request<CouponValidatePublicResponse>(
@@ -90,6 +93,7 @@ function buildDefaultTransport(config: CheckoutClientOptions): Transport {
   return createFetchTransport({
     baseUrl: config.baseUrl,
     slug: config.slug,
+    flowSlug: config.flowSlug,
     publishableKey: config.publishableKey,
     fetch: config.fetch,
   })

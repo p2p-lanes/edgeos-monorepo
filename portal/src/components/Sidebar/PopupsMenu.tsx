@@ -4,7 +4,6 @@ import {
   DropdownMenu,
   DropdownMenuTrigger,
 } from "@radix-ui/react-dropdown-menu"
-import { motion } from "framer-motion"
 import { ChevronsUpDown } from "lucide-react"
 import Image from "next/image"
 import { useRouter } from "next/navigation"
@@ -45,14 +44,14 @@ const PopupsMenu = () => {
   )
 
   return (
-    <SidebarHeader>
+    <SidebarHeader className="border-b border-sidebar-border p-2">
       <SidebarMenu>
         <SidebarMenuItem>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <SidebarMenuButton
                 size="lg"
-                className="h-full w-full justify-between"
+                className="h-full w-full justify-between rounded-lg px-2 py-2"
                 tooltip={isCollapsed ? city?.name : undefined}
               >
                 {!popups.length || !city ? (
@@ -65,18 +64,10 @@ const PopupsMenu = () => {
                     )}
                   </div>
                 ) : (
-                  <div className="flex items-center gap-1">
-                    <motion.div
-                      initial={{ y: 0 }}
-                      animate={{ y: [0, 6, 0] }}
-                      transition={{
-                        duration: 4,
-                        repeat: Infinity,
-                        repeatType: "loop",
-                        ease: "easeIn",
-                      }}
+                  <div className="flex min-w-0 items-center gap-3">
+                    <div
                       className={cn(
-                        "relative shrink-0 transition-all duration-200",
+                        "relative shrink-0 rounded-lg ring-1 ring-sidebar-border",
                         isCollapsed ? "size-8" : "size-12",
                       )}
                     >
@@ -99,9 +90,9 @@ const PopupsMenu = () => {
                           {city.name?.charAt(0) ?? "?"}
                         </div>
                       )}
-                    </motion.div>
+                    </div>
                     {!isCollapsed && (
-                      <div className="flex flex-col gap-0.5 overflow-hidden text-sm">
+                      <div className="flex min-w-0 flex-col gap-0.5 overflow-hidden text-sm">
                         <span className="truncate font-semibold text-nav-text">
                           {city.name}
                         </span>
@@ -125,12 +116,13 @@ const PopupsMenu = () => {
               align="start"
               alignOffset={-4}
               sideOffset={4}
-              className="w-[calc(var(--radix-dropdown-menu-trigger-width)+0.5rem)]"
+              className="portal-sidebar w-[calc(var(--radix-dropdown-menu-trigger-width)+0.5rem)]"
             >
               {popups.map((popup: PopupPublic) => (
                 <DropdownMenuItem
                   key={popup.name}
                   selected={popup.slug === city?.slug}
+                  aria-current={popup.slug === city?.slug ? "page" : undefined}
                   className="cursor-pointer"
                   onClick={() => handleClickCity(popup)}
                 >

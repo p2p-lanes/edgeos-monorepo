@@ -1,31 +1,44 @@
 "use client"
 
+import Link from "next/link"
 import { useEffect, useState } from "react"
 import { useTranslation } from "react-i18next"
-import type { CheckoutRuntimeResponse } from "@/client"
+import { ApiError, type CheckoutRuntimeResponse } from "@/client"
 import { OpenCheckoutRuntime } from "@/components/checkout-flow/OpenCheckoutRuntime"
+import { Button } from "@/components/ui/button"
 import { Loader } from "@/components/ui/Loader"
 import useAuth from "@/hooks/useAuth"
 import {
   resolveRequestLanguage,
   subscribeRequestLanguage,
 } from "@/lib/language-storage"
+import { getAuthRedirectPath } from "@/lib/safe-return-to"
+import ThemeProvider, { type ThemeConfig } from "@/providers/themeProvider"
+import { ApplicationCheckoutRedirect } from "./ApplicationCheckoutRedirect"
 import { CheckoutShell } from "./CheckoutShell"
 import { useCheckoutRuntime } from "./hooks/useCheckoutRuntime"
 
 interface CheckoutPageClientProps {
   popupSlug: string
+  /**
+   * Canonical sales flow URL segment.
+   */
+  flowSlug: string
   initialRuntime?: CheckoutRuntimeResponse
   initialDataUpdatedAt?: number
   /** Language the server render fetched `initialRuntime` in, if any. */
   initialRuntimeLanguage?: string | null
+  /** Show server-authoritative estimate/definitive status in an authenticated shell. */
+  showQuoteStatus?: boolean
 }
 
 export default function CheckoutPageClient({
   popupSlug,
+  flowSlug,
   initialRuntime,
   initialDataUpdatedAt,
   initialRuntimeLanguage = null,
+  showQuoteStatus = false,
 }: CheckoutPageClientProps) {
   const { t } = useTranslation()
   // Resolved in a state initializer rather than an effect so the very first
@@ -49,8 +62,10 @@ export default function CheckoutPageClient({
     data: runtime,
     isLoading,
     isError,
+    error,
   } = useCheckoutRuntime(popupSlug, {
     language,
+    flowSlug,
     initialData: initialRuntime,
     initialDataUpdatedAt: initialMatchesLanguage ? initialDataUpdatedAt : 0,
   })
@@ -68,6 +83,30 @@ export default function CheckoutPageClient({
     return <Loader />
   }
 
+  // The runtime endpoint returns 401 for flows restricted to signed-in
+  // attendees (e.g. upsale flows). The link is valid; the visitor just needs
+  // to sign in, so send them to the auth flow and back to this checkout.
+  if (error instanceof ApiError && error.status === 401) {
+    const checkoutPath = `/checkout/${popupSlug}/${flowSlug}`
+    return (
+      <div className="flex min-h-screen items-center justify-center p-6">
+        <div className="rounded-2xl border bg-card p-8 text-center shadow-sm">
+          <h1 className="text-2xl font-semibold">
+            {t("openCheckout.sign_in_required_title")}
+          </h1>
+          <p className="mt-2 text-sm text-muted-foreground">
+            {t("openCheckout.sign_in_required_description")}
+          </p>
+          <Button asChild className="mt-6">
+            <Link href={getAuthRedirectPath(checkoutPath)}>
+              {t("openCheckout.sign_in_required_cta")}
+            </Link>
+          </Button>
+        </div>
+      </div>
+    )
+  }
+
   if (isError || !runtime) {
     return (
       <div className="flex min-h-screen items-center justify-center p-6">
@@ -83,13 +122,36 @@ export default function CheckoutPageClient({
     )
   }
 
-  return (
-    <CheckoutShell popup={runtime.popup}>
-      <OpenCheckoutRuntime
-        runtime={runtime}
+  // An application flow's buyer pays through their application, and this
+  // page only knows how to submit an anonymous purchase — sending them
+  // down that path would create a second, unlinked payment. The backend
+  // now serves these flows to the people they accepted
+  // (sdd/sales-flows-rediseno), so the link works; the purchase itself
+  // still belongs to the portal page that loads their attendees and
+  // credit. Sending them there is the whole of what the URL owed them.
+  if (runtime.flow_type === "application") {
+    return (
+      <ApplicationCheckoutRedirect
         popupSlug={popupSlug}
-        prefilledBuyer={prefilledBuyer}
+        flowId={runtime.selected_flow.id}
       />
-    </CheckoutShell>
+    )
+  }
+
+  return (
+    <ThemeProvider
+      config={runtime.theme_config as ThemeConfig | null}
+      scope="local"
+    >
+      <CheckoutShell popup={runtime.popup}>
+        <OpenCheckoutRuntime
+          runtime={runtime}
+          popupSlug={popupSlug}
+          flowSlug={runtime.selected_flow.slug}
+          prefilledBuyer={prefilledBuyer}
+          showQuoteStatus={showQuoteStatus}
+        />
+      </CheckoutShell>
+    </ThemeProvider>
   )
 }

@@ -9,7 +9,7 @@ import {
 } from "./language-storage"
 
 function setSearch(search: string) {
-  window.history.replaceState({}, "", `/checkout/festival${search}`)
+  window.history.replaceState({}, "", `/checkout/festival/checkout${search}`)
 }
 
 function clearCookies() {

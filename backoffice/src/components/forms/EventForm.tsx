@@ -1627,9 +1627,7 @@ export function EventForm({
                     field.handleChange(e.target.value)
                     form.setFieldValue("host_id", null)
                   }}
-                  placeholder={
-                    popup?.name ? `${popup.name} (default)` : "Optional"
-                  }
+                  placeholder={popup?.name || "Optional"}
                   maxLength={255}
                   disabled={readOnly}
                 />

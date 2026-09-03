@@ -18,7 +18,7 @@ with the backend Pydantic schemas — the SDK types mirror them 1:1.
 - `baseUrl` defaults to the EdgeOS **production** API and is optional. When you
   do override it (dev/staging/proxy) it is the **API root including the version
   prefix** (e.g. `https://api.example/api/v1`) and **must not** contain the slug.
-  The client appends `/checkout/{slug}/...`. The default is exported as
+   The client appends `/checkout/{slug}/{flowSlug}/...`. The default is exported as
   `DEFAULT_BASE_URL`.
 
 ## Money
@@ -34,7 +34,7 @@ with the backend Pydantic schemas — the SDK types mirror them 1:1.
 
 ---
 
-## GET `/checkout/{slug}/runtime` → `CheckoutRuntimeResponse`
+## GET `/checkout/{slug}/{flowSlug}/runtime` → `CheckoutRuntimeResponse`
 
 Loaded once on mount (`store.load()`), surfaced as `useCheckout().runtime`.
 
@@ -113,7 +113,7 @@ name. `"success"` is a terminal UI state, not a configured step.
 
 ---
 
-## POST `/checkout/{slug}/preview` → `CheckoutPreviewResponse`
+## POST `/checkout/{slug}/{flowSlug}/preview` → `CheckoutPreviewResponse`
 
 The **authoritative price**. The store calls this (debounced) whenever the cart,
 coupon, or insurance changes; you read the result via `usePreview()`. No side
@@ -160,7 +160,7 @@ Display guidance:
 
 ---
 
-## POST `/checkout/{slug}/purchase` → `OpenTicketingPurchaseResponse`
+## POST `/checkout/{slug}/{flowSlug}/purchase` → `OpenTicketingPurchaseResponse`
 
 Called by `store.submit()`. Creates the payment and returns where to send the
 buyer. **This does not settle the payment** — that happens on the provider page

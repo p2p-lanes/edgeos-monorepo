@@ -3,7 +3,7 @@ from datetime import UTC, datetime
 from decimal import Decimal
 from typing import TYPE_CHECKING, Optional
 
-from sqlalchemy import Index, UniqueConstraint, text
+from sqlalchemy import CheckConstraint, Index, UniqueConstraint, text
 from sqlalchemy.dialects.postgresql import UUID
 from sqlmodel import Column, DateTime, Field, Relationship, SQLModel, func
 
@@ -23,7 +23,7 @@ class Invites(SQLModel, table=True):
     Referral) is created by an attendee to share around, and is subject to the
     popup's max_referrals_per_attendee quota. Tell them apart with
     ``is_portal_created`` / ``referrer_human_id``. Portal links start with an
-    auto-approval and no discount; administrators may later adjust either.
+    auto-approval and no discount; administrators may later adjust the discount.
 
     Email stored lowercase via validator when setting recipient_email.
     """
@@ -31,6 +31,10 @@ class Invites(SQLModel, table=True):
     __tablename__ = "invites"
     __table_args__ = (
         UniqueConstraint("popup_id", "token", name="uq_invites_popup_token"),
+        CheckConstraint(
+            "referrer_human_id IS NULL OR auto_approve",
+            name="ck_invites_portal_auto_approve",
+        ),
         Index(
             "uq_invites_legacy_group_id",
             "legacy_migrated_from_group_id",
@@ -48,6 +52,11 @@ class Invites(SQLModel, table=True):
     )
     tenant_id: uuid.UUID = Field(foreign_key="tenants.id")
     popup_id: uuid.UUID = Field(foreign_key="popups.id")
+    # The flow this invite lands someone in. Required
+    # (sdd/sales-flows-rediseno): redeeming creates an application, and an
+    # application always belongs to a flow. Without this the invite fell
+    # back to the popup's default flow whatever it was meant for.
+    sales_flow_id: uuid.UUID = Field(foreign_key="sales_flows.id", index=True)
     token: str = Field(max_length=64)
     recipient_email: str | None = Field(default=None, nullable=True)
     discount_percentage: Decimal = Field(
@@ -72,8 +81,8 @@ class Invites(SQLModel, table=True):
     legacy_migrated_from_group_id: uuid.UUID | None = Field(
         default=None, foreign_key="groups.id", nullable=True
     )
-    # Admin force-disable: a disabled link stops granting access and discounts
-    # immediately, without deleting its attribution history.
+    # Admin force-disable: a disabled link blocks new redemptions without
+    # deleting attribution or changing applications that already used it.
     is_disabled: bool = Field(default=False)
     # Exactly one issuer is set. created_by for backoffice links,
     # referrer_human_id for links an attendee created from the portal.

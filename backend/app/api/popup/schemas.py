@@ -636,6 +636,12 @@ class PopupPublic(SQLModel):
     status: PopupStatus = PopupStatus.draft
     sale_type: SaleType = SaleType.application
     checkout_mode: CheckoutMode = CheckoutMode.pass_system
+    # What the gathering's doors do, which `sale_type` cannot say once a
+    # gathering can both take applications and sell directly
+    # (sdd/sales-flows-rediseno slice 6). Derived from the flows, never
+    # stored. The defaults match what a popup with no doors used to imply.
+    takes_applications: bool = True
+    sells_directly: bool = False
     start_date: datetime | None = None
     end_date: datetime | None = None
     image_url: str | None = None
@@ -649,6 +655,8 @@ class PopupPublic(SQLModel):
     currency: str = "USD"
     terms_and_conditions_url: str | None = None
     invoice_company_name: str | None = None
+    invoice_company_address: str | None = None
+    invoice_company_email: str | None = None
     requires_application_fee: bool = False
     application_fee_amount: Decimal | None = None
     theme_config: dict | None = None
@@ -682,6 +690,10 @@ class PopupAdmin(PopupBase):
     """Admin popup schema — all fields including sensitive ones."""
 
     id: uuid.UUID
+    # Same derived pair the portal reads, so the backoffice list can say what
+    # a gathering actually does instead of echoing a column nothing honours.
+    takes_applications: bool = True
+    sells_directly: bool = False
 
 
 class CheckoutPreviewTokenPublic(SQLModel):

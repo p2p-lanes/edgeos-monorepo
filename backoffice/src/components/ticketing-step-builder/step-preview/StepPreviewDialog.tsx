@@ -29,6 +29,7 @@ interface StepPreviewDialogProps {
   onOpenChange: (open: boolean) => void
   popupId: string
   popupSlug: string | null | undefined
+  flowSlug: string | null | undefined
   supportedLanguages: string[]
   defaultLanguage: string | null | undefined
   /** The step open in the editor, unsaved changes included. Null when no step
@@ -49,6 +50,7 @@ export function StepPreviewDialog({
   onOpenChange,
   popupId,
   popupSlug,
+  flowSlug,
   supportedLanguages,
   defaultLanguage,
   step,
@@ -62,7 +64,7 @@ export function StepPreviewDialog({
   const [frameKey, setFrameKey] = useState(0)
   const iframeRef = useRef<HTMLIFrameElement>(null)
 
-  const target = resolvePreviewTarget(tenant, popupSlug, language)
+  const target = resolvePreviewTarget(tenant, popupSlug, flowSlug, language)
   const url = target.url
   const origin = url ? previewOrigin(url) : null
 

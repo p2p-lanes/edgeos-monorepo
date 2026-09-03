@@ -1,39 +1,29 @@
 import { useForm } from "@tanstack/react-form"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
-import { Link, useNavigate } from "@tanstack/react-router"
+import { useNavigate } from "@tanstack/react-router"
 import {
   Building2,
   Calendar,
   CalendarDays,
   CalendarX,
   Coins,
-  CreditCard,
   DollarSign,
   FileText,
   Globe,
-  GraduationCap,
-  HandCoins,
   Image,
   Key,
   Languages,
-  Link2,
   Link as LinkIcon,
-  Lock,
   Mail,
   MapPin,
   QrCode,
   Scale,
-  Share2,
-  ShieldCheck,
   ShoppingCart,
-  Ticket,
   Users,
 } from "lucide-react"
-import { useState } from "react"
 import {
   ApprovalStrategiesService,
   type CheckoutMode,
-  type InstallmentInterval,
   type PopupAdmin,
   type PopupCreate,
   PopupsService,
@@ -72,7 +62,6 @@ import {
 import { Separator } from "@/components/ui/separator"
 import { Switch } from "@/components/ui/switch"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Textarea } from "@/components/ui/textarea"
 import useAuth from "@/hooks/useAuth"
 import useCustomToast from "@/hooks/useCustomToast"
 import {
@@ -146,6 +135,10 @@ export function PopupForm({ defaultValues, onSuccess }: PopupFormProps) {
   const { isOperatorOrAbove } = useAuth()
   const isEdit = !!defaultValues
   const readOnly = !isOperatorOrAbove
+  // Does anybody apply to this event? Answered by its doors, because one of
+  // them can review applicants while another sells. On a new event there are
+  // no doors yet, so the choice made below in the form is the answer.
+  const takesApplications = defaultValues?.takes_applications !== false
 
   const createMutation = useMutation({
     mutationFn: (data: PopupCreate) =>
@@ -198,18 +191,6 @@ export function PopupForm({ defaultValues, onSuccess }: PopupFormProps) {
   // UI-only enable state per reminder type. The persisted switch is the delay
   // column (null = off); toggling on seeds a default delay, toggling off
   // clears the whole block so the save payload nulls it.
-  const [cartReminderOn, setCartReminderOn] = useState(
-    Boolean(defaultValues?.abandoned_cart_delay_days),
-  )
-  const [purchaseReminderOn, setPurchaseReminderOn] = useState(
-    Boolean(defaultValues?.purchase_reminder_delay_days),
-  )
-  const [applicationReminderOn, setApplicationReminderOn] = useState(
-    Boolean(defaultValues?.abandoned_application_delay_days),
-  )
-  const [checkinPassOn, setCheckinPassOn] = useState(
-    Boolean(defaultValues?.checkin_pass_lead_days),
-  )
 
   const form = useForm({
     defaultValues: {
@@ -224,12 +205,6 @@ export function PopupForm({ defaultValues, onSuccess }: PopupFormProps) {
         )) as CheckoutMode,
       start_date: formatDateForInput(defaultValues?.start_date),
       end_date: formatDateForInput(defaultValues?.end_date),
-      allows_coupons: defaultValues?.allows_coupons ?? false,
-      allows_scholarship: defaultValues?.allows_scholarship ?? false,
-      allows_incentive: defaultValues?.allows_incentive ?? false,
-      requires_application_fee:
-        defaultValues?.requires_application_fee ?? false,
-      application_fee_amount: defaultValues?.application_fee_amount ?? "",
       image_url: defaultValues?.image_url ?? "",
       icon_url: defaultValues?.icon_url ?? "",
       favicon_url: defaultValues?.favicon_url ?? "",
@@ -240,10 +215,6 @@ export function PopupForm({ defaultValues, onSuccess }: PopupFormProps) {
       blog_url: defaultValues?.blog_url ?? "",
       twitter_url: defaultValues?.twitter_url ?? "",
       terms_and_conditions_url: defaultValues?.terms_and_conditions_url ?? "",
-      open_checkout_success_url: defaultValues?.open_checkout_success_url ?? "",
-      open_checkout_cancel_url: defaultValues?.open_checkout_cancel_url ?? "",
-      open_checkout_signing_secret:
-        defaultValues?.open_checkout_signing_secret ?? "",
       simplefi_api_key: defaultValues?.simplefi_api_key ?? "",
       simplefi_success_behavior: (defaultValues?.simplefi_success_behavior ??
         "manual") as SimpleFiSuccessBehavior,
@@ -252,53 +223,12 @@ export function PopupForm({ defaultValues, onSuccess }: PopupFormProps) {
       invoice_company_email: defaultValues?.invoice_company_email ?? "",
       default_language: defaultValues?.default_language ?? "en",
       supported_languages: defaultValues?.supported_languages ?? ["en"],
-      insurance_enabled: defaultValues?.insurance_enabled ?? false,
-      insurance_percentage:
-        defaultValues?.insurance_percentage?.toString() ?? "",
-      contribution_enabled: defaultValues?.contribution_enabled ?? false,
-      contribution_percentage:
-        defaultValues?.contribution_percentage?.toString() ?? "",
-      contribution_label: defaultValues?.contribution_label ?? "",
-      contribution_description: defaultValues?.contribution_description ?? "",
       events_enabled: defaultValues?.events_enabled ?? true,
       edit_passes_enabled: defaultValues?.edit_passes_enabled ?? false,
       self_check_in_enabled: defaultValues?.self_check_in_enabled ?? false,
       show_attendee_directory: defaultValues?.show_attendee_directory ?? false,
-      installments_enabled: defaultValues?.installments_enabled ?? false,
-      installments_deadline: formatDateForInput(
-        defaultValues?.installments_deadline,
-      ),
-      installments_max: defaultValues?.installments_max?.toString() ?? "",
-      installments_interval: (defaultValues?.installments_interval ??
-        "month") as InstallmentInterval,
-      installments_interval_count:
-        defaultValues?.installments_interval_count?.toString() ?? "1",
-      checkin_pass_lead_days:
-        defaultValues?.checkin_pass_lead_days?.toString() ?? "",
-      invites_enabled: defaultValues?.invites_enabled ?? false,
-      referrals_enabled: defaultValues?.referrals_enabled ?? false,
       group_private_events_enabled:
         defaultValues?.group_private_events_enabled ?? false,
-      max_referrals_per_attendee:
-        defaultValues?.max_referrals_per_attendee?.toString() ?? "10",
-      abandoned_cart_delay_days:
-        defaultValues?.abandoned_cart_delay_days?.toString() ?? "",
-      abandoned_cart_repeat_days:
-        defaultValues?.abandoned_cart_repeat_days?.toString() ?? "",
-      abandoned_cart_max_count:
-        defaultValues?.abandoned_cart_max_count?.toString() ?? "",
-      purchase_reminder_delay_days:
-        defaultValues?.purchase_reminder_delay_days?.toString() ?? "",
-      purchase_reminder_repeat_days:
-        defaultValues?.purchase_reminder_repeat_days?.toString() ?? "",
-      purchase_reminder_max_count:
-        defaultValues?.purchase_reminder_max_count?.toString() ?? "",
-      abandoned_application_delay_days:
-        defaultValues?.abandoned_application_delay_days?.toString() ?? "",
-      abandoned_application_repeat_days:
-        defaultValues?.abandoned_application_repeat_days?.toString() ?? "",
-      abandoned_application_max_count:
-        defaultValues?.abandoned_application_max_count?.toString() ?? "",
     },
     onSubmit: ({ value }) => {
       if (readOnly) return
@@ -313,13 +243,6 @@ export function PopupForm({ defaultValues, onSuccess }: PopupFormProps) {
         status: value.status as PopupCreate["status"],
         start_date: toUTCDate(value.start_date),
         end_date: toUTCDate(value.end_date),
-        allows_coupons: value.allows_coupons,
-        allows_scholarship: value.allows_scholarship,
-        allows_incentive: value.allows_incentive,
-        requires_application_fee: value.requires_application_fee,
-        application_fee_amount: value.requires_application_fee
-          ? value.application_fee_amount || null
-          : null,
         image_url: value.image_url || null,
         icon_url: value.icon_url || null,
         favicon_url: value.favicon_url || null,
@@ -329,10 +252,6 @@ export function PopupForm({ defaultValues, onSuccess }: PopupFormProps) {
         blog_url: value.blog_url || null,
         twitter_url: value.twitter_url || null,
         terms_and_conditions_url: value.terms_and_conditions_url || null,
-        open_checkout_success_url: value.open_checkout_success_url || null,
-        open_checkout_cancel_url: value.open_checkout_cancel_url || null,
-        open_checkout_signing_secret:
-          value.open_checkout_signing_secret || null,
         simplefi_api_key: value.simplefi_api_key || null,
         simplefi_success_behavior: value.simplefi_success_behavior,
         invoice_company_name: value.invoice_company_name || null,
@@ -340,96 +259,17 @@ export function PopupForm({ defaultValues, onSuccess }: PopupFormProps) {
         invoice_company_email: value.invoice_company_email || null,
         default_language: value.default_language,
         supported_languages: value.supported_languages,
-        sale_type: value.sale_type,
-        insurance_enabled: value.insurance_enabled,
-        insurance_percentage: value.insurance_enabled
-          ? value.insurance_percentage || null
-          : null,
-        contribution_enabled: value.contribution_enabled,
-        contribution_percentage: value.contribution_enabled
-          ? value.contribution_percentage || null
-          : null,
-        contribution_label: value.contribution_enabled
-          ? value.contribution_label || null
-          : null,
-        contribution_description: value.contribution_enabled
-          ? value.contribution_description || null
-          : null,
+        // Only on create, where it seeds the event's first door. On an
+        // existing event the door owns its own type, and sending this would
+        // retype it from a screen that never asked.
+        ...(isEdit ? {} : { sale_type: value.sale_type }),
         events_enabled: value.events_enabled,
         edit_passes_enabled: value.edit_passes_enabled,
         self_check_in_enabled: value.self_check_in_enabled,
         show_attendee_directory:
-          value.sale_type === "application" && value.show_attendee_directory,
-        installments_enabled: value.installments_enabled,
-        // Deadline / max are only meaningful when the feature is enabled; when
-        // disabled we send null/null so accidental orphaned values don't trip
-        // the backend cross-field validator on a future save.
-        installments_deadline: value.installments_enabled
-          ? toUTCDate(value.installments_deadline)
-          : null,
-        installments_max: value.installments_enabled
-          ? value.installments_max
-            ? Number(value.installments_max)
-            : null
-          : null,
-        installments_interval: value.installments_interval,
-        installments_interval_count: value.installments_interval_count
-          ? Number(value.installments_interval_count)
-          : 1,
-        checkin_pass_lead_days: value.checkin_pass_lead_days
-          ? Number(value.checkin_pass_lead_days)
-          : null,
-        invites_enabled: value.invites_enabled,
-        referrals_enabled: value.referrals_enabled,
+          (isEdit ? takesApplications : value.sale_type === "application") &&
+          value.show_attendee_directory,
         group_private_events_enabled: value.group_private_events_enabled,
-        max_referrals_per_attendee: value.max_referrals_per_attendee
-          ? Number(value.max_referrals_per_attendee)
-          : null,
-        // A reminder's delay is its on/off switch (empty = disabled); when it
-        // is empty we null the whole block so orphaned repeat/max values never
-        // linger behind a disabled reminder. Max only applies to repeating
-        // reminders, so it also requires a repeat interval.
-        abandoned_cart_delay_days: value.abandoned_cart_delay_days
-          ? Number(value.abandoned_cart_delay_days)
-          : null,
-        abandoned_cart_repeat_days:
-          value.abandoned_cart_delay_days && value.abandoned_cart_repeat_days
-            ? Number(value.abandoned_cart_repeat_days)
-            : null,
-        abandoned_cart_max_count:
-          value.abandoned_cart_delay_days &&
-          value.abandoned_cart_repeat_days &&
-          value.abandoned_cart_max_count
-            ? Number(value.abandoned_cart_max_count)
-            : null,
-        purchase_reminder_delay_days: value.purchase_reminder_delay_days
-          ? Number(value.purchase_reminder_delay_days)
-          : null,
-        purchase_reminder_repeat_days:
-          value.purchase_reminder_delay_days &&
-          value.purchase_reminder_repeat_days
-            ? Number(value.purchase_reminder_repeat_days)
-            : null,
-        purchase_reminder_max_count:
-          value.purchase_reminder_delay_days &&
-          value.purchase_reminder_repeat_days &&
-          value.purchase_reminder_max_count
-            ? Number(value.purchase_reminder_max_count)
-            : null,
-        abandoned_application_delay_days: value.abandoned_application_delay_days
-          ? Number(value.abandoned_application_delay_days)
-          : null,
-        abandoned_application_repeat_days:
-          value.abandoned_application_delay_days &&
-          value.abandoned_application_repeat_days
-            ? Number(value.abandoned_application_repeat_days)
-            : null,
-        abandoned_application_max_count:
-          value.abandoned_application_delay_days &&
-          value.abandoned_application_repeat_days &&
-          value.abandoned_application_max_count
-            ? Number(value.abandoned_application_max_count)
-            : null,
       }
       if (value.status === "active") {
         const missing = getMissingLaunchFields(value)
@@ -709,33 +549,27 @@ export function PopupForm({ defaultValues, onSuccess }: PopupFormProps) {
             </InlineSection>
 
             {/* Application review — approval strategy + reviewers (edit only,
-            application sale_type only — direct-sale popups have no application
-            flow, so these are meaningless) */}
-            {isEdit && (
-              <form.Subscribe selector={(state) => state.values.sale_type}>
-                {(saleType) =>
-                  saleType === "application" ? (
-                    <>
-                      <Separator />
+            and only where somebody actually applies: with nothing to review
+            these are meaningless) */}
+            {isEdit && takesApplications && (
+              <>
+                <Separator />
 
-                      <ApprovalStrategyForm
-                        popupId={defaultValues!.id}
-                        readOnly={readOnly}
-                        variant="inline"
-                      />
+                <ApprovalStrategyForm
+                  popupId={defaultValues!.id}
+                  readOnly={readOnly}
+                  variant="inline"
+                />
 
-                      <Separator />
+                <Separator />
 
-                      <ConditionalReviewersManager
-                        popupId={defaultValues!.id}
-                        tenantId={defaultValues!.tenant_id}
-                        readOnly={readOnly}
-                        variant="inline"
-                      />
-                    </>
-                  ) : null
-                }
-              </form.Subscribe>
+                <ConditionalReviewersManager
+                  popupId={defaultValues!.id}
+                  tenantId={defaultValues!.tenant_id}
+                  readOnly={readOnly}
+                  variant="inline"
+                />
+              </>
             )}
 
             {isEdit && !readOnly && (
@@ -764,76 +598,78 @@ export function PopupForm({ defaultValues, onSuccess }: PopupFormProps) {
                   Commerce setup
                 </h3>
                 <p className="text-sm text-muted-foreground">
-                  Decide how people will access this event. This is the primary
-                  identity of the popup. Checkout mode is always derived from
-                  this choice by the backend.
+                  {isEdit
+                    ? "Each way into this event decides for itself whether people apply or buy. Edit a sales flow to change what its door does."
+                    : "Decide how people will first access this event. This becomes the event's main way in, and you can add more later."}
                 </p>
               </div>
 
-              <InlineSection title="How this event sells">
-                <form.Field name="sale_type">
-                  {(field) => (
-                    <InlineRow
-                      icon={
-                        isEdit ? (
-                          <Lock className="h-4 w-4 text-muted-foreground" />
-                        ) : (
+              {/* Only while creating. Once the event exists this is a property
+              of each sales flow, and offering it here would edit one door
+              from a screen that looks like it edits the event. */}
+              {!isEdit && (
+                <InlineSection title="How this event sells">
+                  <form.Field name="sale_type">
+                    {(field) => (
+                      <InlineRow
+                        icon={
                           <ShoppingCart className="h-4 w-4 text-muted-foreground" />
-                        )
-                      }
-                      label="Sale Type"
-                      description={
-                        isEdit
-                          ? "Change sale type only if this gathering has no approved payments yet"
-                          : "Choose whether people apply first or buy tickets directly"
-                      }
-                    >
-                      <Select
-                        value={field.state.value}
-                        onValueChange={(value) =>
-                          field.handleChange(value as SaleType)
                         }
-                        disabled={readOnly}
+                        label="Main way in"
+                        description="Choose whether people apply first or buy tickets directly"
                       >
-                        <SelectTrigger className="w-[220px] text-sm" size="sm">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="application">
-                            {SALE_TYPE_COPY.application.label}
-                          </SelectItem>
-                          <SelectItem value="direct">
-                            {SALE_TYPE_COPY.direct.label}
-                          </SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </InlineRow>
-                  )}
-                </form.Field>
-              </InlineSection>
+                        <Select
+                          value={field.state.value}
+                          onValueChange={(value) =>
+                            field.handleChange(value as SaleType)
+                          }
+                          disabled={readOnly}
+                        >
+                          <SelectTrigger
+                            className="w-[220px] text-sm"
+                            size="sm"
+                          >
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="application">
+                              {SALE_TYPE_COPY.application.label}
+                            </SelectItem>
+                            <SelectItem value="direct">
+                              {SALE_TYPE_COPY.direct.label}
+                            </SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </InlineRow>
+                    )}
+                  </form.Field>
+                </InlineSection>
+              )}
 
-              <form.Subscribe selector={(state) => state.values.sale_type}>
-                {(saleType) => {
-                  const copy = SALE_TYPE_COPY[saleType]
-                  const guidance = getSaleTypeGuidance(saleType)
-                  return (
-                    <div className="rounded-xl border bg-muted/30 p-4">
-                      <p className="text-sm font-semibold">{copy.label}</p>
-                      <p className="mt-1 text-sm text-muted-foreground">
-                        {copy.description}
-                      </p>
-                      <div className="mt-3 border-t pt-3">
-                        <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                          {guidance.title}
-                        </p>
+              {!isEdit && (
+                <form.Subscribe selector={(state) => state.values.sale_type}>
+                  {(saleType) => {
+                    const copy = SALE_TYPE_COPY[saleType]
+                    const guidance = getSaleTypeGuidance(saleType)
+                    return (
+                      <div className="rounded-xl border bg-muted/30 p-4">
+                        <p className="text-sm font-semibold">{copy.label}</p>
                         <p className="mt-1 text-sm text-muted-foreground">
-                          {guidance.description}
+                          {copy.description}
                         </p>
+                        <div className="mt-3 border-t pt-3">
+                          <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                            {guidance.title}
+                          </p>
+                          <p className="mt-1 text-sm text-muted-foreground">
+                            {guidance.description}
+                          </p>
+                        </div>
                       </div>
-                    </div>
-                  )
-                }}
-              </form.Subscribe>
+                    )
+                  }}
+                </form.Subscribe>
+              )}
 
               <InlineSection>
                 <form.Field name="currency">
@@ -869,65 +705,6 @@ export function PopupForm({ defaultValues, onSuccess }: PopupFormProps) {
                 </form.Field>
               </InlineSection>
             </div>
-
-            <Separator />
-
-            {/* Application fee */}
-            <InlineSection title="Application fee">
-              <form.Field name="requires_application_fee">
-                {(field) => (
-                  <InlineRow
-                    icon={
-                      <DollarSign className="h-4 w-4 text-muted-foreground" />
-                    }
-                    label="Require Application Fee"
-                    description="Applicants must pay a refundable fee before their application is reviewed"
-                  >
-                    <Switch
-                      id="requires_application_fee"
-                      checked={!!field.state.value}
-                      onCheckedChange={(checked) => field.handleChange(checked)}
-                      disabled={readOnly}
-                    />
-                  </InlineRow>
-                )}
-              </form.Field>
-
-              <form.Subscribe
-                selector={(state) => ({
-                  requiresFee: state.values.requires_application_fee,
-                  currency: state.values.currency,
-                })}
-              >
-                {({ requiresFee, currency }) =>
-                  requiresFee ? (
-                    <form.Field name="application_fee_amount">
-                      {(field) => (
-                        <InlineRow
-                          icon={
-                            <DollarSign className="h-4 w-4 text-muted-foreground" />
-                          }
-                          label={`Fee Amount (${currency})`}
-                          description={`Amount in ${currency} that applicants must pay`}
-                        >
-                          <Input
-                            id="application_fee_amount"
-                            type="number"
-                            min="0"
-                            step="0.01"
-                            placeholder="0.00"
-                            value={field.state.value}
-                            onChange={(e) => field.handleChange(e.target.value)}
-                            disabled={readOnly}
-                            className="max-w-[120px] text-sm"
-                          />
-                        </InlineRow>
-                      )}
-                    </form.Field>
-                  ) : null
-                }
-              </form.Subscribe>
-            </InlineSection>
 
             <Separator />
 
@@ -979,67 +756,6 @@ export function PopupForm({ defaultValues, onSuccess }: PopupFormProps) {
                         <SelectItem value="automatic">Automatic</SelectItem>
                       </SelectContent>
                     </Select>
-                  </InlineRow>
-                )}
-              </form.Field>
-              <form.Field name="open_checkout_success_url">
-                {(field) => (
-                  <InlineRow
-                    icon={
-                      <LinkIcon className="h-4 w-4 text-muted-foreground" />
-                    }
-                    label="Open checkout success URL"
-                    description="Where the buyer is redirected after a successful open-checkout payment. Defaults to the portal thank-you page."
-                  >
-                    <Input
-                      id="open_checkout_success_url"
-                      type="url"
-                      placeholder="https://example.com/thank-you"
-                      value={field.state.value}
-                      onChange={(e) => field.handleChange(e.target.value)}
-                      disabled={readOnly}
-                      className="max-w-xs text-sm"
-                    />
-                  </InlineRow>
-                )}
-              </form.Field>
-              <form.Field name="open_checkout_cancel_url">
-                {(field) => (
-                  <InlineRow
-                    icon={
-                      <LinkIcon className="h-4 w-4 text-muted-foreground" />
-                    }
-                    label="Open checkout cancel URL"
-                    description="Where the buyer is redirected after a cancelled open-checkout payment. Defaults to the portal checkout page."
-                  >
-                    <Input
-                      id="open_checkout_cancel_url"
-                      type="url"
-                      placeholder="https://example.com/checkout"
-                      value={field.state.value}
-                      onChange={(e) => field.handleChange(e.target.value)}
-                      disabled={readOnly}
-                      className="max-w-xs text-sm"
-                    />
-                  </InlineRow>
-                )}
-              </form.Field>
-              <form.Field name="open_checkout_signing_secret">
-                {(field) => (
-                  <InlineRow
-                    icon={<Key className="h-4 w-4 text-muted-foreground" />}
-                    label="Open checkout signing secret"
-                    description="Shared secret to HMAC-sign the order data sent to the success URL. Set the same value on the external thank-you page to verify it. Leave empty to send the redirect without a signed payload."
-                  >
-                    <Input
-                      id="open_checkout_signing_secret"
-                      type="password"
-                      placeholder="Enter signing secret"
-                      value={field.state.value}
-                      onChange={(e) => field.handleChange(e.target.value)}
-                      disabled={readOnly}
-                      className="max-w-xs text-sm"
-                    />
                   </InlineRow>
                 )}
               </form.Field>
@@ -1106,393 +822,6 @@ export function PopupForm({ defaultValues, onSuccess }: PopupFormProps) {
                 )}
               </form.Field>
             </InlineSection>
-
-            <Separator />
-
-            {/* Insurance */}
-            <InlineSection title="Insurance">
-              <form.Field name="insurance_enabled">
-                {(field) => (
-                  <InlineRow
-                    icon={
-                      <ShieldCheck className="h-4 w-4 text-muted-foreground" />
-                    }
-                    label="Enable Insurance"
-                    description="Offer insurance for eligible products during checkout"
-                  >
-                    <Switch
-                      id="insurance_enabled"
-                      checked={field.state.value}
-                      onCheckedChange={(checked) => field.handleChange(checked)}
-                      disabled={readOnly}
-                    />
-                  </InlineRow>
-                )}
-              </form.Field>
-
-              <form.Subscribe
-                selector={(state) => state.values.insurance_enabled}
-              >
-                {(insuranceEnabled) => (
-                  <form.Field
-                    name="insurance_percentage"
-                    validators={{
-                      onBlur: ({ value }) => {
-                        if (readOnly || !insuranceEnabled) return undefined
-                        const num = Number.parseFloat(value)
-                        if (!value || Number.isNaN(num) || num <= 0) {
-                          return "Insurance percentage must be greater than 0 when insurance is enabled"
-                        }
-                        if (num > 100) {
-                          return "Insurance percentage cannot exceed 100"
-                        }
-                        return undefined
-                      },
-                    }}
-                  >
-                    {(field) => (
-                      <div>
-                        <InlineRow
-                          icon={
-                            <ShieldCheck className="h-4 w-4 text-muted-foreground" />
-                          }
-                          label="Insurance Rate (%)"
-                          description="Percentage of eligible product price applied as insurance fee"
-                        >
-                          <Input
-                            id="insurance_percentage"
-                            type="number"
-                            min="0.01"
-                            max="100"
-                            step="0.01"
-                            placeholder="e.g. 5.00"
-                            value={field.state.value}
-                            onBlur={field.handleBlur}
-                            onChange={(e) => field.handleChange(e.target.value)}
-                            disabled={readOnly || !insuranceEnabled}
-                            className="max-w-[120px] text-sm"
-                          />
-                        </InlineRow>
-                        <FieldError errors={field.state.meta.errors} />
-                      </div>
-                    )}
-                  </form.Field>
-                )}
-              </form.Subscribe>
-            </InlineSection>
-
-            <Separator />
-
-            {/* Contribution fee */}
-            <InlineSection title="Contribution">
-              <form.Field name="contribution_enabled">
-                {(field) => (
-                  <InlineRow
-                    icon={
-                      <HandCoins className="h-4 w-4 text-muted-foreground" />
-                    }
-                    label="Enable Contribution"
-                    description="Add an optional contribution fee to orders at checkout"
-                  >
-                    <Switch
-                      id="contribution_enabled"
-                      checked={field.state.value}
-                      onCheckedChange={(checked) => field.handleChange(checked)}
-                      disabled={readOnly}
-                    />
-                  </InlineRow>
-                )}
-              </form.Field>
-
-              <form.Subscribe
-                selector={(state) => state.values.contribution_enabled}
-              >
-                {(contributionEnabled) => (
-                  <>
-                    <form.Field
-                      name="contribution_percentage"
-                      validators={{
-                        onBlur: ({ value }) => {
-                          if (readOnly || !contributionEnabled) return undefined
-                          const num = Number.parseFloat(value)
-                          if (!value || Number.isNaN(num) || num < 0) {
-                            return "Contribution percentage must be 0 or greater when contribution is enabled"
-                          }
-                          if (num > 100) {
-                            return "Contribution percentage cannot exceed 100"
-                          }
-                          return undefined
-                        },
-                      }}
-                    >
-                      {(field) => (
-                        <div>
-                          <InlineRow
-                            icon={
-                              <HandCoins className="h-4 w-4 text-muted-foreground" />
-                            }
-                            label="Contribution Rate (%)"
-                            description="Percentage of the total order applied as a contribution fee"
-                          >
-                            <Input
-                              id="contribution_percentage"
-                              type="number"
-                              min="0"
-                              max="100"
-                              step="0.01"
-                              placeholder="e.g. 2.50"
-                              value={field.state.value}
-                              onBlur={field.handleBlur}
-                              onChange={(e) =>
-                                field.handleChange(e.target.value)
-                              }
-                              disabled={readOnly || !contributionEnabled}
-                              className="max-w-[120px] text-sm"
-                            />
-                          </InlineRow>
-                          <FieldError errors={field.state.meta.errors} />
-                        </div>
-                      )}
-                    </form.Field>
-
-                    <form.Field name="contribution_label">
-                      {(field) => (
-                        <InlineRow
-                          icon={
-                            <HandCoins className="h-4 w-4 text-muted-foreground" />
-                          }
-                          label="Contribution Label"
-                          description="Short name shown as the line item in the checkout summary"
-                        >
-                          <Input
-                            id="contribution_label"
-                            type="text"
-                            placeholder="e.g. Event support contribution"
-                            value={field.state.value}
-                            onBlur={field.handleBlur}
-                            onChange={(e) => field.handleChange(e.target.value)}
-                            disabled={readOnly || !contributionEnabled}
-                            className="max-w-xs text-sm"
-                          />
-                        </InlineRow>
-                      )}
-                    </form.Field>
-
-                    <form.Field name="contribution_description">
-                      {(field) => (
-                        <InlineRow
-                          icon={
-                            <HandCoins className="h-4 w-4 text-muted-foreground" />
-                          }
-                          label="Contribution Description"
-                          description="Longer explanation shown under the line item in the portal order summary"
-                        >
-                          <Textarea
-                            id="contribution_description"
-                            placeholder="e.g. This contribution helps fund scholarships and community programs."
-                            value={field.state.value}
-                            onBlur={field.handleBlur}
-                            onChange={(e) => field.handleChange(e.target.value)}
-                            disabled={readOnly || !contributionEnabled}
-                            className="w-80 max-w-xs text-sm field-sizing-fixed"
-                            rows={3}
-                          />
-                        </InlineRow>
-                      )}
-                    </form.Field>
-                  </>
-                )}
-              </form.Subscribe>
-            </InlineSection>
-
-            <Separator />
-
-            {/* Installment plans (SimpleFi) */}
-            <InlineSection title="Installment plans">
-              <form.Field name="installments_enabled">
-                {(field) => (
-                  <InlineRow
-                    icon={
-                      <CreditCard className="h-4 w-4 text-muted-foreground" />
-                    }
-                    label="Enable installment plans"
-                    description="Offer buyers the option to pay in scheduled installments. SimpleFi renders the per-cycle selector at checkout."
-                  >
-                    <Switch
-                      id="installments_enabled"
-                      checked={field.state.value}
-                      onCheckedChange={(checked) => field.handleChange(checked)}
-                      disabled={readOnly}
-                    />
-                  </InlineRow>
-                )}
-              </form.Field>
-
-              <form.Subscribe
-                selector={(state) => state.values.installments_enabled}
-              >
-                {(installmentsEnabled) =>
-                  installmentsEnabled ? (
-                    <>
-                      <form.Field
-                        name="installments_deadline"
-                        validators={{
-                          onBlur: ({ value }) => {
-                            if (readOnly) return undefined
-                            if (!value) {
-                              return "Deadline is required when installments are enabled"
-                            }
-                            return undefined
-                          },
-                        }}
-                      >
-                        {(field) => (
-                          <div>
-                            <InlineRow
-                              icon={
-                                <Calendar className="h-4 w-4 text-muted-foreground" />
-                              }
-                              label="Deadline"
-                              description="All installments must be paid by this date. New plans created after the deadline fall back to one-shot payment."
-                            >
-                              <DatePicker
-                                id="installments_deadline"
-                                value={field.state.value}
-                                onChange={field.handleChange}
-                                disabled={readOnly}
-                                placeholder="Select date"
-                                className="w-auto"
-                              />
-                            </InlineRow>
-                            <FieldError errors={field.state.meta.errors} />
-                          </div>
-                        )}
-                      </form.Field>
-
-                      <form.Field
-                        name="installments_max"
-                        validators={{
-                          onBlur: ({ value }) => {
-                            if (readOnly) return undefined
-                            if (!value) {
-                              return "Max installments is required when installments are enabled"
-                            }
-                            const num = Number.parseInt(value, 10)
-                            if (Number.isNaN(num) || num < 2 || num > 12) {
-                              return "Max installments must be between 2 and 12 (SimpleFi limit)"
-                            }
-                            return undefined
-                          },
-                        }}
-                      >
-                        {(field) => (
-                          <div>
-                            <InlineRow
-                              icon={
-                                <Ticket className="h-4 w-4 text-muted-foreground" />
-                              }
-                              label="Max installments"
-                              description="Ceiling shown to buyers. SimpleFi accepts 2–12; the actual number is picked by the buyer at checkout."
-                            >
-                              <Input
-                                id="installments_max"
-                                type="number"
-                                min="2"
-                                max="12"
-                                step="1"
-                                placeholder="e.g. 6"
-                                value={field.state.value}
-                                onBlur={field.handleBlur}
-                                onChange={(e) =>
-                                  field.handleChange(e.target.value)
-                                }
-                                disabled={readOnly}
-                                className="max-w-[120px] text-sm"
-                              />
-                            </InlineRow>
-                            <FieldError errors={field.state.meta.errors} />
-                          </div>
-                        )}
-                      </form.Field>
-
-                      <form.Field name="installments_interval">
-                        {(field) => (
-                          <InlineRow
-                            icon={
-                              <CalendarDays className="h-4 w-4 text-muted-foreground" />
-                            }
-                            label="Billing interval"
-                            description="Cadence between installments."
-                          >
-                            <Select
-                              value={field.state.value}
-                              onValueChange={(v) =>
-                                field.handleChange(v as InstallmentInterval)
-                              }
-                              disabled={readOnly}
-                            >
-                              <SelectTrigger
-                                id="installments_interval"
-                                className="w-[140px]"
-                              >
-                                <SelectValue />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="day">Day</SelectItem>
-                                <SelectItem value="week">Week</SelectItem>
-                                <SelectItem value="month">Month</SelectItem>
-                                <SelectItem value="year">Year</SelectItem>
-                              </SelectContent>
-                            </Select>
-                          </InlineRow>
-                        )}
-                      </form.Field>
-
-                      <form.Field
-                        name="installments_interval_count"
-                        validators={{
-                          onBlur: ({ value }) => {
-                            if (readOnly) return undefined
-                            const num = Number.parseInt(value, 10)
-                            if (!value || Number.isNaN(num) || num < 1) {
-                              return "Interval count must be at least 1"
-                            }
-                            return undefined
-                          },
-                        }}
-                      >
-                        {(field) => (
-                          <div>
-                            <InlineRow
-                              icon={
-                                <CalendarDays className="h-4 w-4 text-muted-foreground" />
-                              }
-                              label="Interval count"
-                              description="Multiplier on the interval (e.g. interval = week + count = 2 → bi-weekly)."
-                            >
-                              <Input
-                                id="installments_interval_count"
-                                type="number"
-                                min="1"
-                                step="1"
-                                value={field.state.value}
-                                onBlur={field.handleBlur}
-                                onChange={(e) =>
-                                  field.handleChange(e.target.value)
-                                }
-                                disabled={readOnly}
-                                className="max-w-[120px] text-sm"
-                              />
-                            </InlineRow>
-                            <FieldError errors={field.state.meta.errors} />
-                          </div>
-                        )}
-                      </form.Field>
-                    </>
-                  ) : null
-                }
-              </form.Subscribe>
-            </InlineSection>
           </TabsContent>
 
           {/* ─── Features ────────────────────────────────────────────── */}
@@ -1502,538 +831,6 @@ export function PopupForm({ defaultValues, onSuccess }: PopupFormProps) {
             className="space-y-6 data-[state=inactive]:hidden"
           >
             {/* Event Options */}
-            <InlineSection title="Gathering Options">
-              <form.Field name="allows_coupons">
-                {(field) => (
-                  <InlineRow
-                    icon={<Ticket className="h-4 w-4 text-muted-foreground" />}
-                    label="Discount Coupons"
-                    description="Enable discount coupons for this gathering"
-                  >
-                    <Switch
-                      id="allows_coupons"
-                      checked={field.state.value}
-                      onCheckedChange={(checked) => field.handleChange(checked)}
-                      disabled={readOnly}
-                    />
-                  </InlineRow>
-                )}
-              </form.Field>
-
-              <form.Field name="allows_scholarship">
-                {(field) => (
-                  <InlineRow
-                    icon={
-                      <GraduationCap className="h-4 w-4 text-muted-foreground" />
-                    }
-                    label="Scholarship Requests"
-                    description="Allow applicants to request financial assistance"
-                  >
-                    <Switch
-                      id="allows_scholarship"
-                      checked={!!field.state.value}
-                      onCheckedChange={(checked) => field.handleChange(checked)}
-                      disabled={readOnly}
-                    />
-                  </InlineRow>
-                )}
-              </form.Field>
-
-              <form.Subscribe
-                selector={(state) => state.values.allows_scholarship}
-              >
-                {(allowsScholarship) =>
-                  allowsScholarship ? (
-                    <form.Field name="allows_incentive">
-                      {(field) => (
-                        <InlineRow
-                          icon={
-                            <DollarSign className="h-4 w-4 text-muted-foreground" />
-                          }
-                          label="Cash Incentives"
-                          description="Allow assigning a cash grant alongside scholarship approval"
-                        >
-                          <Switch
-                            id="allows_incentive"
-                            checked={!!field.state.value}
-                            onCheckedChange={(checked) =>
-                              field.handleChange(checked)
-                            }
-                            disabled={readOnly}
-                          />
-                        </InlineRow>
-                      )}
-                    </form.Field>
-                  ) : null
-                }
-              </form.Subscribe>
-            </InlineSection>
-
-            <Separator />
-
-            {/* Automatic emails. The persisted on/off switch of each row is
-                its days column (null = off): the UI switch seeds a default
-                when enabled and clears the whole block when disabled. Max only
-                applies to repeating reminders, so it unlocks with Every. */}
-            <InlineSection title="Automatic Emails">
-              <InlineRow
-                icon={<QrCode className="h-4 w-4 text-muted-foreground" />}
-                label="Check-in Pass"
-                description="Email attendees their check-in QR code before the event starts"
-              >
-                <div className="flex flex-col items-end gap-2">
-                  <div className="flex items-center gap-3">
-                    {checkinPassOn && (
-                      <form.Field name="checkin_pass_lead_days">
-                        {(field) => (
-                          <div className="space-y-1">
-                            <p className="text-center text-[10px] text-muted-foreground">
-                              Days before
-                            </p>
-                            <Input
-                              id="checkin_pass_lead_days"
-                              type="number"
-                              min="1"
-                              step="1"
-                              placeholder="3"
-                              value={field.state.value}
-                              onChange={(e) =>
-                                field.handleChange(e.target.value)
-                              }
-                              disabled={readOnly}
-                              className="max-w-[80px] text-sm"
-                            />
-                          </div>
-                        )}
-                      </form.Field>
-                    )}
-                    <Switch
-                      id="checkin_pass_enabled"
-                      checked={checkinPassOn}
-                      onCheckedChange={(checked) => {
-                        setCheckinPassOn(checked)
-                        if (checked) {
-                          if (!form.getFieldValue("checkin_pass_lead_days")) {
-                            form.setFieldValue("checkin_pass_lead_days", "3")
-                          }
-                        } else {
-                          form.setFieldValue("checkin_pass_lead_days", "")
-                        }
-                      }}
-                      disabled={readOnly}
-                    />
-                  </div>
-                  {checkinPassOn && (
-                    <Link
-                      to="/email-templates/$type/edit"
-                      params={{ type: "check_in_pass" }}
-                      className="text-xs text-primary hover:underline"
-                    >
-                      Edit email template
-                    </Link>
-                  )}
-                </div>
-              </InlineRow>
-              <InlineRow
-                icon={
-                  <ShoppingCart className="h-4 w-4 text-muted-foreground" />
-                }
-                label="Abandoned Cart"
-                description="Email buyers who did not complete their purchase"
-              >
-                <div className="flex flex-col items-end gap-2">
-                  <div className="flex items-center gap-3">
-                    {cartReminderOn && (
-                      <div className="flex items-end gap-2">
-                        <form.Field name="abandoned_cart_delay_days">
-                          {(field) => (
-                            <div className="space-y-1">
-                              <p className="text-center text-[10px] text-muted-foreground">
-                                Delay (days)
-                              </p>
-                              <Input
-                                id="abandoned_cart_delay_days"
-                                type="number"
-                                min="1"
-                                step="1"
-                                placeholder="3"
-                                value={field.state.value}
-                                onChange={(e) =>
-                                  field.handleChange(e.target.value)
-                                }
-                                disabled={readOnly}
-                                className="max-w-[80px] text-sm"
-                              />
-                            </div>
-                          )}
-                        </form.Field>
-                        <form.Field name="abandoned_cart_repeat_days">
-                          {(field) => (
-                            <div className="space-y-1">
-                              <p className="text-center text-[10px] text-muted-foreground">
-                                Every (days)
-                              </p>
-                              <Input
-                                id="abandoned_cart_repeat_days"
-                                type="number"
-                                min="1"
-                                step="1"
-                                placeholder="once"
-                                value={field.state.value}
-                                onChange={(e) =>
-                                  field.handleChange(e.target.value)
-                                }
-                                disabled={readOnly}
-                                className="max-w-[80px] text-sm"
-                              />
-                            </div>
-                          )}
-                        </form.Field>
-                        <form.Subscribe
-                          selector={(state) =>
-                            state.values.abandoned_cart_repeat_days
-                          }
-                        >
-                          {(cartRepeat) => (
-                            <form.Field name="abandoned_cart_max_count">
-                              {(field) => (
-                                <div className="space-y-1">
-                                  <p className="text-center text-[10px] text-muted-foreground">
-                                    Max sends
-                                  </p>
-                                  <Input
-                                    id="abandoned_cart_max_count"
-                                    type="number"
-                                    min="1"
-                                    step="1"
-                                    placeholder="12"
-                                    value={field.state.value}
-                                    onChange={(e) =>
-                                      field.handleChange(e.target.value)
-                                    }
-                                    disabled={readOnly || !cartRepeat}
-                                    className="max-w-[80px] text-sm"
-                                  />
-                                </div>
-                              )}
-                            </form.Field>
-                          )}
-                        </form.Subscribe>
-                      </div>
-                    )}
-                    <Switch
-                      id="abandoned_cart_reminder_enabled"
-                      checked={cartReminderOn}
-                      onCheckedChange={(checked) => {
-                        setCartReminderOn(checked)
-                        if (checked) {
-                          if (
-                            !form.getFieldValue("abandoned_cart_delay_days")
-                          ) {
-                            form.setFieldValue("abandoned_cart_delay_days", "3")
-                          }
-                        } else {
-                          form.setFieldValue("abandoned_cart_delay_days", "")
-                          form.setFieldValue("abandoned_cart_repeat_days", "")
-                          form.setFieldValue("abandoned_cart_max_count", "")
-                        }
-                      }}
-                      disabled={readOnly}
-                    />
-                  </div>
-                  {cartReminderOn && (
-                    <Link
-                      to="/email-templates/$type/edit"
-                      params={{ type: "abandoned_cart" }}
-                      className="text-xs text-primary hover:underline"
-                    >
-                      Edit email template
-                    </Link>
-                  )}
-                </div>
-              </InlineRow>
-
-              <form.Subscribe selector={(state) => state.values.sale_type}>
-                {(saleType) =>
-                  saleType === "application" ? (
-                    <>
-                      <InlineRow
-                        icon={
-                          <CreditCard className="h-4 w-4 text-muted-foreground" />
-                        }
-                        label="Purchase Reminder"
-                        description="Email accepted applicants who have not purchased yet"
-                      >
-                        <div className="flex flex-col items-end gap-2">
-                          <div className="flex items-center gap-3">
-                            {purchaseReminderOn && (
-                              <div className="flex items-end gap-2">
-                                <form.Field name="purchase_reminder_delay_days">
-                                  {(field) => (
-                                    <div className="space-y-1">
-                                      <p className="text-center text-[10px] text-muted-foreground">
-                                        Delay (days)
-                                      </p>
-                                      <Input
-                                        id="purchase_reminder_delay_days"
-                                        type="number"
-                                        min="1"
-                                        step="1"
-                                        placeholder="3"
-                                        value={field.state.value}
-                                        onChange={(e) =>
-                                          field.handleChange(e.target.value)
-                                        }
-                                        disabled={readOnly}
-                                        className="max-w-[80px] text-sm"
-                                      />
-                                    </div>
-                                  )}
-                                </form.Field>
-                                <form.Field name="purchase_reminder_repeat_days">
-                                  {(field) => (
-                                    <div className="space-y-1">
-                                      <p className="text-center text-[10px] text-muted-foreground">
-                                        Every (days)
-                                      </p>
-                                      <Input
-                                        id="purchase_reminder_repeat_days"
-                                        type="number"
-                                        min="1"
-                                        step="1"
-                                        placeholder="once"
-                                        value={field.state.value}
-                                        onChange={(e) =>
-                                          field.handleChange(e.target.value)
-                                        }
-                                        disabled={readOnly}
-                                        className="max-w-[80px] text-sm"
-                                      />
-                                    </div>
-                                  )}
-                                </form.Field>
-                                <form.Subscribe
-                                  selector={(state) =>
-                                    state.values.purchase_reminder_repeat_days
-                                  }
-                                >
-                                  {(purchaseRepeat) => (
-                                    <form.Field name="purchase_reminder_max_count">
-                                      {(field) => (
-                                        <div className="space-y-1">
-                                          <p className="text-center text-[10px] text-muted-foreground">
-                                            Max sends
-                                          </p>
-                                          <Input
-                                            id="purchase_reminder_max_count"
-                                            type="number"
-                                            min="1"
-                                            step="1"
-                                            placeholder="12"
-                                            value={field.state.value}
-                                            onChange={(e) =>
-                                              field.handleChange(e.target.value)
-                                            }
-                                            disabled={
-                                              readOnly || !purchaseRepeat
-                                            }
-                                            className="max-w-[80px] text-sm"
-                                          />
-                                        </div>
-                                      )}
-                                    </form.Field>
-                                  )}
-                                </form.Subscribe>
-                              </div>
-                            )}
-                            <Switch
-                              id="purchase_reminder_enabled"
-                              checked={purchaseReminderOn}
-                              onCheckedChange={(checked) => {
-                                setPurchaseReminderOn(checked)
-                                if (checked) {
-                                  if (
-                                    !form.getFieldValue(
-                                      "purchase_reminder_delay_days",
-                                    )
-                                  ) {
-                                    form.setFieldValue(
-                                      "purchase_reminder_delay_days",
-                                      "3",
-                                    )
-                                  }
-                                } else {
-                                  form.setFieldValue(
-                                    "purchase_reminder_delay_days",
-                                    "",
-                                  )
-                                  form.setFieldValue(
-                                    "purchase_reminder_repeat_days",
-                                    "",
-                                  )
-                                  form.setFieldValue(
-                                    "purchase_reminder_max_count",
-                                    "",
-                                  )
-                                }
-                              }}
-                              disabled={readOnly}
-                            />
-                          </div>
-                          {purchaseReminderOn && (
-                            <Link
-                              to="/email-templates/$type/edit"
-                              params={{ type: "purchase_reminder" }}
-                              className="text-xs text-primary hover:underline"
-                            >
-                              Edit email template
-                            </Link>
-                          )}
-                        </div>
-                      </InlineRow>
-
-                      <InlineRow
-                        icon={
-                          <FileText className="h-4 w-4 text-muted-foreground" />
-                        }
-                        label="Abandoned Application"
-                        description="Email applicants whose application is still in draft, counted from their last edit"
-                      >
-                        <div className="flex flex-col items-end gap-2">
-                          <div className="flex items-center gap-3">
-                            {applicationReminderOn && (
-                              <div className="flex items-end gap-2">
-                                <form.Field name="abandoned_application_delay_days">
-                                  {(field) => (
-                                    <div className="space-y-1">
-                                      <p className="text-center text-[10px] text-muted-foreground">
-                                        Delay (days)
-                                      </p>
-                                      <Input
-                                        id="abandoned_application_delay_days"
-                                        type="number"
-                                        min="1"
-                                        step="1"
-                                        placeholder="3"
-                                        value={field.state.value}
-                                        onChange={(e) =>
-                                          field.handleChange(e.target.value)
-                                        }
-                                        disabled={readOnly}
-                                        className="max-w-[80px] text-sm"
-                                      />
-                                    </div>
-                                  )}
-                                </form.Field>
-                                <form.Field name="abandoned_application_repeat_days">
-                                  {(field) => (
-                                    <div className="space-y-1">
-                                      <p className="text-center text-[10px] text-muted-foreground">
-                                        Every (days)
-                                      </p>
-                                      <Input
-                                        id="abandoned_application_repeat_days"
-                                        type="number"
-                                        min="1"
-                                        step="1"
-                                        placeholder="once"
-                                        value={field.state.value}
-                                        onChange={(e) =>
-                                          field.handleChange(e.target.value)
-                                        }
-                                        disabled={readOnly}
-                                        className="max-w-[80px] text-sm"
-                                      />
-                                    </div>
-                                  )}
-                                </form.Field>
-                                <form.Subscribe
-                                  selector={(state) =>
-                                    state.values
-                                      .abandoned_application_repeat_days
-                                  }
-                                >
-                                  {(applicationRepeat) => (
-                                    <form.Field name="abandoned_application_max_count">
-                                      {(field) => (
-                                        <div className="space-y-1">
-                                          <p className="text-center text-[10px] text-muted-foreground">
-                                            Max sends
-                                          </p>
-                                          <Input
-                                            id="abandoned_application_max_count"
-                                            type="number"
-                                            min="1"
-                                            step="1"
-                                            placeholder="12"
-                                            value={field.state.value}
-                                            onChange={(e) =>
-                                              field.handleChange(e.target.value)
-                                            }
-                                            disabled={
-                                              readOnly || !applicationRepeat
-                                            }
-                                            className="max-w-[80px] text-sm"
-                                          />
-                                        </div>
-                                      )}
-                                    </form.Field>
-                                  )}
-                                </form.Subscribe>
-                              </div>
-                            )}
-                            <Switch
-                              id="abandoned_application_reminder_enabled"
-                              checked={applicationReminderOn}
-                              onCheckedChange={(checked) => {
-                                setApplicationReminderOn(checked)
-                                if (checked) {
-                                  if (
-                                    !form.getFieldValue(
-                                      "abandoned_application_delay_days",
-                                    )
-                                  ) {
-                                    form.setFieldValue(
-                                      "abandoned_application_delay_days",
-                                      "3",
-                                    )
-                                  }
-                                } else {
-                                  form.setFieldValue(
-                                    "abandoned_application_delay_days",
-                                    "",
-                                  )
-                                  form.setFieldValue(
-                                    "abandoned_application_repeat_days",
-                                    "",
-                                  )
-                                  form.setFieldValue(
-                                    "abandoned_application_max_count",
-                                    "",
-                                  )
-                                }
-                              }}
-                              disabled={readOnly}
-                            />
-                          </div>
-                          {applicationReminderOn && (
-                            <Link
-                              to="/email-templates/$type/edit"
-                              params={{ type: "abandoned_application" }}
-                              className="text-xs text-primary hover:underline"
-                            >
-                              Edit email template
-                            </Link>
-                          )}
-                        </div>
-                      </InlineRow>
-                    </>
-                  ) : null
-                }
-              </form.Subscribe>
-            </InlineSection>
-
-            <Separator />
 
             {/* Self-service check-in feature flag */}
             <InlineSection title="Self-service check-in">
@@ -2060,7 +857,9 @@ export function PopupForm({ defaultValues, onSuccess }: PopupFormProps) {
             {/* Attendee directory feature flag */}
             <form.Subscribe selector={(state) => state.values.sale_type}>
               {(saleType) =>
-                saleType === "application" ? (
+                // On an existing event the doors answer; while creating one
+                // the choice being made in this form is the answer.
+                (isEdit ? takesApplications : saleType === "application") ? (
                   <>
                     <InlineSection title="Attendee directory">
                       <form.Field name="show_attendee_directory">
@@ -2117,72 +916,6 @@ export function PopupForm({ defaultValues, onSuccess }: PopupFormProps) {
 
             {/* Groups and Invites feature flags */}
             <InlineSection title="Groups and Invites">
-              <form.Field name="invites_enabled">
-                {(field) => (
-                  <InlineRow
-                    icon={<Link2 className="h-4 w-4 text-muted-foreground" />}
-                    label="Enable Invites"
-                    description="Allow admins to create invite links with discounts and automatic approvals"
-                  >
-                    <Switch
-                      id="invites_enabled"
-                      checked={field.state.value}
-                      onCheckedChange={(checked) => field.handleChange(checked)}
-                      disabled={readOnly}
-                    />
-                  </InlineRow>
-                )}
-              </form.Field>
-
-              <form.Field name="referrals_enabled">
-                {(field) => (
-                  <InlineRow
-                    icon={<Share2 className="h-4 w-4 text-muted-foreground" />}
-                    label="Enable Referrals"
-                    description="Allow attendees to create referral codes and refer others"
-                  >
-                    <Switch
-                      id="referrals_enabled"
-                      checked={field.state.value}
-                      onCheckedChange={(checked) => field.handleChange(checked)}
-                      disabled={readOnly}
-                    />
-                  </InlineRow>
-                )}
-              </form.Field>
-
-              <form.Subscribe
-                selector={(state) => state.values.referrals_enabled}
-              >
-                {(referralsEnabled) =>
-                  referralsEnabled ? (
-                    <form.Field name="max_referrals_per_attendee">
-                      {(field) => (
-                        <InlineRow
-                          icon={
-                            <Share2 className="h-4 w-4 text-muted-foreground" />
-                          }
-                          label="Max referrals per attendee"
-                          description="How many people each attendee can refer (their referral link's use limit). Leave empty for unlimited."
-                        >
-                          <Input
-                            id="max_referrals_per_attendee"
-                            type="number"
-                            min="1"
-                            step="1"
-                            placeholder="e.g. 10"
-                            value={field.state.value}
-                            onChange={(e) => field.handleChange(e.target.value)}
-                            disabled={readOnly}
-                            className="max-w-[120px] text-sm"
-                          />
-                        </InlineRow>
-                      )}
-                    </form.Field>
-                  ) : null
-                }
-              </form.Subscribe>
-
               <form.Field name="group_private_events_enabled">
                 {(field) => (
                   <InlineRow

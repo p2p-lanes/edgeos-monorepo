@@ -46,6 +46,18 @@ interface ReviewersManagerProps {
   tenantId: string
   readOnly?: boolean
   variant?: "card" | "inline"
+  /**
+   * sdd/sales-flows task 14.1: scopes this manager to one flow's tri-state
+   * reviewer resolution (design D4). Omitted keeps the popup-shared tier
+   * exactly as before this slice. When given, `listReviewers` returns the
+   * RESOLVED set (inherit -> popup-shared tier; override -> the flow's own
+   * rows, possibly empty) and add/remove act on that flow's tier — adding a
+   * reviewer here flips the flow to override automatically; removing the
+   * last one resets it back to inherit (both server-side invariants, no
+   * client-side mode bookkeeping needed).
+   */
+  flowId?: string
+  reviewersMode?: "inherit" | "override"
 }
 
 export function ReviewersManager({
@@ -53,6 +65,8 @@ export function ReviewersManager({
   tenantId,
   readOnly = false,
   variant = "card",
+  flowId,
+  reviewersMode,
 }: ReviewersManagerProps) {
   const queryClient = useQueryClient()
   const { showSuccessToast, showErrorToast } = useCustomToast()
@@ -60,14 +74,19 @@ export function ReviewersManager({
   const [selectedUserId, setSelectedUserId] = useState<string>("")
   const [isRequired, setIsRequired] = useState(false)
 
+  const queryKey = flowId
+    ? ["popup-reviewers", popupId, "flow", flowId]
+    : ["popup-reviewers", popupId]
+
   // Fetch current reviewers
   const {
     data: reviewersData,
     isLoading: loadingReviewers,
     isError: _reviewersError,
   } = useQuery({
-    queryKey: ["popup-reviewers", popupId],
-    queryFn: () => PopupReviewersService.listReviewers({ popupId }),
+    queryKey,
+    queryFn: () =>
+      PopupReviewersService.listReviewers({ popupId, salesFlowId: flowId }),
   })
 
   // Fetch users that can be reviewers (admin role in this tenant)
@@ -104,7 +123,11 @@ export function ReviewersManager({
 
   const removeMutation = useMutation({
     mutationFn: (userId: string) =>
-      PopupReviewersService.removeReviewer({ popupId, userId }),
+      PopupReviewersService.removeReviewer({
+        popupId,
+        userId,
+        salesFlowId: flowId,
+      }),
     onSuccess: () => {
       showSuccessToast("Reviewer removed")
       queryClient.invalidateQueries({ queryKey: ["popup-reviewers", popupId] })
@@ -116,6 +139,7 @@ export function ReviewersManager({
     if (!selectedUserId) return
     addMutation.mutate({
       user_id: selectedUserId,
+      sales_flow_id: flowId,
       is_required: isRequired,
       weight_multiplier: 1.0,
     })
@@ -141,7 +165,13 @@ export function ReviewersManager({
       <SectionShell
         variant={variant}
         title="Reviewers"
-        description="Users who can review and approve applications for this gathering"
+        description={
+          flowId && reviewersMode === "inherit"
+            ? "Inherited from the event. Adding a reviewer here switches this flow to its own reviewer list."
+            : flowId
+              ? "This flow's own reviewer list, independent of the event's."
+              : "Users who can review and approve applications for this gathering"
+        }
         action={
           !readOnly && availableUsers.length > 0 ? (
             <Button

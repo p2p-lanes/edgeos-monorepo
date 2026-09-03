@@ -4,13 +4,17 @@ import { useIsAuthenticated } from "@/hooks/useIsAuthenticated"
 import { queryKeys } from "@/lib/query-keys"
 import type { ProductsPass } from "@/types/Products"
 
-export function useProductsQuery(popupId: string | null) {
+export function useProductsQuery(
+  popupId: string | null,
+  salesFlowId?: string | null,
+) {
   const isAuthenticated = useIsAuthenticated()
   return useQuery({
-    queryKey: queryKeys.products.byPopup(popupId ?? ""),
+    queryKey: queryKeys.products.byPopup(popupId ?? "", salesFlowId),
     queryFn: async (): Promise<ProductsPass[]> => {
       const result = await ProductsService.listPortalProducts({
         popupId: popupId!,
+        salesFlowId: salesFlowId ?? undefined,
       })
       return result.results.map((p) => ({
         ...p,

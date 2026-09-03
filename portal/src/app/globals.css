@@ -374,6 +374,87 @@
   animation: fadeInRight 0.3s ease-out forwards;
 }
 
+/* Portal navigation must not inherit the active checkout flow's tokens.
+   ThemeProvider updates the document root for checkout content, while this
+   local scope keeps the persistent portal chrome intentionally light. */
+.portal-chrome {
+  --background: #f5f5f5;
+  --foreground: oklch(0.145 0 0);
+  --heading: oklch(0.145 0 0);
+  --heading-secondary: oklch(0.556 0.01 260);
+  --body: oklch(0.145 0 0);
+  --pass-title: oklch(0.145 0 0);
+  --pass-text: oklch(0.556 0.01 260);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.205 0.015 285);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.205 0.015 285);
+  --primary: oklch(0.279 0.041 260);
+  --primary-foreground: oklch(0.975 0.005 285);
+  --secondary: oklch(0.96 0.005 285);
+  --secondary-foreground: oklch(0.279 0.041 260);
+  --muted: oklch(0.958 0.005 285);
+  --muted-foreground: oklch(0.556 0.01 260);
+  --accent: oklch(0.958 0.005 285);
+  --accent-foreground: oklch(0.279 0.041 260);
+  --destructive: oklch(0.577 0.245 27.325);
+  --destructive-foreground: oklch(0.975 0.005 285);
+  --border: oklch(0.86 0.01 260);
+  --input: oklch(0.88 0.008 260);
+  --ring: oklch(0.205 0.015 285);
+  --chart-1: oklch(0.646 0.222 41);
+  --chart-2: oklch(0.6 0.118 185);
+  --chart-3: oklch(0.398 0.07 227);
+  --chart-4: oklch(0.828 0.189 84);
+  --chart-5: oklch(0.769 0.188 70);
+  --sidebar: oklch(0.985 0 0);
+  --sidebar-foreground: oklch(0.37 0.01 260);
+  --sidebar-primary: oklch(0.205 0.015 260);
+  --sidebar-primary-foreground: oklch(0.985 0 0);
+  --sidebar-accent: oklch(0.95 0.008 260);
+  --sidebar-accent-foreground: oklch(0.205 0.015 260);
+  --sidebar-border: oklch(0.88 0.01 260);
+  --sidebar-ring: oklch(0.548 0.22 260);
+  --nav-text: oklch(0.145 0 0);
+  --nav-text-secondary: oklch(0.556 0.01 260);
+}
+
+.portal-chrome.portal-sidebar,
+.portal-chrome .portal-sidebar {
+  --sidebar: oklch(0.21 0.04 260);
+  --sidebar-foreground: oklch(0.93 0.01 260);
+  --sidebar-primary: oklch(0.7 0.16 250);
+  --sidebar-primary-foreground: oklch(0.16 0.03 260);
+  --sidebar-accent: oklch(0.55 0.2 260);
+  --sidebar-accent-foreground: oklch(0.98 0.005 260);
+  --sidebar-border: oklch(0.32 0.04 260);
+  --sidebar-ring: oklch(0.7 0.16 250);
+  --popover: var(--sidebar);
+  --popover-foreground: var(--sidebar-foreground);
+  --accent: var(--sidebar-accent);
+  --accent-foreground: var(--sidebar-accent-foreground);
+  --nav-text: var(--sidebar-foreground);
+  --nav-text-secondary: oklch(0.75 0.025 260);
+}
+
+/* The checkout's nested sidebar has zero width. Position its cart footer
+   against the outer portal sidebar, which owns the available content area. */
+.checkout-cart-footer {
+  left: 0;
+}
+
+@media (min-width: 768px) {
+  .group\/sidebar-wrapper:has(> .peer[data-state="expanded"])
+    .checkout-cart-footer {
+    left: 16rem;
+  }
+
+  .group\/sidebar-wrapper:has(> .peer[data-state="collapsed"])
+    .checkout-cart-footer {
+    left: 3rem;
+  }
+}
+
 @layer base {
   * {
     @apply border-border outline-ring/50;

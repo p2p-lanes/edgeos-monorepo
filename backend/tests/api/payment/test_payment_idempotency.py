@@ -29,6 +29,7 @@ from app.api.popup.models import Popups
 from app.api.product.models import Products
 from app.api.shared.enums import SaleType
 from app.api.tenant.models import Tenants
+from tests._flow_helpers import application_flow_id
 
 
 def _make_popup(db: Session, tenant: Tenants) -> Popups:
@@ -80,6 +81,7 @@ def _make_app_and_attendee(
     db: Session, popup: Popups, human: Humans
 ) -> tuple[Applications, Attendees]:
     app = Applications(
+        sales_flow_id=application_flow_id(db, popup.id),
         id=uuid.uuid4(),
         tenant_id=popup.tenant_id,
         popup_id=popup.id,

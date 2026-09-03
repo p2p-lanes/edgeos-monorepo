@@ -26,6 +26,7 @@ import {
   type ReviewDecision,
   type ScholarshipDecisionRequest,
 } from "@/client"
+import { ApplicationAccessSources } from "@/components/applications/ApplicationAccessSources"
 import { ApplicationCommentThread } from "@/components/applications/ApplicationCommentThread"
 import { ApplicationRelatedRecords } from "@/components/applications/ApplicationRelatedRecords"
 import { StatusBadge } from "@/components/Common/StatusBadge"
@@ -1187,6 +1188,8 @@ export function ApplicationDetail({
             ) : null
           })()}
         </InlineSection>
+
+        <ApplicationAccessSources sources={application.access_sources ?? []} />
 
         {/* Unsectioned custom fields */}
         {unsectionedCustomFields.length > 0 && (

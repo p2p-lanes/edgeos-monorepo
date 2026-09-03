@@ -40,6 +40,7 @@ from app.api.popup.models import Popups
 from app.api.product.models import Products
 from app.api.tenant.models import Tenants
 from app.core.security import create_access_token
+from tests._flow_helpers import application_flow_id
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -104,6 +105,9 @@ def _give_ticket(
     tenant: Tenants,
     popup: Popups,
     human: Humans,
+    *,
+    product_category: str = "ticket",
+    managed: bool = False,
 ) -> Attendees:
     """Give ``human`` a purchased ticket for ``popup``.
 
@@ -119,6 +123,7 @@ def _give_ticket(
         name=f"Ticket {uuid.uuid4().hex[:6]}",
         slug=f"ticket-{uuid.uuid4().hex[:10]}",
         price=Decimal("100.00"),
+        category=product_category,
     )
     db.add(product)
     db.commit()
@@ -127,7 +132,8 @@ def _give_ticket(
     attendee = Attendees(
         tenant_id=tenant.id,
         popup_id=popup.id,
-        human_id=human.id,
+        human_id=None if managed else human.id,
+        managed_by_human_id=human.id if managed else None,
         name=f"{human.first_name} {human.last_name}".strip(),
         email=human.email,
     )
@@ -141,6 +147,7 @@ def _give_ticket(
             attendee_id=attendee.id,
             product_id=product.id,
             check_in_code=uuid.uuid4().hex[:10],
+            product_category_snapshot=product_category,
         )
     )
     db.commit()
@@ -210,6 +217,7 @@ class TestPortalAttendeeCount:
         # The hider opted out of showing their name on their application.
         db.add(
             Applications(
+                sales_flow_id=application_flow_id(db, popup.id),
                 id=uuid.uuid4(),
                 tenant_id=tenant_a.id,
                 popup_id=popup.id,
@@ -294,6 +302,7 @@ class TestPortalAttendeeEmails:
         # them since this is the organiser reaching their own attendees.
         db.add(
             Applications(
+                sales_flow_id=application_flow_id(db, popup.id),
                 id=uuid.uuid4(),
                 tenant_id=tenant.id,
                 popup_id=popup.id,
@@ -574,7 +583,7 @@ class TestPortalRegisterEligibility:
         assert resp.status_code == 403, resp.text
         assert _fetch_participant(db, event.id, human.id) is None
 
-    def test_register_with_rejected_application_forbidden(
+    def test_register_with_participant_holding_forbidden(
         self,
         client: TestClient,
         db: Session,
@@ -583,10 +592,56 @@ class TestPortalRegisterEligibility:
         popup = _make_popup(db, tenant_a)
         event = _make_event(db, tenant_a, popup)
         human = _make_human(db, tenant_a)
-        # Even with a ticket, a rejected application blocks RSVP.
+        _give_ticket(
+            db,
+            tenant_a,
+            popup,
+            human,
+            product_category="meal_plan",
+        )
+
+        with patch(_ITIP_TARGET, new=AsyncMock(return_value=None)):
+            response = client.post(
+                f"/api/v1/event-participants/portal/register/{event.id}",
+                headers=_human_headers(human),
+            )
+
+        assert response.status_code == 403, response.text
+        assert _fetch_participant(db, event.id, human.id) is None
+
+    def test_register_with_managed_only_ticket_is_forbidden(
+        self,
+        client: TestClient,
+        db: Session,
+        tenant_a: Tenants,
+    ) -> None:
+        popup = _make_popup(db, tenant_a)
+        event = _make_event(db, tenant_a, popup)
+        human = _make_human(db, tenant_a)
+        _give_ticket(db, tenant_a, popup, human, managed=True)
+
+        with patch(_ITIP_TARGET, new=AsyncMock(return_value=None)):
+            response = client.post(
+                f"/api/v1/event-participants/portal/register/{event.id}",
+                headers=_human_headers(human),
+            )
+
+        assert response.status_code == 403, response.text
+        assert _fetch_participant(db, event.id, human.id) is None
+
+    def test_register_with_access_and_rejected_application_succeeds(
+        self,
+        client: TestClient,
+        db: Session,
+        tenant_a: Tenants,
+    ) -> None:
+        popup = _make_popup(db, tenant_a)
+        event = _make_event(db, tenant_a, popup)
+        human = _make_human(db, tenant_a)
         _give_ticket(db, tenant_a, popup, human)
         db.add(
             Applications(
+                sales_flow_id=application_flow_id(db, popup.id),
                 id=uuid.uuid4(),
                 tenant_id=tenant_a.id,
                 popup_id=popup.id,
@@ -596,17 +651,16 @@ class TestPortalRegisterEligibility:
         )
         db.commit()
 
-        with patch(_ITIP_TARGET, new=AsyncMock(return_value=None)) as itip_mock:
+        with patch(_ITIP_TARGET, new=AsyncMock(return_value=None)):
             resp = client.post(
                 f"/api/v1/event-participants/portal/register/{event.id}",
                 headers=_human_headers(human),
             )
 
-        assert resp.status_code == 403, resp.text
-        assert itip_mock.await_count == 0
-        assert _fetch_participant(db, event.id, human.id) is None
+        assert resp.status_code == 200, resp.text
+        assert resp.json()["status"] == ParticipantStatus.REGISTERED.value
 
-    def test_register_with_ticket_and_accepted_application_succeeds(
+    def test_register_with_attendee_less_accepted_application_succeeds(
         self,
         client: TestClient,
         db: Session,
@@ -615,9 +669,9 @@ class TestPortalRegisterEligibility:
         popup = _make_popup(db, tenant_a)
         event = _make_event(db, tenant_a, popup)
         human = _make_human(db, tenant_a)
-        _give_ticket(db, tenant_a, popup, human)
         db.add(
             Applications(
+                sales_flow_id=application_flow_id(db, popup.id),
                 id=uuid.uuid4(),
                 tenant_id=tenant_a.id,
                 popup_id=popup.id,

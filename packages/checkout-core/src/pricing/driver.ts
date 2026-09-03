@@ -1,5 +1,5 @@
 // The money authority. The core NEVER computes the payable total itself — it
-// debounces changes and asks the server (POST /checkout/{slug}/preview) for an
+// debounces changes and asks the server (POST /checkout/{slug}/{flowSlug}/preview) for an
 // authoritative breakdown, then stores it. Rapid changes collapse into one call
 // (debounce); racing responses resolve last-write-wins so a slow earlier reply
 // can never overwrite a newer one.

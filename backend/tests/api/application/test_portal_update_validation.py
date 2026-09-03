@@ -20,6 +20,11 @@ from app.api.human.models import Humans
 from app.api.popup.models import Popups
 from app.api.tenant.models import Tenants
 from app.core.security import create_access_token
+from tests._flow_helpers import (
+    default_flow_id,
+    group_flow_id,
+    provision_default_flow,
+)
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -32,6 +37,7 @@ def _make_popup(db: Session, tenant: Tenants) -> Popups:
     db.add(popup)
     db.commit()
     db.refresh(popup)
+    provision_default_flow(db, popup)
     return popup
 
 
@@ -49,6 +55,7 @@ def _make_field(
     field = FormFields(
         tenant_id=popup.tenant_id,
         popup_id=popup.id,
+        sales_flow_id=default_flow_id(db, popup.id),
         name=name,
         label=label,
         field_type=field_type,
@@ -98,10 +105,11 @@ def _create_draft(
     return resp.json()
 
 
-def _patch(client: TestClient, token: str, popup: Popups, payload: dict):
+def _patch(client: TestClient, db: Session, token: str, popup: Popups, payload: dict):
     return client.patch(
         f"/api/v1/applications/my/{popup.id}",
         headers=_headers(token),
+        params={"sales_flow_id": str(default_flow_id(db, popup.id))},
         json=payload,
     )
 
@@ -124,7 +132,7 @@ class TestPatchSubmitValidation:
         _, token = _make_human_token(db, tenant_a)
         _create_draft(client, token, popup)
 
-        resp = _patch(client, token, popup, {"status": "in review"})
+        resp = _patch(client, db, token, popup, {"status": "in review"})
 
         assert resp.status_code == 400, resp.text
         assert any("Motivation" in e for e in _errors(resp))
@@ -146,6 +154,7 @@ class TestPatchSubmitValidation:
 
         resp = _patch(
             client,
+            db,
             token,
             popup,
             {"status": "in review", "custom_fields": {"shirt_size": "XXL"}},
@@ -164,6 +173,7 @@ class TestPatchSubmitValidation:
 
         resp = _patch(
             client,
+            db,
             token,
             popup,
             {"status": "in review", "custom_fields": {"mystery_key": "x"}},
@@ -184,6 +194,7 @@ class TestPatchSubmitValidation:
 
         resp = _patch(
             client,
+            db,
             token,
             popup,
             {
@@ -214,7 +225,7 @@ class TestPatchSubmitValidation:
         _, token = _make_human_token(db, tenant_a)
         _create_draft(client, token, popup)
 
-        resp = _patch(client, token, popup, {"custom_fields": {"shirt_size": "M"}})
+        resp = _patch(client, db, token, popup, {"custom_fields": {"shirt_size": "M"}})
 
         assert resp.status_code == 200, resp.text
         assert resp.json()["status"] == ApplicationStatus.DRAFT.value
@@ -234,7 +245,9 @@ class TestPatchSubmitValidation:
         _, token = _make_human_token(db, tenant_a)
         _create_draft(client, token, popup)
 
-        resp = _patch(client, token, popup, {"custom_fields": {"shirt_size": "XXL"}})
+        resp = _patch(
+            client, db, token, popup, {"custom_fields": {"shirt_size": "XXL"}}
+        )
 
         assert resp.status_code == 400, resp.text
         assert any("must be one of" in e for e in _errors(resp))
@@ -259,11 +272,12 @@ class TestPatchSubmitValidation:
         _create_draft(
             client, token, popup, {"motivation": "I want in", "shirt_size": "S"}
         )
-        submit = _patch(client, token, popup, {"status": "in review"})
+        submit = _patch(client, db, token, popup, {"status": "in review"})
         assert submit.status_code == 200, submit.text
 
         resp = _patch(
             client,
+            db,
             token,
             popup,
             {"custom_fields": {"motivation": "I want in", "shirt_size": "M"}},
@@ -288,10 +302,12 @@ class TestPatchSubmitValidation:
         )
         _, token = _make_human_token(db, tenant_a)
         _create_draft(client, token, popup, {"shirt_size": "S"})
-        submit = _patch(client, token, popup, {"status": "in review"})
+        submit = _patch(client, db, token, popup, {"status": "in review"})
         assert submit.status_code == 200, submit.text
 
-        resp = _patch(client, token, popup, {"custom_fields": {"shirt_size": "XXL"}})
+        resp = _patch(
+            client, db, token, popup, {"custom_fields": {"shirt_size": "XXL"}}
+        )
 
         assert resp.status_code == 400, resp.text
         assert any("must be one of" in e for e in _errors(resp))
@@ -383,6 +399,7 @@ class TestPatchReplaceSemantics:
 
         resp = _patch(
             client,
+            db,
             token,
             popup,
             {"status": "in review", "custom_fields": {"motivation": "I want in"}},
@@ -407,6 +424,7 @@ class TestPatchReplaceSemantics:
 
         resp = _patch(
             client,
+            db,
             token,
             popup,
             {"status": "in review", "custom_fields": {"motivation": "still in"}},
@@ -433,6 +451,7 @@ class TestPatchReplaceSemantics:
 
         resp = _patch(
             client,
+            db,
             token,
             popup,
             {"status": "in review", "custom_fields": {"nickname": "Paddy"}},
@@ -451,6 +470,7 @@ class TestPatchReplaceSemantics:
         section = FormSections(
             tenant_id=popup.tenant_id,
             popup_id=popup.id,
+            sales_flow_id=default_flow_id(db, popup.id),
             label="Hidden extras",
             hidden=True,
         )
@@ -470,6 +490,7 @@ class TestPatchReplaceSemantics:
 
         resp = _patch(
             client,
+            db,
             token,
             popup,
             {"status": "in review", "custom_fields": {"motivation": "still in"}},
@@ -491,6 +512,7 @@ class TestPatchReplaceSemantics:
         data = _create_draft(client, token, popup, {"motivation": "I want in"})
 
         group = Groups(
+            sales_flow_id=group_flow_id(db, popup.id),
             tenant_id=popup.tenant_id,
             popup_id=popup.id,
             name="Test Group",
@@ -506,7 +528,7 @@ class TestPatchReplaceSemantics:
         db.commit()
 
         resp = _patch(
-            client, token, popup, {"status": "in review", "custom_fields": {}}
+            client, db, token, popup, {"status": "in review", "custom_fields": {}}
         )
 
         assert resp.status_code == 200, resp.text

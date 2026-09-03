@@ -24,6 +24,15 @@ const CheckoutBridge = ({ children }: { children: ReactNode }) => {
   )
 }
 
+/**
+ * Despite the name, this wraps the invite, group and referral landing
+ * pages — `/invite`, `/groups`, `/r` — not `/checkout`, which mounts its
+ * own providers in `CheckoutPageClient`.
+ *
+ * ThemeProvider belongs here because those pages have no sales flow in
+ * scope: they dress in the gathering's theme, the same as the portal. The
+ * checkout mounts its own with the flow's theme instead.
+ */
 const PublicCheckoutProviders = ({ children }: { children: ReactNode }) => {
   return (
     <CityProvider public>

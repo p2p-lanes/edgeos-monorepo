@@ -12,9 +12,12 @@ def _admin_headers(token: str) -> dict[str, str]:
     return {"Authorization": f"Bearer {token}"}
 
 
-def _patron_step_payload(popup_id: uuid.UUID, *, suffix: str) -> dict:
+def _patron_step_payload(
+    popup_id: uuid.UUID, flow_id: uuid.UUID, *, suffix: str
+) -> dict:
     return {
         "popup_id": str(popup_id),
+        "sales_flow_id": str(flow_id),
         "step_type": "patron",
         "title": f"Patron Step {suffix}",
         "template": "patron-preset",
@@ -28,8 +31,8 @@ def _patron_step_payload(popup_id: uuid.UUID, *, suffix: str) -> dict:
     }
 
 
-def _create_isolated_popup(db, tenant_id: uuid.UUID) -> uuid.UUID:
-    """Insert a fresh popup and return its ID."""
+def _create_isolated_popup(db, tenant_id: uuid.UUID) -> tuple[uuid.UUID, uuid.UUID]:
+    """Insert a fresh popup plus its default flow. Returns (popup, flow)."""
     popup_id = uuid.uuid4()
     slug = f"step-singleton-test-{popup_id.hex[:8]}"
     conn = db.connection()
@@ -51,7 +54,14 @@ def _create_isolated_popup(db, tenant_id: uuid.UUID) -> uuid.UUID:
         ),
     )
     db.commit()
-    return popup_id
+
+    from app.api.sales_flow.crud import sales_flows_crud
+
+    flow = sales_flows_crud.provision_default_flow(
+        db, popup_id=popup_id, tenant_id=tenant_id, sale_type="direct"
+    )
+    db.commit()
+    return popup_id, flow.id
 
 
 def _cleanup_popup(db, popup_id: uuid.UUID) -> None:
@@ -74,12 +84,12 @@ class TestPatronStepSingleton:
         tenant_a,
     ) -> None:
         """POST first patron-preset step for a popup returns 201."""
-        popup_id = _create_isolated_popup(db, tenant_a.id)
+        popup_id, flow_id = _create_isolated_popup(db, tenant_a.id)
         try:
             resp = client.post(
                 "/api/v1/ticketing-steps",
                 headers=_admin_headers(admin_token_tenant_a),
-                json=_patron_step_payload(popup_id, suffix="first"),
+                json=_patron_step_payload(popup_id, flow_id, suffix="first"),
             )
             assert resp.status_code == 201, resp.text
         finally:
@@ -93,13 +103,13 @@ class TestPatronStepSingleton:
         tenant_a,
     ) -> None:
         """POST second patron-preset step for same popup returns 422."""
-        popup_id = _create_isolated_popup(db, tenant_a.id)
+        popup_id, flow_id = _create_isolated_popup(db, tenant_a.id)
         try:
             # Create first — must succeed
             resp1 = client.post(
                 "/api/v1/ticketing-steps",
                 headers=_admin_headers(admin_token_tenant_a),
-                json=_patron_step_payload(popup_id, suffix="first"),
+                json=_patron_step_payload(popup_id, flow_id, suffix="first"),
             )
             assert resp1.status_code == 201, resp1.text
 
@@ -107,7 +117,7 @@ class TestPatronStepSingleton:
             resp2 = client.post(
                 "/api/v1/ticketing-steps",
                 headers=_admin_headers(admin_token_tenant_a),
-                json=_patron_step_payload(popup_id, suffix="second"),
+                json=_patron_step_payload(popup_id, flow_id, suffix="second"),
             )
             assert resp2.status_code == 422, resp2.text
             body = resp2.json()

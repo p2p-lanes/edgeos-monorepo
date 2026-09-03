@@ -51,6 +51,7 @@ from app.api.popup.models import Popups
 from app.api.shared.enums import SaleType
 from app.api.tenant.models import Tenants
 from app.core.security import create_access_token
+from tests._flow_helpers import application_flow_id
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -106,6 +107,7 @@ def _make_application(
     status: str = ApplicationStatus.ACCEPTED.value,
 ) -> Applications:
     application = Applications(
+        sales_flow_id=application_flow_id(db, popup.id),
         id=uuid.uuid4(),
         tenant_id=tenant.id,
         popup_id=popup.id,
@@ -408,10 +410,10 @@ class TestCreateMyAttendeeForPopupHttp:
         )
         assert response.status_code == 401
 
-    def test_application_popup_accepted_creates_attendee(
+    def test_application_popup_returns_gone(
         self, client: TestClient, db: Session, tenant_a: Tenants
     ) -> None:
-        """Application popup + accepted application → 200, attendee created, origin=application."""
+        """Companion creation moved out of the attendee resource."""
         from app.api.attendee_category.models import AttendeeCategories
 
         popup = _make_popup(db, tenant_a, suffix="c-post-ok", sale_type="application")
@@ -441,17 +443,16 @@ class TestCreateMyAttendeeForPopupHttp:
             json={"name": "Companion Person", "category_id": str(companion_cat.id)},
         )
 
-        assert response.status_code == 200, response.text
-        body = response.json()
-        assert body["name"] == "Companion Person"
-        assert body["category"] == "companion"
-        assert body["origin"] == "application"
-        assert body["popup_id"] == str(popup.id)
+        assert response.status_code == 410, response.text
+        assert (
+            response.json()["detail"]
+            == "Companion attendees are created after approval"
+        )
 
-    def test_direct_popup_returns_422_application_required(
+    def test_direct_popup_returns_gone(
         self, client: TestClient, db: Session, tenant_a: Tenants
     ) -> None:
-        """Festival popup (sale_type=direct) → 422 with code=application_required."""
+        """The retired endpoint has one response regardless of popup type."""
         popup = _make_popup(db, tenant_a, suffix="c-post-direct", sale_type="direct")
         human = _make_human(db, tenant_a, suffix="c-post-direct")
 
@@ -461,15 +462,12 @@ class TestCreateMyAttendeeForPopupHttp:
             json={"name": "Spouse Person", "category": "spouse"},
         )
 
-        assert response.status_code == 422
-        detail = response.json()["detail"]
-        codes = [d.get("code") for d in detail if isinstance(d, dict)]
-        assert "application_required" in codes
+        assert response.status_code == 410
 
-    def test_no_application_returns_422_application_required(
+    def test_no_application_returns_gone(
         self, client: TestClient, db: Session, tenant_a: Tenants
     ) -> None:
-        """Application popup but human has no application → 422, code=application_required."""
+        """The retired endpoint does not inspect application ownership."""
         popup = _make_popup(
             db, tenant_a, suffix="c-post-noapp", sale_type="application"
         )
@@ -481,10 +479,7 @@ class TestCreateMyAttendeeForPopupHttp:
             json={"name": "Spouse Person", "category": "spouse"},
         )
 
-        assert response.status_code == 422
-        detail = response.json()["detail"]
-        codes = [d.get("code") for d in detail if isinstance(d, dict)]
-        assert "application_required" in codes
+        assert response.status_code == 410
 
 
 # ---------------------------------------------------------------------------

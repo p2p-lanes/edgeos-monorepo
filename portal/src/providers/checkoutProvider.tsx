@@ -16,7 +16,8 @@ import { useTranslation } from "react-i18next"
 import { toast } from "sonner"
 import {
   CHECKOUT_MODE,
-  resolvePopupCheckoutPolicy,
+  type CheckoutMode,
+  resolveFlowCheckoutPolicy,
 } from "@/checkout/popupCheckoutPolicy"
 import {
   ApiError,
@@ -25,7 +26,7 @@ import {
   type TicketingStepPublic,
   TicketingStepsService,
 } from "@/client"
-import { CONTENT_ONLY_TEMPLATES } from "@/components/checkout-flow/registries/variantRegistry"
+import { CONTENT_ONLY_TEMPLATES } from "@/components/checkout-flow/registries/templateClassification"
 import { supportsQuantitySelector } from "@/components/ui/QuantitySelector"
 import type { StepProductResolution } from "@/hooks/checkout"
 import {
@@ -54,13 +55,15 @@ import { trackMetaAddToCart } from "@/lib/meta-pixel"
 import { queryKeys } from "@/lib/query-keys"
 import { isPassQuantityBased } from "@/strategies/passQuantityHelper"
 import type { AttendeePassState } from "@/types/Attendee"
-import type {
-  CheckoutCartState,
-  CheckoutCartSummary,
-  CheckoutStep,
-  SelectedAccommodationItem,
-  SelectedDynamicItem,
-  SelectedPassItem,
+import {
+  buildCheckoutRecipientDraft,
+  type CheckoutCartState,
+  type CheckoutCartSummary,
+  type CheckoutRecipientPassState,
+  type CheckoutStep,
+  type SelectedAccommodationItem,
+  type SelectedDynamicItem,
+  type SelectedPassItem,
 } from "@/types/checkout"
 import type { ApplicationFormSchema } from "@/types/form-schema"
 import type { ProductsPass } from "@/types/Products"
@@ -73,11 +76,26 @@ interface CheckoutContextValue {
   currentStep: CheckoutStep
   availableSteps: CheckoutStep[]
   stepConfigs: TicketingStepPublic[]
+  /**
+   * The door this checkout is selling into. Sections below read it
+   * rather than the URL: on the checkout routes the flow is a path
+   * segment, not a query, so `?flow=` would find nothing there
+   * (sdd/sales-flows-rediseno).
+   */
+  salesFlowId: string | null
+  salesFlowSlug: string | null
+  /** How that door sells. Resolved once here so no section has to ask the
+   *  gathering, which cannot answer for a door that differs from it. */
+  checkoutMode: CheckoutMode
   cart: CheckoutCartState
   summary: CheckoutCartSummary
   allProducts: ProductsPass[]
   productsByStepId: Map<string, ProductsPass[]>
   getProductsForStep: StepProductResolution["getProductsForStep"]
+  /** Why the catalog came back empty, when it did for a reason. Lets a
+   *  step say "this flow is not open to you" instead of the blank
+   *  "no products" it showed for every cause alike. */
+  emptyCatalogReason: string | null
   attendees: AttendeePassState[]
   isLoading: boolean
   isInitialLoading: boolean
@@ -243,7 +261,21 @@ interface CheckoutProviderProps {
   children: ReactNode
   initialStep?: CheckoutStep
   productsOverride?: ProductsPass[]
+  emptyCatalogReason?: string | null
   configuredStepsOverride?: TicketingStepPublic[]
+  /**
+   * Which door's checkout this is.
+   *
+   * Steps belong to a sales flow (sdd/sales-flows-rediseno), so a portal
+   * buyer accepted through a partner door must see that door's steps and
+   * not the gathering's default ones. Omitted resolves the default flow,
+   * which is what a single-door gathering has.
+   */
+  salesFlowId?: string | null
+  salesFlowSlug?: string | null
+  /** How that door sells. `null` while it is still being resolved, which is
+   *  the same default the portal has always started from. */
+  flowType?: string | null
   accountCreditOverride?: number
   validatePromoCodeOverride?: (code: string) => Promise<number | null>
   submitMode?: "application" | "open-ticketing"
@@ -272,7 +304,11 @@ export function CheckoutProvider({
   children,
   initialStep = "passes",
   productsOverride,
+  emptyCatalogReason = null,
   configuredStepsOverride,
+  salesFlowId,
+  salesFlowSlug,
+  flowType = null,
   accountCreditOverride,
   validatePromoCodeOverride,
   submitMode = "application",
@@ -294,26 +330,40 @@ export function CheckoutProvider({
     isEditing,
     toggleEditing,
     clearSelections,
+    restoreRecipientSelections,
   } = usePassesProvider()
   const { discountApplied, setDiscount, resetDiscount } = useDiscount()
   const { getRelevantApplication } = useApplication()
   const { getCity } = useCityProvider()
   const { products: queriedProducts, loading: isLoadingProducts } =
-    useGetPassesData()
+    useGetPassesData(salesFlowId)
   const products = productsOverride ?? queriedProducts
   const isAuthenticated = useIsAuthenticated()
-  const application = getRelevantApplication()
+  // The application of THIS door. It decides the attendees, the balance and
+  // the `application_id` the payment is created against, so answering with
+  // another door's would charge the wrong one (sdd/sales-flows-rediseno).
+  const application = getRelevantApplication(salesFlowId)
   const city = getCity()
   const editPassesEnabled = city?.edit_passes_enabled ?? false
   // The stored credit balance applies unconditionally (R-FE-02, R-BE-03):
   // edit_passes_enabled gates only the edit-passes in-flow UI, not credit application.
   const appCredit = accountCreditOverride ?? application?.credit ?? 0
-  const checkoutPolicy = resolvePopupCheckoutPolicy(city)
+  // The door decides how its checkout behaves, not the gathering: one that
+  // takes applications can still have a door that sells directly
+  // (sdd/sales-flows-rediseno slice 6).
+  const checkoutPolicy = resolveFlowCheckoutPolicy(flowType)
   const cityId = city?.id ? String(city.id) : null
+  const checkoutScope = `${cityId ?? ""}:${salesFlowId ?? ""}`
 
   const hasRestoredCheckoutRef = useRef(false)
-  const previousCityIdRef = useRef(cityId)
+  const previousCheckoutScopeRef = useRef(checkoutScope)
   const paymentCompleteRef = useRef(false)
+  const hasRestoredStepRef = useRef(false)
+  const initialCartStepRef = useRef<string | null | undefined>(undefined)
+  const buyerRestoredRef = useRef(false)
+  const hasFiredReleaseRef = useRef(false)
+  const [pendingReleaseSettled, setPendingReleaseSettled] = useState(false)
+  const pendingReleaseSettledRef = useRef(false)
   const [buyerValues, setBuyerValues] =
     useState<Record<string, unknown>>(initialBuyerValues)
   const [buyerErrors, setBuyerErrors] = useState<Record<string, string>>({})
@@ -323,10 +373,11 @@ export function CheckoutProvider({
 
   // Ticketing step configuration from API
   const { data: stepsData, isLoading: isLoadingSteps } = useQuery({
-    queryKey: ["ticketing-steps-portal", cityId],
+    queryKey: ["ticketing-steps-portal", cityId, salesFlowId ?? null],
     queryFn: () =>
       TicketingStepsService.listPortalTicketingSteps({
         popupId: cityId!,
+        salesFlowId: salesFlowId ?? undefined,
       }),
     enabled: !configuredStepsOverride && !!cityId && isAuthenticated,
   })
@@ -516,11 +567,34 @@ export function CheckoutProvider({
                   : 1
 
           if (quantity > 0) {
+            const recipientAttendee = attendee as CheckoutRecipientPassState
+            const isAnonymousBuyer =
+              submitMode === "open-ticketing" &&
+              !recipientAttendee.recipient &&
+              attendee.category === "main"
+            const buyerName = [buyerValues.first_name, buyerValues.last_name]
+              .filter((value): value is string => typeof value === "string")
+              .join(" ")
+              .trim()
+            const recipient = buildCheckoutRecipientDraft(
+              recipientAttendee,
+              isAnonymousBuyer
+                ? {
+                    name: buyerName || attendee.name,
+                    email:
+                      typeof buyerValues.email === "string"
+                        ? buyerValues.email
+                        : attendee.email,
+                    profileSnapshot: buyerValues,
+                  }
+                : {},
+            )
             passes.push({
               productId: product.id,
               product,
               attendeeId: attendee.id,
               attendee,
+              recipient,
               quantity,
               price: product.price * quantity,
               originalPrice: product.original_price
@@ -533,7 +607,77 @@ export function CheckoutProvider({
     }
 
     return passes
-  }, [attendeePasses, checkoutPolicy.checkoutMode, isEditing])
+  }, [
+    attendeePasses,
+    buyerValues,
+    checkoutPolicy.checkoutMode,
+    isEditing,
+    submitMode,
+  ])
+
+  // Step management is initialized before cart restoration so a scope reset can
+  // return navigation to its first step before the new flow restores its cart.
+  const {
+    currentStep,
+    setCurrentStep,
+    availableSteps,
+    goToStep: goToStepRaw,
+    goToNextStep: goToNextStepRaw,
+    goToPreviousStep: goToPreviousStepRaw,
+    canProceedToStep: canProceedToStepFn,
+    isStepComplete: isStepCompleteFn,
+  } = useCheckoutSteps({
+    initialStep,
+    configuredSteps: configuredSteps,
+    productsByStepId,
+    selectedPassesCount: selectedPasses.length,
+    dynamicItemsCount: Object.values(dynamicItems).flat().length,
+    productIndependentItemsCount: accommodations.length,
+    isEditing,
+    buyerInfoComplete: isBuyerInfoComplete,
+  })
+
+  // Reset the complete checkout boundary before persistence effects restore the
+  // newly selected flow. Keeping this effect above useCartPersistence prevents
+  // a late reset from wiping the new flow's restored selections.
+  useEffect(() => {
+    if (previousCheckoutScopeRef.current === checkoutScope) return
+    previousCheckoutScopeRef.current = checkoutScope
+
+    hasRestoredCheckoutRef.current = false
+    paymentCompleteRef.current = false
+    buyerRestoredRef.current = false
+    hasFiredReleaseRef.current = false
+    pendingReleaseSettledRef.current = false
+    setPendingReleaseSettled(false)
+    setHousing(null)
+    setAccommodations([])
+    setMerch([])
+    setPatron(null)
+    setSelectedMealPlans([])
+    setDynamicItems({})
+    setInsurance(false)
+    setTermsAccepted(false)
+    setBuyerValues(initialBuyerValues)
+    setBuyerErrors({})
+    setBuyerGeneralError(null)
+    setVisitedSteps(new Set())
+    setForcedBuyerFieldsTouched(new Set())
+    setCheckoutToast(null)
+    hasRestoredStepRef.current = false
+    initialCartStepRef.current = undefined
+    setCurrentStep(initialStep)
+  }, [
+    checkoutScope,
+    initialBuyerValues,
+    initialStep,
+    setAccommodations,
+    setCurrentStep,
+    setHousing,
+    setMerch,
+    setPatron,
+    setSelectedMealPlans,
+  ])
 
   // Ref that holds the latest selection state for cart persistence.
   // Initialized with defaults — updated to real values after all hooks run.
@@ -560,6 +704,7 @@ export function CheckoutProvider({
   } = useCartPersistence({
     enabled: cartPersistenceEnabled,
     cityId,
+    salesFlowId,
     initialStep,
     products,
     housingPricePerDay,
@@ -577,12 +722,6 @@ export function CheckoutProvider({
     paymentCompleteRef,
   })
 
-  // Whether a pending-release attempt has settled (success, no-op, or error).
-  // Gates promo re-validation and auto-apply of restored promo codes so the
-  // coupon field never flashes "Invalid" before the hold is freed.
-  const [pendingReleaseSettled, setPendingReleaseSettled] = useState(false)
-  const pendingReleaseSettledRef = useRef(false)
-
   // Promo code hook — must run BEFORE useOpenCartPersistence so setPromoCode
   // is stable when passed as a restoration setter.
   const {
@@ -590,8 +729,6 @@ export function CheckoutProvider({
     promoCodeValid,
     promoCodeDiscount,
     setPromoCode,
-    setPromoCodeValid,
-    setPromoCodeDiscount,
     applyPromoCode,
     clearPromoCode,
     promoIsLoading,
@@ -599,6 +736,7 @@ export function CheckoutProvider({
     setPromoError,
   } = usePromoCode({
     cityId: city?.id,
+    salesFlowId,
     discountAppliedValue: discountApplied.discount_value,
     setDiscount,
     resetDiscount,
@@ -610,7 +748,7 @@ export function CheckoutProvider({
 
   // Anonymous open-cart persistence (localStorage + backend upsert).
   // Only active when openCartPopupSlug is provided (open-checkout flow).
-  const openCartEnabled = !!openCartPopupSlug
+  const openCartEnabled = !!openCartPopupSlug && !!salesFlowSlug
   const openCartBuyerEmail =
     typeof buyerValues.email === "string" ? buyerValues.email : ""
 
@@ -622,6 +760,8 @@ export function CheckoutProvider({
     restorationPromise: openCartRestorationPromise,
   } = useOpenCartPersistence({
     popupSlug: openCartPopupSlug ?? "",
+    flowSlug: salesFlowSlug ?? "",
+    enabled: openCartEnabled,
     selectionStateRef,
     products,
     housingPricePerDay,
@@ -634,6 +774,7 @@ export function CheckoutProvider({
       setInsurance,
       setDynamicItems,
       setPromoCode,
+      restorePassRecipients: restoreRecipientSelections,
     },
     hasRestoredCheckoutRef,
     paymentCompleteRef,
@@ -648,9 +789,13 @@ export function CheckoutProvider({
   // local convenience so a refresh doesn't wipe a half-filled form. Only for
   // open checkout — authenticated flows carry buyer data on the account.
   const buyerStorageKey = openCartPopupSlug
-    ? `open-checkout-buyer:${openCartPopupSlug}`
+    ? `open-checkout-buyer:${openCartPopupSlug}:${salesFlowSlug ?? ""}`
     : null
-  const buyerRestoredRef = useRef(false)
+  const previousBuyerStorageKeyRef = useRef(buyerStorageKey)
+  if (previousBuyerStorageKeyRef.current !== buyerStorageKey) {
+    previousBuyerStorageKeyRef.current = buyerStorageKey
+    buyerRestoredRef.current = false
+  }
   useEffect(() => {
     if (!buyerStorageKey || buyerRestoredRef.current) return
     buyerRestoredRef.current = true
@@ -692,7 +837,6 @@ export function CheckoutProvider({
   //   inside useOpenCartPersistence's one-shot restore effect (runs after
   //   products load). We guard on it here so cartMetaRef is populated before
   //   we try to extract cid/sig.
-  const hasFiredReleaseRef = useRef(false)
   // biome-ignore lint/correctness/useExhaustiveDependencies: one-shot release; reads current values via refs; products.length used to re-run after restore
   useEffect(() => {
     // P5 fix: when products have not loaded yet, we cannot restore and cannot
@@ -718,6 +862,7 @@ export function CheckoutProvider({
     // Only fire in open-cart mode or authenticated mode with an application.
     const effectiveSubmitMode = submitMode
     const slug = submitPopupSlug ?? city?.slug ?? null
+    const flowSlug = salesFlowSlug
     const appId = application?.id
 
     if (effectiveSubmitMode !== "open-ticketing" && !appId) {
@@ -730,6 +875,7 @@ export function CheckoutProvider({
     }
 
     hasFiredReleaseRef.current = true
+    const releaseScope = checkoutScope
 
     // P1 fix: await restorationPromise before reading cartMetaRef. On the
     // signed-link path, cartMetaRef is populated inside a Promise.then() callback
@@ -742,7 +888,10 @@ export function CheckoutProvider({
 
     restorationReady.then(() => {
       const releasePromise: Promise<{ released: boolean }> =
-        effectiveSubmitMode === "open-ticketing" && openCartEnabled && slug
+        effectiveSubmitMode === "open-ticketing" &&
+        openCartEnabled &&
+        slug &&
+        flowSlug
           ? (() => {
               const cartId = openCartMetaRef.current.cartId ?? undefined
               const restoreToken =
@@ -754,6 +903,7 @@ export function CheckoutProvider({
               }
               return CheckoutService.releasePendingOpen({
                 slug,
+                flowSlug,
                 requestBody: { cid: cartId, sig: restoreToken, email },
               })
             })()
@@ -765,12 +915,13 @@ export function CheckoutProvider({
 
       releasePromise
         .then((result) => {
+          if (previousCheckoutScopeRef.current !== releaseScope) return
           if (result.released) {
             if (slug) {
               // Release succeeded — invalidate the checkout runtime so
               // stock/availability reflects the freed hold on the next render.
               queryClient.invalidateQueries({
-                queryKey: queryKeys.checkout.runtime(slug),
+                queryKey: queryKeys.checkout.runtime(slug, flowSlug),
               })
             }
             // The freed hold also restores application credit; refetch the
@@ -781,6 +932,7 @@ export function CheckoutProvider({
           }
         })
         .catch((err: unknown) => {
+          if (previousCheckoutScopeRef.current !== releaseScope) return
           // Route structured errors through the existing dispatchPaymentError machinery.
           const apiBody =
             err instanceof ApiError
@@ -815,31 +967,12 @@ export function CheckoutProvider({
           // supersede backstop guards the purchase itself.
         })
         .finally(() => {
+          if (previousCheckoutScopeRef.current !== releaseScope) return
           setPendingReleaseSettled(true)
           pendingReleaseSettledRef.current = true
         })
     })
-  }, [products.length])
-
-  // Step management
-  const {
-    currentStep,
-    setCurrentStep,
-    availableSteps,
-    goToStep: goToStepRaw,
-    goToNextStep: goToNextStepRaw,
-    goToPreviousStep: goToPreviousStepRaw,
-    canProceedToStep: canProceedToStepFn,
-    isStepComplete: isStepCompleteFn,
-  } = useCheckoutSteps({
-    initialStep,
-    configuredSteps: configuredSteps,
-    productsByStepId,
-    selectedPassesCount: selectedPasses.length,
-    dynamicItemsCount: Object.values(dynamicItems).flat().length,
-    isEditing,
-    buyerInfoComplete: isBuyerInfoComplete,
-  })
+  }, [products.length, checkoutScope])
 
   // Keep selection state ref in sync — promoCode, promoCodeValid, currentStep,
   // and dynamicItems are defined after useCartPersistence, so we update each render.
@@ -929,6 +1062,13 @@ export function CheckoutProvider({
     const mealPlansTotal = selectedMealPlans
       .filter((m) => m.product && !isNonDiscountable(m.product))
       .reduce((sum, m) => sum + (m.product?.price ?? 0), 0)
+    // Accommodation shadow products are discountable by contract. The UI
+    // carries the server quote rather than the hidden product row, so the
+    // discount base comes directly from each selected stay.
+    const accommodationsTotal = accommodations.reduce(
+      (sum, item) => sum + item.totalPrice,
+      0,
+    )
     const standardDynamicSubtotal = Object.values(dynamicItems)
       .flat()
       .filter((item) => !isNonDiscountable(item.product))
@@ -938,9 +1078,17 @@ export function CheckoutProvider({
       housingTotal +
       merchTotal +
       mealPlansTotal +
+      accommodationsTotal +
       standardDynamicSubtotal
     )
-  }, [selectedPasses, housing, merch, selectedMealPlans, dynamicItems])
+  }, [
+    selectedPasses,
+    housing,
+    accommodations,
+    merch,
+    selectedMealPlans,
+    dynamicItems,
+  ])
 
   // Non-discountable products: anything flagged `product.discountable=false`
   // (patreon products are coerced to this by the backend validator) plus the
@@ -1017,38 +1165,6 @@ export function CheckoutProvider({
     discountValue: effectiveDiscount,
   })
 
-  // Reset state when city changes so we re-restore from new city's cart
-  useEffect(() => {
-    if (previousCityIdRef.current === cityId) return
-    previousCityIdRef.current = cityId
-
-    hasRestoredCheckoutRef.current = false
-    setHousing(null)
-    setAccommodations([])
-    setMerch([])
-    setPatron(null)
-    setSelectedMealPlans([])
-    // P2 fix: reset dynamicItems on city change so products from city A cannot
-    // appear in the upsert body after switching to city B.
-    setDynamicItems({})
-    setPromoCode("")
-    setPromoCodeValid(false)
-    setPromoCodeDiscount(0)
-    setInsurance(false)
-    setCurrentStep("passes")
-  }, [
-    cityId,
-    setCurrentStep,
-    setHousing,
-    setAccommodations,
-    setMerch,
-    setPatron,
-    setSelectedMealPlans,
-    setPromoCode,
-    setPromoCodeValid,
-    setPromoCodeDiscount,
-  ])
-
   // If discounts (group, scholarship, or coupon) drop the product subtotal to
   // $0, force the insurance toggle off so the persisted line item stops
   // counting even when the InsuranceCard is hidden.
@@ -1075,9 +1191,6 @@ export function CheckoutProvider({
   // Restore current step from saved cart (after availableSteps is ready).
   // Uses a ref to capture the initial cart step — ignores subsequent saveCart() updates
   // that would otherwise revert user navigation.
-  const hasRestoredStepRef = useRef(false)
-  const initialCartStepRef = useRef<string | null | undefined>(undefined)
-
   // Capture the initial cart step exactly once when cart data first loads
   if (
     initialCartStepRef.current === undefined &&
@@ -1388,6 +1501,7 @@ export function CheckoutProvider({
     applicationId: application?.id,
     popupId: cityId,
     popupSlug: submitPopupSlug ?? city?.slug ?? null,
+    salesFlowSlug,
     appCredit,
     checkoutMode: checkoutPolicy.checkoutMode,
     attendeePasses,
@@ -1433,13 +1547,17 @@ export function CheckoutProvider({
   })
 
   const value: CheckoutContextValue = {
+    checkoutMode: checkoutPolicy.checkoutMode,
     currentStep,
     availableSteps,
     stepConfigs: configuredSteps,
+    salesFlowId: salesFlowId ?? null,
+    salesFlowSlug: salesFlowSlug ?? null,
     cart,
     summary,
     allProducts: products,
     productsByStepId,
+    emptyCatalogReason,
     getProductsForStep,
     attendees: attendeePasses,
     isLoading,

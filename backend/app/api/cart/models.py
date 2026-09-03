@@ -18,9 +18,9 @@ class Carts(CartBase, table=True):
     """Cart model - persists checkout state per human per popup."""
 
     __table_args__ = (
-        # Open-checkout and authenticated carts are both keyed by (human, popup),
-        # so a buyer has a single cart per popup across both flows.
-        UniqueConstraint("human_id", "popup_id", name="uq_cart_human_popup"),
+        UniqueConstraint(
+            "human_id", "popup_id", "sales_flow_id", name="uq_cart_human_popup_flow"
+        ),
     )
 
     id: uuid.UUID = Field(

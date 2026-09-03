@@ -51,7 +51,10 @@ function booking(
   }
 }
 
-function build(accommodations: SelectedAccommodationItem[]) {
+function build(
+  accommodations: SelectedAccommodationItem[],
+  submitMode: "application" | "open-ticketing" = "application",
+) {
   return buildPaymentProducts({
     attendeePasses: [attendee],
     selectedPasses: [],
@@ -63,6 +66,7 @@ function build(accommodations: SelectedAccommodationItem[]) {
     isEditing: false,
     appCredit: 0,
     checkoutMode: CHECKOUT_MODE.SIMPLE_QUANTITY,
+    submitMode,
   })
 }
 
@@ -129,6 +133,39 @@ describe("buildPaymentProducts: accommodations", () => {
 
     expect(products).toHaveLength(2)
     expect(products.every((line) => line.quantity === 1)).toBe(true)
+    expect(products.map((line) => line.purchase_metadata)).toEqual([
+      expect.objectContaining({
+        check_in: "2026-06-01",
+        check_out: "2026-06-08",
+      }),
+      expect.objectContaining({
+        check_in: "2026-06-20",
+        check_out: "2026-06-22",
+      }),
+    ])
+  })
+
+  it("assigns application stays to a real attendee", () => {
+    expect(build([booking()]).products[0].attendee_id).toBe("attendee-1")
+  })
+
+  it("keeps open checkout stays ownerless instead of using a synthetic buyer", () => {
+    const virtualBuyer = { ...attendee, id: "open-buyer-popup-1" }
+    const { products } = buildPaymentProducts({
+      attendeePasses: [virtualBuyer],
+      selectedPasses: [],
+      housing: null,
+      accommodations: [booking()],
+      merch: [],
+      patron: null,
+      dynamicItems: {},
+      isEditing: false,
+      appCredit: 0,
+      submitMode: "open-ticketing",
+    })
+
+    expect(products[0].attendee_id).toBeUndefined()
+    expect(products[0].recipient_key).toBeUndefined()
   })
 
   it("adds nothing when no room was booked", () => {

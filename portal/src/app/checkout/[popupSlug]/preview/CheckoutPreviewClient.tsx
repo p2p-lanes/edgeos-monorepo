@@ -1,6 +1,7 @@
 "use client"
 
 import { useQuery } from "@tanstack/react-query"
+import { useSearchParams } from "next/navigation"
 import { useEffect, useMemo, useState } from "react"
 import { CheckoutService, type TicketingStepPublic } from "@/client"
 import { OpenCheckoutRuntime } from "@/components/checkout-flow/OpenCheckoutRuntime"
@@ -15,6 +16,7 @@ import {
   resolveRequestLanguage,
   subscribeRequestLanguage,
 } from "@/lib/language-storage"
+import ThemeProvider, { type ThemeConfig } from "@/providers/themeProvider"
 import { CheckoutShell } from "../CheckoutShell"
 
 interface PreviewState {
@@ -39,6 +41,8 @@ export default function CheckoutPreviewClient({
 }: {
   popupSlug: string
 }) {
+  const searchParams = useSearchParams()
+  const flowSlug = searchParams.get("flow")
   const [state, setState] = useState<PreviewState | null>(null)
   const [isFramed, setIsFramed] = useState(true)
 
@@ -97,13 +101,14 @@ export default function CheckoutPreviewClient({
     isLoading,
     isError,
   } = useQuery({
-    queryKey: ["checkout-preview-runtime", popupSlug, language],
+    queryKey: ["checkout-preview-runtime", popupSlug, flowSlug, language],
     queryFn: () =>
-      CheckoutService.getRuntime({
+      CheckoutService.getFlowRuntime({
         slug: popupSlug,
+        flowSlug: flowSlug ?? "",
         xCheckoutPreviewToken: state?.previewToken,
       }),
-    enabled: !!state?.previewToken,
+    enabled: !!state?.previewToken && !!flowSlug,
     staleTime: 30_000,
     retry: false,
   })
@@ -126,6 +131,15 @@ export default function CheckoutPreviewClient({
     return <Loader />
   }
 
+  if (!flowSlug) {
+    return (
+      <PreviewNotice
+        title="Preview unavailable"
+        detail="No sales flow was selected for this checkout preview."
+      />
+    )
+  }
+
   if (isError || !patched) {
     return (
       <PreviewNotice
@@ -136,14 +150,20 @@ export default function CheckoutPreviewClient({
   }
 
   return (
-    <CheckoutShell popup={patched.popup}>
-      <OpenCheckoutRuntime
-        runtime={patched}
-        popupSlug={popupSlug}
-        previewMode
-        previewToken={state?.previewToken}
-      />
-    </CheckoutShell>
+    <ThemeProvider
+      config={patched.theme_config as ThemeConfig | null}
+      scope="local"
+    >
+      <CheckoutShell popup={patched.popup}>
+        <OpenCheckoutRuntime
+          runtime={patched}
+          popupSlug={popupSlug}
+          flowSlug={flowSlug}
+          previewMode
+          previewToken={state.previewToken}
+        />
+      </CheckoutShell>
+    </ThemeProvider>
   )
 }
 

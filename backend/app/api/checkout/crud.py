@@ -1,13 +1,17 @@
 """CRUD aggregator for the open-ticketing checkout bootstrap endpoint (CAP-A)."""
 
 import uuid
+from typing import TYPE_CHECKING
 
 from fastapi import HTTPException, status
-from sqlalchemy.orm import selectinload
 from sqlmodel import Session, select
+
+if TYPE_CHECKING:
+    from app.api.human.schemas import HumanPublic
 
 from app.api.attendee_category.crud import attendee_categories_crud
 from app.api.attendee_category.schemas import AttendeeCategoryPublic
+from app.api.checkout.gate_quote import resolve_checkout_flow, selected_flow
 from app.api.checkout.schemas import (
     CheckoutBuyerField,
     CheckoutBuyerSection,
@@ -16,11 +20,17 @@ from app.api.checkout.schemas import (
     CheckoutShareMeta,
 )
 from app.api.form_field.crud import form_fields_crud
+from app.api.form_field.models import FormFields
+from app.api.form_section.crud import form_sections_crud
 from app.api.form_section.models import FormSections
 from app.api.popup.models import Popups
 from app.api.popup.schemas import PopupPublic, PopupStatus
 from app.api.product.models import Products
-from app.api.shared.enums import SaleType
+from app.api.sales_flow.eligibility import (
+    assert_application_flow_eligible,
+    assert_upsale_eligible,
+)
+from app.api.ticketing_step.crud import ticketing_steps_crud
 from app.api.ticketing_step.models import TicketingSteps
 from app.api.ticketing_step.schemas import TicketingStepPublic
 from app.api.translation.service import (
@@ -33,22 +43,36 @@ from app.api.translation.service import (
 
 
 def resolve_active_direct_popup_slug(db: Session, tenant_id: uuid.UUID) -> str | None:
-    """Return the slug of the earliest active direct-sale popup for a tenant.
+    """Return the slug of the earliest active gathering whose main way in sells.
 
-    Resolution rule (ADR, OI-4, OI-5):
-      WHERE status='active' AND sale_type='direct' AND tenant_id=:tid
+    This answers a bare `/checkout` with no slug: which of a tenant's
+    gatherings is its storefront. Resolution rule (ADR, OI-4, OI-5), with the
+    popup's `sale_type` replaced by the type of its default flow:
+
+      WHERE status='active' AND tenant_id=:tid
+        AND the default sales_flow is of type 'direct'
       ORDER BY start_date ASC NULLS LAST, id ASC
       LIMIT 1
+
+    The DEFAULT flow, not any flow. A conference that reviews applicants and
+    also happens to have a sponsor's door is not a storefront, and matching on
+    "has some door that sells" would let it steal the landing from the
+    tenant's actual shop on start_date order alone.
 
     Returns None when no matching popup exists — callers handle None gracefully
     (signals the Coming Soon path in the portal). Never raises.
     """
+    from app.api.sales_flow.models import SalesFlows  # noqa: PLC0415
+    from app.api.sales_flow.schemas import SalesFlowType  # noqa: PLC0415
+
     popup = db.exec(
         select(Popups)
+        .join(SalesFlows, SalesFlows.popup_id == Popups.id)  # type: ignore[arg-type]
         .where(
             Popups.tenant_id == tenant_id,
             Popups.status == PopupStatus.active,
-            Popups.sale_type == SaleType.direct,
+            SalesFlows.is_default == True,  # noqa: E712
+            SalesFlows.type == SalesFlowType.direct.value,
         )
         .order_by(
             Popups.start_date.asc().nulls_last(),  # type: ignore[attr-defined]
@@ -63,7 +87,7 @@ def resolve_active_direct_popup_slug(db: Session, tenant_id: uuid.UUID) -> str |
 def get_open_ticketing_popup(
     session: Session, slug: str, tenant_id: uuid.UUID, preview: bool = False
 ) -> Popups:
-    """Resolve an active direct-sale popup by slug and tenant for open ticketing.
+    """Resolve an active popup by slug and tenant for open ticketing.
 
     ``preview=True`` skips the sale-type and status gates so the backoffice can
     render a live preview of a popup that is still being configured. It is only
@@ -72,7 +96,7 @@ def get_open_ticketing_popup(
 
     Raises:
         404 — popup not found by slug + tenant_id
-        403 — popup is not sale_type=direct OR is not active (unless preview)
+        403 — popup is not active (unless preview)
     """
     popup = session.exec(
         select(Popups).where(Popups.slug == slug, Popups.tenant_id == tenant_id)
@@ -84,14 +108,13 @@ def get_open_ticketing_popup(
             detail="Popup not found",
         )
 
+    # No sale_type check here. A gathering that takes applications can still
+    # have a door that sells directly — a sponsor's, a partner's — and asking
+    # the popup turned that door away before its flow was ever resolved. The
+    # flow answers for itself: `resolve_flow(require_types=...)` for a named
+    # one, `assert_sells_directly` for the default.
     if preview:
         return popup
-
-    if popup.sale_type != SaleType.direct.value:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="This endpoint is only available for direct-sale popups",
-        )
 
     if popup.status != PopupStatus.active.value:
         raise HTTPException(
@@ -102,14 +125,54 @@ def get_open_ticketing_popup(
     return popup
 
 
+def _get_popup_by_slug_or_404(
+    session: Session, slug: str, tenant_id: uuid.UUID
+) -> Popups:
+    """404-only popup lookup for the checkout runtime.
+
+    sdd/sales-flows slice 9: the runtime's type/status gating moved to the
+    flow resolver (`resolve_flow`, keyed off the RESOLVED flow, not the raw
+    popup columns) — this helper only proves the popup exists, matching
+    `get_open_ticketing_popup`'s first gate without duplicating its status
+    check, which every OTHER checkout endpoint (purchase, cart, share,
+    pending/release) still uses unchanged.
+    """
+    popup = session.exec(
+        select(Popups).where(Popups.slug == slug, Popups.tenant_id == tenant_id)
+    ).first()
+    if popup is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Popup not found",
+        )
+    return popup
+
+
 def runtime_for_slug(
     session: Session,
     slug: str,
     tenant_id: uuid.UUID,
+    flow_slug: str,
     lang: str | None = None,
+    current_human: "HumanPublic | None" = None,
     preview: bool = False,
 ) -> CheckoutRuntimeResponse:
     """Load the public runtime data for an open-ticketing checkout page.
+
+    sdd/sales-flows slice 9 (task 9.2/9.8): resolves the required sales flow
+    named by ``flow_slug`` through `resolve_flow` — gate order, status codes,
+    and the direct/upsale type restriction all live there now (design's
+    Flow-Resolution Contract).
+    Products, buyer-form sections/fields, and ticketing steps are then all
+    resolved through THAT SAME flow, closing two disclosed slice-8 gaps:
+    - risk-001: fields come from the flow's own `find_by_flow` list,
+      grouped by section afterward — never the unfiltered
+      `FormSections.form_fields` ORM relationship (which ignored
+      `sales_flow_id` and could leak a different flow's field that happens
+      to share a section id).
+    - res-001: buyer_form/form_schema now get the same translation overlay
+      treatment as `form_field/router.py`'s portal schema endpoint (they
+      previously got none at all on this path).
 
     When ``lang`` is provided, popup, product, and ticketing-step text is
     overlaid with the matching translations. The overlay is default-agnostic:
@@ -119,10 +182,43 @@ def runtime_for_slug(
     ``preview=True`` (backoffice live preview) serves popups that are not yet
     active and includes disabled ticketing steps, so an operator can see a step
     before enabling it. Everything else is identical to the public payload.
+    sdd/sales-flows slice 13 (task 13.1/13.2): an upsale-type flow
+    additionally requires ``current_human`` to be a portal-authenticated
+    human with >=1 APPROVED payment in this popup (design D8, G0 #2/#3) —
+    see `assert_upsale_eligible`. Direct-type flows are unaffected; this
+    endpoint remains fully anonymous for them.
+
+    Application-type flows are served too, to the people they already
+    accepted (`assert_application_flow_eligible`). They used to be refused
+    by type, which asked the wrong question: what separates an anonymous
+    purchase from an application-backed one is who is buying, not what the
+    flow is called. Their buyers reach the same checkout through the portal
+    already, rendering the same components.
     """
     popup = get_open_ticketing_popup(session, slug, tenant_id, preview=preview)
+    if preview:
+        from app.api.sales_flow.crud import sales_flows_crud
 
-    # Load active products
+        flow = sales_flows_crud.get_by_slug(session, popup.id, flow_slug)
+        if flow is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, detail="Not found"
+            )
+    else:
+        flow = resolve_checkout_flow(session, popup, flow_slug)
+    if not preview:
+        assert_upsale_eligible(session, flow, popup.id, tenant_id, current_human)
+        assert_application_flow_eligible(session, flow, tenant_id, current_human)
+
+    # Load active products, then apply catalog-read enforcement (design D5/D6,
+    # D3 amendment, sdd/sales-flows slice 12): D3 per-product exclusivity and
+    # the flow's restriction_rule, silently filtered — never an error at a
+    # catalog read. No buyer form data exists yet at this point (the buyer
+    # hasn't submitted the checkout form), so a `form_answer` predicate is
+    # UNRESOLVED here and fails closed under the evaluator's own rule.
+    from app.services.restrictions.context import build_context
+    from app.services.restrictions.enforcement import filter_allowed_products
+
     products = list(
         session.exec(
             select(Products).where(
@@ -132,26 +228,34 @@ def runtime_for_slug(
             )
         ).all()
     )
-
-    # Load form_sections with their form_fields, ordered by section.order then field.position
-    sections = list(
-        session.exec(
-            select(FormSections)
-            .where(FormSections.popup_id == popup.id)
-            .order_by(FormSections.order)  # type: ignore[arg-type]
-            .options(selectinload(FormSections.form_fields))  # ty: ignore[invalid-argument-type]
-        ).all()
+    restriction_context = build_context(session, popup, flow, human=current_human)
+    from app.services.restrictions.enforcement import (
+        RESTRICTION_RULE_VIOLATED,
+        restriction_passes,
     )
 
-    steps_query = select(TicketingSteps).where(TicketingSteps.popup_id == popup.id)
-    if not preview:
-        steps_query = steps_query.where(
-            TicketingSteps.is_enabled == True,  # noqa: E712
-        )
-    ticketing_steps = list(
-        session.exec(
-            steps_query.order_by(TicketingSteps.order)  # type: ignore[arg-type]
-        ).all()
+    # Tell the portal WHY an empty catalog is empty (slice 5, F3). A rule
+    # that turns this buyer away and a flow with nothing configured used to
+    # produce the same blank step, which is how the original bug went
+    # unnoticed for so long.
+    empty_catalog_reason: str | None = None
+    if products and not restriction_passes(flow, restriction_context):
+        empty_catalog_reason = RESTRICTION_RULE_VIOLATED
+
+    products = filter_allowed_products(
+        session, flow, popup, products, restriction_context
+    )
+
+    sections, _ = form_sections_crud.find_by_flow(session, flow.id, limit=None)
+    fields, _ = form_fields_crud.find_by_flow(session, flow.id, skip=0, limit=1000)
+    fields_by_section: dict[uuid.UUID | None, list[FormFields]] = {}
+    for f in fields:
+        fields_by_section.setdefault(f.section_id, []).append(f)
+
+    ticketing_steps = (
+        ticketing_steps_crud.find_by_flow(session, flow.id, limit=1000)[0]
+        if preview
+        else ticketing_steps_crud.find_portal_by_flow(session, flow.id)
     )
 
     attendee_categories = attendee_categories_crud.list_by_popup(session, popup.id)
@@ -161,6 +265,8 @@ def runtime_for_slug(
     popup_data = PopupPublic.model_validate(popup).model_dump()
     product_translations: dict[uuid.UUID, dict] = {}
     step_translations: dict[uuid.UUID, dict] = {}
+    field_translations: dict[uuid.UUID, dict] = {}
+    section_translations: dict[uuid.UUID, dict] = {}
     if lang:
         popup_data = apply_translation_overlay(
             popup_data,
@@ -172,6 +278,12 @@ def runtime_for_slug(
         )
         step_translations = get_translations_bulk(
             session, "ticketing_step", [s.id for s in ticketing_steps], lang
+        )
+        field_translations = get_translations_bulk(
+            session, "form_field", [f.id for f in fields], lang
+        )
+        section_translations = get_translations_bulk(
+            session, "form_section", [s.id for s in sections], lang
         )
 
     def _product(p: Products) -> CheckoutRuntimeProduct:
@@ -186,23 +298,59 @@ def runtime_for_slug(
         data = apply_ticketing_step_overlay(data, step_translations.get(step.id))
         return TicketingStepPublic.model_validate(data)
 
+    def _field(f: FormFields) -> CheckoutBuyerField:
+        data = CheckoutBuyerField.model_validate(f).model_dump()
+        data = apply_translation_overlay(
+            data, field_translations.get(f.id), TRANSLATABLE_FIELDS["form_field"]
+        )
+        return CheckoutBuyerField.model_validate(data)
+
+    def _section(sec: FormSections) -> CheckoutBuyerSection:
+        data = {
+            "id": sec.id,
+            "label": sec.label,
+            "description": sec.description,
+            "order": sec.order,
+            "kind": sec.kind,
+        }
+        data = apply_translation_overlay(
+            data, section_translations.get(sec.id), TRANSLATABLE_FIELDS["form_section"]
+        )
+        section_fields = sorted(
+            fields_by_section.get(sec.id, []), key=lambda field: field.position
+        )
+        return CheckoutBuyerSection(
+            **data, form_fields=[_field(f) for f in section_fields]
+        )
+
+    form_schema = form_fields_crud.build_schema_for_flow(session, popup.id, flow.id)
+    if lang:
+        for f in fields:
+            if f.id in field_translations:
+                t_data = field_translations[f.id]
+                entry = form_schema["custom_fields"].get(f.name)
+                if entry:
+                    for key in TRANSLATABLE_FIELDS["form_field"]:
+                        if key in t_data:
+                            entry[key] = t_data[key]
+        for section_dict in form_schema["sections"]:
+            sid = uuid.UUID(section_dict["id"])
+            if sid in section_translations:
+                t_data = section_translations[sid]
+                for key in TRANSLATABLE_FIELDS["form_section"]:
+                    if key in t_data:
+                        section_dict[key] = t_data[key]
+
     return CheckoutRuntimeResponse(
+        selected_flow=selected_flow(flow),
+        flow_type=flow.type,
+        theme_config=flow.theme_config,
         popup=PopupPublic.model_validate(popup_data),
         products=[_product(p) for p in products],
         buyer_form=[
-            CheckoutBuyerSection(
-                id=sec.id,
-                label=sec.label,
-                description=sec.description,
-                order=sec.order,
-                kind=sec.kind,
-                form_fields=sorted(
-                    [CheckoutBuyerField.model_validate(f) for f in sec.form_fields],
-                    key=lambda f: f.position,
-                ),
-            )
             # Hidden sections (and their fields) are never surfaced to the
-            # anonymous checkout, mirroring build_schema_for_popup.
+            # anonymous checkout, mirroring build_schema_for_flow.
+            _section(sec)
             for sec in sections
             if not sec.hidden
         ],
@@ -210,15 +358,25 @@ def runtime_for_slug(
         attendee_categories=[
             AttendeeCategoryPublic.model_validate(c) for c in attendee_categories
         ],
-        form_schema=form_fields_crud.build_schema_for_popup(session, popup.id),
+        form_schema=form_schema,
+        empty_catalog_reason=empty_catalog_reason,
     )
 
 
 def share_meta_for_slug(
-    session: Session, slug: str, tenant_id: uuid.UUID
+    session: Session, slug: str, tenant_id: uuid.UUID, flow_slug: str
 ) -> CheckoutShareMeta:
-    """Load the minimal popup projection for social/OpenGraph share previews."""
+    """Load the minimal popup projection for social/OpenGraph share previews.
+
+    A share card describes one canonical public checkout link, so it exists
+    only for that active direct flow.
+    """
+    from app.api.sales_flow.schemas import SalesFlowType  # noqa: PLC0415
+
     popup = get_open_ticketing_popup(session, slug, tenant_id)
+    resolve_checkout_flow(
+        session, popup, flow_slug, require_types={SalesFlowType.direct}
+    )
     return CheckoutShareMeta(
         id=popup.id,
         name=popup.name,

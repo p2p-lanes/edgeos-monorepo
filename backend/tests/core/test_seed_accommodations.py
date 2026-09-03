@@ -37,14 +37,15 @@ from app.api.human.models import Humans
 from app.api.payment.models import Payments
 from app.api.popup.models import Popups
 from app.api.product.models import Products
+from app.api.sales_flow.crud import sales_flows_crud
 from app.api.tenant.models import Tenants
-from app.api.ticketing_step.constants import seed_ticketing_steps_for_popup
 from app.api.ticketing_step.models import TicketingSteps
 from app.core.db import (
     _load_seed_data,
     _seed_accommodation_bookings,
     _seed_accommodations,
 )
+from tests._flow_helpers import seed_default_steps
 
 SEED_POPUP_KEY = "tech-summit"
 
@@ -64,7 +65,7 @@ def seed_popup(db: Session, tenant_a: Tenants) -> Popups:
     db.add(popup)
     db.commit()
     db.refresh(popup)
-    seed_ticketing_steps_for_popup(db, popup_id=popup.id, tenant_id=tenant_a.id)
+    seed_default_steps(db, popup, sale_type=str(popup.sale_type))
     return popup
 
 
@@ -256,6 +257,8 @@ def seed_applicants(db: Session, seed_popup: Popups) -> tuple[dict, dict]:
     """
     application_map: dict[str, Applications] = {}
     attendee_lists: dict[str, list[Attendees]] = {}
+    flow = sales_flows_crud.get_default_flow(db, seed_popup.id)
+    assert flow is not None
 
     for key in APPLICATION_KEYS:
         human = Humans(
@@ -271,6 +274,7 @@ def seed_applicants(db: Session, seed_popup: Popups) -> tuple[dict, dict]:
         application = Applications(
             tenant_id=seed_popup.tenant_id,
             popup_id=seed_popup.id,
+            sales_flow_id=flow.id,
             human_id=human.id,
             status="accepted",
         )

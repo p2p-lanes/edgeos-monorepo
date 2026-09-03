@@ -25,6 +25,7 @@ import {
 import {
   type FormEvent,
   type KeyboardEvent,
+  useCallback,
   useEffect,
   useMemo,
   useRef,
@@ -64,7 +65,6 @@ import {
   loadConversations,
   removeConversation,
   type StoredConversation,
-  saveConversation,
   setActiveConversation,
 } from "./conversation-store"
 import {
@@ -73,6 +73,7 @@ import {
   storedAssistantPanelWidth,
 } from "./panel-width"
 import { MessageParts } from "./ToolPartRenderer"
+import { useConversationAutosave } from "./useConversationAutosave"
 
 const PANEL_WIDTH_KEY = "edgeos-ai-panel-width"
 const EMPTY_CONVERSATIONS: StoredConversation[] = []
@@ -457,29 +458,19 @@ function ConversationChat({
     sendAutomaticallyWhen: lastAssistantMessageIsCompleteWithApprovalResponses,
   })
 
-  useEffect(() => {
-    if (
-      !chat.messages.length ||
-      chat.status === "submitted" ||
-      chat.status === "streaming"
-    ) {
-      return
-    }
-    let cancelled = false
-    const timer = window.setTimeout(() => {
-      saveConversation(effectiveTenantId, conversationId, chat.messages)
-        .then((conversation) => {
-          if (!cancelled && conversation) onPersist(conversation)
-        })
-        .catch(() => {
-          if (!cancelled) toast.error("Could not save this conversation")
-        })
-    }, 400)
-    return () => {
-      cancelled = true
-      window.clearTimeout(timer)
-    }
-  }, [chat.messages, chat.status, conversationId, effectiveTenantId, onPersist])
+  useConversationAutosave({
+    tenantId: effectiveTenantId,
+    conversationId,
+    initialMessages,
+    messages: chat.messages,
+    status: chat.status,
+    onPersist,
+    onError: () => {
+      toast.error("Could not save this conversation", {
+        id: `save-conversation-${conversationId}`,
+      })
+    },
+  })
 
   return (
     <AssistantSession
@@ -563,14 +554,17 @@ function ConversationWorkspace({
     setHasMessages(Boolean(conversation.messages.length))
   }
 
-  const persistConversation = (conversation: StoredConversation) => {
-    setActiveConversation(contextKey, conversation.id)
-    setConversations((current) =>
-      [conversation, ...current.filter((item) => item.id !== conversation.id)]
-        .sort((left, right) => right.updatedAt.localeCompare(left.updatedAt))
-        .slice(0, 8),
-    )
-  }
+  const persistConversation = useCallback(
+    (conversation: StoredConversation) => {
+      setActiveConversation(contextKey, conversation.id)
+      setConversations((current) =>
+        [conversation, ...current.filter((item) => item.id !== conversation.id)]
+          .sort((left, right) => right.updatedAt.localeCompare(left.updatedAt))
+          .slice(0, 8),
+      )
+    },
+    [contextKey],
+  )
 
   const deleteCurrentConversation = async () => {
     if (!session) return

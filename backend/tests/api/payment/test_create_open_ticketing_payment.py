@@ -23,12 +23,19 @@ from app.api.form_section.models import FormSections
 from app.api.human.models import Humans
 from app.api.payment.crud import payments_crud
 from app.api.payment.models import PaymentProducts, Payments
-from app.api.payment.schemas import PaymentStatus
+from app.api.payment.schemas import PaymentRecipientRequest, PaymentStatus
 from app.api.popup.models import Popups
 from app.api.product.models import Products
+from app.api.sales_flow.models import SalesFlows
 from app.api.shared.enums import SaleType
 from app.api.tenant.models import Tenants
 from app.services.simplefi.client import CancelOutcome
+from tests._flow_helpers import (
+    coupon_flow_id,
+    default_flow_id,
+    offer_category,
+    seed_default_steps,
+)
 
 
 def _make_popup(
@@ -62,6 +69,7 @@ def _make_popup(
     )
     db.add(popup)
     db.flush()
+    seed_default_steps(db, popup)
     return popup
 
 
@@ -73,6 +81,8 @@ def _make_product(
     price: str,
     attendee_category_id: uuid.UUID | None = None,
     insurance_eligible: bool = False,
+    category: str = "ticket",
+    requires_check_in: bool = False,
 ) -> Products:
     product = Products(
         id=uuid.uuid4(),
@@ -81,7 +91,8 @@ def _make_product(
         name=name,
         slug=f"prod-{uuid.uuid4().hex[:6]}",
         price=Decimal(price),
-        category="ticket",
+        category=category,
+        requires_check_in=requires_check_in,
         attendee_category_id=attendee_category_id,
         is_active=True,
         insurance_eligible=insurance_eligible,
@@ -98,6 +109,7 @@ def _make_section(
         id=uuid.uuid4(),
         tenant_id=popup.tenant_id,
         popup_id=popup.id,
+        sales_flow_id=default_flow_id(db, popup.id),
         label=label,
         order=order,
         kind="standard",
@@ -122,6 +134,7 @@ def _make_field(
         id=uuid.uuid4(),
         tenant_id=popup.tenant_id,
         popup_id=popup.id,
+        sales_flow_id=default_flow_id(db, popup.id),
         section_id=section.id,
         name=f"{name}_{uuid.uuid4().hex[:4]}",
         label=label,
@@ -142,6 +155,7 @@ def _make_coupon(
     discount_value: int,
 ) -> Coupons:
     coupon = Coupons(
+        sales_flow_id=coupon_flow_id(db, popup.id),
         id=uuid.uuid4(),
         tenant_id=popup.tenant_id,
         popup_id=popup.id,
@@ -164,11 +178,26 @@ def _purchase_create(
     coupon_code: str | None = None,
     insurance: bool = False,
 ) -> OpenTicketingPurchaseCreate:
+    has_ticket = any(product.category == "ticket" for product, _ in products)
     return OpenTicketingPurchaseCreate(
         products=[
-            ProductLine(product_id=product.id, quantity=quantity)
+            ProductLine(
+                product_id=product.id,
+                quantity=quantity,
+                recipient_key="buyer" if product.category == "ticket" else None,
+            )
             for product, quantity in products
         ],
+        recipients=[
+            PaymentRecipientRequest(
+                recipient_key="buyer",
+                name=f"{first_name} {last_name}",
+                email=email,
+                profile_snapshot=form_data,
+            )
+        ]
+        if has_ticket
+        else [],
         buyer=BuyerInfo(
             email=email,
             first_name=first_name,
@@ -228,6 +257,7 @@ def test_create_open_ticketing_payment_one_attendee_n_tickets(
             obj=obj,
             popup=popup,
             tenant=tenant_a,
+            flow_slug="checkout",
             attribution={
                 "fbc": "fb.1.1710000000.click",
                 "fbp": "fb.1.1710000000.browser",
@@ -245,14 +275,10 @@ def test_create_open_ticketing_payment_one_attendee_n_tickets(
     assert payment.meta_client_ip == "203.0.113.10"
     assert payment.meta_client_user_agent == "Mozilla/5.0 Test"
 
-    # New design: 1 attendee for 3 tickets (not 3 attendees)
     attendees = list(
         db.exec(select(Attendees).where(Attendees.popup_id == popup.id)).all()
     )
-    assert len(attendees) == 1
-    assert attendees[0].name == "Matias Walter"
-    assert attendees[0].category == "main"
-    assert attendees[0].email == "buyer@test.com"
+    assert attendees == []
 
     # AttendeeProducts are NOT created at checkout — only when payment is approved.
     attendee_products = list(
@@ -336,7 +362,7 @@ def test_create_open_ticketing_payment_second_purchase_reuses_attendee(
         mock_get_client.return_value = mock_client
 
         p1, _, _ = payments_crud.create_open_ticketing_payment(
-            db, obj=obj1, popup=popup, tenant=tenant_a
+            db, obj=obj1, popup=popup, tenant=tenant_a, flow_slug="checkout"
         )
 
         # Create an anonymous cart for the buyer to supply as continuity proof on
@@ -355,7 +381,21 @@ def test_create_open_ticketing_payment_second_purchase_reuses_attendee(
         valid_sig = build_cart_restore_token(str(buyer_cart.id), signing_secret)
 
         obj2 = OpenTicketingPurchaseCreate(
-            products=[ProductLine(product_id=product.id, quantity=2)],
+            products=[
+                ProductLine(
+                    product_id=product.id,
+                    quantity=2,
+                    recipient_key="buyer",
+                )
+            ],
+            recipients=[
+                PaymentRecipientRequest(
+                    recipient_key="buyer",
+                    name="Repeat Buyer",
+                    email=buyer_email,
+                    profile_snapshot={name_field.name: "Repeat"},
+                )
+            ],
             buyer=BuyerInfo(
                 email=buyer_email,
                 first_name="Repeat",
@@ -367,7 +407,7 @@ def test_create_open_ticketing_payment_second_purchase_reuses_attendee(
         )
 
         p2, _, _ = payments_crud.create_open_ticketing_payment(
-            db, obj=obj2, popup=popup, tenant=tenant_a
+            db, obj=obj2, popup=popup, tenant=tenant_a, flow_slug="checkout"
         )
 
     # Second purchase superseded the first: P1 is CANCELLED, P2 is PENDING
@@ -381,21 +421,10 @@ def test_create_open_ticketing_payment_second_purchase_reuses_attendee(
     assert fresh_p2 is not None
     assert fresh_p2.status == PaymentStatus.PENDING.value
 
-    # Still exactly 1 attendee after two purchases
     attendees = list(
         db.exec(select(Attendees).where(Attendees.popup_id == popup.id)).all()
     )
-    assert len(attendees) == 1
-
-    # AttendeeProducts are NOT created at checkout — only when each payment is approved.
-    tickets = list(
-        db.exec(
-            select(AttendeeProducts).where(
-                AttendeeProducts.attendee_id == attendees[0].id
-            )
-        ).all()
-    )
-    assert len(tickets) == 0
+    assert attendees == []
 
 
 def test_create_open_ticketing_payment_does_not_overwrite_existing_human(
@@ -436,7 +465,7 @@ def test_create_open_ticketing_payment_does_not_overwrite_existing_human(
         )
 
         payments_crud.create_open_ticketing_payment(
-            db, obj=obj, popup=popup, tenant=tenant_a
+            db, obj=obj, popup=popup, tenant=tenant_a, flow_slug="checkout"
         )
 
     db.expire(existing)
@@ -445,9 +474,7 @@ def test_create_open_ticketing_payment_does_not_overwrite_existing_human(
     assert existing.last_name == "Human"
 
     attendee = db.exec(select(Attendees).where(Attendees.popup_id == popup.id)).first()
-    assert attendee is not None
-    assert attendee.name == "New Buyer"
-    assert attendee.human_id == existing.id
+    assert attendee is None
 
 
 def test_create_open_ticketing_payment_rolls_back_payment_artifacts_on_provider_failure(
@@ -479,6 +506,7 @@ def test_create_open_ticketing_payment_rolls_back_payment_artifacts_on_provider_
                 obj=obj,
                 popup=popup,
                 tenant=tenant_a,
+                flow_slug="checkout",
             )
 
     payments = list(
@@ -538,6 +566,7 @@ def test_create_open_ticketing_payment_does_not_consume_coupon_on_provider_failu
                 obj=obj,
                 popup=popup,
                 tenant=tenant_a,
+                flow_slug="checkout",
             )
 
     db.expire(coupon)
@@ -576,6 +605,7 @@ def test_create_open_ticketing_payment_applies_coupon_discount(
             obj=obj,
             popup=popup,
             tenant=tenant_a,
+            flow_slug="checkout",
         )
 
     # 2 × $100 = $200, minus 10% = $180
@@ -628,6 +658,7 @@ def test_create_open_ticketing_payment_applies_contribution(
             obj=obj,
             popup=popup,
             tenant=tenant_a,
+            flow_slug="checkout",
         )
 
         sent_amount = mock_get_client.return_value.create_payment.call_args.kwargs[
@@ -684,6 +715,7 @@ def test_create_open_ticketing_payment_applies_insurance_opt_in(
             obj=obj,
             popup=popup,
             tenant=tenant_a,
+            flow_slug="checkout",
         )
 
         sent_amount = mock_get_client.return_value.create_payment.call_args.kwargs[
@@ -736,6 +768,7 @@ def test_create_open_ticketing_payment_insurance_skipped_without_opt_in(
             obj=obj,
             popup=popup,
             tenant=tenant_a,
+            flow_slug="checkout",
         )
 
     assert payment.insurance_amount == Decimal("0")
@@ -785,6 +818,7 @@ def test_create_open_ticketing_payment_insurance_and_contribution_dont_compound(
             obj=obj,
             popup=popup,
             tenant=tenant_a,
+            flow_slug="checkout",
         )
 
         sent_amount = mock_get_client.return_value.create_payment.call_args.kwargs[
@@ -805,18 +839,27 @@ def test_create_open_ticketing_payment_100_percent_coupon_auto_approves(
     db: Session,
     tenant_a: Tenants,
 ) -> None:
-    """A 100% coupon zeroes the cart: skip SimpleFI, mark APPROVED, materialize
-    AttendeeProducts so the router can fire the confirmation email."""
+    """A fully discounted Parking purchase materializes one ownerless unit."""
     popup = _make_popup(db, tenant_a, slug_prefix="full-coupon")
-    product = _make_product(db, popup, name="GA", price="75.00")
+    product = _make_product(
+        db,
+        popup,
+        name="Parking",
+        price="75.00",
+        category="parking",
+        requires_check_in=True,
+    )
+    offer_category(db, popup, "parking")
     coupon = _make_coupon(db, popup, code="FREEPASS", discount_value=100)
+    flow = db.get(SalesFlows, default_flow_id(db, popup.id))
+    assert flow is not None
     db.commit()
 
     obj = _purchase_create(
         email="buyer@test.com",
         first_name="Matias",
         last_name="Walter",
-        products=[(product, 2)],
+        products=[(product, 1)],
         form_data={},
         coupon_code="FREEPASS",
     )
@@ -827,6 +870,7 @@ def test_create_open_ticketing_payment_100_percent_coupon_auto_approves(
             obj=obj,
             popup=popup,
             tenant=tenant_a,
+            flow_slug=flow.slug,
         )
 
     mock_get_client.assert_not_called()
@@ -841,7 +885,16 @@ def test_create_open_ticketing_payment_100_percent_coupon_auto_approves(
             select(AttendeeProducts).where(AttendeeProducts.payment_id == payment.id)
         ).all()
     )
-    assert len(attendee_products) == 2
+    assert len(attendee_products) == 1
+    unit = attendee_products[0]
+    assert unit.attendee_id is None
+    assert unit.product_id == product.id
+    assert unit.payment_product_id is not None
+    assert unit.unit_index == 0
+    assert unit.check_in_code
+    assert unit.revoked_at is None
+    assert unit.product_category_snapshot == "parking"
+    assert unit.requires_check_in_snapshot is True
 
     db.expire(coupon)
     db.refresh(coupon)
@@ -868,7 +921,7 @@ def test_create_open_ticketing_payment_rejects_invalid_coupon(
     with patch("app.services.simplefi.get_simplefi_client") as mock_get_client:
         with pytest.raises(HTTPException) as exc_info:
             payments_crud.create_open_ticketing_payment(
-                db, obj=obj, popup=popup, tenant=tenant_a
+                db, obj=obj, popup=popup, tenant=tenant_a, flow_slug="checkout"
             )
 
     assert exc_info.value.status_code == 404

@@ -1,3 +1,4 @@
+import type { PaymentRecipientRequest } from "@/client"
 import type { AttendeePassState } from "./Attendee"
 import type { ProductsPass } from "./Products"
 
@@ -8,6 +9,7 @@ export type CheckoutStep =
   | "tickets"
   | "buyer"
   | "housing"
+  | "accommodation"
   | "merch"
   | "patron"
   | "confirm"
@@ -65,9 +67,70 @@ export interface SelectedPassItem {
   product: ProductsPass
   attendeeId: string
   attendee: AttendeePassState
+  /** Stable draft identity. Absent only while restoring legacy attendee lines. */
+  recipient?: CheckoutRecipientDraft
   quantity: number
   price: number
   originalPrice?: number
+}
+
+/**
+ * Portal recipient state reuses the generated payment snapshot contract while
+ * remaining attached to the pass-selection model until payment submission.
+ */
+export type CheckoutRecipientDraft = PaymentRecipientRequest
+
+export type CheckoutRecipientPassState = AttendeePassState & {
+  recipient?: CheckoutRecipientDraft
+}
+
+interface RecipientDraftOverrides {
+  name?: string
+  email?: string | null
+  profileSnapshot?: Record<string, unknown>
+}
+
+/**
+ * Projects an attendee-shaped UI recipient into a stable cart recipient.
+ * Embedded draft identity always wins, so reloads never generate a new key.
+ */
+export function buildCheckoutRecipientDraft(
+  attendee: CheckoutRecipientPassState,
+  overrides: RecipientDraftOverrides = {},
+): CheckoutRecipientDraft {
+  const embedded = attendee.recipient
+  const humanId = embedded?.human_id ?? attendee.human_id ?? undefined
+  const isPersistedAccountlessAttendee =
+    !humanId &&
+    Boolean(
+      attendee.created_at || attendee.updated_at || attendee.application_id,
+    )
+  const existingAttendeeId =
+    embedded?.existing_attendee_id ??
+    (isPersistedAccountlessAttendee ? attendee.id : undefined)
+  const profileSnapshot = {
+    ...(attendee.additional_data ?? {}),
+    ...(attendee.category ? { category: attendee.category } : {}),
+    ...(attendee.gender ? { gender: attendee.gender } : {}),
+    ...(embedded?.profile_snapshot ?? {}),
+    ...(overrides.profileSnapshot ?? {}),
+  }
+
+  return {
+    recipient_key:
+      embedded?.recipient_key ??
+      (humanId ? `human:${humanId}` : `draft:${attendee.id}`),
+    ...(humanId ? { human_id: humanId } : {}),
+    ...(existingAttendeeId ? { existing_attendee_id: existingAttendeeId } : {}),
+    name: overrides.name ?? embedded?.name ?? attendee.name,
+    ...((overrides.email ?? embedded?.email ?? attendee.email) !== undefined
+      ? { email: overrides.email ?? embedded?.email ?? attendee.email }
+      : {}),
+    ...((embedded?.category_id ?? attendee.category_id) !== undefined
+      ? { category_id: embedded?.category_id ?? attendee.category_id }
+      : {}),
+    profile_snapshot: profileSnapshot,
+  }
 }
 
 export interface SelectedHousingItem {

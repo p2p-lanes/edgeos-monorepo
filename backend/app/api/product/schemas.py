@@ -143,7 +143,7 @@ class ProductCreate(BaseModel):
     requires_check_in: bool = False
     discountable: bool = True
 
-    model_config = ConfigDict(str_strip_whitespace=True)
+    model_config = ConfigDict(str_strip_whitespace=True, extra="forbid")
 
     @model_validator(mode="after")
     def validate_patreon_price(self) -> "ProductCreate":
@@ -224,6 +224,8 @@ class ProductUpdate(BaseModel):
     requires_check_in: bool | None = None
     discountable: bool | None = None
 
+    model_config = ConfigDict(str_strip_whitespace=True, extra="forbid")
+
     @model_validator(mode="after")
     def validate_patreon_price(self) -> "ProductUpdate":
         """Reject updates that set category=patreon with a nonzero price."""
@@ -290,7 +292,7 @@ class ProductBatchItem(BaseModel):
     requires_check_in: bool = False
     discountable: bool = True
 
-    model_config = ConfigDict(str_strip_whitespace=True)
+    model_config = ConfigDict(str_strip_whitespace=True, extra="forbid")
 
     @model_validator(mode="after")
     def validate_ticket_fields(self) -> "ProductBatchItem":

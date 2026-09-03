@@ -30,6 +30,12 @@ from app.api.shared.enums import HumanRating, UserRole
 from app.api.tenant.models import Tenants
 from app.api.user.models import Users
 from app.core.security import create_access_token
+from tests._flow_helpers import (
+    application_flow_id,
+    default_flow_id,
+    group_flow_id,
+    provision_default_flow,
+)
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -49,6 +55,7 @@ def _make_popup(db: Session, tenant: Tenants, *, slug_suffix: str) -> Popups:
         db.add(popup)
         db.commit()
         db.refresh(popup)
+        provision_default_flow(db, popup)
     return popup
 
 
@@ -100,6 +107,7 @@ def _set_strategy(
 
     strategy = ApprovalStrategies(
         popup_id=popup.id,
+        sales_flow_id=default_flow_id(db, popup.id),
         tenant_id=tenant.id,
         strategy_type=strategy_type,
         required_approvals=required_approvals,
@@ -285,6 +293,7 @@ class TestApprovalTransitions:
         patch_resp = client.patch(
             f"/api/v1/applications/my/{popup.id}",
             headers={"Authorization": f"Bearer {human_token}"},
+            params={"sales_flow_id": create_resp.json()["sales_flow_id"]},
             json={"status": "in review"},
         )
         assert patch_resp.status_code == 200, patch_resp.text
@@ -326,6 +335,7 @@ class TestApprovalTransitions:
         patch_resp = client.patch(
             f"/api/v1/applications/my/{popup.id}",
             headers={"Authorization": f"Bearer {human_token}"},
+            params={"sales_flow_id": create_resp.json()["sales_flow_id"]},
             json={"status": "in review"},
         )
         assert patch_resp.status_code == 200, patch_resp.text
@@ -355,6 +365,7 @@ class TestApprovalTransitions:
         human = _make_human(db, tenant_a, email=email)
 
         application = Applications(
+            sales_flow_id=application_flow_id(db, popup.id),
             tenant_id=tenant_a.id,
             popup_id=popup.id,
             human_id=human.id,
@@ -408,6 +419,7 @@ class TestApprovalTransitions:
         human = _make_human(db, tenant_a, email=email)
 
         application = Applications(
+            sales_flow_id=application_flow_id(db, popup.id),
             tenant_id=tenant_a.id,
             popup_id=popup.id,
             human_id=human.id,
@@ -468,6 +480,7 @@ class TestApprovalTransitions:
         )
 
         application = Applications(
+            sales_flow_id=application_flow_id(db, popup.id),
             tenant_id=tenant_a.id,
             popup_id=popup.id,
             human_id=human.id,
@@ -547,6 +560,7 @@ class TestApprovalTransitions:
         )
 
         application = Applications(
+            sales_flow_id=application_flow_id(db, popup.id),
             tenant_id=tenant_a.id,
             popup_id=popup.id,
             human_id=human.id,
@@ -604,6 +618,7 @@ class TestApprovalTransitions:
         leader_token = create_access_token(subject=leader.id, token_type="human")
 
         group = Groups(
+            sales_flow_id=group_flow_id(db, popup.id),
             tenant_id=tenant_a.id,
             popup_id=popup.id,
             name="Test Group T10",
@@ -625,6 +640,7 @@ class TestApprovalTransitions:
         member_human = _make_human(db, tenant_a, email=member_email)
 
         existing_app = Applications(
+            sales_flow_id=application_flow_id(db, popup.id),
             tenant_id=tenant_a.id,
             popup_id=popup.id,
             human_id=member_human.id,

@@ -207,9 +207,24 @@ def _validate_accommodation_booking_template_config(
     return {**template_config, **validated.model_dump(mode="json")}
 
 
+def validate_template_config(
+    template: str | None, template_config: dict[str, Any] | None
+) -> dict[str, Any] | None:
+    template_config = _validate_sections_in_template_config(template, template_config)
+    template_config = _validate_meal_plan_select_template_config(
+        template, template_config
+    )
+    return _validate_accommodation_booking_template_config(template, template_config)
+
+
 class TicketingStepBase(SQLModel):
     tenant_id: uuid.UUID = Field(foreign_key="tenants.id", index=True)
     popup_id: uuid.UUID = Field(foreign_key="popups.id", index=True)
+    # sdd/sales-flows-rediseno slice 2: a step belongs to exactly one flow.
+    # There is no popup-shared tier and nothing is inherited.
+    sales_flow_id: uuid.UUID = Field(
+        foreign_key="sales_flows.id", nullable=False, index=True
+    )
     step_type: str
     title: str
     description: str | None = Field(default=None, nullable=True)
@@ -232,6 +247,7 @@ class TicketingStepPublic(BaseModel):
     id: uuid.UUID
     tenant_id: uuid.UUID
     popup_id: uuid.UUID
+    sales_flow_id: uuid.UUID
     step_type: str
     title: str
     description: str | None = None
@@ -252,6 +268,9 @@ class TicketingStepPublic(BaseModel):
 
 class TicketingStepCreate(BaseModel):
     popup_id: uuid.UUID
+    # Required: every step is created into a specific flow. The caller picks
+    # the flow it is looking at; there is no shared tier to omit into.
+    sales_flow_id: uuid.UUID
     step_type: str
     title: str
     description: str | None = None
@@ -268,13 +287,7 @@ class TicketingStepCreate(BaseModel):
 
     @model_validator(mode="after")
     def _validate_template_config(self) -> "TicketingStepCreate":
-        self.template_config = _validate_sections_in_template_config(
-            self.template, self.template_config
-        )
-        self.template_config = _validate_meal_plan_select_template_config(
-            self.template, self.template_config
-        )
-        self.template_config = _validate_accommodation_booking_template_config(
+        self.template_config = validate_template_config(
             self.template, self.template_config
         )
         return self
@@ -308,13 +321,17 @@ class TicketingStepUpdate(BaseModel):
 
         # Note: when template is None (PATCH without template field), validation is skipped.
         # To trigger validation, send both template and template_config in the same request.
-        self.template_config = _validate_sections_in_template_config(
-            self.template, self.template_config
-        )
-        self.template_config = _validate_meal_plan_select_template_config(
-            self.template, self.template_config
-        )
-        self.template_config = _validate_accommodation_booking_template_config(
+        self.template_config = validate_template_config(
             self.template, self.template_config
         )
         return self
+
+
+class CopyStepsToFlowRequest(BaseModel):
+    """Which flow to copy the checkout steps from."""
+
+    source_flow_id: uuid.UUID
+
+
+class CopyStepsToFlowResponse(BaseModel):
+    steps: int

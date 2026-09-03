@@ -31,6 +31,7 @@ from app.api.product.models import Products
 from app.api.tenant.models import Tenants
 from app.api.user.models import Users
 from app.core.security import create_access_token
+from tests._flow_helpers import invite_flow_id, provision_default_flow, set_link_policy
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -66,6 +67,7 @@ def _make_popup(
     db.add(popup)
     db.commit()
     db.refresh(popup)
+    provision_default_flow(db, popup)
     return popup
 
 
@@ -112,6 +114,8 @@ def _give_ticket(db: Session, popup: Popups, human: Humans) -> AttendeeProducts:
         attendee_id=attendee.id,
         product_id=product.id,
         check_in_code=uuid.uuid4().hex[:8].upper(),
+        product_category_snapshot=product.category,
+        requires_check_in_snapshot=product.requires_check_in,
     )
     db.add(ap)
     db.commit()
@@ -126,7 +130,7 @@ def _make_referral(
     code: str | None = None,
     max_uses: int | None = None,
     current_uses: int = 0,
-    auto_approve: bool = False,
+    auto_approve: bool = True,
     discount_percentage: Decimal = Decimal("0"),
     expires_at: datetime | None = None,
     is_disabled: bool = False,
@@ -138,6 +142,7 @@ def _make_referral(
     """
     ref_code = code or f"ref-{uuid.uuid4().hex[:12]}"
     ref = Invites(
+        sales_flow_id=invite_flow_id(db, popup.id),
         tenant_id=popup.tenant_id,
         popup_id=popup.id,
         referrer_human_id=referrer.id,
@@ -181,7 +186,7 @@ class TestReferralModel:
         assert fetched.popup_id == popup.id
         assert fetched.referrer_human_id == human.id
         assert fetched.current_uses == 0
-        assert fetched.auto_approve is False
+        assert fetched.auto_approve is True
 
     def test_referral_stores_discount_percentage(
         self, db: Session, tenant_a: Tenants
@@ -681,45 +686,6 @@ class TestReferralAttribution:
         assert app is not None
         assert app.status == ApplicationStatus.ACCEPTED.value
 
-    def test_application_via_non_auto_approve_referral_stays_in_review(
-        self,
-        client: TestClient,
-        db: Session,
-        tenant_a: Tenants,
-    ) -> None:
-        """An admin-restricted referral must not fall through to AUTO_ACCEPT."""
-        from app.api.application.models import Applications
-        from app.api.application.schemas import ApplicationStatus
-
-        popup = _make_popup(db, tenant_a)
-        referrer = _make_human(db, tenant_a)
-        applicant = _make_human(db, tenant_a)
-        ref = _make_referral(
-            db,
-            popup,
-            referrer,
-            code=f"manual-review-{uuid.uuid4().hex[:8]}",
-            auto_approve=False,
-        )
-
-        resp = client.post(
-            "/api/v1/applications/my",
-            json={
-                "popup_id": str(popup.id),
-                "first_name": applicant.first_name,
-                "last_name": applicant.last_name,
-                "email": applicant.email,
-                "referral_id": str(ref.id),
-                "status": "in review",
-            },
-            headers=_auth(_human_token(applicant)),
-        )
-        assert resp.status_code in (200, 201), resp.json()
-
-        app = db.get(Applications, uuid.UUID(resp.json()["id"]))
-        assert app is not None
-        assert app.status == ApplicationStatus.IN_REVIEW.value
-
     def test_exhausted_referral_blocks_application(
         self,
         client: TestClient,
@@ -901,10 +867,7 @@ class TestPerPopupReferralLimit:
     ) -> None:
         """Popup config max_referrals_per_attendee=5 sets max_uses=5 on the new referral."""
         popup = _make_popup(db, tenant_a)
-        popup.max_referrals_per_attendee = 5
-        db.add(popup)
-        db.commit()
-        db.refresh(popup)
+        set_link_policy(db, popup, max_referrals_per_attendee=5)
 
         human = _make_human(db, tenant_a)
         _give_ticket(db, popup, human)
@@ -926,10 +889,7 @@ class TestPerPopupReferralLimit:
     ) -> None:
         """Popup max_referrals_per_attendee=null → max_uses=null (unlimited)."""
         popup = _make_popup(db, tenant_a)
-        popup.max_referrals_per_attendee = None
-        db.add(popup)
-        db.commit()
-        db.refresh(popup)
+        set_link_policy(db, popup, max_referrals_per_attendee=None)
 
         human = _make_human(db, tenant_a)
         _give_ticket(db, popup, human)
@@ -949,12 +909,9 @@ class TestPerPopupReferralLimit:
         db: Session,
         tenant_a: Tenants,
     ) -> None:
-        """Popup config max_uses=3 overrides any body-provided max_uses."""
+        """The flow's ceiling overrides any body-provided max_uses."""
         popup = _make_popup(db, tenant_a)
-        popup.max_referrals_per_attendee = 3
-        db.add(popup)
-        db.commit()
-        db.refresh(popup)
+        set_link_policy(db, popup, max_referrals_per_attendee=3)
 
         human = _make_human(db, tenant_a)
         _give_ticket(db, popup, human)

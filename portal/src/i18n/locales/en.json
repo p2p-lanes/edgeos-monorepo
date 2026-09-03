@@ -72,7 +72,95 @@
     "no_active_popups": "No Active Popups",
     "no_active_popups_description": "There are no active popups available at the moment. Please check back later.",
     "no_profile": "No profile data available.",
-    "no_profile_contact": "Please contact support if you believe this is an error."
+    "no_profile_contact": "Please contact support if you believe this is an error.",
+    "direct_sales_title": "Purchase options",
+    "direct_sales_description": "Choose an available option for this event.",
+    "door_generic": "Your application",
+    "door_status": {
+      "accepted": "Accepted",
+      "in_review": "In review",
+      "draft": "Draft",
+      "rejected": "Not accepted",
+      "none": "Open"
+    },
+    "door_action": {
+      "passes": "View my passes",
+      "application": "View application",
+      "apply": "Apply"
+    }
+  },
+  "shop": {
+    "title": "Shop",
+    "description": "Choose an available option.",
+    "catalog": "Available options",
+    "application": "Application",
+    "direct": "Direct purchase",
+    "upsale": "Available to you",
+    "open": "View option",
+    "source": "Source: {{source}}",
+    "eligibility": {
+      "application": "Available to approved applicants",
+      "direct": "Available to all attendees",
+      "upsale": "Available after an eligible purchase"
+    },
+    "price_from": "From {{price}}",
+    "price_unavailable": "Price unavailable",
+    "empty_title": "Nothing available right now",
+    "empty_description": "Check back later for new options.",
+    "approval_required_title": "Approval required",
+    "approval_required_description": "Your application must be approved before you can purchase this option.",
+    "approval_required_cta": "View application",
+    "estimated_total": "Estimated total",
+    "definitive_total": "Total"
+  },
+  "orders": {
+    "title": "Orders",
+    "description": "Your payment history for this event.",
+    "empty_title": "No orders yet",
+    "empty_description": "Your payment history will appear here.",
+    "total": "Total",
+    "lines": "Order items",
+    "line_quantity": "Quantity: {{count}}",
+    "legacy_purchase": "Legacy purchase",
+    "invoice": "Invoice",
+    "download_invoice_error": "Failed to download invoice. Please try again.",
+    "status": {
+      "approved": "Approved",
+      "pending": "Pending",
+      "rejected": "Rejected",
+      "expired": "Expired",
+      "cancelled": "Cancelled",
+      "unknown": "Unknown payment status"
+    }
+  },
+  "people": {
+    "title": "People",
+    "description": "People you can manage for this event.",
+    "primary": "Primary attendee",
+    "dependent": "Dependent",
+    "can_manage": "Managed by you",
+    "empty_title": "No people yet",
+    "empty_description": "People you manage will appear here."
+  },
+  "tickets_access": {
+    "title": "Tickets & Access",
+    "description": "Your active event tickets and check-in items.",
+    "empty_title": "No tickets or check-in items yet",
+    "empty_description": "Active event tickets and check-in items will appear here.",
+    "purchased_by_you": "Purchased by you",
+    "show_code": "Show check-in code for {{ticket}}",
+    "checked_in": "Checked in",
+    "active": "Ready for check-in",
+    "access_active": "Access active",
+    "code_title": "Check-in code",
+    "code_description": "Use this code when checking in.",
+    "duration": {
+      "day": "Daily event access",
+      "week": "Weekly event access",
+      "month": "Monthly event access",
+      "full": "Full event access"
+    },
+    "qr_alt": "QR code"
   },
   "auth": {
     "sign_up_or_log_in": "Sign Up or Log In",
@@ -129,6 +217,8 @@
   "application": {
     "unavailable": "Application Unavailable",
     "unavailable_description": "The application form for this event is not yet configured.",
+    "flow_picker_title": "Choose how you'd like to apply",
+    "flow_picker_description": "This event has more than one application track. Select one to continue.",
     "step_of": "Step {{current}} of {{total}}",
     "existing_found": "Existing Application Found",
     "existing_description": "We've found a previous application associated with your email.",
@@ -244,7 +334,19 @@
     "cart": {
       "close_aria": "Close cart",
       "empty_title": "Your cart is empty",
-      "empty_description": "Please go back and select some passes to continue."
+      "empty_description": "Please go back and select some passes to continue.",
+      "unknown_attendee": "Unknown attendee",
+      "passes": "Passes",
+      "housing": "Housing",
+      "full_stay": "Full stay",
+      "merchandise": "Merchandise",
+      "patron_contribution": "Patron Contribution",
+      "community_support": "Community Support",
+      "meal_plans": "Meal Plans",
+      "pass_protection": "Pass Protection",
+      "pass_protection_description": "Coverage for all passes",
+      "promo_code": "Promo Code",
+      "promo_code_expired": "Your promo code is no longer valid"
     },
     "actions": {
       "pay": "Pay",
@@ -278,6 +380,46 @@
         "next_image_aria": "Next image"
       }
     },
+    "accommodation": {
+      "default_notice": "Accommodation is paid in full at checkout and is non-refundable.",
+      "in_cart": "In cart",
+      "sleeps": "Sleeps {{count}}",
+      "nights_one": "{{count}} night",
+      "nights_other": "{{count}} nights",
+      "monthly_rate": "monthly rate",
+      "per_night": "night",
+      "includes_tax": "Includes {{amount}} lodging tax",
+      "remove": "Remove",
+      "select": "Select",
+      "only_left_one": "Only {{count}} left",
+      "only_left_other": "Only {{count}} left",
+      "guests_label": "Guests",
+      "guests_one": "{{count}} guest",
+      "guests_other": "{{count}} guests",
+      "guest_name_placeholder": "Guest {{number}} full name",
+      "no_rooms": "No accommodation is available for this checkout.",
+      "check_in": "Check-in",
+      "check_out": "Check-out",
+      "who_is_staying": "Who is staying",
+      "cart_title": "Accommodation",
+      "bed_count": "{{count}} {{type}}",
+      "bed_types": {
+        "king": "King bed",
+        "queen": "Queen bed",
+        "double": "Double bed",
+        "single": "Single bed",
+        "bunk": "Bunk bed",
+        "sofa": "Sofa bed"
+      },
+      "unavailable": {
+        "sold_out": "Fully booked for these dates",
+        "min_stay_not_met": "Needs a longer stay",
+        "outside_bookable_window": "Not available on these dates",
+        "over_capacity": "Too small for your party",
+        "inactive": "Not available",
+        "default": "Not available for these dates"
+      }
+    },
     "contribution": {
       "fallbackLabel": "Event contribution",
       "fallbackDescription": "Helps fund the event"
@@ -290,6 +432,7 @@
     "payment_error": "Something went wrong with your payment. Please try again.",
     "popup_ended_error": "This popup has ended. Purchases are no longer available.",
     "no_products": "No products available for this step.",
+    "not_eligible_for_flow": "This checkout isn't available for your account.",
     "no_images": "No images available for this step.",
     "no_video": "No video available for this step.",
     "no_passes": "No passes available.",
@@ -301,7 +444,10 @@
     "previous_payment_completed": "Your previous payment was completed.",
     "pending_payment_wait": "You have a pending payment. Please wait a few minutes.",
     "payment_cancel_failed": "We could not process your payment. Please try again.",
+    "flow_restriction_violated": "You are not eligible to purchase from this flow.",
+    "product_not_in_flow": "This product is not available through this flow.",
     "amanita": {
+      "hero_headline": "4 days of music, art, yoga and workshops",
       "buyer_kicker": "Your details",
       "buyer_title": "You're one step away!",
       "buyer_intro": "Just a few details to issue your tickets — then all that's left is to confirm.",
@@ -357,6 +503,9 @@
     "loading": "Loading checkout...",
     "unavailable_title": "Checkout unavailable",
     "unavailable_description": "This link is invalid or this event is no longer available.",
+    "sign_in_required_title": "Sign in required",
+    "sign_in_required_description": "This checkout is for existing attendees. Sign in to your portal account to continue.",
+    "sign_in_required_cta": "Sign in",
     "tickets_title": "Tickets",
     "tickets_subtitle": "Choose how many tickets you want to buy.",
     "coupon_title": "Coupon",
@@ -379,12 +528,20 @@
     "thank_you_total": "Total",
     "previous_payment_completed": "Your previous payment was completed.",
     "payment_cancel_failed": "We could not process your payment. Please try again.",
-    "pending_payment_wait": "You have a pending payment. Please wait a few minutes."
+    "pending_payment_wait": "You have a pending payment. Please wait a few minutes.",
+    "flow_restriction_violated": "You are not eligible to purchase from this flow.",
+    "product_not_in_flow": "This product is not available through this flow."
   },
   "passes": {
     "your_passes": "Your Passes",
+    "companion_attending": "You are attending as a companion.",
+    "companion_attending_city": "You are attending {{city}} as a companion.",
+    "companion_no_passes": "No passes assigned yet. Check back later.",
+    "companion_waiting_acceptance": "Passes will be available once the application is accepted.",
     "buy_passes": "Buy Passes",
     "your_passes_description": "View and manage your order here.",
+    "upsale_title": "More for you",
+    "upsale_description": "Exclusive add-ons available for your purchase.",
     "loading_passes": "Loading passes information...",
     "add_spouse": "Add spouse",
     "add_children": "Add children",
@@ -452,7 +609,7 @@
     }
   },
   "attendees": {
-    "title": "Attendee Directory",
+    "title": "Directory",
     "description": "Reach out to your friends to plan dates, find shared housing, or organize activities together. *This directory includes only the information of those who have voluntarily opted in to share their details.",
     "search_placeholder": "Search by name, email, organization...",
     "export_csv": "Export attendees as CSV",
@@ -505,8 +662,18 @@
     "coming_soon": "(Coming Soon)",
     "soon_badge": "Soon",
     "application": "Application",
+    "navigation": "Portal navigation",
+    "mobile_navigation": "Portal navigation menu",
+    "general": "General",
+    "participation": "Participation",
+    "commerce": "Commerce",
+    "community": "Community",
+    "shop": "Shop",
+    "orders": "Orders",
+    "people": "People",
+    "tickets_access": "Tickets & Access",
     "passes": "Passes",
-    "attendee_directory": "Attendee Directory",
+    "attendee_directory": "Directory",
     "companion": "Companion",
     "status": "Status",
     "groups": "Groups",
@@ -574,7 +741,7 @@
     "application": "Application",
     "passes": "Passes",
     "buy": "Buy",
-    "attendees": "Attendee Directory",
+    "attendees": "Directory",
     "groups": "Groups",
     "profile": "Profile"
   },
@@ -933,7 +1100,7 @@
       "visibility_private": "Private (invitees only)",
       "visibility_unlisted": "Unlisted (hidden, shareable link)",
       "host_label": "Displayed host (optional)",
-      "host_placeholder_default": "{{name}} (default)",
+      "host_placeholder_popup": "{{name}}",
       "host_placeholder_optional": "Optional",
       "host_use_popup": "Use {{name}}",
       "host_use_me": "Use my name",

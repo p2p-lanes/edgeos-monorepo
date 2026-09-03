@@ -20,6 +20,9 @@ class InviteCreate(BaseModel):
     """
 
     popup_id: uuid.UUID
+    # Which flow the recipient lands in. Omitted means the popup's default
+    # flow, which is what every invite did implicitly before it could say.
+    sales_flow_id: uuid.UUID | None = None
     token: str | None = None
     recipient_email: str | None = None
     discount_percentage: Decimal = Decimal("0")
@@ -128,6 +131,7 @@ class InvitePublic(BaseModel):
 
     id: uuid.UUID
     popup_id: uuid.UUID
+    sales_flow_id: uuid.UUID
     token: str
     recipient_email: str | None = None
     discount_percentage: Decimal

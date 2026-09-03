@@ -12,6 +12,19 @@ import { getProductAvailability } from "@/lib/product-availability"
 import type { SelectedDynamicItem } from "@/types/checkout"
 import type { ProductsPass } from "@/types/Products"
 import { dispatchPaymentError } from "./errorDispatch"
+import type { CartSelectionState } from "./useCartPersistence"
+import {
+  buildItemsSnapshot as buildRealItemsSnapshot,
+  hasCartItems as hasRealCartItems,
+  hydrateFromSnapshot,
+} from "./useOpenCartPersistence"
+
+vi.mock("@/client", () => ({
+  CheckoutService: {
+    restoreFlowCart: vi.fn(),
+    upsertFlowCart: vi.fn(),
+  },
+}))
 
 // ---------------------------------------------------------------------------
 // Test helpers — inlined types to match the module's internal shapes
@@ -162,6 +175,68 @@ describe("hasCartItems — dynamicItems gap (ADR-R7)", () => {
         dynamicItems: {},
       }),
     ).toBe(true)
+  })
+})
+
+describe("accommodation-only cart persistence", () => {
+  const state = {
+    selectedPasses: [],
+    housing: null,
+    accommodations: [
+      {
+        accommodationId: "room-1",
+        productId: "shadow-room-1",
+        name: "Double room",
+        propertyId: "property-1",
+        propertyName: "Hotel",
+        checkIn: "2026-09-01",
+        checkOut: "2026-09-03",
+        nights: 2,
+        guestCount: 1,
+        guests: ["Taylor Buyer"],
+        subtotal: 100,
+        tax: 10,
+        totalPrice: 110,
+      },
+    ],
+    merch: [],
+    patron: null,
+    selectedMealPlans: [],
+    dynamicItems: {},
+    promoCode: "",
+    promoCodeValid: false,
+    insurance: false,
+    currentStep: "housing",
+  } satisfies CartSelectionState
+
+  it("counts and serializes a cart whose only item is a stay", () => {
+    expect(hasRealCartItems(state)).toBe(true)
+    expect(buildRealItemsSnapshot(state).accommodations).toEqual([
+      {
+        accommodation_id: "room-1",
+        check_in: "2026-09-01",
+        check_out: "2026-09-03",
+        guest_count: 1,
+        guests: ["Taylor Buyer"],
+      },
+    ])
+  })
+
+  it("does not restore a saved stay because the cart never held the room", () => {
+    const setAccommodations = vi.fn()
+    const snapshot = buildRealItemsSnapshot(state)
+
+    hydrateFromSnapshot(snapshot, [], true, {
+      setHousing: vi.fn(),
+      setAccommodations,
+      setMerch: vi.fn(),
+      setPatron: vi.fn(),
+      setMealPlans: vi.fn(),
+      setInsurance: vi.fn(),
+      setDynamicItems: vi.fn(),
+    })
+
+    expect(setAccommodations).not.toHaveBeenCalled()
   })
 })
 

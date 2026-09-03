@@ -18,7 +18,9 @@ function ThankYouContent() {
   const params = useParams<{ popupSlug: string }>()
   const searchParams = useSearchParams()
   const { tenant } = useTenant()
-  const { data: runtime } = useCheckoutRuntime(params.popupSlug)
+  const { data: runtime } = useCheckoutRuntime(params.popupSlug, {
+    flowSlug: "checkout",
+  })
   const popup = runtime?.popup as
     | {
         favicon_url?: string | null

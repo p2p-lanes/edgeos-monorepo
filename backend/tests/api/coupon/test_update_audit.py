@@ -7,6 +7,7 @@ from app.api.audit_log.constants import AuditAction
 from app.api.audit_log.models import AuditLog
 from app.api.coupon.models import Coupons
 from app.api.popup.models import Popups
+from tests._flow_helpers import coupon_flow_id
 
 
 def test_coupon_update_records_ai_audit_metadata(
@@ -19,6 +20,7 @@ def test_coupon_update_records_ai_audit_metadata(
         id=uuid.uuid4(),
         tenant_id=popup_tenant_a.tenant_id,
         popup_id=popup_tenant_a.id,
+        sales_flow_id=coupon_flow_id(db, popup_tenant_a.id),
         code=f"AIUPDATE{uuid.uuid4().hex[:8].upper()}",
         discount_value=50,
         max_uses=20,

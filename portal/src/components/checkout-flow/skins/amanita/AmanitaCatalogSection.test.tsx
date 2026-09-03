@@ -208,4 +208,29 @@ describe("AmanitaCatalogSection", () => {
     )
     expect(screen.queryByText("Descripción del producto Full Pass")).toBeNull()
   })
+
+  // The Home step that used to carry the festival hero is gone from the flow,
+  // so the landing catalog draws it instead — but only when it IS the landing
+  // step, or a mid-flow Alojamiento/Extras step would re-introduce the event.
+  it("draws the brand hero when it is the flow's first section", () => {
+    const { container } = render(
+      <AmanitaCatalogSection stepConfig={stepConfig} isFirstSection />,
+    )
+
+    expect(screen.getByText("checkout.amanita.hero_headline")).toBeTruthy()
+    const srcs = [...container.querySelectorAll("img")].map((img) =>
+      img.getAttribute("src"),
+    )
+    expect(srcs.some((src) => src?.includes("logo-fecha"))).toBe(true)
+    expect(srcs.some((src) => src?.includes("tercera-edicion"))).toBe(true)
+  })
+
+  it("omits the brand hero on any later section", () => {
+    const { container } = render(
+      <AmanitaCatalogSection stepConfig={stepConfig} />,
+    )
+
+    expect(screen.queryByText("checkout.amanita.hero_headline")).toBeNull()
+    expect(container.querySelector('img[src*="logo-fecha"]')).toBeNull()
+  })
 })

@@ -11,7 +11,7 @@
 /** ISO decimal string, e.g. "120.00". Never a JS number (float drift). */
 export type Money = string
 
-// --- GET /checkout/{slug}/runtime -----------------------------------------
+// --- GET /checkout/{slug}/{flowSlug}/runtime -------------------------------
 
 /** A product offered in the checkout runtime. */
 export interface CheckoutRuntimeProduct {
@@ -79,7 +79,7 @@ export interface CheckoutRuntimeResponse {
   form_schema?: Record<string, unknown> | null
 }
 
-// --- POST /checkout/{slug}/preview ----------------------------------------
+// --- POST /checkout/{slug}/{flowSlug}/preview ------------------------------
 
 /** One product + quantity line. Shared by preview and purchase. */
 export interface ProductLine {
@@ -127,7 +127,7 @@ export interface CheckoutPreviewResponse {
   currency: string
 }
 
-// --- POST /checkout/{slug}/purchase ---------------------------------------
+// --- POST /checkout/{slug}/{flowSlug}/purchase -----------------------------
 
 export interface BuyerInfo {
   email: string
@@ -179,7 +179,7 @@ export interface CouponValidatePublicResponse {
   valid: boolean
 }
 
-// --- PUT / GET /checkout/{slug}/cart --------------------------------------
+// --- PUT / GET /checkout/{slug}/{flowSlug}/cart ----------------------------
 // The cart JSONB persisted by the anonymous cart endpoints. Mirrors
 // `backend/app/api/cart/schemas.py` (CartState). Note the backend model drops
 // unknown fields, so only these are round-tripped server-side.

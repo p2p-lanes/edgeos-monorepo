@@ -21,6 +21,7 @@ import {
 import { DangerZone } from "@/components/Common/DangerZone"
 import { FieldError } from "@/components/Common/FieldError"
 import { WorkspaceAlert } from "@/components/Common/WorkspaceAlert"
+import { FlowPicker } from "@/components/forms/FlowPicker"
 import { TranslationManager } from "@/components/translations/TranslationManager"
 import { Button } from "@/components/ui/button"
 import {
@@ -128,6 +129,7 @@ export function GroupForm({
         defaultValues?.auto_approve_applications ?? false,
       express_checkout: defaultValues?.express_checkout ?? false,
       enable_private_events: defaultValues?.enable_private_events ?? false,
+      sales_flow_id: defaultValues?.sales_flow_id ?? "",
     },
     onSubmit: ({ value }) => {
       if (readOnly) return
@@ -155,6 +157,7 @@ export function GroupForm({
         }
         createMutation.mutate({
           popup_id: selectedPopupId,
+          sales_flow_id: value.sales_flow_id || undefined,
           name: value.name,
           description: value.description || undefined,
           discount_percentage: Number(value.discount_percentage) || 0,
@@ -251,6 +254,34 @@ export function GroupForm({
         <Separator />
 
         {/* Settings */}
+        {/*
+          Which flow the members apply through. Joining produces an
+          application, and an application belongs to a flow — before this a
+          group made for a partner organisation sent everyone through the
+          general one. Only application flows: a group is only ever reached
+          through an application.
+
+          Locked after creation, like an invite: the flow decides the form
+          the members fill in and the emails they get, and moving a group
+          that already has people would change both under them.
+        */}
+        {!isEdit && selectedPopupId && (
+          <form.Field name="sales_flow_id">
+            {(field) => (
+              <InlineSection title="Sales flow">
+                <FlowPicker
+                  popupId={selectedPopupId}
+                  value={field.state.value}
+                  onChange={(flowId) => field.handleChange(flowId)}
+                  disabled={readOnly}
+                  restrictTo="application"
+                  hint="The recipient fills in this flow's form and gets its emails. It cannot be changed later."
+                />
+              </InlineSection>
+            )}
+          </form.Field>
+        )}
+
         <InlineSection title="Settings">
           <form.Field name="discount_percentage">
             {(field) => (

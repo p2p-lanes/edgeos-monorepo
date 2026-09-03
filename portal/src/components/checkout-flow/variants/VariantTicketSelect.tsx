@@ -12,6 +12,8 @@ import QuantitySelector, {
 import type { TemplateSection } from "@/hooks/checkout/ticketSections"
 import {
   buildSectionGroups,
+  getStepAttendeeCategoryIds,
+  hasRenderableSectionProducts,
   isSectionVisibleForApp,
   parseSections,
 } from "@/hooks/checkout/ticketSections"
@@ -133,22 +135,6 @@ function countSelected(attendee: AttendeePassState): number {
 }
 
 // ---------------------------------------------------------------------------
-// Empty-attendee suppression helper
-// ---------------------------------------------------------------------------
-
-/** True when an attendee has at least one renderable product:
- *  either purchased (must show Owned row in editing mode), or
- *  present in at least one section group (configurable product). */
-function attendeeHasRenderableContent(
-  attendee: AttendeePassState,
-  sections: TemplateSection[],
-): boolean {
-  // Always show attendees who have purchased products.
-  if (attendee.products.some((p) => p.purchased)) return true
-  return buildSectionGroups(attendee, sections).length > 0
-}
-
-// ---------------------------------------------------------------------------
 // Main component
 // ---------------------------------------------------------------------------
 
@@ -181,6 +167,7 @@ export default function VariantTicketSelect({
   const sections = parseSections(templateConfig).filter((s) =>
     isSectionVisibleForApp(s, customFields),
   )
+  const allowedCategoryIds = getStepAttendeeCategoryIds(sections)
 
   // Build category_id -> sort_order map for attendee ordering.
   const { getCity } = useCityProvider()
@@ -209,7 +196,7 @@ export default function VariantTicketSelect({
   const visibleAttendees = sortedAttendees(
     attendeePasses,
     categorySortOrderById,
-  ).filter((a) => attendeeHasRenderableContent(a, sections))
+  ).filter((attendee) => hasRenderableSectionProducts(attendee, sections))
 
   // Route toggle actions through the contract. The contract resolves
   // exclusivity scope, attendee-visible product ids, and strategies
@@ -240,7 +227,10 @@ export default function VariantTicketSelect({
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center gap-3 text-sm">
-        <AddAttendeeButtons onAttendeeAdded={handleAttendeeAdded} />
+        <AddAttendeeButtons
+          allowedCategoryIds={allowedCategoryIds}
+          onAttendeeAdded={handleAttendeeAdded}
+        />
       </div>
       {passesVariant === "stacked" && <StackedLayout {...sharedProps} />}
       {passesVariant === "tabs" && <TabsLayout {...sharedProps} />}

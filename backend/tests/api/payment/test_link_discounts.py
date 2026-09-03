@@ -26,6 +26,11 @@ from app.api.product.models import Products
 from app.api.shared.enums import SaleType
 from app.api.tenant.models import Tenants
 from app.api.user.models import Users
+from tests._flow_helpers import (
+    application_flow_id,
+    group_flow_id,
+    invite_flow_id,
+)
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -71,6 +76,7 @@ def _make_invite(
     discount_percentage: Decimal,
 ) -> Invites:
     invite = Invites(
+        sales_flow_id=invite_flow_id(db, popup.id),
         tenant_id=tenant.id,
         popup_id=popup.id,
         token=f"tok-{uuid.uuid4().hex[:10]}",
@@ -93,12 +99,14 @@ def _make_referral(
 ) -> Invites:
     """A referral is an Invite carrying a referrer_human_id."""
     referral = Invites(
+        sales_flow_id=invite_flow_id(db, popup.id),
         tenant_id=tenant.id,
         popup_id=popup.id,
         referrer_human_id=referrer.id,
         token=f"ref{uuid.uuid4().hex[:8]}",
         discount_percentage=discount_percentage,
         express_checkout=True,
+        auto_approve=True,
         is_disabled=is_disabled,
     )
     db.add(referral)
@@ -115,6 +123,7 @@ def _make_group(
 ) -> Groups:
     suffix = uuid.uuid4().hex[:6]
     group = Groups(
+        sales_flow_id=group_flow_id(db, popup.id),
         tenant_id=tenant.id,
         popup_id=popup.id,
         name=f"Disc Group {suffix}",
@@ -137,6 +146,7 @@ def _make_application(
     group_id: uuid.UUID | None = None,
 ) -> Applications:
     application = Applications(
+        sales_flow_id=application_flow_id(db, popup.id),
         tenant_id=tenant.id,
         popup_id=popup.id,
         human_id=human.id,
@@ -347,12 +357,12 @@ class TestReferralDiscountAtPayment:
 
         assert payment.amount == Decimal("80.00")
 
-    def test_disabled_referral_grants_no_discount(
+    def test_disabled_referral_preserves_existing_applicant_discount(
         self,
         db: Session,
         tenant_a: Tenants,
     ) -> None:
-        """An admin-disabled referral stops discounting immediately."""
+        """Disabling blocks new uses without changing an existing applicant."""
         popup = _make_popup(db, tenant_a)
         referrer = _make_human(db, tenant_a)
         buyer = _make_human(db, tenant_a)
@@ -372,4 +382,4 @@ class TestReferralDiscountAtPayment:
 
         payment = _create_payment(db, application, product, attendee)
 
-        assert payment.amount == Decimal("100.00")
+        assert payment.amount == Decimal("80.00")

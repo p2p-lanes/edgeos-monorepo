@@ -18,7 +18,7 @@ const CheckoutPage = () => {
     }
 
     if (popupSlug) {
-      router.replace(`/checkout/${popupSlug}`)
+      router.replace(`/checkout/${popupSlug}/checkout`)
       return
     }
 

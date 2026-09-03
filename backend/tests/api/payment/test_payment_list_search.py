@@ -12,6 +12,7 @@ from app.api.payment.models import PaymentProducts, Payments
 from app.api.payment.schemas import PaymentStatus
 from app.api.popup.models import Popups
 from app.api.product.models import Products
+from app.api.sales_flow.crud import sales_flows_crud
 from app.api.tenant.models import Tenants
 
 
@@ -26,6 +27,10 @@ def _create_popup(db: Session, tenant: Tenants, *, suffix: str) -> Popups:
         tenant_id=tenant.id,
     )
     db.add(popup)
+    db.flush()
+    sales_flows_crud.provision_default_flow(
+        db, popup_id=popup.id, tenant_id=tenant.id, sale_type="direct"
+    )
     db.commit()
     db.refresh(popup)
     return popup
@@ -407,6 +412,7 @@ class TestPaymentListSearch:
             tenant_id=tenant_a.id,
             popup_id=popup.id,
             human_id=human.id,
+            sales_flow_id=sales_flows_crud.get_default_flow(db, popup.id).id,
             status="accepted",
         )
         db.add(application)

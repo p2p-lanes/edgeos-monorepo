@@ -2,7 +2,7 @@ import uuid
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
-from sqlalchemy import UniqueConstraint
+from sqlalchemy import Index
 from sqlalchemy.dialects.postgresql import UUID
 from sqlmodel import Column, DateTime, Field, Relationship, func
 
@@ -14,12 +14,15 @@ if TYPE_CHECKING:
 
 
 class ApprovalStrategies(ApprovalStrategyBase, table=True):
-    """Approval strategy for a popup.
+    """How one sales flow reviews and accepts its applications.
 
-    Defines the rules for reviewing and accepting applications.
+    One strategy per flow (sdd/sales-flows-rediseno slice 6), so two
+    application flows of the same popup can review differently — which is
+    the point of having flows. See migration
+    `c9e2f4b71d38_approval_strategy_flow_required.py`.
     """
 
-    __table_args__ = (UniqueConstraint("popup_id", name="uq_approval_strategy_popup"),)
+    __table_args__ = (Index("uq_approval_strategy_flow", "sales_flow_id", unique=True),)
 
     id: uuid.UUID = Field(
         default_factory=uuid.uuid4,

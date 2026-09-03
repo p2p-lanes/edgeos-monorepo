@@ -109,23 +109,30 @@ def seed_ticketing_steps_for_popup(
     db: Session,
     popup_id: uuid.UUID,
     tenant_id: uuid.UUID,
-    sale_type: str | None = None,
+    sales_flow_id: uuid.UUID,
+    flow_type: str | None = None,
 ) -> None:
-    """Seed the default ticketing-step set for a popup.
+    """Seed the default ticketing-step set into one sales flow.
+
+    ``sales_flow_id`` is required (sdd/sales-flows-rediseno slice 2): steps
+    are always seeded INTO a flow, because there is no other place for a
+    step to live. Popup creation passes the default flow it just
+    provisioned.
 
     Steps flagged with ``_direct_sale_only`` (e.g. the buyer step) only get
-    inserted when ``sale_type='direct'``. Application popups collect buyer
-    info via the application form earlier in the funnel, so the open-
-    ticketing buyer step is irrelevant there.
+    inserted when ``flow_type='direct'``. Application-type flows collect
+    buyer info via the application form earlier in the funnel, so the
+    open-ticketing buyer step is irrelevant there.
     """
     from app.api.ticketing_step.models import TicketingSteps
 
     for step_def in DEFAULT_TICKETING_STEPS:
-        if step_def.get("_direct_sale_only") and sale_type != "direct":
+        if step_def.get("_direct_sale_only") and flow_type != "direct":
             continue
         step = TicketingSteps(
             tenant_id=tenant_id,
             popup_id=popup_id,
+            sales_flow_id=sales_flow_id,
             step_type=step_def["step_type"],
             title=step_def["title"],
             description=step_def.get("description"),
