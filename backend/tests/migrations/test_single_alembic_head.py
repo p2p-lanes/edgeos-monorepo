@@ -3,7 +3,7 @@ from pathlib import Path
 from alembic.config import Config
 from alembic.script import ScriptDirectory
 
-MERGE_HEAD = "a5c8e2f7b1d4"
+MERGE_HEAD = "b6d4e9f2a1c7"
 
 
 def test_repository_has_one_alembic_head() -> None:
