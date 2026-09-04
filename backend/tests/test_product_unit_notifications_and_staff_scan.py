@@ -51,6 +51,9 @@ def test_ownerless_buyer_notifications_and_order_projection(client, db, tenant_a
     buyer = _make_human(db, tenant_a)
     attendee_count = _attendee_count(db, popup)
     payment, line, unit = _ownerless_unit(db, popup, buyer)
+    unit.requires_check_in_snapshot = False
+    db.add(unit)
+    db.commit()
 
     context = _build_payment_confirmed_context(
         payment, popup.name, buyer.first_name or "", None
@@ -105,13 +108,14 @@ def test_staff_ownerless_scan_repeats_and_rejects_unsafe_units(
 ):
     attendee_count = _attendee_count(db, popup_tenant_a)
     _, _, active = _ownerless_unit(db, popup_tenant_a)
+    active.requires_check_in_snapshot = False
     _, _, revoked = _ownerless_unit(db, popup_tenant_a)
     revoked.revoked_at = datetime.now(UTC)
     _, _, not_scannable = _ownerless_unit(db, popup_tenant_a)
-    not_scannable.requires_check_in_snapshot = False
+    not_scannable.product.requires_check_in = False
     _, _, wrong_popup = _ownerless_unit(db, popup_tenant_a_summer_fest)
     _, _, wrong_tenant = _ownerless_unit(db, popup_tenant_b)
-    db.add_all([revoked, not_scannable])
+    db.add_all([active, revoked, not_scannable.product])
     db.commit()
     headers = _headers(admin_user_tenant_a, "user")
 

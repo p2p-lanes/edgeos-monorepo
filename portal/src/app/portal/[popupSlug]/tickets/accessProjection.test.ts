@@ -3,6 +3,35 @@ import type { AttendeeWithOriginPublic, PaymentPublic } from "@/client"
 import { projectTicketAccess } from "./accessProjection"
 
 describe("projectTicketAccess", () => {
+  it("shows the QR when check-in is enabled after purchase", () => {
+    const access = projectTicketAccess([
+      {
+        id: "holder-1",
+        name: "Alex Morgan",
+        products: [
+          {
+            id: "ticket-1",
+            attendee_id: "holder-1",
+            product_id: "week-pass",
+            check_in_code: "CHECK-IN-1",
+            product_name: "Week 2",
+            product_category_snapshot: "ticket",
+            requires_check_in_snapshot: false,
+            requires_check_in: true,
+          },
+        ],
+      } as AttendeeWithOriginPublic,
+    ])
+
+    expect(access[0]?.tickets).toMatchObject([
+      {
+        id: "ticket-1",
+        requiresCheckIn: true,
+        checkInCode: "CHECK-IN-1",
+      },
+    ])
+  })
+
   it("shows active buyer-owned parking without assigning it to an attendee", () => {
     const access = projectTicketAccess(
       [],
@@ -111,6 +140,7 @@ describe("projectTicketAccess", () => {
             product_name: "Parking",
             product_category_snapshot: "parking",
             requires_check_in_snapshot: true,
+            requires_check_in: true,
           },
           {
             id: "unresolved-1",
@@ -121,6 +151,7 @@ describe("projectTicketAccess", () => {
             product_category: "ticket",
             product_category_snapshot: null,
             requires_check_in_snapshot: true,
+            requires_check_in: true,
           },
         ],
       } as AttendeeWithOriginPublic,

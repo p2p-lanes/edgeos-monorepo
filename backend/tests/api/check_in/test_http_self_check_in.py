@@ -170,7 +170,7 @@ def _make_ownerless_unit(
 ) -> AttendeeProducts:
     from datetime import UTC, datetime
 
-    product = _make_product(db, tenant, popup, requires_check_in=False)
+    product = _make_product(db, tenant, popup, requires_check_in=True)
     product.category = "parking"
     payment = Payments(
         tenant_id=tenant.id,
@@ -297,6 +297,9 @@ class TestGetMyCheckInOptions:
         popup = _make_self_check_in_popup(db, tenant_a)
         human = _make_human(db, tenant_a)
         unit = _make_ownerless_unit(db, tenant_a, popup, human)
+        unit.requires_check_in_snapshot = False
+        db.add(unit)
+        db.commit()
 
         options = client.get(
             f"/api/v1/check-ins/my/{popup.slug}/options", headers=_human_auth(human)
@@ -398,6 +401,9 @@ class TestConfirmMyCheckIn:
         popup = _make_self_check_in_popup(db, tenant_a)
         human = _make_human(db, tenant_a)
         unit = _make_ownerless_unit(db, tenant_a, popup, human)
+        unit.requires_check_in_snapshot = False
+        db.add(unit)
+        db.commit()
         attendee_count = db.exec(select(func.count()).select_from(Attendees)).one()
 
         for _ in range(2):

@@ -98,16 +98,13 @@ def _payment_public_with_units(
             .options(selectinload(AttendeeProducts.product))  # type: ignore[arg-type]
         ).all()
         for unit in units:
-            requires_check_in = unit.requires_check_in_snapshot
-            if requires_check_in is None:
-                requires_check_in = unit.product.requires_check_in
             units_by_line[unit.payment_product_id].append(  # type: ignore[index]
                 PaymentProductUnitResponse(
                     id=unit.id,
                     attendee_id=unit.attendee_id,
                     check_in_code=unit.check_in_code,
                     active=unit.revoked_at is None,
-                    requires_check_in=requires_check_in,
+                    requires_check_in=unit.product.requires_check_in,
                 )
             )
 

@@ -45,7 +45,7 @@ export function projectTicketAccess(
     for (const product of attendee.products ?? []) {
       const grantsEventAccess =
         product.product_category_snapshot?.toLowerCase() === "ticket"
-      const requiresCheckIn = product.requires_check_in_snapshot === true
+      const requiresCheckIn = product.requires_check_in === true
 
       if (
         product.revoked_at != null ||

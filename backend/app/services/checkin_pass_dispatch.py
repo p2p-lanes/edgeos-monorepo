@@ -79,7 +79,7 @@ def _find_unsent_units(
         .where(
             Products.popup_id == popup.id,
             AttendeeProducts.revoked_at.is_(None),
-            AttendeeProducts.requires_check_in_snapshot.is_(True),
+            Products.requires_check_in.is_(True),
             or_(
                 AttendeeProducts.attendee_id.is_(None),
                 func.lower(AttendeeProducts.product_category_snapshot) == "ticket",
