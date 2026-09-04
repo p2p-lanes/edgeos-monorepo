@@ -16,7 +16,6 @@ Addendum #12 spec:
 import uuid
 from decimal import Decimal
 
-import pytest
 from fastapi.testclient import TestClient
 from sqlmodel import Session, select
 
@@ -206,14 +205,8 @@ class TestPostCheckIn:
             "first_scan_at must not change on re-scan"
         )
 
-    @pytest.mark.parametrize(
-        "requires_check_in_snapshot",
-        [False, None],
-        ids=["false", "unresolved"],
-    )
-    def test_non_scannable_snapshot_returns_400(
+    def test_current_product_check_in_state_controls_scanning(
         self,
-        requires_check_in_snapshot: bool | None,
         client: TestClient,
         db: Session,
         tenant_a: Tenants,
@@ -225,8 +218,10 @@ class TestPostCheckIn:
         attendee = _make_attendee(db, tenant_a, popup_tenant_a, human)
         code = f"NOSCAN{uuid.uuid4().hex[:2].upper()}"
         ticket = _make_ticket(db, tenant_a, attendee, product, code=code)
-        ticket.requires_check_in_snapshot = requires_check_in_snapshot
+        ticket.requires_check_in_snapshot = False
+        product.requires_check_in = False
         db.add(ticket)
+        db.add(product)
         db.commit()
 
         response = client.post(
@@ -241,7 +236,18 @@ class TestPostCheckIn:
             f"Expected detail to mention non-scannable; got {response.json()['detail']!r}"
         )
 
-    def test_allocated_meal_plan_snapshot_scans_and_persists_history(
+        product.requires_check_in = True
+        db.add(product)
+        db.commit()
+
+        response = client.post(
+            f"/api/v1/attendees/check-in/{code}?popup_id={popup_tenant_a.id}",
+            json={"source": "qr"},
+            headers=_auth(admin_user_tenant_a),
+        )
+        assert response.status_code == 200, response.text
+
+    def test_allocated_meal_plan_scans_and_persists_history(
         self,
         client: TestClient,
         db: Session,
@@ -251,7 +257,7 @@ class TestPostCheckIn:
     ) -> None:
         product = _make_product(db, tenant_a, popup_tenant_a)
         product.category = "meal_plan"
-        product.requires_check_in = False
+        product.requires_check_in = True
         db.add(product)
         db.commit()
         human = _make_human(db, tenant_a)

@@ -57,10 +57,7 @@ def _get_self_check_in_popup(
 
 
 def _scannable_unit_filter():
-    return (AttendeeProducts.requires_check_in_snapshot.is_(True)) | (
-        AttendeeProducts.requires_check_in_snapshot.is_(None)
-        & Products.requires_check_in.is_(True)  # type: ignore[union-attr]
-    )
+    return Products.requires_check_in.is_(True)
 
 
 def _first_check_ins_by_ticket(
@@ -180,10 +177,7 @@ async def confirm_my_check_in(
     attendee = ticket.attendee
     product = ticket.product
 
-    requires_check_in = ticket.requires_check_in_snapshot
-    if requires_check_in is None:
-        requires_check_in = product.requires_check_in
-    if not requires_check_in:
+    if not product.requires_check_in:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Product does not require check-in",

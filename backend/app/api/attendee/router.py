@@ -952,7 +952,7 @@ async def post_check_in(
     # The migration generates a check_in_code for every attendee_products row to
     # keep the column NOT NULL, but only `requires_check_in=true` products are
     # legitimate scan targets.
-    if ticket.requires_check_in_snapshot is not True:
+    if not product.requires_check_in:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Product does not require check-in",

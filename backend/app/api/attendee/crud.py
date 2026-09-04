@@ -1445,7 +1445,7 @@ class AttendeesCRUD(BaseCRUD[Attendees, AttendeeCreate, AttendeeUpdate]):
                 Attendees.popup_id == popup_id,
                 AttendeeProducts.revoked_at.is_(None),
                 AttendeeProducts.product_category_snapshot == "ticket",
-                AttendeeProducts.requires_check_in_snapshot.is_(True),
+                Products.requires_check_in.is_(True),
                 AttendeeProducts.checkin_pass_sent_at.is_(None),  # type: ignore[union-attr]
             )
             .options(
