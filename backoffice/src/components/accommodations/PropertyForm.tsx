@@ -1,11 +1,22 @@
-import { useMutation, useQueryClient } from "@tanstack/react-query"
-import { Building2, Eye, Percent, UserRound } from "lucide-react"
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
+import { Link } from "@tanstack/react-router"
+import { Building2, ClipboardList, Eye, Percent, UserRound } from "lucide-react"
 import { useState } from "react"
 
 import {
   type AccommodationPropertyPublic,
   AccommodationsService,
+  TicketingStepsService,
 } from "@/client"
+import {
+  GuestFormEditor,
+  type GuestFormMode,
+  GuestFormPreview,
+  type GuestFormValue,
+  isEmpty,
+  parseForm,
+  toApi,
+} from "@/components/accommodations/guest-form"
 import { Button } from "@/components/ui/button"
 import {
   Card,
@@ -21,6 +32,7 @@ import { LoadingButton } from "@/components/ui/loading-button"
 import { Switch } from "@/components/ui/switch"
 import { Textarea } from "@/components/ui/textarea"
 import useCustomToast from "@/hooks/useCustomToast"
+import { cn } from "@/lib/utils"
 import { createErrorHandler } from "@/utils"
 
 interface PropertyFormProps {
@@ -63,6 +75,12 @@ export function PropertyForm({
   const [sortOrder, setSortOrder] = useState(
     defaultValues?.sort_order?.toString() ?? "0",
   )
+  const [guestFormMode, setGuestFormMode] = useState<GuestFormMode>(
+    (defaultValues?.guest_form_mode as GuestFormMode) ?? "inherit",
+  )
+  const [guestForm, setGuestForm] = useState<GuestFormValue>(() =>
+    parseForm(defaultValues?.guest_form),
+  )
 
   const save = useMutation({
     mutationFn: async () => {
@@ -76,6 +94,11 @@ export function PropertyForm({
         tax_percentage: taxPercentage.trim() ? taxPercentage.trim() : null,
         is_active: isActive,
         sort_order: Number(sortOrder) || 0,
+        guest_form_mode: guestFormMode,
+        // Only a property that overrides carries a form of its own. Keeping
+        // one under "inherit" or "off" would leave a second, invisible answer
+        // to "what is asked here" waiting to contradict the first.
+        guest_form: guestFormMode === "custom" ? toApi(guestForm) : null,
       }
 
       if (defaultValues) {
@@ -246,6 +269,28 @@ export function PropertyForm({
         </CardContent>
       </Card>
 
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-base">
+            <ClipboardList className="h-4 w-4" />
+            Guest details
+          </CardTitle>
+          <CardDescription>
+            What the checkout asks about the people staying here, beyond their
+            names.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <GuestDetailsSection
+            popupId={popupId}
+            mode={guestFormMode}
+            form={guestForm}
+            onModeChange={setGuestFormMode}
+            onFormChange={setGuestForm}
+          />
+        </CardContent>
+      </Card>
+
       <div className="flex justify-end gap-2">
         <Button variant="outline" onClick={onSuccess}>
           Cancel
@@ -258,6 +303,127 @@ export function PropertyForm({
           {isEdit ? "Save changes" : "Create property"}
         </LoadingButton>
       </div>
+    </div>
+  )
+}
+
+const MODES: { value: GuestFormMode; label: string; hint: string }[] = [
+  {
+    value: "inherit",
+    label: "Ask what the checkout asks",
+    hint: "This property uses the questions set on the Accommodation step.",
+  },
+  {
+    value: "custom",
+    label: "Ask something different here",
+    hint: "These questions replace the step's for bookings at this property.",
+  },
+  {
+    value: "off",
+    label: "Ask nothing extra",
+    hint: "Only a name per guest, whatever the step asks elsewhere.",
+  },
+]
+
+interface GuestDetailsSectionProps {
+  popupId: string
+  mode: GuestFormMode
+  form: GuestFormValue
+  onModeChange: (mode: GuestFormMode) => void
+  onFormChange: (form: GuestFormValue) => void
+}
+
+/**
+ * Which questions this property asks, of the three ways it can answer that.
+ *
+ * `inherit` shows what it inherits rather than saying the word: an operator
+ * who cannot see the inherited questions has no way to judge whether they
+ * are the right ones for this building.
+ */
+function GuestDetailsSection({
+  popupId,
+  mode,
+  form,
+  onModeChange,
+  onFormChange,
+}: GuestDetailsSectionProps) {
+  const { data: steps } = useQuery({
+    queryKey: ["ticketing-steps", popupId, "accommodation"],
+    queryFn: () => TicketingStepsService.listTicketingSteps({ popupId }),
+    enabled: !!popupId && mode === "inherit",
+  })
+
+  const accommodationSteps = (steps?.results ?? []).filter(
+    (step) => step.template === "accommodation-booking" && step.is_enabled,
+  )
+  const inherited = parseForm(
+    (accommodationSteps[0]?.template_config as Record<string, unknown>)
+      ?.guest_form,
+  )
+
+  return (
+    <div className="flex flex-col gap-4">
+      <div className="flex flex-col gap-2">
+        {MODES.map((option) => (
+          <label
+            key={option.value}
+            className={cn(
+              "flex cursor-pointer items-start gap-3 rounded-lg border p-3 transition-colors",
+              mode === option.value
+                ? "border-primary bg-primary/5"
+                : "hover:bg-accent/40",
+            )}
+          >
+            <input
+              type="radio"
+              name="guest-form-mode"
+              className="mt-1"
+              checked={mode === option.value}
+              onChange={() => {
+                // Carry the inherited questions into the override rather than
+                // opening an empty editor: "different" almost always means
+                // "the same, plus one".
+                if (option.value === "custom" && isEmpty(form)) {
+                  onFormChange(inherited)
+                }
+                onModeChange(option.value)
+              }}
+            />
+            <span className="flex flex-col gap-0.5">
+              <span className="text-sm font-medium">{option.label}</span>
+              <span className="text-xs text-muted-foreground">
+                {option.hint}
+              </span>
+            </span>
+          </label>
+        ))}
+      </div>
+
+      {mode === "inherit" &&
+        (isEmpty(inherited) ? (
+          <p className="text-xs text-muted-foreground">
+            The Accommodation step asks nothing extra yet, so neither does this
+            property. Set the questions in{" "}
+            <Link
+              to="/ticketing-steps"
+              className="underline underline-offset-4"
+            >
+              Ticketing Steps
+            </Link>
+            .
+          </p>
+        ) : (
+          <div className="flex flex-col gap-2">
+            <p className="text-xs text-muted-foreground">
+              Inherited from the Accommodation step:
+            </p>
+            <GuestFormPreview form={inherited} />
+          </div>
+        ))}
+
+      {mode === "custom" && (
+        <GuestFormEditor value={form} onChange={onFormChange} />
+      )}
     </div>
   )
 }

@@ -2,6 +2,11 @@ import { useQuery } from "@tanstack/react-query"
 import { ArrowUpRight, BedDouble, Info } from "lucide-react"
 
 import { AccommodationsService } from "@/client"
+import {
+  GuestFormEditor,
+  parseForm,
+  toApi,
+} from "@/components/accommodations/guest-form"
 import { CollapsibleSection } from "@/components/ticketing-step-builder/step-detail/CollapsibleSection"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
@@ -42,6 +47,10 @@ export function AccommodationBookingConfig({
   const showPropertyHeaders = config?.show_property_headers !== false
   const requireGuestNames = config?.require_guest_names !== false
   const noticeText = (config?.notice_text as string) ?? ""
+  // Parsed on every render rather than held in state: the panel is
+  // controlled by `config`, and a second copy would drift the moment a step
+  // is switched underneath it.
+  const guestForm = parseForm(config?.guest_form)
   const accommodationsHref = `/accommodations?popup_id=${popupId}`
 
   const { data, isLoading } = useQuery({
@@ -238,6 +247,27 @@ export function AccommodationBookingConfig({
               }
             />
           </div>
+        </div>
+      </CollapsibleSection>
+
+      <CollapsibleSection
+        title="Guest details"
+        description="What the checkout asks about the people staying"
+      >
+        <div className="flex flex-col gap-4">
+          <p className="text-xs leading-relaxed text-muted-foreground">
+            Asked for every property in this checkout. A property can ask
+            something different, or nothing at all, from its own page under{" "}
+            <span className="font-medium">Accommodations</span>.
+          </p>
+          <GuestFormEditor
+            value={guestForm}
+            onChange={(next) =>
+              // `toApi` returns null for a form that asks nothing, which
+              // is how the step stores "no questions".
+              update({ guest_form: toApi(next) })
+            }
+          />
         </div>
       </CollapsibleSection>
 

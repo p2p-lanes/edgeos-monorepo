@@ -18,6 +18,18 @@ vi.mock("@/client", () => ({
     createProperty: vi.fn(),
     updateProperty: vi.fn(),
   },
+  // Read by the Guest details section to show what "inherit" inherits.
+  TicketingStepsService: {
+    listTicketingSteps: vi.fn().mockResolvedValue({ results: [] }),
+  },
+}))
+
+// The page links to Ticketing Steps, and a typed Link needs a router the
+// tests have no reason to build.
+vi.mock("@tanstack/react-router", () => ({
+  Link: ({ children, to }: { children: ReactNode; to: string }) => (
+    <a href={to}>{children}</a>
+  ),
 }))
 
 vi.mock("@/hooks/useCustomToast", () => ({
@@ -117,8 +129,60 @@ describe("PropertyForm", () => {
       tax_percentage: "21",
       is_active: true,
       sort_order: 3,
+      // A property that inherits carries no form of its own: a second,
+      // invisible answer to "what is asked here" would contradict the first
+      // the next time someone flips the mode.
+      guest_form_mode: "inherit",
+      guest_form: null,
     })
     await waitFor(() => expect(onSuccess).toHaveBeenCalled())
+  })
+
+  it("saves the questions it was given, and only when it overrides", async () => {
+    renderForm()
+
+    await userEvent.type(screen.getByLabelText("Name"), "Hotel Arcadia")
+    await userEvent.click(screen.getByText("Ask something different here"))
+    await userEvent.click(screen.getByText("Contact details"))
+    await userEvent.click(
+      screen.getByRole("button", { name: "Create property" }),
+    )
+
+    await waitFor(() => expect(mockCreate).toHaveBeenCalled())
+    const body = mockCreate.mock.calls[0][0].requestBody as Record<
+      string,
+      unknown
+    >
+    expect(body.guest_form_mode).toBe("custom")
+    const form = body.guest_form as {
+      booker: { fields: { key: string }[] }
+    }
+    expect(form.booker.fields.map((field) => field.key)).toEqual([
+      "email",
+      "phone",
+    ])
+  })
+
+  it("drops the questions again when the property goes back to inheriting", async () => {
+    // The editor keeps its state so switching back and forth does not retype
+    // the form, but only an override is stored.
+    renderForm()
+
+    await userEvent.type(screen.getByLabelText("Name"), "Hotel Arcadia")
+    await userEvent.click(screen.getByText("Ask something different here"))
+    await userEvent.click(screen.getByText("Contact details"))
+    await userEvent.click(screen.getByText("Ask nothing extra"))
+    await userEvent.click(
+      screen.getByRole("button", { name: "Create property" }),
+    )
+
+    await waitFor(() => expect(mockCreate).toHaveBeenCalled())
+    const body = mockCreate.mock.calls[0][0].requestBody as Record<
+      string,
+      unknown
+    >
+    expect(body.guest_form_mode).toBe("off")
+    expect(body.guest_form).toBeNull()
   })
 
   it("updates instead of creating when it was given a property", async () => {
