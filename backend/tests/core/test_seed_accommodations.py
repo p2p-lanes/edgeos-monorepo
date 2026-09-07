@@ -485,8 +485,8 @@ def _fill_entry(index: int, mode: str, **extra) -> dict:
         "popup_key": SEED_POPUP_KEY,
         # Two units, so the third identical entry has nowhere to go.
         "accommodation_key": "residences-penthouse",
-        "check_in": "2026-06-14",
-        "check_out": "2026-06-16",
+        "check_in": "2026-09-14",
+        "check_out": "2026-09-16",
         "mode": mode,
     }
     entry.update(extra)
@@ -516,8 +516,8 @@ def test_a_room_that_cannot_be_placed_does_not_take_the_boot_down(
     placed = {
         booking.primary_guest_name
         for booking in _bookings(db, seed_popup)
-        if booking.check_in == date(2026, 6, 14)
-        and booking.check_out == date(2026, 6, 16)
+        if booking.check_in == date(2026, 9, 14)
+        and booking.check_out == date(2026, 9, 16)
     }
     # The Penthouse Loft has two units: the first two fit, the rest do not.
     assert {"First", "Second"} <= placed
@@ -534,8 +534,8 @@ def test_a_block_left_to_the_assigner_is_seeded_once(
         "key": "unpinned-block",
         "popup_key": SEED_POPUP_KEY,
         "accommodation_key": "arcadia-twin",
-        "check_in": "2026-06-14",
-        "check_out": "2026-06-16",
+        "check_in": "2026-09-14",
+        "check_out": "2026-09-16",
         "mode": "block",
         "notes": "Deep clean",
     }
