@@ -10,7 +10,7 @@ from sqlalchemy import inspect, text
 
 REVISION = "c9a4e7b2d1f8"
 PREVIOUS_REVISION = "b7d3e1f8c2a4"
-HEAD_REVISION = "b6d4e9f2a1c7"
+HEAD_REVISION = "c7e5a1b9d3f2"
 TABLES = ("products", "payment_products", "attendee_products")
 INDEXES = {
     "ix_products_fulfillment_type",
