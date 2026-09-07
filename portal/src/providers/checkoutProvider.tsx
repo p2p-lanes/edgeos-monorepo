@@ -707,6 +707,7 @@ export function CheckoutProvider({
     salesFlowId,
     initialStep,
     products,
+    checkoutMode: checkoutPolicy.checkoutMode,
     housingPricePerDay,
     selectionStateRef,
     restorationSetters: {
@@ -764,6 +765,7 @@ export function CheckoutProvider({
     enabled: openCartEnabled,
     selectionStateRef,
     products,
+    checkoutMode: checkoutPolicy.checkoutMode,
     housingPricePerDay,
     restorationSetters: {
       setHousing,

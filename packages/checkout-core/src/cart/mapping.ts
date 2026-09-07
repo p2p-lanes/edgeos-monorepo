@@ -1,21 +1,16 @@
 // Pure SelectionState ↔ CartState mapping for persistence and restore.
 //
-// The headless core uses a flat product→quantity model, so on SAVE every
-// selected product goes into the cart's generic `merch` bucket (for the
-// anonymous flow a product is just product+quantity — the category split the
-// authenticated portal needs does not apply). On RESTORE, products from ANY
-// bucket (merch/passes/patron) are merged back into quantities, so a cart
-// written by either flow hydrates cleanly. Housing keeps its dates (the backend
-// CartItemHousing carries no quantity, so units default to 1 on restore).
+// The headless core uses a flat product→quantity model. Cart lines preserve
+// purchase intent without pretending generic products belong to a UI category.
 
 import {
   emptySelection,
-  selectHousing,
   type SelectionState,
+  selectHousing,
   setCoupon,
   setInsurance,
 } from "../selection/state"
-import type { CartState } from "../types/api"
+import type { CartLine, CartState } from "../types/api"
 
 export interface ToCartOptions {
   currentStep?: string | null
@@ -26,20 +21,27 @@ export function selectionToCartState(
   selection: SelectionState,
   opts: ToCartOptions = {},
 ): CartState {
+  const lines: CartLine[] = Object.entries(selection.quantities).map(
+    ([product_id, quantity]) => ({
+      kind: "product",
+      assignment: { kind: "unassigned" },
+      product_id,
+      quantity,
+    }),
+  )
+  if (selection.housing) {
+    lines.push({
+      kind: "date_range",
+      assignment: { kind: "unassigned" },
+      step_type: "housing",
+      product_id: selection.housing.productId,
+      check_in: selection.housing.checkIn,
+      check_out: selection.housing.checkOut,
+      quantity: 1,
+    })
+  }
   return {
-    passes: [],
-    housing: selection.housing
-      ? {
-          product_id: selection.housing.productId,
-          check_in: selection.housing.checkIn,
-          check_out: selection.housing.checkOut,
-        }
-      : null,
-    merch: Object.entries(selection.quantities).map(
-      ([product_id, quantity]) => ({ product_id, quantity }),
-    ),
-    patron: null,
-    meal_plans: [],
+    lines,
     promo_code: selection.couponCode ?? null,
     insurance: selection.insurance,
     current_step: opts.currentStep ?? null,
@@ -54,16 +56,18 @@ export function cartStateToSelection(cart: CartState): SelectionState {
     quantities[productId] = (quantities[productId] ?? 0) + quantity
   }
 
-  for (const m of cart.merch ?? []) add(m.product_id, m.quantity)
-  for (const p of cart.passes ?? []) add(p.product_id, p.quantity)
-  if (cart.patron) add(cart.patron.product_id, 1)
+  for (const line of cart.lines ?? []) {
+    if (line.kind === "product") add(line.product_id, line.quantity)
+    if (line.kind === "custom_amount") add(line.product_id, 1)
+  }
 
   let state: SelectionState = { ...emptySelection(), quantities }
-  if (cart.housing) {
+  const housing = cart.lines?.find((line) => line.kind === "date_range")
+  if (housing) {
     state = selectHousing(state, {
-      productId: cart.housing.product_id,
-      checkIn: cart.housing.check_in,
-      checkOut: cart.housing.check_out,
+      productId: housing.product_id,
+      checkIn: housing.check_in,
+      checkOut: housing.check_out,
     })
   }
   state = setInsurance(state, !!cart.insurance)

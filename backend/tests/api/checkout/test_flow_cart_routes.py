@@ -25,9 +25,14 @@ from tests.api.checkout.test_flow_scoped_runtime import _make_direct_popup, _mak
 
 def _items(marker: str) -> dict:
     return {
-        "passes": [
+        "lines": [
             {
-                "attendee_id": f"attendee-{marker}",
+                "kind": "product",
+                "assignment": {
+                    "kind": "attendee",
+                    "attendee_id": f"attendee-{marker}",
+                },
+                "step_type": "tickets",
                 "product_id": str(uuid.uuid4()),
                 "quantity": 1,
             }
@@ -126,7 +131,16 @@ def test_legacy_cart_migrates_once_or_is_quarantined_and_destination_wins(
         tenant_id=tenant_a.id,
         popup_id=popup.id,
         human_id=human_id,
-        items=_items("legacy"),
+        items={
+            "passes": [
+                {
+                    "attendee_id": "attendee-legacy",
+                    "product_id": str(uuid.uuid4()),
+                    "quantity": 1,
+                }
+            ],
+            "current_step": "legacy",
+        },
     )
     db.add(legacy)
     db.commit()

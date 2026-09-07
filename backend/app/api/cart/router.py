@@ -9,7 +9,6 @@ from app.api.cart.schemas import (
     CartPaymentInfo,
     CartPopupInfo,
     CartPublic,
-    CartState,
     CartUpdate,
 )
 from app.api.shared.response import ListModel, PaginationLimit, PaginationSkip, Paging
@@ -92,7 +91,7 @@ async def list_abandoned_carts(
             )
         payments = list(db.exec(payment_stmt).all())
 
-        items = CartState.model_validate(cart.items) if cart.items else CartState()
+        items = carts_crud.restore_items(db, cart)
 
         human_info = (
             CartHumanInfo(
@@ -156,7 +155,7 @@ async def get_my_cart(
     if not cart:
         return None
 
-    items = CartState.model_validate(cart.items) if cart.items else CartState()
+    items = carts_crud.restore_items(db, cart)
 
     return CartPublic(
         id=cart.id,
@@ -192,7 +191,7 @@ async def update_my_cart(
     )
 
     cart = carts_crud.update_items(db, cart, cart_in.items)
-    items = CartState.model_validate(cart.items) if cart.items else CartState()
+    items = carts_crud.restore_items(db, cart)
 
     return CartPublic(
         id=cart.id,

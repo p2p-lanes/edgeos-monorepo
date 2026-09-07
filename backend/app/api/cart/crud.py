@@ -1,9 +1,12 @@
 import uuid
 from datetime import UTC, datetime
 
+from sqlalchemy import update
 from sqlalchemy.orm import selectinload
+from sqlalchemy.orm.attributes import set_committed_value
 from sqlmodel import Session, func, select
 
+from app.api.cart._migration import migrate_cart_state
 from app.api.cart.models import Carts
 from app.api.cart.schemas import CartState
 
@@ -141,6 +144,27 @@ class CartsCRUD:
         session.add(cart)
         session.commit()
         return cart
+
+    def restore_items(self, session: Session, cart: Carts) -> CartState:
+        """Return canonical items and persist a legacy conversion before returning."""
+        raw_items = cart.items
+        items, was_legacy = migrate_cart_state(raw_items)
+        if was_legacy:
+            serialized = items.model_dump(mode="json")
+            statement = (
+                update(Carts)
+                .where(Carts.id == cart.id, Carts.items == raw_items)
+                .values(items=serialized, updated_at=cart.updated_at)
+                .execution_options(synchronize_session=False)
+            )
+            result = session.execute(statement)
+            session.commit()
+            if result.rowcount:
+                set_committed_value(cart, "items", serialized)
+            else:
+                session.refresh(cart)
+                return self.restore_items(session, cart)
+        return items
 
     def delete_by_human_popup(
         self,

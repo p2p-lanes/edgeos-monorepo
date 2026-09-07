@@ -5,7 +5,7 @@
  */
 export type AbandonedCartPublic = {
     id: string;
-    items: CartState;
+    items: CartState_Output;
     created_at?: (string | null);
     updated_at?: (string | null);
     email?: (string | null);
@@ -1486,16 +1486,6 @@ export type CalendarUnit = {
 };
 
 /**
- * Embedded human info for abandoned cart listing.
- */
-export type CartHumanInfo = {
-    id: string;
-    email: string;
-    first_name?: (string | null);
-    last_name?: (string | null);
-};
-
-/**
  * A room the buyer picked, as it survives a page reload.
  *
  * Keyed by ``accommodation_id`` rather than by the shadow ``product_id``:
@@ -1507,7 +1497,10 @@ export type CartHumanInfo = {
  * them, and the ``{name: ...}`` shape the purchase needs is built when the
  * payment is submitted.
  */
-export type CartItemAccommodation = {
+export type CartAccommodationLine = {
+    assignment: (CartUnassigned | CartAttendeeAssignment | CartRecipientAssignment);
+    step_type?: (string | null);
+    kind: "accommodation";
     accommodation_id: string;
     check_in: string;
     check_out: string;
@@ -1515,13 +1508,44 @@ export type CartItemAccommodation = {
     guests?: Array<(string)>;
 };
 
+export type CartAttendeeAssignment = {
+    kind: "attendee";
+    attendee_id: string;
+};
+
 /**
- * Housing selection in cart.
+ * A product whose unit price is chosen during checkout.
  */
-export type CartItemHousing = {
+export type CartCustomAmountLine = {
+    assignment: (CartUnassigned | CartAttendeeAssignment | CartRecipientAssignment);
+    step_type?: (string | null);
+    kind: "custom_amount";
+    product_id: string;
+    amount: number;
+    is_custom_amount?: boolean;
+};
+
+/**
+ * A product selected for a date range, such as legacy housing.
+ */
+export type CartDateRangeLine = {
+    assignment: (CartUnassigned | CartAttendeeAssignment | CartRecipientAssignment);
+    step_type?: (string | null);
+    kind: "date_range";
     product_id: string;
     check_in: string;
     check_out: string;
+    quantity?: number;
+};
+
+/**
+ * Embedded human info for abandoned cart listing.
+ */
+export type CartHumanInfo = {
+    id: string;
+    email: string;
+    first_name?: (string | null);
+    last_name?: (string | null);
 };
 
 /**
@@ -1535,41 +1559,16 @@ export type CartItemHousing = {
  * `special_request` apply at the attendee level — the frontend / reducer
  * keeps them in sync across every meal_plans entry for that attendee.
  */
-export type CartItemMealPlan = {
-    attendee_id: string;
+export type CartMealPlanLine = {
+    assignment: (CartUnassigned | CartAttendeeAssignment | CartRecipientAssignment);
+    step_type?: (string | null);
+    kind: "meal_plan";
     product_id: string;
     daily_choices?: ({
     [key: string]: (string);
 } | null);
     dietary_restriction?: (string | null);
     special_request?: (string | null);
-};
-
-/**
- * Merch selection in cart.
- */
-export type CartItemMerch = {
-    product_id: string;
-    quantity?: number;
-};
-
-/**
- * Pass selection in cart.
- */
-export type CartItemPass = {
-    attendee_id?: (string | null);
-    recipient_key?: (string | null);
-    product_id: string;
-    quantity?: number;
-};
-
-/**
- * Patron selection in cart.
- */
-export type CartItemPatron = {
-    product_id: string;
-    amount: number;
-    is_custom_amount?: boolean;
 };
 
 /**
@@ -1593,38 +1592,65 @@ export type CartPopupInfo = {
 };
 
 /**
+ * A fixed-price product selection, assigned or unassigned.
+ */
+export type CartProductLine = {
+    assignment: (CartUnassigned | CartAttendeeAssignment | CartRecipientAssignment);
+    step_type?: (string | null);
+    kind: "product";
+    product_id: string;
+    quantity?: number;
+    price?: (number | null);
+};
+
+/**
  * Cart schema for API responses.
  */
 export type CartPublic = {
     id: string;
     human_id: string;
     popup_id: string;
-    items: CartState;
+    items: CartState_Output;
     created_at?: (string | null);
     updated_at?: (string | null);
+};
+
+export type CartRecipientAssignment = {
+    kind: "recipient";
+    recipient_key: string;
 };
 
 /**
  * Full cart state stored as JSONB.
  */
-export type CartState = {
-    passes?: Array<CartItemPass>;
+export type CartState_Input = {
+    lines?: Array<(CartProductLine | CartDateRangeLine | CartCustomAmountLine | CartMealPlanLine | CartAccommodationLine)>;
     recipients?: Array<PaymentRecipientRequest>;
-    housing?: (CartItemHousing | null);
-    merch?: Array<CartItemMerch>;
-    patron?: (CartItemPatron | null);
-    meal_plans?: Array<CartItemMealPlan>;
-    accommodations?: Array<CartItemAccommodation>;
     promo_code?: (string | null);
     insurance?: boolean;
     current_step?: (string | null);
 };
 
 /**
+ * Full cart state stored as JSONB.
+ */
+export type CartState_Output = {
+    lines?: Array<(CartProductLine | CartDateRangeLine | CartCustomAmountLine | CartMealPlanLine | CartAccommodationLine)>;
+    recipients?: Array<PaymentRecipientRequest>;
+    promo_code?: (string | null);
+    insurance?: boolean;
+    current_step?: (string | null);
+};
+
+export type CartUnassigned = {
+    kind: "unassigned";
+};
+
+/**
  * Schema for updating cart items.
  */
 export type CartUpdate = {
-    items: CartState;
+    items: CartState_Input;
 };
 
 /**
@@ -3779,7 +3805,7 @@ export type OpenCartPublic = {
     id: string;
     popup_id: string;
     email: string;
-    items: CartState;
+    items: CartState_Output;
     restore_token?: (string | null);
     created_at?: (string | null);
     updated_at?: (string | null);
@@ -3790,7 +3816,7 @@ export type OpenCartPublic = {
  */
 export type OpenCartUpsert = {
     email: string;
-    items: CartState;
+    items: CartState_Input;
 };
 
 /**

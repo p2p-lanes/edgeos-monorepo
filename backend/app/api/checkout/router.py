@@ -451,14 +451,15 @@ async def check_accommodation_availability(
     )
 
 
-def _to_open_cart_public(cart: object, *, restore_token: str | None) -> OpenCartPublic:
-    """Build the anonymous cart response, coercing stored JSONB into CartState."""
-    raw_items = getattr(cart, "items", None) or {}
+def _to_open_cart_public(
+    cart: object, *, items: CartState, restore_token: str | None
+) -> OpenCartPublic:
+    """Build an anonymous cart response from canonical items."""
     return OpenCartPublic(
         id=cart.id,  # type: ignore[attr-defined]
         popup_id=cart.popup_id,  # type: ignore[attr-defined]
         email=cart.email or "",  # type: ignore[attr-defined]
-        items=CartState(**raw_items),
+        items=items,
         restore_token=restore_token,
         created_at=getattr(cart, "created_at", None),
         updated_at=getattr(cart, "updated_at", None),
@@ -506,7 +507,9 @@ async def _upsert_open_cart(
         if secret
         else None
     )
-    return _to_open_cart_public(cart, restore_token=restore_token)
+    return _to_open_cart_public(
+        cart, items=carts_crud.restore_items(db, cart), restore_token=restore_token
+    )
 
 
 @router.put(
@@ -556,7 +559,9 @@ async def _restore_open_cart(
     cart = carts_crud.find_by_id_popup(db, cid, popup.id, flow.id)
     if cart is None:
         raise HTTPException(status_code=404, detail="Not found")
-    return _to_open_cart_public(cart, restore_token=sig)
+    return _to_open_cart_public(
+        cart, items=carts_crud.restore_items(db, cart), restore_token=sig
+    )
 
 
 @router.get(

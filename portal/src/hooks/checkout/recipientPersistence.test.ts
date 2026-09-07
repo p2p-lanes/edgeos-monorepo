@@ -62,23 +62,31 @@ function state(selectedPasses: SelectedPassItem[]) {
 }
 
 describe("recipient draft persistence", () => {
-  it("types legacy and recipient cart lines and clears recipient snapshots", () => {
-    const legacyCart: CartState = {
+  it("types attendee and recipient assignments and clears recipient snapshots", () => {
+    const attendeeCart: CartState = {
       ...EMPTY_CART,
-      passes: [
-        { attendee_id: "legacy-attendee", product_id: "ticket-1", quantity: 1 },
+      lines: [
+        {
+          kind: "product",
+          assignment: { kind: "attendee", attendee_id: "legacy-attendee" },
+          step_type: "tickets",
+          product_id: "ticket-1",
+          quantity: 1,
+          price: null,
+        },
       ],
-      housing: {
-        product_id: "housing-1",
-        check_in: "2026-08-27",
-        check_out: "2026-08-29",
-        quantity: 2,
-      },
     }
     const recipientCart: CartState = {
       ...EMPTY_CART,
-      passes: [
-        { recipient_key: "managed-kid", product_id: "ticket-1", quantity: 1 },
+      lines: [
+        {
+          kind: "product",
+          assignment: { kind: "recipient", recipient_key: "managed-kid" },
+          step_type: "tickets",
+          product_id: "ticket-1",
+          quantity: 1,
+          price: null,
+        },
       ],
       recipients: [
         {
@@ -89,12 +97,8 @@ describe("recipient draft persistence", () => {
       ],
     }
 
-    expect(legacyCart.housing?.quantity).toBe(2)
-    expect(recipientCart.passes[0]).toEqual({
-      recipient_key: "managed-kid",
-      product_id: "ticket-1",
-      quantity: 1,
-    })
+    expect(attendeeCart.lines[0].assignment.kind).toBe("attendee")
+    expect(recipientCart.lines[0].assignment.kind).toBe("recipient")
     expect(EMPTY_CART.recipients).toEqual([])
   })
 
@@ -167,13 +171,29 @@ describe("recipient draft persistence", () => {
         selection("legacy-attendee"),
       ]),
     ).toEqual({
-      passes: [
+      lines: [
         {
-          recipient_key: "managed-spouse",
+          kind: "product",
+          assignment: {
+            kind: "recipient",
+            recipient_key: "managed-spouse",
+          },
+          step_type: "tickets",
           product_id: "ticket-1",
           quantity: 1,
+          price: null,
         },
-        { attendee_id: "legacy-attendee", product_id: "ticket-1", quantity: 1 },
+        {
+          kind: "product",
+          assignment: {
+            kind: "attendee",
+            attendee_id: "legacy-attendee",
+          },
+          step_type: "tickets",
+          product_id: "ticket-1",
+          quantity: 1,
+          price: null,
+        },
       ],
       recipients: [spouse],
     })
@@ -193,10 +213,9 @@ describe("recipient draft persistence", () => {
       state([selection("recipient:managed-kid", first.recipients[0])]),
     )
 
-    expect(first.passes[0]).toEqual({
+    expect(first.lines[0].assignment).toEqual({
+      kind: "recipient",
       recipient_key: "managed-kid",
-      product_id: "ticket-1",
-      quantity: 1,
     })
     expect(second.recipients).toEqual([kid])
   })
@@ -224,21 +243,30 @@ describe("recipient draft persistence", () => {
       restorePassRecipients,
     })
 
-    expect(restorePassRecipients).toHaveBeenCalledWith(
-      snapshot.recipients,
-      snapshot.passes,
-    )
+    expect(restorePassRecipients).toHaveBeenCalledWith(snapshot.recipients, [
+      {
+        recipient_key: "managed-kid",
+        product_id: "ticket-1",
+        quantity: 1,
+      },
+    ])
   })
 
   it("keeps legacy attendee lines unchanged and emits no recipient snapshot", () => {
     expect(
       buildPersistedPassSelections([selection("legacy-attendee")]),
     ).toEqual({
-      passes: [
+      lines: [
         {
-          attendee_id: "legacy-attendee",
+          kind: "product",
+          assignment: {
+            kind: "attendee",
+            attendee_id: "legacy-attendee",
+          },
+          step_type: "tickets",
           product_id: "ticket-1",
           quantity: 1,
+          price: null,
         },
       ],
       recipients: [],

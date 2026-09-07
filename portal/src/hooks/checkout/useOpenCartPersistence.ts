@@ -1,10 +1,14 @@
 "use client"
 
 import { type MutableRefObject, useCallback, useEffect, useRef } from "react"
-import { CheckoutService } from "@/client"
+import {
+  CHECKOUT_MODE,
+  type CheckoutMode,
+} from "@/checkout/popupCheckoutPolicy"
+import { CheckoutService, type PaymentRecipientRequest } from "@/client"
+import type { CartAssignment, CartLine, CartState } from "@/hooks/useCartApi"
 import { getProductAvailability } from "@/lib/product-availability"
 import type {
-  CheckoutRecipientDraft,
   CheckoutStep,
   SelectedDynamicItem,
   SelectedMealPlanItem,
@@ -15,11 +19,14 @@ import type {
   CartSelectionState,
   RestorationSetters,
 } from "./useCartPersistence"
-import { buildPersistedPassSelections } from "./useCartPersistence"
+import {
+  buildPersistedCartState,
+  deriveCartRestoration,
+} from "./useCartPersistence"
 
 /**
  * What we persist in localStorage per popup slug.
- * Keeping the structure flat and versioned so future migrations are easy.
+ * The current payload is canonical; older bucketed snapshots migrate on read.
  */
 interface OpenCartLocalStorage {
   /** CartState serialized as JSON (mirrors useCartPersistence.buildCartState) */
@@ -30,56 +37,7 @@ interface OpenCartLocalStorage {
   restoreToken: string | null
 }
 
-/** Minimal CartState fields we need for serialization / deserialization. */
-export interface CartItemsSnapshot {
-  passes: (
-    | { attendee_id: string; product_id: string; quantity: number }
-    | { recipient_key: string; product_id: string; quantity: number }
-  )[]
-  recipients: CheckoutRecipientDraft[]
-  housing: {
-    product_id: string
-    check_in: string
-    check_out: string
-    quantity?: number
-  } | null
-  merch: { product_id: string; quantity: number }[]
-  patron: {
-    product_id: string
-    amount: number
-    is_custom_amount: boolean
-  } | null
-  meal_plans: {
-    attendee_id: string
-    product_id: string
-    daily_choices: Record<string, string> | null
-    dietary_restriction: string | null
-    special_request: string | null
-  }[]
-  /**
-   * Booked rooms. Saved but not restored — see the note in
-   * `useCartPersistence.buildCartState`: a stay's price is a dated server
-   * quote and a room in a cart is not held, so bringing one back would show
-   * a bookable room that may be gone.
-   */
-  accommodations: {
-    accommodation_id: string
-    check_in: string
-    check_out: string
-    guest_count: number | null
-    guests: string[]
-  }[]
-  /** Flat array of dynamic-step items, keyed by step_type for reconstruction. */
-  dynamic_items: {
-    step_type: string
-    product_id: string
-    quantity: number
-    price: number
-  }[]
-  promo_code: string | null
-  insurance: boolean
-  current_step: string | null
-}
+export type CartItemsSnapshot = CartState
 
 interface UseOpenCartPersistenceParams {
   /** The popup slug — used as localStorage key and in API calls */
@@ -92,6 +50,7 @@ interface UseOpenCartPersistenceParams {
   selectionStateRef: MutableRefObject<CartSelectionState>
   /** Products for availability validation during restore */
   products: ProductsPass[]
+  checkoutMode?: CheckoutMode
   /** Whether housing pricing is per-day */
   housingPricePerDay: boolean
   /** State setters used to hydrate the cart from a saved snapshot */
@@ -140,12 +99,259 @@ export function getOpenCartScope(popupSlug: string, flowSlug?: string | null) {
   }
 }
 
+type UnknownRecord = Record<string, unknown>
+
+function isRecord(value: unknown): value is UnknownRecord {
+  return typeof value === "object" && value !== null && !Array.isArray(value)
+}
+
+function entries(value: unknown): UnknownRecord[] {
+  return Array.isArray(value) ? value.filter(isRecord) : []
+}
+
+function nonEmptyString(value: unknown): string | null {
+  if (typeof value !== "string") return null
+  const trimmed = value.trim()
+  return trimmed.length > 0 ? trimmed : null
+}
+
+function uuidString(value: unknown): string | null {
+  const parsed = nonEmptyString(value)
+  return parsed &&
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+      parsed,
+    )
+    ? parsed
+    : null
+}
+
+function positiveInt(value: unknown, fallback = 1): number {
+  if (typeof value === "boolean") return fallback
+  const parsed = Number(value)
+  return Number.isInteger(parsed) && parsed >= 1 ? parsed : fallback
+}
+
+function nonnegativeNumber(value: unknown): number | null {
+  if (
+    typeof value === "boolean" ||
+    value === null ||
+    (typeof value !== "number" && nonEmptyString(value) === null)
+  )
+    return null
+  const parsed = Number(value)
+  return Number.isFinite(parsed) && parsed >= 0 ? parsed : null
+}
+
+function dateString(value: unknown): string | null {
+  const parsed = nonEmptyString(value)
+  if (!parsed) return null
+  const date = new Date(`${parsed}T00:00:00Z`)
+  return Number.isFinite(date.getTime()) &&
+    date.toISOString().slice(0, 10) === parsed
+    ? parsed
+    : null
+}
+
+function parseRecipients(value: unknown): PaymentRecipientRequest[] {
+  const recipients: PaymentRecipientRequest[] = []
+  const seen = new Set<string>()
+  for (const entry of entries(value)) {
+    const recipientKey = nonEmptyString(entry.recipient_key)
+    const name = nonEmptyString(entry.name)
+    if (
+      !recipientKey ||
+      recipientKey.length > 255 ||
+      !name ||
+      seen.has(recipientKey)
+    )
+      continue
+    const email = nonEmptyString(entry.email)
+    const humanId = uuidString(entry.human_id)
+    const attendeeId = uuidString(entry.existing_attendee_id)
+    const categoryId = uuidString(entry.category_id)
+    recipients.push({
+      recipient_key: recipientKey,
+      name,
+      ...(humanId ? { human_id: humanId } : {}),
+      ...(attendeeId ? { existing_attendee_id: attendeeId } : {}),
+      ...(entry.email === null || email?.includes("@") ? { email } : {}),
+      ...(entry.category_id === null || categoryId
+        ? { category_id: categoryId }
+        : {}),
+      ...(isRecord(entry.profile_snapshot)
+        ? { profile_snapshot: entry.profile_snapshot }
+        : {}),
+    })
+    seen.add(recipientKey)
+  }
+  return recipients
+}
+
+function legacyAssignment(
+  entry: UnknownRecord,
+  recipientKeys: Set<string>,
+): CartAssignment {
+  const recipientKey = nonEmptyString(entry.recipient_key)
+  if (recipientKey && recipientKeys.has(recipientKey)) {
+    return { kind: "recipient", recipient_key: recipientKey }
+  }
+  const attendeeId = nonEmptyString(entry.attendee_id)
+  if (!attendeeId) return { kind: "unassigned" }
+  if (attendeeId.startsWith("recipient:")) {
+    const key = attendeeId.slice("recipient:".length)
+    if (recipientKeys.has(key)) return { kind: "recipient", recipient_key: key }
+  }
+  return { kind: "attendee", attendee_id: attendeeId }
+}
+
+function migrateLegacySnapshot(value: UnknownRecord): CartState {
+  const recipients = parseRecipients(value.recipients)
+  const recipientKeys = new Set(recipients.map((item) => item.recipient_key))
+  const lines: CartLine[] = []
+  const passProductIds = new Set<string>()
+  const addProduct = (entry: UnknownRecord, stepType: string | null) => {
+    const productId = nonEmptyString(entry.product_id)
+    if (!productId) return
+    lines.push({
+      kind: "product",
+      assignment: legacyAssignment(entry, recipientKeys),
+      step_type: stepType,
+      product_id: productId,
+      quantity: positiveInt(entry.quantity),
+      price: nonnegativeNumber(entry.price),
+    })
+  }
+
+  for (const entry of entries(value.passes)) {
+    const productId = nonEmptyString(entry.product_id)
+    if (!productId) continue
+    passProductIds.add(productId)
+    addProduct(entry, "tickets")
+  }
+  if (isRecord(value.housing)) {
+    const productId = nonEmptyString(value.housing.product_id)
+    const checkIn = dateString(value.housing.check_in)
+    const checkOut = dateString(value.housing.check_out)
+    if (productId && checkIn && checkOut) {
+      lines.push({
+        kind: "date_range",
+        assignment: legacyAssignment(value.housing, recipientKeys),
+        step_type: "housing",
+        product_id: productId,
+        check_in: checkIn,
+        check_out: checkOut,
+        quantity: positiveInt(value.housing.quantity),
+      })
+    }
+  }
+  for (const entry of entries(value.merch)) addProduct(entry, "merch")
+  if (isRecord(value.patron)) {
+    const productId = nonEmptyString(value.patron.product_id)
+    const amount = nonnegativeNumber(value.patron.amount)
+    if (productId && amount !== null) {
+      lines.push({
+        kind: "custom_amount",
+        assignment: legacyAssignment(value.patron, recipientKeys),
+        step_type: "patron",
+        product_id: productId,
+        amount,
+        is_custom_amount:
+          typeof value.patron.is_custom_amount === "boolean"
+            ? value.patron.is_custom_amount
+            : false,
+      })
+    }
+  }
+  for (const entry of entries(value.meal_plans)) {
+    const productId = nonEmptyString(entry.product_id)
+    if (!productId) continue
+    const choices = isRecord(entry.daily_choices)
+      ? Object.fromEntries(
+          Object.entries(entry.daily_choices).filter(
+            (pair): pair is [string, string] => typeof pair[1] === "string",
+          ),
+        )
+      : null
+    lines.push({
+      kind: "meal_plan",
+      assignment: legacyAssignment(entry, recipientKeys),
+      step_type: "meal_plan",
+      product_id: productId,
+      daily_choices: choices,
+      dietary_restriction:
+        typeof entry.dietary_restriction === "string"
+          ? entry.dietary_restriction
+          : null,
+      special_request:
+        typeof entry.special_request === "string"
+          ? entry.special_request
+          : null,
+    })
+  }
+  for (const entry of entries(value.accommodations)) {
+    const accommodationId = nonEmptyString(entry.accommodation_id)
+    const checkIn = dateString(entry.check_in)
+    const checkOut = dateString(entry.check_out)
+    if (!accommodationId || !checkIn || !checkOut) continue
+    const guestCount = positiveInt(entry.guest_count, 0)
+    lines.push({
+      kind: "accommodation",
+      assignment: legacyAssignment(entry, recipientKeys),
+      step_type: "housing",
+      accommodation_id: accommodationId,
+      check_in: checkIn,
+      check_out: checkOut,
+      guest_count: guestCount || null,
+      guests: Array.isArray(entry.guests)
+        ? entry.guests.filter(
+            (guest): guest is string => typeof guest === "string",
+          )
+        : [],
+    })
+  }
+  for (const entry of entries(value.dynamic_items)) {
+    const productId = nonEmptyString(entry.product_id)
+    if (!productId || passProductIds.has(productId)) continue
+    addProduct(entry, nonEmptyString(entry.step_type))
+  }
+  return {
+    lines,
+    recipients,
+    promo_code: typeof value.promo_code === "string" ? value.promo_code : null,
+    insurance: typeof value.insurance === "boolean" ? value.insurance : false,
+    current_step:
+      typeof value.current_step === "string" ? value.current_step : null,
+  }
+}
+
+export function normalizeCartItemsSnapshot(
+  value: unknown,
+): { items: CartItemsSnapshot; migrated: boolean } | null {
+  if (!isRecord(value)) return null
+  if ("lines" in value) {
+    if (!Array.isArray(value.lines)) return null
+    return { items: value as unknown as CartItemsSnapshot, migrated: false }
+  }
+  return { items: migrateLegacySnapshot(value), migrated: true }
+}
+
 function readLocalStorage(storageKey: string): OpenCartLocalStorage | null {
   if (typeof window === "undefined") return null
   try {
     const raw = window.localStorage.getItem(storageKey)
     if (!raw) return null
-    return JSON.parse(raw) as OpenCartLocalStorage
+    const parsed: unknown = JSON.parse(raw)
+    if (!isRecord(parsed)) return null
+    const normalized = normalizeCartItemsSnapshot(parsed.items)
+    if (!normalized) return null
+    const saved: OpenCartLocalStorage = {
+      items: normalized.items,
+      cartId: typeof parsed.cartId === "string" ? parsed.cartId : null,
+      restoreToken:
+        typeof parsed.restoreToken === "string" ? parsed.restoreToken : null,
+    }
+    writeLocalStorage(storageKey, saved)
+    return saved
   } catch {
     return null
   }
@@ -204,56 +410,7 @@ function upsertScopedOpenCart(
 export function buildItemsSnapshot(
   state: CartSelectionState,
 ): CartItemsSnapshot {
-  const recipientSelections = buildPersistedPassSelections(state.selectedPasses)
-  return {
-    ...recipientSelections,
-    housing: state.housing
-      ? {
-          product_id: state.housing.productId,
-          check_in: state.housing.checkIn,
-          check_out: state.housing.checkOut,
-          quantity: state.housing.quantity,
-        }
-      : null,
-    merch: state.merch.map((m) => ({
-      product_id: m.productId,
-      quantity: m.quantity,
-    })),
-    patron: state.patron
-      ? {
-          product_id: state.patron.productId,
-          amount: state.patron.amount,
-          is_custom_amount: state.patron.isCustomAmount,
-        }
-      : null,
-    meal_plans: state.selectedMealPlans.map((m) => ({
-      attendee_id: m.attendeeId,
-      product_id: m.productId,
-      daily_choices: m.dailyChoices,
-      dietary_restriction: m.dietaryRestriction,
-      special_request: m.specialRequest,
-    })),
-    accommodations: state.accommodations.map((a) => ({
-      accommodation_id: a.accommodationId,
-      check_in: a.checkIn,
-      check_out: a.checkOut,
-      guest_count: a.guestCount,
-      guests: a.guests.filter(Boolean),
-    })),
-    // Flat array — step_type is the grouping key used to reconstruct the
-    // Record<string, SelectedDynamicItem[]> during hydration.
-    dynamic_items: Object.values(state.dynamicItems)
-      .flat()
-      .map((item) => ({
-        step_type: item.stepType,
-        product_id: item.productId,
-        quantity: item.quantity,
-        price: item.price,
-      })),
-    promo_code: state.promoCodeValid ? state.promoCode : null,
-    insurance: state.insurance,
-    current_step: state.currentStep !== "success" ? state.currentStep : null,
-  }
+  return buildPersistedCartState(state)
 }
 
 /** Returns true if there is at least one product selected in the cart state. */
@@ -271,11 +428,13 @@ export function hasCartItems(state: CartSelectionState): boolean {
 
 /** Apply a saved CartItemsSnapshot to the UI state, validating product availability. */
 export function hydrateFromSnapshot(
-  snapshot: CartItemsSnapshot,
+  cartState: CartItemsSnapshot,
   products: ProductsPass[],
   housingPricePerDay: boolean,
   restorationSetters: RestorationSetters,
+  checkoutMode: CheckoutMode = CHECKOUT_MODE.PASS_SYSTEM,
 ): void {
+  const snapshot = deriveCartRestoration(cartState, checkoutMode)
   const {
     setHousing,
     setMerch,
@@ -288,7 +447,7 @@ export function hydrateFromSnapshot(
   } = restorationSetters
 
   if (snapshot.passes.length > 0 && restorePassRecipients) {
-    restorePassRecipients(snapshot.recipients ?? [], snapshot.passes)
+    restorePassRecipients(snapshot.recipients, snapshot.passes)
   }
 
   // Restore housing — skip products that are sold_out / ended / upcoming.
@@ -327,7 +486,7 @@ export function hydrateFromSnapshot(
   }
 
   // Restore merch — drop items whose product is no longer selectable.
-  if (snapshot.merch?.length) {
+  if (snapshot.merch.length) {
     const restoredMerch = snapshot.merch.reduce<SelectedMerchItem[]>(
       (acc, saved) => {
         const product = products.find((p) => p.id === saved.product_id)
@@ -368,7 +527,7 @@ export function hydrateFromSnapshot(
   }
 
   // Restore meal plans — resolve the ProductsPass reference the UI needs.
-  if (snapshot.meal_plans?.length) {
+  if (snapshot.meal_plans.length) {
     const restoredMealPlans = snapshot.meal_plans.reduce<
       SelectedMealPlanItem[]
     >((acc, saved) => {
@@ -388,26 +547,27 @@ export function hydrateFromSnapshot(
   }
 
   // Restore insurance
-  if (snapshot.insurance) {
+  if (cartState.insurance) {
     setInsurance(true)
   }
 
   // Restore dynamic items — group flat array back into Record<string, SelectedDynamicItem[]>
   // keyed by step_type. Skip entries whose product is no longer available.
-  if (snapshot.dynamic_items?.length) {
+  if (snapshot.dynamic_items.length) {
     const grouped: Record<string, SelectedDynamicItem[]> = {}
     for (const saved of snapshot.dynamic_items) {
       const product = products.find((p) => p.id === saved.product_id)
-      if (!product) continue
+      const stepType = saved.step_type
+      if (!product || !stepType) continue
       if (!getProductAvailability(product).canSelect) continue
       const entry: SelectedDynamicItem = {
         productId: product.id,
         product,
         quantity: saved.quantity,
-        price: saved.price,
-        stepType: saved.step_type,
+        price: saved.price ?? product.price,
+        stepType,
       }
-      grouped[saved.step_type] = [...(grouped[saved.step_type] ?? []), entry]
+      grouped[stepType] = [...(grouped[stepType] ?? []), entry]
     }
     if (Object.keys(grouped).length > 0) {
       setDynamicItems(grouped)
@@ -417,8 +577,8 @@ export function hydrateFromSnapshot(
   // Restore promo code — populate the input field so the gated re-validation
   // (after release settles) can confirm the code is still valid. setPromoCode
   // is optional (not present on non-open-cart flows).
-  if (snapshot.promo_code && setPromoCode) {
-    setPromoCode(snapshot.promo_code)
+  if (cartState.promo_code && setPromoCode) {
+    setPromoCode(cartState.promo_code)
   }
 }
 
@@ -428,6 +588,7 @@ export function useOpenCartPersistence({
   enabled,
   selectionStateRef,
   products,
+  checkoutMode = CHECKOUT_MODE.PASS_SYSTEM,
   housingPricePerDay,
   restorationSetters,
   hasRestoredCheckoutRef,
@@ -510,36 +671,74 @@ export function useOpenCartPersistence({
       return
     }
 
-    // Signed-link restore: cid + sig present in URL
-    if (cidParam && sigParam) {
+    const savedSnapshot = readLocalStorage(scope.storageKey)
+    const hasSignedUrl = Boolean(cidParam && sigParam)
+    const restoreCartId = hasSignedUrl ? cidParam : savedSnapshot?.cartId
+    const restoreToken = hasSignedUrl ? sigParam : savedSnapshot?.restoreToken
+
+    // A signed URL wins, but a same-browser cart can use its stored proof to
+    // reconcile with the backend before trusting its local snapshot.
+    if (restoreCartId && restoreToken) {
       // Resolve restorationPromise only AFTER the async call settles so that
       // the release effect sees the populated cartMetaRef (P1 fix).
-      restoreScopedOpenCart(popupSlug, flowSlug, cidParam, sigParam)
+      restoreScopedOpenCart(popupSlug, flowSlug, restoreCartId, restoreToken)
         .then((openCart) => {
           if (previousScopeRef.current !== restorationScope) return
-          // Persist the backend meta so the debounced save can merge with it
+          const backendItems = openCart.items as unknown as CartItemsSnapshot
+          const local = savedSnapshot
+          const repairFromLocal =
+            backendItems.lines.length === 0 &&
+            local?.cartId === openCart.id &&
+            local.items.lines.length > 0
+          const restoredItems = repairFromLocal ? local.items : backendItems
           cartMetaRef.current = {
             cartId: openCart.id,
             restoreToken: openCart.restore_token ?? null,
           }
-          // Update localStorage with the restored data so same-browser
-          // navigation continues from the same state.
           writeLocalStorage(scope.storageKey, {
-            items: openCart.items as CartItemsSnapshot,
+            items: restoredItems,
             cartId: openCart.id,
             restoreToken: openCart.restore_token ?? null,
           })
           hydrateFromSnapshot(
-            openCart.items as CartItemsSnapshot,
+            restoredItems,
             products,
             housingPricePerDay,
             restorationSetters,
+            checkoutMode,
           )
+          if (!repairFromLocal) return
+
+          inFlightUpsertRef.current = inFlightUpsertRef.current
+            .then(() =>
+              upsertScopedOpenCart(
+                popupSlug,
+                flowSlug,
+                openCart.email,
+                restoredItems,
+              ),
+            )
+            .then((repairedCart) => {
+              if (previousScopeRef.current !== restorationScope) return
+              cartMetaRef.current = {
+                cartId: repairedCart.id,
+                restoreToken: repairedCart.restore_token ?? null,
+              }
+              writeLocalStorage(scope.storageKey, {
+                items: restoredItems,
+                cartId: repairedCart.id,
+                restoreToken: repairedCart.restore_token ?? null,
+              })
+            })
+            .catch(() => {
+              // The canonical local snapshot remains available for retry.
+            })
+          return inFlightUpsertRef.current
         })
         .catch(() => {
           if (previousScopeRef.current !== restorationScope) return
           // 403 (bad signature) or 404 (no cart / no secret) — fall back to localStorage
-          const saved = readLocalStorage(scope.storageKey)
+          const saved = savedSnapshot
           if (saved) {
             cartMetaRef.current = {
               cartId: saved.cartId,
@@ -550,6 +749,7 @@ export function useOpenCartPersistence({
               products,
               housingPricePerDay,
               restorationSetters,
+              checkoutMode,
             )
           }
         })
@@ -562,7 +762,7 @@ export function useOpenCartPersistence({
     }
 
     // localStorage same-browser restore
-    const saved = readLocalStorage(scope.storageKey)
+    const saved = savedSnapshot
     if (saved) {
       cartMetaRef.current = {
         cartId: saved.cartId,
@@ -573,6 +773,7 @@ export function useOpenCartPersistence({
         products,
         housingPricePerDay,
         restorationSetters,
+        checkoutMode,
       )
 
       // restore_token refresh: when a cart was saved before the popup had a
