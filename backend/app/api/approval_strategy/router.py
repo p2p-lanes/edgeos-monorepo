@@ -7,6 +7,7 @@ from app.api.approval_strategy.crud import approval_strategies_crud
 from app.api.approval_strategy.schemas import (
     ApprovalStrategyCreate,
     ApprovalStrategyPublic,
+    ApprovalStrategyType,
     ApprovalStrategyUpdate,
 )
 from app.api.shared.enums import UserRole
@@ -54,12 +55,8 @@ async def get_approval_strategy(
             detail="Popup not found",
         )
 
-    strategy = approval_strategies_crud.get_by_popup(db, popup_id)
-    if not strategy:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Approval strategy not configured for this popup",
-        )
+    strategy = approval_strategies_crud.get_effective_by_popup(db, popup_id)
+    assert strategy is not None
 
     return ApprovalStrategyPublic.model_validate(strategy)
 
@@ -137,7 +134,7 @@ async def delete_approval_strategy(
     db: TenantSession,
     _current_user: CurrentWriter,
 ) -> None:
-    """Delete approval strategy for a popup (revert to manual review)."""
+    """Idempotently disable review by resetting the gathering to AUTO_ACCEPT."""
     from app.api.popup.crud import popups_crud
 
     # Verify popup exists
@@ -149,10 +146,16 @@ async def delete_approval_strategy(
         )
 
     strategy = approval_strategies_crud.get_by_popup(db, popup_id)
-    if not strategy:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Approval strategy not configured for this popup",
+    if strategy:
+        approval_strategies_crud.update(
+            db,
+            strategy,
+            ApprovalStrategyUpdate(strategy_type=ApprovalStrategyType.AUTO_ACCEPT),
         )
-
-    approval_strategies_crud.delete(db, strategy)
+    else:
+        approval_strategies_crud.create_for_popup(
+            db,
+            popup_id,
+            popup.tenant_id,
+            ApprovalStrategyCreate(strategy_type=ApprovalStrategyType.AUTO_ACCEPT),
+        )

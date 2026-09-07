@@ -7,6 +7,7 @@ from sqlmodel import Session, select
 from app.api.approval_strategy.models import ApprovalStrategies
 from app.api.approval_strategy.schemas import (
     ApprovalStrategyCreate,
+    ApprovalStrategyType,
     ApprovalStrategyUpdate,
 )
 from app.api.shared.crud import BaseCRUD
@@ -23,25 +24,52 @@ class ApprovalStrategiesCRUD(
     def get_by_popup(
         self, session: Session, popup_id: uuid.UUID
     ) -> ApprovalStrategies | None:
-        """The strategy of the popup's DEFAULT flow.
+        """Return the explicitly configured gathering-level strategy."""
+        statement = select(ApprovalStrategies).where(
+            ApprovalStrategies.popup_id == popup_id,
+            ApprovalStrategies.sales_flow_id.is_(None),  # type: ignore[union-attr]
+        )
+        return session.exec(statement).first()
 
-        Kept for callers that name a popup and mean "its default flow"
-        (sdd/sales-flows-rediseno slice 6). There is no popup-shared
-        strategy any more: a strategy belongs to one flow, so two
-        application flows can review their applicants differently.
-        """
-        from app.api.sales_flow.crud import sales_flows_crud
+    def get_effective_by_popup(
+        self, session: Session, popup_id: uuid.UUID
+    ) -> ApprovalStrategies | None:
+        """Return the gathering strategy, safely defaulting to AUTO_ACCEPT."""
+        strategy = self.get_by_popup(session, popup_id)
+        if strategy is not None:
+            return strategy
 
-        default_flow = sales_flows_crud.get_default_flow(session, popup_id)
-        if default_flow is None:
+        from app.api.popup.models import Popups
+
+        popup = session.get(Popups, popup_id)
+        if popup is None:
             return None
-        return self.get_by_flow(session, default_flow.id)
+        return ApprovalStrategies(
+            popup_id=popup.id,
+            tenant_id=popup.tenant_id,
+            strategy_type=ApprovalStrategyType.AUTO_ACCEPT,
+        )
 
     def get_by_flow(
         self, session: Session, flow_id: uuid.UUID
     ) -> ApprovalStrategies | None:
-        """The strategy of `flow_id` — the only way to read one. None means
-        this flow has no strategy, never that it should borrow another's."""
+        """Resolve approval policy only for an application flow."""
+        from app.api.sales_flow.crud import sales_flows_crud
+        from app.api.sales_flow.schemas import SalesFlowType
+
+        flow = sales_flows_crud.get(session, flow_id)
+        if flow is None or flow.type != SalesFlowType.application:
+            return None
+
+        strategy = self.get_override_by_flow(session, flow_id)
+        if strategy is not None:
+            return strategy
+        return self.get_effective_by_popup(session, flow.popup_id)
+
+    def get_override_by_flow(
+        self, session: Session, flow_id: uuid.UUID
+    ) -> ApprovalStrategies | None:
+        """Return only the strategy explicitly owned by one sales flow."""
         statement = select(ApprovalStrategies).where(
             ApprovalStrategies.sales_flow_id == flow_id
         )
@@ -54,26 +82,18 @@ class ApprovalStrategiesCRUD(
         tenant_id: uuid.UUID,
         strategy_in: ApprovalStrategyCreate,
         sales_flow_id: uuid.UUID | None = None,
+        *,
+        commit: bool = True,
     ) -> ApprovalStrategies:
-        """Create a strategy for a flow. Omitting `sales_flow_id` means the
-        popup's optional compatibility default.
+        """Create a gathering default or an application-flow override.
 
-        Only `application` flows may have one: direct sales and upsales
-        never produce an application, so a review strategy there would be
-        configuration that can never run.
+        Flow ownership is validated only for overrides. A gathering default
+        is valid regardless of the gathering's current sales-flow mix.
         """
-        from app.api.sales_flow.crud import sales_flows_crud
-        from app.api.sales_flow.schemas import SalesFlowType
+        if sales_flow_id is not None:
+            from app.api.sales_flow.crud import sales_flows_crud
+            from app.api.sales_flow.schemas import SalesFlowType
 
-        if sales_flow_id is None:
-            default_flow = sales_flows_crud.get_default_flow(session, popup_id)
-            if default_flow is None:
-                raise HTTPException(
-                    status_code=status.HTTP_404_NOT_FOUND,
-                    detail="Sales flow not found",
-                )
-            flow = default_flow
-        else:
             flow = sales_flows_crud.get(session, sales_flow_id)
             if flow is None or flow.popup_id != popup_id:
                 raise HTTPException(
@@ -81,15 +101,14 @@ class ApprovalStrategiesCRUD(
                     detail="Sales flow not found for this popup",
                 )
 
-        if flow.type != SalesFlowType.application:
-            raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                detail=(
-                    "Only application flows can have an approval strategy. "
-                    f"This flow sells directly ({flow.type})."
-                ),
-            )
-        sales_flow_id = flow.id
+            if flow.type != SalesFlowType.application:
+                raise HTTPException(
+                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                    detail=(
+                        "Only application flows can have an approval strategy. "
+                        f"This flow sells directly ({flow.type})."
+                    ),
+                )
 
         db_obj = ApprovalStrategies(
             popup_id=popup_id,
@@ -98,8 +117,11 @@ class ApprovalStrategiesCRUD(
             **strategy_in.model_dump(),
         )
         session.add(db_obj)
-        session.commit()
-        session.refresh(db_obj)
+        if commit:
+            session.commit()
+            session.refresh(db_obj)
+        else:
+            session.flush()
         return db_obj
 
     def update(

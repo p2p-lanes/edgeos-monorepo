@@ -106,6 +106,20 @@ def _slug_url(slug: str) -> str:
 
 
 class TestListPortalPopupsHttp:
+    def test_draft_popup_is_not_listed(
+        self,
+        client: TestClient,
+        db: Session,
+        tenant_a: Tenants,
+    ) -> None:
+        draft = _make_popup(db, tenant_a, suffix="list-draft", status="draft")
+        human = _make_human(db, tenant_a, suffix="list-draft")
+
+        response = client.get(_list_url(), headers=_auth(human))
+
+        assert response.status_code == 200
+        assert str(draft.id) not in {popup["id"] for popup in response.json()}
+
     def test_participant_sees_ended_popup_in_list(
         self,
         client: TestClient,

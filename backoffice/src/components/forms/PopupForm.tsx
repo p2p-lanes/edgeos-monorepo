@@ -36,6 +36,7 @@ import { DangerZone } from "@/components/Common/DangerZone"
 import { FieldError } from "@/components/Common/FieldError"
 import { FormErrorSummary } from "@/components/Common/FormErrorSummary"
 import { ApprovalStrategyForm } from "@/components/forms/ApprovalStrategyForm"
+import { applicationReviewVisibility } from "@/components/forms/popupApplicationReviewVisibility"
 import { getMissingLaunchFields } from "@/components/forms/popupLaunchChecklist"
 import { ReviewersManager } from "@/components/forms/ReviewersManager"
 import { TranslationManager } from "@/components/translations/TranslationManager"
@@ -139,6 +140,10 @@ export function PopupForm({ defaultValues, onSuccess }: PopupFormProps) {
   // them can review applicants while another sells. On a new event there are
   // no doors yet, so the choice made below in the form is the answer.
   const takesApplications = defaultValues?.takes_applications !== false
+  const applicationReview = applicationReviewVisibility({
+    isEdit,
+    takesApplications,
+  })
 
   const createMutation = useMutation({
     mutationFn: (data: PopupCreate) =>
@@ -548,10 +553,9 @@ export function PopupForm({ defaultValues, onSuccess }: PopupFormProps) {
               </form.Subscribe>
             </InlineSection>
 
-            {/* Application review — approval strategy + reviewers (edit only,
-            and only where somebody actually applies: with nothing to review
-            these are meaningless) */}
-            {isEdit && takesApplications && (
+            {/* The gathering default remains valid even before it has an
+            application door. Reviewer assignment only matters once it does. */}
+            {applicationReview.strategy && (
               <>
                 <Separator />
 
@@ -561,14 +565,18 @@ export function PopupForm({ defaultValues, onSuccess }: PopupFormProps) {
                   variant="inline"
                 />
 
-                <Separator />
+                {applicationReview.reviewers && (
+                  <>
+                    <Separator />
 
-                <ConditionalReviewersManager
-                  popupId={defaultValues!.id}
-                  tenantId={defaultValues!.tenant_id}
-                  readOnly={readOnly}
-                  variant="inline"
-                />
+                    <ConditionalReviewersManager
+                      popupId={defaultValues!.id}
+                      tenantId={defaultValues!.tenant_id}
+                      readOnly={readOnly}
+                      variant="inline"
+                    />
+                  </>
+                )}
               </>
             )}
 

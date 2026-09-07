@@ -122,6 +122,8 @@ class BaseFieldConfigsCRUD(
         tenant_id: uuid.UUID,
         sales_flow_id: uuid.UUID,
         section_map: dict[str, uuid.UUID],
+        *,
+        commit: bool = True,
     ) -> list[BaseFieldConfigs]:
         """Create one BaseFieldConfig per base field, owned by one flow.
 
@@ -167,9 +169,12 @@ class BaseFieldConfigsCRUD(
             session.add(config)
             configs.append(config)
 
-        session.commit()
-        for config in configs:
-            session.refresh(config)
+        if commit:
+            session.commit()
+            for config in configs:
+                session.refresh(config)
+        else:
+            session.flush()
         return configs
 
 

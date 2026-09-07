@@ -18,6 +18,7 @@ import uuid
 
 from sqlmodel import Session, func, select
 
+from app.api.approval_strategy.schemas import ApprovalStrategyType
 from app.api.sales_flow.models import SalesFlows
 from app.api.sales_flow.schemas import (
     SalesFlowReadiness,
@@ -73,11 +74,17 @@ def flow_readiness(session: Session, flow: SalesFlows) -> SalesFlowReadiness:
     offered = flow_offered_product_ids(session, flow.id, flow.popup_id)
     field_count = _form_field_count(session, flow.id)
     is_application = flow.type == SalesFlowType.application
-    has_strategy = (
-        approval_strategies_crud.get_by_flow(session, flow.id) is not None
+    strategy = (
+        approval_strategies_crud.get_by_flow(session, flow.id)
         if is_application
-        else False
+        else None
     )
+    has_strategy = False
+    if is_application:
+        has_strategy = (
+            approval_strategies_crud.get_override_by_flow(session, flow.id) is not None
+            or approval_strategies_crud.get_by_popup(session, flow.popup_id) is not None
+        )
 
     blockers: list[str] = []
     if step_count == 0:
@@ -93,7 +100,10 @@ def flow_readiness(session: Session, flow: SalesFlows) -> SalesFlowReadiness:
     warnings: list[str] = []
     if flow.visibility == SalesFlowVisibility.direct_url_only:
         warnings.append(UNLISTED)
-    if is_application and not has_strategy:
+    if (
+        strategy is not None
+        and strategy.strategy_type == ApprovalStrategyType.AUTO_ACCEPT
+    ):
         warnings.append(ACCEPTS_EVERYONE)
 
     return SalesFlowReadiness(

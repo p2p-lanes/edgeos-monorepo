@@ -858,7 +858,7 @@ export type ApprovalStrategyPublic = {
     id: string;
     popup_id: string;
     tenant_id: string;
-    sales_flow_id: string;
+    sales_flow_id: (string | null);
     strategy_type: ApprovalStrategyType;
     required_approvals: number;
     accept_threshold: number;

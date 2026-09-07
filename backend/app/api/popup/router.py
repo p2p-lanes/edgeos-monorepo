@@ -4,15 +4,6 @@ from typing import Annotated
 from fastapi import APIRouter, Header, HTTPException, status
 from sqlalchemy.exc import IntegrityError
 
-from app.api.approval_strategy.crud import approval_strategies_crud
-from app.api.approval_strategy.schemas import (
-    ApprovalStrategyCreate,
-    ApprovalStrategyType,
-)
-from app.api.base_field_config.constants import BASE_FIELD_DEFINITIONS, DEFAULT_SECTIONS
-from app.api.base_field_config.crud import base_field_configs_crud
-from app.api.base_field_config.models import BaseFieldConfigs
-from app.api.form_section.models import FormSections
 from app.api.payment.crud import payments_crud
 from app.api.payment.schemas import PaymentStatus
 from app.api.popup import crud
@@ -21,7 +12,6 @@ from app.api.popup.guards import (
     ensure_api_key_popup,
     is_popup_scoped_api_key,
 )
-from app.api.popup.models import Popups
 from app.api.popup.schemas import (
     CheckoutPreviewTokenPublic,
     PopupAdmin,
@@ -30,7 +20,7 @@ from app.api.popup.schemas import (
     PopupStatus,
     PopupUpdate,
 )
-from app.api.sales_flow.crud import default_flow_name, popup_takes_applications
+from app.api.sales_flow.crud import default_flow_name
 from app.api.shared.enums import LandingMode, UserRole
 from app.api.shared.response import ListModel, PaginationLimit, PaginationSkip, Paging
 from app.api.ticketing_step.constants import seed_ticketing_steps_for_popup
@@ -67,92 +57,6 @@ def _default_flow_or_404(db, popup_id: uuid.UUID):
             detail="Sales flow not found",
         )
     return flow
-
-
-def _create_form_section(
-    db: TenantSession,
-    *,
-    popup: Popups,
-    key: str,
-    sales_flow_id: uuid.UUID,
-) -> FormSections:
-    section_def = DEFAULT_SECTIONS[key]
-    section = FormSections(
-        tenant_id=popup.tenant_id,
-        popup_id=popup.id,
-        sales_flow_id=sales_flow_id,
-        label=section_def["label"],
-        order=section_def["order"],
-        protected=True,
-        kind=section_def["kind"],
-    )
-    db.add(section)
-    db.commit()
-    db.refresh(section)
-    return section
-
-
-def _seed_application_defaults(db: TenantSession, popup: Popups) -> None:
-    from app.api.sales_flow.crud import sales_flows_crud  # noqa: PLC0415
-    from app.api.sales_flow.resolver import build_effective_config  # noqa: PLC0415
-
-    # The form belongs to the popup's default flow (slice 3): a section or
-    # base-field config has no other place to live.
-    default_flow = sales_flows_crud.get_default_flow(db, popup.id)
-    if default_flow is None:
-        return
-
-    if popup.approval_strategy is None:
-        approval_strategies_crud.create_for_popup(
-            db,
-            popup_id=popup.id,
-            tenant_id=popup.tenant_id,
-            strategy_in=ApprovalStrategyCreate(
-                strategy_type=ApprovalStrategyType.AUTO_ACCEPT
-            ),
-        )
-
-    existing_sections = {section.label: section for section in popup.form_sections}
-    section_map: dict[str, uuid.UUID] = {}
-    for key, section_def in DEFAULT_SECTIONS.items():
-        # The sections being seeded belong to the default flow, so the flag
-        # that decides whether to seed one comes from that same flow.
-        if (
-            key == "scholarship"
-            and not build_effective_config(default_flow).allows_scholarship
-        ):
-            continue
-
-        existing_section = existing_sections.get(section_def["label"])
-        if existing_section is None:
-            existing_section = _create_form_section(
-                db, popup=popup, key=key, sales_flow_id=default_flow.id
-            )
-        section_map[key] = existing_section.id
-
-    if popup.base_field_configs:
-        return
-
-    for field_name, definition in BASE_FIELD_DEFINITIONS.items():
-        section_key = definition.get("default_section_key", "profile")
-        if section_key not in section_map:
-            continue
-        db.add(
-            BaseFieldConfigs(
-                tenant_id=popup.tenant_id,
-                popup_id=popup.id,
-                sales_flow_id=default_flow.id,
-                field_name=field_name,
-                section_id=section_map[section_key],
-                position=definition.get("default_position", 0),
-                required=definition.get("required", False),
-                label=definition.get("label"),
-                placeholder=definition.get("default_placeholder"),
-                help_text=definition.get("default_help_text"),
-                options=definition.get("default_options"),
-            )
-        )
-    db.commit()
 
 
 @router.get("", response_model=ListModel[PopupAdmin])
@@ -309,6 +213,7 @@ async def create_popup(
     # (task 5.0), and since sdd/sales-flows-rediseno slice 2 it owns the
     # seeded steps: a step has nowhere else to live. Its `type` also drives
     # the buyer-step gate, and what gets bootstrapped below.
+    from app.api.sales_flow.application_defaults import seed_application_defaults
     from app.api.sales_flow.crud import sales_flows_crud
     from app.api.sales_flow.schemas import SalesFlowType
 
@@ -319,11 +224,11 @@ async def create_popup(
             detail="Popup was created without a sales flow",
         )
 
-    # A door that sells directly skips the application-centric bootstrap (no
-    # approval strategy, no form sections, no base field configs). Only
-    # ticketing steps are seeded, so there is always something to sell.
+    # A door that sells directly skips the flow-owned application form
+    # bootstrap. The gathering approval strategy was created independently;
+    # ticketing steps are seeded for every first door.
     if default_flow.type == SalesFlowType.application.value:
-        _seed_application_defaults(db, popup)
+        seed_application_defaults(db, popup=popup, flow=default_flow)
     seed_ticketing_steps_for_popup(
         db,
         popup_id=popup.id,
@@ -386,11 +291,6 @@ async def update_popup(
                 )
             door_to_retype = current_door
 
-    # Detect feature flags being enabled for the first time
-    scholarship_enabling = (
-        popup_in.allows_scholarship is True and not popup.allows_scholarship
-    )
-
     # CDN image ingestion: rewrite external image URLs to CDN before commit.
     # Pattern B (async hook). Fail-open: any per-URL failure keeps the original URL.
     _svc = ImageIngestionService()
@@ -408,7 +308,18 @@ async def update_popup(
         )
 
     try:
-        updated = crud.update(db, popup, popup_in)
+        updated = crud.update(db, popup, popup_in, commit=False)
+
+        if door_to_retype is not None:
+            # The name follows the type while it is still the one we gave it. A
+            # door the organiser named themselves keeps their name.
+            if door_to_retype.name == default_flow_name(door_to_retype.type):
+                door_to_retype.name = default_flow_name(popup_in.sale_type)
+            door_to_retype.type = popup_in.sale_type
+            db.add(door_to_retype)
+
+        db.commit()
+        db.refresh(updated)
     except IntegrityError as exc:
         db.rollback()
         if "uq_popups_tenant_slug" in str(getattr(exc, "orig", exc)):
@@ -417,72 +328,6 @@ async def update_popup(
                 detail="A popup with this slug already exists in this tenant",
             )
         raise
-
-    if door_to_retype is not None:
-        # The name follows the type while it is still the one we gave it. A
-        # door the organiser named themselves keeps their name.
-        if door_to_retype.name == default_flow_name(door_to_retype.type):
-            door_to_retype.name = default_flow_name(popup_in.sale_type)
-        door_to_retype.type = popup_in.sale_type
-        db.add(door_to_retype)
-        db.commit()
-
-    if popup_takes_applications(db, updated.id):
-        _seed_application_defaults(db, updated)
-
-    # Create gated sections and base field configs on first enable.
-    # Section and config creation are both idempotent: re-enabling a flag
-    # reuses any row left over from a previous enable cycle. Both belong to
-    # the popup's default flow — a form row has no other place to live
-    # (sdd/sales-flows-rediseno slice 3) — so the flow is resolved lazily,
-    # only when a row is actually about to be written. A PATCH that touches
-    # nothing form-related must not depend on it.
-    default_flow = None
-
-    section_map: dict[str, uuid.UUID] = {}
-    for key, should_create in [
-        ("scholarship", scholarship_enabling),
-    ]:
-        if not should_create:
-            continue
-        section_def = DEFAULT_SECTIONS[key]
-        existing_section = next(
-            (
-                s
-                for s in updated.form_sections
-                if s.kind == section_def["kind"] or s.label == section_def["label"]
-            ),
-            None,
-        )
-        if existing_section is not None:
-            section_map[key] = existing_section.id
-            continue
-        if default_flow is None:
-            default_flow = _default_flow_or_404(db, updated.id)
-        section = FormSections(
-            tenant_id=updated.tenant_id,
-            popup_id=updated.id,
-            sales_flow_id=default_flow.id,
-            label=section_def["label"],
-            order=section_def["order"],
-            protected=True,
-            kind=section_def["kind"],
-        )
-        db.add(section)
-        db.commit()
-        db.refresh(section)
-        section_map[key] = section.id
-
-    if section_map:
-        if default_flow is None:
-            default_flow = _default_flow_or_404(db, updated.id)
-        base_field_configs_crud.create_defaults_for_popup(
-            db,
-            popup_id=updated.id,
-            tenant_id=updated.tenant_id,
-            sales_flow_id=default_flow.id,
-            section_map=section_map,
-        )
 
     # Cache invalidation hook — ADR-2 cache event #4.
     # Lazy-open the main-platform DB session only on status transition so other

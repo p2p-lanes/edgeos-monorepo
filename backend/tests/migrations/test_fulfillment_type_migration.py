@@ -18,7 +18,7 @@ from app.api.product.models import Products
 
 REVISION = "e4a7c2d9b1f6"
 PREVIOUS_REVISION = "d9c7b4e2a1f8"
-HEAD_REVISION = "c7e5a1b9d3f2"
+HEAD_REVISION = "a6f4c2e9d1b7"
 COMPATIBILITY_CONSTRAINT = "ck_payment_product_fulfillment_identity_compatibility"
 LEGACY_CONSTRAINT = "ck_payment_product_has_recipient_or_attendee"
 
@@ -316,7 +316,7 @@ def test_backfill_classifies_evidence_propagates_snapshots_and_reports_stably(
             """
             INSERT INTO sales_flows
               (id,tenant_id,popup_id,slug,name,type,is_default)
-              VALUES (:flow,:tenant,:popup,'fulfillment-test','Fulfillment test','direct',true);
+              VALUES (:flow,:tenant,:popup,'fulfillment-test','Fulfillment test','direct',false);
             INSERT INTO products (id, tenant_id, popup_id, name, slug, price, category) VALUES
               (:product_access,:tenant,:popup,'1 access','ft-access',1,'ticket'), (:product_meal,:tenant,:popup,'2 meal','ft-meal',1,'food'),
               (:product_order,:tenant,:popup,'3 order','ft-order',1,'housing'), (:product_global,:tenant,:popup,'4 global','ft-global',1,'addons'),

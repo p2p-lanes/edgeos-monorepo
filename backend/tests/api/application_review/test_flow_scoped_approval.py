@@ -31,7 +31,6 @@ from app.api.tenant.models import Tenants
 from app.api.user.models import Users
 from app.core.security import create_access_token
 from app.services.approval.calculator import approval_calculator
-from tests._flow_helpers import default_flow_id
 
 
 def _headers(token: str) -> dict[str, str]:
@@ -101,16 +100,13 @@ def _set_strategy(
     strategy_type: ApprovalStrategyType,
     sales_flow_id: uuid.UUID | None = None,
 ) -> ApprovalStrategies:
-    """Create or replace a flow's strategy. Omitting `sales_flow_id` means
-    the popup's default flow — there is no shared tier since slice 6, and
-    popup creation already seeds an AUTO_ACCEPT row there, so it must be
-    replaced rather than duplicated."""
-    if sales_flow_id is None:
-        sales_flow_id = default_flow_id(db, popup_id)
-    filters = [
-        ApprovalStrategies.popup_id == popup_id,
-        ApprovalStrategies.sales_flow_id == sales_flow_id,
-    ]
+    """Create or replace a gathering strategy or flow override."""
+    flow_filter = (
+        ApprovalStrategies.sales_flow_id.is_(None)
+        if sales_flow_id is None
+        else ApprovalStrategies.sales_flow_id == sales_flow_id
+    )
+    filters = [ApprovalStrategies.popup_id == popup_id, flow_filter]
     existing = db.exec(select(ApprovalStrategies).where(*filters)).first()
     if existing:
         db.delete(existing)

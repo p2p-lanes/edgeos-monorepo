@@ -77,10 +77,14 @@ const useResources = () => {
     city?.status === "ended" && city?.id ? String(city.id) : null,
   )
 
+  if (!city) {
+    return { resources: [], doorName: null }
+  }
+
   // What the sidebar actually branches on: whether anybody applies here. A
   // gathering can take applications through one door and sell through
   // another, so the popup's `sale_type` can no longer answer it.
-  const nobodyApplies = city?.takes_applications === false
+  const nobodyApplies = city.takes_applications === false
 
   if (city?.status === "ended") {
     const resources = buildEndedResources({

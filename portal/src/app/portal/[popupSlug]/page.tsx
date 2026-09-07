@@ -1,6 +1,7 @@
 "use client"
 
 import { useRouter } from "next/navigation"
+import { useEffect } from "react"
 import type { CompanionParticipation } from "@/client"
 import { EventCard } from "@/components/Card/EventCard"
 import type { EventStatus } from "@/components/Card/EventProgressBar"
@@ -12,11 +13,15 @@ import { useApplication } from "@/providers/applicationProvider"
 import { useCityProvider } from "@/providers/cityProvider"
 
 export default function Home() {
-  const { getCity } = useCityProvider()
+  const { getCity, popupsLoaded } = useCityProvider()
   const { getRelevantApplication, participation } = useApplication()
   const router = useRouter()
   const city = getCity()
   const { doors } = useGatheringDoors(city?.id ? String(city.id) : null)
+
+  useEffect(() => {
+    if (popupsLoaded && !city) router.replace("/portal")
+  }, [city, popupsLoaded, router])
 
   if (!city) return null
 
