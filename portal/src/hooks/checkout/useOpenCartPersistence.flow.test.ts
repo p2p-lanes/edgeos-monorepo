@@ -48,21 +48,24 @@ describe("getOpenCartScope", () => {
 describe("useOpenCartPersistence Sales Flow boundary", () => {
   it("ignores a signed restore that settles after the flow changes", async () => {
     const emptySnapshot: CartItemsSnapshot = {
-      passes: [],
+      lines: [],
       recipients: [],
-      housing: null,
-      merch: [],
-      patron: null,
-      meal_plans: [],
-      accommodations: [],
-      dynamic_items: [],
       promo_code: null,
       insurance: false,
       current_step: null,
     }
     const oldSnapshot: CartItemsSnapshot = {
       ...emptySnapshot,
-      merch: [{ product_id: "product-1", quantity: 1 }],
+      lines: [
+        {
+          kind: "product",
+          assignment: { kind: "unassigned" },
+          step_type: "merch",
+          product_id: "product-1",
+          quantity: 1,
+          price: null,
+        },
+      ],
     }
     let resolveOldRestore!: (value: {
       id: string

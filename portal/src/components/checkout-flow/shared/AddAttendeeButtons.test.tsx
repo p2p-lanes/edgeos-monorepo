@@ -1,7 +1,10 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 import { CHECKOUT_MODE } from "@/checkout/popupCheckoutPolicy"
-import { buildPersistedPassSelections } from "@/hooks/checkout/useCartPersistence"
+import {
+  buildPersistedPassSelections,
+  deriveCartRestoration,
+} from "@/hooks/checkout/useCartPersistence"
 import { buildItemsSnapshot } from "@/hooks/checkout/useOpenCartPersistence"
 import type { CheckoutRecipientDraft } from "@/types/checkout"
 import type { ProductsPass } from "@/types/Products"
@@ -172,10 +175,14 @@ describe("AddAttendeeButtons", () => {
       insurance: false,
       currentStep: "passes",
     })
+    const openRestoration = deriveCartRestoration(
+      open,
+      CHECKOUT_MODE.PASS_SYSTEM,
+    )
     const restored = provider.rebuildRecipientPasses(
       [],
       open.recipients,
-      open.passes,
+      openRestoration.passes,
       "popup-1",
       [product],
       0,
@@ -184,7 +191,7 @@ describe("AddAttendeeButtons", () => {
     )
 
     expect(authenticated).toEqual({
-      passes: open.passes,
+      lines: open.lines,
       recipients: [recipient],
     })
     expect(restored).toHaveLength(1)

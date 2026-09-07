@@ -44,8 +44,11 @@ describe("buildPersistedCartState", () => {
       currentStep: "accommodation",
     } satisfies CartSelectionState
 
-    expect(buildPersistedCartState(state).accommodations).toEqual([
+    expect(buildPersistedCartState(state).lines).toEqual([
       {
+        kind: "accommodation",
+        assignment: { kind: "unassigned" },
+        step_type: "accommodation",
         accommodation_id: "room-1",
         check_in: "2026-09-01",
         check_out: "2026-09-03",
