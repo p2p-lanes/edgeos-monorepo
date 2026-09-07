@@ -1,5 +1,6 @@
 import uuid
-from datetime import datetime
+from datetime import date, datetime
+from typing import Annotated, Literal
 
 from pydantic import BaseModel, ConfigDict, EmailStr, model_validator
 from pydantic import Field as PydanticField
@@ -9,47 +10,70 @@ from sqlmodel import Column, Field, SQLModel
 from app.api.payment.schemas import PaymentRecipientRequest
 
 
-class CartItemPass(BaseModel):
-    """Pass selection in cart."""
-
-    attendee_id: str | None = None
-    recipient_key: str | None = PydanticField(
-        default=None, min_length=1, max_length=255
-    )
-    product_id: str
-    quantity: int = 1
-
-    @model_validator(mode="after")
-    def validate_identity(self) -> "CartItemPass":
-        if self.attendee_id is not None and self.recipient_key is not None:
-            raise ValueError("attendee_id and recipient_key cannot both be set")
-        return self
+class CartAssignmentBase(BaseModel):
+    model_config = ConfigDict(extra="forbid")
 
 
-class CartItemHousing(BaseModel):
-    """Housing selection in cart."""
-
-    product_id: str
-    check_in: str
-    check_out: str
+class CartUnassigned(CartAssignmentBase):
+    kind: Literal["unassigned"]
 
 
-class CartItemMerch(BaseModel):
-    """Merch selection in cart."""
-
-    product_id: str
-    quantity: int = 1
+class CartAttendeeAssignment(CartAssignmentBase):
+    kind: Literal["attendee"]
+    attendee_id: str = PydanticField(min_length=1)
 
 
-class CartItemPatron(BaseModel):
-    """Patron selection in cart."""
+class CartRecipientAssignment(CartAssignmentBase):
+    kind: Literal["recipient"]
+    recipient_key: str = PydanticField(min_length=1, max_length=255)
 
-    product_id: str
-    amount: float
+
+CartAssignment = Annotated[
+    CartUnassigned | CartAttendeeAssignment | CartRecipientAssignment,
+    PydanticField(discriminator="kind"),
+]
+
+
+class CartLineBase(BaseModel):
+    """Fields shared by every purchase-intent line."""
+
+    assignment: CartAssignment
+    step_type: str | None = PydanticField(default=None, min_length=1)
+
+    model_config = ConfigDict(extra="forbid")
+
+
+class CartProductLine(CartLineBase):
+    """A fixed-price product selection, assigned or unassigned."""
+
+    kind: Literal["product"]
+    product_id: str = PydanticField(min_length=1)
+    quantity: int = PydanticField(default=1, ge=1)
+    # Display snapshot carried by legacy dynamic items. Quote and payment code
+    # always resolve the authoritative product price and never trust this value.
+    price: float | None = PydanticField(default=None, ge=0)
+
+
+class CartDateRangeLine(CartLineBase):
+    """A product selected for a date range, such as legacy housing."""
+
+    kind: Literal["date_range"]
+    product_id: str = PydanticField(min_length=1)
+    check_in: date
+    check_out: date
+    quantity: int = PydanticField(default=1, ge=1)
+
+
+class CartCustomAmountLine(CartLineBase):
+    """A product whose unit price is chosen during checkout."""
+
+    kind: Literal["custom_amount"]
+    product_id: str = PydanticField(min_length=1)
+    amount: float = PydanticField(ge=0)
     is_custom_amount: bool = False
 
 
-class CartItemMealPlan(BaseModel):
+class CartMealPlanLine(CartLineBase):
     """Meal-plan selection in cart (one row per attendee × weekly product).
 
     All metadata fields are nullable in cart because the buyer fills them
@@ -61,14 +85,14 @@ class CartItemMealPlan(BaseModel):
     keeps them in sync across every meal_plans entry for that attendee.
     """
 
-    attendee_id: str
-    product_id: str
+    kind: Literal["meal_plan"]
+    product_id: str = PydanticField(min_length=1)
     daily_choices: dict[str, str] | None = None
     dietary_restriction: str | None = None
     special_request: str | None = None
 
 
-class CartItemAccommodation(BaseModel):
+class CartAccommodationLine(CartLineBase):
     """A room the buyer picked, as it survives a page reload.
 
     Keyed by ``accommodation_id`` rather than by the shadow ``product_id``:
@@ -81,26 +105,34 @@ class CartItemAccommodation(BaseModel):
     payment is submitted.
     """
 
-    accommodation_id: str
-    check_in: str
-    check_out: str
-    guest_count: int | None = None
-    guests: list[str] = []
+    kind: Literal["accommodation"]
+    accommodation_id: str = PydanticField(min_length=1)
+    check_in: date
+    check_out: date
+    guest_count: int | None = PydanticField(default=None, ge=1)
+    guests: list[str] = PydanticField(default_factory=list)
+
+
+CartLine = Annotated[
+    CartProductLine
+    | CartDateRangeLine
+    | CartCustomAmountLine
+    | CartMealPlanLine
+    | CartAccommodationLine,
+    PydanticField(discriminator="kind"),
+]
 
 
 class CartState(BaseModel):
     """Full cart state stored as JSONB."""
 
-    passes: list[CartItemPass] = PydanticField(default_factory=list)
+    lines: list[CartLine] = PydanticField(default_factory=list)
     recipients: list[PaymentRecipientRequest] = PydanticField(default_factory=list)
-    housing: CartItemHousing | None = None
-    merch: list[CartItemMerch] = []
-    patron: CartItemPatron | None = None
-    meal_plans: list[CartItemMealPlan] = []
-    accommodations: list[CartItemAccommodation] = []
     promo_code: str | None = None
     insurance: bool = False
     current_step: str | None = None
+
+    model_config = ConfigDict(extra="forbid")
 
     @model_validator(mode="after")
     def validate_recipients(self) -> "CartState":
@@ -108,7 +140,9 @@ class CartState(BaseModel):
         if len(keys) != len(set(keys)):
             raise ValueError("recipient_key values must be unique")
         referenced = {
-            item.recipient_key for item in self.passes if item.recipient_key is not None
+            line.assignment.recipient_key
+            for line in self.lines
+            if isinstance(line.assignment, CartRecipientAssignment)
         }
         if referenced - set(keys):
             raise ValueError("Every recipient_key must reference a supplied recipient")

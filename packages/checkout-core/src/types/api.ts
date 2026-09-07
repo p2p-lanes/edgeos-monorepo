@@ -181,46 +181,66 @@ export interface CouponValidatePublicResponse {
 
 // --- PUT / GET /checkout/{slug}/{flowSlug}/cart ----------------------------
 // The cart JSONB persisted by the anonymous cart endpoints. Mirrors
-// `backend/app/api/cart/schemas.py` (CartState). Note the backend model drops
-// unknown fields, so only these are round-tripped server-side.
+// `backend/app/api/cart/schemas.py` (CartState).
 
-export interface CartItemPass {
-  attendee_id: string
-  product_id: string
-  quantity: number
+export type CartAssignment =
+  | { kind: "unassigned" }
+  | { kind: "attendee"; attendee_id: string }
+  | { kind: "recipient"; recipient_key: string }
+
+interface CartLineBase {
+  assignment: CartAssignment
+  step_type?: string | null
 }
 
-export interface CartItemHousing {
+export interface CartProductLine extends CartLineBase {
+  kind: "product"
+  product_id: string
+  quantity: number
+  price?: number | null
+}
+
+export interface CartDateRangeLine extends CartLineBase {
+  kind: "date_range"
   product_id: string
   check_in: string
   check_out: string
+  quantity?: number
 }
 
-export interface CartItemMerch {
-  product_id: string
-  quantity: number
-}
-
-export interface CartItemPatron {
+export interface CartCustomAmountLine extends CartLineBase {
+  kind: "custom_amount"
   product_id: string
   amount: number
-  is_custom_amount: boolean
+  is_custom_amount?: boolean
 }
 
-export interface CartItemMealPlan {
-  attendee_id: string
+export interface CartMealPlanLine extends CartLineBase {
+  kind: "meal_plan"
   product_id: string
   daily_choices?: Record<string, string> | null
   dietary_restriction?: string | null
   special_request?: string | null
 }
 
+export interface CartAccommodationLine extends CartLineBase {
+  kind: "accommodation"
+  accommodation_id: string
+  check_in: string
+  check_out: string
+  guest_count?: number | null
+  guests?: string[]
+}
+
+export type CartLine =
+  | CartProductLine
+  | CartDateRangeLine
+  | CartCustomAmountLine
+  | CartMealPlanLine
+  | CartAccommodationLine
+
 export interface CartState {
-  passes?: CartItemPass[]
-  housing?: CartItemHousing | null
-  merch?: CartItemMerch[]
-  patron?: CartItemPatron | null
-  meal_plans?: CartItemMealPlan[]
+  lines?: CartLine[]
   promo_code?: string | null
   insurance?: boolean
   current_step?: string | null

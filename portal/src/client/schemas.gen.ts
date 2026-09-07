@@ -188,7 +188,7 @@ export const AbandonedCartPublicSchema = {
             title: 'Id'
         },
         items: {
-            '$ref': '#/components/schemas/CartState'
+            '$ref': '#/components/schemas/CartState-Output'
         },
         created_at: {
             anyOf: [
@@ -6930,6 +6930,251 @@ export const CalendarUnitSchema = {
     description: 'One row of the calendar.'
 } as const;
 
+export const CartAccommodationLineSchema = {
+    properties: {
+        assignment: {
+            oneOf: [
+                {
+                    '$ref': '#/components/schemas/CartUnassigned'
+                },
+                {
+                    '$ref': '#/components/schemas/CartAttendeeAssignment'
+                },
+                {
+                    '$ref': '#/components/schemas/CartRecipientAssignment'
+                }
+            ],
+            title: 'Assignment',
+            discriminator: {
+                propertyName: 'kind',
+                mapping: {
+                    attendee: '#/components/schemas/CartAttendeeAssignment',
+                    recipient: '#/components/schemas/CartRecipientAssignment',
+                    unassigned: '#/components/schemas/CartUnassigned'
+                }
+            }
+        },
+        step_type: {
+            anyOf: [
+                {
+                    type: 'string',
+                    minLength: 1
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Step Type'
+        },
+        kind: {
+            type: 'string',
+            const: 'accommodation',
+            title: 'Kind'
+        },
+        accommodation_id: {
+            type: 'string',
+            minLength: 1,
+            title: 'Accommodation Id'
+        },
+        check_in: {
+            type: 'string',
+            format: 'date',
+            title: 'Check In'
+        },
+        check_out: {
+            type: 'string',
+            format: 'date',
+            title: 'Check Out'
+        },
+        guest_count: {
+            anyOf: [
+                {
+                    type: 'integer',
+                    minimum: 1
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Guest Count'
+        },
+        guests: {
+            items: {
+                type: 'string'
+            },
+            type: 'array',
+            title: 'Guests'
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    required: ['assignment', 'kind', 'accommodation_id', 'check_in', 'check_out'],
+    title: 'CartAccommodationLine',
+    description: `A room the buyer picked, as it survives a page reload.
+
+Keyed by \`\`accommodation_id\`\` rather than by the shadow \`\`product_id\`\`:
+the product is an implementation detail of how the booking travels
+through payments, and resolving it at purchase time means a cart saved
+before a room was re-synced still points at the right room.
+
+Guests are stored as plain names: the buyer types nothing else about
+them, and the \`\`{name: ...}\`\` shape the purchase needs is built when the
+payment is submitted.`
+} as const;
+
+export const CartAttendeeAssignmentSchema = {
+    properties: {
+        kind: {
+            type: 'string',
+            const: 'attendee',
+            title: 'Kind'
+        },
+        attendee_id: {
+            type: 'string',
+            minLength: 1,
+            title: 'Attendee Id'
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    required: ['kind', 'attendee_id'],
+    title: 'CartAttendeeAssignment'
+} as const;
+
+export const CartCustomAmountLineSchema = {
+    properties: {
+        assignment: {
+            oneOf: [
+                {
+                    '$ref': '#/components/schemas/CartUnassigned'
+                },
+                {
+                    '$ref': '#/components/schemas/CartAttendeeAssignment'
+                },
+                {
+                    '$ref': '#/components/schemas/CartRecipientAssignment'
+                }
+            ],
+            title: 'Assignment',
+            discriminator: {
+                propertyName: 'kind',
+                mapping: {
+                    attendee: '#/components/schemas/CartAttendeeAssignment',
+                    recipient: '#/components/schemas/CartRecipientAssignment',
+                    unassigned: '#/components/schemas/CartUnassigned'
+                }
+            }
+        },
+        step_type: {
+            anyOf: [
+                {
+                    type: 'string',
+                    minLength: 1
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Step Type'
+        },
+        kind: {
+            type: 'string',
+            const: 'custom_amount',
+            title: 'Kind'
+        },
+        product_id: {
+            type: 'string',
+            minLength: 1,
+            title: 'Product Id'
+        },
+        amount: {
+            type: 'number',
+            minimum: 0,
+            title: 'Amount'
+        },
+        is_custom_amount: {
+            type: 'boolean',
+            title: 'Is Custom Amount',
+            default: false
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    required: ['assignment', 'kind', 'product_id', 'amount'],
+    title: 'CartCustomAmountLine',
+    description: 'A product whose unit price is chosen during checkout.'
+} as const;
+
+export const CartDateRangeLineSchema = {
+    properties: {
+        assignment: {
+            oneOf: [
+                {
+                    '$ref': '#/components/schemas/CartUnassigned'
+                },
+                {
+                    '$ref': '#/components/schemas/CartAttendeeAssignment'
+                },
+                {
+                    '$ref': '#/components/schemas/CartRecipientAssignment'
+                }
+            ],
+            title: 'Assignment',
+            discriminator: {
+                propertyName: 'kind',
+                mapping: {
+                    attendee: '#/components/schemas/CartAttendeeAssignment',
+                    recipient: '#/components/schemas/CartRecipientAssignment',
+                    unassigned: '#/components/schemas/CartUnassigned'
+                }
+            }
+        },
+        step_type: {
+            anyOf: [
+                {
+                    type: 'string',
+                    minLength: 1
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Step Type'
+        },
+        kind: {
+            type: 'string',
+            const: 'date_range',
+            title: 'Kind'
+        },
+        product_id: {
+            type: 'string',
+            minLength: 1,
+            title: 'Product Id'
+        },
+        check_in: {
+            type: 'string',
+            format: 'date',
+            title: 'Check In'
+        },
+        check_out: {
+            type: 'string',
+            format: 'date',
+            title: 'Check Out'
+        },
+        quantity: {
+            type: 'integer',
+            minimum: 1,
+            title: 'Quantity',
+            default: 1
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    required: ['assignment', 'kind', 'product_id', 'check_in', 'check_out'],
+    title: 'CartDateRangeLine',
+    description: 'A product selected for a date range, such as legacy housing.'
+} as const;
+
 export const CartHumanInfoSchema = {
     properties: {
         id: {
@@ -6970,84 +7215,50 @@ export const CartHumanInfoSchema = {
     description: 'Embedded human info for abandoned cart listing.'
 } as const;
 
-export const CartItemAccommodationSchema = {
+export const CartMealPlanLineSchema = {
     properties: {
-        accommodation_id: {
-            type: 'string',
-            title: 'Accommodation Id'
+        assignment: {
+            oneOf: [
+                {
+                    '$ref': '#/components/schemas/CartUnassigned'
+                },
+                {
+                    '$ref': '#/components/schemas/CartAttendeeAssignment'
+                },
+                {
+                    '$ref': '#/components/schemas/CartRecipientAssignment'
+                }
+            ],
+            title: 'Assignment',
+            discriminator: {
+                propertyName: 'kind',
+                mapping: {
+                    attendee: '#/components/schemas/CartAttendeeAssignment',
+                    recipient: '#/components/schemas/CartRecipientAssignment',
+                    unassigned: '#/components/schemas/CartUnassigned'
+                }
+            }
         },
-        check_in: {
-            type: 'string',
-            title: 'Check In'
-        },
-        check_out: {
-            type: 'string',
-            title: 'Check Out'
-        },
-        guest_count: {
+        step_type: {
             anyOf: [
                 {
-                    type: 'integer'
+                    type: 'string',
+                    minLength: 1
                 },
                 {
                     type: 'null'
                 }
             ],
-            title: 'Guest Count'
+            title: 'Step Type'
         },
-        guests: {
-            items: {
-                type: 'string'
-            },
-            type: 'array',
-            title: 'Guests',
-            default: []
-        }
-    },
-    type: 'object',
-    required: ['accommodation_id', 'check_in', 'check_out'],
-    title: 'CartItemAccommodation',
-    description: `A room the buyer picked, as it survives a page reload.
-
-Keyed by \`\`accommodation_id\`\` rather than by the shadow \`\`product_id\`\`:
-the product is an implementation detail of how the booking travels
-through payments, and resolving it at purchase time means a cart saved
-before a room was re-synced still points at the right room.
-
-Guests are stored as plain names: the buyer types nothing else about
-them, and the \`\`{name: ...}\`\` shape the purchase needs is built when the
-payment is submitted.`
-} as const;
-
-export const CartItemHousingSchema = {
-    properties: {
-        product_id: {
+        kind: {
             type: 'string',
-            title: 'Product Id'
-        },
-        check_in: {
-            type: 'string',
-            title: 'Check In'
-        },
-        check_out: {
-            type: 'string',
-            title: 'Check Out'
-        }
-    },
-    type: 'object',
-    required: ['product_id', 'check_in', 'check_out'],
-    title: 'CartItemHousing',
-    description: 'Housing selection in cart.'
-} as const;
-
-export const CartItemMealPlanSchema = {
-    properties: {
-        attendee_id: {
-            type: 'string',
-            title: 'Attendee Id'
+            const: 'meal_plan',
+            title: 'Kind'
         },
         product_id: {
             type: 'string',
+            minLength: 1,
             title: 'Product Id'
         },
         daily_choices: {
@@ -7087,9 +7298,10 @@ export const CartItemMealPlanSchema = {
             title: 'Special Request'
         }
     },
+    additionalProperties: false,
     type: 'object',
-    required: ['attendee_id', 'product_id'],
-    title: 'CartItemMealPlan',
+    required: ['assignment', 'kind', 'product_id'],
+    title: 'CartMealPlanLine',
     description: `Meal-plan selection in cart (one row per attendee × weekly product).
 
 All metadata fields are nullable in cart because the buyer fills them
@@ -7099,88 +7311,6 @@ incrementally — completeness is enforced only at checkout submission.
 (or the literal "chef" for chef's choice). \`dietary_restriction\` and
 \`special_request\` apply at the attendee level — the frontend / reducer
 keeps them in sync across every meal_plans entry for that attendee.`
-} as const;
-
-export const CartItemMerchSchema = {
-    properties: {
-        product_id: {
-            type: 'string',
-            title: 'Product Id'
-        },
-        quantity: {
-            type: 'integer',
-            title: 'Quantity',
-            default: 1
-        }
-    },
-    type: 'object',
-    required: ['product_id'],
-    title: 'CartItemMerch',
-    description: 'Merch selection in cart.'
-} as const;
-
-export const CartItemPassSchema = {
-    properties: {
-        attendee_id: {
-            anyOf: [
-                {
-                    type: 'string'
-                },
-                {
-                    type: 'null'
-                }
-            ],
-            title: 'Attendee Id'
-        },
-        recipient_key: {
-            anyOf: [
-                {
-                    type: 'string',
-                    maxLength: 255,
-                    minLength: 1
-                },
-                {
-                    type: 'null'
-                }
-            ],
-            title: 'Recipient Key'
-        },
-        product_id: {
-            type: 'string',
-            title: 'Product Id'
-        },
-        quantity: {
-            type: 'integer',
-            title: 'Quantity',
-            default: 1
-        }
-    },
-    type: 'object',
-    required: ['product_id'],
-    title: 'CartItemPass',
-    description: 'Pass selection in cart.'
-} as const;
-
-export const CartItemPatronSchema = {
-    properties: {
-        product_id: {
-            type: 'string',
-            title: 'Product Id'
-        },
-        amount: {
-            type: 'number',
-            title: 'Amount'
-        },
-        is_custom_amount: {
-            type: 'boolean',
-            title: 'Is Custom Amount',
-            default: false
-        }
-    },
-    type: 'object',
-    required: ['product_id', 'amount'],
-    title: 'CartItemPatron',
-    description: 'Patron selection in cart.'
 } as const;
 
 export const CartPaymentInfoSchema = {
@@ -7243,6 +7373,78 @@ export const CartPopupInfoSchema = {
     description: 'Embedded popup info for abandoned cart listing.'
 } as const;
 
+export const CartProductLineSchema = {
+    properties: {
+        assignment: {
+            oneOf: [
+                {
+                    '$ref': '#/components/schemas/CartUnassigned'
+                },
+                {
+                    '$ref': '#/components/schemas/CartAttendeeAssignment'
+                },
+                {
+                    '$ref': '#/components/schemas/CartRecipientAssignment'
+                }
+            ],
+            title: 'Assignment',
+            discriminator: {
+                propertyName: 'kind',
+                mapping: {
+                    attendee: '#/components/schemas/CartAttendeeAssignment',
+                    recipient: '#/components/schemas/CartRecipientAssignment',
+                    unassigned: '#/components/schemas/CartUnassigned'
+                }
+            }
+        },
+        step_type: {
+            anyOf: [
+                {
+                    type: 'string',
+                    minLength: 1
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Step Type'
+        },
+        kind: {
+            type: 'string',
+            const: 'product',
+            title: 'Kind'
+        },
+        product_id: {
+            type: 'string',
+            minLength: 1,
+            title: 'Product Id'
+        },
+        quantity: {
+            type: 'integer',
+            minimum: 1,
+            title: 'Quantity',
+            default: 1
+        },
+        price: {
+            anyOf: [
+                {
+                    type: 'number',
+                    minimum: 0
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Price'
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    required: ['assignment', 'kind', 'product_id'],
+    title: 'CartProductLine',
+    description: 'A fixed-price product selection, assigned or unassigned.'
+} as const;
+
 export const CartPublicSchema = {
     properties: {
         id: {
@@ -7261,7 +7463,7 @@ export const CartPublicSchema = {
             title: 'Popup Id'
         },
         items: {
-            '$ref': '#/components/schemas/CartState'
+            '$ref': '#/components/schemas/CartState-Output'
         },
         created_at: {
             anyOf: [
@@ -7294,14 +7496,60 @@ export const CartPublicSchema = {
     description: 'Cart schema for API responses.'
 } as const;
 
-export const CartStateSchema = {
+export const CartRecipientAssignmentSchema = {
     properties: {
-        passes: {
+        kind: {
+            type: 'string',
+            const: 'recipient',
+            title: 'Kind'
+        },
+        recipient_key: {
+            type: 'string',
+            maxLength: 255,
+            minLength: 1,
+            title: 'Recipient Key'
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    required: ['kind', 'recipient_key'],
+    title: 'CartRecipientAssignment'
+} as const;
+
+export const CartState_InputSchema = {
+    properties: {
+        lines: {
             items: {
-                '$ref': '#/components/schemas/CartItemPass'
+                oneOf: [
+                    {
+                        '$ref': '#/components/schemas/CartProductLine'
+                    },
+                    {
+                        '$ref': '#/components/schemas/CartDateRangeLine'
+                    },
+                    {
+                        '$ref': '#/components/schemas/CartCustomAmountLine'
+                    },
+                    {
+                        '$ref': '#/components/schemas/CartMealPlanLine'
+                    },
+                    {
+                        '$ref': '#/components/schemas/CartAccommodationLine'
+                    }
+                ],
+                discriminator: {
+                    propertyName: 'kind',
+                    mapping: {
+                        accommodation: '#/components/schemas/CartAccommodationLine',
+                        custom_amount: '#/components/schemas/CartCustomAmountLine',
+                        date_range: '#/components/schemas/CartDateRangeLine',
+                        meal_plan: '#/components/schemas/CartMealPlanLine',
+                        product: '#/components/schemas/CartProductLine'
+                    }
+                }
             },
             type: 'array',
-            title: 'Passes'
+            title: 'Lines'
         },
         recipients: {
             items: {
@@ -7309,50 +7557,6 @@ export const CartStateSchema = {
             },
             type: 'array',
             title: 'Recipients'
-        },
-        housing: {
-            anyOf: [
-                {
-                    '$ref': '#/components/schemas/CartItemHousing'
-                },
-                {
-                    type: 'null'
-                }
-            ]
-        },
-        merch: {
-            items: {
-                '$ref': '#/components/schemas/CartItemMerch'
-            },
-            type: 'array',
-            title: 'Merch',
-            default: []
-        },
-        patron: {
-            anyOf: [
-                {
-                    '$ref': '#/components/schemas/CartItemPatron'
-                },
-                {
-                    type: 'null'
-                }
-            ]
-        },
-        meal_plans: {
-            items: {
-                '$ref': '#/components/schemas/CartItemMealPlan'
-            },
-            type: 'array',
-            title: 'Meal Plans',
-            default: []
-        },
-        accommodations: {
-            items: {
-                '$ref': '#/components/schemas/CartItemAccommodation'
-            },
-            type: 'array',
-            title: 'Accommodations',
-            default: []
         },
         promo_code: {
             anyOf: [
@@ -7382,15 +7586,106 @@ export const CartStateSchema = {
             title: 'Current Step'
         }
     },
+    additionalProperties: false,
     type: 'object',
     title: 'CartState',
     description: 'Full cart state stored as JSONB.'
 } as const;
 
+export const CartState_OutputSchema = {
+    properties: {
+        lines: {
+            items: {
+                oneOf: [
+                    {
+                        '$ref': '#/components/schemas/CartProductLine'
+                    },
+                    {
+                        '$ref': '#/components/schemas/CartDateRangeLine'
+                    },
+                    {
+                        '$ref': '#/components/schemas/CartCustomAmountLine'
+                    },
+                    {
+                        '$ref': '#/components/schemas/CartMealPlanLine'
+                    },
+                    {
+                        '$ref': '#/components/schemas/CartAccommodationLine'
+                    }
+                ],
+                discriminator: {
+                    propertyName: 'kind',
+                    mapping: {
+                        accommodation: '#/components/schemas/CartAccommodationLine',
+                        custom_amount: '#/components/schemas/CartCustomAmountLine',
+                        date_range: '#/components/schemas/CartDateRangeLine',
+                        meal_plan: '#/components/schemas/CartMealPlanLine',
+                        product: '#/components/schemas/CartProductLine'
+                    }
+                }
+            },
+            type: 'array',
+            title: 'Lines'
+        },
+        recipients: {
+            items: {
+                '$ref': '#/components/schemas/PaymentRecipientRequest'
+            },
+            type: 'array',
+            title: 'Recipients'
+        },
+        promo_code: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Promo Code'
+        },
+        insurance: {
+            type: 'boolean',
+            title: 'Insurance',
+            default: false
+        },
+        current_step: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Current Step'
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    title: 'CartState',
+    description: 'Full cart state stored as JSONB.'
+} as const;
+
+export const CartUnassignedSchema = {
+    properties: {
+        kind: {
+            type: 'string',
+            const: 'unassigned',
+            title: 'Kind'
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    required: ['kind'],
+    title: 'CartUnassigned'
+} as const;
+
 export const CartUpdateSchema = {
     properties: {
         items: {
-            '$ref': '#/components/schemas/CartState'
+            '$ref': '#/components/schemas/CartState-Input'
         }
     },
     type: 'object',
@@ -17213,7 +17508,7 @@ export const OpenCartPublicSchema = {
             title: 'Email'
         },
         items: {
-            '$ref': '#/components/schemas/CartState'
+            '$ref': '#/components/schemas/CartState-Output'
         },
         restore_token: {
             anyOf: [
@@ -17270,7 +17565,7 @@ export const OpenCartUpsertSchema = {
             title: 'Email'
         },
         items: {
-            '$ref': '#/components/schemas/CartState'
+            '$ref': '#/components/schemas/CartState-Input'
         }
     },
     type: 'object',

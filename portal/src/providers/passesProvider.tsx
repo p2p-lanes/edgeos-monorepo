@@ -14,7 +14,7 @@ import {
   resolveFlowCheckoutPolicy,
 } from "@/checkout/popupCheckoutPolicy"
 import type { AttendeePurchases } from "@/client"
-import { useCart } from "@/hooks/useCartApi"
+import { type CartState, useCart } from "@/hooks/useCartApi"
 import useGetPassesData from "@/hooks/useGetPassesData"
 import { usePurchasesQuery } from "@/hooks/useGetPurchases"
 import { getPriceStrategy } from "@/strategies/PriceStrategy"
@@ -188,6 +188,24 @@ export interface CartPassSelection {
   recipient_key?: string | null
   product_id: string
   quantity?: number
+}
+
+function getAssignedProductSelections(
+  cart: CartState | undefined,
+): CartPassSelection[] {
+  if (!cart) return []
+  return cart.lines.reduce<CartPassSelection[]>((selections, line) => {
+    if (line.kind !== "product" || line.assignment.kind === "unassigned")
+      return selections
+    selections.push({
+      product_id: line.product_id,
+      quantity: line.quantity,
+      ...(line.assignment.kind === "attendee"
+        ? { attendee_id: line.assignment.attendee_id }
+        : { recipient_key: line.assignment.recipient_key }),
+    })
+    return selections
+  }, [])
 }
 
 export function applyCartSelections(
@@ -521,12 +539,8 @@ const PassesProvider = ({
 
     if (!hasInitializedRef.current) {
       // First initialization — build base passes with prices
-      const cart = savedCartPassesRef.current as
-        | {
-            passes?: CartPassSelection[]
-            recipients?: CheckoutRecipientDraft[]
-          }
-        | undefined
+      const cart = savedCartPassesRef.current
+      const cartPasses = getAssignedProductSelections(cart)
       let basePasses = rebuildRecipientPasses(
         attendees,
         cart?.recipients ?? [],
@@ -539,13 +553,9 @@ const PassesProvider = ({
       )
 
       // Apply cart selections in the same tick if already available (avoids extra render cycle)
-      if (
-        restoreFromCart &&
-        !hasRestoredCartRef.current &&
-        cart?.passes?.length
-      ) {
+      if (restoreFromCart && !hasRestoredCartRef.current && cartPasses.length) {
         hasRestoredCartRef.current = true
-        basePasses = applyCartSelections(basePasses, cart.passes)
+        basePasses = applyCartSelections(basePasses, cartPasses)
       }
 
       hasInitializedRef.current = true
@@ -555,9 +565,7 @@ const PassesProvider = ({
 
     // Structural change (attendees/products/purchases changed) — rebuild with current discount
     if (structuralChange) {
-      const cart = savedCartPassesRef.current as
-        | { recipients?: CheckoutRecipientDraft[] }
-        | undefined
+      const cart = savedCartPassesRef.current
       setAttendeePasses((current) =>
         rebuildRecipientPasses(
           attendees,
@@ -611,17 +619,16 @@ const PassesProvider = ({
     if (!restoreFromCart) return
     if (hasRestoredCartRef.current) return
     if (!hasInitializedRef.current) return
-    if (!savedCartPasses?.passes?.length) return
+    if (!savedCartPasses) return
+    const cartPasses = getAssignedProductSelections(savedCartPasses)
+    if (!cartPasses.length) return
 
     hasRestoredCartRef.current = true
-    const cart = savedCartPasses as typeof savedCartPasses & {
-      recipients?: CheckoutRecipientDraft[]
-    }
     setAttendeePasses((current) => {
       return rebuildRecipientPasses(
         current,
-        cart.recipients ?? [],
-        cart.passes,
+        savedCartPasses.recipients,
+        cartPasses,
         cityId ?? "",
         products,
         discountRef.current.discount_value,

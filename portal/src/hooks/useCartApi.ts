@@ -5,54 +5,48 @@ import { request } from "@/client/core/request"
 import { useIsAuthenticated } from "@/hooks/useIsAuthenticated"
 import { queryKeys } from "@/lib/query-keys"
 
-export type CartItemPass =
-  | {
-      attendee_id: string
-      recipient_key?: never
-      product_id: string
-      quantity: number
-    }
-  | {
-      attendee_id?: never
-      recipient_key: string
-      product_id: string
-      quantity: number
-    }
+export type CartAssignment =
+  | { kind: "unassigned" }
+  | { kind: "attendee"; attendee_id: string }
+  | { kind: "recipient"; recipient_key: string }
 
-export interface CartItemHousing {
+interface CartLineBase {
+  assignment: CartAssignment
+  step_type: string | null
+}
+
+export interface CartProductLine extends CartLineBase {
+  kind: "product"
+  product_id: string
+  quantity: number
+  price: number | null
+}
+
+export interface CartDateRangeLine extends CartLineBase {
+  kind: "date_range"
   product_id: string
   check_in: string
   check_out: string
-  quantity?: number
-}
-
-export interface CartItemMerch {
-  product_id: string
   quantity: number
 }
 
-export interface CartItemPatron {
+export interface CartCustomAmountLine extends CartLineBase {
+  kind: "custom_amount"
   product_id: string
   amount: number
   is_custom_amount: boolean
 }
 
-export interface CartItemMealPlan {
-  attendee_id: string
+export interface CartMealPlanLine extends CartLineBase {
+  kind: "meal_plan"
   product_id: string
   daily_choices: Record<string, string> | null
   dietary_restriction: string | null
   special_request: string | null
 }
 
-/**
- * A room the buyer picked. Mirrors the backend `CartItemAccommodation`.
- *
- * Keyed by the accommodation, not by its shadow product: the product is how
- * a booking travels through payments, and a cart saved before a room was
- * re-synced still has to point at the right room.
- */
-export interface CartItemAccommodation {
+export interface CartAccommodationLine extends CartLineBase {
+  kind: "accommodation"
   accommodation_id: string
   check_in: string
   check_out: string
@@ -60,14 +54,16 @@ export interface CartItemAccommodation {
   guests: string[]
 }
 
+export type CartLine =
+  | CartProductLine
+  | CartDateRangeLine
+  | CartCustomAmountLine
+  | CartMealPlanLine
+  | CartAccommodationLine
+
 export interface CartState {
-  passes: CartItemPass[]
+  lines: CartLine[]
   recipients: PaymentRecipientRequest[]
-  housing: CartItemHousing | null
-  merch: CartItemMerch[]
-  patron: CartItemPatron | null
-  meal_plans: CartItemMealPlan[]
-  accommodations: CartItemAccommodation[]
   promo_code: string | null
   insurance: boolean
   current_step: string | null
@@ -83,13 +79,8 @@ interface CartPublic {
 }
 
 export const EMPTY_CART: CartState = {
-  passes: [],
+  lines: [],
   recipients: [],
-  housing: null,
-  merch: [],
-  patron: null,
-  meal_plans: [],
-  accommodations: [],
   promo_code: null,
   insurance: false,
   current_step: null,

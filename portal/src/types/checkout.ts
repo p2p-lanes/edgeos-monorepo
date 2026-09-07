@@ -162,7 +162,7 @@ export interface SelectedPatronItem {
 
 /**
  * One meal-plan cart entry — bound to a specific (attendee, weekly product) pair.
- * Mirrors `CartItemMealPlan` from the cart API; carries the resolved product
+ * Mirrors the `meal_plan` cart line; carries the resolved product
  * + display fields the UI needs.
  *
  * `dailyChoices` maps ISO weekday dates → menu_option key (or "chef").

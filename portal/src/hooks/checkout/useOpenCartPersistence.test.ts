@@ -17,6 +17,7 @@ import {
   buildItemsSnapshot as buildRealItemsSnapshot,
   hasCartItems as hasRealCartItems,
   hydrateFromSnapshot,
+  normalizeCartItemsSnapshot,
 } from "./useOpenCartPersistence"
 
 vi.mock("@/client", () => ({
@@ -211,15 +212,16 @@ describe("accommodation-only cart persistence", () => {
 
   it("counts and serializes a cart whose only item is a stay", () => {
     expect(hasRealCartItems(state)).toBe(true)
-    expect(buildRealItemsSnapshot(state).accommodations).toEqual([
-      {
-        accommodation_id: "room-1",
-        check_in: "2026-09-01",
-        check_out: "2026-09-03",
-        guest_count: 1,
-        guests: ["Taylor Buyer"],
-      },
-    ])
+    expect(buildRealItemsSnapshot(state).lines).toContainEqual({
+      kind: "accommodation",
+      assignment: { kind: "unassigned" },
+      step_type: "accommodation",
+      accommodation_id: "room-1",
+      check_in: "2026-09-01",
+      check_out: "2026-09-03",
+      guest_count: 1,
+      guests: ["Taylor Buyer"],
+    })
   })
 
   it("does not restore a saved stay because the cart never held the room", () => {
@@ -237,6 +239,38 @@ describe("accommodation-only cart persistence", () => {
     })
 
     expect(setAccommodations).not.toHaveBeenCalled()
+  })
+})
+
+describe("legacy snapshot migration", () => {
+  it("recovers dynamic-only carts and leaves canonical snapshots unchanged", () => {
+    const migrated = normalizeCartItemsSnapshot({
+      passes: [],
+      dynamic_items: [
+        {
+          step_type: "tickets",
+          product_id: "ticket-1",
+          quantity: 2,
+          price: 200,
+        },
+      ],
+      promo_code: "SAVE",
+    })
+
+    expect(migrated?.migrated).toBe(true)
+    expect(migrated?.items.lines).toEqual([
+      {
+        kind: "product",
+        assignment: { kind: "unassigned" },
+        step_type: "tickets",
+        product_id: "ticket-1",
+        quantity: 2,
+        price: 200,
+      },
+    ])
+
+    const canonical = normalizeCartItemsSnapshot(migrated?.items)
+    expect(canonical).toEqual({ items: migrated?.items, migrated: false })
   })
 })
 

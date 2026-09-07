@@ -72,9 +72,11 @@ def _make_product(db: Session, popup: Popups, *, price: str = "100.00") -> Produ
 
 def _items(product: Products, *, promo_code: str | None = None) -> dict:
     return {
-        "passes": [
+        "lines": [
             {
-                "attendee_id": "att-1",
+                "kind": "product",
+                "assignment": {"kind": "attendee", "attendee_id": "att-1"},
+                "step_type": "tickets",
                 "product_id": str(product.id),
                 "quantity": 2,
             }
@@ -272,7 +274,7 @@ def test_restore_open_cart_with_valid_signature_returns_items(
     assert body["id"] == created["id"]
     assert body["email"] == "buyer@test.com"
     assert body["items"]["promo_code"] == "X10"
-    assert body["items"]["passes"][0]["quantity"] == 2
+    assert body["items"]["lines"][0]["quantity"] == 2
 
 
 def test_restore_open_cart_invalid_signature_returns_403(

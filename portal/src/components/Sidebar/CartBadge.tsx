@@ -23,12 +23,21 @@ const CartBadge = () => {
   const { mutate: clearCart, isPending } = useClearCart(cityId)
   const [confirming, setConfirming] = useState(false)
 
-  const passCount = cart?.passes?.length ?? 0
-  const merchCount = cart?.merch?.length ?? 0
-  const hasHousing = Boolean(cart?.housing)
-  const hasPatron = Boolean(cart?.patron)
-  const itemCount =
-    passCount + merchCount + (hasHousing ? 1 : 0) + (hasPatron ? 1 : 0)
+  const cartLines = cart?.lines ?? []
+  const passCount = cartLines.filter(
+    (line) => line.kind === "product" && line.step_type === "tickets",
+  ).length
+  const merchCount = cartLines.filter(
+    (line) => line.kind === "product" && line.step_type === "merch",
+  ).length
+  const hasHousing = cartLines.some(
+    (line) => line.kind === "date_range" || line.kind === "accommodation",
+  )
+  const hasPatron = cartLines.some((line) => line.kind === "custom_amount")
+  const itemCount = cartLines.reduce(
+    (count, line) => count + (line.kind === "product" ? line.quantity : 1),
+    0,
+  )
 
   if (!itemCount || !city?.slug) return null
 
