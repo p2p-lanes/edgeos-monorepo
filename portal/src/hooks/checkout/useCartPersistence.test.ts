@@ -28,7 +28,12 @@ describe("buildPersistedCartState", () => {
           checkOut: "2026-09-03",
           nights: 2,
           guestCount: 2,
-          guests: ["Taylor Buyer", ""],
+          guests: [
+            { name: "Taylor Buyer", answers: {} },
+            { name: "", answers: {} },
+          ],
+          bookerAnswers: {},
+          guestForm: null,
           subtotal: 100,
           tax: 10,
           totalPrice: 110,
@@ -50,7 +55,11 @@ describe("buildPersistedCartState", () => {
         check_in: "2026-09-01",
         check_out: "2026-09-03",
         guest_count: 2,
-        guests: ["Taylor Buyer"],
+        // The empty second slot is dropped: a row with no name and no answer
+        // is what the checkout renders for a party not yet filled in, and is
+        // not a person. Mirrors `normalise_guests` on the backend.
+        guests: [{ name: "Taylor Buyer", answers: {} }],
+        booker_answers: {},
       },
     ])
   })

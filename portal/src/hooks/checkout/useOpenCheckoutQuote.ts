@@ -1,4 +1,6 @@
-"use client"
+import { guestsForWire } from "@/lib/accommodationForm"
+
+;("use client")
 
 import { useQuery } from "@tanstack/react-query"
 import {
@@ -43,10 +45,9 @@ export function buildOpenCheckoutPreviewRequest(
       check_in: item.checkIn,
       check_out: item.checkOut,
       guest_count: item.guestCount,
-      guests: item.guests
-        .map((name) => name.trim())
-        .filter(Boolean)
-        .map((name) => ({ name })),
+      guests: guestsForWire(item.guests).map((guest) => ({
+        name: guest.name,
+      })),
     },
   }))
 

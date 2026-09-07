@@ -27,7 +27,9 @@ function room(
     checkOut: "2026-06-08",
     nights: 7,
     guestCount: 1,
-    guests: [""],
+    guests: [{ name: "", answers: {} }],
+    bookerAnswers: {},
+    guestForm: null,
     subtotal: 840,
     tax: 84,
     totalPrice: 924,
@@ -108,7 +110,9 @@ describe("useAccommodationSelection", () => {
     )
 
     expect(result.current.accommodations[0].guestCount).toBe(3)
-    expect(result.current.accommodations[0].guests).toEqual(["", "", ""])
+    expect(
+      result.current.accommodations[0].guests.map((guest) => guest.name),
+    ).toEqual(["", "", ""])
   })
 
   it("drops the trailing name when the party shrinks", () => {
@@ -117,7 +121,14 @@ describe("useAccommodationSelection", () => {
     const { result } = renderHook(() => useAccommodationSelection())
     act(() =>
       result.current.addAccommodation(
-        room({ guestCount: 3, guests: ["Ada", "Grace", "Katherine"] }),
+        room({
+          guestCount: 3,
+          guests: [
+            { name: "Ada", answers: {} },
+            { name: "Grace", answers: {} },
+            { name: "Katherine", answers: {} },
+          ],
+        }),
       ),
     )
     act(() =>
@@ -129,7 +140,9 @@ describe("useAccommodationSelection", () => {
       ),
     )
 
-    expect(result.current.accommodations[0].guests).toEqual(["Ada", "Grace"])
+    expect(
+      result.current.accommodations[0].guests.map((guest) => guest.name),
+    ).toEqual(["Ada", "Grace"])
   })
 
   it("never lets the party drop below one", () => {
@@ -151,7 +164,13 @@ describe("useAccommodationSelection", () => {
     const { result } = renderHook(() => useAccommodationSelection())
     act(() =>
       result.current.addAccommodation(
-        room({ guestCount: 2, guests: ["", ""] }),
+        room({
+          guestCount: 2,
+          guests: [
+            { name: "", answers: {} },
+            { name: "", answers: {} },
+          ],
+        }),
       ),
     )
     act(() =>
@@ -164,7 +183,9 @@ describe("useAccommodationSelection", () => {
       ),
     )
 
-    expect(result.current.accommodations[0].guests).toEqual(["", "Grace"])
+    expect(
+      result.current.accommodations[0].guests.map((guest) => guest.name),
+    ).toEqual(["", "Grace"])
   })
 
   it("drops rooms quoted for other dates when the stay moves", () => {

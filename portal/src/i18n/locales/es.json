@@ -418,6 +418,19 @@
         "over_capacity": "Capacidad insuficiente para el grupo",
         "inactive": "No disponible",
         "default": "No disponible para estas fechas"
+      },
+      "form": {
+        "lead_guest": "Huésped principal",
+        "guest_number": "Huésped {{number}}",
+        "name": "Nombre completo",
+        "not_filled_in": "Sin completar",
+        "complete": "Completo",
+        "missing_count_one": "Falta {{count}}",
+        "missing_count_other": "Faltan {{count}}",
+        "same_as_lead": "Igual que el huésped principal",
+        "progress": "{{complete}} de {{total}} huéspedes completos",
+        "booking_contact": "Contacto de la reserva",
+        "booking_contact_hint": "A quién contacta la propiedad por esta habitación"
       }
     },
     "contribution": {
@@ -497,7 +510,8 @@
       "catalog_add_aria": "Agregar {{product}}",
       "catalog_add_one_aria": "Agregar uno más de {{product}}",
       "catalog_remove_one_aria": "Quitar uno de {{product}}"
-    }
+    },
+    "toast_guest_details_incomplete": "Faltan datos de los huéspedes para completar la reserva."
   },
   "openCheckout": {
     "loading": "Cargando checkout...",

@@ -49,6 +49,7 @@ import { useOpenCartPersistence } from "@/hooks/checkout/useOpenCartPersistence"
 import { useStepProductResolver } from "@/hooks/checkout/useStepProductResolver"
 import useGetPassesData from "@/hooks/useGetPassesData"
 import { useIsAuthenticated } from "@/hooks/useIsAuthenticated"
+import { firstIncompleteStay } from "@/lib/accommodationForm"
 import { buildFormZodSchema } from "@/lib/form-schema-builder"
 import { trackGAAddToCart } from "@/lib/google-analytics"
 import { trackMetaAddToCart } from "@/lib/meta-pixel"
@@ -166,6 +167,29 @@ interface CheckoutContextValue {
     checkOut: string,
     index: number,
     name: string,
+  ) => void
+  setAccommodationBookerAnswer: (
+    accommodationId: string,
+    checkIn: string,
+    checkOut: string,
+    key: string,
+    value: unknown,
+  ) => void
+  setAccommodationGuestAnswer: (
+    accommodationId: string,
+    checkIn: string,
+    checkOut: string,
+    index: number,
+    key: string,
+    value: unknown,
+  ) => void
+  /** Copy the shared answers from the lead guest onto one occupant. */
+  copyBookerAnswersToGuest: (
+    accommodationId: string,
+    checkIn: string,
+    checkOut: string,
+    index: number,
+    keys: string[],
   ) => void
   /** Drop rooms booked for other dates. Called when the buyer moves the stay:
    *  their quotes were for the old nights. */
@@ -388,6 +412,16 @@ export function CheckoutProvider({
   // other — a popup without one collects no buyer info.
   const configuredSteps = configuredStepsOverride ?? stepsData?.results ?? []
 
+  // Whether the accommodation step collects a name per guest. Read here as
+  // well as in the step itself because the pay-time gate has to apply the
+  // same rule from a screen where that step is not mounted.
+  const accommodationRequiresGuestNames =
+    (
+      configuredSteps.find(
+        (step) => step.template === "accommodation-booking" && step.is_enabled,
+      )?.template_config as Record<string, unknown> | undefined
+    )?.require_guest_names !== false
+
   const isBuyerInfoComplete =
     !buyerFormSchema ||
     buildFormZodSchema(buyerFormSchema, false).safeParse(buyerValues).success
@@ -487,6 +521,9 @@ export function CheckoutProvider({
     removeAccommodation,
     setAccommodationGuestCount,
     setAccommodationGuestName,
+    setAccommodationBookerAnswer,
+    setAccommodationGuestAnswer,
+    copyBookerAnswersToGuest,
     clearAccommodationsOutsideStay,
   } = useAccommodationSelection()
 
@@ -1270,8 +1307,27 @@ export function CheckoutProvider({
     ) {
       return "buyer"
     }
+    // Guest details for a booked room. Validated from the cart rather than
+    // from the accommodation step, which may not be mounted: each room
+    // carries the form its property asks, resolved by the server when it was
+    // added. The rule mirrors the one the purchase enforces, so a buyer is
+    // never sent back by the server for something this could have caught.
+    if (
+      accommodations.length > 0 &&
+      (availableSteps as string[]).includes("housing") &&
+      firstIncompleteStay(accommodations, {
+        requireGuestNames: accommodationRequiresGuestNames,
+      })
+    ) {
+      return "housing"
+    }
     return null
-  }, [availableSteps, isBuyerInfoComplete])
+  }, [
+    accommodations,
+    accommodationRequiresGuestNames,
+    availableSteps,
+    isBuyerInfoComplete,
+  ])
 
   // findFirstProductStep: pick a step to bounce the user back to when
   // the cart is empty at confirm time. Skips structural steps (buyer,
@@ -1580,6 +1636,9 @@ export function CheckoutProvider({
     removeAccommodation,
     setAccommodationGuestCount,
     setAccommodationGuestName,
+    setAccommodationBookerAnswer,
+    setAccommodationGuestAnswer,
+    copyBookerAnswersToGuest,
     clearAccommodationsOutsideStay,
     addMealPlan,
     removeMealPlan,

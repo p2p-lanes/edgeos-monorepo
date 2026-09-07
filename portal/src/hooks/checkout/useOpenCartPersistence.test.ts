@@ -193,7 +193,9 @@ describe("accommodation-only cart persistence", () => {
         checkOut: "2026-09-03",
         nights: 2,
         guestCount: 1,
-        guests: ["Taylor Buyer"],
+        guests: [{ name: "Taylor Buyer", answers: {} }],
+        bookerAnswers: {},
+        guestForm: null,
         subtotal: 100,
         tax: 10,
         totalPrice: 110,
@@ -217,9 +219,10 @@ describe("accommodation-only cart persistence", () => {
         check_in: "2026-09-01",
         check_out: "2026-09-03",
         guest_count: 1,
-        // `{ name }` rather than a bare string since the guest form landed:
-        // an entry now carries the answers its property asked for too.
-        guests: [{ name: "Taylor Buyer" }],
+        // `{ name, answers }` rather than a bare string since the guest form
+        // landed: an entry now carries the answers its property asked for.
+        guests: [{ name: "Taylor Buyer", answers: {} }],
+        booker_answers: {},
       },
     ])
   })

@@ -57,7 +57,10 @@ export interface CartItemAccommodation {
   check_in: string
   check_out: string
   guest_count: number | null
-  guests: string[]
+  /** `{ name, answers }` since the guest form landed. The server still lifts
+   *  a bare name from carts saved before that, but nothing writes them now. */
+  guests: { name: string; answers?: Record<string, unknown> }[]
+  booker_answers?: Record<string, unknown>
 }
 
 export interface CartState {

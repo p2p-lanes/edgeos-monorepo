@@ -1,4 +1,6 @@
-"use client"
+import { guestsForWire } from "@/lib/accommodationForm"
+
+;("use client")
 
 import { type MutableRefObject, useCallback, useEffect, useRef } from "react"
 import { CheckoutService } from "@/client"
@@ -71,6 +73,7 @@ export interface CartItemsSnapshot {
      *  accepts bare names for carts saved before that, but nothing writes
      *  them any more. */
     guests: { name: string; answers?: Record<string, unknown> }[]
+    booker_answers?: Record<string, unknown>
   }[]
   /** Flat array of dynamic-step items, keyed by step_type for reconstruction. */
   dynamic_items: {
@@ -241,7 +244,8 @@ export function buildItemsSnapshot(
       check_in: a.checkIn,
       check_out: a.checkOut,
       guest_count: a.guestCount,
-      guests: a.guests.filter(Boolean).map((name) => ({ name })),
+      guests: guestsForWire(a.guests),
+      booker_answers: a.bookerAnswers,
     })),
     // Flat array — step_type is the grouping key used to reconstruct the
     // Record<string, SelectedDynamicItem[]> during hydration.

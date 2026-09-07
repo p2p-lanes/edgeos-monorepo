@@ -46,13 +46,31 @@ export function useAccommodationSelection() {
     [],
   )
 
+  /** Apply a change to the one entry identified by (room, check-in, out). */
+  const patchEntry = useCallback(
+    (
+      accommodationId: string,
+      checkIn: string,
+      checkOut: string,
+      patch: (entry: SelectedAccommodationItem) => SelectedAccommodationItem,
+    ) => {
+      const key = entryKey({ accommodationId, checkIn, checkOut })
+      setAccommodations((prev) =>
+        prev.map((entry) => (entryKey(entry) === key ? patch(entry) : entry)),
+      )
+    },
+    [],
+  )
+
   /**
    * Resize the party in one booking.
    *
-   * The guest-name list is grown and trimmed to match: dropping from three
-   * guests to two must not leave a third name behind to be submitted, and
-   * growing must leave an empty slot for the buyer to fill rather than
-   * silently under-reporting the party.
+   * The guest list is grown and trimmed to match: dropping from three guests
+   * to two must not leave a third behind to be submitted, and growing must
+   * leave an empty slot for the buyer to fill rather than silently
+   * under-reporting the party. Answers already typed into the slots that
+   * survive are kept, because resizing a party is not a reason to make
+   * someone retype their passport number.
    */
   const setAccommodationGuestCount = useCallback(
     (
@@ -61,20 +79,16 @@ export function useAccommodationSelection() {
       checkOut: string,
       guestCount: number,
     ) => {
-      const key = entryKey({ accommodationId, checkIn, checkOut })
-      setAccommodations((prev) =>
-        prev.map((entry) => {
-          if (entryKey(entry) !== key) return entry
-          const next = Math.max(1, Math.floor(guestCount))
-          const guests = Array.from(
-            { length: next },
-            (_, index) => entry.guests[index] ?? "",
-          )
-          return { ...entry, guestCount: next, guests }
-        }),
-      )
+      patchEntry(accommodationId, checkIn, checkOut, (entry) => {
+        const next = Math.max(1, Math.floor(guestCount))
+        const guests = Array.from(
+          { length: next },
+          (_, index) => entry.guests[index] ?? { name: "", answers: {} },
+        )
+        return { ...entry, guestCount: next, guests }
+      })
     },
-    [],
+    [patchEntry],
   )
 
   const setAccommodationGuestName = useCallback(
@@ -85,17 +99,83 @@ export function useAccommodationSelection() {
       index: number,
       name: string,
     ) => {
-      const key = entryKey({ accommodationId, checkIn, checkOut })
-      setAccommodations((prev) =>
-        prev.map((entry) => {
-          if (entryKey(entry) !== key) return entry
-          const guests = [...entry.guests]
-          guests[index] = name
-          return { ...entry, guests }
-        }),
-      )
+      patchEntry(accommodationId, checkIn, checkOut, (entry) => {
+        const guests = [...entry.guests]
+        guests[index] = { ...(guests[index] ?? { answers: {} }), name }
+        return { ...entry, guests }
+      })
     },
-    [],
+    [patchEntry],
+  )
+
+  /** One answer from whoever the room is for. */
+  const setAccommodationBookerAnswer = useCallback(
+    (
+      accommodationId: string,
+      checkIn: string,
+      checkOut: string,
+      key: string,
+      value: unknown,
+    ) => {
+      patchEntry(accommodationId, checkIn, checkOut, (entry) => ({
+        ...entry,
+        bookerAnswers: { ...entry.bookerAnswers, [key]: value },
+      }))
+    },
+    [patchEntry],
+  )
+
+  /** One answer from one occupant, by position. */
+  const setAccommodationGuestAnswer = useCallback(
+    (
+      accommodationId: string,
+      checkIn: string,
+      checkOut: string,
+      index: number,
+      key: string,
+      value: unknown,
+    ) => {
+      patchEntry(accommodationId, checkIn, checkOut, (entry) => {
+        const guests = [...entry.guests]
+        const guest = guests[index] ?? { name: "", answers: {} }
+        guests[index] = {
+          ...guest,
+          answers: { ...guest.answers, [key]: value },
+        }
+        return { ...entry, guests }
+      })
+    },
+    [patchEntry],
+  )
+
+  /**
+   * Copy the lead guest's answers onto one occupant.
+   *
+   * Only the keys the two sections share, and never the name: a couple
+   * travelling together share a phone number and an address, not a name.
+   */
+  const copyBookerAnswersToGuest = useCallback(
+    (
+      accommodationId: string,
+      checkIn: string,
+      checkOut: string,
+      index: number,
+      keys: string[],
+    ) => {
+      patchEntry(accommodationId, checkIn, checkOut, (entry) => {
+        const guests = [...entry.guests]
+        const guest = guests[index] ?? { name: "", answers: {} }
+        const copied: Record<string, unknown> = { ...guest.answers }
+        for (const key of keys) {
+          if (entry.bookerAnswers[key] !== undefined) {
+            copied[key] = entry.bookerAnswers[key]
+          }
+        }
+        guests[index] = { ...guest, answers: copied }
+        return { ...entry, guests }
+      })
+    },
+    [patchEntry],
   )
 
   /**
@@ -122,6 +202,9 @@ export function useAccommodationSelection() {
     removeAccommodation,
     setAccommodationGuestCount,
     setAccommodationGuestName,
+    setAccommodationBookerAnswer,
+    setAccommodationGuestAnswer,
+    copyBookerAnswersToGuest,
     clearAccommodationsOutsideStay,
   }
 }

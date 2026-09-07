@@ -9,6 +9,7 @@ import {
   useSaveCart,
 } from "@/hooks/useCartApi"
 import { checkAndClearPurchasePending } from "@/hooks/usePaymentRedirect"
+import { guestsForWire } from "@/lib/accommodationForm"
 import { getProductAvailability } from "@/lib/product-availability"
 import { queryKeys } from "@/lib/query-keys"
 import type {
@@ -103,7 +104,8 @@ export function buildPersistedCartState(state: CartSelectionState): CartState {
       check_in: item.checkIn,
       check_out: item.checkOut,
       guest_count: item.guestCount,
-      guests: item.guests.filter(Boolean),
+      guests: guestsForWire(item.guests),
+      booker_answers: item.bookerAnswers,
     })),
     promo_code: state.promoCodeValid ? state.promoCode : null,
     insurance: state.insurance,

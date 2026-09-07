@@ -1,4 +1,4 @@
-import type { PaymentRecipientRequest } from "@/client"
+import type { AccommodationGuestForm, PaymentRecipientRequest } from "@/client"
 import type { AttendeePassState } from "./Attendee"
 import type { ProductsPass } from "./Products"
 
@@ -191,6 +191,12 @@ export interface SelectedMealPlanItem {
  * `productId` is the accommodation's shadow product. The purchase line must
  * point at it, or the backend refuses the booking metadata.
  */
+/** One occupant as the checkout holds them, before the booking exists. */
+export interface CheckoutGuest {
+  name: string
+  answers: Record<string, unknown>
+}
+
 export interface SelectedAccommodationItem {
   accommodationId: string
   productId: string
@@ -201,8 +207,17 @@ export interface SelectedAccommodationItem {
   checkOut: string
   nights: number
   guestCount: number
-  /** One name per guest, in order. Empty until the buyer fills them in. */
-  guests: string[]
+  /** One entry per guest, in order. Slots exist before they are filled in. */
+  guests: CheckoutGuest[]
+  /** Answers from whoever the room is for, keyed by the form's field keys. */
+  bookerAnswers: Record<string, unknown>
+  /**
+   * What this room's property asks about the people staying, already
+   * resolved by the server against the step. Captured when the room is added
+   * so the cart carries everything needed to validate it, including from
+   * screens where the accommodation step is not mounted.
+   */
+  guestForm: AccommodationGuestForm | null
   subtotal: number
   tax: number
   totalPrice: number

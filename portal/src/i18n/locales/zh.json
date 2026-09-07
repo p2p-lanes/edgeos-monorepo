@@ -403,6 +403,19 @@
         "over_capacity": "无法容纳您的同行人数",
         "inactive": "不可预订",
         "default": "所选日期不可预订"
+      },
+      "form": {
+        "lead_guest": "主要入住人",
+        "guest_number": "入住人 {{number}}",
+        "name": "全名",
+        "not_filled_in": "尚未填写",
+        "complete": "已完成",
+        "missing_count_one": "缺少 {{count}} 项",
+        "missing_count_other": "缺少 {{count}} 项",
+        "same_as_lead": "与主要入住人相同",
+        "progress": "{{total}} 位入住人中已完成 {{complete}} 位",
+        "booking_contact": "预订联系人",
+        "booking_contact_hint": "住宿方就此房间联系的人"
       }
     },
     "contribution": {
@@ -429,7 +442,8 @@
     "pending_payment_wait": "您有一笔待处理的付款，请等待几分钟。",
     "payment_cancel_failed": "我们无法处理您的付款，请重试。",
     "flow_restriction_violated": "您不符合通过此渠道购买的条件。",
-    "product_not_in_flow": "此商品无法通过此渠道购买。"
+    "product_not_in_flow": "此商品无法通过此渠道购买。",
+    "toast_guest_details_incomplete": "还需要填写入住人信息才能完成付款。"
   },
   "openCheckout": {
     "loading": "正在加载结账...",

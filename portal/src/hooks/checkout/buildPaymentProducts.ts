@@ -6,6 +6,7 @@ import type {
   PaymentProductRequest_Input as PaymentProductRequest,
   PaymentRecipientRequest,
 } from "@/client"
+import { guestsForWire } from "@/lib/accommodationForm"
 import type { AttendeePassState } from "@/types/Attendee"
 import type {
   SelectedAccommodationItem,
@@ -285,10 +286,8 @@ export function buildPaymentProducts({
           check_in: item.checkIn,
           check_out: item.checkOut,
           guest_count: item.guestCount,
-          guests: item.guests
-            .map((name) => name.trim())
-            .filter(Boolean)
-            .map((name) => ({ name })),
+          guests: guestsForWire(item.guests),
+          booker_answers: item.bookerAnswers,
         },
       })
     }

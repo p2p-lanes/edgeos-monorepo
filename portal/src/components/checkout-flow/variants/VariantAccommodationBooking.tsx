@@ -32,7 +32,6 @@ import {
 } from "@/client"
 import { Button } from "@/components/ui/button"
 import { DatePicker } from "@/components/ui/date-picker"
-import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { imageOptimization } from "@/lib/image-optimization"
 import { cn } from "@/lib/utils"
@@ -45,6 +44,7 @@ import {
   type SelectedAccommodationItem,
 } from "@/types/checkout"
 import type { VariantProps } from "../registries/variantRegistry"
+import { GuestDetailsPanel } from "./accommodation/GuestDetailsPanel"
 
 interface AccommodationTemplateConfig {
   layout: "grid" | "list"
@@ -284,82 +284,6 @@ function RoomCard({
   )
 }
 
-/** The party in one booked room: how many, and who. */
-function GuestBlock({
-  item,
-  room,
-  requireGuestNames,
-}: {
-  item: SelectedAccommodationItem
-  room: PublicAccommodation | undefined
-  requireGuestNames: boolean
-}) {
-  const { t } = useTranslation()
-  const { setAccommodationGuestCount, setAccommodationGuestName } =
-    useCheckout()
-  const capacity = room?.guest_capacity ?? item.guestCount
-
-  return (
-    <div className="rounded-xl border bg-muted/30 p-4">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <p className="font-medium">{item.name}</p>
-          <p className="text-xs text-muted-foreground">
-            {item.propertyName} · {formatCheckoutDate(item.checkIn)} →{" "}
-            {formatCheckoutDate(item.checkOut)}
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          <Label htmlFor={`guests-${item.accommodationId}`} className="text-xs">
-            {t("checkout.accommodation.guests_label")}
-          </Label>
-          <Input
-            id={`guests-${item.accommodationId}`}
-            type="number"
-            min={1}
-            max={capacity}
-            className="w-20"
-            value={item.guestCount}
-            onChange={(event) =>
-              setAccommodationGuestCount(
-                item.accommodationId,
-                item.checkIn,
-                item.checkOut,
-                Number(event.target.value) || 1,
-              )
-            }
-          />
-        </div>
-      </div>
-
-      {requireGuestNames && (
-        <div className="mt-3 grid gap-2 sm:grid-cols-2">
-          {item.guests.map((guest, index) => (
-            <Input
-              // Positional slots: a guest has no id until the booking exists,
-              // and this UI never reorders them.
-              key={index}
-              placeholder={t("checkout.accommodation.guest_name_placeholder", {
-                number: index + 1,
-              })}
-              value={guest}
-              onChange={(event) =>
-                setAccommodationGuestName(
-                  item.accommodationId,
-                  item.checkIn,
-                  item.checkOut,
-                  index,
-                  event.target.value,
-                )
-              }
-            />
-          ))}
-        </div>
-      )}
-    </div>
-  )
-}
-
 export default function VariantAccommodationBooking({
   templateConfig,
   onSkip,
@@ -562,7 +486,11 @@ export default function VariantAccommodationBooking({
       checkOut,
       nights,
       guestCount: 1,
-      guests: [""],
+      guests: [{ name: "", answers: {} }],
+      bookerAnswers: {},
+      // Captured now, resolved by the server: the cart then carries what it
+      // needs to be validated from screens where this step is not mounted.
+      guestForm: property?.guest_form ?? null,
       subtotal: Number(row.quote.subtotal),
       tax: Number(row.quote.tax),
       totalPrice: Number(row.quote.total),
@@ -693,10 +621,13 @@ export default function VariantAccommodationBooking({
             {t("checkout.accommodation.who_is_staying")}
           </h3>
           {cart.accommodations.map((item) => (
-            <GuestBlock
+            <GuestDetailsPanel
               key={`${item.accommodationId}-${item.checkIn}`}
               item={item}
-              room={roomById.get(item.accommodationId)}
+              capacity={
+                roomById.get(item.accommodationId)?.guest_capacity ??
+                item.guestCount
+              }
               requireGuestNames={config.requireGuestNames}
             />
           ))}
