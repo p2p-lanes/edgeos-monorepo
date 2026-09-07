@@ -690,3 +690,74 @@ class TestPortalReads:
             headers=_human_auth(outsider),
         )
         assert response.status_code == 404
+
+
+# ---------------------------------------------------------------------------
+# The guest form reaches the checkout already resolved
+# ---------------------------------------------------------------------------
+
+
+class TestGuestFormOnTheOffer:
+    """The client is handed what to ask, never the three modes.
+
+    Resolving inherit / off / custom on the client would mean the checkout
+    could collect a different set of answers from the one the purchase
+    validates, and the buyer would find out at the payment button.
+    """
+
+    FORM = {
+        "booker": {
+            "fields": [
+                {
+                    "key": "full_name",
+                    "type": "text",
+                    "label": "Full name",
+                    "required": True,
+                }
+            ]
+        }
+    }
+
+    def _property_payload(self, body: dict, property_id) -> dict:
+        return next(row for row in body["properties"] if row["id"] == str(property_id))
+
+    def test_a_property_inheriting_the_step_shows_the_step_s_questions(
+        self, client: TestClient, db: Session, tenant_a: Tenants
+    ) -> None:
+        popup = _make_popup(db, tenant_a)
+        _enable_step(db, popup, config={"guest_form": self.FORM})
+        property_row, _ = _make_inventory(db, popup)
+        db.commit()
+
+        body = _offer(client, db, popup, tenant_a).json()
+        payload = self._property_payload(body, property_row.id)
+
+        assert payload["guest_form"]["booker"]["fields"][0]["key"] == "full_name"
+        # Resolved, so the guests section is explicit rather than implied.
+        assert payload["guest_form"]["guests"]["mode"] == "same_as_booker"
+
+    def test_a_property_that_asks_nothing_comes_back_with_no_form(
+        self, client: TestClient, db: Session, tenant_a: Tenants
+    ) -> None:
+        popup = _make_popup(db, tenant_a)
+        _enable_step(db, popup, config={"guest_form": self.FORM})
+        property_row, _ = _make_inventory(db, popup)
+        property_row.guest_form_mode = "off"
+        db.add(property_row)
+        db.commit()
+
+        body = _offer(client, db, popup, tenant_a).json()
+
+        assert self._property_payload(body, property_row.id)["guest_form"] is None
+
+    def test_a_step_with_no_form_asks_nothing_anywhere(
+        self, client: TestClient, db: Session, tenant_a: Tenants
+    ) -> None:
+        popup = _make_popup(db, tenant_a)
+        _enable_step(db, popup)
+        property_row, _ = _make_inventory(db, popup)
+        db.commit()
+
+        body = _offer(client, db, popup, tenant_a).json()
+
+        assert self._property_payload(body, property_row.id)["guest_form"] is None

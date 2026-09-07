@@ -5,7 +5,7 @@
  */
 export type AbandonedCartPublic = {
     id: string;
-    items: CartState;
+    items: CartState_Output;
     created_at?: (string | null);
     updated_at?: (string | null);
     email?: (string | null);
@@ -64,6 +64,9 @@ export type AccommodationBookingCreate = {
     check_out: string;
     guest_count?: (number | null);
     guests?: Array<BookingGuest>;
+    booker_answers?: {
+        [key: string]: unknown;
+    };
     primary_guest_name?: (string | null);
     primary_guest_email?: (string | null);
     notes?: (string | null);
@@ -83,6 +86,12 @@ export type AccommodationBookingPublic = {
     guests?: Array<{
         [key: string]: unknown;
     }>;
+    booker_answers?: {
+        [key: string]: unknown;
+    };
+    form_snapshot?: ({
+    [key: string]: unknown;
+} | null);
     primary_guest_name?: (string | null);
     primary_guest_email?: (string | null);
     attendee_id?: (string | null);
@@ -106,6 +115,9 @@ export type AccommodationBookingUpdate = {
     status?: (BookingStatus | null);
     guest_count?: (number | null);
     guests?: (Array<BookingGuest> | null);
+    booker_answers?: ({
+    [key: string]: unknown;
+} | null);
     primary_guest_name?: (string | null);
     primary_guest_email?: (string | null);
     notes?: (string | null);
@@ -193,6 +205,16 @@ export type AccommodationDuplicate = {
     copy_images?: boolean;
 };
 
+/**
+ * The whole form: what the booker is asked, and what each guest is asked.
+ */
+export type AccommodationGuestForm = {
+    version?: number;
+    booker?: GuestFormSection;
+    guests?: GuestFormGuestsSection;
+    [key: string]: unknown | number | GuestFormSection | GuestFormGuestsSection;
+};
+
 export type AccommodationImageCreate = {
     popup_id: string;
     url: string;
@@ -261,9 +283,15 @@ export type AccommodationPropertyCreate = {
     contact_email?: (string | null);
     contact_name?: (string | null);
     tax_percentage?: (number | string | null);
+    guest_form_mode?: 'inherit' | 'off' | 'custom';
+    guest_form?: ({
+    [key: string]: unknown;
+} | null);
     is_active?: boolean;
     sort_order?: number;
 };
+
+export type guest_form_mode = 'inherit' | 'off' | 'custom';
 
 export type AccommodationPropertyPublic = {
     tenant_id: string;
@@ -274,6 +302,10 @@ export type AccommodationPropertyPublic = {
     contact_email?: (string | null);
     contact_name?: (string | null);
     tax_percentage?: (string | null);
+    guest_form_mode?: string;
+    guest_form?: ({
+    [key: string]: unknown;
+} | null);
     is_active?: boolean;
     sort_order?: number;
     created_at?: string;
@@ -288,6 +320,10 @@ export type AccommodationPropertyUpdate = {
     contact_email?: (string | null);
     contact_name?: (string | null);
     tax_percentage?: (number | string | null);
+    guest_form_mode?: ('inherit' | 'off' | 'custom' | null);
+    guest_form?: ({
+    [key: string]: unknown;
+} | null);
     is_active?: (boolean | null);
     sort_order?: (number | null);
 };
@@ -1375,10 +1411,15 @@ export type BlockRangeResult = {
  * One occupant.
  *
  * Names are collected in the checkout and exported to the property owner,
- * who needs them for their own registry.
+ * who needs them for their own registry. ``answers`` holds whatever else
+ * the property asked for, keyed by the guest form's field keys; it is empty
+ * when the property asks nothing, which is the default.
  */
 export type BookingGuest = {
     name: string;
+    answers?: {
+        [key: string]: unknown;
+    };
 };
 
 /**
@@ -1486,6 +1527,21 @@ export type CalendarUnit = {
 };
 
 /**
+ * One occupant as the cart holds them.
+ *
+ * ``name`` may be empty: the checkout renders a slot per guest before any
+ * of them is filled in, and half a party typed in is exactly what a saved
+ * cart is for. ``answers`` holds whatever else the property asked, keyed by
+ * the guest form's field keys.
+ */
+export type CartGuest = {
+    name?: string;
+    answers?: {
+        [key: string]: unknown;
+    };
+};
+
+/**
  * Embedded human info for abandoned cart listing.
  */
 export type CartHumanInfo = {
@@ -1502,17 +1558,16 @@ export type CartHumanInfo = {
  * the product is an implementation detail of how the booking travels
  * through payments, and resolving it at purchase time means a cart saved
  * before a room was re-synced still points at the right room.
- *
- * Guests are stored as plain names: the buyer types nothing else about
- * them, and the ``{name: ...}`` shape the purchase needs is built when the
- * payment is submitted.
  */
 export type CartItemAccommodation = {
     accommodation_id: string;
     check_in: string;
     check_out: string;
     guest_count?: (number | null);
-    guests?: Array<(string)>;
+    guests?: Array<CartGuest>;
+    booker_answers?: {
+        [key: string]: unknown;
+    };
 };
 
 /**
@@ -1599,7 +1654,7 @@ export type CartPublic = {
     id: string;
     human_id: string;
     popup_id: string;
-    items: CartState;
+    items: CartState_Output;
     created_at?: (string | null);
     updated_at?: (string | null);
 };
@@ -1607,7 +1662,23 @@ export type CartPublic = {
 /**
  * Full cart state stored as JSONB.
  */
-export type CartState = {
+export type CartState_Input = {
+    passes?: Array<CartItemPass>;
+    recipients?: Array<PaymentRecipientRequest>;
+    housing?: (CartItemHousing | null);
+    merch?: Array<CartItemMerch>;
+    patron?: (CartItemPatron | null);
+    meal_plans?: Array<CartItemMealPlan>;
+    accommodations?: Array<CartItemAccommodation>;
+    promo_code?: (string | null);
+    insurance?: boolean;
+    current_step?: (string | null);
+};
+
+/**
+ * Full cart state stored as JSONB.
+ */
+export type CartState_Output = {
     passes?: Array<CartItemPass>;
     recipients?: Array<PaymentRecipientRequest>;
     housing?: (CartItemHousing | null);
@@ -1624,7 +1695,7 @@ export type CartState = {
  * Schema for updating cart items.
  */
 export type CartUpdate = {
-    items: CartState;
+    items: CartState_Input;
 };
 
 /**
@@ -3069,6 +3140,53 @@ export type GroupWithMembers = {
     members?: Array<GroupMemberPublic>;
 };
 
+/**
+ * One question.
+ *
+ * Mirrors ``FormFieldSchema`` in ``@edgeos/shared-form-ui`` so the portal
+ * renders it with the same component as every other form, plus ``key``:
+ * the slug the answer is stored under. The key is generated from the label
+ * when the field is created and then frozen, so renaming a question does
+ * not orphan the answers already collected under it.
+ */
+export type GuestFormField = {
+    key: string;
+    type?: string;
+    label: string;
+    required?: boolean;
+    placeholder?: (string | null);
+    help_text?: (string | null);
+    options?: Array<(string)>;
+    width?: ('full' | 'half' | 'half_row' | null);
+    config?: {
+        [key: string]: unknown;
+    };
+};
+
+/**
+ * The questions asked of each additional occupant.
+ *
+ * ``same_as_booker`` is the default because it is the common case and the
+ * one that stays right when the booker's fields change later.
+ */
+export type GuestFormGuestsSection = {
+    title?: (string | null);
+    description?: (string | null);
+    fields?: Array<GuestFormField>;
+    mode?: 'same_as_booker' | 'custom' | 'off';
+};
+
+export type mode = 'same_as_booker' | 'custom' | 'off';
+
+/**
+ * A block of questions with a heading.
+ */
+export type GuestFormSection = {
+    title?: (string | null);
+    description?: (string | null);
+    fields?: Array<GuestFormField>;
+};
+
 export type HardDeleteSummary = {
     applications: number;
     attendees: number;
@@ -3779,7 +3897,7 @@ export type OpenCartPublic = {
     id: string;
     popup_id: string;
     email: string;
-    items: CartState;
+    items: CartState_Output;
     restore_token?: (string | null);
     created_at?: (string | null);
     updated_at?: (string | null);
@@ -3790,7 +3908,7 @@ export type OpenCartPublic = {
  */
 export type OpenCartUpsert = {
     email: string;
-    items: CartState;
+    items: CartState_Input;
 };
 
 /**
@@ -4771,6 +4889,7 @@ export type PublicAccommodationProperty = {
     address?: (string | null);
     description?: (string | null);
     tax_percentage?: (string | null);
+    guest_form?: (AccommodationGuestForm | null);
 };
 
 export type PublishableKeyCreate = {

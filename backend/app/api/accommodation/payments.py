@@ -53,6 +53,13 @@ from app.api.accommodation.constants import (
 from app.api.accommodation.crud import (
     accommodation_price_rules_crud,
 )
+from app.api.accommodation.guest_form import (
+    GuestFormError,
+    normalise_guests,
+    resolve_form,
+    snapshot,
+    validate_answers,
+)
 from app.api.accommodation.models import (
     AccommodationProperties,
     Accommodations,
@@ -69,6 +76,7 @@ ERROR_NOT_OFFERED = "accommodation_not_offered"
 ERROR_UNKNOWN = "accommodation_not_found"
 ERROR_BAD_METADATA = "accommodation_invalid_booking_data"
 ERROR_UNAVAILABLE = "accommodation_unavailable"
+ERROR_GUEST_DETAILS = "accommodation_missing_guest_details"
 
 
 @dataclass
@@ -83,6 +91,9 @@ class AccommodationStepOffer:
     enabled: bool
     property_ids: list[uuid.UUID]
     require_guest_names: bool = True
+    #: The step's ``template_config.guest_form``, as stored. A property can
+    #: override or refuse it; ``guest_form.resolve_form`` settles that.
+    guest_form: dict | None = None
 
     def offers(self, property_id: uuid.UUID) -> bool:
         return not self.property_ids or property_id in self.property_ids
@@ -99,11 +110,31 @@ class ResolvedAccommodationLine:
     check_out: date
     guest_count: int | None
     guests: list[dict]
+    booker_answers: dict
+    form_snapshot: dict | None
     quote: AccommodationQuote
 
     @property
     def total(self) -> Decimal:
         return self.quote.total
+
+
+def _reject_field(error: GuestFormError) -> HTTPException:
+    """422 that says which input is wrong, so the checkout can point at it.
+
+    ``field`` is the guest form's key and ``guest_index`` the occupant it
+    belongs to (absent for the booker). Without those the buyer gets a
+    sentence and a page of inputs to hunt through.
+    """
+    return HTTPException(
+        status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+        detail={
+            "code": ERROR_GUEST_DETAILS,
+            "message": error.message,
+            "field": error.key,
+            "guest_index": error.guest_index,
+        },
+    )
 
 
 def _reject(code: str, message: str) -> HTTPException:
@@ -162,6 +193,7 @@ def step_offer(
         enabled=True,
         property_ids=property_ids,
         require_guest_names=bool(config.get("require_guest_names", True)),
+        guest_form=config.get("guest_form"),
     )
 
 
@@ -284,11 +316,10 @@ def resolve_lines(
         check_in = _parse_date(metadata.get("check_in"), "check_in")
         check_out = _parse_date(metadata.get("check_out"), "check_out")
 
-        guests = [
-            guest
-            for guest in (metadata.get("guests") or [])
-            if isinstance(guest, dict) and guest.get("name")
-        ]
+        # Accepts both the current ``{"name", "answers"}`` entries and the
+        # bare names carts used before the guest form existed.
+        guests = normalise_guests(metadata.get("guests"))
+        named_guests = [guest for guest in guests if guest["name"]]
         guest_count = metadata.get("guest_count")
         if guest_count is None and guests:
             guest_count = len(guests)
@@ -307,11 +338,28 @@ def resolve_lines(
         if reason:
             raise _reject(reason, f"These dates cannot be booked ({reason}).")
 
-        if offer.require_guest_names and guest_count and len(guests) < guest_count:
+        if (
+            offer.require_guest_names
+            and guest_count
+            and len(named_guests) < guest_count
+        ):
             raise _reject(
                 ERROR_BAD_METADATA,
                 "A name is required for every guest.",
             )
+
+        # What this property asks about the people staying, and whether it was
+        # answered. Runs before the money math for the same reason the stay
+        # rules do: a purchase that is going to be refused should be refused
+        # before a quote, a coupon and a contribution are computed on it.
+        form = resolve_form(offer.guest_form, property_row)
+        booker_answers = metadata.get("booker_answers")
+        if not isinstance(booker_answers, dict):
+            booker_answers = {}
+        try:
+            validate_answers(form, booker_answers, guests)
+        except GuestFormError as error:
+            raise _reject_field(error) from None
 
         quote = quote_accommodation(
             accommodation,
@@ -338,6 +386,7 @@ def resolve_lines(
                 "nights": quote.night_count,
                 "guest_count": guest_count,
                 "guests": guests,
+                "booker_answers": booker_answers,
                 "quote": quote.model_dump(mode="json"),
             }
         )
@@ -352,6 +401,8 @@ def resolve_lines(
                 check_out=check_out,
                 guest_count=guest_count,
                 guests=guests,
+                booker_answers=booker_answers,
+                form_snapshot=snapshot(form),
                 quote=quote,
             )
         )
@@ -402,8 +453,14 @@ def create_holds(
                 status=(BookingStatus.CONFIRMED if confirmed else BookingStatus.HOLD),
                 guest_count=entry.guest_count,
                 guests=entry.guests,
-                primary_guest_name=(
-                    entry.guests[0].get("name") if entry.guests else buyer_name
+                booker_answers=entry.booker_answers,
+                form_snapshot=entry.form_snapshot,
+                # First guest who actually has a name: an entry can now carry
+                # answers without one, and falling back to the buyer beats
+                # putting an empty string on the booking.
+                primary_guest_name=next(
+                    (guest["name"] for guest in entry.guests if guest.get("name")),
+                    buyer_name,
                 ),
                 primary_guest_email=buyer_email,
                 price_snapshot=entry.quote.model_dump(mode="json"),

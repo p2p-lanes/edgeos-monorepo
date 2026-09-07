@@ -91,6 +91,9 @@ class TestDefaults:
             "show_property_headers": True,
             "require_guest_names": True,
             "notice_text": None,
+            # No questions until an operator writes some: the step asks for a
+            # name per guest and nothing else out of the box.
+            "guest_form": None,
         }
 
     def test_a_null_config_is_left_alone(
@@ -310,3 +313,99 @@ class TestOtherTemplatesAreUnaffected:
         )
         assert patched.status_code == 200, patched.text
         assert patched.json()["template_config"]["layout"] == "list"
+
+
+class TestGuestForm:
+    """The questions asked about the people staying.
+
+    Stored on the step so an operator writes them once for the whole
+    checkout. A property can override or refuse them, which is the
+    Accommodations section's business, not this endpoint's.
+    """
+
+    FORM = {
+        "booker": {
+            "fields": [
+                {
+                    "key": "full_name",
+                    "type": "text",
+                    "label": "Full name",
+                    "required": True,
+                }
+            ]
+        }
+    }
+
+    def _create(self, client, db, token, popup, config):
+        return client.post(
+            BASE, headers=_auth(token), json=_step_payload(db, popup, config)
+        )
+
+    def test_a_form_is_stored_in_its_canonical_shape(
+        self,
+        client: TestClient,
+        db: Session,
+        admin_token_tenant_a: str,
+        popup_tenant_a: Popups,
+    ) -> None:
+        """Saved filled in, not as sent: the portal and the export both read
+        this back, and neither should have to cope with an absent section."""
+        response = self._create(
+            client, db, admin_token_tenant_a, popup_tenant_a, {"guest_form": self.FORM}
+        )
+
+        assert response.status_code == 201, response.text
+        form = response.json()["template_config"]["guest_form"]
+        assert form["version"] == 1
+        assert form["guests"] == {
+            "title": None,
+            "description": None,
+            "fields": [],
+            "mode": "same_as_booker",
+        }
+        assert form["booker"]["fields"][0]["options"] == []
+
+    def test_a_field_type_the_checkout_cannot_render_is_rejected(
+        self,
+        client: TestClient,
+        db: Session,
+        admin_token_tenant_a: str,
+        popup_tenant_a: Popups,
+    ) -> None:
+        response = self._create(
+            client,
+            db,
+            admin_token_tenant_a,
+            popup_tenant_a,
+            {
+                "guest_form": {
+                    "booker": {
+                        "fields": [
+                            {"key": "sig", "type": "signature", "label": "Sign here"}
+                        ]
+                    }
+                }
+            },
+        )
+
+        assert response.status_code == 422, response.text
+
+    def test_two_questions_cannot_share_a_key(
+        self,
+        client: TestClient,
+        db: Session,
+        admin_token_tenant_a: str,
+        popup_tenant_a: Popups,
+    ) -> None:
+        """The key is where the answer is stored, so a duplicate is one
+        question quietly overwriting the other's answer."""
+        field = {"key": "age", "type": "number", "label": "Age"}
+        response = self._create(
+            client,
+            db,
+            admin_token_tenant_a,
+            popup_tenant_a,
+            {"guest_form": {"booker": {"fields": [field, {**field, "label": "Age?"}]}}},
+        )
+
+        assert response.status_code == 422, response.text

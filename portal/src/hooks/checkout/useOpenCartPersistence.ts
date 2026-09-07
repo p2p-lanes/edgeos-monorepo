@@ -67,7 +67,10 @@ export interface CartItemsSnapshot {
     check_in: string
     check_out: string
     guest_count: number | null
-    guests: string[]
+    /** `{ name, answers }` since the guest form landed. The server still
+     *  accepts bare names for carts saved before that, but nothing writes
+     *  them any more. */
+    guests: { name: string; answers?: Record<string, unknown> }[]
   }[]
   /** Flat array of dynamic-step items, keyed by step_type for reconstruction. */
   dynamic_items: {
@@ -238,7 +241,7 @@ export function buildItemsSnapshot(
       check_in: a.checkIn,
       check_out: a.checkOut,
       guest_count: a.guestCount,
-      guests: a.guests.filter(Boolean),
+      guests: a.guests.filter(Boolean).map((name) => ({ name })),
     })),
     // Flat array — step_type is the grouping key used to reconstruct the
     // Record<string, SelectedDynamicItem[]> during hydration.

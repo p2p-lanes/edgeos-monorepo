@@ -175,15 +175,31 @@ class AccommodationBookingConfig(BaseModel):
     show_property_headers: bool = True
     require_guest_names: bool = True
     notice_text: str | None = None
+    # The questions this checkout asks about the people staying. Kept as a
+    # plain dict here and validated in the model validator: the typed model
+    # lives in ``app.api.accommodation.guest_form``, and importing it at module
+    # scope would close the loop ticketing_step.schemas -> accommodation ->
+    # app.models -> ticketing_step.models -> ticketing_step.schemas.
+    # A property can override or refuse this form; see ``resolve_form``.
+    guest_form: dict[str, Any] | None = None
 
     model_config = ConfigDict(extra="allow")
 
     @model_validator(mode="after")
     def _validate(self) -> "AccommodationBookingConfig":
+        from app.api.accommodation.guest_form import AccommodationGuestForm
+
         if len(set(self.property_ids)) != len(self.property_ids):
             raise ValueError(
                 "accommodation-booking template_config.property_ids must be unique"
             )
+        if self.guest_form is not None:
+            # Store the canonical shape, not whatever the caller sent: the
+            # portal and the export both read this back and should not each
+            # have to cope with a missing `mode` or an absent section.
+            self.guest_form = AccommodationGuestForm.model_validate(
+                self.guest_form
+            ).model_dump(mode="json")
         return self
 
 

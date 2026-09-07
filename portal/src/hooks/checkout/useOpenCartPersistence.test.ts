@@ -217,7 +217,9 @@ describe("accommodation-only cart persistence", () => {
         check_in: "2026-09-01",
         check_out: "2026-09-03",
         guest_count: 1,
-        guests: ["Taylor Buyer"],
+        // `{ name }` rather than a bare string since the guest form landed:
+        // an entry now carries the answers its property asked for too.
+        guests: [{ name: "Taylor Buyer" }],
       },
     ])
   })

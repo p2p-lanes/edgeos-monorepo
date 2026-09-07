@@ -188,7 +188,7 @@ export const AbandonedCartPublicSchema = {
             title: 'Id'
         },
         items: {
-            '$ref': '#/components/schemas/CartState'
+            '$ref': '#/components/schemas/CartState-Output'
         },
         created_at: {
             anyOf: [
@@ -431,6 +431,11 @@ export const AccommodationBookingCreateSchema = {
             type: 'array',
             title: 'Guests'
         },
+        booker_answers: {
+            additionalProperties: true,
+            type: 'object',
+            title: 'Booker Answers'
+        },
         primary_guest_name: {
             anyOf: [
                 {
@@ -537,6 +542,23 @@ export const AccommodationBookingPublicSchema = {
             },
             type: 'array',
             title: 'Guests'
+        },
+        booker_answers: {
+            additionalProperties: true,
+            type: 'object',
+            title: 'Booker Answers'
+        },
+        form_snapshot: {
+            anyOf: [
+                {
+                    additionalProperties: true,
+                    type: 'object'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Form Snapshot'
         },
         primary_guest_name: {
             anyOf: [
@@ -732,6 +754,18 @@ export const AccommodationBookingUpdateSchema = {
                 }
             ],
             title: 'Guests'
+        },
+        booker_answers: {
+            anyOf: [
+                {
+                    additionalProperties: true,
+                    type: 'object'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Booker Answers'
         },
         primary_guest_name: {
             anyOf: [
@@ -1187,6 +1221,33 @@ export const AccommodationDuplicateSchema = {
     description: 'Copy a room type, optionally with its units and price rules.'
 } as const;
 
+export const AccommodationGuestFormSchema = {
+    properties: {
+        version: {
+            type: 'integer',
+            title: 'Version',
+            default: 1
+        },
+        booker: {
+            '$ref': '#/components/schemas/GuestFormSection',
+            default: {
+                fields: []
+            }
+        },
+        guests: {
+            '$ref': '#/components/schemas/GuestFormGuestsSection',
+            default: {
+                fields: [],
+                mode: 'same_as_booker'
+            }
+        }
+    },
+    additionalProperties: true,
+    type: 'object',
+    title: 'AccommodationGuestForm',
+    description: 'The whole form: what the booker is asked, and what each guest is asked.'
+} as const;
+
 export const AccommodationImageCreateSchema = {
     properties: {
         popup_id: {
@@ -1589,6 +1650,24 @@ export const AccommodationPropertyCreateSchema = {
             ],
             title: 'Tax Percentage'
         },
+        guest_form_mode: {
+            type: 'string',
+            enum: ['inherit', 'off', 'custom'],
+            title: 'Guest Form Mode',
+            default: 'inherit'
+        },
+        guest_form: {
+            anyOf: [
+                {
+                    additionalProperties: true,
+                    type: 'object'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Guest Form'
+        },
         is_active: {
             type: 'boolean',
             title: 'Is Active',
@@ -1679,6 +1758,23 @@ export const AccommodationPropertyPublicSchema = {
                 }
             ],
             title: 'Tax Percentage'
+        },
+        guest_form_mode: {
+            type: 'string',
+            title: 'Guest Form Mode',
+            default: 'inherit'
+        },
+        guest_form: {
+            anyOf: [
+                {
+                    additionalProperties: true,
+                    type: 'object'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Guest Form'
         },
         is_active: {
             type: 'boolean',
@@ -1786,6 +1882,30 @@ export const AccommodationPropertyUpdateSchema = {
                 }
             ],
             title: 'Tax Percentage'
+        },
+        guest_form_mode: {
+            anyOf: [
+                {
+                    type: 'string',
+                    enum: ['inherit', 'off', 'custom']
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Guest Form Mode'
+        },
+        guest_form: {
+            anyOf: [
+                {
+                    additionalProperties: true,
+                    type: 'object'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Guest Form'
         },
         is_active: {
             anyOf: [
@@ -6586,6 +6706,11 @@ export const BookingGuestSchema = {
             maxLength: 255,
             minLength: 1,
             title: 'Name'
+        },
+        answers: {
+            additionalProperties: true,
+            type: 'object',
+            title: 'Answers'
         }
     },
     type: 'object',
@@ -6594,7 +6719,9 @@ export const BookingGuestSchema = {
     description: `One occupant.
 
 Names are collected in the checkout and exported to the property owner,
-who needs them for their own registry.`
+who needs them for their own registry. \`\`answers\`\` holds whatever else
+the property asked for, keyed by the guest form's field keys; it is empty
+when the property asks nothing, which is the default.`
 } as const;
 
 export const BookingKindSchema = {
@@ -6930,6 +7057,29 @@ export const CalendarUnitSchema = {
     description: 'One row of the calendar.'
 } as const;
 
+export const CartGuestSchema = {
+    properties: {
+        name: {
+            type: 'string',
+            title: 'Name',
+            default: ''
+        },
+        answers: {
+            additionalProperties: true,
+            type: 'object',
+            title: 'Answers'
+        }
+    },
+    type: 'object',
+    title: 'CartGuest',
+    description: `One occupant as the cart holds them.
+
+\`\`name\`\` may be empty: the checkout renders a slot per guest before any
+of them is filled in, and half a party typed in is exactly what a saved
+cart is for. \`\`answers\`\` holds whatever else the property asked, keyed by
+the guest form's field keys.`
+} as const;
+
 export const CartHumanInfoSchema = {
     properties: {
         id: {
@@ -6997,11 +7147,16 @@ export const CartItemAccommodationSchema = {
         },
         guests: {
             items: {
-                type: 'string'
+                '$ref': '#/components/schemas/CartGuest'
             },
             type: 'array',
             title: 'Guests',
             default: []
+        },
+        booker_answers: {
+            additionalProperties: true,
+            type: 'object',
+            title: 'Booker Answers'
         }
     },
     type: 'object',
@@ -7012,11 +7167,7 @@ export const CartItemAccommodationSchema = {
 Keyed by \`\`accommodation_id\`\` rather than by the shadow \`\`product_id\`\`:
 the product is an implementation detail of how the booking travels
 through payments, and resolving it at purchase time means a cart saved
-before a room was re-synced still points at the right room.
-
-Guests are stored as plain names: the buyer types nothing else about
-them, and the \`\`{name: ...}\`\` shape the purchase needs is built when the
-payment is submitted.`
+before a room was re-synced still points at the right room.`
 } as const;
 
 export const CartItemHousingSchema = {
@@ -7261,7 +7412,7 @@ export const CartPublicSchema = {
             title: 'Popup Id'
         },
         items: {
-            '$ref': '#/components/schemas/CartState'
+            '$ref': '#/components/schemas/CartState-Output'
         },
         created_at: {
             anyOf: [
@@ -7294,7 +7445,100 @@ export const CartPublicSchema = {
     description: 'Cart schema for API responses.'
 } as const;
 
-export const CartStateSchema = {
+export const CartState_InputSchema = {
+    properties: {
+        passes: {
+            items: {
+                '$ref': '#/components/schemas/CartItemPass'
+            },
+            type: 'array',
+            title: 'Passes'
+        },
+        recipients: {
+            items: {
+                '$ref': '#/components/schemas/PaymentRecipientRequest'
+            },
+            type: 'array',
+            title: 'Recipients'
+        },
+        housing: {
+            anyOf: [
+                {
+                    '$ref': '#/components/schemas/CartItemHousing'
+                },
+                {
+                    type: 'null'
+                }
+            ]
+        },
+        merch: {
+            items: {
+                '$ref': '#/components/schemas/CartItemMerch'
+            },
+            type: 'array',
+            title: 'Merch',
+            default: []
+        },
+        patron: {
+            anyOf: [
+                {
+                    '$ref': '#/components/schemas/CartItemPatron'
+                },
+                {
+                    type: 'null'
+                }
+            ]
+        },
+        meal_plans: {
+            items: {
+                '$ref': '#/components/schemas/CartItemMealPlan'
+            },
+            type: 'array',
+            title: 'Meal Plans',
+            default: []
+        },
+        accommodations: {
+            items: {
+                '$ref': '#/components/schemas/CartItemAccommodation'
+            },
+            type: 'array',
+            title: 'Accommodations',
+            default: []
+        },
+        promo_code: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Promo Code'
+        },
+        insurance: {
+            type: 'boolean',
+            title: 'Insurance',
+            default: false
+        },
+        current_step: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Current Step'
+        }
+    },
+    type: 'object',
+    title: 'CartState',
+    description: 'Full cart state stored as JSONB.'
+} as const;
+
+export const CartState_OutputSchema = {
     properties: {
         passes: {
             items: {
@@ -7390,7 +7634,7 @@ export const CartStateSchema = {
 export const CartUpdateSchema = {
     properties: {
         items: {
-            '$ref': '#/components/schemas/CartState'
+            '$ref': '#/components/schemas/CartState-Input'
         }
     },
     type: 'object',
@@ -14281,6 +14525,172 @@ export const GroupWithMembersSchema = {
     description: 'Group with members list.'
 } as const;
 
+export const GuestFormFieldSchema = {
+    properties: {
+        key: {
+            type: 'string',
+            title: 'Key'
+        },
+        type: {
+            type: 'string',
+            title: 'Type',
+            default: 'text'
+        },
+        label: {
+            type: 'string',
+            title: 'Label'
+        },
+        required: {
+            type: 'boolean',
+            title: 'Required',
+            default: false
+        },
+        placeholder: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Placeholder'
+        },
+        help_text: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Help Text'
+        },
+        options: {
+            items: {
+                type: 'string'
+            },
+            type: 'array',
+            title: 'Options',
+            default: []
+        },
+        width: {
+            anyOf: [
+                {
+                    type: 'string',
+                    enum: ['full', 'half', 'half_row']
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Width'
+        },
+        config: {
+            additionalProperties: true,
+            type: 'object',
+            title: 'Config',
+            default: {}
+        }
+    },
+    type: 'object',
+    required: ['key', 'label'],
+    title: 'GuestFormField',
+    description: `One question.
+
+Mirrors \`\`FormFieldSchema\`\` in \`\`@edgeos/shared-form-ui\`\` so the portal
+renders it with the same component as every other form, plus \`\`key\`\`:
+the slug the answer is stored under. The key is generated from the label
+when the field is created and then frozen, so renaming a question does
+not orphan the answers already collected under it.`
+} as const;
+
+export const GuestFormGuestsSectionSchema = {
+    properties: {
+        title: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Title'
+        },
+        description: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Description'
+        },
+        fields: {
+            items: {
+                '$ref': '#/components/schemas/GuestFormField'
+            },
+            type: 'array',
+            title: 'Fields',
+            default: []
+        },
+        mode: {
+            type: 'string',
+            enum: ['same_as_booker', 'custom', 'off'],
+            title: 'Mode',
+            default: 'same_as_booker'
+        }
+    },
+    type: 'object',
+    title: 'GuestFormGuestsSection',
+    description: `The questions asked of each additional occupant.
+
+\`\`same_as_booker\`\` is the default because it is the common case and the
+one that stays right when the booker's fields change later.`
+} as const;
+
+export const GuestFormSectionSchema = {
+    properties: {
+        title: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Title'
+        },
+        description: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Description'
+        },
+        fields: {
+            items: {
+                '$ref': '#/components/schemas/GuestFormField'
+            },
+            type: 'array',
+            title: 'Fields',
+            default: []
+        }
+    },
+    type: 'object',
+    title: 'GuestFormSection',
+    description: 'A block of questions with a heading.'
+} as const;
+
 export const HTTPValidationErrorSchema = {
     properties: {
         detail: {
@@ -17213,7 +17623,7 @@ export const OpenCartPublicSchema = {
             title: 'Email'
         },
         items: {
-            '$ref': '#/components/schemas/CartState'
+            '$ref': '#/components/schemas/CartState-Output'
         },
         restore_token: {
             anyOf: [
@@ -17270,7 +17680,7 @@ export const OpenCartUpsertSchema = {
             title: 'Email'
         },
         items: {
-            '$ref': '#/components/schemas/CartState'
+            '$ref': '#/components/schemas/CartState-Input'
         }
     },
     type: 'object',
@@ -23108,6 +23518,16 @@ export const PublicAccommodationPropertySchema = {
                 }
             ],
             title: 'Tax Percentage'
+        },
+        guest_form: {
+            anyOf: [
+                {
+                    '$ref': '#/components/schemas/AccommodationGuestForm'
+                },
+                {
+                    type: 'null'
+                }
+            ]
         }
     },
     type: 'object',

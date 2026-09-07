@@ -1,7 +1,8 @@
 import uuid
 from datetime import datetime
+from typing import Any
 
-from pydantic import BaseModel, ConfigDict, EmailStr, model_validator
+from pydantic import BaseModel, ConfigDict, EmailStr, field_validator, model_validator
 from pydantic import Field as PydanticField
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlmodel import Column, Field, SQLModel
@@ -68,6 +69,19 @@ class CartItemMealPlan(BaseModel):
     special_request: str | None = None
 
 
+class CartGuest(BaseModel):
+    """One occupant as the cart holds them.
+
+    ``name`` may be empty: the checkout renders a slot per guest before any
+    of them is filled in, and half a party typed in is exactly what a saved
+    cart is for. ``answers`` holds whatever else the property asked, keyed by
+    the guest form's field keys.
+    """
+
+    name: str = ""
+    answers: dict[str, Any] = PydanticField(default_factory=dict)
+
+
 class CartItemAccommodation(BaseModel):
     """A room the buyer picked, as it survives a page reload.
 
@@ -75,17 +89,29 @@ class CartItemAccommodation(BaseModel):
     the product is an implementation detail of how the booking travels
     through payments, and resolving it at purchase time means a cart saved
     before a room was re-synced still points at the right room.
-
-    Guests are stored as plain names: the buyer types nothing else about
-    them, and the ``{name: ...}`` shape the purchase needs is built when the
-    payment is submitted.
     """
 
     accommodation_id: str
     check_in: str
     check_out: str
     guest_count: int | None = None
-    guests: list[str] = []
+    guests: list[CartGuest] = []
+    #: Answers from whoever the room is for. Per-guest answers live on each
+    #: entry of ``guests``.
+    booker_answers: dict[str, Any] = PydanticField(default_factory=dict)
+
+    @field_validator("guests", mode="before")
+    @classmethod
+    def _lift_bare_names(cls, value: Any) -> Any:
+        """Accept the shape carts used before guests had answers.
+
+        Guests were a list of names. There are carts saved with that shape and
+        a 422 on reopening the checkout is worse than the feature is good, so
+        a bare string is read as a guest with that name and nothing else.
+        """
+        if not isinstance(value, list):
+            return value
+        return [{"name": item} if isinstance(item, str) else item for item in value]
 
 
 class CartState(BaseModel):

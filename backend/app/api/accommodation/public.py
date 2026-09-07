@@ -23,6 +23,7 @@ from app.api.accommodation.availability import (
     check_stay_allowed,
     effective_min_stay,
 )
+from app.api.accommodation.guest_form import resolve_form
 from app.api.accommodation.models import (
     AccommodationProperties,
     Accommodations,
@@ -144,6 +145,11 @@ def offer_for_popup(
                 address=row.address,
                 description=row.description,
                 tax_percentage=row.tax_percentage,
+                # Resolved here, not in the client: the three modes and the
+                # step-versus-property precedence are a server decision, and a
+                # client that guessed differently would collect answers the
+                # purchase then refuses.
+                guest_form=resolve_form(offer.guest_form, row),
             )
             for row in properties
         ],

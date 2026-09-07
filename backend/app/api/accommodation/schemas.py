@@ -12,6 +12,7 @@ import uuid
 from datetime import UTC, date, datetime
 from decimal import Decimal
 from enum import StrEnum
+from typing import Any
 
 from pydantic import BaseModel, ConfigDict, model_validator
 from pydantic import Field as PydanticField
@@ -25,10 +26,26 @@ from app.api.accommodation.constants import (
     BookingKind,
     BookingStatus,
 )
+from app.api.accommodation.guest_form import (
+    AccommodationGuestForm,
+    GuestFormMode,
+)
 
 
 def _utcnow() -> datetime:
     return datetime.now(UTC)
+
+
+def _canonical_guest_form(mode: str | None, raw: dict | None) -> dict | None:
+    """Normalise a property's own form, or drop it when it has no say.
+
+    Only ``custom`` keeps a form. Storing one under ``inherit`` or ``off``
+    would leave a second, invisible answer to "what is asked here" waiting to
+    contradict the first the next time someone flips the mode.
+    """
+    if mode != "custom" or raw is None:
+        return None
+    return AccommodationGuestForm.model_validate(raw).model_dump(mode="json")
 
 
 # ---------------------------------------------------------------------------
@@ -93,6 +110,16 @@ class AccommodationPropertyBase(SQLModel):
     # Optional VAT / lodging tax applied on top of the nightly subtotal and
     # itemised in the quote. NULL = no tax line at all.
     tax_percentage: Decimal | None = Field(default=None, decimal_places=2, max_digits=5)
+    # Whether the checkout asks this property's guests the step's questions.
+    # "inherit" uses the step's form, "off" asks nothing, "custom" replaces it
+    # with ``guest_form``. Resolved by ``guest_form.resolve_form``.
+    guest_form_mode: str = Field(
+        default="inherit",
+        sa_column=Column(String(20), nullable=False, server_default="inherit"),
+    )
+    guest_form: dict | None = Field(
+        default=None, sa_column=Column(JSONB, nullable=True)
+    )
     is_active: bool = Field(default=True)
     sort_order: int = Field(default=0)
     created_at: datetime = Field(
@@ -111,8 +138,15 @@ class AccommodationPropertyCreate(BaseModel):
     contact_email: str | None = None
     contact_name: str | None = None
     tax_percentage: Decimal | None = PydanticField(default=None, ge=0, le=100)
+    guest_form_mode: GuestFormMode = "inherit"
+    guest_form: dict | None = None
     is_active: bool = True
     sort_order: int = 0
+
+    @model_validator(mode="after")
+    def _validate_guest_form(self) -> "AccommodationPropertyCreate":
+        self.guest_form = _canonical_guest_form(self.guest_form_mode, self.guest_form)
+        return self
 
 
 class AccommodationPropertyUpdate(BaseModel):
@@ -122,8 +156,21 @@ class AccommodationPropertyUpdate(BaseModel):
     contact_email: str | None = None
     contact_name: str | None = None
     tax_percentage: Decimal | None = PydanticField(default=None, ge=0, le=100)
+    guest_form_mode: GuestFormMode | None = None
+    guest_form: dict | None = None
     is_active: bool | None = None
     sort_order: int | None = None
+
+    @model_validator(mode="after")
+    def _validate_guest_form(self) -> "AccommodationPropertyUpdate":
+        # Only when the caller actually sent a form: an absent key must stay
+        # absent so ``model_dump(exclude_unset=True)`` leaves the stored form
+        # alone, the way every other optional field on this schema behaves.
+        if "guest_form" in self.model_fields_set:
+            self.guest_form = _canonical_guest_form(
+                self.guest_form_mode or "custom", self.guest_form
+            )
+        return self
 
 
 class AccommodationPropertyPublic(AccommodationPropertyBase):
@@ -402,10 +449,13 @@ class BookingGuest(BaseModel):
     """One occupant.
 
     Names are collected in the checkout and exported to the property owner,
-    who needs them for their own registry.
+    who needs them for their own registry. ``answers`` holds whatever else
+    the property asked for, keyed by the guest form's field keys; it is empty
+    when the property asks nothing, which is the default.
     """
 
     name: str = PydanticField(min_length=1, max_length=255)
+    answers: dict[str, Any] = PydanticField(default_factory=dict)
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -441,6 +491,17 @@ class AccommodationBookingBase(SQLModel):
     guests: list[dict] = Field(
         default_factory=list,
         sa_column=Column(JSONB, nullable=False, server_default="'[]'::jsonb"),
+    )
+    # Answers to the property's questions, for whoever the room is for.
+    booker_answers: dict = Field(
+        default_factory=dict,
+        sa_column=Column(JSONB, nullable=False, server_default="'{}'::jsonb"),
+    )
+    # The form as it stood when this booking was made. Without it, renaming a
+    # question would relabel every answer ever given under the old wording,
+    # including the ones already sent to the property owner.
+    form_snapshot: dict | None = Field(
+        default=None, sa_column=Column(JSONB, nullable=True)
     )
     primary_guest_name: str | None = Field(default=None, max_length=255)
     primary_guest_email: str | None = Field(default=None, max_length=255)
@@ -481,6 +542,7 @@ class AccommodationBookingCreate(BaseModel):
     check_out: date
     guest_count: int | None = PydanticField(default=None, ge=1)
     guests: list[BookingGuest] = PydanticField(default_factory=list)
+    booker_answers: dict[str, Any] = PydanticField(default_factory=dict)
     primary_guest_name: str | None = None
     primary_guest_email: str | None = None
     notes: str | None = None
@@ -499,6 +561,7 @@ class AccommodationBookingUpdate(BaseModel):
     status: BookingStatus | None = None
     guest_count: int | None = PydanticField(default=None, ge=1)
     guests: list[BookingGuest] | None = None
+    booker_answers: dict[str, Any] | None = None
     primary_guest_name: str | None = None
     primary_guest_email: str | None = None
     notes: str | None = None
@@ -806,6 +869,11 @@ class PublicAccommodationProperty(BaseModel):
     address: str | None = None
     description: str | None = None
     tax_percentage: Decimal | None = None
+    # Already resolved against the step: what this property actually asks,
+    # or null when it asks nothing. The client never sees the three modes and
+    # never has to merge two forms, because getting that merge wrong client
+    # side would mean asking for data the server then refuses.
+    guest_form: AccommodationGuestForm | None = None
 
 
 class PublicAccommodation(BaseModel):
