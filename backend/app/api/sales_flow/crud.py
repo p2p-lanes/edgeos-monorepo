@@ -427,12 +427,15 @@ class SalesFlowsCRUD(BaseCRUD[SalesFlows, SalesFlowCreate, SalesFlowUpdate]):
         session: Session,
         obj_in: SalesFlowCreate,
         tenant_id: uuid.UUID,
+        *,
+        commit: bool = True,
     ) -> SalesFlows:
         """Create a sales flow. tenant_id is always derived server-side.
 
         A public creation starts fresh unless the caller explicitly names a
         source flow. The checkout baseline is seeded by the route after this
-        transaction; configuration stays independent by default.
+        transaction; configuration stays independent by default. The route
+        can retain commit ownership while adding that baseline.
         """
         data = obj_in.model_dump()
         start_from = data.pop("start_from", None) or START_FRESH
@@ -440,8 +443,11 @@ class SalesFlowsCRUD(BaseCRUD[SalesFlows, SalesFlowCreate, SalesFlowUpdate]):
         flow = SalesFlows(**data)
         self.seed_config(session, flow, flow.popup_id, start_from=start_from)
         session.add(flow)
-        session.commit()
-        session.refresh(flow)
+        if commit:
+            session.commit()
+            session.refresh(flow)
+        else:
+            session.flush()
         return flow
 
     def provision_default_flow(

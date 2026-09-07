@@ -7,6 +7,7 @@ from sqlmodel import Session, select
 
 from app.api.popup_reviewer.crud import popup_reviewers_crud
 from app.api.sales_flow import crud
+from app.api.sales_flow.application_defaults import seed_application_defaults
 from app.api.sales_flow.crud import START_FRESH
 from app.api.sales_flow.models import SalesFlows
 from app.api.sales_flow.readiness import flow_readiness
@@ -280,8 +281,31 @@ async def create_sales_flow(
         )
 
     try:
-        flow = crud.sales_flows_crud.create(db, flow_in, tenant_id=popup.tenant_id)
+        flow = crud.sales_flows_crud.create(
+            db,
+            flow_in,
+            tenant_id=popup.tenant_id,
+            commit=False,
+        )
+
+        # A fresh flow needs its own type-required technical checkout baseline.
+        # An explicit source is copied separately by the caller, so seeding it
+        # here would duplicate the source's checkout steps.
+        if flow_in.start_from is None or flow_in.start_from == START_FRESH:
+            seed_application_defaults(db, popup=popup, flow=flow)
+            seed_ticketing_steps_for_popup(
+                db,
+                popup_id=flow.popup_id,
+                tenant_id=flow.tenant_id,
+                sales_flow_id=flow.id,
+                flow_type=flow.type,
+                commit=False,
+            )
+
+        db.commit()
+        db.refresh(flow)
     except ValueError as exc:
+        db.rollback()
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail=str(exc),
@@ -289,20 +313,9 @@ async def create_sales_flow(
     except IntegrityError as exc:
         db.rollback()
         _raise_on_default_conflict(exc)
-
-    # A fresh flow needs its own type-required technical checkout baseline.
-    # An explicit source is copied separately by the caller, so seeding it
-    # here would duplicate the source's checkout steps.
-    if flow_in.start_from is None or flow_in.start_from == START_FRESH:
-        seed_ticketing_steps_for_popup(
-            db,
-            popup_id=flow.popup_id,
-            tenant_id=flow.tenant_id,
-            sales_flow_id=flow.id,
-            flow_type=flow.type,
-        )
-        db.commit()
-        db.refresh(flow)
+    except Exception:
+        db.rollback()
+        raise
 
     return SalesFlowPublic.model_validate(flow)
 

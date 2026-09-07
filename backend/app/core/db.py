@@ -232,33 +232,18 @@ def _seed_ticketing_steps(session: Session, popup_map: dict, tenant_id) -> None:
 
 
 def _seed_approval_strategies(session: Session, popup_map: dict, tenant_id) -> None:
-    from app.api.approval_strategy.schemas import ApprovalStrategyType
-    from app.api.sales_flow.crud import sales_flows_crud
-    from app.models import ApprovalStrategies
+    from app.api.approval_strategy.crud import approval_strategies_crud
+    from app.api.approval_strategy.schemas import ApprovalStrategyCreate
 
     for popup_key, popup in popup_map.items():
-        existing_strategy = session.exec(
-            select(ApprovalStrategies).where(ApprovalStrategies.popup_id == popup.id)
-        ).first()
+        existing_strategy = approval_strategies_crud.get_by_popup(session, popup.id)
         if not existing_strategy:
-            default_flow = sales_flows_crud.get_default_flow(session, popup.id)
-            if default_flow is None:
-                logger.warning(
-                    f"Skipping approval strategy for {popup_key}: no default flow"
-                )
-                continue
-            # Only application flows review anything; a direct-sale or
-            # upsale flow never produces an application to review.
-            if default_flow.type != "application":
-                continue
-            strategy = ApprovalStrategies(
-                tenant_id=tenant_id,
+            approval_strategies_crud.create_for_popup(
+                session,
                 popup_id=popup.id,
-                sales_flow_id=default_flow.id,
-                strategy_type=ApprovalStrategyType.AUTO_ACCEPT,
+                tenant_id=tenant_id,
+                strategy_in=ApprovalStrategyCreate(),
             )
-            session.add(strategy)
-            session.commit()
             logger.info(f"Approval strategy created: auto_accept for {popup_key}")
 
 

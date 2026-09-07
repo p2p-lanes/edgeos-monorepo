@@ -20,6 +20,8 @@ class PopupsCRUD(BaseCRUD[Popups, PopupCreate, PopupUpdate]):
 
     def create(self, session: Session, obj_in: PopupCreate) -> Popups:
         """Create a popup and seed the main attendee category in the same transaction."""
+        from app.api.approval_strategy.crud import approval_strategies_crud
+        from app.api.approval_strategy.schemas import ApprovalStrategyCreate
         from app.api.attendee_category.crud import attendee_categories_crud
         from app.api.sales_flow.crud import sales_flows_crud
 
@@ -50,10 +52,38 @@ class PopupsCRUD(BaseCRUD[Popups, PopupCreate, PopupUpdate]):
             tenant_id=popup.tenant_id,
             sale_type=obj_in.sale_type.value,
         )
+        approval_strategies_crud.create_for_popup(
+            session,
+            popup_id=popup.id,
+            tenant_id=popup.tenant_id,
+            strategy_in=ApprovalStrategyCreate(),
+            commit=False,
+        )
 
         session.commit()
         session.refresh(popup)
         return popup
+
+    def update(
+        self,
+        session: Session,
+        db_obj: Popups,
+        obj_in: PopupUpdate,
+        *,
+        commit: bool = True,
+    ) -> Popups:
+        """Update a popup, optionally leaving commit ownership to the route."""
+        update_data = obj_in.model_dump(exclude_unset=True)
+        for field, value in update_data.items():
+            setattr(db_obj, field, value)
+
+        session.add(db_obj)
+        if commit:
+            session.commit()
+            session.refresh(db_obj)
+        else:
+            session.flush()
+        return db_obj
 
     def _apply_sorting(
         self,

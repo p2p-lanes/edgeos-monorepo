@@ -111,6 +111,8 @@ def seed_ticketing_steps_for_popup(
     tenant_id: uuid.UUID,
     sales_flow_id: uuid.UUID,
     flow_type: str | None = None,
+    *,
+    commit: bool = True,
 ) -> None:
     """Seed the default ticketing-step set into one sales flow.
 
@@ -146,4 +148,5 @@ def seed_ticketing_steps_for_popup(
         )
         db.add(step)
 
-    db.commit()
+    if commit:
+        db.commit()

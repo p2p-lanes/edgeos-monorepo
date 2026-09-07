@@ -1,5 +1,5 @@
 import uuid
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING
 
 from sqlalchemy import UniqueConstraint
 from sqlalchemy.dialects.postgresql import UUID
@@ -66,9 +66,9 @@ class Popups(PopupBase, table=True):
     )
 
     # Approval configuration
-    approval_strategy: Optional["ApprovalStrategies"] = Relationship(
+    approval_strategies: list["ApprovalStrategies"] = Relationship(
         back_populates="popup",
-        sa_relationship_kwargs={"cascade": "all, delete-orphan", "uselist": False},
+        sa_relationship_kwargs={"cascade": "all, delete-orphan"},
     )
     reviewers: list["PopupReviewers"] = Relationship(
         back_populates="popup", cascade_delete=True

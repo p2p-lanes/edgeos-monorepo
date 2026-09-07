@@ -7,7 +7,12 @@ const mocks = vi.hoisted(() => ({
     slug: "summit",
     status: "ended",
     takes_applications: false,
-  },
+  } as {
+    id: string
+    slug: string
+    status: string
+    takes_applications: boolean
+  } | null,
   directFlows: [] as Array<{ id: string; slug: string; name: string }>,
 }))
 
@@ -60,8 +65,21 @@ import useResources from "./useResources"
 
 describe("useResources", () => {
   beforeEach(() => {
-    mocks.city.status = "ended"
+    mocks.city = {
+      id: "popup-1",
+      slug: "summit",
+      status: "ended",
+      takes_applications: false,
+    }
     mocks.directFlows = []
+  })
+
+  it("does not synthesize navigation while no popup is selected", () => {
+    mocks.city = null
+
+    const { result } = renderHook(() => useResources())
+
+    expect(result.current.resources).toEqual([])
   })
 
   it("removes commerce links from an ended direct-sale popup while retaining Orders", () => {
@@ -73,7 +91,7 @@ describe("useResources", () => {
   })
 
   it("keeps Shop available for an active direct-sale popup", () => {
-    mocks.city.status = "active"
+    if (mocks.city) mocks.city.status = "active"
     mocks.directFlows = [
       { id: "direct-1", slug: "merch-store", name: "Merch Store" },
     ]

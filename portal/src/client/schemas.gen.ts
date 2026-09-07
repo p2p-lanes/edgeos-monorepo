@@ -4275,7 +4275,7 @@ export const ApprovalStrategyCreateSchema = {
     properties: {
         strategy_type: {
             '$ref': '#/components/schemas/ApprovalStrategyType',
-            default: 'any_reviewer'
+            default: 'auto_accept'
         },
         required_approvals: {
             type: 'integer',
@@ -4336,8 +4336,15 @@ export const ApprovalStrategyPublicSchema = {
             title: 'Tenant Id'
         },
         sales_flow_id: {
-            type: 'string',
-            format: 'uuid',
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
             title: 'Sales Flow Id'
         },
         strategy_type: {

@@ -2,7 +2,7 @@ import uuid
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
-from sqlalchemy import Index
+from sqlalchemy import Index, text
 from sqlalchemy.dialects.postgresql import UUID
 from sqlmodel import Column, DateTime, Field, Relationship, func
 
@@ -14,15 +14,26 @@ if TYPE_CHECKING:
 
 
 class ApprovalStrategies(ApprovalStrategyBase, table=True):
-    """How one sales flow reviews and accepts its applications.
+    """How a gathering or one application flow accepts applications.
 
-    One strategy per flow (sdd/sales-flows-rediseno slice 6), so two
-    application flows of the same popup can review differently — which is
-    the point of having flows. See migration
-    `c9e2f4b71d38_approval_strategy_flow_required.py`.
+    A row without ``sales_flow_id`` is the gathering default. Application
+    flows may own an override; direct and upsale flows never do.
     """
 
-    __table_args__ = (Index("uq_approval_strategy_flow", "sales_flow_id", unique=True),)
+    __table_args__ = (
+        Index(
+            "uq_approval_strategy_flow",
+            "sales_flow_id",
+            unique=True,
+            postgresql_where=text("sales_flow_id IS NOT NULL"),
+        ),
+        Index(
+            "uq_approval_strategy_popup_shared",
+            "popup_id",
+            unique=True,
+            postgresql_where=text("sales_flow_id IS NULL"),
+        ),
+    )
 
     id: uuid.UUID = Field(
         default_factory=uuid.uuid4,
@@ -49,5 +60,5 @@ class ApprovalStrategies(ApprovalStrategyBase, table=True):
     )
 
     # Relationships
-    popup: "Popups" = Relationship(back_populates="approval_strategy")
+    popup: "Popups" = Relationship(back_populates="approval_strategies")
     tenant: "Tenants" = Relationship()

@@ -1,17 +1,8 @@
-"""Tests for flow-scoped approval strategy resolution (sdd/sales-flows slice 7).
-
-Design: orchestrator's binding extension of D4 — the one-per-popup
-`approval_strategies` constraint re-keys to the flow dimension with popup
-fallback, mirroring the reviewer tri-state's own two-tier pattern.
-`get_by_flow(session, sales_flow_id)` returns that flow's own strategy
-if one exists, else the popup-shared (`sales_flow_id IS NULL`) fallback. No write
-path creates a flow-scoped row yet (the backoffice editor is slice 14) —
-these tests seed rows directly to prove the resolution logic ahead of that
-write path.
-"""
+"""Tests for gathering defaults and flow-specific approval overrides."""
 
 import uuid
 
+import pytest
 from sqlmodel import Session
 
 from app.api.approval_strategy.crud import approval_strategies_crud
@@ -41,11 +32,18 @@ def _make_popup(db: Session, tenant: Tenants) -> Popups:
     return popup
 
 
-def _make_flow(db: Session, tenant: Tenants, popup: Popups, *, slug: str) -> SalesFlows:
+def _make_flow(
+    db: Session,
+    tenant: Tenants,
+    popup: Popups,
+    *,
+    slug: str,
+    flow_type: str = "application",
+) -> SalesFlows:
     flow = SalesFlows(
         tenant_id=tenant.id,
         popup_id=popup.id,
-        type="application",
+        type=flow_type,
         slug=slug,
         name=slug,
         visibility=SalesFlowVisibility.portal_listed,
@@ -66,7 +64,7 @@ def _make_strategy(
     popup: Popups,
     *,
     strategy_type: ApprovalStrategyType,
-    sales_flow_id: uuid.UUID,
+    sales_flow_id: uuid.UUID | None = None,
 ) -> ApprovalStrategies:
     strategy = ApprovalStrategies(
         tenant_id=tenant.id,
@@ -81,43 +79,76 @@ def _make_strategy(
 
 
 class TestStrategyOwnership:
-    def test_flow_without_a_strategy_gets_none(
+    def test_flow_without_an_override_inherits_the_gathering_strategy(
         self, db: Session, tenant_a: Tenants
     ) -> None:
-        """The deleted fallback: a sibling's strategy must not leak in."""
         popup = _make_popup(db, tenant_a)
-        populated = _make_flow(db, tenant_a, popup, slug="flow-populated")
         empty = _make_flow(db, tenant_a, popup, slug="flow-empty")
         _make_strategy(
             db,
             tenant_a,
             popup,
             strategy_type=ApprovalStrategyType.AUTO_ACCEPT,
-            sales_flow_id=populated.id,
         )
 
-        assert approval_strategies_crud.get_by_flow(db, empty.id) is None
+        resolved = approval_strategies_crud.get_by_flow(db, empty.id)
 
-    def test_get_by_popup_reads_the_default_flows_strategy(
+        assert resolved is not None
+        assert resolved.strategy_type == ApprovalStrategyType.AUTO_ACCEPT
+        assert resolved.sales_flow_id is None
+
+    def test_get_by_popup_reads_the_gathering_strategy(
         self, db: Session, tenant_a: Tenants
     ) -> None:
-        """Naming a popup means its default flow, not a shared tier."""
-        from app.api.sales_flow.crud import sales_flows_crud
-
         popup = _make_popup(db, tenant_a)
-        default_flow = sales_flows_crud.get_default_flow(db, popup.id)
         _make_strategy(
             db,
             tenant_a,
             popup,
             strategy_type=ApprovalStrategyType.ANY_REVIEWER,
-            sales_flow_id=default_flow.id,
         )
 
         resolved = approval_strategies_crud.get_by_popup(db, popup.id)
 
         assert resolved is not None
         assert resolved.strategy_type == ApprovalStrategyType.ANY_REVIEWER
+        assert resolved.sales_flow_id is None
+
+    def test_missing_legacy_rows_safely_resolve_to_auto_accept(
+        self, db: Session, tenant_a: Tenants
+    ) -> None:
+        popup = _make_popup(db, tenant_a)
+        flow = _make_flow(db, tenant_a, popup, slug="legacy-flow")
+
+        resolved = approval_strategies_crud.get_by_flow(db, flow.id)
+
+        assert resolved is not None
+        assert resolved.strategy_type == ApprovalStrategyType.AUTO_ACCEPT
+        assert resolved.sales_flow_id is None
+
+    @pytest.mark.parametrize("flow_type", ["direct", "upsale"])
+    def test_selling_flows_do_not_consume_the_gathering_strategy(
+        self,
+        db: Session,
+        tenant_a: Tenants,
+        flow_type: str,
+    ) -> None:
+        popup = _make_popup(db, tenant_a)
+        flow = _make_flow(
+            db,
+            tenant_a,
+            popup,
+            slug=f"{flow_type}-flow",
+            flow_type=flow_type,
+        )
+        _make_strategy(
+            db,
+            tenant_a,
+            popup,
+            strategy_type=ApprovalStrategyType.ANY_REVIEWER,
+        )
+
+        assert approval_strategies_crud.get_by_flow(db, flow.id) is None
 
     def test_two_flows_review_independently(
         self, db: Session, tenant_a: Tenants
@@ -157,7 +188,6 @@ class TestStrategyOwnership:
             tenant_a,
             popup,
             strategy_type=ApprovalStrategyType.AUTO_ACCEPT,
-            sales_flow_id=flow_b.id,
         )
         _make_strategy(
             db,
@@ -174,5 +204,5 @@ class TestStrategyOwnership:
         assert resolved_a.strategy_type == ApprovalStrategyType.THRESHOLD
         assert resolved_b is not None
         assert resolved_b.strategy_type == ApprovalStrategyType.AUTO_ACCEPT, (
-            "Each flow keeps its own strategy — editing one never reaches the other"
+            "A flow override must not alter the gathering default inherited by siblings"
         )

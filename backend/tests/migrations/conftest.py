@@ -45,11 +45,13 @@ def migration_tenant_popup_ids(
     """Seed the minimal tenant boundary required by migration data fixtures."""
     tenant_id = uuid.uuid4()
     popup_id = uuid.uuid4()
+    flow_id = uuid.uuid4()
     params = {
         "tenant": tenant_id,
         "tenant_slug": f"migration-tenant-{tenant_id}",
         "popup": popup_id,
         "popup_slug": f"migration-popup-{popup_id}",
+        "flow": flow_id,
     }
     with migration_test_engine.begin() as connection:
         connection.execute(
@@ -63,6 +65,16 @@ def migration_tenant_popup_ids(
             text("""
             INSERT INTO popups (id,tenant_id,name,slug,status)
             VALUES (:popup,:tenant,'Migration test popup',:popup_slug,'draft')
+            """),
+            params,
+        )
+        connection.execute(
+            text("""
+            INSERT INTO sales_flows
+              (id,tenant_id,popup_id,type,slug,name,is_default)
+            VALUES
+              (:flow,:tenant,:popup,'application','attendee',
+               'Migration test default flow',true)
             """),
             params,
         )

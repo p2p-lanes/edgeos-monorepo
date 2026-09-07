@@ -14,7 +14,7 @@ class ApprovalStrategyType(StrEnum):
     ALL_REVIEWERS = "all_reviewers"  # All designated reviewers must approve
     THRESHOLD = "threshold"  # N out of M reviewers must approve
     WEIGHTED = "weighted"  # Weighted votes (strong yes = 2, yes = 1, etc.)
-    # Note: If no strategy exists for a popup, applications are auto-accepted
+    # If no strategy row exists, applications are safely auto-accepted.
 
 
 class ApprovalStrategyBase(SQLModel):
@@ -26,14 +26,13 @@ class ApprovalStrategyBase(SQLModel):
 
     popup_id: uuid.UUID = Field(foreign_key="popups.id", index=True)
     tenant_id: uuid.UUID = Field(foreign_key="tenants.id", index=True)
-    # sdd/sales-flows-rediseno slice 6: a strategy belongs to exactly one
-    # flow, so two application flows can review their applicants
-    # differently. There is no popup-shared tier.
-    sales_flow_id: uuid.UUID = Field(
-        foreign_key="sales_flows.id", nullable=False, index=True
+    # NULL owns the gathering-level default. A non-null flow id is an
+    # application-flow-specific override.
+    sales_flow_id: uuid.UUID | None = Field(
+        default=None, foreign_key="sales_flows.id", nullable=True, index=True
     )
 
-    strategy_type: ApprovalStrategyType = ApprovalStrategyType.ANY_REVIEWER
+    strategy_type: ApprovalStrategyType = ApprovalStrategyType.AUTO_ACCEPT
 
     # Threshold config (for THRESHOLD strategy)
     required_approvals: int = Field(default=1, ge=1)
@@ -50,7 +49,7 @@ class ApprovalStrategyBase(SQLModel):
 class ApprovalStrategyCreate(BaseModel):
     """Schema for creating an approval strategy."""
 
-    strategy_type: ApprovalStrategyType = ApprovalStrategyType.ANY_REVIEWER
+    strategy_type: ApprovalStrategyType = ApprovalStrategyType.AUTO_ACCEPT
     required_approvals: int = 1
     accept_threshold: int = 2
     reject_threshold: int = -2
@@ -79,7 +78,7 @@ class ApprovalStrategyPublic(BaseModel):
     id: uuid.UUID
     popup_id: uuid.UUID
     tenant_id: uuid.UUID
-    sales_flow_id: uuid.UUID
+    sales_flow_id: uuid.UUID | None
 
     strategy_type: ApprovalStrategyType
     required_approvals: int

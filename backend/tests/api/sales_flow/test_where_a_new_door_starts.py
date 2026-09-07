@@ -13,11 +13,14 @@ docs/sales-flows-templates.md, slice 2.
 """
 
 import uuid
+from unittest.mock import patch
 
 import pytest
 from fastapi.testclient import TestClient
 from sqlmodel import Session, select
 
+from app.api.base_field_config.models import BaseFieldConfigs
+from app.api.form_section.models import FormSections
 from app.api.popup.models import Popups
 from app.api.sales_flow.crud import sales_flows_crud
 from app.api.sales_flow.models import SalesFlows
@@ -337,6 +340,37 @@ class TestThePreviewMatchesWhatYouGet:
 
 
 class TestCreatingThroughTheApi:
+    def test_application_default_seed_failure_rolls_back_the_flow(
+        self,
+        client: TestClient,
+        db: Session,
+        tenant_a: Tenants,
+        admin_token_tenant_a: str,
+    ) -> None:
+        popup = _popup(db, tenant_a)
+        _partner_default(db, popup)
+        slug = f"rollback-{uuid.uuid4().hex[:6]}"
+
+        with (
+            patch(
+                "app.api.sales_flow.router.seed_application_defaults",
+                side_effect=RuntimeError("application defaults failed"),
+            ),
+            pytest.raises(RuntimeError, match="application defaults failed"),
+        ):
+            client.post(
+                "/api/v1/sales-flows",
+                headers={"Authorization": f"Bearer {admin_token_tenant_a}"},
+                json={
+                    "popup_id": str(popup.id),
+                    "type": "application",
+                    "slug": slug,
+                    "name": "Rollback",
+                },
+            )
+
+        assert sales_flows_crud.get_by_slug(db, popup.id, slug) is None
+
     @pytest.mark.parametrize("flow_type", ["application", "direct", "upsale"])
     def test_omitted_and_null_start_fresh_with_a_checkout_baseline(
         self,
@@ -367,12 +401,25 @@ class TestCreatingThroughTheApi:
 
             assert resp.status_code == 201, resp.text
             assert resp.json()["allows_coupons"] is None
+            flow_id = uuid.UUID(resp.json()["id"])
             steps = db.exec(
-                select(TicketingSteps).where(
-                    TicketingSteps.sales_flow_id == uuid.UUID(resp.json()["id"])
-                )
+                select(TicketingSteps).where(TicketingSteps.sales_flow_id == flow_id)
             ).all()
             assert steps
+            sections = db.exec(
+                select(FormSections).where(FormSections.sales_flow_id == flow_id)
+            ).all()
+            base_fields = db.exec(
+                select(BaseFieldConfigs).where(
+                    BaseFieldConfigs.sales_flow_id == flow_id
+                )
+            ).all()
+            if flow_type == "application":
+                assert sections
+                assert base_fields
+            else:
+                assert sections == []
+                assert base_fields == []
 
     @pytest.mark.parametrize("flow_type", ["application", "direct", "upsale"])
     def test_explicit_same_type_source_copies_configuration(
