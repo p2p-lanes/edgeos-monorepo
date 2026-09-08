@@ -1,10 +1,10 @@
 /**
  * The accommodation cart slice.
  *
- * The invariants worth protecting are the ones a buyer would notice: two
- * rooms of the same type for different weeks are two bookings, resizing a
- * party must not leave a stranger's name behind, and moving the dates must
- * take the old quotes with it rather than re-charging them.
+ * The invariants worth protecting are the ones a buyer would notice: the
+ * checkout holds one room and picking another swaps it, resizing a party
+ * must not leave a stranger's name behind, and moving the dates must take
+ * the old quotes with it rather than re-charging them.
  */
 import { act, renderHook } from "@testing-library/react"
 import { describe, expect, it } from "vitest"
@@ -39,8 +39,9 @@ function room(
 
 describe("entryKey", () => {
   it("identifies a booking by its room and its nights", () => {
-    // Not by room alone: the same room type booked for two different weeks is
-    // two bookings, and each gets its own unit.
+    // Not by room alone: every setter addresses the entry by this key, and
+    // the same room across two date ranges is not the same booking. It is
+    // what tells a stale entry from the current one after a date change.
     expect(entryKey(room())).not.toBe(
       entryKey(room({ checkIn: "2026-06-10", checkOut: "2026-06-12" })),
     )
@@ -56,44 +57,77 @@ describe("useAccommodationSelection", () => {
     expect(result.current.accommodations[0].totalPrice).toBe(924)
   })
 
-  it("ignores the same room for the same nights twice", () => {
-    // A double-click, not a second room, and the backend would refuse the
-    // second line anyway when it found no free unit.
+  it("keeps the details already typed when the same room is picked twice", () => {
+    // A double-click, not a second room. Replacing the entry with the fresh
+    // one would wipe the guest answers already in it.
     const { result } = renderHook(() => useAccommodationSelection())
-    act(() => {
-      result.current.addAccommodation(room())
-      result.current.addAccommodation(room())
-    })
+    act(() => result.current.addAccommodation(room()))
+    act(() =>
+      result.current.setAccommodationGuestName(
+        "room-1",
+        "2026-06-01",
+        "2026-06-08",
+        0,
+        "Ada",
+      ),
+    )
+    act(() => result.current.addAccommodation(room()))
 
     expect(result.current.accommodations).toHaveLength(1)
+    expect(result.current.accommodations[0].guests[0].name).toBe("Ada")
   })
 
-  it("keeps the same room booked for two different stays", () => {
+  it("swaps the room instead of booking a second one", () => {
+    // One room per checkout. A party that needs two books twice.
     const { result } = renderHook(() => useAccommodationSelection())
-    act(() => {
-      result.current.addAccommodation(room())
-      result.current.addAccommodation(
-        room({ checkIn: "2026-06-20", checkOut: "2026-06-22" }),
-      )
-    })
-
-    expect(result.current.accommodations).toHaveLength(2)
-  })
-
-  it("removes one booking without touching the other", () => {
-    const { result } = renderHook(() => useAccommodationSelection())
-    act(() => {
-      result.current.addAccommodation(room())
+    act(() => result.current.addAccommodation(room()))
+    act(() =>
       result.current.addAccommodation(
         room({ accommodationId: "room-2", name: "Suite" }),
-      )
-    })
-    act(() =>
-      result.current.removeAccommodation("room-1", "2026-06-01", "2026-06-08"),
+      ),
     )
 
     expect(result.current.accommodations.map((r) => r.accommodationId)).toEqual(
       ["room-2"],
+    )
+  })
+
+  it("swaps the room even when only the dates differ", () => {
+    const { result } = renderHook(() => useAccommodationSelection())
+    act(() => result.current.addAccommodation(room()))
+    act(() =>
+      result.current.addAccommodation(
+        room({ checkIn: "2026-06-20", checkOut: "2026-06-22" }),
+      ),
+    )
+
+    expect(result.current.accommodations).toHaveLength(1)
+    expect(result.current.accommodations[0].checkIn).toBe("2026-06-20")
+  })
+
+  it("empties the cart when the room is removed", () => {
+    const { result } = renderHook(() => useAccommodationSelection())
+    act(() => result.current.addAccommodation(room()))
+    act(() =>
+      result.current.removeAccommodation("room-1", "2026-06-01", "2026-06-08"),
+    )
+
+    expect(result.current.accommodations).toEqual([])
+  })
+
+  it("restores at most one room from a persisted cart", () => {
+    // Carts saved before the step went single-room are still in people's
+    // browsers, and they hold two.
+    const { result } = renderHook(() => useAccommodationSelection())
+    act(() =>
+      result.current.setAccommodations([
+        room(),
+        room({ accommodationId: "room-2", name: "Suite" }),
+      ]),
+    )
+
+    expect(result.current.accommodations.map((r) => r.accommodationId)).toEqual(
+      ["room-1"],
     )
   })
 

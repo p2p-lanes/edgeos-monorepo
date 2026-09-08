@@ -2,13 +2,21 @@ import { useCallback, useState } from "react"
 import type { SelectedAccommodationItem } from "@/types/checkout"
 
 /**
- * Rooms the buyer has put in the cart.
+ * The room the buyer has put in the cart.
  *
- * A list, not a single selection: a family books two rooms, and the same room
- * type can appear twice for different dates. The identity of an entry is
- * therefore (accommodation, check-in, check-out). Adding the same room for
- * the same nights twice is a double-click, not a second room, and the backend
- * would refuse it anyway when the second line finds no free unit.
+ * One room per checkout. Still stored as a list, and every entry is still
+ * identified by (accommodation, check-in, check-out), because that is what
+ * the cart, the persistence layer and the payment builder all speak; the
+ * list simply never holds more than one. Picking a second room replaces the
+ * first rather than adding to it, which is what makes the step a choice
+ * instead of a shopping basket, and what keeps one stay from carrying two
+ * sets of guest answers.
+ *
+ * A party that needs two rooms books twice. That is a worse experience than
+ * a real multi-room cart and a much better one than the half-built version:
+ * two rooms in one cart raise a pile of questions this checkout has no
+ * answers for yet (which guests sleep where, one payment or two, what a
+ * partial availability failure does at purchase time).
  *
  * Nothing here computes a price. `totalPrice` is whatever the availability
  * endpoint quoted for those dates; when the dates change the entry is dropped
@@ -25,21 +33,38 @@ export function entryKey(item: {
 }
 
 export function useAccommodationSelection() {
-  const [accommodations, setAccommodations] = useState<
+  const [accommodations, setStoredAccommodations] = useState<
     SelectedAccommodationItem[]
   >([])
 
+  /**
+   * Restore or clear the selection.
+   *
+   * Trimmed to one, not trusted as given: this is the door a persisted cart
+   * comes back through, and a cart saved before the step went single-room
+   * would otherwise restore two.
+   */
+  const setAccommodations = useCallback(
+    (items: SelectedAccommodationItem[]) => {
+      setStoredAccommodations(items.slice(0, 1))
+    },
+    [],
+  )
+
   const addAccommodation = useCallback((item: SelectedAccommodationItem) => {
-    setAccommodations((prev) => {
-      if (prev.some((entry) => entryKey(entry) === entryKey(item))) return prev
-      return [...prev, item]
+    setStoredAccommodations((prev) => {
+      // Selecting the room already selected is a double-click. Keeping the
+      // stored entry rather than the fresh one keeps the guest details
+      // already typed into it.
+      if (prev.length === 1 && entryKey(prev[0]) === entryKey(item)) return prev
+      return [item]
     })
   }, [])
 
   const removeAccommodation = useCallback(
     (accommodationId: string, checkIn: string, checkOut: string) => {
       const key = entryKey({ accommodationId, checkIn, checkOut })
-      setAccommodations((prev) =>
+      setStoredAccommodations((prev) =>
         prev.filter((entry) => entryKey(entry) !== key),
       )
     },
@@ -55,7 +80,7 @@ export function useAccommodationSelection() {
       patch: (entry: SelectedAccommodationItem) => SelectedAccommodationItem,
     ) => {
       const key = entryKey({ accommodationId, checkIn, checkOut })
-      setAccommodations((prev) =>
+      setStoredAccommodations((prev) =>
         prev.map((entry) => (entryKey(entry) === key ? patch(entry) : entry)),
       )
     },
@@ -186,7 +211,7 @@ export function useAccommodationSelection() {
    */
   const clearAccommodationsOutsideStay = useCallback(
     (checkIn: string, checkOut: string) => {
-      setAccommodations((prev) =>
+      setStoredAccommodations((prev) =>
         prev.filter(
           (entry) => entry.checkIn === checkIn && entry.checkOut === checkOut,
         ),
