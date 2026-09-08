@@ -73,6 +73,61 @@ export type AccommodationBookingCreate = {
     ignore_restrictions?: boolean;
 };
 
+/**
+ * One booking with everything its own page needs, in one request.
+ *
+ * The context is denormalised on purpose. A detail screen that had to fetch
+ * the room to learn its name, the property to learn its address and the
+ * room again to list its other units would render in four steps and show
+ * three of them half-built.
+ *
+ * ``units`` carries every unit of the same room type, the booking's own
+ * included, because the only thing an operator does to a booking from here
+ * besides releasing it is move it to a different bed.
+ */
+export type AccommodationBookingDetail = {
+    tenant_id: string;
+    popup_id: string;
+    accommodation_id: string;
+    unit_id: string;
+    kind?: BookingKind;
+    status?: BookingStatus;
+    check_in: string;
+    check_out: string;
+    guest_count?: (number | null);
+    guests?: Array<{
+        [key: string]: unknown;
+    }>;
+    booker_answers?: {
+        [key: string]: unknown;
+    };
+    form_snapshot?: ({
+    [key: string]: unknown;
+} | null);
+    primary_guest_name?: (string | null);
+    primary_guest_email?: (string | null);
+    attendee_id?: (string | null);
+    human_id?: (string | null);
+    payment_id?: (string | null);
+    payment_product_id?: (string | null);
+    price_snapshot?: ({
+    [key: string]: unknown;
+} | null);
+    hold_expires_at?: (string | null);
+    notes?: (string | null);
+    created_by_user_id?: (string | null);
+    created_at?: string;
+    updated_at?: string;
+    id: string;
+    nights?: number;
+    property_id: string;
+    property_name: string;
+    property_address?: (string | null);
+    accommodation_name: string;
+    unit_label?: (string | null);
+    units?: Array<BookingUnitOption>;
+};
+
 export type AccommodationBookingPublic = {
     tenant_id: string;
     popup_id: string;
@@ -1414,6 +1469,15 @@ export type BookingKind = 'guest' | 'block' | 'maintenance';
  * covered by the exclusion constraint, so only those two occupy a unit.
  */
 export type BookingStatus = 'hold' | 'confirmed' | 'cancelled' | 'expired';
+
+/**
+ * A unit the booking could be moved to, or the one it is in.
+ */
+export type BookingUnitOption = {
+    id: string;
+    label: string;
+    is_active?: boolean;
+};
 
 /**
  * The 'report a bug' payload, open to every backoffice user.
@@ -6193,12 +6257,12 @@ export type AccommodationsCreateManualBookingData = {
 
 export type AccommodationsCreateManualBookingResponse = (AccommodationBookingPublic);
 
-export type AccommodationsBlockRangeData = {
-    requestBody: AccommodationBlockRange;
+export type AccommodationsGetBookingData = {
+    bookingId: string;
     xTenantId?: (string | null);
 };
 
-export type AccommodationsBlockRangeResponse = (BlockRangeResult);
+export type AccommodationsGetBookingResponse = (AccommodationBookingDetail);
 
 export type AccommodationsUpdateBookingData = {
     bookingId: string;
@@ -6207,6 +6271,13 @@ export type AccommodationsUpdateBookingData = {
 };
 
 export type AccommodationsUpdateBookingResponse = (AccommodationBookingPublic);
+
+export type AccommodationsBlockRangeData = {
+    requestBody: AccommodationBlockRange;
+    xTenantId?: (string | null);
+};
+
+export type AccommodationsBlockRangeResponse = (BlockRangeResult);
 
 export type AccommodationsExportBookingsData = {
     accommodationId?: (string | null);

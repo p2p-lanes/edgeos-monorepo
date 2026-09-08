@@ -534,6 +534,35 @@ class AccommodationBookingPublic(AccommodationBookingBase):
         return self
 
 
+class BookingUnitOption(SQLModel):
+    """A unit the booking could be moved to, or the one it is in."""
+
+    id: uuid.UUID
+    label: str
+    is_active: bool = True
+
+
+class AccommodationBookingDetail(AccommodationBookingPublic):
+    """One booking with everything its own page needs, in one request.
+
+    The context is denormalised on purpose. A detail screen that had to fetch
+    the room to learn its name, the property to learn its address and the
+    room again to list its other units would render in four steps and show
+    three of them half-built.
+
+    ``units`` carries every unit of the same room type, the booking's own
+    included, because the only thing an operator does to a booking from here
+    besides releasing it is move it to a different bed.
+    """
+
+    property_id: uuid.UUID
+    property_name: str
+    property_address: str | None = None
+    accommodation_name: str
+    unit_label: str | None = None
+    units: list[BookingUnitOption] = []
+
+
 # ---------------------------------------------------------------------------
 # Image library
 # ---------------------------------------------------------------------------

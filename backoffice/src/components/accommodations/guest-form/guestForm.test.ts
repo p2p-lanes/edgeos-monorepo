@@ -228,7 +228,7 @@ describe("presets", () => {
     expect(empty.map((preset) => preset.key)).toEqual(["blank"])
   })
 
-  it("lead guest only asks the other guests nothing", () => {
+  it("booking contact only asks the other guests nothing", () => {
     const form = PRESETS.find((preset) => preset.key === "lead_only")?.build()
 
     expect(form && guestFieldsOf(form)).toEqual([])

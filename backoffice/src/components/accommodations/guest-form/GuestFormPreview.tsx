@@ -25,7 +25,7 @@ export function GuestFormPreview({ form }: { form: GuestFormValue }) {
       </p>
 
       <PreviewSection
-        heading="Lead guest"
+        heading="Booking contact"
         subheading="Asked once per room"
         fields={form.booker.fields}
       />

@@ -40,7 +40,7 @@ const GUESTS_MODES: { value: GuestsMode; label: string; hint: string }[] = [
   {
     value: "same_as_booker",
     label: "The same questions",
-    hint: "Every guest is asked what the lead guest is asked.",
+    hint: "Every guest is asked what the booking contact is asked.",
   },
   {
     value: "custom",
@@ -50,7 +50,7 @@ const GUESTS_MODES: { value: GuestsMode; label: string; hint: string }[] = [
   {
     value: "off",
     label: "Nothing",
-    hint: "Only the lead guest is asked anything.",
+    hint: "Only the booking contact is asked anything.",
   },
 ]
 
@@ -98,7 +98,7 @@ export function GuestFormEditor({ value, onChange }: GuestFormEditorProps) {
   return (
     <div className="flex flex-col gap-5">
       <FieldSection
-        title="Lead guest"
+        title="Booking contact"
         description="Asked once per room, of whoever the room is for."
         fields={value.booker.fields}
         onChange={setBookerFields}

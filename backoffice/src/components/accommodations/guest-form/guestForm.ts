@@ -228,7 +228,7 @@ export function formProblem(form: GuestFormValue): string | null {
     if (problem) return `${field.label || "A question"}: ${problem}`
   }
   if (form.booker.fields.length > MAX_FIELDS) {
-    return `The lead guest section can hold at most ${MAX_FIELDS} questions`
+    return `The booking contact section can hold at most ${MAX_FIELDS} questions`
   }
   if (form.guests.fields.length > MAX_FIELDS) {
     return `The guests section can hold at most ${MAX_FIELDS} questions`
@@ -278,7 +278,7 @@ export interface GuestFormPreset {
 
 /** Starting points, because a blank editor is the slowest way to begin.
  *
- * Every preset asks the *lead guest* the questions and repeats them for the
+ * Every preset asks the *booking contact* the questions and repeats them for the
  * others; narrowing that is one click in the guests section.
  */
 export const PRESETS: GuestFormPreset[] = [
@@ -307,7 +307,7 @@ export const PRESETS: GuestFormPreset[] = [
   },
   {
     key: "lead_only",
-    label: "Lead guest only",
+    label: "Booking contact only",
     description: "One set of contact details per room, nothing per guest",
     build: () => build([["email", "Email", true]], "off"),
   },

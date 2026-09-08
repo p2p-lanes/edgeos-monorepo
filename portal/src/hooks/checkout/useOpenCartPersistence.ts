@@ -326,7 +326,9 @@ function migrateLegacySnapshot(value: UnknownRecord): CartState {
       // A legacy cart holds bare names; one saved after the guest form
       // landed holds `{name, answers}`. Both are read, because both are on
       // disk in somebody's browser right now.
-      guests: Array.isArray(entry.guests) ? entry.guests.flatMap(legacyGuest) : [],
+      guests: Array.isArray(entry.guests)
+        ? entry.guests.flatMap(legacyGuest)
+        : [],
     })
   }
   for (const entry of entries(value.dynamic_items)) {

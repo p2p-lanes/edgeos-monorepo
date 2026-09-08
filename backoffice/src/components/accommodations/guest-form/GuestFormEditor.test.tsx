@@ -38,7 +38,7 @@ function Harness({
 
 /** The editable input for a question.
  *
- * Under the default guests mode the lead guest's questions are echoed
+ * Under the default guests mode the booking contact's questions are echoed
  * read-only below, so every label matches twice. The first is the real one.
  */
 function question(label: string): HTMLElement {
@@ -64,7 +64,7 @@ describe("starting out", () => {
     render(<Harness initial={emptyForm()} />)
 
     expect(screen.getByText("Hotel registry")).toBeTruthy()
-    expect(screen.queryByText("Lead guest")).toBeNull()
+    expect(screen.queryByText("Booking contact")).toBeNull()
   })
 
   it("opens the editor on a preset, with its questions in place", async () => {
@@ -72,7 +72,7 @@ describe("starting out", () => {
 
     await userEvent.click(screen.getByText("Contact details"))
 
-    expect(screen.getByText("Lead guest")).toBeTruthy()
+    expect(screen.getByText("Booking contact")).toBeTruthy()
     expect(question("Email")).toBeTruthy()
     expect(question("Phone")).toBeTruthy()
   })
@@ -84,14 +84,14 @@ describe("starting out", () => {
 
     await userEvent.click(screen.getByText("Start from scratch"))
 
-    expect(screen.getByText("Lead guest")).toBeTruthy()
+    expect(screen.getByText("Booking contact")).toBeTruthy()
     expect(screen.queryByText("Hotel registry")).toBeNull()
   })
 
   it("goes straight to the editor when questions already exist", () => {
     render(<Harness initial={formWith(["email", "Email"])} />)
 
-    expect(screen.getByText("Lead guest")).toBeTruthy()
+    expect(screen.getByText("Booking contact")).toBeTruthy()
     expect(screen.queryByText("Hotel registry")).toBeNull()
   })
 })
@@ -170,7 +170,7 @@ describe("editing questions", () => {
 })
 
 describe("the other guests", () => {
-  it("echoes the lead guest questions, read-only, under the default mode", () => {
+  it("echoes the booking contact questions, read-only, under the default mode", () => {
     render(<Harness initial={formWith(["email", "Email"])} />)
 
     // Two rows for one question: the editable one and the echo.
@@ -191,7 +191,7 @@ describe("the other guests", () => {
 
     const form = onChange.mock.lastCall?.[0] as GuestFormValue
     expect(form.guests.mode).toBe("off")
-    // The lead guest's questions are untouched: the mode says who is asked,
+    // The booking contact's questions are untouched: the mode says who is asked,
     // not what exists.
     expect(form.booker.fields).toHaveLength(1)
     expect(screen.getAllByDisplayValue("Email")).toHaveLength(1)

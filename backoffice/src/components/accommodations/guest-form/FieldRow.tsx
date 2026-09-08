@@ -31,7 +31,7 @@ interface FieldRowProps {
   field: GuestField
   onChange: (next: GuestField) => void
   onRemove: () => void
-  /** Read-only rows are how the "same as lead guest" echo is drawn. */
+  /** Read-only rows are how the "same questions" echo is drawn. */
   readOnly?: boolean
 }
 
