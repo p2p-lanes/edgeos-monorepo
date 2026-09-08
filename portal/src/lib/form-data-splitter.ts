@@ -24,9 +24,9 @@ interface SplitCreateParams {
   /** Referral UUID to attribute this application — passed from /r/{code} flow (REQ-GR-009). */
   referralId?: string | null
   /**
-   * Explicit target sales flow (sdd/sales-flows D6 URL scheme — the
-   * portal FlowPicker, task 9.4). Omitted keeps the backend's default-flow
-   * resolution, unchanged from before this slice.
+   * Explicit target sales flow (sdd/sales-flows D6 URL scheme, selected
+   * from the portal gathering overview). Omitted keeps the backend's
+   * default-flow resolution, unchanged from before this slice.
    */
   salesFlowId?: string | null
 }
@@ -97,7 +97,7 @@ export function splitForCreate({
     status,
     // Referral attribution — set when user arrived via /r/{code} (REQ-GR-009)
     referral_id: referralId ?? undefined,
-    // Explicit target flow (sdd/sales-flows FlowPicker) — omitted keeps the
+    // Explicit target flow from the gathering overview — omitted keeps the
     // backend's default-flow resolution.
     sales_flow_id: salesFlowId ?? undefined,
     // Application-target base fields from the schema (scholarship, etc.)

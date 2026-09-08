@@ -6,8 +6,10 @@ import type { CompanionParticipation } from "@/client"
 import { EventCard } from "@/components/Card/EventCard"
 import type { EventStatus } from "@/components/Card/EventProgressBar"
 import { CompanionView } from "@/components/CompanionView"
+import { ApplicationUnavailable } from "@/components/Portal/ApplicationUnavailable"
 import { GatheringDoorCard } from "@/components/Portal/GatheringDoorCard"
 import { ScholarshipStatusBadge } from "@/components/ScholarshipStatusBadge"
+import { Loader } from "@/components/ui/Loader"
 import { useGatheringDoors } from "@/hooks/useGatheringDoors"
 import { useApplication } from "@/providers/applicationProvider"
 import { useCityProvider } from "@/providers/cityProvider"
@@ -17,15 +19,22 @@ export default function Home() {
   const { getRelevantApplication, participation } = useApplication()
   const router = useRouter()
   const city = getCity()
-  const { doors } = useGatheringDoors(city?.id ? String(city.id) : null)
+  const {
+    doors,
+    isLoading: doorsLoading,
+    isError: doorsError,
+  } = useGatheringDoors(city?.id ? String(city.id) : null)
 
   useEffect(() => {
     if (popupsLoaded && !city) router.replace("/portal")
   }, [city, popupsLoaded, router])
 
-  if (!city) return null
+  if (!city) return popupsLoaded ? null : <Loader />
 
   const nobodyApplies = city?.takes_applications === false
+
+  if (!nobodyApplies && doorsLoading) return <Loader />
+  if (!nobodyApplies && doorsError) return <ApplicationUnavailable />
 
   // One relationship is unambiguous, so nothing has to be named and the
   // page stays exactly as it was. This is almost every gathering.

@@ -62,7 +62,7 @@ export function GatheringDoorCard({
   }
 
   return (
-    <div className="flex flex-col gap-3 rounded-2xl border bg-card p-5 shadow-sm">
+    <div className="flex flex-col gap-3 rounded-2xl border bg-card p-5 text-card-foreground shadow-sm">
       <div className="flex items-start justify-between gap-3">
         {showName && door.name ? (
           <p className="font-semibold">{door.name}</p>
@@ -86,7 +86,11 @@ export function GatheringDoorCard({
       {/* A door that is not accepted yet still needs a way in, and a
           rejected one deliberately offers none. */}
       {door.status !== "rejected" && (
-        <Button onClick={onClick} variant={isAccepted ? "default" : "outline"}>
+        <Button
+          onClick={onClick}
+          variant={isAccepted ? "default" : "outline"}
+          className={isAccepted ? undefined : "text-card-foreground"}
+        >
           {actionLabel}
         </Button>
       )}

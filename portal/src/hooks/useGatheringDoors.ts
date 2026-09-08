@@ -1,8 +1,10 @@
 "use client"
 
-import { useQuery } from "@tanstack/react-query"
-
-import { type ApplicationPublic, SalesFlowsService } from "@/client"
+import type { ApplicationPublic } from "@/client"
+import { useApplicationsQuery } from "@/hooks/useGetApplications"
+import { useParticipationQuery } from "@/hooks/useParticipationQuery"
+import { usePortalSalesFlows } from "@/hooks/usePortalSalesFlows"
+import { useInitialQueryResolution } from "@/lib/initial-query-resolution"
 import { useApplication } from "@/providers/applicationProvider"
 
 /**
@@ -56,23 +58,32 @@ function statusOf(
 export function useGatheringDoors(popupId: string | null | undefined): {
   doors: GatheringDoor[]
   isLoading: boolean
+  isError: boolean
 } {
   const { getApplicationsForPopup } = useApplication()
-
-  const { data, isLoading } = useQuery({
-    queryKey: ["portal-sales-flows", popupId],
-    queryFn: () =>
-      SalesFlowsService.listPortalSalesFlows({ popupId: popupId! }),
-    enabled: !!popupId,
-  })
+  const applicationsQuery = useApplicationsQuery()
+  const participationQuery = useParticipationQuery(popupId ?? null)
+  const flowsQuery = usePortalSalesFlows(popupId ?? undefined)
+  const listed = flowsQuery.data
+  const applicationsLoading = useInitialQueryResolution(
+    "applications",
+    applicationsQuery,
+  )
+  const participationLoading = useInitialQueryResolution(
+    `participation:${popupId ?? ""}`,
+    participationQuery,
+  )
+  const flowsLoading = useInitialQueryResolution(
+    `application-flows:${popupId ?? ""}`,
+    flowsQuery,
+  )
 
   const mine = getApplicationsForPopup()
-  const listed = data?.results ?? []
   const byFlow = new Map(
     mine.filter((a) => a.sales_flow_id).map((a) => [a.sales_flow_id, a]),
   )
 
-  const doors: GatheringDoor[] = listed.map((flow) => {
+  const doors: GatheringDoor[] = (listed ?? []).map((flow) => {
     const application = byFlow.get(flow.id) ?? null
     byFlow.delete(flow.id)
     return {
@@ -96,5 +107,12 @@ export function useGatheringDoors(popupId: string | null | undefined): {
     })
   }
 
-  return { doors, isLoading }
+  return {
+    doors,
+    isLoading: applicationsLoading || participationLoading || flowsLoading,
+    isError:
+      applicationsQuery.isLoadingError ||
+      participationQuery.isLoadingError ||
+      flowsQuery.isLoadingError,
+  }
 }

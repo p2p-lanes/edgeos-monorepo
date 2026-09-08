@@ -6,9 +6,9 @@ import type { ApplicationFormSchema } from "@/types/form-schema"
 export function useApplicationSchema(
   popupId: string | undefined,
   /**
-   * Explicit target sales flow chosen via the FlowPicker (sdd/sales-flows
-   * D6 URL scheme, task 9.4). Omitted keeps the backend's default-flow
-   * resolution.
+   * Explicit target sales flow chosen from the gathering overview
+   * (sdd/sales-flows D6 URL scheme, task 9.4). Omitted keeps the backend's
+   * default-flow resolution; null holds the query until route resolution.
    */
   salesFlowId?: string | null,
 ) {
@@ -22,7 +22,7 @@ export function useApplicationSchema(
       )
       return result as unknown as ApplicationFormSchema
     },
-    enabled: !!popupId,
+    enabled: !!popupId && salesFlowId !== null,
     staleTime: 5 * 60 * 1000,
   })
 }

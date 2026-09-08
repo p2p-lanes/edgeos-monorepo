@@ -73,6 +73,7 @@ import PortalShell from "./PortalShell"
 function expectPortalBoundary(getByTestId: (id: string) => HTMLElement) {
   expect(getByTestId("portal-sidebar").classList).toContain("portal-chrome")
   expect(getByTestId("portal-inset").classList).toContain("portal-chrome")
+  expect(getByTestId("portal-inset").classList).toContain("text-foreground")
   expect(document.querySelector("#portal-scroll")?.classList).toContain(
     "portal-chrome",
   )
@@ -96,6 +97,19 @@ describe("PortalShell", () => {
       "portal-chrome",
     )
     expectPortalBoundary(getByTestId)
+  })
+
+  it("establishes a foreground after overriding dark gathering tokens", () => {
+    const { getByTestId } = render(
+      <PortalShell>
+        <p data-testid="ordinary-content">Ordinary content</p>
+      </PortalShell>,
+    )
+
+    const inset = getByTestId("portal-inset")
+    expect(inset.classList).toContain("portal-chrome")
+    expect(inset.classList).toContain("text-foreground")
+    expect(inset.contains(getByTestId("ordinary-content"))).toBe(true)
   })
 
   it("keeps the profile canvas scoped when the Portal header is absent", () => {

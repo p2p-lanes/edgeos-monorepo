@@ -50,6 +50,7 @@ describe("ThemeProvider", () => {
     expect(
       document.documentElement.style.getPropertyValue("--background"),
     ).toBe(portalBackground)
+    expect(checkoutScope?.classList).toContain("text-foreground")
   })
 
   it("loads configured Google fonts without leaking local flow fonts to the document", () => {

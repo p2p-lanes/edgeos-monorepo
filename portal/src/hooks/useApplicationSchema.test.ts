@@ -2,7 +2,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
 import { renderHook, waitFor } from "@testing-library/react"
 import type { ReactNode } from "react"
 import { createElement } from "react"
-import { describe, expect, it, vi } from "vitest"
+import { beforeEach, describe, expect, it, vi } from "vitest"
 import { FormFieldsService } from "@/client"
 import { useApplicationSchema } from "./useApplicationSchema"
 
@@ -24,6 +24,8 @@ function wrapper({ children }: { children: ReactNode }) {
 }
 
 describe("useApplicationSchema", () => {
+  beforeEach(() => vi.clearAllMocks())
+
   it("omits salesFlowId when not provided (default-flow resolution unchanged)", async () => {
     const getPortalApplicationSchema = vi.mocked(
       FormFieldsService.getPortalApplicationSchema,
@@ -38,7 +40,7 @@ describe("useApplicationSchema", () => {
     })
   })
 
-  it("forwards salesFlowId when an explicit flow is targeted (FlowPicker, task 9.4)", async () => {
+  it("forwards salesFlowId when an explicit flow is targeted", async () => {
     const getPortalApplicationSchema = vi.mocked(
       FormFieldsService.getPortalApplicationSchema,
     )
@@ -51,5 +53,15 @@ describe("useApplicationSchema", () => {
         salesFlowId: "flow-vip",
       })
     })
+  })
+
+  it("does not request a default schema while flow resolution is pending", () => {
+    const getPortalApplicationSchema = vi.mocked(
+      FormFieldsService.getPortalApplicationSchema,
+    )
+
+    renderHook(() => useApplicationSchema("popup-1", null), { wrapper })
+
+    expect(getPortalApplicationSchema).not.toHaveBeenCalled()
   })
 })
