@@ -27,9 +27,13 @@ buyer sees.
 """
 
 import uuid
-from typing import Any
+from collections.abc import Iterable
+from typing import TYPE_CHECKING, Any
 
 from sqlmodel import Session, select
+
+if TYPE_CHECKING:
+    from app.api.ticketing_step.models import TicketingSteps
 
 
 def _curated_product_ids(template_config: Any) -> set[uuid.UUID]:
@@ -63,6 +67,23 @@ def _curated_product_ids(template_config: Any) -> set[uuid.UUID]:
     return ids
 
 
+def step_product_scope(
+    steps: Iterable["TicketingSteps"],
+) -> tuple[set[uuid.UUID], set[str]]:
+    """Separate explicit product IDs from category fallbacks for enabled steps."""
+    offered: set[uuid.UUID] = set()
+    open_categories: set[str] = set()
+    for step in steps:
+        if not step.product_category:
+            continue
+        curated = _curated_product_ids(step.template_config)
+        if curated:
+            offered |= curated
+        else:
+            open_categories.add(step.product_category.lower())
+    return offered, open_categories
+
+
 def flow_offered_product_ids(
     session: Session, flow_id: uuid.UUID, popup_id: uuid.UUID
 ) -> set[uuid.UUID]:
@@ -79,17 +100,7 @@ def flow_offered_product_ids(
         ).all()
     )
 
-    offered: set[uuid.UUID] = set()
-    open_categories: set[str] = set()
-
-    for step in steps:
-        if not step.product_category:
-            continue
-        curated = _curated_product_ids(step.template_config)
-        if curated:
-            offered |= curated
-        else:
-            open_categories.add(step.product_category.lower())
+    offered, open_categories = step_product_scope(steps)
 
     if open_categories:
         rows = session.exec(
