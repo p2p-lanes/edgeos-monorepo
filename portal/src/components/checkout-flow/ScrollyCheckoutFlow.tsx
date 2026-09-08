@@ -46,6 +46,8 @@ function ScrollyCheckoutFlowInner({
     isInitialLoading,
     previewMode,
     markStepVisited,
+    salesFlowId,
+    submitMode,
   } = useCheckout()
   const { getCity } = useCityProvider()
   const popup = getCity()
@@ -61,8 +63,10 @@ function ScrollyCheckoutFlowInner({
     // Discard any persisted redirect state from a prior session so it does
     // not leak into the next purchase.
     readAndClearPendingPaymentRedirectState()
-    router.replace(`/portal/${params.popupSlug}/passes`)
-  }, [isSimpleFIReturn, params.popupSlug, router])
+    const flowQuery =
+      submitMode === "application" && salesFlowId ? `?flow=${salesFlowId}` : ""
+    router.replace(`/portal/${params.popupSlug}/passes${flowQuery}`)
+  }, [isSimpleFIReturn, params.popupSlug, router, salesFlowId, submitMode])
 
   const handlePayment = async () => {
     const result = await submitPayment()

@@ -9,7 +9,6 @@ import {
   Ticket,
   Users,
 } from "lucide-react"
-import { useSearchParams } from "next/navigation"
 import { useTranslation } from "react-i18next"
 import { getEligibleShopOffers } from "@/app/portal/[popupSlug]/shop/components/shopOffers"
 import { OpenClaw } from "@/components/Icons/OpenClaw"
@@ -20,6 +19,7 @@ import { useHumanPopupAccess } from "@/hooks/useHumanPopupAccess"
 import { usePortalDirectSalesFlows } from "@/hooks/usePortalDirectSalesFlows"
 import { usePortalSalesFlows } from "@/hooks/usePortalSalesFlows"
 import { usePortalUpsaleFlows } from "@/hooks/usePortalUpsaleFlows"
+import { useRouteSalesFlow } from "@/hooks/useRouteSalesFlow"
 import { useApplication } from "@/providers/applicationProvider"
 import { useCityProvider } from "@/providers/cityProvider"
 import type { Resource } from "@/types/resources"
@@ -55,7 +55,7 @@ const useResources = () => {
   // would have to speak for both at once — one status, one passes link
   // (sdd/sales-flows-rediseno). Absent means a single application,
   // which is almost everyone.
-  const flowId = useSearchParams().get("flow")
+  const { flowId } = useRouteSalesFlow()
   // Every link keeps the door, so moving through the sidebar never
   // drops back to guessing.
   const flowQuery = flowId ? `?flow=${flowId}` : ""
@@ -109,15 +109,13 @@ const useResources = () => {
   const companionApplicationAccepted =
     participation?.type === "companion" &&
     participation?.application_status === "accepted"
-  const isApplicationApproved = isCompanion
-    ? participation?.application_status === "accepted"
-    : application?.status === "accepted"
   const hasEligibleShopOptions =
     getEligibleShopOffers({
       application: applicationFlows,
       direct: directFlows,
       upsale: upsaleFlows,
-      isApplicationApproved,
+      isApplicationApproved: (flow) =>
+        getRelevantApplication(flow.id)?.status === "accepted",
     }).length > 0
 
   // Where nobody applies there is no application and no reviewer-controlled

@@ -17,6 +17,7 @@ from app.api.sales_flow.schemas import (
     FlowStartPreview,
     SalesFlowCreate,
     SalesFlowPortalPublic,
+    SalesFlowPriceSummary,
     SalesFlowPublic,
     SalesFlowReadiness,
     SalesFlowReviewersMode,
@@ -38,7 +39,9 @@ from app.services.restrictions.schemas import assert_restriction_rule_allowed_fo
 router = APIRouter(prefix="/sales-flows", tags=["sales-flows"])
 
 
-def _portal_flow_public(db: Session, flow: SalesFlows) -> SalesFlowPortalPublic:
+def _portal_flow_public(
+    flow: SalesFlows, price_summary: SalesFlowPriceSummary | None
+) -> SalesFlowPortalPublic:
     """Build the Portal allowlist without exposing sales-flow configuration."""
     return SalesFlowPortalPublic(
         id=flow.id,
@@ -46,7 +49,7 @@ def _portal_flow_public(db: Session, flow: SalesFlows) -> SalesFlowPortalPublic:
         name=flow.name,
         order=flow.order,
         type=flow.type,
-        price_summary=crud.sales_flows_crud.resolve_portal_price_summary(db, flow),
+        price_summary=price_summary,
     )
 
 
@@ -64,8 +67,9 @@ async def list_portal_sales_flows(
     (see the checkout runtime and `resolve_flow`).
     """
     flows = crud.sales_flows_crud.find_portal_listed(db, popup_id)
+    summaries = crud.sales_flows_crud.resolve_portal_price_summaries(db, flows)
     return ListModel[SalesFlowPortalPublic](
-        results=[_portal_flow_public(db, flow) for flow in flows],
+        results=[_portal_flow_public(flow, summaries[flow.id]) for flow in flows],
         paging=Paging(offset=0, limit=len(flows), total=len(flows)),
     )
 
@@ -89,8 +93,9 @@ async def list_portal_upsale_flows(
     from app.api.application.crud import applications_crud  # noqa: PLC0415
 
     flows = applications_crud.resolve_upsale_catalog(db, current_human.id, popup_id)
+    summaries = crud.sales_flows_crud.resolve_portal_price_summaries(db, flows)
     return ListModel[SalesFlowPortalPublic](
-        results=[_portal_flow_public(db, flow) for flow in flows],
+        results=[_portal_flow_public(flow, summaries[flow.id]) for flow in flows],
         paging=Paging(offset=0, limit=len(flows), total=len(flows)),
     )
 
@@ -105,8 +110,9 @@ async def list_portal_direct_sales_flows(
     flows = crud.sales_flows_crud.find_portal_listed(
         db, popup_id, type=SalesFlowType.direct
     )
+    summaries = crud.sales_flows_crud.resolve_portal_price_summaries(db, flows)
     return ListModel[SalesFlowPortalPublic](
-        results=[_portal_flow_public(db, flow) for flow in flows],
+        results=[_portal_flow_public(flow, summaries[flow.id]) for flow in flows],
         paging=Paging(offset=0, limit=len(flows), total=len(flows)),
     )
 

@@ -297,8 +297,7 @@ const useCheckoutState = ({
         (error.status === 400 || error.status === 409)
       ) {
         try {
-          const token = window?.localStorage?.getItem("token")
-          if (token) {
+          {
             const result = await ApplicationsService.listMyApplications()
             const existingApp = findCheckoutApplication(
               result.results,

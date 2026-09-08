@@ -14,14 +14,15 @@ export const SUPPORTED_LANGUAGES = {
 } as const
 
 export type SupportedLanguage = keyof typeof SUPPORTED_LANGUAGES
+export const translationResources = {
+  en: { translation: en },
+  es: { translation: es },
+  zh: { translation: zh },
+  is: { translation: is },
+}
 
 i18n.use(initReactI18next).init({
-  resources: {
-    en: { translation: en },
-    es: { translation: es },
-    zh: { translation: zh },
-    is: { translation: is },
-  },
+  resources: translationResources,
   lng: "en",
   fallbackLng: "en",
   interpolation: {

@@ -2,7 +2,7 @@
 
 import { toast } from "sonner"
 
-import { OpenAPI } from "@/client"
+import { portalFetch } from "@/lib/session-network"
 
 function slugify(input: string): string {
   return (
@@ -18,7 +18,7 @@ function slugify(input: string): string {
 
 /**
  * Download the iCalendar file for a portal event.
- * Uses OpenAPI.BASE + the authenticated token so the file streams as a blob.
+ * Uses the same-origin session adapter so the file streams without browser tokens.
  */
 export async function downloadEventIcs({
   eventId,
@@ -29,19 +29,9 @@ export async function downloadEventIcs({
 }): Promise<void> {
   const dismissId = toast.loading("Preparing calendar file...")
   try {
-    const token =
-      typeof OpenAPI.TOKEN === "function"
-        ? await OpenAPI.TOKEN({ method: "GET", url: "" })
-        : OpenAPI.TOKEN
-
-    const headers: Record<string, string> = {
-      Accept: "text/calendar",
-    }
-    if (token) headers.Authorization = `Bearer ${token}`
-
-    const response = await fetch(
-      `${OpenAPI.BASE}/api/v1/events/portal/events/${eventId}/ics`,
-      { headers },
+    const response = await portalFetch(
+      `/api/v1/events/portal/events/${eventId}/ics`,
+      { headers: { Accept: "text/calendar" } },
     )
 
     if (!response.ok) {

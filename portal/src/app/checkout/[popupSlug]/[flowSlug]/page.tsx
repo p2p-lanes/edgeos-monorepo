@@ -2,7 +2,7 @@ export const dynamic = "force-dynamic"
 
 import type { Metadata } from "next"
 import { cookies } from "next/headers"
-import { fetchCheckoutRuntime } from "@/lib/checkout-runtime"
+import type { CheckoutRuntimeResponse } from "@/client"
 import {
   checkoutShareDescription,
   fetchCheckoutShareMeta,
@@ -11,8 +11,11 @@ import {
   LANGUAGE_COOKIE_KEY,
   normalizeLanguageTag,
 } from "@/lib/language-storage"
+import { getServerContext } from "@/lib/server/bootstrap"
+import { sessionIdentity } from "@/lib/session-contract"
 import { buildShareMetadata } from "@/lib/share-metadata"
 import { resolveTenantForMetadata } from "@/lib/tenant-metadata"
+import { SessionI18n } from "@/providers/sessionI18n"
 import CheckoutPageClient from "../CheckoutPageClient"
 
 export async function generateMetadata({
@@ -72,24 +75,36 @@ export default async function FlowCheckoutPage({
     normalizeLanguageTag(lang ?? locale) ??
     normalizeLanguageTag(cookieStore.get(LANGUAGE_COOKIE_KEY)?.value)
 
-  const runtime = await fetchCheckoutRuntime(
-    popupSlug,
-    tenant.id,
-    flowSlug,
-    ssrLanguage ?? undefined,
-  )
+  const context = await getServerContext()
+  const runtime = await context
+    .api<CheckoutRuntimeResponse>(
+      `/api/v1/checkout/${encodeURIComponent(popupSlug)}/${encodeURIComponent(flowSlug)}/runtime`,
+      ssrLanguage,
+    )
+    .catch(() => null)
   if (!runtime) {
     return <CheckoutPageClient popupSlug={popupSlug} flowSlug={flowSlug} />
   }
 
   const initialDataUpdatedAt = Date.now()
   return (
-    <CheckoutPageClient
-      popupSlug={popupSlug}
-      flowSlug={flowSlug}
-      initialRuntime={runtime}
-      initialDataUpdatedAt={initialDataUpdatedAt}
-      initialRuntimeLanguage={ssrLanguage}
-    />
+    <SessionI18n
+      language={ssrLanguage ?? runtime.popup.default_language ?? "en"}
+    >
+      <CheckoutPageClient
+        popupSlug={popupSlug}
+        flowSlug={flowSlug}
+        initialRuntime={runtime}
+        initialDataUpdatedAt={initialDataUpdatedAt}
+        initialRuntimeLanguage={
+          ssrLanguage ?? runtime.popup.default_language ?? "en"
+        }
+        initialRuntimeAudience={
+          context.snapshot.session
+            ? sessionIdentity(context.snapshot.session)
+            : undefined
+        }
+      />
+    </SessionI18n>
   )
 }

@@ -13,16 +13,18 @@ export type ApplicationStatus =
   | "rejected"
 
 /**
- * Tristate return type for the popup access gate.
+ * Verified access decisions and transport state for the popup access gate.
  *
  * - `loading` — backend request in flight; caller should render a loader.
  * - `allowed` — Human has access; `source` indicates which ladder step matched.
  * - `denied` — Human does not have access; `reason` indicates why.
+ * - `unavailable` — no decision is available; the caller can retry.
  *
  * The hook does NOT redirect. Routing decisions live in the page component.
  */
 export type HumanPopupAccess =
   | { state: "loading" }
+  | { state: "unavailable"; retry: () => void }
   | {
       state: "denied"
       reason: "no_access" | "application_pending" | "application_rejected"
@@ -41,21 +43,19 @@ export type HumanPopupAccess =
  * companion → denied).
  *
  * The hook does NOT perform any redirect or side effect. Consumers read the
- * tristate result and handle navigation accordingly.
+ * result and handle navigation accordingly.
  *
- * On network error the hook falls back to `{ state: "denied", reason: "no_access" }`
- * to avoid infinite loading states.
+ * Transport failures are unavailable, never a claim that access was denied.
  */
 export function useHumanPopupAccess(
   popupId: string | null | undefined,
 ): HumanPopupAccess {
-  const { data, isLoading, isError } = useQuery({
+  const { data, isLoading, isError, refetch } = useQuery({
     queryKey: queryKeys.humanPopupAccess.byPopup(popupId ?? ""),
     queryFn: async () => {
       return PortalService.getPopupAccess({ popupId: popupId! })
     },
     enabled: popupId != null && popupId !== "",
-    // Treat errors as denied rather than surfacing them to the UI
     retry: 1,
   })
 
@@ -63,9 +63,15 @@ export function useHumanPopupAccess(
     return { state: "loading" }
   }
 
-  if (isError || !data) {
-    return { state: "denied", reason: "no_access" }
+  if (!data && isError) {
+    return {
+      state: "unavailable",
+      retry: () => {
+        void refetch()
+      },
+    }
   }
+  if (!data) return { state: "loading" }
 
   if (!data.allowed) {
     const reason =

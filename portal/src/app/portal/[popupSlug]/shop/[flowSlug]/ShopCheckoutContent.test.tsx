@@ -6,10 +6,14 @@ const replace = vi.fn()
 const mocks = vi.hoisted(() => ({
   application: [] as Array<{ id: string; slug: string; name: string }>,
   applicationStatus: "accepted" as string | null,
+  loading: false,
 }))
 
 vi.mock("@/hooks/usePortalSalesFlows", () => ({
-  usePortalSalesFlows: () => ({ data: mocks.application }),
+  usePortalSalesFlows: () => ({
+    data: mocks.application,
+    isLoading: mocks.loading,
+  }),
 }))
 vi.mock("@/hooks/usePortalDirectSalesFlows", () => ({
   usePortalDirectSalesFlows: () => ({
@@ -36,6 +40,7 @@ vi.mock("react-i18next", () => ({
 }))
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ replace }),
+  useSearchParams: () => new URLSearchParams(),
 }))
 
 describe("ShopCheckoutContent", () => {
@@ -43,6 +48,7 @@ describe("ShopCheckoutContent", () => {
     replace.mockReset()
     mocks.application = []
     mocks.applicationStatus = "accepted"
+    mocks.loading = false
   })
 
   it("keeps the selected flow name visible around the shared checkout content", () => {
@@ -71,7 +77,8 @@ describe("ShopCheckoutContent", () => {
     expect(replace).toHaveBeenCalledWith("/portal/summer-camp/shop/merch-store")
   })
 
-  it("explains the approval prerequisite for an application Shop deep link", () => {
+  it("mounts the authenticated runtime before application catalogs resolve", () => {
+    mocks.loading = true
     mocks.applicationStatus = "in review"
     mocks.application = [
       { id: "application-1", slug: "attendee", name: "Attendee" },
@@ -85,12 +92,7 @@ describe("ShopCheckoutContent", () => {
       />,
     )
 
-    expect(screen.getByText("shop.approval_required_title")).toBeTruthy()
-    expect(
-      screen
-        .getByRole("link", { name: "shop.approval_required_cta" })
-        .getAttribute("href"),
-    ).toBe("/portal/summer-camp?flow=application-1")
-    expect(screen.queryByText("checkout:attendee")).toBeNull()
+    expect(screen.getByText("checkout:attendee")).toBeTruthy()
+    expect(replace).not.toHaveBeenCalled()
   })
 })

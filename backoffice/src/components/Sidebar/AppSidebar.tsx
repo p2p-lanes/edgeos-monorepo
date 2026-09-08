@@ -48,6 +48,8 @@ import {
 import { useWorkspace } from "@/contexts/WorkspaceContext"
 import useAuth from "@/hooks/useAuth"
 import { useCurrentTenant } from "@/hooks/useCurrentTenant"
+import { useFlowEditorPrefetch } from "@/hooks/useFlowEditorPrefetch"
+import { salesFlowsQueryOptions } from "@/lib/salesFlowQueries"
 import { type Item, Main } from "./Main"
 import { User as UserComponent } from "./User"
 import { WorkspaceSelector } from "./WorkspaceSelector"
@@ -142,6 +144,11 @@ export function AppSidebar() {
   } = useAuth()
   const { isContextReady, selectedPopupId } = useWorkspace()
   const { data: tenant } = useCurrentTenant()
+  const { scope, prefetch } = useFlowEditorPrefetch()
+  useQuery({
+    ...salesFlowsQueryOptions(selectedPopupId ?? undefined, scope),
+    enabled: !!scope,
+  })
 
   const { data: pendingReviews } = useQuery({
     queryKey: ["pending-reviews-count", selectedPopupId],
@@ -237,7 +244,7 @@ export function AppSidebar() {
         {/* Popup management section */}
         <SidebarGroup>
           <SidebarGroupLabel>Gathering Management</SidebarGroupLabel>
-          <Main items={popupItems} />
+          <Main items={popupItems} onIntent={prefetch} />
         </SidebarGroup>
 
         {/* Registration section */}

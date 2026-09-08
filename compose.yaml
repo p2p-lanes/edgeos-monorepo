@@ -112,6 +112,8 @@ services:
     ports:
       - "3000:3000"
     environment:
+      - PORTAL_BACKEND_URL=http://backend:8000
+      - PORTAL_STATIC_HOSTS=${PORTAL_STATIC_HOSTS-static.edgeos.world,static-origin.edgeos.world}
       - NEXT_PUBLIC_API_URL=${BACKEND_URL?Variable not set}
       # The ticketing-step live preview needs nothing here: the backoffice
       # drives it with an API-minted token, which is what authorizes it.

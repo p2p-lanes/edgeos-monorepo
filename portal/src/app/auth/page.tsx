@@ -26,7 +26,7 @@ function AuthContent() {
   if (loggedIn) {
     return (
       <div className="w-full h-full">
-        <Loader />
+        <Loader fullscreen />
       </div>
     )
   }
@@ -44,7 +44,7 @@ export default function AuthPage() {
     <Suspense
       fallback={
         <div className="w-full h-full">
-          <Loader />
+          <Loader fullscreen />
         </div>
       }
     >

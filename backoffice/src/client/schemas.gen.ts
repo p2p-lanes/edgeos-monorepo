@@ -15587,6 +15587,78 @@ automatic cascade (revoke API keys, reject in-review applications, send
 rejection emails); the other levels are purely advisory labels.`
 } as const;
 
+export const HumanSessionSchema = {
+    properties: {
+        human: {
+            '$ref': '#/components/schemas/HumanSessionProfile'
+        },
+        expires_at: {
+            type: 'string',
+            format: 'date-time',
+            title: 'Expires At'
+        }
+    },
+    type: 'object',
+    required: ['human', 'expires_at'],
+    title: 'HumanSession'
+} as const;
+
+export const HumanSessionProfileSchema = {
+    properties: {
+        id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Id'
+        },
+        tenant_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Tenant Id'
+        },
+        email: {
+            type: 'string',
+            title: 'Email'
+        },
+        first_name: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'First Name'
+        },
+        last_name: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Last Name'
+        },
+        picture_url: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Picture Url'
+        }
+    },
+    type: 'object',
+    required: ['id', 'tenant_id', 'email'],
+    title: 'HumanSessionProfile',
+    description: 'Explicit safe projection; never expose assessment or authentication fields.'
+} as const;
+
 export const HumanUpdateSchema = {
     properties: {
         first_name: {
