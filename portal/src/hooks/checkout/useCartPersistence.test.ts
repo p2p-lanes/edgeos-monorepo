@@ -28,7 +28,12 @@ describe("buildPersistedCartState", () => {
           checkOut: "2026-09-03",
           nights: 2,
           guestCount: 2,
-          guests: ["Taylor Buyer", ""],
+          guests: [
+            { name: "Taylor Buyer", answers: { phone: "+541100" } },
+            { name: "", answers: {} },
+          ],
+          bookerAnswers: { phone: "+541100" },
+          guestForm: null,
           subtotal: 100,
           tax: 10,
           totalPrice: 110,
@@ -53,9 +58,10 @@ describe("buildPersistedCartState", () => {
         check_in: "2026-09-01",
         check_out: "2026-09-03",
         guest_count: 2,
-        // The empty second slot is dropped: it is a guest the buyer has not
-        // typed in yet, not a nameless occupant to put on the booking.
-        guests: [{ name: "Taylor Buyer" }],
+        // The untouched second slot is dropped: it is a guest the buyer has
+        // not got to yet, not a nameless occupant to put on the booking.
+        guests: [{ name: "Taylor Buyer", answers: { phone: "+541100" } }],
+        booker_answers: { phone: "+541100" },
       },
     ])
   })
