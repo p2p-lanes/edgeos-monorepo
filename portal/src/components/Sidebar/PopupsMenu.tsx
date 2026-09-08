@@ -24,7 +24,7 @@ import {
 } from "./SidebarComponents"
 
 const PopupsMenu = () => {
-  const { getCity, getPopups } = useCityProvider()
+  const { getCity, getPopups, popupsLoaded } = useCityProvider()
   const { state } = useSidebar()
   const router = useRouter()
   const { t } = useTranslation()
@@ -42,6 +42,8 @@ const PopupsMenu = () => {
     },
     [router],
   )
+
+  if (popupsLoaded && popups.length === 0) return null
 
   return (
     <SidebarHeader className="border-b border-sidebar-border p-2">
