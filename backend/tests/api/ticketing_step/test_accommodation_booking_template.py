@@ -87,7 +87,7 @@ class TestDefaults:
         config = response.json()["template_config"]
         assert config == {
             "property_ids": [],
-            "layout": "grid",
+            "layout": "rows",
             "show_property_headers": True,
             "require_guest_names": True,
             "notice_text": None,
@@ -129,7 +129,7 @@ class TestDefaults:
                 popup_tenant_a,
                 {
                     "property_ids": [str(property_row.id)],
-                    "layout": "list",
+                    "layout": "sheet",
                     "show_property_headers": False,
                     "require_guest_names": False,
                     "notice_text": "Paid in full, non-refundable.",
@@ -139,10 +139,51 @@ class TestDefaults:
         assert response.status_code == 201, response.text
         config = response.json()["template_config"]
         assert config["property_ids"] == [str(property_row.id)]
-        assert config["layout"] == "list"
+        assert config["layout"] == "sheet"
         assert config["show_property_headers"] is False
         assert config["require_guest_names"] is False
         assert config["notice_text"] == "Paid in full, non-refundable."
+
+
+class TestLayoutNames:
+    """The step shipped with two layouts and now offers three.
+
+    "grid" and "list" are stored on every step configured before that, so
+    they are still accepted and are renamed on the way in. A step nobody has
+    edited since must not start answering 422 to its own stored config.
+    """
+
+    def test_the_old_names_are_renamed(
+        self,
+        client: TestClient,
+        db: Session,
+        admin_token_tenant_a: str,
+        popup_tenant_a: Popups,
+    ) -> None:
+        for stored, expected in (("grid", "cards"), ("list", "rows")):
+            response = client.post(
+                BASE,
+                headers=_auth(admin_token_tenant_a),
+                json=_step_payload(db, popup_tenant_a, {"layout": stored}),
+            )
+            assert response.status_code == 201, response.text
+            assert response.json()["template_config"]["layout"] == expected
+
+    def test_every_current_layout_is_accepted(
+        self,
+        client: TestClient,
+        db: Session,
+        admin_token_tenant_a: str,
+        popup_tenant_a: Popups,
+    ) -> None:
+        for layout in ("rows", "cards", "sheet"):
+            response = client.post(
+                BASE,
+                headers=_auth(admin_token_tenant_a),
+                json=_step_payload(db, popup_tenant_a, {"layout": layout}),
+            )
+            assert response.status_code == 201, response.text
+            assert response.json()["template_config"]["layout"] == layout
 
 
 class TestShapeValidation:
@@ -302,7 +343,7 @@ class TestOtherTemplatesAreUnaffected:
         created = client.post(
             BASE,
             headers=_auth(admin_token_tenant_a),
-            json=_step_payload(db, popup_tenant_a, {"layout": "list"}),
+            json=_step_payload(db, popup_tenant_a, {"layout": "sheet"}),
         )
         step_id = created.json()["id"]
 
@@ -312,7 +353,7 @@ class TestOtherTemplatesAreUnaffected:
             json={"order": 3},
         )
         assert patched.status_code == 200, patched.text
-        assert patched.json()["template_config"]["layout"] == "list"
+        assert patched.json()["template_config"]["layout"] == "sheet"
 
 
 class TestGuestForm:

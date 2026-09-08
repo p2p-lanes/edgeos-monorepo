@@ -2,7 +2,7 @@ import uuid
 from datetime import date
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, model_validator
+from pydantic import BaseModel, ConfigDict, field_validator, model_validator
 from sqlalchemy import Column
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlmodel import Field, SQLModel
@@ -155,6 +155,13 @@ def _validate_meal_plan_select_template_config(
     return out
 
 
+#: The layout names the accommodation step shipped with, and what they are
+#: called now. Read by the validator below and by nothing else: the portal
+#: only ever sees the new names, because everything reaching it has been
+#: through this model.
+LEGACY_ACCOMMODATION_LAYOUTS = {"grid": "cards", "list": "rows"}
+
+
 class AccommodationBookingConfig(BaseModel):
     """Typed template_config for the ``accommodation-booking`` step.
 
@@ -171,7 +178,10 @@ class AccommodationBookingConfig(BaseModel):
     """
 
     property_ids: list[uuid.UUID] = []
-    layout: Literal["grid", "list"] = "grid"
+    # How the rooms are laid out. "rows" is the default because it is the only
+    # one that reads well at every offer size: cards want photography, and the
+    # sheet earns its keep once there are more room types than fit a screen.
+    layout: Literal["rows", "cards", "sheet"] = "rows"
     show_property_headers: bool = True
     require_guest_names: bool = True
     notice_text: str | None = None
@@ -183,6 +193,20 @@ class AccommodationBookingConfig(BaseModel):
     guest_form: dict[str, Any] | None = None
 
     model_config = ConfigDict(extra="allow")
+
+    @field_validator("layout", mode="before")
+    @classmethod
+    def _rename_legacy_layout(cls, value: Any) -> Any:
+        """Accept the two names the step shipped with.
+
+        "grid" and "list" are stored on every step configured before the third
+        layout existed, and a Literal would reject them on the next read of a
+        row nobody has touched. They are the same two designs under their new
+        names, so they are renamed rather than deprecated.
+        """
+        if not isinstance(value, str):
+            return value
+        return LEGACY_ACCOMMODATION_LAYOUTS.get(value, value)
 
     @model_validator(mode="after")
     def _validate(self) -> "AccommodationBookingConfig":
