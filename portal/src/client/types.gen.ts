@@ -64,6 +64,9 @@ export type AccommodationBookingCreate = {
     check_out: string;
     guest_count?: (number | null);
     guests?: Array<BookingGuest>;
+    booker_answers?: {
+        [key: string]: unknown;
+    };
     primary_guest_name?: (string | null);
     primary_guest_email?: (string | null);
     notes?: (string | null);
@@ -83,6 +86,12 @@ export type AccommodationBookingPublic = {
     guests?: Array<{
         [key: string]: unknown;
     }>;
+    booker_answers?: {
+        [key: string]: unknown;
+    };
+    form_snapshot?: ({
+    [key: string]: unknown;
+} | null);
     primary_guest_name?: (string | null);
     primary_guest_email?: (string | null);
     attendee_id?: (string | null);
@@ -106,6 +115,9 @@ export type AccommodationBookingUpdate = {
     status?: (BookingStatus | null);
     guest_count?: (number | null);
     guests?: (Array<BookingGuest> | null);
+    booker_answers?: ({
+    [key: string]: unknown;
+} | null);
     primary_guest_name?: (string | null);
     primary_guest_email?: (string | null);
     notes?: (string | null);
@@ -1375,10 +1387,15 @@ export type BlockRangeResult = {
  * One occupant.
  *
  * Names are collected in the checkout and exported to the property owner,
- * who needs them for their own registry.
+ * who needs them for their own registry. ``answers`` holds whatever else the
+ * step's guest form asked, keyed by its field keys; it is empty when the
+ * step asks nothing, which is the default.
  */
 export type BookingGuest = {
     name: string;
+    answers?: {
+        [key: string]: unknown;
+    };
 };
 
 /**
@@ -1492,10 +1509,6 @@ export type CalendarUnit = {
  * the product is an implementation detail of how the booking travels
  * through payments, and resolving it at purchase time means a cart saved
  * before a room was re-synced still points at the right room.
- *
- * Guests are stored as plain names: the buyer types nothing else about
- * them, and the ``{name: ...}`` shape the purchase needs is built when the
- * payment is submitted.
  */
 export type CartAccommodationLine = {
     assignment: (CartUnassigned | CartAttendeeAssignment | CartRecipientAssignment);
@@ -1505,7 +1518,10 @@ export type CartAccommodationLine = {
     check_in: string;
     check_out: string;
     guest_count?: (number | null);
-    guests?: Array<(string)>;
+    guests?: Array<CartGuest>;
+    booker_answers?: {
+        [key: string]: unknown;
+    };
 };
 
 export type CartAttendeeAssignment = {
@@ -1536,6 +1552,21 @@ export type CartDateRangeLine = {
     check_in: string;
     check_out: string;
     quantity?: number;
+};
+
+/**
+ * One occupant as the cart holds them.
+ *
+ * ``name`` may be empty: the checkout renders a slot per guest before any of
+ * them is filled in, and half a party typed in is exactly what a saved cart
+ * is for. ``answers`` holds whatever else the step's guest form asked, keyed
+ * by its field keys.
+ */
+export type CartGuest = {
+    name?: string;
+    answers?: {
+        [key: string]: unknown;
+    };
 };
 
 /**

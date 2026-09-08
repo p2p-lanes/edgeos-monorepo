@@ -1077,3 +1077,187 @@ def test_payment_status_is_untouched_by_the_stay(
     payment = db.exec(select(Payments).where(Payments.popup_id == popup.id)).first()
     assert payment.status == PaymentStatus.PENDING.value
     assert payment.external_id is not None
+
+
+# ---------------------------------------------------------------------------
+# The guest form: what the property asks about the people staying
+# ---------------------------------------------------------------------------
+
+
+FULL_NAME_FIELD = {
+    "key": "full_name",
+    "type": "text",
+    "label": "Full name",
+    "required": True,
+}
+PASSPORT_FIELD = {
+    "key": "passport",
+    "type": "text",
+    "label": "Passport number",
+    "required": True,
+}
+GUEST_FORM = {"booker": {"fields": [FULL_NAME_FIELD]}, "guests": {"mode": "off"}}
+
+
+def _booking(db: Session, accommodation) -> AccommodationBookings:
+    return db.exec(
+        select(AccommodationBookings).where(
+            AccommodationBookings.accommodation_id == accommodation.id
+        )
+    ).first()
+
+
+class TestGuestForm:
+    def test_a_missing_answer_names_the_field_it_belongs_to(
+        self, client: TestClient, db: Session, tenant_a: Tenants
+    ) -> None:
+        """422 with the key, so the checkout can point at the input rather
+        than making the buyer hunt down the page for it."""
+        popup = _make_popup(db, tenant_a)
+        _enable_step(db, popup, config={"guest_form": GUEST_FORM})
+        _, accommodation = _make_inventory(db, popup)
+        db.commit()
+
+        response = _purchase(client, popup, tenant_a, [_booking_line(accommodation)])
+
+        assert response.status_code == 422, response.text
+        detail = response.json()["detail"]
+        assert detail["code"] == "accommodation_missing_guest_details"
+        assert detail["field"] == "full_name"
+        assert detail["guest_index"] is None
+
+    def test_the_answers_and_the_form_land_on_the_booking(
+        self, client: TestClient, db: Session, tenant_a: Tenants
+    ) -> None:
+        popup = _make_popup(db, tenant_a)
+        _enable_step(
+            db,
+            popup,
+            config={"guest_form": {"booker": {"fields": [FULL_NAME_FIELD]}}},
+        )
+        _, accommodation = _make_inventory(db, popup)
+        db.commit()
+
+        response = _purchase(
+            client,
+            popup,
+            tenant_a,
+            [
+                _booking_line(
+                    accommodation,
+                    booker_answers={"full_name": "Ada Lovelace"},
+                    guests=[
+                        {"name": "Ada", "answers": {"full_name": "Ada Lovelace"}},
+                        {"name": "Grace", "answers": {"full_name": "Grace Hopper"}},
+                    ],
+                )
+            ],
+        )
+        assert response.status_code == 200, response.text
+
+        booking = _booking(db, accommodation)
+        assert booking.booker_answers == {"full_name": "Ada Lovelace"}
+        assert booking.guests[1]["answers"] == {"full_name": "Grace Hopper"}
+        # The form is frozen onto the booking: renaming the question later
+        # must not relabel an answer already sent to the property owner.
+        assert booking.form_snapshot["booker"]["fields"][0]["label"] == "Full name"
+
+    def test_a_guest_missing_an_answer_is_reported_by_position(
+        self, client: TestClient, db: Session, tenant_a: Tenants
+    ) -> None:
+        popup = _make_popup(db, tenant_a)
+        _enable_step(
+            db,
+            popup,
+            config={"guest_form": {"booker": {"fields": [FULL_NAME_FIELD]}}},
+        )
+        _, accommodation = _make_inventory(db, popup)
+        db.commit()
+
+        response = _purchase(
+            client,
+            popup,
+            tenant_a,
+            [
+                _booking_line(
+                    accommodation,
+                    booker_answers={"full_name": "Ada Lovelace"},
+                    guests=[
+                        {"name": "Ada", "answers": {"full_name": "Ada Lovelace"}},
+                        {"name": "Grace", "answers": {}},
+                    ],
+                )
+            ],
+        )
+
+        assert response.status_code == 422, response.text
+        assert response.json()["detail"]["guest_index"] == 1
+
+    def test_a_step_with_no_form_sells_without_answers(
+        self, client: TestClient, db: Session, tenant_a: Tenants
+    ) -> None:
+        """The overwhelmingly common case, and the one that must stay free.
+
+        Nothing is asked, nothing is validated, and no snapshot is written:
+        the booking should not carry a record of a form that never existed.
+        """
+        popup = _make_popup(db, tenant_a)
+        _enable_step(db, popup)
+        _, accommodation = _make_inventory(db, popup)
+        db.commit()
+
+        response = _purchase(client, popup, tenant_a, [_booking_line(accommodation)])
+
+        assert response.status_code == 200, response.text
+        assert _booking(db, accommodation).form_snapshot is None
+
+    def test_a_form_that_lost_a_question_does_not_strand_a_cart(
+        self, client: TestClient, db: Session, tenant_a: Tenants
+    ) -> None:
+        """Answers to fields the form no longer defines are ignored, not
+        refused: the operator edited the step while this cart was open."""
+        popup = _make_popup(db, tenant_a)
+        _enable_step(db, popup, config={"guest_form": GUEST_FORM})
+        _, accommodation = _make_inventory(db, popup)
+        db.commit()
+
+        response = _purchase(
+            client,
+            popup,
+            tenant_a,
+            [
+                _booking_line(
+                    accommodation,
+                    booker_answers={"full_name": "Ada", "passport": "X1"},
+                )
+            ],
+        )
+
+        assert response.status_code == 200, response.text
+        # The stale answer is carried, not invented and not refused: it is
+        # what the buyer typed, and the snapshot says what was asked.
+        assert _booking(db, accommodation).booker_answers["passport"] == "X1"
+
+    def test_a_cart_saved_before_guests_had_answers_still_buys(
+        self, client: TestClient, db: Session, tenant_a: Tenants
+    ) -> None:
+        """Guests used to travel as bare names. Those carts exist."""
+        popup = _make_popup(db, tenant_a)
+        _enable_step(db, popup)
+        _, accommodation = _make_inventory(db, popup)
+        db.commit()
+
+        response = _purchase(
+            client,
+            popup,
+            tenant_a,
+            [_booking_line(accommodation, guests=["Ada", "Grace"])],
+        )
+
+        assert response.status_code == 200, response.text
+        booking = _booking(db, accommodation)
+        assert booking.guests == [
+            {"name": "Ada", "answers": {}},
+            {"name": "Grace", "answers": {}},
+        ]
+        assert booking.primary_guest_name == "Ada"

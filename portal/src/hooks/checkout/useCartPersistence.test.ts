@@ -53,7 +53,9 @@ describe("buildPersistedCartState", () => {
         check_in: "2026-09-01",
         check_out: "2026-09-03",
         guest_count: 2,
-        guests: ["Taylor Buyer"],
+        // The empty second slot is dropped: it is a guest the buyer has not
+        // typed in yet, not a nameless occupant to put on the booking.
+        guests: [{ name: "Taylor Buyer" }],
       },
     ])
   })

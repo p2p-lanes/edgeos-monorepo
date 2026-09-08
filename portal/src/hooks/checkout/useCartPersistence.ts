@@ -206,7 +206,9 @@ export function buildPersistedCartState(state: CartSelectionState): CartState {
       check_in: item.checkIn,
       check_out: item.checkOut,
       guest_count: item.guestCount,
-      guests: item.guests.filter(Boolean),
+      // Named slots only: an empty one is a guest the buyer has not typed in
+      // yet, and saving it would put a nameless occupant on the booking.
+      guests: item.guests.filter(Boolean).map((name) => ({ name })),
     })
   }
   for (const item of Object.values(state.dynamicItems).flat()) {

@@ -220,7 +220,7 @@ describe("accommodation-only cart persistence", () => {
       check_in: "2026-09-01",
       check_out: "2026-09-03",
       guest_count: 1,
-      guests: ["Taylor Buyer"],
+      guests: [{ name: "Taylor Buyer" }],
     })
   })
 
@@ -271,6 +271,31 @@ describe("legacy snapshot migration", () => {
 
     const canonical = normalizeCartItemsSnapshot(migrated?.items)
     expect(canonical).toEqual({ items: migrated?.items, migrated: false })
+  })
+
+  it("reads a stay whose guests are bare names, and one whose guests answered", () => {
+    // Both shapes are sitting in somebody's localStorage right now: bare
+    // names predate the guest form, records postdate it. Dropping either
+    // loses a party the buyer already typed in.
+    const migrated = normalizeCartItemsSnapshot({
+      accommodations: [
+        {
+          accommodation_id: "room-1",
+          check_in: "2026-09-01",
+          check_out: "2026-09-03",
+          guest_count: 2,
+          guests: ["Ada", { name: "Grace", answers: { age: 36 } }],
+        },
+      ],
+    })
+
+    expect(migrated?.migrated).toBe(true)
+    const line = migrated?.items.lines[0]
+    expect(line?.kind).toBe("accommodation")
+    expect(line?.kind === "accommodation" && line.guests).toEqual([
+      { name: "Ada" },
+      { name: "Grace", answers: { age: 36 } },
+    ])
   })
 })
 

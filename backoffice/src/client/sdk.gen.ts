@@ -2299,7 +2299,7 @@ export class ApprovalStrategiesService {
 
     /**
      * Delete Approval Strategy
-     * Delete approval strategy for a popup (revert to manual review).
+     * Idempotently disable review by resetting the gathering to AUTO_ACCEPT.
      * @param data The data for the request.
      * @param data.popupId
      * @param data.xTenantId

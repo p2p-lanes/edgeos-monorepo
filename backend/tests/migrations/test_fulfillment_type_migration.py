@@ -18,7 +18,7 @@ from app.api.product.models import Products
 
 REVISION = "e4a7c2d9b1f6"
 PREVIOUS_REVISION = "d9c7b4e2a1f8"
-HEAD_REVISION = "a6f4c2e9d1b7"
+HEAD_REVISION = "a4f1c8b2e7d3"
 COMPATIBILITY_CONSTRAINT = "ck_payment_product_fulfillment_identity_compatibility"
 LEGACY_CONSTRAINT = "ck_payment_product_has_recipient_or_attendee"
 

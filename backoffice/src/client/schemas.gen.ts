@@ -431,6 +431,11 @@ export const AccommodationBookingCreateSchema = {
             type: 'array',
             title: 'Guests'
         },
+        booker_answers: {
+            additionalProperties: true,
+            type: 'object',
+            title: 'Booker Answers'
+        },
         primary_guest_name: {
             anyOf: [
                 {
@@ -537,6 +542,23 @@ export const AccommodationBookingPublicSchema = {
             },
             type: 'array',
             title: 'Guests'
+        },
+        booker_answers: {
+            additionalProperties: true,
+            type: 'object',
+            title: 'Booker Answers'
+        },
+        form_snapshot: {
+            anyOf: [
+                {
+                    additionalProperties: true,
+                    type: 'object'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Form Snapshot'
         },
         primary_guest_name: {
             anyOf: [
@@ -732,6 +754,18 @@ export const AccommodationBookingUpdateSchema = {
                 }
             ],
             title: 'Guests'
+        },
+        booker_answers: {
+            anyOf: [
+                {
+                    additionalProperties: true,
+                    type: 'object'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Booker Answers'
         },
         primary_guest_name: {
             anyOf: [
@@ -6593,6 +6627,11 @@ export const BookingGuestSchema = {
             maxLength: 255,
             minLength: 1,
             title: 'Name'
+        },
+        answers: {
+            additionalProperties: true,
+            type: 'object',
+            title: 'Answers'
         }
     },
     type: 'object',
@@ -6601,7 +6640,9 @@ export const BookingGuestSchema = {
     description: `One occupant.
 
 Names are collected in the checkout and exported to the property owner,
-who needs them for their own registry.`
+who needs them for their own registry. \`\`answers\`\` holds whatever else the
+step's guest form asked, keyed by its field keys; it is empty when the
+step asks nothing, which is the default.`
 } as const;
 
 export const BookingKindSchema = {
@@ -7007,10 +7048,15 @@ export const CartAccommodationLineSchema = {
         },
         guests: {
             items: {
-                type: 'string'
+                '$ref': '#/components/schemas/CartGuest'
             },
             type: 'array',
             title: 'Guests'
+        },
+        booker_answers: {
+            additionalProperties: true,
+            type: 'object',
+            title: 'Booker Answers'
         }
     },
     additionalProperties: false,
@@ -7022,11 +7068,7 @@ export const CartAccommodationLineSchema = {
 Keyed by \`\`accommodation_id\`\` rather than by the shadow \`\`product_id\`\`:
 the product is an implementation detail of how the booking travels
 through payments, and resolving it at purchase time means a cart saved
-before a room was re-synced still points at the right room.
-
-Guests are stored as plain names: the buyer types nothing else about
-them, and the \`\`{name: ...}\`\` shape the purchase needs is built when the
-payment is submitted.`
+before a room was re-synced still points at the right room.`
 } as const;
 
 export const CartAttendeeAssignmentSchema = {
@@ -7180,6 +7222,29 @@ export const CartDateRangeLineSchema = {
     required: ['assignment', 'kind', 'product_id', 'check_in', 'check_out'],
     title: 'CartDateRangeLine',
     description: 'A product selected for a date range, such as legacy housing.'
+} as const;
+
+export const CartGuestSchema = {
+    properties: {
+        name: {
+            type: 'string',
+            title: 'Name',
+            default: ''
+        },
+        answers: {
+            additionalProperties: true,
+            type: 'object',
+            title: 'Answers'
+        }
+    },
+    type: 'object',
+    title: 'CartGuest',
+    description: `One occupant as the cart holds them.
+
+\`\`name\`\` may be empty: the checkout renders a slot per guest before any of
+them is filled in, and half a party typed in is exactly what a saved cart
+is for. \`\`answers\`\` holds whatever else the step's guest form asked, keyed
+by its field keys.`
 } as const;
 
 export const CartHumanInfoSchema = {

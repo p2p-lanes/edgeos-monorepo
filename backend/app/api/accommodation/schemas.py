@@ -12,6 +12,7 @@ import uuid
 from datetime import UTC, date, datetime
 from decimal import Decimal
 from enum import StrEnum
+from typing import Any
 
 from pydantic import BaseModel, ConfigDict, model_validator
 from pydantic import Field as PydanticField
@@ -402,10 +403,13 @@ class BookingGuest(BaseModel):
     """One occupant.
 
     Names are collected in the checkout and exported to the property owner,
-    who needs them for their own registry.
+    who needs them for their own registry. ``answers`` holds whatever else the
+    step's guest form asked, keyed by its field keys; it is empty when the
+    step asks nothing, which is the default.
     """
 
     name: str = PydanticField(min_length=1, max_length=255)
+    answers: dict[str, Any] = PydanticField(default_factory=dict)
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -441,6 +445,17 @@ class AccommodationBookingBase(SQLModel):
     guests: list[dict] = Field(
         default_factory=list,
         sa_column=Column(JSONB, nullable=False, server_default="'[]'::jsonb"),
+    )
+    # Answers to the property's questions, for whoever the room is for.
+    booker_answers: dict = Field(
+        default_factory=dict,
+        sa_column=Column(JSONB, nullable=False, server_default="'{}'::jsonb"),
+    )
+    # The form as it stood when this booking was made. Without it, renaming a
+    # question would relabel every answer ever given under the old wording,
+    # including the ones already sent to the property owner.
+    form_snapshot: dict | None = Field(
+        default=None, sa_column=Column(JSONB, nullable=True)
     )
     primary_guest_name: str | None = Field(default=None, max_length=255)
     primary_guest_email: str | None = Field(default=None, max_length=255)
@@ -481,6 +496,7 @@ class AccommodationBookingCreate(BaseModel):
     check_out: date
     guest_count: int | None = PydanticField(default=None, ge=1)
     guests: list[BookingGuest] = PydanticField(default_factory=list)
+    booker_answers: dict[str, Any] = PydanticField(default_factory=dict)
     primary_guest_name: str | None = None
     primary_guest_email: str | None = None
     notes: str | None = None
@@ -499,6 +515,7 @@ class AccommodationBookingUpdate(BaseModel):
     status: BookingStatus | None = None
     guest_count: int | None = PydanticField(default=None, ge=1)
     guests: list[BookingGuest] | None = None
+    booker_answers: dict[str, Any] | None = None
     primary_guest_name: str | None = None
     primary_guest_email: str | None = None
     notes: str | None = None
