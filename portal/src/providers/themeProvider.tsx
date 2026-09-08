@@ -447,7 +447,9 @@ export default function ThemeProvider({
   if (scope === "local") {
     return (
       <ThemeScopeContext.Provider value={localStyles}>
-        <div style={localStyles}>{children}</div>
+        <div className="text-foreground" style={localStyles}>
+          {children}
+        </div>
       </ThemeScopeContext.Provider>
     )
   }

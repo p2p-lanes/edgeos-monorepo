@@ -19,7 +19,7 @@ describe("splitForCreate", () => {
     expect(result.sales_flow_id).toBeUndefined()
   })
 
-  it("includes sales_flow_id when an explicit flow is targeted (sdd/sales-flows FlowPicker, task 9.4)", () => {
+  it("includes sales_flow_id when an explicit flow is targeted", () => {
     const result = splitForCreate({
       values: { first_name: "Pat", last_name: "Doe" },
       popupId: "popup-1",

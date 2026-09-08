@@ -144,9 +144,9 @@ interface DynamicApplicationFormProps {
   /** Referral UUID carried from /r/{code} — attributed on application create (REQ-GR-009). */
   referralId?: string | null
   /**
-   * Explicit target sales flow chosen via the FlowPicker (sdd/sales-flows
-   * D6 URL scheme, task 9.4). Omitted keeps the backend's primary-flow
-   * resolution.
+   * Explicit target sales flow chosen from the gathering overview
+   * (sdd/sales-flows D6 URL scheme, task 9.4). Omitted keeps the backend's
+   * primary-flow resolution.
    */
   salesFlowId?: string | null
 }
