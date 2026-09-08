@@ -137,20 +137,70 @@ describe("AccommodationBookingConfig", () => {
     expect(next.property_ids).toEqual(["prop-a"])
   })
 
-  it("defaults both switches to on and can turn them off", async () => {
+  it("defaults grouping to on and can turn it off", async () => {
     const onChange = renderConfig({})
 
     await waitFor(() => {
       expect(screen.getByText("Hotel Arcadia")).toBeTruthy()
     })
     fireEvent.click(screen.getByRole("button", { name: /Presentation/ }))
-    const switches = screen.getAllByRole("switch")
-    expect(
-      switches.every((s) => s.getAttribute("data-state") === "checked"),
-    ).toBe(true)
+    const grouping = screen.getByRole("switch")
+    expect(grouping.getAttribute("data-state")).toBe("checked")
 
-    fireEvent.click(switches[1])
+    fireEvent.click(grouping)
+    expect(onChange.mock.calls[0][0].show_property_headers).toBe(false)
+  })
+
+  it("keeps the name switch with the rest of what guests are asked", async () => {
+    // It moved out of Presentation: it answers the same question as the
+    // guest form below it, and an operator deciding what to ask should not
+    // have to find half of it under a layout heading.
+    const onChange = renderConfig({})
+
+    await waitFor(() => {
+      expect(screen.getByText("Hotel Arcadia")).toBeTruthy()
+    })
+    fireEvent.click(screen.getByRole("button", { name: /Guest details/ }))
+    const names = screen.getByRole("switch")
+    expect(names.getAttribute("data-state")).toBe("checked")
+
+    fireEvent.click(names)
     expect(onChange.mock.calls[0][0].require_guest_names).toBe(false)
+  })
+
+  it("writes a picked preset into template_config.guest_form", async () => {
+    // The wiring, not the editor: the editor has its own tests. What this
+    // pins is that what it hands back lands under the key the backend
+    // validates and the portal reads.
+    const onChange = renderConfig({})
+
+    await waitFor(() => {
+      expect(screen.getByText("Hotel Arcadia")).toBeTruthy()
+    })
+    fireEvent.click(screen.getByRole("button", { name: /Guest details/ }))
+    fireEvent.click(screen.getByRole("button", { name: /Contact details/ }))
+
+    const form = onChange.mock.calls[0][0].guest_form
+    expect(form.booker.fields.map((f: { key: string }) => f.key)).toEqual([
+      "email",
+      "phone",
+    ])
+    expect(form.guests.mode).toBe("same_as_booker")
+  })
+
+  it("stores no form at all when the operator asks nothing", async () => {
+    // "Start from scratch" opens an empty editor. An empty form is stored as
+    // null rather than as a shape with two empty sections, so the checkout
+    // has one thing to check instead of three.
+    const onChange = renderConfig({})
+
+    await waitFor(() => {
+      expect(screen.getByText("Hotel Arcadia")).toBeTruthy()
+    })
+    fireEvent.click(screen.getByRole("button", { name: /Guest details/ }))
+    fireEvent.click(screen.getByRole("button", { name: /Start from scratch/ }))
+
+    expect(onChange.mock.calls[0][0].guest_form).toBeNull()
   })
 
   it("stores the payment notice copy", async () => {

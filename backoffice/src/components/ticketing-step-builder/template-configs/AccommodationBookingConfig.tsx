@@ -2,6 +2,11 @@ import { useQuery } from "@tanstack/react-query"
 import { ArrowUpRight, BedDouble, Info } from "lucide-react"
 
 import { AccommodationsService } from "@/client"
+import {
+  GuestFormEditor,
+  parseForm,
+  toApi,
+} from "@/components/accommodations/guest-form"
 import { CollapsibleSection } from "@/components/ticketing-step-builder/step-detail/CollapsibleSection"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
@@ -27,7 +32,7 @@ const DEFAULT_NOTICE =
  * prices, photos and the booking calendar live in the Accommodations section
  * and are shared across steps (and, once sales flows land, across flows).
  * What belongs here is only how accommodation is *offered in this checkout*:
- * which properties, how they look, whether guest names are collected, and the
+ * which properties, how they look, what the people staying are asked, and the
  * payment notice.
  */
 export function AccommodationBookingConfig({
@@ -42,6 +47,10 @@ export function AccommodationBookingConfig({
   const showPropertyHeaders = config?.show_property_headers !== false
   const requireGuestNames = config?.require_guest_names !== false
   const noticeText = (config?.notice_text as string) ?? ""
+  // Parsed on every render rather than held in state: the panel is
+  // controlled by `config`, and a second copy would drift the moment a step
+  // is switched underneath it.
+  const guestForm = parseForm(config?.guest_form)
   const accommodationsHref = `/accommodations?popup_id=${popupId}`
 
   const { data, isLoading } = useQuery({
@@ -220,9 +229,17 @@ export function AccommodationBookingConfig({
               }
             />
           </div>
+        </div>
+      </CollapsibleSection>
 
-          <Separator />
-
+      <CollapsibleSection
+        title="Guest details"
+        description="What the checkout asks about the people staying"
+      >
+        <div className="flex flex-col gap-5">
+          {/* The name switch lives here rather than under Presentation: it
+              answers the same question as everything below it, and an
+              operator deciding what to ask should see it in one place. */}
           <div className="flex items-center justify-between">
             <div>
               <Label className="text-sm font-medium">Ask for guest names</Label>
@@ -238,6 +255,17 @@ export function AccommodationBookingConfig({
               }
             />
           </div>
+
+          <Separator />
+
+          <GuestFormEditor
+            value={guestForm}
+            onChange={(next) =>
+              // `toApi` returns null for a form that asks nothing, which is
+              // how the step stores "no questions beyond the name".
+              update({ guest_form: toApi(next) })
+            }
+          />
         </div>
       </CollapsibleSection>
 
