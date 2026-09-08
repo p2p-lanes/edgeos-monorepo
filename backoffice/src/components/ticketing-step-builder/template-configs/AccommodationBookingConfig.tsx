@@ -18,9 +18,64 @@ import { cn } from "@/lib/utils"
 import type { TemplateConfigProps } from "./types"
 
 const LAYOUTS = [
-  { value: "grid", label: "Grid", description: "Two columns with photos" },
-  { value: "list", label: "List", description: "One row per room type" },
+  {
+    value: "rows",
+    label: "Rows",
+    description:
+      "One wide row per room, prices in a column. Reads well at any offer size.",
+  },
+  {
+    value: "cards",
+    label: "Cards",
+    description:
+      "Two columns, photo first. Best when every room is photographed.",
+  },
+  {
+    value: "sheet",
+    label: "Sheet",
+    description:
+      "One line per room, opens in place. Best past a screenful of rooms.",
+  },
 ] as const
+
+/**
+ * What the first two layouts are called now.
+ *
+ * The backend renames these on save, but a step saved before the rename
+ * still answers with the old name until someone touches it, and the picker
+ * has to light up the right option in the meantime.
+ */
+const RENAMED_LAYOUTS: Record<string, string> = { grid: "cards", list: "rows" }
+
+/** A sketch of what each layout does with the space, at picker size. */
+function LayoutSketch({ value, active }: { value: string; active: boolean }) {
+  const fill = active ? "bg-primary/50" : "bg-muted-foreground/30"
+  return (
+    <div className="flex h-8 w-11 shrink-0 flex-col justify-center gap-[3px] rounded border border-border/60 bg-background p-1">
+      {value === "rows" &&
+        [0, 1, 2].map((row) => (
+          <div key={row} className="flex items-center gap-[3px]">
+            <div className={cn("h-[6px] w-[6px] rounded-[1px]", fill)} />
+            <div className={cn("h-[6px] flex-1 rounded-[1px]", fill)} />
+          </div>
+        ))}
+      {value === "cards" && (
+        <div className="grid grid-cols-2 gap-[3px]">
+          {[0, 1, 2, 3].map((cell) => (
+            <div key={cell} className={cn("h-[9px] rounded-[1px]", fill)} />
+          ))}
+        </div>
+      )}
+      {value === "sheet" &&
+        [0, 1, 2, 3].map((line) => (
+          <div
+            key={line}
+            className={cn("h-[3px] w-full rounded-[1px]", fill)}
+          />
+        ))}
+    </div>
+  )
+}
 
 const DEFAULT_NOTICE =
   "Full payment is required to confirm your stay. Accommodation is non-refundable."
@@ -43,7 +98,8 @@ export function AccommodationBookingConfig({
   const selectedIds = Array.isArray(config?.property_ids)
     ? (config.property_ids as string[])
     : []
-  const layout = (config?.layout as string) || "grid"
+  const storedLayout = (config?.layout as string) || "rows"
+  const layout = RENAMED_LAYOUTS[storedLayout] ?? storedLayout
   const showPropertyHeaders = config?.show_property_headers !== false
   const requireGuestNames = config?.require_guest_names !== false
   const noticeText = (config?.notice_text as string) ?? ""
@@ -180,31 +236,35 @@ export function AccommodationBookingConfig({
                 How room types are laid out in the checkout
               </p>
             </div>
-            <div className="grid grid-cols-2 gap-2">
+            <div className="flex flex-col gap-2">
               {LAYOUTS.map((option) => {
                 const isActive = layout === option.value
                 return (
                   <button
                     key={option.value}
                     type="button"
+                    aria-pressed={isActive}
                     onClick={() => update({ layout: option.value })}
                     className={cn(
-                      "flex flex-col items-start gap-0.5 rounded-lg border-2 p-3 text-left transition-all hover:bg-accent/50",
+                      "flex items-center gap-3 rounded-lg border-2 p-3 text-left transition-all hover:bg-accent/50",
                       isActive
                         ? "border-primary bg-primary/5"
                         : "border-border",
                     )}
                   >
-                    <span
-                      className={cn(
-                        "text-xs font-medium",
-                        isActive && "text-primary",
-                      )}
-                    >
-                      {option.label}
-                    </span>
-                    <span className="text-[10px] leading-tight text-muted-foreground">
-                      {option.description}
+                    <LayoutSketch value={option.value} active={isActive} />
+                    <span className="flex min-w-0 flex-col gap-0.5">
+                      <span
+                        className={cn(
+                          "text-xs font-medium",
+                          isActive && "text-primary",
+                        )}
+                      >
+                        {option.label}
+                      </span>
+                      <span className="text-[10px] leading-tight text-muted-foreground">
+                        {option.description}
+                      </span>
                     </span>
                   </button>
                 )

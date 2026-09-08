@@ -100,7 +100,7 @@ describe("AccommodationBookingConfig", () => {
   })
 
   it("adds a property to the subset without dropping the rest of the config", async () => {
-    const onChange = renderConfig({ layout: "list", property_ids: ["prop-b"] })
+    const onChange = renderConfig({ layout: "sheet", property_ids: ["prop-b"] })
 
     await waitFor(() => {
       expect(screen.getByText("Hotel Arcadia")).toBeTruthy()
@@ -109,7 +109,7 @@ describe("AccommodationBookingConfig", () => {
 
     const next = onChange.mock.calls[0][0]
     expect(next.property_ids).toEqual(["prop-b", "prop-a"])
-    expect(next.layout).toBe("list")
+    expect(next.layout).toBe("sheet")
   })
 
   it("removes a property from the subset", async () => {
@@ -130,11 +130,34 @@ describe("AccommodationBookingConfig", () => {
       expect(screen.getByText("Hotel Arcadia")).toBeTruthy()
     })
     fireEvent.click(screen.getByRole("button", { name: /Presentation/ }))
-    fireEvent.click(screen.getByRole("button", { name: /^List/ }))
+    fireEvent.click(screen.getByRole("button", { name: /^Sheet/ }))
 
     const next = onChange.mock.calls[0][0]
-    expect(next.layout).toBe("list")
+    expect(next.layout).toBe("sheet")
     expect(next.property_ids).toEqual(["prop-a"])
+  })
+
+  it("lights up the right option for a step saved under the old names", async () => {
+    // "grid" and "list" are what the first two layouts were called. The
+    // backend renames them on save, but until someone saves this step it
+    // still answers with the old name, and the picker has to cope.
+    renderConfig({ layout: "grid" })
+
+    await waitFor(() => {
+      expect(screen.getByText("Hotel Arcadia")).toBeTruthy()
+    })
+    fireEvent.click(screen.getByRole("button", { name: /Presentation/ }))
+
+    expect(
+      screen
+        .getByRole("button", { name: /^Cards/ })
+        .getAttribute("aria-pressed"),
+    ).toBe("true")
+    expect(
+      screen
+        .getByRole("button", { name: /^Rows/ })
+        .getAttribute("aria-pressed"),
+    ).toBe("false")
   })
 
   it("defaults grouping to on and can turn it off", async () => {
