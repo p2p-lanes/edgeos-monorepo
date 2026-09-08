@@ -4,8 +4,6 @@ import { useState } from "react"
 import { useTranslation } from "react-i18next"
 
 import { DynamicField } from "@/app/portal/[popupSlug]/application/components/fields/dynamic-field"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
 import {
   bookerFieldsOf,
   checkField,
@@ -21,7 +19,6 @@ import { GuestCard, toSchema } from "./GuestCard"
 
 interface GuestDetailsPanelProps {
   item: SelectedAccommodationItem
-  capacity: number
   requireGuestNames: boolean
 }
 
@@ -35,13 +32,11 @@ interface GuestDetailsPanelProps {
  */
 export function GuestDetailsPanel({
   item,
-  capacity,
   requireGuestNames,
 }: GuestDetailsPanelProps) {
   const { t } = useTranslation()
   const [touched, setTouched] = useState<Record<string, boolean>>({})
   const {
-    setAccommodationGuestCount,
     setAccommodationGuestName,
     setAccommodationBookerAnswer,
     setAccommodationGuestAnswer,
@@ -60,32 +55,12 @@ export function GuestDetailsPanel({
 
   return (
     <div className="flex flex-col gap-4 rounded-xl border bg-muted/30 p-4">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div className="min-w-0">
-          <p className="font-medium">{item.name}</p>
-          <p className="truncate text-xs text-muted-foreground">{where}</p>
-        </div>
-        <div className="flex items-center gap-2">
-          <Label htmlFor={`guests-${item.accommodationId}`} className="text-xs">
-            {t("checkout.accommodation.guests_label")}
-          </Label>
-          <Input
-            id={`guests-${item.accommodationId}`}
-            type="number"
-            min={1}
-            max={capacity}
-            className="w-20"
-            value={item.guestCount}
-            onChange={(event) =>
-              setAccommodationGuestCount(
-                item.accommodationId,
-                item.checkIn,
-                item.checkOut,
-                Number(event.target.value) || 1,
-              )
-            }
-          />
-        </div>
+      <div className="min-w-0">
+        {/* No party-size input here any more: it moved above the rooms,
+            where it filters which rooms exist rather than resizing a booking
+            that was already made against a room that may not fit. */}
+        <p className="font-medium">{item.name}</p>
+        <p className="truncate text-xs text-muted-foreground">{where}</p>
       </div>
 
       {bookerFields.length > 0 && (

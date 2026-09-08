@@ -178,7 +178,8 @@ describe("VariantAccommodationBooking: which endpoint it calls", () => {
 
   it("asks for the shortest stay the inventory accepts, not one night", async () => {
     // This room has a two-night minimum: seeding one night would open the
-    // step on "needs a longer stay" before showing a single price.
+    // step on an empty board before showing a single price. The party size
+    // rides along, so a room too small for it never reaches the board.
     renderStep()
 
     await waitFor(() =>
@@ -187,7 +188,11 @@ describe("VariantAccommodationBooking: which endpoint it calls", () => {
     expect(checkPortalAccommodationAvailability).toHaveBeenCalledWith({
       popupId: "popup-1",
       salesFlowId: "flow-application",
-      requestBody: { check_in: "2026-08-25", check_out: "2026-08-27" },
+      requestBody: {
+        check_in: "2026-08-25",
+        check_out: "2026-08-27",
+        guest_count: 1,
+      },
     })
   })
 

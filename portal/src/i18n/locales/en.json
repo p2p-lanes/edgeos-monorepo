@@ -417,6 +417,33 @@
         "inactive": "Not available",
         "default": "Not available for these dates"
       },
+      "stay": {
+        "fewer_guests": "One guest fewer",
+        "more_guests": "One guest more",
+        "checking": "Checking what's free…",
+        "results_one": "{{count}} room for these nights",
+        "results_other": "{{count}} rooms for these nights"
+      },
+      "removed": {
+        "extend_stay_one": "{{count}} more room opens at {{nights}} nights.",
+        "extend_stay_other": "{{count}} more rooms open at {{nights}} nights.",
+        "extend_stay_cta_one": "Stay {{count}} night",
+        "extend_stay_cta_other": "Stay {{count}} nights",
+        "opens_later_one": "{{count}} more room opens on {{date}}.",
+        "opens_later_other": "{{count}} more rooms open on {{date}}.",
+        "move_stay_cta": "Move to {{date}}",
+        "closed_earlier_one": "{{count}} room was bookable until {{date}}.",
+        "closed_earlier_other": "{{count}} rooms were bookable until {{date}}.",
+        "party_too_big_one": "{{count}} room sleeps fewer than {{guests}}. The largest here sleeps {{largest}}.",
+        "party_too_big_other": "{{count}} rooms sleep fewer than {{guests}}. The largest here sleeps {{largest}}.",
+        "taken_one": "{{count}} room is booked for these nights.",
+        "taken_other": "{{count}} rooms are booked for these nights."
+      },
+      "empty": {
+        "title": "No rooms for {{from}} to {{to}}",
+        "body": "Every room here is either booked, too small for your party, or asks for a longer stay."
+      },
+      "dropped": "{{room}} left your stay: {{reason}}.",
       "form": {
         "lead_guest": "Lead guest",
         "guest_number": "Guest {{number}}",

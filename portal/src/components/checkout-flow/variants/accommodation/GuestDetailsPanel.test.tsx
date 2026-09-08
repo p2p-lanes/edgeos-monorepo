@@ -50,11 +50,9 @@ const setAccommodationGuestName = vi.fn()
 const setAccommodationBookerAnswer = vi.fn()
 const setAccommodationGuestAnswer = vi.fn()
 const copyBookerAnswersToGuest = vi.fn()
-const setAccommodationGuestCount = vi.fn()
 
 vi.mock("@/providers/checkoutProvider", () => ({
   useCheckout: () => ({
-    setAccommodationGuestCount,
     setAccommodationGuestName,
     setAccommodationBookerAnswer,
     setAccommodationGuestAnswer,
@@ -102,11 +100,7 @@ function stay(overrides: Partial<SelectedAccommodationItem> = {}) {
 
 function renderPanel(item = stay(), requireGuestNames = true) {
   return render(
-    <GuestDetailsPanel
-      item={item}
-      capacity={4}
-      requireGuestNames={requireGuestNames}
-    />,
+    <GuestDetailsPanel item={item} requireGuestNames={requireGuestNames} />,
   )
 }
 
@@ -242,13 +236,12 @@ describe("same as lead guest", () => {
 })
 
 describe("party size", () => {
-  it("resizes through the provider", () => {
+  it("is not asked for here", () => {
+    // It moved above the rooms, where it decides which rooms exist at all.
+    // Asked here it could only resize a booking already made against a room
+    // that may not hold the new party.
     renderPanel()
 
-    fireEvent.change(screen.getByLabelText("Guests"), {
-      target: { value: "3" },
-    })
-
-    expect(setAccommodationGuestCount).toHaveBeenCalled()
+    expect(screen.queryByLabelText("Guests")).toBeNull()
   })
 })
