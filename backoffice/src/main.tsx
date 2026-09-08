@@ -11,6 +11,7 @@ import { ApiError, OpenAPI } from "./client"
 import { ThemeProvider } from "./components/theme-provider"
 import { Toaster } from "./components/ui/sonner"
 import "./index.css"
+import { withWorkspaceTenant } from "./lib/workspaceTenantHeader"
 import { routeTree } from "./routeTree.gen"
 
 OpenAPI.BASE = import.meta.env.VITE_API_URL
@@ -22,13 +23,7 @@ OpenAPI.TOKEN = async () => {
 // This ensures the header is added fresh on every request
 OpenAPI.interceptors.request.use((config) => {
   const tenantId = localStorage.getItem("workspace_tenant_id")
-  if (tenantId) {
-    config.headers = {
-      ...config.headers,
-      "X-Tenant-Id": tenantId,
-    }
-  }
-  return config
+  return withWorkspaceTenant(config, tenantId)
 })
 
 const handleApiError = (error: Error) => {

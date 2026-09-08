@@ -1,32 +1,13 @@
 import { useQuery } from "@tanstack/react-query"
 import { useEffect } from "react"
 
-import { type SalesFlowPublic, SalesFlowsService } from "@/client"
-import { salesFlowsQueryKey } from "@/lib/salesFlowQueries"
-
-const STORAGE_KEY = "edgeos.flow-scope"
-
-/**
- * Which sales flow a flow-scoped page is showing.
- *
- * The answer lives in the URL, so a link to "the form of Volunteers" means
- * the same thing to everyone who opens it. Memory only fills the gap: it
- * decides where you land when a URL says nothing, so moving between
- * sections does not ask the same question again.
- *
- * Stored per gathering. Two gatherings have different flows, and carrying
- * one's choice into the other would resolve to a flow that is not there.
- */
-function readRemembered(popupId: string): string | undefined {
-  if (typeof window === "undefined") return undefined
-  try {
-    const raw = window.localStorage.getItem(STORAGE_KEY)
-    if (!raw) return undefined
-    return (JSON.parse(raw) as Record<string, string>)[popupId]
-  } catch {
-    return undefined
-  }
-}
+import type { SalesFlowPublic } from "@/client"
+import {
+  type FlowEditorScope,
+  rememberedOrDefaultFlow,
+  FLOW_SCOPE_STORAGE_KEY as STORAGE_KEY,
+  salesFlowsQueryOptions,
+} from "@/lib/salesFlowQueries"
 
 /**
  * Persist the choice without navigating. For pages whose flow switch does
@@ -56,6 +37,8 @@ interface UseFlowScopeResult {
 }
 
 /**
+ * The URL selects the flow. Per-gathering memory only fills an unnamed URL.
+ *
  * @param popupId  The selected gathering.
  * @param urlFlowId  The `flow` search param of the current route.
  * @param onFlowResolved  Called when the page should adopt a flow the URL did
@@ -65,11 +48,10 @@ export function useFlowScope(
   popupId: string | undefined,
   urlFlowId: string | undefined,
   onFlowResolved?: (flowId: string) => void,
+  scope?: FlowEditorScope,
 ): UseFlowScopeResult {
   const { data, isFetching, isLoading } = useQuery({
-    queryKey: salesFlowsQueryKey(popupId),
-    queryFn: () =>
-      SalesFlowsService.listSalesFlows({ popupId: popupId!, limit: 100 }),
+    ...salesFlowsQueryOptions(popupId, scope),
     enabled: !!popupId,
   })
 
@@ -80,13 +62,9 @@ export function useFlowScope(
   // its refetch before replacing the URL with a remembered/default flow.
   const fromUrl = flows.find((f) => f.id === urlFlowId)
   const isRefreshingMissingUrlFlow = !!urlFlowId && !fromUrl && isFetching
-  const remembered = popupId
-    ? flows.find((f) => f.id === readRemembered(popupId))
-    : undefined
-  const fallback = flows.find((f) => f.is_default) ?? flows[0]
   const activeFlow = isRefreshingMissingUrlFlow
     ? undefined
-    : (fromUrl ?? remembered ?? fallback)
+    : (fromUrl ?? rememberedOrDefaultFlow(flows, popupId))
 
   useEffect(() => {
     if (!activeFlow || activeFlow.id === urlFlowId) return
