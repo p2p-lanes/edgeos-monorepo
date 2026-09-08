@@ -9,6 +9,8 @@ import CheckoutPageClient from "./CheckoutPageClient"
 const mockUseCheckoutRuntime = vi.fn()
 
 vi.mock("./hooks/useCheckoutRuntime", () => ({
+  checkoutRuntimeAudience: (user: { tenant_id: string; id: string }) =>
+    `${user.tenant_id}:${user.id}`,
   useCheckoutRuntime: (_slug: string, opts?: unknown) =>
     mockUseCheckoutRuntime(_slug, opts),
 }))

@@ -1,12 +1,42 @@
 "use client"
 
-import { useQuery } from "@tanstack/react-query"
+import { queryOptions, useQuery } from "@tanstack/react-query"
 import {
   ApiError,
   type CheckoutRuntimeResponse,
   CheckoutService,
+  type HumanPublic,
 } from "@/client"
 import { queryKeys } from "@/lib/query-keys"
+
+export function checkoutRuntimeAudience(
+  user: Pick<HumanPublic, "id" | "tenant_id">,
+) {
+  return `${user.tenant_id}:${user.id}`
+}
+
+export function checkoutRuntimeOptions(
+  slug: string,
+  flowSlug: string,
+  language?: string | null,
+  audience?: string,
+) {
+  return queryOptions({
+    queryKey: queryKeys.checkout.runtime(slug, flowSlug, language, audience),
+    queryFn: () => CheckoutService.getFlowRuntime({ slug, flowSlug }),
+    staleTime: 30_000,
+    gcTime: 60_000,
+    retry: (failureCount, error) => {
+      if (
+        error instanceof ApiError &&
+        error.status >= 400 &&
+        error.status < 500
+      )
+        return false
+      return failureCount < 3
+    },
+  })
+}
 
 export function useCheckoutRuntime(
   slug: string,
@@ -25,26 +55,19 @@ export function useCheckoutRuntime(
     flowSlug: string
     initialData?: CheckoutRuntimeResponse
     initialDataUpdatedAt?: number
+    audience?: string
+    enabled?: boolean
   },
 ) {
   return useQuery({
-    queryKey: queryKeys.checkout.runtime(slug, opts.flowSlug, opts.language),
-    queryFn: () =>
-      CheckoutService.getFlowRuntime({ slug, flowSlug: opts.flowSlug }),
-    enabled: slug.length > 0,
-    staleTime: 30_000,
-    gcTime: 60_000,
+    ...checkoutRuntimeOptions(
+      slug,
+      opts.flowSlug,
+      opts.language,
+      opts.audience,
+    ),
+    enabled: slug.length > 0 && opts.enabled !== false,
     initialData: opts.initialData,
     initialDataUpdatedAt: opts.initialDataUpdatedAt,
-    retry: (failureCount, error) => {
-      if (
-        error instanceof ApiError &&
-        error.status >= 400 &&
-        error.status < 500
-      ) {
-        return false
-      }
-      return failureCount < 3
-    },
   })
 }

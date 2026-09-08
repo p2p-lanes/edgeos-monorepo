@@ -5,6 +5,7 @@ import ScrollyCheckoutFlow from "./ScrollyCheckoutFlow"
 const mockUseSearchParams = vi.fn()
 const mockReadAndClearPendingPaymentRedirectState = vi.fn()
 const mockRouterReplace = vi.fn()
+let selectedFlowId: string | null = null
 
 vi.mock("next/navigation", () => ({
   useParams: () => ({ popupSlug: "popup-a" }),
@@ -22,6 +23,8 @@ vi.mock("@/providers/checkoutProvider", () => ({
     availableSteps: ["passes"],
     submitPayment: vi.fn().mockResolvedValue({ success: true }),
     stepConfigs: [],
+    salesFlowId: selectedFlowId,
+    submitMode: "application",
   }),
 }))
 
@@ -70,6 +73,7 @@ describe("ScrollyCheckoutFlow", () => {
     mockReadAndClearPendingPaymentRedirectState.mockReset()
     mockUseSearchParams.mockReset()
     mockRouterReplace.mockReset()
+    selectedFlowId = null
   })
 
   it("redirects to /passes when returning from SimpleFI", async () => {
@@ -96,5 +100,18 @@ describe("ScrollyCheckoutFlow", () => {
       expect(mockReadAndClearPendingPaymentRedirectState).not.toHaveBeenCalled()
       expect(mockRouterReplace).not.toHaveBeenCalled()
     })
+  })
+  it("keeps the selected application's context on a canonical Shop payment return", async () => {
+    selectedFlowId = "flow-b"
+    mockUseSearchParams.mockReturnValue(
+      new URLSearchParams("checkout=success&lang=es"),
+    )
+    render(<ScrollyCheckoutFlow />)
+    await waitFor(() =>
+      expect(mockRouterReplace).toHaveBeenCalledWith(
+        "/portal/popup-a/passes?flow=flow-b",
+      ),
+    )
+    expect(mockReadAndClearPendingPaymentRedirectState).toHaveBeenCalledOnce()
   })
 })

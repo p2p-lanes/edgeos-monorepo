@@ -1,6 +1,29 @@
-import { render, screen } from "@testing-library/react"
-import { describe, expect, it, vi } from "vitest"
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
+import {
+  fireEvent,
+  render as renderUi,
+  screen,
+  waitFor,
+} from "@testing-library/react"
+import type { ReactNode } from "react"
+import { beforeEach, describe, expect, it, vi } from "vitest"
+import { CheckoutService } from "@/client"
 import { resolveShopFlowSlug, ShopContent } from "./ShopContent"
+
+let queryClient: QueryClient
+beforeEach(() => {
+  queryClient = new QueryClient({
+    defaultOptions: { queries: { retry: false } },
+  })
+})
+function render(ui: ReactNode) {
+  return renderUi(
+    <QueryClientProvider client={queryClient}>{ui}</QueryClientProvider>,
+  )
+}
+vi.mock("@/hooks/useAuth", () => ({
+  default: () => ({ user: { id: "human-1", tenant_id: "tenant-1" } }),
+}))
 
 const mocks = vi.hoisted(() => ({
   application: [] as Array<{
@@ -50,8 +73,12 @@ vi.mock("@/hooks/usePortalUpsaleFlows", () => ({
 
 vi.mock("@/providers/applicationProvider", () => ({
   useApplication: () => ({
-    getRelevantApplication: () =>
-      mocks.applicationStatus ? { status: mocks.applicationStatus } : null,
+    getRelevantApplication: (flowId: string) =>
+      flowId === "unapproved"
+        ? { status: "in review" }
+        : mocks.applicationStatus
+          ? { status: mocks.applicationStatus }
+          : null,
     participation: null,
   }),
 }))
@@ -87,6 +114,44 @@ vi.mock("react-i18next", () => ({
 }))
 
 describe("ShopContent", () => {
+  it("only exposes application inventory belonging to an accepted application", () => {
+    mocks.applicationStatus = "accepted"
+    mocks.application = [
+      { id: "application", slug: "volunteer", name: "Volunteer" },
+      { id: "unapproved", slug: "general", name: "General" },
+    ]
+    mocks.direct = []
+    mocks.upsale = []
+    render(<ShopContent popupId="popup-1" popupSlug="summer-camp" />)
+    expect(
+      screen.getByRole("link", { name: "Application Volunteer View option" }),
+    ).toBeTruthy()
+    expect(screen.queryByText("General")).toBeNull()
+  })
+  it("prefetches only the intended flow, deduplicating focus and hover", async () => {
+    const runtime = vi
+      .spyOn(CheckoutService, "getFlowRuntime")
+      .mockResolvedValue({} as never)
+    mocks.application = []
+    mocks.upsale = []
+    mocks.direct = [
+      { id: "direct", slug: "weekend", name: "Weekend Pass" },
+      { id: "other", slug: "other", name: "Other" },
+    ]
+    render(<ShopContent popupId="popup-1" popupSlug="summer-camp" />)
+    expect(runtime).not.toHaveBeenCalled()
+    const link = screen.getByRole("link", {
+      name: "Direct purchase Weekend Pass View option",
+    })
+    fireEvent.mouseEnter(link)
+    fireEvent.focus(link)
+    await waitFor(() => expect(runtime).toHaveBeenCalledTimes(1))
+    expect(runtime).toHaveBeenCalledWith({
+      slug: "summer-camp",
+      flowSlug: "weekend",
+    })
+    runtime.mockRestore()
+  })
   it("canonicalizes an authorized UUID link to the flow's current slug", () => {
     const flow = {
       id: "flow-1",

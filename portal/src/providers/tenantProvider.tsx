@@ -28,6 +28,7 @@ const TenantContext = createContext<TenantContextValue | null>(null)
 
 interface TenantProviderProps {
   children: ReactNode
+  initialTenant?: TenantPublic | null
   /**
    * Pre-resolved tenant ID from the middleware (custom domain path only).
    * When provided, the client-side by-domain API call is skipped.
@@ -54,6 +55,7 @@ interface TenantProviderProps {
 
 export const TenantProvider = ({
   children,
+  initialTenant = null,
   initialTenantId = null,
   initialTenantSlug = null,
   // These are accepted to keep the component API consistent with the middleware
@@ -64,13 +66,17 @@ export const TenantProvider = ({
   initialLandingMode: _initialLandingMode = null,
   initialActivePopupSlug: _initialActivePopupSlug = null,
 }: TenantProviderProps) => {
-  const [tenant, setTenant] = useState<TenantPublic | null>(null)
-  const [isLoading, setIsLoading] = useState(true)
+  const [tenant, setTenant] = useState<TenantPublic | null>(initialTenant)
+  const [isLoading, setIsLoading] = useState(!initialTenant)
   const [error, setError] = useState<string | null>(null)
-  const [slug, setSlug] = useState<string | null>(null)
+  const [slug, setSlug] = useState<string | null>(initialTenant?.slug ?? null)
 
   useEffect(() => {
     if (typeof window === "undefined") return
+    if (initialTenant) {
+      localStorage.setItem(TENANT_STORAGE_KEY, initialTenant.id)
+      return
+    }
 
     // If the proxy already resolved the tenant server-side, use those headers
     // directly — no custom domain logic needed on the client.
@@ -123,10 +129,10 @@ export const TenantProvider = ({
       .finally(() => {
         setIsLoading(false)
       })
-  }, [initialTenantId, initialTenantSlug])
+  }, [initialTenant, initialTenantId, initialTenantSlug])
 
   if (isLoading) {
-    return <Loader />
+    return <Loader fullscreen />
   }
 
   if (error) {

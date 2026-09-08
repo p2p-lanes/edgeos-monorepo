@@ -4,10 +4,11 @@ import { Download, FileText, Loader2 } from "lucide-react"
 import { useState } from "react"
 import { useTranslation } from "react-i18next"
 import { toast } from "sonner"
-import { OpenAPI, type PaymentPublic } from "@/client"
+import type { PaymentPublic } from "@/client"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { formatDate } from "@/helpers/dates"
+import { portalFetch } from "@/lib/session-network"
 import { formatCurrency } from "@/types/checkout"
 import { type OrderStatus, projectOrders } from "./ordersProjection"
 
@@ -42,18 +43,8 @@ export function OrdersContent({
   const downloadInvoice = async (paymentId: string) => {
     setDownloadingId(paymentId)
     try {
-      const token =
-        typeof OpenAPI.TOKEN === "function"
-          ? await OpenAPI.TOKEN({ method: "GET", url: "" })
-          : OpenAPI.TOKEN
-      const tenantId = localStorage.getItem("portal_tenant_id")
-      const headers: Record<string, string> = {}
-      if (token) headers.Authorization = `Bearer ${token}`
-      if (tenantId) headers["X-Tenant-Id"] = tenantId
-
-      const response = await fetch(
-        `${OpenAPI.BASE}/api/v1/payments/my/${paymentId}/invoice`,
-        { headers },
+      const response = await portalFetch(
+        `/api/v1/payments/my/${paymentId}/invoice`,
       )
       if (!response.ok) throw new Error(`HTTP ${response.status}`)
 

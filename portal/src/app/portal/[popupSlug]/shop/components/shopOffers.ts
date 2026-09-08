@@ -14,7 +14,7 @@ interface ShopOfferCollections {
   application: ShopFlow[]
   direct: ShopFlow[]
   upsale: ShopFlow[]
-  isApplicationApproved: boolean
+  isApplicationApproved: boolean | ((flow: ShopFlow) => boolean)
 }
 
 export function getEligibleShopOffers({
@@ -23,9 +23,14 @@ export function getEligibleShopOffers({
   upsale,
   isApplicationApproved,
 }: ShopOfferCollections): ShopOffer[] {
+  const approvedApplications = application.filter((flow) =>
+    typeof isApplicationApproved === "function"
+      ? isApplicationApproved(flow)
+      : isApplicationApproved,
+  )
   return [
-    ...(isApplicationApproved && application.length > 0
-      ? [{ key: "application" as const, flows: application }]
+    ...(approvedApplications.length > 0
+      ? [{ key: "application" as const, flows: approvedApplications }]
       : []),
     ...(direct.length > 0 ? [{ key: "direct" as const, flows: direct }] : []),
     ...(upsale.length > 0 ? [{ key: "upsale" as const, flows: upsale }] : []),

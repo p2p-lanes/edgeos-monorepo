@@ -18,16 +18,14 @@ import {
 } from "@/components/ui/popover"
 import { useApplicationSchema } from "@/hooks/useApplicationSchema"
 import useAuth from "@/hooks/useAuth"
-import {
-  dispatchAuthChange,
-  useIsAuthenticated,
-} from "@/hooks/useIsAuthenticated"
+import { useIsAuthenticated } from "@/hooks/useIsAuthenticated"
 import useResolvedAttendees from "@/hooks/useResolvedAttendees"
 import { queryKeys } from "@/lib/query-keys"
 import { useApplication } from "@/providers/applicationProvider"
 import { CheckoutProvider } from "@/providers/checkoutProvider"
 import { useCityProvider } from "@/providers/cityProvider"
 import PassesProvider from "@/providers/passesProvider"
+import { useSession } from "@/providers/sessionProvider"
 import useCheckoutState from "../hooks/useCheckoutState"
 import type {
   CheckoutApplicationValues,
@@ -63,6 +61,7 @@ export const PopupCheckoutContent = ({
   const takesApplications = popup.takes_applications !== false
   const { t } = useTranslation()
   const isAuthenticated = useIsAuthenticated()
+  const { lifecycle } = useSession()
   const { getRelevantApplication } = useApplication()
   const fallbackApplication = getRelevantApplication()
   const checkoutSalesFlowId =
@@ -170,8 +169,7 @@ export const PopupCheckoutContent = ({
   const handleCompanionCancel = () => {
     // Per spec: cancel == log out + return portal to email-entry state.
     setPaidBlockOverride(false)
-    localStorage.removeItem("token")
-    dispatchAuthChange()
+    void lifecycle.logout()
     queryClient.removeQueries({ queryKey: queryKeys.profile.current })
     queryClient.removeQueries({ queryKey: queryKeys.applications.mine() })
     queryClient.removeQueries({
@@ -271,8 +269,7 @@ export const PopupCheckoutContent = ({
   }
 
   const handleChangeEmailForDirectCheckout = () => {
-    localStorage.removeItem("token")
-    dispatchAuthChange()
+    void lifecycle.logout()
     queryClient.clear()
     hasSkippedForm.current = false
     setCheckoutState("form")

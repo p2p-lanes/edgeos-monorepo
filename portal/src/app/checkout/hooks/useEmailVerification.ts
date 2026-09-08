@@ -1,19 +1,20 @@
 import { useCallback, useEffect, useRef, useState } from "react"
-import { ApiError, AuthService } from "@/client"
-import { dispatchAuthChange } from "@/hooks/useIsAuthenticated"
-import { configureApiClient } from "@/lib/api-client"
-import { useTenant } from "@/providers/tenantProvider"
+import { useTranslation } from "react-i18next"
+import type { PortalSession } from "@/lib/session-contract"
+import { authRequest, SessionRequestError } from "@/lib/session-lifecycle"
+import { useSession } from "@/providers/sessionProvider"
 
 interface UseEmailVerificationProps {
   email: string
-  onVerificationSuccess: (token: string) => void
+  onVerificationSuccess: (session: PortalSession) => void
 }
 
 export const useEmailVerification = ({
   email,
   onVerificationSuccess,
 }: UseEmailVerificationProps) => {
-  const { tenantId } = useTenant()
+  const { lifecycle } = useSession()
+  const { t } = useTranslation()
   const [showVerificationInput, setShowVerificationInput] = useState(false)
   const [verificationCode, setVerificationCode] = useState("")
   const [isSendingCode, setIsSendingCode] = useState(false)
@@ -54,12 +55,12 @@ export const useEmailVerification = ({
 
   const handleSendVerificationCode = async () => {
     if (!email) {
-      setVerificationError("Email is required")
+      setVerificationError(t("auth.invalid_email"))
       return
     }
 
     if (!/^\S+@\S+\.\S+$/.test(email)) {
-      setVerificationError("Invalid email")
+      setVerificationError(t("auth.invalid_email"))
       return
     }
 
@@ -67,20 +68,12 @@ export const useEmailVerification = ({
       setIsSendingCode(true)
       setVerificationError(null)
 
-      await AuthService.humanLogin({
-        requestBody: {
-          tenant_id: tenantId ?? "",
-          email: email.toLowerCase(),
-        },
-      })
+      await authRequest("login", { email: email.toLowerCase() })
 
       setShowVerificationInput(true)
       startCountdown()
-    } catch (error) {
-      console.error("Error sending verification code:", error)
-      setVerificationError(
-        "Failed to send verification code. Please try again.",
-      )
+    } catch {
+      setVerificationError(t("auth.failed_to_send_code"))
     } finally {
       setIsSendingCode(false)
     }
@@ -88,7 +81,7 @@ export const useEmailVerification = ({
 
   const handleVerifyCode = useCallback(async () => {
     if (verificationCode.length !== 6) {
-      setVerificationError("Please enter the full 6-digit code")
+      setVerificationError(t("auth.code_must_be_6_digits"))
       return
     }
 
@@ -96,18 +89,10 @@ export const useEmailVerification = ({
       setIsVerifyingCode(true)
       setVerificationError(null)
 
-      const result = await AuthService.humanAuthenticate({
-        requestBody: {
-          email: email.toLowerCase(),
-          tenant_id: tenantId ?? "",
-          code: verificationCode,
-        },
-      })
-
-      const token = result.access_token
-      configureApiClient(token)
-      window?.localStorage?.setItem("token", token)
-      dispatchAuthChange()
+      const session = await lifecycle.verify(
+        email.toLowerCase(),
+        verificationCode,
+      )
 
       setVerificationError(null)
       if (timerRef.current) {
@@ -117,29 +102,24 @@ export const useEmailVerification = ({
       setCountdown(0)
       setShowVerificationInput(false)
 
-      onVerificationSuccess(token)
+      onVerificationSuccess(session)
     } catch (error: unknown) {
-      console.error("Error verifying code:", error)
-
-      if (error instanceof ApiError) {
+      setVerificationCode("")
+      if (error instanceof SessionRequestError) {
         if (error.status === 401) {
-          setVerificationError("Invalid verification code. Please try again.")
+          setVerificationError(t("auth.invalid_code"))
         } else if (error.status === 404) {
-          setVerificationError(
-            "Verification code not found. Please request a new code.",
-          )
+          setVerificationError(t("auth.code_expired"))
         } else {
-          setVerificationError("Failed to verify code. Please try again.")
+          setVerificationError(t("auth.failed_to_verify"))
         }
       } else {
-        setVerificationError(
-          "Network error. Please check your connection and try again.",
-        )
+        setVerificationError(t("auth.network_error"))
       }
     } finally {
       setIsVerifyingCode(false)
     }
-  }, [email, verificationCode, onVerificationSuccess, tenantId])
+  }, [email, verificationCode, onVerificationSuccess, lifecycle, t])
 
   useEffect(() => {
     if (
@@ -161,11 +141,8 @@ export const useEmailVerification = ({
       setVerificationCode("")
       setVerificationError(null)
       await handleSendVerificationCode()
-    } catch (error) {
-      console.error("Error resending code:", error)
-      setVerificationError(
-        "Failed to resend verification code. Please try again.",
-      )
+    } catch {
+      setVerificationError(t("auth.failed_to_send_code"))
     }
   }
 

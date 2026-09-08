@@ -2,7 +2,7 @@
 
 import { useCallback, useState } from "react"
 import { toast } from "sonner"
-import { OpenAPI } from "@/client"
+import { portalFetch } from "@/lib/session-network"
 import { useCityProvider } from "@/providers/cityProvider"
 
 type UseExportCsvReturn = {
@@ -27,19 +27,8 @@ const useExportCsv = (): UseExportCsvReturn => {
     const dismissId = toast.loading("Preparing CSV export...")
     setIsExporting(true)
     try {
-      const token =
-        typeof OpenAPI.TOKEN === "function"
-          ? await OpenAPI.TOKEN({ method: "GET", url: "" })
-          : OpenAPI.TOKEN
-      const tenantId = localStorage.getItem("portal_tenant_id")
-
-      const headers: Record<string, string> = {}
-      if (token) headers.Authorization = `Bearer ${token}`
-      if (tenantId) headers["X-Tenant-Id"] = tenantId
-
-      const response = await fetch(
-        `${OpenAPI.BASE}/api/v1/applications/my/directory/${city.id}/csv`,
-        { headers },
+      const response = await portalFetch(
+        `/api/v1/applications/my/directory/${city.id}/csv`,
       )
 
       if (!response.ok) {

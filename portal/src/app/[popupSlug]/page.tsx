@@ -1,47 +1,52 @@
 import { notFound, redirect } from "next/navigation"
+import type { PopupPublic } from "@/client"
+import { PortalHttpError } from "@/lib/server/backend"
+import { getServerContext } from "@/lib/server/bootstrap"
+import { BootstrapRecovery } from "@/providers/sessionProvider"
 
 interface PopupRoutePageProps {
   params: Promise<{
     popupSlug: string
   }>
+  searchParams: Promise<Record<string, string | string[] | undefined>>
 }
 
-export default async function PopupRoutePage({ params }: PopupRoutePageProps) {
+export default async function PopupRoutePage({
+  params,
+  searchParams,
+}: PopupRoutePageProps) {
   const { popupSlug } = await params
-  const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL
-
-  if (!apiBaseUrl) {
-    throw new Error("NEXT_PUBLIC_API_URL is not configured")
+  const query = new URLSearchParams()
+  for (const [key, value] of Object.entries(await searchParams)) {
+    for (const item of Array.isArray(value)
+      ? value
+      : value === undefined
+        ? []
+        : [value])
+      query.append(key, item)
   }
-
-  let response: Response
+  const suffix = query.size ? `?${query}` : ""
+  let popup: PopupPublic | undefined
   try {
-    response = await fetch(`${apiBaseUrl}/api/v1/popups/portal/${popupSlug}`, {
-      cache: "no-store",
-    })
-  } catch {
-    // Network/backend unreachable: show the 404 page instead of a raw
-    // server-side exception.
-    notFound()
-  }
-
-  // Any non-OK status (404 unknown slug, 401 anonymous SSR request, etc.)
-  // resolves to the not-found page rather than throwing.
-  if (!response.ok) {
-    notFound()
-  }
-
-  const popup = (await response.json()) as {
-    takes_applications?: boolean
-    slug: string
+    const context = await getServerContext()
+    popup = context.snapshot.session
+      ? await context.api<PopupPublic>(
+          `/api/v1/popups/portal/${encodeURIComponent(popupSlug)}`,
+        )
+      : (await context.api<PopupPublic[]>("/api/v1/popups/public/list")).find(
+          (item) => item.slug === popupSlug,
+        )
+  } catch (error) {
+    if (error instanceof PortalHttpError && error.status === 404) notFound()
+    return <BootstrapRecovery />
   }
 
   // Only a gathering nobody applies to lands straight on the checkout. One
   // that takes applications belongs in the portal even when some of its doors
   // also sell, which is why this cannot read `sale_type` any more.
-  if (popup.takes_applications === false) {
-    redirect(`/checkout/${popup.slug}/checkout`)
+  if (popup?.takes_applications === false) {
+    redirect(`/checkout/${encodeURIComponent(popup.slug)}/checkout${suffix}`)
   }
 
-  redirect(`/portal/${popup.slug}`)
+  redirect(`/portal/${encodeURIComponent(popup?.slug ?? popupSlug)}${suffix}`)
 }

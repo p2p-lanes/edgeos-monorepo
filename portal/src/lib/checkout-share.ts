@@ -1,10 +1,11 @@
-import "@/lib/api-client"
-import { CheckoutService, type CheckoutShareMeta } from "@/client"
+import "server-only"
+import type { CheckoutShareMeta } from "@/client"
+import { backendFetch } from "./server/backend"
 
 export type { CheckoutShareMeta }
 
 /**
- * Server-side fetch of checkout OpenGraph share metadata via the generated SDK.
+ * Public server transport for checkout OpenGraph metadata; never sends a session.
  *
  * On 404/network failure returns `null` so the caller falls back to tenant-level
  * metadata from the root layout.
@@ -15,11 +16,11 @@ export async function fetchCheckoutShareMeta(
   tenantId: string,
 ): Promise<CheckoutShareMeta | null> {
   try {
-    return await CheckoutService.getCheckoutShareMeta({
-      slug: popupSlug,
-      flowSlug,
-      xTenantId: tenantId,
-    })
+    const response = await backendFetch(
+      `/api/v1/checkout/${encodeURIComponent(popupSlug)}/${encodeURIComponent(flowSlug)}/share`,
+      { headers: { "X-Tenant-Id": tenantId } },
+    )
+    return response.ok ? response.json() : null
   } catch {
     return null
   }

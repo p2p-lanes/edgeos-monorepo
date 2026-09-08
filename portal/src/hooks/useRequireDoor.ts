@@ -1,9 +1,10 @@
 "use client"
 
-import { useRouter, useSearchParams } from "next/navigation"
+import { useRouter } from "next/navigation"
 import { useEffect } from "react"
 
 import { useGatheringDoors } from "@/hooks/useGatheringDoors"
+import { useRouteSalesFlow } from "@/hooks/useRouteSalesFlow"
 
 /**
  * Sends a visitor back to pick a way in when the page needs one.
@@ -29,15 +30,15 @@ export function useRequireDoor(
   popupSlug: string,
 ): boolean {
   const router = useRouter()
-  const flowId = useSearchParams().get("flow")
+  const { isNamed } = useRouteSalesFlow()
   const { doors, isLoading } = useGatheringDoors(popupId)
 
-  const mustChoose = !isLoading && !flowId && doors.length > 1
+  const mustChoose = !isLoading && !isNamed && doors.length > 1
 
   useEffect(() => {
     if (!mustChoose) return
     router.replace(`/portal/${popupSlug}`)
   }, [mustChoose, popupSlug, router])
 
-  return mustChoose || isLoading
+  return !isNamed && (mustChoose || isLoading)
 }

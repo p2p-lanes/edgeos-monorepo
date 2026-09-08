@@ -6,7 +6,11 @@ vi.mock("next/navigation", () => ({
   useRouter: () => ({ replace: mockReplace }),
 }))
 
-let authState: { user: { id: string } | null; isUserLoading: boolean }
+let authState: {
+  user: { id: string } | null
+  isUserLoading: boolean
+  isAnonymous: boolean
+}
 vi.mock("@/hooks/useAuth", () => ({
   default: () => authState,
 }))
@@ -24,7 +28,7 @@ describe("Authentication", () => {
   })
 
   it("preserves the requested popup URL when sending a visitor to login", async () => {
-    authState = { user: null, isUserLoading: false }
+    authState = { user: null, isUserLoading: false, isAnonymous: true }
     window.history.replaceState(
       {},
       "",
@@ -47,7 +51,11 @@ describe("Authentication", () => {
   })
 
   it("renders the requested page for an authenticated visitor", () => {
-    authState = { user: { id: "human-1" }, isUserLoading: false }
+    authState = {
+      user: { id: "human-1" },
+      isUserLoading: false,
+      isAnonymous: false,
+    }
 
     render(
       <Authentication>
@@ -57,5 +65,15 @@ describe("Authentication", () => {
 
     expect(screen.getByText("Portal content")).toBeTruthy()
     expect(mockReplace).not.toHaveBeenCalled()
+  })
+  it("does not redirect an unresolved legacy migration or session outage", () => {
+    authState = { user: null, isUserLoading: false, isAnonymous: false }
+    render(
+      <Authentication>
+        <div>Private content</div>
+      </Authentication>,
+    )
+    expect(mockReplace).not.toHaveBeenCalled()
+    expect(screen.queryByText("Private content")).toBeNull()
   })
 })

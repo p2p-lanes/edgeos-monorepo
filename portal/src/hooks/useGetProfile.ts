@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import type { HumanProfileUpdate } from "@/client"
 import { type HumanPublic, HumansService } from "@/client"
 import { queryKeys } from "@/lib/query-keys"
+import { useIsAuthenticated } from "./useIsAuthenticated"
 
 export type UpdateProfilePayload = Partial<
   Pick<
@@ -24,6 +25,7 @@ interface UseGetProfileReturn {
 
 const useGetProfile = (): UseGetProfileReturn => {
   const queryClient = useQueryClient()
+  const isAuthenticated = useIsAuthenticated()
 
   const {
     data: profile = null,
@@ -32,6 +34,7 @@ const useGetProfile = (): UseGetProfileReturn => {
     refetch,
   } = useQuery({
     queryKey: queryKeys.profile.current,
+    enabled: isAuthenticated,
     queryFn: async () => {
       return HumansService.getCurrentHumanInfo()
     },

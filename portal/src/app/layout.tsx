@@ -1,17 +1,31 @@
+import { dehydrate, HydrationBoundary } from "@tanstack/react-query"
 import { GeistMono } from "geist/font/mono"
 import { GeistSans } from "geist/font/sans"
 import type { Metadata, Viewport } from "next"
-import { headers } from "next/headers"
+import { cookies, headers } from "next/headers"
+import { notFound } from "next/navigation"
+import type { HumanPublic, TenantPublic } from "@/client"
 import "./globals.css"
 import { Toaster } from "sonner"
 import { MetaPixel } from "@/components/MetaPixel"
+import { ServiceWorkerRegistrar } from "@/components/ServiceWorkerRegistrar"
 import GoogleAnalytics from "@/components/utils/GoogleAnalytics"
+import {
+  LANGUAGE_COOKIE_KEY,
+  normalizeLanguageTag,
+} from "@/lib/language-storage"
+import { queryKeys } from "@/lib/query-keys"
+import { getServerContext } from "@/lib/server/bootstrap"
+import { isStaticHost } from "@/lib/server/ingress"
+import { requestHost } from "@/lib/server/tenant"
 import { buildShareMetadata } from "@/lib/share-metadata"
 import {
   getMetadataBase,
   resolveTenantForMetadata,
 } from "@/lib/tenant-metadata"
 import QueryProvider from "@/providers/queryProvider"
+import { SessionI18n } from "@/providers/sessionI18n"
+import { BootstrapRecovery, SessionProvider } from "@/providers/sessionProvider"
 import { TenantProvider } from "@/providers/tenantProvider"
 
 const FALLBACK_NAME = "Edge Portal"
@@ -76,23 +90,37 @@ export default async function RootLayout({
   const apiOrigin = getApiOrigin()
 
   const headersList = await headers()
-  const isCustomDomain = headersList.get("x-custom-domain") === "true"
-  const middlewareTenantId = isCustomDomain
-    ? (headersList.get("x-tenant-id") ?? null)
-    : null
-  const middlewareTenantSlug = isCustomDomain
-    ? (headersList.get("x-tenant-slug") ?? null)
-    : null
-  const middlewareLandingMode = isCustomDomain
-    ? ((headersList.get("x-landing-mode") as "portal" | "checkout" | null) ??
-      null)
-    : null
-  const middlewareActivePopupSlug = isCustomDomain
-    ? (headersList.get("x-active-popup-slug") ?? null)
-    : null
+  const route = new URL(
+    headersList.get("x-portal-route") ?? "/",
+    "http://portal.internal",
+  )
+  const initialLanguage =
+    normalizeLanguageTag(
+      route.searchParams.get("lang") ?? route.searchParams.get("locale"),
+    ) ??
+    normalizeLanguageTag((await cookies()).get(LANGUAGE_COOKIE_KEY)?.value) ??
+    "en"
+  if (isStaticHost(requestHost(new Headers(headersList)).hostname)) notFound()
+  const context = await getServerContext().catch(() => null)
+  if (!context)
+    return (
+      <html lang={initialLanguage}>
+        <body>
+          <SessionI18n language={initialLanguage}>
+            <BootstrapRecovery />
+          </SessionI18n>
+        </body>
+      </html>
+    )
+  const tenant = context.tenant
+  if (context.snapshot.session)
+    await context.queryClient.prefetchQuery({
+      queryKey: queryKeys.profile.current,
+      queryFn: () => context.api<HumanPublic>("/api/v1/humans/me"),
+    })
 
   return (
-    <html lang="en">
+    <html lang={initialLanguage}>
       <body
         className={`${GeistSans.variable} ${GeistSans.className} ${GeistMono.variable} antialiased`}
         suppressHydrationWarning
@@ -100,18 +128,26 @@ export default async function RootLayout({
         {apiOrigin && (
           <link rel="preconnect" href={apiOrigin} crossOrigin="anonymous" />
         )}
-        <QueryProvider>
-          <TenantProvider
-            initialTenantId={middlewareTenantId}
-            initialTenantSlug={middlewareTenantSlug}
-            initialLandingMode={middlewareLandingMode}
-            initialActivePopupSlug={middlewareActivePopupSlug}
-          >
-            <GoogleAnalytics />
-            <MetaPixel />
-            <div className="w-full">{children}</div>
-          </TenantProvider>
-        </QueryProvider>
+        <SessionI18n language={initialLanguage}>
+          <SessionProvider initial={context.snapshot}>
+            <QueryProvider>
+              <HydrationBoundary state={dehydrate(context.queryClient)}>
+                <ServiceWorkerRegistrar />
+                <TenantProvider
+                  initialTenant={tenant as TenantPublic}
+                  initialTenantId={tenant?.id ?? null}
+                  initialTenantSlug={tenant?.slug ?? null}
+                  initialLandingMode={tenant?.landing_mode ?? null}
+                  initialActivePopupSlug={tenant?.active_popup_slug ?? null}
+                >
+                  <GoogleAnalytics />
+                  <MetaPixel />
+                  <div className="w-full">{children}</div>
+                </TenantProvider>
+              </HydrationBoundary>
+            </QueryProvider>
+          </SessionProvider>
+        </SessionI18n>
         <Toaster position="bottom-center" richColors />
       </body>
     </html>

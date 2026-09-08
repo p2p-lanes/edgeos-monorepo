@@ -7,17 +7,17 @@ import useAuth from "@/hooks/useAuth"
 import { getAuthRedirectPath } from "@/lib/safe-return-to"
 
 const Authentication = ({ children }: { children: ReactNode }) => {
-  const { user, isUserLoading } = useAuth()
+  const { user, isUserLoading, isAnonymous } = useAuth()
   const router = useRouter()
 
   useEffect(() => {
-    if (!isUserLoading && !user) {
+    if (isAnonymous) {
       const returnTo = `${window.location.pathname}${window.location.search}${window.location.hash}`
       router.replace(getAuthRedirectPath(returnTo))
     }
-  }, [user, isUserLoading, router])
+  }, [isAnonymous, router])
 
-  if (isUserLoading || !user) return <Loader />
+  if (isUserLoading || !user) return <Loader fullscreen />
 
   return children
 }

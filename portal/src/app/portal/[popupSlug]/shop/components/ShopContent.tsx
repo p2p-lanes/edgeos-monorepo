@@ -1,10 +1,17 @@
 "use client"
 
+import { useQueryClient } from "@tanstack/react-query"
 import Link from "next/link"
 import { useTranslation } from "react-i18next"
+import {
+  checkoutRuntimeAudience,
+  checkoutRuntimeOptions,
+} from "@/app/checkout/[popupSlug]/hooks/useCheckoutRuntime"
+import useAuth from "@/hooks/useAuth"
 import { usePortalDirectSalesFlows } from "@/hooks/usePortalDirectSalesFlows"
 import { usePortalSalesFlows } from "@/hooks/usePortalSalesFlows"
 import { usePortalUpsaleFlows } from "@/hooks/usePortalUpsaleFlows"
+import { resolveRequestLanguage } from "@/lib/language-storage"
 import { useApplication } from "@/providers/applicationProvider"
 import { getEligibleShopOffers, type ShopFlow } from "./shopOffers"
 
@@ -33,21 +40,30 @@ function getShopPriceLabel(
 
 export function ShopContent({ popupId, popupSlug }: ShopContentProps) {
   const { t } = useTranslation()
-  const { getRelevantApplication, participation } = useApplication()
+  const { getRelevantApplication } = useApplication()
+  const { user } = useAuth()
+  const queryClient = useQueryClient()
   const application = usePortalSalesFlows(popupId).data ?? []
   const direct = usePortalDirectSalesFlows(popupId).data ?? []
   const upsale = usePortalUpsaleFlows(popupId).data ?? []
-  const currentApplication = getRelevantApplication()
-  const isApplicationApproved =
-    participation?.type === "companion"
-      ? participation.application_status === "accepted"
-      : currentApplication?.status === "accepted"
   const offers = getEligibleShopOffers({
     application,
     direct,
     upsale,
-    isApplicationApproved,
+    isApplicationApproved: (flow) =>
+      getRelevantApplication(flow.id)?.status === "accepted",
   })
+  const prefetchFlow = (flowSlug: string) => {
+    if (!user || !popupId) return
+    void queryClient.prefetchQuery(
+      checkoutRuntimeOptions(
+        popupSlug,
+        flowSlug,
+        resolveRequestLanguage(),
+        checkoutRuntimeAudience(user),
+      ),
+    )
+  }
 
   if (offers.length === 0) {
     return (
@@ -99,6 +115,8 @@ export function ShopContent({ popupId, popupSlug }: ShopContentProps) {
                   <li key={flow.id}>
                     <Link
                       href={`/portal/${popupSlug}/shop/${flow.slug}`}
+                      onMouseEnter={() => prefetchFlow(flow.slug)}
+                      onFocus={() => prefetchFlow(flow.slug)}
                       aria-label={`${t(`shop.${key}`)} ${flow.name} ${t("shop.open")}`}
                       className="group flex h-full flex-col overflow-hidden rounded-xl border border-slate-200 border-t-4 border-t-sky-500 bg-white p-4 shadow-sm transition hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                     >
