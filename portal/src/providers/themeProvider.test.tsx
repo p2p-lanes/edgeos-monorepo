@@ -6,6 +6,9 @@ const portalBackground = "rgb(245 245 245)"
 const darkConfig: ThemeConfig = {
   colors: { mode: "dark", primary_color: "#112233" },
 }
+const lightConfig: ThemeConfig = {
+  colors: { mode: "light", primary_color: "#445566" },
+}
 
 beforeEach(() => {
   document.head.innerHTML = ""
@@ -40,17 +43,70 @@ describe("ThemeProvider", () => {
     ).toBe("oklch(0.145 0 0)")
   })
 
-  it("keeps a flow palette on its checkout subtree", () => {
+  it.each([
+    ["light", lightConfig, "oklch(1 0 0)", "oklch(0.145 0 0)"],
+    ["dark", darkConfig, "oklch(0.145 0 0)", "oklch(0.985 0 0)"],
+  ])("keeps a %s flow palette on its local checkout subtree", (mode, config, background, foreground) => {
     document.documentElement.style.setProperty("--background", portalBackground)
-    const checkoutScope = renderLocalTheme(darkConfig, "Dark checkout")
+    const checkoutScope = renderLocalTheme(config, `${mode} checkout`)
 
     expect(checkoutScope?.style.getPropertyValue("--background")).toBe(
-      "oklch(0.145 0 0)",
+      background,
+    )
+    expect(checkoutScope?.style.getPropertyValue("--foreground")).toBe(
+      foreground,
     )
     expect(
       document.documentElement.style.getPropertyValue("--background"),
     ).toBe(portalBackground)
     expect(checkoutScope?.classList).toContain("text-foreground")
+  })
+
+  it("keeps explicit checkout nav text ahead of a different primary foreground", () => {
+    const checkoutScope = renderLocalTheme(
+      {
+        colors: {
+          mode: "dark",
+          primary_color: "#112233",
+          primary_foreground_color: "#fefefe",
+          checkout_nav_text_color: "#abcdef",
+        },
+      },
+      "Custom checkout navigation",
+    )
+
+    expect(checkoutScope?.style.getPropertyValue("--checkout-nav-text")).toBe(
+      "#abcdef",
+    )
+    expect(
+      checkoutScope?.style.getPropertyValue("--checkout-badge-title"),
+    ).toBe("#abcdef")
+    expect(
+      checkoutScope?.style.getPropertyValue("--checkout-badge-title-disabled"),
+    ).toBe("color-mix(in srgb, #abcdef 70%, transparent)")
+    expect(checkoutScope?.style.getPropertyValue("--primary-foreground")).toBe(
+      "#fefefe",
+    )
+  })
+
+  it("uses primary foreground for nav and badge titles only as a fallback", () => {
+    const checkoutScope = renderLocalTheme(
+      {
+        colors: {
+          mode: "dark",
+          primary_color: "#112233",
+          primary_foreground_color: "#fefefe",
+        },
+      },
+      "Fallback checkout navigation",
+    )
+
+    expect(checkoutScope?.style.getPropertyValue("--checkout-nav-text")).toBe(
+      "#fefefe",
+    )
+    expect(
+      checkoutScope?.style.getPropertyValue("--checkout-badge-title"),
+    ).toBe("#fefefe")
   })
 
   it("loads configured Google fonts without leaking local flow fonts to the document", () => {

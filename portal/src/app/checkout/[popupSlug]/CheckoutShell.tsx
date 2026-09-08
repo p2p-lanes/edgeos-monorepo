@@ -30,16 +30,16 @@ export function CheckoutShell({
         } as React.CSSProperties
       }
     >
-      <main
-        className={`h-svh overflow-y-auto no-scrollbar ${background.type === "none" ? "bg-background" : ""}`.trim()}
-      >
-        {background.type === "image" && (
-          <CheckoutBackgroundImage url={background.url} />
-        )}
-        {background.type === "video" && (
-          <CheckoutBackgroundVideo url={background.url} />
-        )}
-        {children}
+      <main className="relative isolate h-svh overflow-y-auto bg-background no-scrollbar">
+        <div className="relative min-h-full">
+          {background.type === "image" && (
+            <CheckoutBackgroundImage url={background.url} position="absolute" />
+          )}
+          {background.type === "video" && (
+            <CheckoutBackgroundVideo url={background.url} position="absolute" />
+          )}
+          {children}
+        </div>
       </main>
     </SidebarProvider>
   )

@@ -258,8 +258,8 @@ function computeThemeVars(
     vars["--sidebar-primary-foreground"] = primaryFg
     vars["--sidebar-ring"] = primary
     vars["--checkout-badge-bg"] = primary
-    vars["--checkout-badge-title"] = primaryFg
-    vars["--checkout-nav-text"] = primaryFg
+    vars["--checkout-badge-title"] = colors.checkout_nav_text_color || primaryFg
+    vars["--checkout-nav-text"] = colors.checkout_nav_text_color || primaryFg
     vars["--checkout-button"] = primary
     vars["--checkout-button-title"] = primaryFg
   }
