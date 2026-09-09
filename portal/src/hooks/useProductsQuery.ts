@@ -7,6 +7,7 @@ import type { ProductsPass } from "@/types/Products"
 export function useProductsQuery(
   popupId: string | null,
   salesFlowId?: string | null,
+  enabled = true,
 ) {
   const isAuthenticated = useIsAuthenticated()
   return useQuery({
@@ -23,7 +24,7 @@ export function useProductsQuery(
         category: p.category ?? "other",
       }))
     },
-    enabled: !!popupId && isAuthenticated,
+    enabled: enabled && !!popupId && isAuthenticated,
     staleTime: 0,
     refetchInterval: 30_000,
   })
