@@ -3,21 +3,32 @@ import { beforeEach, describe, expect, it, vi } from "vitest"
 import { ShopCheckoutContent } from "./ShopCheckoutContent"
 
 const replace = vi.fn()
+type Flow = { id: string; slug: string; name: string }
 const mocks = vi.hoisted(() => ({
-  application: [] as Array<{ id: string; slug: string; name: string }>,
+  application: [] as Flow[],
+  direct: [] as Flow[],
+  upsale: [] as Flow[],
+  loading: { application: false, direct: false, upsale: false },
   applicationStatus: "accepted" as string | null,
 }))
 
 vi.mock("@/hooks/usePortalSalesFlows", () => ({
-  usePortalSalesFlows: () => ({ data: mocks.application }),
+  usePortalSalesFlows: () => ({
+    data: mocks.application,
+    isLoading: mocks.loading.application,
+  }),
 }))
 vi.mock("@/hooks/usePortalDirectSalesFlows", () => ({
   usePortalDirectSalesFlows: () => ({
-    data: [{ id: "flow-1", slug: "merch-store", name: "Merch Store" }],
+    data: mocks.direct,
+    isLoading: mocks.loading.direct,
   }),
 }))
 vi.mock("@/hooks/usePortalUpsaleFlows", () => ({
-  usePortalUpsaleFlows: () => ({ data: [] }),
+  usePortalUpsaleFlows: () => ({
+    data: mocks.upsale,
+    isLoading: mocks.loading.upsale,
+  }),
 }))
 vi.mock("@/providers/applicationProvider", () => ({
   useApplication: () => ({
@@ -42,6 +53,9 @@ describe("ShopCheckoutContent", () => {
   beforeEach(() => {
     replace.mockReset()
     mocks.application = []
+    mocks.direct = [{ id: "flow-1", slug: "merch-store", name: "Merch Store" }]
+    mocks.upsale = []
+    mocks.loading = { application: false, direct: false, upsale: false }
     mocks.applicationStatus = "accepted"
   })
 
@@ -71,7 +85,12 @@ describe("ShopCheckoutContent", () => {
     expect(replace).toHaveBeenCalledWith("/portal/summer-camp/shop/merch-store")
   })
 
-  it("explains the approval prerequisite for an application Shop deep link", () => {
+  it.each([
+    false,
+    true,
+  ])("keeps application approval required with other catalogs pending=%s", (pending) => {
+    mocks.loading.direct = pending
+    mocks.loading.upsale = pending
     mocks.applicationStatus = "in review"
     mocks.application = [
       { id: "application-1", slug: "attendee", name: "Attendee" },
@@ -92,5 +111,53 @@ describe("ShopCheckoutContent", () => {
         .getAttribute("href"),
     ).toBe("/portal/summer-camp?flow=application-1")
     expect(screen.queryByText("checkout:attendee")).toBeNull()
+  })
+
+  it.each([
+    "direct",
+    "upsale",
+  ] as const)("mounts a known canonical %s flow before unrelated catalogs settle", (kind) => {
+    mocks.direct = []
+    mocks[kind] = [{ id: "known-flow", slug: "extras", name: "Extras" }]
+    mocks.loading.application = true
+    mocks.loading.upsale = kind === "direct"
+
+    const { container } = render(
+      <ShopCheckoutContent
+        popupId="popup-1"
+        popupSlug="summer-camp"
+        flowSlug="extras"
+      />,
+    )
+
+    expect(screen.getByText("checkout:extras")).toBeTruthy()
+    expect(screen.getByRole("heading", { name: "Extras" })).toBeTruthy()
+    expect(container.querySelector(".animate-spin")).toBeNull()
+    expect(replace).not.toHaveBeenCalled()
+  })
+
+  it.each([
+    ["unknown", "/portal/summer-camp/shop", null],
+    ["flow-1", "/portal/summer-camp/shop/merch-store", "checkout:merch-store"],
+  ] as const)("waits for all catalogs before resolving %s", (identifier, destination, checkout) => {
+    mocks.loading.application = true
+    const content = () => (
+      <ShopCheckoutContent
+        popupId="popup-1"
+        popupSlug="summer-camp"
+        flowSlug={identifier}
+      />
+    )
+    const { container, rerender } = render(content())
+
+    expect(container.querySelector(".animate-spin")).not.toBeNull()
+    expect(screen.queryByText(/^checkout:/)).toBeNull()
+    expect(replace).not.toHaveBeenCalled()
+
+    mocks.loading.application = false
+    rerender(content())
+
+    expect(replace).toHaveBeenCalledWith(destination)
+    expect(screen.queryByText(/^checkout:/)?.textContent ?? null).toBe(checkout)
   })
 })
