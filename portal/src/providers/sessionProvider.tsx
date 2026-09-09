@@ -1,5 +1,6 @@
 "use client"
 
+import { usePathname } from "next/navigation"
 import {
   createContext,
   type ReactNode,
@@ -11,7 +12,7 @@ import {
 import { flushSync } from "react-dom"
 import { useTranslation } from "react-i18next"
 import { Loader } from "@/components/ui/Loader"
-import { getSafeReturnTo } from "@/lib/safe-return-to"
+import { getAuthRedirectPath, getSafeReturnTo } from "@/lib/safe-return-to"
 import type { SessionSnapshot } from "@/lib/session-contract"
 import { SessionLifecycle } from "@/lib/session-lifecycle"
 
@@ -25,10 +26,12 @@ export function SessionRecovery({
   conflict = false,
   onRetry,
   onDiscard,
+  onSignIn,
 }: {
   conflict?: boolean
   onRetry: () => void
   onDiscard?: () => void
+  onSignIn?: () => void
 }) {
   const { t } = useTranslation()
   return (
@@ -36,7 +39,7 @@ export function SessionRecovery({
       role="alert"
       className="mx-auto flex min-h-64 max-w-lg flex-col items-center justify-center gap-4 p-6 text-center"
     >
-      <p>{t(conflict ? "session.conflict" : "session.unavailable")}</p>
+      <p>{t(conflict ? "session.conflict" : "auth.network_error")}</p>
       <button
         type="button"
         className="rounded-md border px-4 py-2"
@@ -44,6 +47,11 @@ export function SessionRecovery({
       >
         {t(conflict ? "session.continue_current" : "session.retry")}
       </button>
+      {!conflict && onSignIn && (
+        <button type="button" className="underline" onClick={onSignIn}>
+          {t("auth.sign_up_or_log_in")}
+        </button>
+      )}
     </section>
   )
 }
@@ -61,6 +69,7 @@ export function SessionProvider({
   children: ReactNode
   onNavigate?: (destination?: string) => void
 }) {
+  const pathname = usePathname()
   const [lifecycle] = useState(
     () =>
       new SessionLifecycle(
@@ -79,6 +88,13 @@ export function SessionProvider({
     lifecycle.getSnapshot,
     () => initial,
   )
+  // An unavailable initial check must not replace public entry content. If a
+  // personalized bootstrap has been retired, keep its old hydration tree closed
+  // until verified again; the sign-in page itself never needs that private data.
+  const retiredBootstrap =
+    snapshot.status === "unavailable" &&
+    initial.session !== null &&
+    pathname !== "/auth"
   useEffect(() => {
     void lifecycle.revalidate(true)
     const refresh = () => {
@@ -125,7 +141,7 @@ export function SessionProvider({
   }, [snapshot.session, lifecycle])
   return (
     <SessionContext.Provider value={{ snapshot, lifecycle }}>
-      {snapshot.status === "unavailable" || snapshot.status === "conflict" ? (
+      {retiredBootstrap || snapshot.status === "conflict" ? (
         <SessionRecovery
           conflict={snapshot.status === "conflict"}
           onRetry={() => {
@@ -133,6 +149,13 @@ export function SessionProvider({
           }}
           onDiscard={() => {
             void lifecycle.discardLegacy()
+          }}
+          onSignIn={() => {
+            const destination = getAuthRedirectPath(
+              `${window.location.pathname}${window.location.search}${window.location.hash}`,
+            )
+            if (onNavigate) onNavigate(destination)
+            else window.location.assign(destination)
           }}
         />
       ) : snapshot.status === "changing" ? (

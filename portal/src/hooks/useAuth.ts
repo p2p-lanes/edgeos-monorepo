@@ -3,11 +3,12 @@
 import { useQuery } from "@tanstack/react-query"
 import { type HumanPublic, HumansService } from "@/client"
 import { queryKeys } from "@/lib/query-keys"
+import { hasVerifiedSession } from "@/lib/session-contract"
 import { useSession } from "@/providers/sessionProvider"
 
 const useAuth = () => {
   const { snapshot, lifecycle } = useSession()
-  const isAuthenticated = snapshot.status === "authenticated"
+  const isAuthenticated = hasVerifiedSession(snapshot)
 
   const {
     data: user = null,

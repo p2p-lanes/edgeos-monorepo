@@ -1,7 +1,8 @@
 "use client"
 
+import { hasVerifiedSession } from "@/lib/session-contract"
 import { useSession } from "@/providers/sessionProvider"
 
 export function useIsAuthenticated(): boolean {
-  return useSession().snapshot.status === "authenticated"
+  return hasVerifiedSession(useSession().snapshot)
 }

@@ -11,6 +11,13 @@ export type SessionSnapshot = {
     | "changing"
   session: PortalSession | null
 }
+export function hasVerifiedSession(snapshot: SessionSnapshot): boolean {
+  return (
+    snapshot.status === "authenticated" &&
+    snapshot.session !== null &&
+    Date.parse(snapshot.session.expires_at) > Date.now()
+  )
+}
 export function sessionIdentity(session: PortalSession | null): string {
   return session
     ? `${session.human.tenant_id}:${session.human.id}`

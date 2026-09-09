@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs"
 import vm from "node:vm"
 import { afterEach, describe, expect, it, vi } from "vitest"
 import { ensureSafeServiceWorker } from "./service-worker"
+import { authRequest } from "./session-lifecycle"
 
 function workerHarness() {
   const handlers: Record<string, (event: Record<string, unknown>) => void> = {}
@@ -153,6 +154,60 @@ describe("public-static worker upgrade", () => {
 })
 
 describe("controlling-worker migration barrier", () => {
+  it("does not require optional worker installation for a verified clean production browser", async () => {
+    vi.stubEnv("NODE_ENV", "production")
+    const workers = {
+      controller: null,
+      getRegistrations: vi.fn(async () => []),
+      register: vi.fn(async () => {
+        throw new Error("Fake installation failure")
+      }),
+    }
+    vi.stubGlobal("navigator", { serviceWorker: workers })
+    const fetchMock = vi.fn(async () => Response.json({ session: null }))
+    vi.stubGlobal("fetch", fetchMock)
+    await authRequest("session")
+    expect(workers.getRegistrations).toHaveBeenCalled()
+    expect(workers.register).not.toHaveBeenCalled()
+    expect(fetchMock).toHaveBeenCalledOnce()
+  })
+  it.each([
+    "active",
+    "waiting",
+    "installing",
+  ])("does not mistake a null controller with an %s registration for a clean browser", async (state) => {
+    vi.stubGlobal("navigator", {
+      serviceWorker: {
+        controller: null,
+        getRegistrations: vi.fn(async () => [{ [state]: {} }]),
+        register: vi.fn(async () => {
+          throw new Error("Fake update failure")
+        }),
+      },
+    })
+    const fetchMock = vi.fn()
+    vi.stubGlobal("fetch", fetchMock)
+    await expect(
+      authRequest("verify", { email: "fake@example.com", code: "123456" }),
+    ).rejects.toThrow("Fake update failure")
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+  it("does not assume worker absence when registration discovery fails", async () => {
+    vi.stubGlobal("navigator", {
+      serviceWorker: {
+        controller: null,
+        getRegistrations: vi.fn(async () => {
+          throw new Error("Fake discovery failure")
+        }),
+      },
+    })
+    const fetchMock = vi.fn()
+    vi.stubGlobal("fetch", fetchMock)
+    await expect(authRequest("session")).rejects.toThrow(
+      "Fake discovery failure",
+    )
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
   it("does not treat unregister as retirement; waits for an acknowledged new controller", async () => {
     vi.stubEnv("NODE_ENV", "production")
     const oldController = { postMessage: vi.fn() }

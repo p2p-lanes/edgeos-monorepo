@@ -47,12 +47,7 @@ export async function ensureSafeServiceWorker(): Promise<void> {
     await Promise.race([
       (async () => {
         const registrations = await workers.getRegistrations()
-        if (
-          !workers.controller &&
-          !registrations.length &&
-          process.env.NODE_ENV !== "production"
-        )
-          return
+        if (!workers.controller && !registrations.length) return
         const registration = await workers.register("/sw.js", {
           scope: "/",
           updateViaCache: "none",

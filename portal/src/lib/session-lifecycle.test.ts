@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
+import { ensureSafeServiceWorker } from "./service-worker"
 import type { PortalSession, SessionSnapshot } from "./session-contract"
 import { SessionLifecycle } from "./session-lifecycle"
 import {
@@ -31,11 +32,13 @@ beforeEach(() => {
   fetchMock.mockReset()
   navigate.mockReset()
   changed.mockReset()
+  vi.mocked(ensureSafeServiceWorker).mockReset().mockResolvedValue(undefined)
   vi.stubGlobal("fetch", fetchMock)
   rotateSessionRequests()
 })
 afterEach(() => {
   vi.unstubAllGlobals()
+  vi.useRealTimers()
   rotateSessionRequests()
 })
 
@@ -68,7 +71,115 @@ describe("cookie session lifecycle", () => {
     fetchMock.mockResolvedValue(Response.json({}))
     const store = lifecycle({ status: "authenticated", session })
     await store.revalidate()
-    expect(store.getSnapshot().status).toBe("unavailable")
+    expect(store.getSnapshot()).toEqual({ status: "authenticated", session })
+    expect(navigate).not.toHaveBeenCalled()
+  })
+  it.each([
+    "503",
+    "network",
+  ])("retains an unexpired verified identity after ordinary read %s and retry", async (failure) => {
+    if (failure === "503")
+      fetchMock.mockResolvedValueOnce(
+        Response.json({ code: "session_unavailable" }, { status: 503 }),
+      )
+    else fetchMock.mockRejectedValueOnce(new Error("Fake network failure"))
+    fetchMock.mockResolvedValueOnce(Response.json({ session }))
+    const store = lifecycle({ status: "authenticated", session })
+    await store.revalidate()
+    expect(store.getSnapshot()).toEqual({ status: "authenticated", session })
+    await store.retry()
+    expect(store.getSnapshot()).toEqual({ status: "authenticated", session })
+    expect(navigate).not.toHaveBeenCalled()
+    expect(changed).not.toHaveBeenCalled()
+  })
+  it("does not make a verified SSR identity depend on worker availability", async () => {
+    vi.mocked(ensureSafeServiceWorker).mockRejectedValue(
+      new Error("Fake worker failure"),
+    )
+    const store = lifecycle({ status: "authenticated", session })
+    await store.revalidate(true)
+    expect(store.getSnapshot()).toEqual({ status: "authenticated", session })
+    expect(ensureSafeServiceWorker).not.toHaveBeenCalled()
+    expect(fetchMock).not.toHaveBeenCalled()
+    await store.revalidate()
+    expect(store.getSnapshot()).toEqual({ status: "authenticated", session })
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+  it("checks expiry at failure time rather than preserving an expired starting snapshot", async () => {
+    vi.useFakeTimers()
+    const current = {
+      ...session,
+      expires_at: new Date(Date.now() + 1000).toISOString(),
+    }
+    fetchMock.mockImplementation(async () => {
+      vi.setSystemTime(new Date(Date.parse(current.expires_at) + 1))
+      return Response.json({ code: "session_unavailable" }, { status: 503 })
+    })
+    const store = lifecycle({ status: "authenticated", session: current })
+    await store.revalidate()
+    expect(store.getSnapshot()).toEqual({
+      status: "unavailable",
+      session: null,
+    })
+  })
+  it("never restores an identity rejected before cookie cleanup fails", async () => {
+    const duringCleanup: Array<PortalSession | null> = []
+    fetchMock
+      .mockResolvedValueOnce(
+        Response.json({ code: "session_invalid" }, { status: 401 }),
+      )
+      .mockImplementationOnce(async () => {
+        duringCleanup.push(store.getSnapshot().session)
+        return Response.json({ code: "session_unavailable" }, { status: 503 })
+      })
+    const store = lifecycle({ status: "authenticated", session })
+    await store.revalidate()
+    expect(duringCleanup).toEqual([null])
+    expect(store.getSnapshot()).toEqual({
+      status: "unavailable",
+      session: null,
+    })
+  })
+  it("does not preserve a verified starting snapshot through migration uncertainty", async () => {
+    localStorage.setItem("token", "fake-legacy")
+    fetchMock.mockResolvedValue(
+      Response.json({ code: "session_unavailable" }, { status: 503 }),
+    )
+    const store = lifecycle({ status: "authenticated", session })
+    await store.revalidate(true)
+    expect(store.getSnapshot()).toEqual({
+      status: "unavailable",
+      session: null,
+    })
+    expect(localStorage.getItem("token")).toBe("fake-legacy")
+  })
+  it("does not restore a retired cross-tab or pagehide identity on read failure", async () => {
+    const store = lifecycle({ status: "authenticated", session })
+    store.retireView()
+    fetchMock.mockResolvedValue(
+      Response.json({ code: "session_unavailable" }, { status: 503 }),
+    )
+    await store.revalidate()
+    expect(store.getSnapshot()).toEqual({
+      status: "unavailable",
+      session: null,
+    })
+  })
+  it("ignores a late failed read after its generation is retired", async () => {
+    let finish: (response: Response) => void = () => {}
+    fetchMock.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          finish = resolve
+        }),
+    )
+    const store = lifecycle({ status: "authenticated", session })
+    const pending = store.revalidate()
+    await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledOnce())
+    store.retireView()
+    finish(Response.json({ code: "session_unavailable" }, { status: 503 }))
+    await pending
+    expect(store.getSnapshot()).toEqual({ status: "changing", session: null })
     expect(navigate).not.toHaveBeenCalled()
   })
   it("rejects an invalid legacy credential without logging out a valid current cookie", async () => {
