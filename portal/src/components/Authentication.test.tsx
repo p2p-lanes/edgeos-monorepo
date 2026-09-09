@@ -11,10 +11,6 @@ vi.mock("@/hooks/useAuth", () => ({
   default: () => authState,
 }))
 
-vi.mock("@/components/ui/Loader", () => ({
-  Loader: () => <div data-testid="loader" />,
-}))
-
 import Authentication from "./Authentication"
 
 describe("Authentication", () => {
@@ -31,7 +27,7 @@ describe("Authentication", () => {
       "/portal/tech-summit-2025?tab=events#schedule",
     )
 
-    render(
+    const { container } = render(
       <Authentication>
         <div>Portal content</div>
       </Authentication>,
@@ -42,7 +38,9 @@ describe("Authentication", () => {
         "/auth?redirect=%2Fportal%2Ftech-summit-2025%3Ftab%3Devents%23schedule",
       )
     })
-    expect(screen.getByTestId("loader")).toBeTruthy()
+    expect(
+      container.querySelector(".fixed.inset-0.z-50 .animate-spin"),
+    ).not.toBeNull()
     expect(screen.queryByText("Portal content")).toBeNull()
   })
 
@@ -56,6 +54,17 @@ describe("Authentication", () => {
     )
 
     expect(screen.getByText("Portal content")).toBeTruthy()
+    expect(mockReplace).not.toHaveBeenCalled()
+  })
+
+  it("retains the full-screen loader while authentication is pending", () => {
+    authState = { user: null, isUserLoading: true }
+
+    const { container } = render(<Authentication>{null}</Authentication>)
+
+    expect(
+      container.querySelector(".fixed.inset-0.z-50 .animate-spin"),
+    ).not.toBeNull()
     expect(mockReplace).not.toHaveBeenCalled()
   })
 })
