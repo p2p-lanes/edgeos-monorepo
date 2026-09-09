@@ -15,12 +15,18 @@
  * off the screen. A button per room said "press me" a dozen times over and
  * made picking a room look like adding one to a basket you could keep
  * filling; a checked circle says the true thing, that choosing this room is
- * un-choosing the last one. Nothing toggles off by being clicked twice
- * either: a room is left by choosing another, or by the Remove that only the
- * chosen card shows.
+ * un-choosing the last one.
+ *
+ * Clicking the chosen room again lets it go. Strict radio behaviour would
+ * keep it chosen, and that is the one deviation here: a room is not a
+ * required answer, the step can be walked past without one, so the buyer has
+ * to be able to get back to none. The alternative was a second control
+ * saying Remove, which puts the way out somewhere other than where the way
+ * in was.
  *
  * What none of these cards can do is make the case for its room. That is the
- * dialog's job, and every layout has the same way into it.
+ * dialog's job, and every layout has the same way into it, bottom right,
+ * where the price the buyer is reading about already is.
  *
  * Every price here is a server quote. Nightly rate times nights is wrong the
  * moment a date-range rule or the long-stay rate applies, so nothing on this
@@ -156,39 +162,38 @@ function ChoiceMark({
 /**
  * A room, as one option among the rooms on offer.
  *
- * `role="radio"` rather than a `<button>` because the card has to contain
- * buttons of its own, and a button inside a button is not something the
- * browser will render. Enter and Space choose it, the way they would on a
- * real radio.
+ * `role="radio"` rather than a `<button>` because the card has to contain a
+ * button of its own, and a button inside a button is not something the
+ * browser will render. Enter and Space do what a click does.
  */
 function RoomChoice({
   selected,
   onSelect,
+  onRemove,
   className,
   children,
-}: {
-  selected: boolean
-  onSelect: () => void
+}: Pick<RoomViewProps, "selected" | "onSelect" | "onRemove"> & {
   className?: string
   children: ReactNode
 }) {
-  const choose = (event: KeyboardEvent<HTMLDivElement>) => {
+  const toggle = () => (selected ? onRemove() : onSelect())
+  const onKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
     // Only from the card surface itself. Enter on the Details button inside
     // it bubbles up here, and would otherwise book the room the buyer was
     // asking to read about.
     if (event.target !== event.currentTarget) return
     if (event.key !== "Enter" && event.key !== " ") return
     event.preventDefault()
-    onSelect()
+    toggle()
   }
   return (
-    // biome-ignore lint/a11y/useSemanticElements: a real radio input cannot contain the buttons this card contains
+    // biome-ignore lint/a11y/useSemanticElements: a real radio input cannot contain the button this card contains
     <div
       role="radio"
       aria-checked={selected}
       tabIndex={0}
-      onClick={onSelect}
-      onKeyDown={choose}
+      onClick={toggle}
+      onKeyDown={onKeyDown}
       className={cn(
         "cursor-pointer text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
         className,
@@ -200,45 +205,30 @@ function RoomChoice({
 }
 
 /**
- * The two things a card can do that are not "choose me".
+ * The one thing a card does that is not "choose me".
  *
- * Both stop the click reaching the card, which would otherwise book the room
+ * It stops the click reaching the card, which would otherwise book the room
  * the buyer only wanted to read about.
  */
-function CardActions({
-  selected,
-  onRemove,
+function DetailsLink({
   onOpenDetails,
   className,
-}: Pick<RoomViewProps, "selected" | "onRemove" | "onOpenDetails"> & {
-  className?: string
-}) {
+}: Pick<RoomViewProps, "onOpenDetails"> & { className?: string }) {
   const { t } = useTranslation()
   return (
-    <div className={cn("flex items-center gap-3 text-xs", className)}>
-      <button
-        type="button"
-        onClick={(event) => {
-          event.stopPropagation()
-          onOpenDetails()
-        }}
-        className="font-medium text-primary underline-offset-2 hover:underline"
-      >
-        {t("checkout.accommodation.view_details")}
-      </button>
-      {selected && (
-        <button
-          type="button"
-          onClick={(event) => {
-            event.stopPropagation()
-            onRemove()
-          }}
-          className="text-muted-foreground underline-offset-2 hover:underline"
-        >
-          {t("checkout.accommodation.remove")}
-        </button>
+    <button
+      type="button"
+      onClick={(event) => {
+        event.stopPropagation()
+        onOpenDetails()
+      }}
+      className={cn(
+        "font-medium text-primary text-xs underline-offset-2 hover:underline",
+        className,
       )}
-    </div>
+    >
+      {t("checkout.accommodation.view_details")}
+    </button>
   )
 }
 
@@ -300,6 +290,7 @@ export function RoomRow({
     <RoomChoice
       selected={selected}
       onSelect={onSelect}
+      onRemove={onRemove}
       className={cn(
         "flex flex-col gap-3 rounded-2xl border bg-card p-3 sm:flex-row",
         selected
@@ -328,21 +319,16 @@ export function RoomRow({
           </p>
         )}
         <Scarcity entry={entry} />
-        <CardActions
-          selected={selected}
-          onRemove={onRemove}
-          onOpenDetails={onOpenDetails}
-          className="mt-1"
-        />
       </div>
 
-      <div className="shrink-0 sm:w-36">
+      <div className="flex shrink-0 items-end justify-between gap-3 sm:w-36 sm:flex-col sm:items-end sm:justify-between">
         <Price
           entry={entry}
           currency={currency}
           nights={nights}
           align="right"
         />
+        <DetailsLink onOpenDetails={onOpenDetails} />
       </div>
     </RoomChoice>
   )
@@ -370,6 +356,7 @@ export function RoomCard({
     <RoomChoice
       selected={selected}
       onSelect={onSelect}
+      onRemove={onRemove}
       className={cn(
         "flex flex-col overflow-hidden rounded-2xl border bg-card",
         selected
@@ -398,16 +385,11 @@ export function RoomCard({
       <div className="flex flex-1 flex-col gap-1 p-3">
         <h4 className="font-semibold leading-tight">{room.name}</h4>
         <RoomFacts room={room} />
-        <div className="mt-auto pt-2">
-          <Price entry={entry} currency={currency} nights={nights} />
-        </div>
         <Scarcity entry={entry} />
-        <CardActions
-          selected={selected}
-          onRemove={onRemove}
-          onOpenDetails={onOpenDetails}
-          className="mt-1"
-        />
+        <div className="mt-auto flex items-end justify-between gap-3 pt-2">
+          <Price entry={entry} currency={currency} nights={nights} />
+          <DetailsLink onOpenDetails={onOpenDetails} />
+        </div>
       </div>
     </RoomChoice>
   )
@@ -439,6 +421,7 @@ export function RoomSheetRow({
     <RoomChoice
       selected={selected}
       onSelect={onSelect}
+      onRemove={onRemove}
       className={cn(
         "flex items-center gap-3 border-b p-3 last:border-b-0",
         selected ? "bg-primary/5" : "hover:bg-muted/50",
@@ -457,15 +440,17 @@ export function RoomSheetRow({
           {t("checkout.accommodation.sleeps", { count: room.guest_capacity })}
           {beds && ` · ${beds}`}
         </p>
-        <CardActions
-          selected={selected}
-          onRemove={onRemove}
-          onOpenDetails={onOpenDetails}
-          className="mt-0.5"
-        />
       </div>
 
-      <Price entry={entry} currency={currency} nights={nights} align="right" />
+      <div className="flex shrink-0 flex-col items-end gap-0.5">
+        <Price
+          entry={entry}
+          currency={currency}
+          nights={nights}
+          align="right"
+        />
+        <DetailsLink onOpenDetails={onOpenDetails} />
+      </div>
     </RoomChoice>
   )
 }

@@ -162,6 +162,27 @@ const OFFER = {
   currency: "USD",
 }
 
+/** The step's own cart entry for the Garden Studio. */
+function chosen() {
+  return {
+    accommodationId: "studio",
+    productId: "product-studio",
+    name: "Garden Studio",
+    propertyId: "prop-1",
+    propertyName: "Casa del Lago",
+    checkIn: "2026-08-01",
+    checkOut: "2026-08-03",
+    nights: 2,
+    guestCount: 1,
+    guests: [{ name: "", answers: {} }],
+    bookerAnswers: {},
+    guestForm: null,
+    subtotal: 290,
+    tax: 0,
+    totalPrice: 290,
+  }
+}
+
 function wrapper({ children }: { children: ReactNode }) {
   const client = new QueryClient({
     defaultOptions: { queries: { retry: false } },
@@ -342,6 +363,29 @@ describe("the three layouts", () => {
 
       expect(addAccommodation).toHaveBeenCalledTimes(1)
       addAccommodation.mockClear()
+      view.unmount()
+    }
+  })
+
+  it("lets the chosen room go when it is clicked again", async () => {
+    // Not what a radio does, and deliberate: no room is a valid answer
+    // here, so the way out has to be where the way in was.
+    for (const layout of ["rows", "cards", "sheet"]) {
+      checkoutValue.cart.accommodations = [chosen()]
+      const view = renderStep({ layout })
+      // By role, not by name: the guest panel prints the room's name too,
+      // and it is on screen before the board has been priced.
+      const card = await screen.findByRole("radio")
+      expect(card.getAttribute("aria-checked")).toBe("true")
+      fireEvent.click(card)
+
+      expect(removeAccommodation).toHaveBeenCalledWith(
+        "studio",
+        expect.any(String),
+        expect.any(String),
+      )
+      expect(addAccommodation).not.toHaveBeenCalled()
+      removeAccommodation.mockClear()
       view.unmount()
     }
   })
