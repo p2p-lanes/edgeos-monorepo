@@ -235,11 +235,10 @@ describe("AccommodationBookingConfig", () => {
       expect(screen.getByText("Hotel Arcadia")).toBeTruthy()
     })
     fireEvent.click(screen.getByRole("button", { name: /Guest details/ }))
-    fireEvent.click(screen.getByRole("button", { name: /Contact details/ }))
+    fireEvent.click(screen.getByRole("button", { name: /A phone number/ }))
 
     const form = onChange.mock.calls[0][0].guest_form
     expect(form.booker.fields.map((f: { key: string }) => f.key)).toEqual([
-      "email",
       "phone",
     ])
     expect(form.guests.mode).toBe("same_as_booker")

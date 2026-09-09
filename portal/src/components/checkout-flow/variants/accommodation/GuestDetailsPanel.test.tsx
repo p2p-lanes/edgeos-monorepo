@@ -1,15 +1,27 @@
 /**
  * Who is staying, in the checkout.
  *
- * What is worth pinning is the behaviour a buyer would notice going wrong:
- * only the lead guest is open on arrival, a collapsed card still says whether
- * it is done, and copying from the lead guest fills the shared answers without
- * taking their name with it.
+ * Two things are being pinned. First, what the checkout already knows about
+ * the buyer is not asked again here: the panel used to open with an email
+ * field the buyer step asked for a second time three screens later, and the
+ * point of this panel now is how little of it is left. Second, the parts
+ * that were never duplicated still work exactly as they did, because the
+ * other occupants are people this checkout has never heard of.
+ *
+ * The identity is varied per test rather than fixed, because the two funnels
+ * differ: a direct sale knows the buyer from the buyer step, an application
+ * flow from the account, and a checkout that knows neither must fall back to
+ * asking everything.
  */
 
 import { fireEvent, render, screen, within } from "@testing-library/react"
-import { describe, expect, it, vi } from "vitest"
+import { beforeEach, describe, expect, it, vi } from "vitest"
 
+import {
+  type BuyerIdentity,
+  buildBuyerIdentity,
+  NO_BUYER_IDENTITY,
+} from "@/lib/buyerIdentity"
 import type { SelectedAccommodationItem } from "@/types/checkout"
 
 /**
@@ -51,8 +63,11 @@ const setAccommodationBookerAnswer = vi.fn()
 const setAccommodationGuestAnswer = vi.fn()
 const copyBookerAnswersToGuest = vi.fn()
 
+let buyerIdentity: BuyerIdentity = NO_BUYER_IDENTITY
+
 vi.mock("@/providers/checkoutProvider", () => ({
   useCheckout: () => ({
+    buyerIdentity,
     setAccommodationGuestName,
     setAccommodationBookerAnswer,
     setAccommodationGuestAnswer,
@@ -69,6 +84,24 @@ const NAME = {
   label: "Full name",
   required: true,
 }
+
+/** A direct sale, after the buyer step has been filled in. */
+const KNOWN_BUYER = buildBuyerIdentity({
+  buyerFormSchema: {
+    base_fields: {
+      email: { type: "email", label: "Email", required: true },
+      first_name: { type: "text", label: "First name", required: true },
+      last_name: { type: "text", label: "Last name", required: true },
+    },
+    custom_fields: {},
+    sections: [],
+  },
+  buyerValues: {
+    email: "ada@example.com",
+    first_name: "Ada",
+    last_name: "Lovelace",
+  },
+})
 
 function stay(overrides: Partial<SelectedAccommodationItem> = {}) {
   return {
@@ -104,20 +137,124 @@ function renderPanel(item = stay(), requireGuestNames = true) {
   )
 }
 
-describe("the lead guest block", () => {
-  it("asks the booker questions once for the room", () => {
+beforeEach(() => {
+  vi.clearAllMocks()
+  buyerIdentity = NO_BUYER_IDENTITY
+})
+
+describe("what the checkout already knows", () => {
+  it("stops asking the buyer for what the buyer step asks them", () => {
+    buyerIdentity = KNOWN_BUYER
     renderPanel()
 
-    expect(screen.getByText("Booking contact")).toBeTruthy()
+    // Both booker questions are the buyer's own email and name, so the
+    // block they lived in has nothing left to hold.
+    expect(screen.queryByText("Booking contact")).toBeNull()
+    expect(screen.queryByRole("button", { name: /Lead guest/ })).toBeNull()
+  })
+
+  it("says whose booking it is instead", () => {
+    buyerIdentity = KNOWN_BUYER
+    renderPanel()
+
+    expect(screen.getByText("Booked in the name of Ada Lovelace")).toBeTruthy()
+    expect(screen.getByText(/ada@example.com/)).toBeTruthy()
+  })
+
+  it("leaves a party of one nothing at all to fill in", () => {
+    // The whole point of the change: the common booking is now a sentence.
+    buyerIdentity = KNOWN_BUYER
+    renderPanel(stay({ guestCount: 1, guests: [{ name: "", answers: {} }] }))
+
+    expect(screen.getByText("Booked in the name of Ada Lovelace")).toBeTruthy()
+    expect(screen.queryByRole("button", { name: /Guest/ })).toBeNull()
+    expect(screen.queryByText(/missing/)).toBeNull()
+  })
+
+  it("keeps asking the other occupants, who are not the buyer", () => {
+    // And opens the first of them, because the card that used to be open on
+    // arrival was the buyer's and it is no longer there.
+    buyerIdentity = KNOWN_BUYER
+    renderPanel()
+
+    const second = screen.getByRole("button", { name: /Guest 2/ })
+    expect(second.getAttribute("aria-expanded")).toBe("true")
     expect(screen.getAllByText(/Email/).length).toBeGreaterThan(0)
   })
 
-  it("does not appear when the property asks the booker nothing", () => {
-    renderPanel(stay({ guestForm: null }))
+  it("asks for everything when it knows nobody", () => {
+    // An application flow whose account carries no name, which is the only
+    // way a checkout reaches this panel knowing nothing.
+    renderPanel()
 
-    expect(screen.queryByText("Booking contact")).toBeNull()
-    // Names are still collected: that is the step's setting, not the form's.
-    expect(screen.getByText("Guest 2")).toBeTruthy()
+    expect(screen.getByText("Booking contact")).toBeTruthy()
+    expect(screen.getByRole("button", { name: /Lead guest/ })).toBeTruthy()
+  })
+
+  it("still asks whatever the buyer step does not", () => {
+    buyerIdentity = KNOWN_BUYER
+    renderPanel(
+      stay({
+        guestForm: {
+          version: 1,
+          booker: {
+            fields: [
+              EMAIL,
+              {
+                key: "passport",
+                type: "text",
+                label: "Passport number",
+                required: true,
+              },
+            ],
+          },
+          guests: { mode: "off", fields: [] },
+        },
+      }),
+    )
+
+    expect(screen.getByText("Booking contact")).toBeTruthy()
+    expect(screen.getAllByText(/Passport number/).length).toBeGreaterThan(0)
+    expect(screen.queryByLabelText("Email")).toBeNull()
+  })
+})
+
+describe("booking for someone else", () => {
+  it("takes a name that is not the buyer's", () => {
+    buyerIdentity = KNOWN_BUYER
+    renderPanel()
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "Someone else is staying" }),
+    )
+    fireEvent.change(screen.getByLabelText("Name of whoever is staying"), {
+      target: { value: "Grace Hopper" },
+    })
+
+    expect(setAccommodationGuestName).toHaveBeenCalledWith(
+      "room-1",
+      "2026-09-14",
+      "2026-09-18",
+      0,
+      "Grace Hopper",
+    )
+  })
+
+  it("opens already showing an override that was typed before", () => {
+    buyerIdentity = KNOWN_BUYER
+    renderPanel(
+      stay({
+        guests: [
+          { name: "Grace Hopper", answers: {} },
+          { name: "", answers: {} },
+        ],
+      }),
+    )
+
+    expect(
+      (screen.getByLabelText("Name of whoever is staying") as HTMLInputElement)
+        .value,
+    ).toBe("Grace Hopper")
   })
 })
 
@@ -168,6 +305,14 @@ describe("the guest cards", () => {
       ],
     })
     renderPanel(item)
+
+    expect(screen.getByText("1 of 2 guests complete")).toBeTruthy()
+  })
+
+  it("counts the buyer as done rather than as missing", () => {
+    // Their answers are not on this screen, which is not the same as absent.
+    buyerIdentity = KNOWN_BUYER
+    renderPanel()
 
     expect(screen.getByText("1 of 2 guests complete")).toBeTruthy()
   })
@@ -230,6 +375,16 @@ describe("same as lead guest", () => {
     })
     renderPanel(item)
     fireEvent.click(screen.getByRole("button", { name: /Guest 2/ }))
+
+    expect(screen.queryByText("Same as lead guest")).toBeNull()
+  })
+
+  it("is not offered once the booker has nothing left to copy", () => {
+    // The shortcut copies the booking's shared answers. With the buyer's own
+    // struck off, there is nothing under it, and a button that does nothing
+    // is worse than no button.
+    buyerIdentity = KNOWN_BUYER
+    renderPanel()
 
     expect(screen.queryByText("Same as lead guest")).toBeNull()
   })

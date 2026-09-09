@@ -59,6 +59,32 @@ function formWith(...labels: [string, string][]): GuestFormValue {
   return form
 }
 
+describe("what the checkout already asks", () => {
+  it("says so on a question the buyer answers elsewhere", () => {
+    // Without this an operator adds an email question, previews the step,
+    // does not find it, and concludes the editor is broken.
+    render(<Harness initial={formWith(["email", "Email"])} />)
+
+    expect(
+      screen.getAllByText(/already asks the buyer for this/).length,
+    ).toBeGreaterThan(0)
+  })
+
+  it("says it conditionally for a phone, which not every buyer form asks", () => {
+    render(<Harness initial={formWith(["phone", "Phone"])} />)
+
+    expect(
+      screen.getAllByText(/if your buyer form already asks/).length,
+    ).toBeGreaterThan(0)
+  })
+
+  it("stays quiet about a question that is genuinely the property's", () => {
+    render(<Harness initial={formWith(["text", "Passport number"])} />)
+
+    expect(screen.queryByText(/already asks the buyer/)).toBeNull()
+  })
+})
+
 describe("starting out", () => {
   it("offers presets while the form is empty", () => {
     render(<Harness initial={emptyForm()} />)
@@ -70,10 +96,9 @@ describe("starting out", () => {
   it("opens the editor on a preset, with its questions in place", async () => {
     render(<Harness initial={emptyForm()} />)
 
-    await userEvent.click(screen.getByText("Contact details"))
+    await userEvent.click(screen.getByText("A phone number"))
 
     expect(screen.getByText("Booking contact")).toBeTruthy()
-    expect(question("Email")).toBeTruthy()
     expect(question("Phone")).toBeTruthy()
   })
 

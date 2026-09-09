@@ -251,6 +251,37 @@ export function toSchemaField(field: GuestField): FormFieldSchema {
   }
 }
 
+/**
+ * Questions the checkout answers by itself, having already asked the buyer.
+ *
+ * Mirrors `COVERABLE` in the portal's `lib/buyerIdentity.ts`, and matches on
+ * the key for the same reason: a key is generated once and frozen, so
+ * `email` means the buyer's email in every form on every tenant, while a
+ * second field that merely has type `email` is usually somebody else's
+ * address and must go on being asked.
+ *
+ * `always` holds everywhere: a direct sale's buyer step forces email and
+ * both name halves into its schema, and an application flow reads the same
+ * three off the signed-in account. `if_asked` depends on the popup's own
+ * buyer form, which this editor does not load, so it is stated as the
+ * condition it is rather than guessed at.
+ */
+export type BuyerCoverage = "always" | "if_asked"
+
+const BUYER_COVERAGE: Record<string, BuyerCoverage> = {
+  email: "always",
+  first_name: "always",
+  last_name: "always",
+  name: "always",
+  full_name: "always",
+  phone: "if_asked",
+}
+
+/** How the checkout covers this question, or null when it is the form's own. */
+export function buyerCoverage(field: GuestField): BuyerCoverage | null {
+  return BUYER_COVERAGE[field.key] ?? null
+}
+
 // ---------------------------------------------------------------------------
 // Presets
 // ---------------------------------------------------------------------------
@@ -280,25 +311,27 @@ export interface GuestFormPreset {
  *
  * Every preset asks the *booking contact* the questions and repeats them for the
  * others; narrowing that is one click in the guests section.
+ *
+ * None of them asks for a name or an email any more. The checkout already
+ * has both, from the buyer step or from the signed-in account, and fills
+ * them into the booking on the way to the property. A preset that asked for
+ * them would be building the duplication these were rewritten to remove.
  */
 export const PRESETS: GuestFormPreset[] = [
   {
     key: "contact",
-    label: "Contact details",
-    description: "Email and phone, so the property can reach whoever arrives",
-    build: () =>
-      build([
-        ["email", "Email", true],
-        ["phone", "Phone", false],
-      ]),
+    label: "A phone number",
+    description:
+      "The one contact detail the checkout does not already have from the buyer",
+    build: () => build([["phone", "Phone", false]]),
   },
   {
     key: "registry",
     label: "Hotel registry",
-    description: "What a front desk is usually required to record",
+    description:
+      "What a front desk is usually required to record, beyond the name and email",
     build: () =>
       build([
-        ["email", "Email", true],
         ["phone", "Phone", true],
         ["date", "Date of birth", true],
         ["country_select", "Nationality", true],
@@ -306,10 +339,14 @@ export const PRESETS: GuestFormPreset[] = [
       ]),
   },
   {
-    key: "lead_only",
-    label: "Booking contact only",
-    description: "One set of contact details per room, nothing per guest",
-    build: () => build([["email", "Email", true]], "off"),
+    key: "stay_needs",
+    label: "Needs for the stay",
+    description: "What the property should prepare for, asked of everyone",
+    build: () =>
+      build([
+        ["textarea", "Dietary requirements", false],
+        ["textarea", "Accessibility needs", false],
+      ]),
   },
   {
     key: "blank",

@@ -7,6 +7,11 @@ import type {
   PaymentRecipientRequest,
 } from "@/client"
 import { guestsForWire } from "@/lib/accommodationForm"
+import {
+  type BuyerIdentity,
+  NO_BUYER_IDENTITY,
+  withBuyerIdentity,
+} from "@/lib/buyerIdentity"
 import type { AttendeePassState } from "@/types/Attendee"
 import type {
   SelectedAccommodationItem,
@@ -23,6 +28,9 @@ interface BuildPaymentProductsParams {
   selectedPasses: SelectedPassItem[]
   housing: SelectedHousingItem | null
   accommodations?: SelectedAccommodationItem[]
+  /** What the checkout already knows about the buyer. Defaults to knowing
+   *  nothing, which leaves every booking exactly as the cart holds it. */
+  buyerIdentity?: BuyerIdentity
   merch: SelectedMerchItem[]
   patron: SelectedPatronItem | null
   selectedMealPlans?: SelectedMealPlanItem[]
@@ -83,6 +91,7 @@ export function buildPaymentProducts({
   selectedPasses,
   housing,
   accommodations = [],
+  buyerIdentity = NO_BUYER_IDENTITY,
   merch,
   patron,
   selectedMealPlans = [],
@@ -273,7 +282,13 @@ export function buildPaymentProducts({
     // the dates in `purchase_metadata` and charges that, so a tampered price
     // has nothing to tamper with. `quantity` must be 1, because a second room is a
     // second line, because each one is assigned its own unit.
-    for (const item of accommodations) {
+    for (const stay of accommodations) {
+      // The step stopped asking the buyer for their own email, phone and
+      // name once the buyer step or the account already had them. This is
+      // where those answers become real ones, in the single place the
+      // booking leaves for the server, so the property's registry and the
+      // backend's `validate_answers` both see a complete form.
+      const item = withBuyerIdentity(stay, buyerIdentity)
       products.push({
         product_id: item.productId,
         ...(accommodationAttendeeId

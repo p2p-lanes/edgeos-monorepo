@@ -1,5 +1,10 @@
 import { act, renderHook } from "@testing-library/react"
 import { beforeEach, describe, expect, it, vi } from "vitest"
+import {
+  type BuyerIdentity,
+  buildBuyerIdentity,
+  NO_BUYER_IDENTITY,
+} from "@/lib/buyerIdentity"
 import type { AttendeePassState } from "@/types/Attendee"
 import type {
   CheckoutRecipientDraft,
@@ -95,6 +100,7 @@ function renderPaymentSubmit(
     mealPlans?: SelectedMealPlanItem[]
     accommodations?: SelectedAccommodationItem[]
     dynamicItems?: Record<string, SelectedDynamicItem[]>
+    buyerIdentity?: BuyerIdentity
   } = {},
 ) {
   const submitMode = options.submitMode ?? "open-ticketing"
@@ -107,6 +113,7 @@ function renderPaymentSubmit(
       appCredit: 0,
       checkoutMode: "pass_system",
       attendeePasses: options.attendees ?? [attendee],
+      buyerIdentity: options.buyerIdentity ?? NO_BUYER_IDENTITY,
       selectedPasses: options.passes ?? selectedPasses,
       housing: null,
       accommodations: options.accommodations ?? [],
@@ -404,6 +411,63 @@ describe("usePaymentSubmit public purchase payload", () => {
     expect(
       lines.every((line: { attendee_id?: string }) => !line.attendee_id),
     ).toBe(true)
+  })
+
+  it("sends the buyer's own details for a booking that stopped asking for them", async () => {
+    // The accommodation step no longer asks the buyer for an email or a name
+    // that the buyer step already collects. This is the single place those
+    // answers become real ones, and the backend's `validate_answers` refuses
+    // the purchase without them, so the wire is where it has to be pinned.
+    const { result } = renderPaymentSubmit("merch-store", {
+      passes: [],
+      buyerIdentity: buildBuyerIdentity({
+        buyerFormSchema: {
+          base_fields: {
+            email: { type: "email", label: "Email", required: true },
+            first_name: { type: "text", label: "First name", required: true },
+            last_name: { type: "text", label: "Last name", required: true },
+          },
+          custom_fields: {},
+          sections: [],
+        },
+        buyerValues: {
+          email: "ada@example.com",
+          first_name: "Ada",
+          last_name: "Lovelace",
+        },
+      }),
+      accommodations: [
+        {
+          accommodationId: "room-1",
+          productId: "room-product",
+          name: "Double room",
+          propertyId: "property-1",
+          propertyName: "Hotel",
+          checkIn: "2026-09-01",
+          checkOut: "2026-09-03",
+          nights: 2,
+          guestCount: 1,
+          guests: [{ name: "", answers: {} }],
+          bookerAnswers: {},
+          guestForm: null,
+          subtotal: 100,
+          tax: 10,
+          totalPrice: 110,
+        } satisfies SelectedAccommodationItem,
+      ],
+    })
+
+    await act(async () => {
+      await result.current.submitPayment()
+    })
+
+    const [line] = purchaseOpenTicketing.mock.calls[0][0].requestBody.products
+    expect(line.purchase_metadata.booker_answers).toEqual(
+      expect.objectContaining({ email: "ada@example.com" }),
+    )
+    expect(line.purchase_metadata.guests).toEqual([
+      expect.objectContaining({ name: "Ada Lovelace" }),
+    ])
   })
 
   it("invalidates the popup upsale catalog after an approved payment", async () => {

@@ -99,7 +99,7 @@ export function GuestFormEditor({ value, onChange }: GuestFormEditorProps) {
     <div className="flex flex-col gap-5">
       <FieldSection
         title="Booking contact"
-        description="Asked once per room, of whoever the room is for."
+        description="Asked once per room, of whoever the room is for. Their name and email are not here: the checkout already has both and files them with the booking."
         fields={value.booker.fields}
         onChange={setBookerFields}
         takenKeys={takenKeys(value)}
@@ -302,8 +302,9 @@ function PresetPicker({ onPick }: { onPick: (form: GuestFormValue) => void }) {
   return (
     <div className="flex flex-col gap-3">
       <p className="text-xs text-muted-foreground">
-        Nothing is asked beyond a name per guest. Start from one of these, or
-        build your own.
+        The buyer's name and email already reach the property with the booking,
+        so nothing here needs to ask for them. Start from one of these, or build
+        your own.
       </p>
       <div className="grid gap-2 sm:grid-cols-2">
         {PRESETS.map((preset) => (

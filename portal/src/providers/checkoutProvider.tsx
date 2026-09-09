@@ -50,6 +50,7 @@ import { useStepProductResolver } from "@/hooks/checkout/useStepProductResolver"
 import useGetPassesData from "@/hooks/useGetPassesData"
 import { useIsAuthenticated } from "@/hooks/useIsAuthenticated"
 import { firstIncompleteStay } from "@/lib/accommodationForm"
+import { type BuyerIdentity, buildBuyerIdentity } from "@/lib/buyerIdentity"
 import { buildFormZodSchema } from "@/lib/form-schema-builder"
 import { trackGAAddToCart } from "@/lib/google-analytics"
 import { trackMetaAddToCart } from "@/lib/meta-pixel"
@@ -225,6 +226,9 @@ interface CheckoutContextValue {
     qty: number,
   ) => void
   buyerFormSchema: ApplicationFormSchema | null
+  /** What the checkout already knows about the buyer, so the accommodation
+   *  step neither asks for it nor gates on it. */
+  buyerIdentity: BuyerIdentity
   buyerValues: Record<string, unknown>
   buyerErrors: Record<string, string>
   buyerGeneralError: string | null
@@ -425,6 +429,26 @@ export function CheckoutProvider({
   const isBuyerInfoComplete =
     !buyerFormSchema ||
     buildFormZodSchema(buyerFormSchema, false).safeParse(buyerValues).success
+
+  /**
+   * Who is buying, so nothing asks them for it twice.
+   *
+   * The accommodation step used to collect a booking contact of its own and
+   * the buyer step then asked for the same email and name again. There is
+   * one payer per cart, so the contact is derived from whichever of the two
+   * funnels knows them: the buyer form in a direct sale, the signed-in
+   * account in an application flow (which has no buyer step at all, see
+   * `_direct_sale_only` in the backend's step constants).
+   */
+  const buyerIdentity = useMemo(
+    () =>
+      buildBuyerIdentity({
+        buyerFormSchema,
+        buyerValues,
+        human: application?.human ?? null,
+      }),
+    [buyerFormSchema, buyerValues, application?.human],
+  )
 
   // Returns the names of buyer-form fields that fail the current schema.
   // Returns [] when complete or when no schema is configured.
@@ -1319,6 +1343,7 @@ export function CheckoutProvider({
       (availableSteps as string[]).includes("housing") &&
       firstIncompleteStay(accommodations, {
         requireGuestNames: accommodationRequiresGuestNames,
+        identity: buyerIdentity,
       })
     ) {
       return "housing"
@@ -1328,6 +1353,7 @@ export function CheckoutProvider({
     accommodations,
     accommodationRequiresGuestNames,
     availableSteps,
+    buyerIdentity,
     isBuyerInfoComplete,
   ])
 
@@ -1566,6 +1592,7 @@ export function CheckoutProvider({
     selectedPasses,
     housing,
     accommodations,
+    buyerIdentity,
     merch,
     patron,
     selectedMealPlans,
@@ -1667,6 +1694,7 @@ export function CheckoutProvider({
     removeDynamicItem,
     updateDynamicQuantity,
     buyerFormSchema,
+    buyerIdentity,
     buyerValues,
     buyerErrors,
     buyerGeneralError,

@@ -228,10 +228,19 @@ describe("presets", () => {
     expect(empty.map((preset) => preset.key)).toEqual(["blank"])
   })
 
-  it("booking contact only asks the other guests nothing", () => {
-    const form = PRESETS.find((preset) => preset.key === "lead_only")?.build()
+  it("never asks for a name or an email, which the checkout already has", () => {
+    // Both are collected from the buyer once, by the buyer step or from the
+    // signed-in account, and filed with the booking. A preset that asked
+    // again would be rebuilding the duplication these were rewritten to
+    // remove, and the checkout would hide the question anyway.
+    const keys = PRESETS.flatMap((preset) => [
+      ...preset.build().booker.fields,
+      ...preset.build().guests.fields,
+    ]).map((field) => field.key)
 
-    expect(form && guestFieldsOf(form)).toEqual([])
+    expect(keys).not.toContain("email")
+    expect(keys).not.toContain("full_name")
+    expect(keys).not.toContain("name")
   })
 })
 

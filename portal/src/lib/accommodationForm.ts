@@ -12,6 +12,8 @@
  * the buyer is still typing rather than after they press pay.
  */
 
+import type { BuyerIdentity } from "@/lib/buyerIdentity"
+import { NO_BUYER_IDENTITY } from "@/lib/buyerIdentity"
 import type { SelectedAccommodationItem } from "@/types/checkout"
 
 /**
@@ -170,17 +172,53 @@ export function checkField(
   return null
 }
 
+/**
+ * What one occupant is actually asked.
+ *
+ * The lead occupant is the buyer, so whatever the buyer is asked elsewhere
+ * is struck off their list; everyone else is a different person and keeps
+ * being asked their own email. This is the single rule the panel renders by
+ * and the gate validates by, so a hidden field can never be one the funnel
+ * still refuses to pay without.
+ */
+export function fieldsAskedOf(
+  fields: GuestFormField[],
+  index: number,
+  identity: BuyerIdentity,
+): GuestFormField[] {
+  if (index !== 0) return fields
+  return fields.filter((field) => !identity.covers.has(field.key))
+}
+
+/** The booking-wide questions still worth putting on screen. */
+export function bookerFieldsAsked(
+  form: AccommodationGuestForm | null | undefined,
+  identity: BuyerIdentity,
+): GuestFormField[] {
+  return bookerFieldsOf(form).filter((field) => !identity.covers.has(field.key))
+}
+
+interface StayCheckOptions {
+  requireGuestNames: boolean
+  /**
+   * What the checkout answers on the buyer's behalf. Defaults to nothing,
+   * which is the pre-derivation behaviour and what every caller outside the
+   * checkout provider wants.
+   */
+  identity?: BuyerIdentity
+}
+
 /** The first problem in one booked room, or null when it is ready to buy. */
 export function checkStayAnswers(
   item: Pick<
     SelectedAccommodationItem,
     "guestForm" | "bookerAnswers" | "guests" | "guestCount"
   >,
-  { requireGuestNames }: { requireGuestNames: boolean },
+  { requireGuestNames, identity = NO_BUYER_IDENTITY }: StayCheckOptions,
 ): GuestFormProblem | null {
   const form = item.guestForm
 
-  for (const field of bookerFieldsOf(form)) {
+  for (const field of bookerFieldsAsked(form, identity)) {
     const message = checkField(field, item.bookerAnswers)
     if (message) return { field: field.key, guestIndex: null, message }
   }
@@ -188,14 +226,18 @@ export function checkStayAnswers(
   const guestFields = guestFieldsOf(form)
   for (let index = 0; index < item.guestCount; index += 1) {
     const guest = item.guests[index]
-    if (requireGuestNames && !guest?.name?.trim()) {
+    // The lead occupant's name is the buyer's own, and in a direct sale it
+    // is typed a step later than this one. Refusing here would bounce a
+    // buyer back to a screen that no longer has the field on it.
+    const namedElsewhere = index === 0 && identity.namesLeadGuest
+    if (requireGuestNames && !namedElsewhere && !guest?.name?.trim()) {
       return {
         field: "name",
         guestIndex: index,
         message: `Guest ${index + 1} needs a name`,
       }
     }
-    for (const field of guestFields) {
+    for (const field of fieldsAskedOf(guestFields, index, identity)) {
       const message = checkField(field, guest?.answers ?? {})
       if (message) return { field: field.key, guestIndex: index, message }
     }
@@ -207,14 +249,15 @@ export function checkStayAnswers(
 /** How many of a room's people are fully answered for. Drives the counter. */
 export function completeGuestCount(
   item: Pick<SelectedAccommodationItem, "guestForm" | "guests" | "guestCount">,
-  { requireGuestNames }: { requireGuestNames: boolean },
+  { requireGuestNames, identity = NO_BUYER_IDENTITY }: StayCheckOptions,
 ): number {
   const fields = guestFieldsOf(item.guestForm)
   let complete = 0
   for (let index = 0; index < item.guestCount; index += 1) {
     const guest = item.guests[index]
-    const named = !requireGuestNames || !!guest?.name?.trim()
-    const answered = fields.every(
+    const namedElsewhere = index === 0 && identity.namesLeadGuest
+    const named = !requireGuestNames || namedElsewhere || !!guest?.name?.trim()
+    const answered = fieldsAskedOf(fields, index, identity).every(
       (field) => !checkField(field, guest?.answers ?? {}),
     )
     if (named && answered) complete += 1
@@ -230,7 +273,7 @@ export function firstIncompleteStay(
       "guestForm" | "bookerAnswers" | "guests" | "guestCount"
     >
   >,
-  options: { requireGuestNames: boolean },
+  options: StayCheckOptions,
 ): GuestFormProblem | null {
   for (const item of items) {
     const problem = checkStayAnswers(item, options)

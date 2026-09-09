@@ -19,6 +19,11 @@ interface GuestCardProps {
   defaultOpen: boolean
   /** Keys the lead guest also answers, so "same as lead guest" has meaning. */
   copyableKeys: string[]
+  /** Shown collapsed in place of a typed name. The lead occupant's name is
+   *  the buyer's, and it is stated on the contact row rather than asked for
+   *  here, so without this their card would read "Not filled in yet" about
+   *  something that is in fact known. */
+  summary?: string
   onName: (name: string) => void
   onAnswer: (key: string, value: unknown) => void
   onCopyFromLead: () => void
@@ -42,6 +47,7 @@ export function GuestCard({
   requireName,
   defaultOpen,
   copyableKeys,
+  summary,
   onName,
   onAnswer,
   onCopyFromLead,
@@ -72,6 +78,7 @@ export function GuestCard({
           {!open && (
             <span className="truncate text-xs text-muted-foreground">
               {guest.name.trim() ||
+                summary ||
                 t("checkout.accommodation.form.not_filled_in")}
             </span>
           )}

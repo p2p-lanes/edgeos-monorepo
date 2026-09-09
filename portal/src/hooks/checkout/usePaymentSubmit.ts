@@ -19,6 +19,7 @@ import { trackGAPurchase } from "@/lib/google-analytics"
 import { getMetaAttribution, trackMetaPurchase } from "@/lib/meta-pixel"
 import { trackPortalTelemetry } from "@/lib/portal-telemetry"
 import { queryKeys } from "@/lib/query-keys"
+import type { BuyerIdentity } from "@/lib/buyerIdentity"
 import type { AttendeePassState } from "@/types/Attendee"
 import type {
   CheckoutStep,
@@ -48,6 +49,10 @@ interface UsePaymentSubmitParams {
   selectedPasses: SelectedPassItem[]
   housing: SelectedHousingItem | null
   accommodations: SelectedAccommodationItem[]
+  /** What the checkout knows about the buyer. Folded into each booking's
+   *  answers on the way out, so a contact the step stopped asking for still
+   *  reaches the property. */
+  buyerIdentity: BuyerIdentity
   merch: SelectedMerchItem[]
   patron: SelectedPatronItem | null
   selectedMealPlans: SelectedMealPlanItem[]
@@ -151,6 +156,7 @@ export function usePaymentSubmit({
   selectedPasses,
   housing,
   accommodations,
+  buyerIdentity,
   merch,
   patron,
   selectedMealPlans,
@@ -264,6 +270,7 @@ export function usePaymentSubmit({
         selectedPasses,
         housing,
         accommodations,
+        buyerIdentity,
         merch,
         patron,
         selectedMealPlans,
@@ -496,6 +503,7 @@ export function usePaymentSubmit({
   }, [
     applicationId,
     buyerData,
+    buyerIdentity,
     appCredit,
     checkoutMode,
     selectedPasses,
