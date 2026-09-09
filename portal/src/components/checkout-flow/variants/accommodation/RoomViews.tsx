@@ -9,17 +9,30 @@
  * dorm beds. The step's `layout` picks one; none of them knows about the
  * others.
  *
+ * All three are a single choice, because the cart holds one room:
+ * `addAccommodation` replaces rather than appends. So each room is a radio
+ * and the card itself is the control, which is what took the Select button
+ * off the screen. A button per room said "press me" a dozen times over and
+ * made picking a room look like adding one to a basket you could keep
+ * filling; a checked circle says the true thing, that choosing this room is
+ * un-choosing the last one. Nothing toggles off by being clicked twice
+ * either: a room is left by choosing another, or by the Remove that only the
+ * chosen card shows.
+ *
+ * What none of these cards can do is make the case for its room. That is the
+ * dialog's job, and every layout has the same way into it.
+ *
  * Every price here is a server quote. Nightly rate times nights is wrong the
  * moment a date-range rule or the long-stay rate applies, so nothing on this
  * screen multiplies.
  */
 
 import type { TFunction } from "i18next"
-import { Check, ChevronRight, Users } from "lucide-react"
+import { Check, Images, Users } from "lucide-react"
 import Image from "next/image"
+import type { KeyboardEvent, ReactNode } from "react"
 import { useTranslation } from "react-i18next"
 import type { PublicAccommodation } from "@/client"
-import { Button } from "@/components/ui/button"
 import type { BoardEntry } from "@/lib/accommodationBoard"
 import { imageOptimization } from "@/lib/image-optimization"
 import { cn } from "@/lib/utils"
@@ -32,6 +45,7 @@ export interface RoomViewProps {
   selected: boolean
   onSelect: () => void
   onRemove: () => void
+  onOpenDetails: () => void
 }
 
 export function bedSummary(room: PublicAccommodation, t: TFunction): string {
@@ -70,7 +84,7 @@ function RoomFacts({ room }: { room: PublicAccommodation }) {
  * rate. No per-night figure is shown, because dividing the quote back out
  * would print a rate the property does not charge.
  */
-function Price({
+export function Price({
   entry,
   currency,
   nights,
@@ -104,7 +118,7 @@ function Price({
 }
 
 /** "Only 2 left", and only when it is true and low enough to matter. */
-function Scarcity({ entry }: { entry: BoardEntry }) {
+export function Scarcity({ entry }: { entry: BoardEntry }) {
   const { t } = useTranslation()
   const left = entry.availability.available
   if (left <= 0 || left > 3) return null
@@ -115,23 +129,116 @@ function Scarcity({ entry }: { entry: BoardEntry }) {
   )
 }
 
-function SelectAction({
+/** The circle that says whether this is the room. */
+function ChoiceMark({
+  selected,
+  className,
+}: {
+  selected: boolean
+  className?: string
+}) {
+  return (
+    <span
+      aria-hidden
+      className={cn(
+        "flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 transition-colors",
+        selected
+          ? "border-primary bg-primary text-primary-foreground"
+          : "border-muted-foreground/35 bg-background",
+        className,
+      )}
+    >
+      {selected && <Check className="h-3 w-3" />}
+    </span>
+  )
+}
+
+/**
+ * A room, as one option among the rooms on offer.
+ *
+ * `role="radio"` rather than a `<button>` because the card has to contain
+ * buttons of its own, and a button inside a button is not something the
+ * browser will render. Enter and Space choose it, the way they would on a
+ * real radio.
+ */
+function RoomChoice({
   selected,
   onSelect,
-  onRemove,
   className,
-}: Pick<RoomViewProps, "selected" | "onSelect" | "onRemove"> & {
+  children,
+}: {
+  selected: boolean
+  onSelect: () => void
+  className?: string
+  children: ReactNode
+}) {
+  const choose = (event: KeyboardEvent<HTMLDivElement>) => {
+    // Only from the card surface itself. Enter on the Details button inside
+    // it bubbles up here, and would otherwise book the room the buyer was
+    // asking to read about.
+    if (event.target !== event.currentTarget) return
+    if (event.key !== "Enter" && event.key !== " ") return
+    event.preventDefault()
+    onSelect()
+  }
+  return (
+    // biome-ignore lint/a11y/useSemanticElements: a real radio input cannot contain the buttons this card contains
+    <div
+      role="radio"
+      aria-checked={selected}
+      tabIndex={0}
+      onClick={onSelect}
+      onKeyDown={choose}
+      className={cn(
+        "cursor-pointer text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+        className,
+      )}
+    >
+      {children}
+    </div>
+  )
+}
+
+/**
+ * The two things a card can do that are not "choose me".
+ *
+ * Both stop the click reaching the card, which would otherwise book the room
+ * the buyer only wanted to read about.
+ */
+function CardActions({
+  selected,
+  onRemove,
+  onOpenDetails,
+  className,
+}: Pick<RoomViewProps, "selected" | "onRemove" | "onOpenDetails"> & {
   className?: string
 }) {
   const { t } = useTranslation()
-  return selected ? (
-    <Button variant="outline" className={className} onClick={onRemove}>
-      {t("checkout.accommodation.remove")}
-    </Button>
-  ) : (
-    <Button className={className} onClick={onSelect}>
-      {t("checkout.accommodation.select")}
-    </Button>
+  return (
+    <div className={cn("flex items-center gap-3 text-xs", className)}>
+      <button
+        type="button"
+        onClick={(event) => {
+          event.stopPropagation()
+          onOpenDetails()
+        }}
+        className="font-medium text-primary underline-offset-2 hover:underline"
+      >
+        {t("checkout.accommodation.view_details")}
+      </button>
+      {selected && (
+        <button
+          type="button"
+          onClick={(event) => {
+            event.stopPropagation()
+            onRemove()
+          }}
+          className="text-muted-foreground underline-offset-2 hover:underline"
+        >
+          {t("checkout.accommodation.remove")}
+        </button>
+      )}
+    </div>
   )
 }
 
@@ -160,6 +267,18 @@ function Photo({
   )
 }
 
+/** How many photos there are, printed on the one that is showing. */
+function PhotoCount({ room }: { room: PublicAccommodation }) {
+  const count = room.images?.length ?? 0
+  if (count < 2) return null
+  return (
+    <span className="pointer-events-none absolute bottom-2 left-2 flex items-center gap-1 rounded-full bg-black/60 px-2 py-0.5 font-medium text-[11px] text-white">
+      <Images aria-hidden className="h-3 w-3" />
+      {count}
+    </span>
+  )
+}
+
 /**
  * Layout "rows": a wide row per room, prices in a column down the right.
  *
@@ -174,57 +293,67 @@ export function RoomRow({
   selected,
   onSelect,
   onRemove,
+  onOpenDetails,
 }: RoomViewProps) {
   const { room } = entry
   return (
-    <div
+    <RoomChoice
+      selected={selected}
+      onSelect={onSelect}
       className={cn(
-        "flex flex-col gap-3 rounded-2xl border bg-card p-3 transition-colors sm:flex-row",
-        selected && "border-primary ring-1 ring-primary",
+        "flex flex-col gap-3 rounded-2xl border bg-card p-3 sm:flex-row",
+        selected
+          ? "border-primary ring-1 ring-primary"
+          : "hover:border-primary/50",
       )}
     >
-      <Photo
-        room={room}
-        className="h-32 w-full rounded-xl sm:h-auto sm:w-32 sm:shrink-0"
-        sizes="(max-width: 640px) 100vw, 128px"
-      />
+      <div className="relative h-32 w-full shrink-0 sm:h-auto sm:w-32">
+        <Photo
+          room={room}
+          className="absolute inset-0 rounded-xl"
+          sizes="(max-width: 640px) 100vw, 128px"
+        />
+        <PhotoCount room={room} />
+      </div>
 
       <div className="flex min-w-0 flex-1 flex-col gap-1">
-        <h4 className="font-semibold leading-tight">{room.name}</h4>
+        <div className="flex items-start gap-2">
+          <ChoiceMark selected={selected} className="mt-0.5" />
+          <h4 className="font-semibold leading-tight">{room.name}</h4>
+        </div>
         <RoomFacts room={room} />
         {room.description && (
-          <p className="line-clamp-2 text-xs text-muted-foreground">
+          <p className="line-clamp-2 text-muted-foreground text-xs">
             {room.description}
           </p>
         )}
         <Scarcity entry={entry} />
+        <CardActions
+          selected={selected}
+          onRemove={onRemove}
+          onOpenDetails={onOpenDetails}
+          className="mt-1"
+        />
       </div>
 
-      <div className="flex shrink-0 items-end justify-between gap-3 sm:w-36 sm:flex-col sm:items-end sm:justify-between">
+      <div className="shrink-0 sm:w-36">
         <Price
           entry={entry}
           currency={currency}
           nights={nights}
           align="right"
         />
-        <SelectAction
-          selected={selected}
-          onSelect={onSelect}
-          onRemove={onRemove}
-          className="w-auto sm:w-full"
-        />
       </div>
-    </div>
+    </RoomChoice>
   )
 }
 
 /**
  * Layout "cards": photo first, and the card itself is the control.
  *
- * Taking the button out of every card is what buys the room for a 4:3 photo,
- * so the card carries `aria-pressed` and the tick is the feedback. Worth it
- * only when the rooms are actually photographed; without images it is a
- * worse version of rows.
+ * The 4:3 photo is the whole reason to pick this layout, so everything else
+ * is kept to what fits under it. Worth it only when the rooms are actually
+ * photographed; without images it is a worse version of rows.
  */
 export function RoomCard({
   entry,
@@ -233,17 +362,19 @@ export function RoomCard({
   selected,
   onSelect,
   onRemove,
+  onOpenDetails,
 }: RoomViewProps) {
   const { t } = useTranslation()
   const { room } = entry
   return (
-    <button
-      type="button"
-      aria-pressed={selected}
-      onClick={selected ? onRemove : onSelect}
+    <RoomChoice
+      selected={selected}
+      onSelect={onSelect}
       className={cn(
-        "flex flex-col overflow-hidden rounded-2xl border bg-card text-left transition-colors hover:border-primary/60",
-        selected && "border-primary ring-1 ring-primary",
+        "flex flex-col overflow-hidden rounded-2xl border bg-card",
+        selected
+          ? "border-primary ring-1 ring-primary"
+          : "hover:border-primary/60",
       )}
     >
       <div className="relative aspect-[4/3] w-full">
@@ -252,15 +383,16 @@ export function RoomCard({
           className="absolute inset-0"
           sizes="(max-width: 640px) 100vw, 50vw"
         />
-        <span
-          aria-hidden
-          className={cn(
-            "absolute right-2 top-2 flex h-6 w-6 items-center justify-center rounded-full border bg-card",
-            selected && "border-primary bg-primary text-primary-foreground",
-          )}
-        >
-          {selected && <Check className="h-3.5 w-3.5" />}
-        </span>
+        <PhotoCount room={room} />
+        <ChoiceMark
+          selected={selected}
+          className="absolute top-2 right-2 h-6 w-6 shadow-sm"
+        />
+        {selected && (
+          <span className="absolute top-2 left-2 rounded-full bg-primary px-2 py-0.5 font-medium text-[11px] text-primary-foreground">
+            {t("checkout.accommodation.your_room")}
+          </span>
+        )}
       </div>
 
       <div className="flex flex-1 flex-col gap-1 p-3">
@@ -270,23 +402,26 @@ export function RoomCard({
           <Price entry={entry} currency={currency} nights={nights} />
         </div>
         <Scarcity entry={entry} />
-        <span className="text-xs font-medium text-primary">
-          {selected
-            ? t("checkout.accommodation.in_cart")
-            : t("checkout.accommodation.select")}
-        </span>
+        <CardActions
+          selected={selected}
+          onRemove={onRemove}
+          onOpenDetails={onOpenDetails}
+          className="mt-1"
+        />
       </div>
-    </button>
+    </RoomChoice>
   )
 }
 
 /**
- * Layout "sheet": one line per room, opening in place.
+ * Layout "sheet": one line per room, for an offer with more room types than
+ * fit a screen.
  *
- * For an offer with more room types than fit a screen, where the buyer is
- * scanning names and prices rather than looking at pictures. The photo and
- * the description are one click away instead of costing every room its own
- * card.
+ * The buyer here is scanning names and prices, so a line is a name, a price
+ * and a thumbnail. It used to unfold in place instead, which meant the
+ * description and the one photo it could fit were competing for width with
+ * the list they were pushing apart. The dialog has neither problem, and it
+ * is the same dialog the other two layouts open.
  */
 export function RoomSheetRow({
   entry,
@@ -295,68 +430,42 @@ export function RoomSheetRow({
   selected,
   onSelect,
   onRemove,
-  open,
-  onToggle,
-}: RoomViewProps & { open: boolean; onToggle: () => void }) {
+  onOpenDetails,
+}: RoomViewProps) {
   const { t } = useTranslation()
   const { room } = entry
-  const quote = entry.availability.quote
+  const beds = bedSummary(room, t)
   return (
-    <div className={cn("border-b last:border-b-0", selected && "bg-primary/5")}>
-      <button
-        type="button"
-        aria-expanded={open}
-        onClick={onToggle}
-        className="flex w-full items-center gap-3 p-3 text-left transition-colors hover:bg-muted/50"
-      >
-        <ChevronRight
-          aria-hidden
-          className={cn(
-            "h-4 w-4 shrink-0 text-muted-foreground transition-transform",
-            open && "rotate-90",
-          )}
-        />
-        <span className="min-w-0 flex-1">
-          <span className="block truncate font-medium">{room.name}</span>
-          <span className="block truncate text-xs text-muted-foreground">
-            {t("checkout.accommodation.sleeps", { count: room.guest_capacity })}
-            {bedSummary(room, t) && ` · ${bedSummary(room, t)}`}
-          </span>
-        </span>
-        {selected && (
-          <Check aria-hidden className="h-4 w-4 shrink-0 text-primary" />
-        )}
-        {quote && (
-          <span className="shrink-0 font-semibold">
-            {formatCurrency(Number(quote.total), currency)}
-          </span>
-        )}
-      </button>
-
-      {open && (
-        <div className="flex flex-col gap-3 px-3 pb-3 sm:flex-row">
-          <Photo
-            room={room}
-            className="h-28 w-full rounded-xl sm:w-40 sm:shrink-0"
-            sizes="(max-width: 640px) 100vw, 160px"
-          />
-          <div className="flex min-w-0 flex-1 flex-col gap-2">
-            {room.description && (
-              <p className="text-xs text-muted-foreground">
-                {room.description}
-              </p>
-            )}
-            <Price entry={entry} currency={currency} nights={nights} />
-            <Scarcity entry={entry} />
-            <SelectAction
-              selected={selected}
-              onSelect={onSelect}
-              onRemove={onRemove}
-              className="w-fit"
-            />
-          </div>
-        </div>
+    <RoomChoice
+      selected={selected}
+      onSelect={onSelect}
+      className={cn(
+        "flex items-center gap-3 border-b p-3 last:border-b-0",
+        selected ? "bg-primary/5" : "hover:bg-muted/50",
       )}
-    </div>
+    >
+      <ChoiceMark selected={selected} />
+      <Photo
+        room={room}
+        className="h-12 w-12 shrink-0 rounded-lg"
+        sizes="48px"
+      />
+
+      <div className="min-w-0 flex-1">
+        <p className="truncate font-medium">{room.name}</p>
+        <p className="truncate text-muted-foreground text-xs">
+          {t("checkout.accommodation.sleeps", { count: room.guest_capacity })}
+          {beds && ` · ${beds}`}
+        </p>
+        <CardActions
+          selected={selected}
+          onRemove={onRemove}
+          onOpenDetails={onOpenDetails}
+          className="mt-0.5"
+        />
+      </div>
+
+      <Price entry={entry} currency={currency} nights={nights} align="right" />
+    </RoomChoice>
   )
 }

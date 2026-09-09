@@ -456,6 +456,28 @@
         "progress": "{{complete}} of {{total}} guests complete",
         "booking_contact": "Booking contact",
         "booking_contact_hint": "Who the property contacts about this room"
+      },
+      "view_details": "View details",
+      "choose": "Choose this room",
+      "choose_room": "Choose a room",
+      "your_room": "Your room",
+      "beds_label": "Beds",
+      "min_stay_label": "Minimum stay",
+      "about_property": "About {{name}}",
+      "kinds": {
+        "room": "Room",
+        "apartment": "Apartment",
+        "studio": "Studio",
+        "tent": "Tent",
+        "cabin": "Cabin",
+        "other": "Accommodation"
+      },
+      "gallery": {
+        "previous": "Previous photo",
+        "next": "Next photo",
+        "position": "{{current}} of {{total}}",
+        "go_to": "Photo {{number}}",
+        "no_photos": "No photos of this room yet"
       }
     },
     "contribution": {

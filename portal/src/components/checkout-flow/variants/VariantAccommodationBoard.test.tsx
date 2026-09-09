@@ -10,7 +10,13 @@
  */
 
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
-import { fireEvent, render, screen, waitFor } from "@testing-library/react"
+import {
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react"
 import type { ReactNode } from "react"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 import { NO_BUYER_IDENTITY } from "@/lib/buyerIdentity"
@@ -302,7 +308,7 @@ describe("the party size", () => {
     await waitFor(() =>
       expect(checkPortalAccommodationAvailability).toHaveBeenCalledTimes(2),
     )
-    fireEvent.click(screen.getByRole("button", { name: "Select" }))
+    fireEvent.click(screen.getByRole("radio"))
 
     expect(addAccommodation).toHaveBeenCalledWith(
       expect.objectContaining({ guestCount: 2 }),
@@ -316,39 +322,42 @@ describe("the three layouts", () => {
     for (const layout of ["rows", "cards", "sheet"]) {
       const view = renderStep({ layout })
       expect(await screen.findByText("Garden Studio")).toBeTruthy()
-      // Not getBy: the open sheet row prints the total in its header and
-      // again in the detail it just revealed.
       expect(screen.getAllByText("$290").length).toBeGreaterThan(0)
+      // The card is the control in all three: no layout has a button that
+      // books the room, and none of them books it by being read about.
+      expect(screen.getByRole("radio").getAttribute("aria-checked")).toBe(
+        "false",
+      )
+      expect(screen.queryByRole("button", { name: "Select" })).toBeNull()
       view.unmount()
     }
   })
 
-  it("makes the whole card the control when it is cards", async () => {
-    renderStep({ layout: "cards" })
-    await screen.findByText("Garden Studio")
+  it("books the room from the card in each of them", async () => {
+    for (const layout of ["rows", "cards", "sheet"]) {
+      const view = renderStep({ layout })
+      await screen.findByText("Garden Studio")
 
-    const card = screen.getByRole("button", { pressed: false })
-    fireEvent.click(card)
+      fireEvent.click(screen.getByRole("radio"))
 
-    expect(addAccommodation).toHaveBeenCalledTimes(1)
+      expect(addAccommodation).toHaveBeenCalledTimes(1)
+      addAccommodation.mockClear()
+      view.unmount()
+    }
   })
 
-  it("keeps the detail behind a disclosure when it is a sheet", async () => {
-    renderStep({ layout: "sheet" })
-    await screen.findByText("Garden Studio")
+  it("opens the same room screen from each of them", async () => {
+    for (const layout of ["rows", "cards", "sheet"]) {
+      const view = renderStep({ layout })
+      await screen.findByText("Garden Studio")
 
-    // By name, not by state: the date pickers are Popover triggers and
-    // carry aria-expanded of their own.
-    const row = screen.getByRole("button", { name: /Garden Studio/ })
-    expect(row.getAttribute("aria-expanded")).toBe("true")
+      fireEvent.click(screen.getByRole("button", { name: "View details" }))
 
-    fireEvent.click(row)
-
-    expect(
-      screen
-        .getByRole("button", { name: /Garden Studio/ })
-        .getAttribute("aria-expanded"),
-    ).toBe("false")
+      expect(screen.getByRole("dialog")).toBeTruthy()
+      // Reading about a room is not choosing it.
+      expect(addAccommodation).not.toHaveBeenCalled()
+      view.unmount()
+    }
   })
 
   it("still understands the two names the step shipped with", async () => {
@@ -357,6 +366,90 @@ describe("the three layouts", () => {
     renderStep({ layout: "grid" })
     await screen.findByText("Garden Studio")
 
-    expect(screen.getByRole("button", { pressed: false })).toBeTruthy()
+    expect(screen.getByRole("radio")).toBeTruthy()
+  })
+})
+
+/**
+ * The room's own screen.
+ *
+ * A board has to fit every room at once, so it can only ever show a cover
+ * photo and a clipped description. Everything a property wrote about a room,
+ * and every photo it uploaded, has to be reachable from somewhere, and this
+ * is that somewhere. It also carries the choice, because a buyer who opened
+ * a room to read about it is already deciding.
+ */
+describe("the details dialog", () => {
+  const PHOTOGRAPHED = [
+    room({
+      images: [
+        { id: "a", url: "https://example.test/a.jpg" },
+        { id: "b", url: "https://example.test/b.jpg" },
+        { id: "c", url: "https://example.test/c.jpg" },
+      ],
+      description: "A long description the board has no room for.",
+    }),
+  ]
+
+  beforeEach(() => {
+    listPortalAccommodations.mockResolvedValue({
+      ...OFFER,
+      accommodations: PHOTOGRAPHED,
+      properties: [
+        {
+          id: "prop-1",
+          name: "Casa del Lago",
+          address: "Calle 12",
+          description: "On the lake.",
+        },
+      ],
+    })
+    checkPortalAccommodationAvailability.mockResolvedValue([priced("studio")])
+  })
+
+  async function openDetails() {
+    renderStep()
+    await screen.findByText("Garden Studio")
+    fireEvent.click(screen.getByRole("button", { name: "View details" }))
+    return screen.getByRole("dialog")
+  }
+
+  it("says everything the card had to clip", async () => {
+    const dialog = await openDetails()
+
+    expect(
+      within(dialog).getByText("A long description the board has no room for."),
+    ).toBeTruthy()
+    expect(within(dialog).getByText("On the lake.")).toBeTruthy()
+    expect(within(dialog).getByText("Calle 12")).toBeTruthy()
+  })
+
+  it("carries every photo, not just the cover", async () => {
+    const dialog = await openDetails()
+
+    expect(within(dialog).getByText("1 of 3")).toBeTruthy()
+    fireEvent.click(within(dialog).getByRole("button", { name: "Next photo" }))
+    expect(within(dialog).getByText("2 of 3")).toBeTruthy()
+  })
+
+  it("wraps round rather than dead-ending on the last photo", async () => {
+    const dialog = await openDetails()
+
+    fireEvent.click(
+      within(dialog).getByRole("button", { name: "Previous photo" }),
+    )
+
+    expect(within(dialog).getByText("3 of 3")).toBeTruthy()
+  })
+
+  it("lets the buyer decide without going back to the board", async () => {
+    const dialog = await openDetails()
+
+    fireEvent.click(
+      within(dialog).getByRole("button", { name: "Choose this room" }),
+    )
+
+    expect(addAccommodation).toHaveBeenCalledTimes(1)
+    expect(screen.queryByRole("dialog")).toBeNull()
   })
 })

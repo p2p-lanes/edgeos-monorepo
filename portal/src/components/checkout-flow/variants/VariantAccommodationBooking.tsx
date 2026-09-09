@@ -59,6 +59,7 @@ import {
 import type { VariantProps } from "../registries/variantRegistry"
 import { GuestDetailsPanel } from "./accommodation/GuestDetailsPanel"
 import { RecoveryNotes } from "./accommodation/RecoveryNotes"
+import { RoomDetailsDialog } from "./accommodation/RoomDetailsDialog"
 import { RoomCard, RoomRow, RoomSheetRow } from "./accommodation/RoomViews"
 import { StayBar } from "./accommodation/StayBar"
 
@@ -175,7 +176,7 @@ export default function VariantAccommodationBooking({
   const [checkIn, setCheckIn] = useState("")
   const [checkOut, setCheckOut] = useState("")
   const [guests, setGuests] = useState(1)
-  const [openRoomId, setOpenRoomId] = useState<string | null>(null)
+  const [detailsRoomId, setDetailsRoomId] = useState<string | null>(null)
   const [dropped, setDropped] = useState<{
     name: string
     reason: string
@@ -422,8 +423,12 @@ export default function VariantAccommodationBooking({
     )
   }
 
-  const firstOpenId = board.bookable[0]?.room.id ?? null
   const settling = availabilityFetching || board.unanswered.length > 0
+  // The room whose own screen is open, looked up on the board rather than
+  // remembered: a room the stay has just made unbookable leaves the board,
+  // and its dialog goes with it instead of describing an offer that is gone.
+  const detailsEntry =
+    board.bookable.find((entry) => entry.room.id === detailsRoomId) ?? null
 
   const renderEntries = (entries: typeof board.bookable) => {
     if (config.layout === "sheet") {
@@ -436,18 +441,11 @@ export default function VariantAccommodationBooking({
               currency={currency}
               nights={nights}
               selected={selected?.accommodationId === entry.room.id}
-              open={(openRoomId ?? firstOpenId) === entry.room.id}
-              onToggle={() =>
-                setOpenRoomId(
-                  (openRoomId ?? firstOpenId) === entry.room.id
-                    ? ""
-                    : entry.room.id,
-                )
-              }
               onSelect={() => handleSelect(entry.room)}
               onRemove={() =>
                 removeAccommodation(entry.room.id, checkIn, checkOut)
               }
+              onOpenDetails={() => setDetailsRoomId(entry.room.id)}
             />
           ))}
         </div>
@@ -473,6 +471,7 @@ export default function VariantAccommodationBooking({
             onRemove={() =>
               removeAccommodation(entry.room.id, checkIn, checkOut)
             }
+            onOpenDetails={() => setDetailsRoomId(entry.room.id)}
           />
         ))}
       </div>
@@ -520,21 +519,33 @@ export default function VariantAccommodationBooking({
           </p>
         </div>
       ) : (
-        grouped.map(({ property, entries }) => (
-          <div key={property?.id ?? "unknown"} className="flex flex-col gap-3">
-            {config.showPropertyHeaders && property && (
-              <div>
-                <h3 className="font-semibold">{property.name}</h3>
-                {property.address && (
-                  <p className="text-xs text-muted-foreground">
-                    {property.address}
-                  </p>
-                )}
-              </div>
-            )}
-            {renderEntries(entries)}
-          </div>
-        ))
+        // One group, however many property headings it is broken up by: the
+        // cart holds a single room, so choosing one anywhere on this board
+        // un-chooses whatever was chosen anywhere else on it.
+        <div
+          role="radiogroup"
+          aria-label={t("checkout.accommodation.choose_room")}
+          className="flex flex-col gap-6"
+        >
+          {grouped.map(({ property, entries }) => (
+            <div
+              key={property?.id ?? "unknown"}
+              className="flex flex-col gap-3"
+            >
+              {config.showPropertyHeaders && property && (
+                <div>
+                  <h3 className="font-semibold">{property.name}</h3>
+                  {property.address && (
+                    <p className="text-muted-foreground text-xs">
+                      {property.address}
+                    </p>
+                  )}
+                </div>
+              )}
+              {renderEntries(entries)}
+            </div>
+          ))}
+        </div>
       )}
 
       <RecoveryNotes
@@ -561,10 +572,30 @@ export default function VariantAccommodationBooking({
         </div>
       )}
 
-      <div className="flex items-start gap-2 rounded-xl bg-muted/50 p-3 text-xs text-muted-foreground">
+      <div className="flex items-start gap-2 rounded-xl bg-muted/50 p-3 text-muted-foreground text-xs">
         <Info className="mt-0.5 h-4 w-4 shrink-0" />
         <span>{config.noticeText}</span>
       </div>
+
+      <RoomDetailsDialog
+        entry={detailsEntry}
+        property={
+          detailsEntry
+            ? propertyById.get(detailsEntry.room.property_id)
+            : undefined
+        }
+        currency={currency}
+        nights={nights}
+        selected={
+          !!detailsEntry && selected?.accommodationId === detailsEntry.room.id
+        }
+        onClose={() => setDetailsRoomId(null)}
+        onSelect={() => detailsEntry && handleSelect(detailsEntry.room)}
+        onRemove={() => {
+          if (!detailsEntry) return
+          removeAccommodation(detailsEntry.room.id, checkIn, checkOut)
+        }}
+      />
     </div>
   )
 }

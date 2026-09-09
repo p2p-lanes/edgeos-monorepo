@@ -456,6 +456,28 @@
         "progress": "{{complete}} de {{total}} huéspedes completos",
         "booking_contact": "Contacto de la reserva",
         "booking_contact_hint": "A quién contacta la propiedad por esta habitación"
+      },
+      "view_details": "Ver detalles",
+      "choose": "Elegir esta habitación",
+      "choose_room": "Elegí una habitación",
+      "your_room": "Tu habitación",
+      "beds_label": "Camas",
+      "min_stay_label": "Estadía mínima",
+      "about_property": "Sobre {{name}}",
+      "kinds": {
+        "room": "Habitación",
+        "apartment": "Departamento",
+        "studio": "Monoambiente",
+        "tent": "Carpa",
+        "cabin": "Cabaña",
+        "other": "Alojamiento"
+      },
+      "gallery": {
+        "previous": "Foto anterior",
+        "next": "Foto siguiente",
+        "position": "{{current}} de {{total}}",
+        "go_to": "Foto {{number}}",
+        "no_photos": "Todavía no hay fotos de esta habitación"
       }
     },
     "contribution": {
