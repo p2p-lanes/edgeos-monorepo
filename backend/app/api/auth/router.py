@@ -1,10 +1,9 @@
-from fastapi import APIRouter, Header, HTTPException, Response
+from fastapi import APIRouter, Header, HTTPException
 from loguru import logger
 
 from app.api.auth.crud import (
     authenticate_human,
     authenticate_user,
-    check_tenant_not_suspended,
     login_existing_human,
     login_human,
     login_user,
@@ -12,41 +11,18 @@ from app.api.auth.crud import (
 from app.api.auth.schemas import (
     AuthCodeSentResponse,
     HumanAuth,
-    HumanSession,
-    HumanSessionProfile,
     HumanVerify,
     ThirdPartyHumanLogin,
     ThirdPartyHumanVerify,
     UserAuth,
     UserVerify,
 )
-from app.api.auth.session import PortalSessionPayload
 from app.api.shared.enums import UserRole
 from app.api.third_party_app.crud import touch_last_used, validate_third_party_key
-from app.core.dependencies.users import CurrentTenant, SessionDep, get_current_human
+from app.core.dependencies.users import SessionDep
 from app.core.security import THIRD_PARTY_TOKEN_SCOPES_MAX, Token, create_access_token
 
 router = APIRouter(prefix="/auth", tags=["auth"])
-
-
-@router.get("/human/session", response_model=HumanSession)
-async def human_session(
-    payload: PortalSessionPayload,
-    tenant: CurrentTenant,
-    session: SessionDep,
-    response: Response,
-) -> HumanSession:
-    """Validate a Portal JWT against the server-resolved tenant without renewing it."""
-    human = get_current_human(payload, session)
-    if human.tenant_id != tenant.id:
-        raise HTTPException(status_code=401, detail="Invalid portal session")
-    check_tenant_not_suspended(session, tenant.id)
-    response.headers["Cache-Control"] = "private, no-store"
-    response.headers["Vary"] = "Authorization, X-Tenant-Id"
-    return HumanSession(
-        human=HumanSessionProfile.model_validate(human, from_attributes=True),
-        expires_at=payload.exp,
-    )
 
 
 @router.post("/user/login", response_model=AuthCodeSentResponse)

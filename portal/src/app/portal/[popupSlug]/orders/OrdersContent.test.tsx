@@ -286,14 +286,9 @@ describe("OrdersContent", () => {
     }) as HTMLButtonElement
     fireEvent.click(invoiceButton)
 
-    await waitFor(() =>
-      expect(fetchMock).toHaveBeenCalledWith(
-        "/api/v1/payments/my/payment-1/invoice",
-        expect.objectContaining({
-          credentials: "same-origin",
-          cache: "no-store",
-        }),
-      ),
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/v1/payments/my/payment-1/invoice",
+      { headers: {} },
     )
     expect(invoiceButton.disabled).toBe(true)
 
@@ -344,10 +339,7 @@ describe("OrdersContent", () => {
     )
     expect(fetchMock).toHaveBeenCalledWith(
       "/api/v1/payments/my/payment-failure/invoice",
-      expect.objectContaining({
-        credentials: "same-origin",
-        cache: "no-store",
-      }),
+      { headers: {} },
     )
     expect(invoiceButton.disabled).toBe(false)
     expect(consoleError).toHaveBeenCalled()

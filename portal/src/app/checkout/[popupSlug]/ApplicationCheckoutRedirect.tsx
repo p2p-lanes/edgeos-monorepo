@@ -1,14 +1,13 @@
 "use client"
 
-import { useRouter, useSearchParams } from "next/navigation"
+import { useRouter } from "next/navigation"
 import { useEffect } from "react"
 
 import { Loader } from "@/components/ui/Loader"
-import { canonicalShopTarget } from "@/lib/shop-route"
 
 interface ApplicationCheckoutRedirectProps {
   popupSlug: string
-  flowSlug: string
+  flowId: string
 }
 
 /**
@@ -27,20 +26,19 @@ interface ApplicationCheckoutRedirectProps {
  * nothing. So the URL resolves and hands over to the portal page that
  * already does this correctly.
  *
- * The selected slug is canonical; remaining URL context survives the handoff.
+ * The selected flow UUID travels in the query so the portal checkout keeps
+ * its application, quote, and purchase context without resolving a default.
  */
 export function ApplicationCheckoutRedirect({
   popupSlug,
-  flowSlug,
+  flowId,
 }: ApplicationCheckoutRedirectProps) {
   const router = useRouter()
-  const search = useSearchParams().toString()
 
   useEffect(() => {
-    router.replace(
-      canonicalShopTarget(popupSlug, flowSlug, search, window.location.hash),
-    )
-  }, [popupSlug, flowSlug, search, router])
+    const target = `/portal/${popupSlug}/passes/buy`
+    router.replace(`${target}?flow=${flowId}`)
+  }, [popupSlug, flowId, router])
 
   return (
     <div className="flex min-h-screen items-center justify-center">

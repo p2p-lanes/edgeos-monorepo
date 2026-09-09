@@ -1,5 +1,6 @@
 "use client"
 
+import { useSearchParams } from "next/navigation"
 import {
   createContext,
   type ReactNode,
@@ -11,7 +12,6 @@ import {
   useState,
 } from "react"
 import { useGroupsQuery } from "@/components/Sidebar/hooks/useGetGroups"
-import { useRouteSalesFlow } from "@/hooks/useRouteSalesFlow"
 import type { DiscountProps } from "@/types/discounts"
 import { useApplication } from "./applicationProvider"
 import { useCityProvider } from "./cityProvider"
@@ -25,35 +25,34 @@ interface DiscountContextType {
 export const DiscountContext = createContext<DiscountContextType | null>(null)
 
 const DiscountProvider = ({ children }: { children: ReactNode }) => {
-  const { flowId } = useRouteSalesFlow()
   const { getCity } = useCityProvider()
   const city = getCity()
   const { getRelevantApplication } = useApplication()
+  // This provider wraps the checkout rather than living inside it, so
+  // there is no `useCheckout` to ask — the portal carries the door in
+  // `?flow=`. A group discount belongs to the application that joined
+  // that group, and reading another door's used to apply the wrong one
+  // (sdd/sales-flows-rediseno).
+  const flowId = useSearchParams().get("flow")
   const application = getRelevantApplication(flowId)
   const { data: groups = [] } = useGroupsQuery()
-  const groupDiscount = Number(
-    groups.find((group) => group.id === application?.group_id)
-      ?.discount_percentage ?? 0,
-  )
 
   const [discountApplied, setDiscountApplied] = useState<DiscountProps>({
-    discount_value: Math.max(0, groupDiscount),
+    discount_value: 0,
     discount_type: "percentage",
     discount_code: null,
-    city_id: city?.id,
   })
-  const scope = `${city?.id ?? ""}:${flowId ?? ""}`
-  const [previousScope, setPreviousScope] = useState(scope)
-  // Reset before children render without remounting the persistent portal shell.
-  if (previousScope !== scope) {
-    setPreviousScope(scope)
-    setDiscountApplied({
-      discount_value: Math.max(0, groupDiscount),
-      discount_type: "percentage",
-      discount_code: null,
-      city_id: city?.id,
-    })
-  }
+
+  useEffect(() => {
+    if (city?.id && discountApplied.city_id !== city?.id) {
+      setDiscountApplied({
+        discount_value: 0,
+        discount_type: "percentage",
+        discount_code: null,
+        city_id: city.id,
+      })
+    }
+  }, [city?.id, discountApplied.city_id])
 
   useEffect(() => {
     if (application?.group_id && groups.length > 0) {
@@ -67,11 +66,10 @@ const DiscountProvider = ({ children }: { children: ReactNode }) => {
           discount_value: groupDiscount,
           discount_type: "percentage",
           discount_code: null,
-          city_id: city?.id,
         })
       }
     }
-  }, [application?.group_id, groups, discountApplied.discount_value, city?.id])
+  }, [application?.group_id, groups, discountApplied.discount_value])
 
   const discountRef = useRef(discountApplied)
   discountRef.current = discountApplied

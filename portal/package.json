@@ -9,7 +9,6 @@
     "start": "next start",
     "lint": "biome check --write --unsafe --no-errors-on-unmatched --files-ignore-unknown=true ./",
     "test": "vitest run --config vitest.config.ts",
-    "test:session-runtime": "node scripts/test-session-runtime.mjs",
     "generate-client": "openapi-ts"
   },
   "dependencies": {

@@ -34,9 +34,7 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { useWorkspace } from "@/contexts/WorkspaceContext"
 import useAuth from "@/hooks/useAuth"
 import useCustomToast from "@/hooks/useCustomToast"
-import { useFlowEditorPrefetch } from "@/hooks/useFlowEditorPrefetch"
 import { rememberFlow, useFlowScope } from "@/hooks/useFlowScope"
-import { ticketingStepsQueryOptions } from "@/lib/salesFlowQueries"
 import { createErrorHandler } from "@/utils"
 
 interface TicketingStepsSearch {
@@ -109,7 +107,6 @@ function TicketingStepsPage() {
 }
 
 function TicketingStepsContent({ popupId }: { popupId: string }) {
-  const { scope } = useFlowEditorPrefetch()
   const queryClient = useQueryClient()
   const navigate = useNavigate()
   const { step, flow: flowParam } = Route.useSearch()
@@ -150,11 +147,17 @@ function TicketingStepsContent({ popupId }: { popupId: string }) {
     flows,
     activeFlowId,
     isLoading: flowsLoading,
-  } = useFlowScope(popupId, flowParam, adoptFlow, scope)
+  } = useFlowScope(popupId, flowParam, adoptFlow)
 
   const { data: stepsData, isLoading } = useQuery({
-    ...ticketingStepsQueryOptions(popupId, activeFlowId, scope),
-    enabled: !!activeFlowId && !!scope,
+    queryKey: ["ticketing-steps", popupId, activeFlowId],
+    queryFn: () =>
+      TicketingStepsService.listTicketingSteps({
+        popupId,
+        salesFlowId: activeFlowId,
+        limit: 100,
+      }),
+    enabled: !!activeFlowId,
   })
 
   const steps = useMemo(() => {

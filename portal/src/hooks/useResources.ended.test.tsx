@@ -63,10 +63,6 @@ vi.mock("@/providers/cityProvider", () => ({
 
 import useResources from "./useResources"
 
-vi.mock("@/hooks/useRouteSalesFlow", () => ({
-  useRouteSalesFlow: () => ({ flowId: null }),
-}))
-
 describe("useResources", () => {
   beforeEach(() => {
     mocks.city = {

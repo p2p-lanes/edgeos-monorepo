@@ -1,33 +1,19 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
-import { fireEvent, render, screen } from "@testing-library/react"
+import { render, screen } from "@testing-library/react"
 import type { ReactNode } from "react"
 import { beforeEach, describe, expect, it, vi } from "vitest"
-
-const prefetch = vi.hoisted(() => vi.fn())
-vi.mock("@/hooks/useFlowEditorPrefetch", () => ({
-  useFlowEditorPrefetch: () => ({ prefetch }),
-}))
 
 vi.mock("@tanstack/react-router", () => ({
   Link: ({
     children,
     search,
     to,
-    onPointerEnter,
-    onFocus,
   }: {
     children: ReactNode
     search: { flow: string }
     to: string
-    onPointerEnter?: () => void
-    onFocus?: () => void
   }) => (
-    <a
-      data-flow={search.flow}
-      href={to}
-      onPointerEnter={onPointerEnter}
-      onFocus={onFocus}
-    >
+    <a data-flow={search.flow} href={to}>
       {children}
     </a>
   ),
@@ -72,20 +58,5 @@ describe("FlowSectionLinks", () => {
     for (const link of links) {
       expect(link).toHaveAttribute("data-flow", "current-flow")
     }
-    expect(prefetch).not.toHaveBeenCalled()
-    fireEvent.pointerEnter(links[0])
-    fireEvent.focus(links[1])
-    expect(prefetch).toHaveBeenNthCalledWith(
-      1,
-      "/ticketing-steps",
-      "current-flow",
-      "popup-1",
-    )
-    expect(prefetch).toHaveBeenNthCalledWith(
-      2,
-      "/form-builder",
-      "current-flow",
-      "popup-1",
-    )
   })
 })

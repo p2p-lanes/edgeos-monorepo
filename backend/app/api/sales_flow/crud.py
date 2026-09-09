@@ -1,8 +1,6 @@
 import uuid
-from collections import defaultdict
-from collections.abc import Iterable
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
 from sqlmodel import Session, col, select
 
@@ -18,9 +16,6 @@ from app.api.sales_flow.schemas import (
     recommended_visibility_for_type,
 )
 from app.api.shared.crud import BaseCRUD
-
-if TYPE_CHECKING:
-    from app.api.ticketing_step.models import TicketingSteps
 
 PRIMARY_FLOW_SLUGS = {
     "application": "attendee",
@@ -152,16 +147,33 @@ def _has_flow_of_type(
 
 
 def _application_price_product_ids(
-    steps: Iterable["TicketingSteps"], primary_category_id: uuid.UUID | None
+    session: Session, flow: SalesFlows
 ) -> set[uuid.UUID]:
     """Return paid-ticket candidates explicitly visible to the primary attendee."""
+    from app.api.attendee_category.models import AttendeeCategories  # noqa: PLC0415
+    from app.api.ticketing_step.models import TicketingSteps  # noqa: PLC0415
+
+    primary_category_id = session.exec(
+        select(AttendeeCategories.id)
+        .where(
+            AttendeeCategories.popup_id == flow.popup_id,
+            AttendeeCategories.is_primary == True,  # noqa: E712
+        )
+        .limit(1)
+    ).first()
     if primary_category_id is None:
         return set()
 
+    steps = session.exec(
+        select(TicketingSteps).where(
+            TicketingSteps.sales_flow_id == flow.id,
+            TicketingSteps.is_enabled == True,  # noqa: E712
+            TicketingSteps.template == "ticket-select",
+        )
+    ).all()
+
     product_ids: set[uuid.UUID] = set()
     for step in steps:
-        if step.template != "ticket-select":
-            continue
         template_config = step.template_config
         if not isinstance(template_config, dict):
             continue
@@ -329,127 +341,62 @@ class SalesFlowsCRUD(BaseCRUD[SalesFlows, SalesFlowCreate, SalesFlowUpdate]):
     def resolve_portal_price_summary(
         self, session: Session, flow: SalesFlows
     ) -> SalesFlowPriceSummary | None:
-        """Single-flow compatibility entry point for the request-local batch."""
-        return self.resolve_portal_price_summaries(session, [flow])[flow.id]
-
-    def resolve_portal_price_summaries(
-        self, session: Session, flows: list[SalesFlows]
-    ) -> dict[uuid.UUID, SalesFlowPriceSummary | None]:
-        """Price a listing in at most four SELECTs, without ORM relationship reads."""
-        from app.api.attendee_category.models import AttendeeCategories  # noqa: PLC0415
+        """Return the narrowest truthful price fact for a flow's catalog."""
         from app.api.popup.models import Popups  # noqa: PLC0415
         from app.api.product.models import Products  # noqa: PLC0415
-        from app.api.ticketing_step.models import TicketingSteps  # noqa: PLC0415
-        from app.services.restrictions.offering import (
-            step_product_scope,  # noqa: PLC0415
-        )
 
-        summaries: dict[uuid.UUID, SalesFlowPriceSummary | None] = {
-            flow.id: None for flow in flows
-        }
-        if not flows:
-            return summaries
-
-        popup_ids = {flow.popup_id for flow in flows}
-        application_popup_ids = {
-            flow.popup_id for flow in flows if flow.type == SalesFlowType.application
-        }
-        steps_by_flow: dict[uuid.UUID, list[TicketingSteps]] = defaultdict(list)
-        for step in session.exec(
-            select(TicketingSteps).where(
-                col(TicketingSteps.sales_flow_id).in_(summaries),
-                TicketingSteps.is_enabled == True,  # noqa: E712
+        if flow.type == SalesFlowType.application:
+            product_ids = _application_price_product_ids(session, flow)
+            if not product_ids:
+                return None
+            prices = list(
+                session.exec(
+                    select(Products.price).where(
+                        Products.id.in_(product_ids),  # type: ignore[attr-defined]
+                        Products.popup_id == flow.popup_id,
+                        Products.category == "ticket",
+                        Products.is_active == True,  # noqa: E712
+                        Products.deleted_at.is_(None),  # type: ignore[attr-defined]
+                        Products.price > 0,
+                    )
+                ).all()
             )
-        ).all():
-            steps_by_flow[step.sales_flow_id].append(step)
-
-        primary_categories: dict[uuid.UUID, uuid.UUID] = {}
-        if application_popup_ids:
-            for popup_id, category_id in session.exec(
-                select(AttendeeCategories.popup_id, AttendeeCategories.id).where(
-                    col(AttendeeCategories.popup_id).in_(application_popup_ids),
-                    AttendeeCategories.is_primary == True,  # noqa: E712
-                )
-            ).all():
-                primary_categories.setdefault(popup_id, category_id)
-
-        candidates: dict[uuid.UUID, set[uuid.UUID]] = {}
-        categories_by_flow: dict[uuid.UUID, set[str]] = {}
-        fallback_popups: set[uuid.UUID] = set()
-        for flow in flows:
-            steps = steps_by_flow[flow.id]
-            if flow.type == SalesFlowType.application:
-                candidates[flow.id] = _application_price_product_ids(
-                    steps, primary_categories.get(flow.popup_id)
-                )
-            else:
-                candidates[flow.id], categories_by_flow[flow.id] = step_product_scope(
-                    steps
-                )
-                if categories_by_flow[flow.id]:
-                    fallback_popups.add(flow.popup_id)
-
-        # Explicit direct/upsale curation historically resolves IDs under RLS,
-        # not a popup filter. Only category fallbacks are popup-local here.
-        product_ids = set().union(*candidates.values())
-        if not product_ids and not fallback_popups:
-            return summaries
-        products = session.exec(
-            select(
-                Products.id, Products.popup_id, Products.category, Products.price
-            ).where(
-                col(Products.id).in_(product_ids)
-                | col(Products.popup_id).in_(fallback_popups),
-                Products.is_active == True,  # noqa: E712
-                col(Products.deleted_at).is_(None),
+        else:
+            from app.services.restrictions.offering import (  # noqa: PLC0415
+                flow_offered_product_ids,
             )
-        ).all()
-        if not products:
-            return summaries
-        products_by_id = {
-            product_id: (popup_id, category, price)
-            for product_id, popup_id, category, price in products
-        }
-        products_by_category: dict[tuple[uuid.UUID, str], set[uuid.UUID]] = defaultdict(
-            set
-        )
-        for product_id, popup_id, category, _price in products:
-            if category:
-                products_by_category[popup_id, category.lower()].add(product_id)
-        currencies = dict(
-            session.exec(
-                select(Popups.id, Popups.currency).where(col(Popups.id).in_(popup_ids))
-            ).all()
-        )
 
-        for flow in flows:
-            offered = candidates[flow.id].copy()
-            for category in categories_by_flow.get(flow.id, set()):
-                offered.update(products_by_category[flow.popup_id, category])
-            selected = [
-                products_by_id[product_id]
-                for product_id in offered
-                if product_id in products_by_id
-            ]
-            if flow.type == SalesFlowType.application:
-                prices = [
-                    price
-                    for popup_id, category, price in selected
-                    if popup_id == flow.popup_id and category == "ticket" and price > 0
-                ]
-            elif any(category == "patreon" for _, category, _ in selected):
-                continue
-            else:
-                prices = [price for _, _, price in selected]
-            if not prices or flow.popup_id not in currencies:
-                continue
-            amount = min(prices)
-            summaries[flow.id] = SalesFlowPriceSummary(
-                amount=amount,
-                currency=currencies[flow.popup_id],
-                kind="fixed" if all(price == amount for price in prices) else "from",
+            offered_product_ids = flow_offered_product_ids(
+                session, flow.id, flow.popup_id
             )
-        return summaries
+            if not offered_product_ids:
+                return None
+            products = list(
+                session.exec(
+                    select(Products.price, Products.category).where(
+                        Products.id.in_(offered_product_ids),  # type: ignore[attr-defined]
+                        Products.is_active == True,  # noqa: E712
+                        Products.deleted_at.is_(None),  # type: ignore[attr-defined]
+                    )
+                ).all()
+            )
+            if not products or any(category == "patreon" for _, category in products):
+                return None
+            prices = [price for price, _ in products]
+
+        if not prices:
+            return None
+
+        popup = session.get(Popups, flow.popup_id)
+        if popup is None:
+            return None
+
+        amount = min(prices)
+        return SalesFlowPriceSummary(
+            amount=amount,
+            currency=popup.currency,
+            kind="fixed" if all(price == amount for price in prices) else "from",
+        )
 
     def find_by_popup(
         self,

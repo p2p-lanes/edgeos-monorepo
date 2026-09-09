@@ -420,12 +420,12 @@ const PassesProvider = ({
   salesFlowId,
 }: PassesProviderProps) => {
   const { discountApplied } = useDiscount()
+  const [attendeePasses, setAttendeePasses] = useState<
+    CheckoutRecipientPassState[]
+  >([])
 
   const [isEditing, setIsEditing] = useState(false)
-  const { products: queriedProducts } = useGetPassesData(
-    salesFlowId,
-    productsOverride === undefined,
-  )
+  const { products: queriedProducts } = useGetPassesData(salesFlowId)
   const products = productsOverride ?? queriedProducts
   const { getCity } = useCityProvider()
   const city = getCity()
@@ -441,29 +441,11 @@ const PassesProvider = ({
   )
 
   // Dedicated purchases query — granular invalidation after payment
-  const { data: queriedPurchasesData } = usePurchasesQuery(
-    cityId,
-    attendees,
-    purchasesOverride === undefined,
-  )
+  const { data: queriedPurchasesData } = usePurchasesQuery(cityId, attendees)
   const purchasesData = purchasesOverride ?? queriedPurchasesData
   const purchasesMap = useMemo(
     () => buildPurchasesMap(purchasesData),
     [purchasesData],
-  )
-  const [attendeePasses, setAttendeePasses] = useState<
-    CheckoutRecipientPassState[]
-  >(() =>
-    rebuildRecipientPasses(
-      attendees,
-      restoreFromCart ? (savedCartPasses?.recipients ?? []) : [],
-      restoreFromCart ? getAssignedProductSelections(savedCartPasses) : [],
-      cityId ?? "",
-      products,
-      discountApplied.discount_value,
-      purchasesMap,
-      checkoutPolicy.checkoutMode,
-    ),
   )
 
   // Refs for stable callback closures — avoids recreating toggleProduct on every discount/editing change

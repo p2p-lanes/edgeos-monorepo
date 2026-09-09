@@ -17,9 +17,6 @@ const mockUseCheckoutState = vi.fn()
 const mockGetRelevantApplication = vi.fn()
 const mockGetCity = vi.fn()
 const mockSetCityPreselected = vi.fn()
-vi.mock("@/providers/sessionProvider", () => ({
-  useSession: () => ({ lifecycle: { logout: vi.fn() } }),
-}))
 
 vi.mock("@tanstack/react-query", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@tanstack/react-query")>()

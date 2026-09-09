@@ -4,6 +4,7 @@ import { Download, FileText, Loader2 } from "lucide-react"
 import { useState } from "react"
 import { useTranslation } from "react-i18next"
 import { toast } from "sonner"
+import { OpenAPI } from "@/client"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import {
@@ -16,7 +17,6 @@ import {
 } from "@/components/ui/table"
 import { formatDate } from "@/helpers/dates"
 import useAuth from "@/hooks/useAuth"
-import { portalFetch } from "@/lib/session-network"
 import type { PaymentsProps } from "@/types/passes"
 
 const PaymentHistory = ({ payments }: { payments: PaymentsProps[] }) => {
@@ -46,8 +46,19 @@ const PaymentHistory = ({ payments }: { payments: PaymentsProps[] }) => {
 
     setDownloadingId(payment.id)
     try {
-      const response = await portalFetch(
-        `/api/v1/payments/my/${payment.id}/invoice`,
+      const token =
+        typeof OpenAPI.TOKEN === "function"
+          ? await OpenAPI.TOKEN({ method: "GET", url: "" })
+          : OpenAPI.TOKEN
+      const tenantId = localStorage.getItem("portal_tenant_id")
+
+      const headers: Record<string, string> = {}
+      if (token) headers.Authorization = `Bearer ${token}`
+      if (tenantId) headers["X-Tenant-Id"] = tenantId
+
+      const response = await fetch(
+        `${OpenAPI.BASE}/api/v1/payments/my/${payment.id}/invoice`,
+        { headers },
       )
 
       if (!response.ok) {

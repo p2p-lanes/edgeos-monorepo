@@ -71,12 +71,7 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { useWorkspace } from "@/contexts/WorkspaceContext"
 import useAuth from "@/hooks/useAuth"
 import useCustomToast from "@/hooks/useCustomToast"
-import { useFlowEditorPrefetch } from "@/hooks/useFlowEditorPrefetch"
 import { rememberFlow, useFlowScope } from "@/hooks/useFlowScope"
-import {
-  allFormFieldsQueryOptions,
-  allFormSectionsQueryOptions,
-} from "@/lib/salesFlowQueries"
 import { createErrorHandler } from "@/utils"
 
 export const Route = createFileRoute("/_layout/form-builder/")({
@@ -93,6 +88,36 @@ export const Route = createFileRoute("/_layout/form-builder/")({
 })
 
 const UNSECTIONED = "__unsectioned__"
+
+// A form belongs to one sales flow, so every read and write here is
+// scoped to the flow being edited. Editing one flow's form never changes
+// another's.
+function getAllFormFieldsQueryOptions(popupId: string | null, flowId?: string) {
+  return {
+    queryFn: () =>
+      FormFieldsService.listFormFields({
+        popupId: popupId || undefined,
+        salesFlowId: flowId,
+        limit: 200,
+      }),
+    queryKey: ["form-fields", popupId, flowId, "all"],
+  }
+}
+
+function getAllFormSectionsQueryOptions(
+  popupId: string | null,
+  flowId?: string,
+) {
+  return {
+    queryFn: () =>
+      FormSectionsService.listFormSections({
+        popupId: popupId || undefined,
+        salesFlowId: flowId,
+        limit: 200,
+      }),
+    queryKey: ["form-sections", popupId, flowId, "all"],
+  }
+}
 
 function FormBuilderPage() {
   const { isOperatorOrAbove } = useAuth()
@@ -121,7 +146,6 @@ function FormBuilderPage() {
 }
 
 function FormBuilderContent({ popupId }: { popupId: string }) {
-  const { scope } = useFlowEditorPrefetch()
   const navigate = useNavigate()
   const { flow: flowParam } = Route.useSearch()
 
@@ -137,7 +161,7 @@ function FormBuilderContent({ popupId }: { popupId: string }) {
     flows,
     activeFlowId,
     isLoading: flowsLoading,
-  } = useFlowScope(popupId, flowParam, adoptFlow, scope)
+  } = useFlowScope(popupId, flowParam, adoptFlow)
   const activeFlow = flows.find((flow) => flow.id === activeFlowId)
 
   const queryClient = useQueryClient()
@@ -156,13 +180,13 @@ function FormBuilderContent({ popupId }: { popupId: string }) {
   )
 
   const { data: formFieldsData, isLoading: isLoadingFields } = useQuery({
-    ...allFormFieldsQueryOptions(popupId, activeFlowId, scope),
-    enabled: !!activeFlowId && !!scope,
+    ...getAllFormFieldsQueryOptions(popupId, activeFlowId),
+    enabled: !!activeFlowId,
   })
 
   const { data: formSectionsData, isLoading: isLoadingSections } = useQuery({
-    ...allFormSectionsQueryOptions(popupId, activeFlowId, scope),
-    enabled: !!activeFlowId && !!scope,
+    ...getAllFormSectionsQueryOptions(popupId, activeFlowId),
+    enabled: !!activeFlowId,
   })
 
   const { data: popup } = useQuery({

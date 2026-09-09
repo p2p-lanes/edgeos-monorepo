@@ -336,7 +336,7 @@ export function CheckoutProvider({
   const { getRelevantApplication } = useApplication()
   const { getCity } = useCityProvider()
   const { products: queriedProducts, loading: isLoadingProducts } =
-    useGetPassesData(salesFlowId, productsOverride === undefined)
+    useGetPassesData(salesFlowId)
   const products = productsOverride ?? queriedProducts
   const isAuthenticated = useIsAuthenticated()
   // The application of THIS door. It decides the attendees, the balance and
@@ -379,8 +379,7 @@ export function CheckoutProvider({
         popupId: cityId!,
         salesFlowId: salesFlowId ?? undefined,
       }),
-    enabled:
-      configuredStepsOverride === undefined && !!cityId && isAuthenticated,
+    enabled: !configuredStepsOverride && !!cityId && isAuthenticated,
   })
   // The funnel is exactly what the organizer configured. The buyer step used
   // to be synthesized here when a popup carried no `buyer` row, which made it
@@ -417,10 +416,7 @@ export function CheckoutProvider({
   // ["passes", "confirm"] with default labels and the cart total reads $0,
   // producing a brief flash of a "broken" checkout before real data arrives.
   const isInitialLoading =
-    !!cityId &&
-    isAuthenticated &&
-    ((configuredStepsOverride === undefined && isLoadingSteps) ||
-      (productsOverride === undefined && isLoadingProducts))
+    !!cityId && isAuthenticated && (isLoadingSteps || isLoadingProducts)
 
   // Step-aware product resolution (replaces hardcoded useProductCategories).
   // Each step's product list is derived from step.product_category at runtime,

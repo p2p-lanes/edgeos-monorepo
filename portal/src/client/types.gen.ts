@@ -3307,23 +3307,6 @@ export type HumanPublic = {
  */
 export type HumanRating = 'unrated' | 'red_flag' | 'orange_flag' | 'green_flag' | 'star';
 
-export type HumanSession = {
-    human: HumanSessionProfile;
-    expires_at: string;
-};
-
-/**
- * Explicit safe projection; never expose assessment or authentication fields.
- */
-export type HumanSessionProfile = {
-    id: string;
-    tenant_id: string;
-    email: string;
-    first_name?: (string | null);
-    last_name?: (string | null);
-    picture_url?: (string | null);
-};
-
 /**
  * Human schema for profile updates.
  */
@@ -6978,12 +6961,6 @@ export type AuditLogsListAuditLogsData = {
 };
 
 export type AuditLogsListAuditLogsResponse = (ListModel_AuditLogPublic_);
-
-export type AuthHumanSessionData = {
-    xTenantId: string;
-};
-
-export type AuthHumanSessionResponse = (HumanSession);
 
 export type AuthUserLoginData = {
     requestBody: UserAuth;
