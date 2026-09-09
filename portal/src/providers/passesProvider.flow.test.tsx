@@ -4,7 +4,9 @@ import type { ReactNode } from "react"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import {
   type AttendeePurchases,
+  CancelablePromise,
   PaymentsService,
+  type ProductsListPortalProductsResponse,
   ProductsService,
 } from "@/client"
 import { useProductsQuery } from "@/hooks/useProductsQuery"
@@ -133,7 +135,7 @@ describe("PassesProvider override query ownership", () => {
 
   it("allows an independent observer to fetch while a disabled observer shares its pending state", async () => {
     vi.mocked(ProductsService.listPortalProducts).mockImplementation(
-      () => new Promise(() => {}),
+      () => new CancelablePromise<ProductsListPortalProductsResponse>(() => {}),
     )
     const { result } = renderHook(
       () => {
