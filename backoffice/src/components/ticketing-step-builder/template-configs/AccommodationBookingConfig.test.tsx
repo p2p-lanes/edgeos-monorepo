@@ -87,16 +87,50 @@ describe("AccommodationBookingConfig", () => {
     expect(screen.getByText(/Manage accommodations/)).toBeTruthy()
   })
 
-  it("treats an empty selection as 'every property is offered'", async () => {
+  it("says an empty selection offers everything, rather than implying none", async () => {
+    // The bug this replaced: a column of unticked boxes reads as "I have
+    // chosen nothing", and the checkout then offered every property. An
+    // empty subset is how the backend stores "everything", so the panel has
+    // to say which of the two it means.
     renderConfig({ property_ids: [] })
 
     await waitFor(() => {
-      expect(
-        screen.getByText(
-          "Nothing selected. Every visible property is offered.",
-        ),
-      ).toBeTruthy()
+      expect(screen.getByText("Hotel Arcadia")).toBeTruthy()
     })
+    expect(
+      screen
+        .getByRole("button", { name: /^Every property/ })
+        .getAttribute("aria-pressed"),
+    ).toBe("true")
+    // The names stay on screen: "every property" is a claim about them.
+    expect(screen.getByText("Cabañas del Lago")).toBeTruthy()
+    expect(screen.queryAllByRole("checkbox")).toHaveLength(0)
+  })
+
+  it("offers the boxes only once the operator says 'only some'", async () => {
+    const onChange = renderConfig({ property_ids: [] })
+
+    await waitFor(() => {
+      expect(screen.getByText("Hotel Arcadia")).toBeTruthy()
+    })
+    fireEvent.click(screen.getByRole("button", { name: /^Only some/ }))
+
+    expect(screen.queryAllByRole("checkbox")).toHaveLength(2)
+    // Nothing is written yet: opening the picker is not a decision.
+    expect(onChange).not.toHaveBeenCalled()
+    // And while nothing is ticked it still means everything, so it says so.
+    expect(screen.getByText(/still offers every property/)).toBeTruthy()
+  })
+
+  it("goes back to everything by clearing the subset", async () => {
+    const onChange = renderConfig({ property_ids: ["prop-a"] })
+
+    await waitFor(() => {
+      expect(screen.getByText("Hotel Arcadia")).toBeTruthy()
+    })
+    fireEvent.click(screen.getByRole("button", { name: /^Every property/ }))
+
+    expect(onChange.mock.calls[0][0].property_ids).toEqual([])
   })
 
   it("adds a property to the subset without dropping the rest of the config", async () => {

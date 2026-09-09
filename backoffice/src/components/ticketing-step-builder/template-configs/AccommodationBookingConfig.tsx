@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query"
-import { ArrowUpRight, BedDouble, Info } from "lucide-react"
+import { ArrowUpRight, BedDouble, Info, TriangleAlert } from "lucide-react"
+import { useState } from "react"
 
 import { AccommodationsService } from "@/client"
 import {
@@ -117,11 +118,32 @@ export function AccommodationBookingConfig({
 
   const properties = data?.results ?? []
 
+  /**
+   * Whether the operator is narrowing the offer.
+   *
+   * An empty `property_ids` means "every property" on the wire, which is what
+   * makes a freshly enabled step work instead of showing an empty checkout.
+   * A list of unticked boxes does not say that: it reads as "I have chosen
+   * nothing", and the checkout then offers everything. So the choice is made
+   * explicit here, and the boxes only appear once it is "only some".
+   *
+   * Local state, because "narrowing, but nothing ticked yet" is a real step
+   * in the operator's hands and has no representation in the stored config.
+   */
+  const [narrowing, setNarrowing] = useState(false)
+  const offersEverything = selectedIds.length === 0
+  const showPicker = narrowing || !offersEverything
+
   const toggleProperty = (id: string, checked: boolean) => {
     const next = checked
       ? [...selectedIds, id]
       : selectedIds.filter((value) => value !== id)
     onChange({ ...config, property_ids: next })
+  }
+
+  const offerEverything = () => {
+    setNarrowing(false)
+    onChange({ ...config, property_ids: [] })
   }
 
   const update = (patch: Record<string, unknown>) =>
@@ -172,40 +194,103 @@ export function AccommodationBookingConfig({
           </div>
         ) : (
           <div className="flex flex-col gap-3">
+            {/* The choice, spelled out. An empty subset means "everything" to
+                the backend, and a column of unticked boxes is the one thing
+                that cannot say so on its own. */}
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                aria-pressed={!showPicker}
+                onClick={offerEverything}
+                className={cn(
+                  "flex flex-col items-start gap-0.5 rounded-lg border-2 p-3 text-left transition-all hover:bg-accent/50",
+                  showPicker ? "border-border" : "border-primary bg-primary/5",
+                )}
+              >
+                <span
+                  className={cn(
+                    "text-xs font-medium",
+                    !showPicker && "text-primary",
+                  )}
+                >
+                  Every property
+                </span>
+                <span className="text-[10px] leading-tight text-muted-foreground">
+                  All {properties.length} appear in this checkout, and so does
+                  anything added later.
+                </span>
+              </button>
+              <button
+                type="button"
+                aria-pressed={showPicker}
+                onClick={() => setNarrowing(true)}
+                className={cn(
+                  "flex flex-col items-start gap-0.5 rounded-lg border-2 p-3 text-left transition-all hover:bg-accent/50",
+                  showPicker ? "border-primary bg-primary/5" : "border-border",
+                )}
+              >
+                <span
+                  className={cn(
+                    "text-xs font-medium",
+                    showPicker && "text-primary",
+                  )}
+                >
+                  Only some
+                </span>
+                <span className="text-[10px] leading-tight text-muted-foreground">
+                  Sell a subset here and leave the rest to another step.
+                </span>
+              </button>
+            </div>
+
+            {/* The list stays visible either way. "Every property" is a
+                claim about these names, and hiding them makes the operator
+                take it on trust. Only the checkbox comes and goes. */}
             <div className="flex flex-col gap-2">
               {properties.map((property) => {
-                const checked = selectedIds.includes(property.id)
+                const checked = showPicker && selectedIds.includes(property.id)
                 const inputId = `offer-property-${property.id}`
+                const name = (
+                  <>
+                    <span className="text-sm font-medium">{property.name}</span>
+                    {property.address ? (
+                      <span className="text-xs text-muted-foreground">
+                        {property.address}
+                      </span>
+                    ) : null}
+                  </>
+                )
                 return (
                   <div
                     key={property.id}
                     className={cn(
                       "flex items-center gap-3 rounded-lg border p-3 transition-colors",
-                      checked
-                        ? "border-primary bg-primary/5"
-                        : "border-border hover:bg-accent/40",
+                      checked && "border-primary bg-primary/5",
+                      !checked &&
+                        showPicker &&
+                        "border-border hover:bg-accent/40",
+                      !showPicker && "border-border bg-muted/30",
                     )}
                   >
-                    <Checkbox
-                      id={inputId}
-                      checked={checked}
-                      onCheckedChange={(value) =>
-                        toggleProperty(property.id, value === true)
-                      }
-                    />
-                    <label
-                      htmlFor={inputId}
-                      className="flex flex-1 cursor-pointer flex-col"
-                    >
-                      <span className="text-sm font-medium">
-                        {property.name}
-                      </span>
-                      {property.address ? (
-                        <span className="text-xs text-muted-foreground">
-                          {property.address}
-                        </span>
-                      ) : null}
-                    </label>
+                    {showPicker && (
+                      <Checkbox
+                        id={inputId}
+                        checked={checked}
+                        onCheckedChange={(value) =>
+                          toggleProperty(property.id, value === true)
+                        }
+                      />
+                    )}
+                    {showPicker ? (
+                      <label
+                        htmlFor={inputId}
+                        className="flex flex-1 cursor-pointer flex-col"
+                      >
+                        {name}
+                      </label>
+                    ) : (
+                      <div className="flex flex-1 flex-col">{name}</div>
+                    )}
                     {!property.is_active && (
                       <span className="text-xs text-muted-foreground">
                         Inactive
@@ -215,11 +300,24 @@ export function AccommodationBookingConfig({
                 )
               })}
             </div>
-            <p className="text-xs text-muted-foreground">
-              {selectedIds.length === 0
-                ? "Nothing selected. Every visible property is offered."
-                : `${selectedIds.length} of ${properties.length} properties offered.`}
-            </p>
+
+            {showPicker &&
+              (offersEverything ? (
+                // Not a nag: this state really does offer everything, because
+                // an empty list is how "everything" is stored.
+                <div className="flex items-start gap-2 rounded-lg border border-amber-300 bg-amber-50 p-2.5 text-amber-900 dark:border-amber-900/60 dark:bg-amber-950/40 dark:text-amber-200">
+                  <TriangleAlert className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                  <p className="text-xs leading-relaxed">
+                    Nothing ticked, so the checkout still offers every property.
+                    Tick at least one to narrow it.
+                  </p>
+                </div>
+              ) : (
+                <p className="text-xs text-muted-foreground">
+                  {selectedIds.length} of {properties.length} properties
+                  offered.
+                </p>
+              ))}
           </div>
         )}
       </CollapsibleSection>
