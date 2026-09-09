@@ -13,6 +13,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
 import { fireEvent, render, screen, waitFor } from "@testing-library/react"
 import type { ReactNode } from "react"
 import { beforeEach, describe, expect, it, vi } from "vitest"
+import { NO_BUYER_IDENTITY } from "@/lib/buyerIdentity"
 
 const listPortalAccommodations = vi.fn()
 const checkPortalAccommodationAvailability = vi.fn()
@@ -36,6 +37,7 @@ const clearAccommodationsOutsideStay = vi.fn()
 
 const checkoutValue = {
   cart: { accommodations: [] as unknown[] },
+  buyerIdentity: NO_BUYER_IDENTITY,
   addAccommodation,
   removeAccommodation,
   clearAccommodationsOutsideStay,

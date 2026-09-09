@@ -456,16 +456,6 @@
         "progress": "{{complete}} de {{total}} huéspedes completos",
         "booking_contact": "Contacto de la reserva",
         "booking_contact_hint": "A quién contacta la propiedad por esta habitación"
-      },
-      "contact": {
-        "for": "A nombre de {{name}}",
-        "pending": "A nombre de quien completes antes de pagar",
-        "from_you": "Tomado de tus datos ({{email}}), así no los escribís dos veces",
-        "hint": "La propiedad te contacta por esta habitación",
-        "change": "Se hospeda otra persona",
-        "name_label": "Nombre de quien se hospeda",
-        "name_hint": "Dejalo vacío para que quede a tu nombre",
-        "you": "Vos"
       }
     },
     "contribution": {

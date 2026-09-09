@@ -22,6 +22,7 @@ import {
   buildBuyerIdentity,
   NO_BUYER_IDENTITY,
 } from "@/lib/buyerIdentity"
+import { stayAsksAnything } from "@/lib/accommodationForm"
 import type { SelectedAccommodationItem } from "@/types/checkout"
 
 /**
@@ -153,22 +154,52 @@ describe("what the checkout already knows", () => {
     expect(screen.queryByRole("button", { name: /Lead guest/ })).toBeNull()
   })
 
-  it("says whose booking it is instead", () => {
+  it("says nothing about the buyer at all", () => {
+    // Their name is on the booking and reaches the property, but announcing
+    // it back to the person who just typed it is noise in the middle of a
+    // room selection.
     buyerIdentity = KNOWN_BUYER
     renderPanel()
 
-    expect(screen.getByText("Booked in the name of Ada Lovelace")).toBeTruthy()
-    expect(screen.getByText(/ada@example.com/)).toBeTruthy()
+    expect(screen.queryByText(/Ada Lovelace/)).toBeNull()
+    expect(screen.queryByText(/ada@example.com/)).toBeNull()
   })
 
   it("leaves a party of one nothing at all to fill in", () => {
-    // The whole point of the change: the common booking is now a sentence.
+    // The whole point of the change: the common booking asks nothing, and
+    // the step drops the block rather than drawing an empty one.
     buyerIdentity = KNOWN_BUYER
-    renderPanel(stay({ guestCount: 1, guests: [{ name: "", answers: {} }] }))
+    const item = stay({ guestCount: 1, guests: [{ name: "", answers: {} }] })
 
-    expect(screen.getByText("Booked in the name of Ada Lovelace")).toBeTruthy()
+    expect(
+      stayAsksAnything(item, {
+        requireGuestNames: true,
+        identity: KNOWN_BUYER,
+      }),
+    ).toBe(false)
+
+    renderPanel(item)
     expect(screen.queryByRole("button", { name: /Guest/ })).toBeNull()
     expect(screen.queryByText(/missing/)).toBeNull()
+  })
+
+  it("asks the lead occupant for a name when nothing else knows it", () => {
+    // An account with no name on it. Skipping the card here would leave the
+    // funnel demanding a name that no field on the screen collects, which is
+    // a checkout nobody can finish.
+    buyerIdentity = buildBuyerIdentity({
+      human: { email: "someone@example.com" },
+    })
+    renderPanel(
+      stay({
+        guestCount: 1,
+        guests: [{ name: "", answers: {} }],
+        guestForm: null,
+      }),
+    )
+
+    // Open on arrival, because it is the only card there is.
+    expect(screen.getByLabelText("Full name")).toBeTruthy()
   })
 
   it("keeps asking the other occupants, who are not the buyer", () => {
@@ -216,45 +247,6 @@ describe("what the checkout already knows", () => {
     expect(screen.getByText("Booking contact")).toBeTruthy()
     expect(screen.getAllByText(/Passport number/).length).toBeGreaterThan(0)
     expect(screen.queryByLabelText("Email")).toBeNull()
-  })
-})
-
-describe("booking for someone else", () => {
-  it("takes a name that is not the buyer's", () => {
-    buyerIdentity = KNOWN_BUYER
-    renderPanel()
-
-    fireEvent.click(
-      screen.getByRole("button", { name: "Someone else is staying" }),
-    )
-    fireEvent.change(screen.getByLabelText("Name of whoever is staying"), {
-      target: { value: "Grace Hopper" },
-    })
-
-    expect(setAccommodationGuestName).toHaveBeenCalledWith(
-      "room-1",
-      "2026-09-14",
-      "2026-09-18",
-      0,
-      "Grace Hopper",
-    )
-  })
-
-  it("opens already showing an override that was typed before", () => {
-    buyerIdentity = KNOWN_BUYER
-    renderPanel(
-      stay({
-        guests: [
-          { name: "Grace Hopper", answers: {} },
-          { name: "", answers: {} },
-        ],
-      }),
-    )
-
-    expect(
-      (screen.getByLabelText("Name of whoever is staying") as HTMLInputElement)
-        .value,
-    ).toBe("Grace Hopper")
   })
 })
 

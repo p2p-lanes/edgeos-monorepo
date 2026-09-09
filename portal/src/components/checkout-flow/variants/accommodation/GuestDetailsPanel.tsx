@@ -9,6 +9,7 @@ import {
   checkField,
   completeGuestCount,
   fieldsAskedOf,
+  guestCardIndexes,
   guestFieldsOf,
 } from "@/lib/accommodationForm"
 import { useCheckout } from "@/providers/checkoutProvider"
@@ -16,7 +17,6 @@ import {
   formatCheckoutDate,
   type SelectedAccommodationItem,
 } from "@/types/checkout"
-import { BookingContactRow } from "./BookingContactRow"
 import { GuestCard, toSchema } from "./GuestCard"
 
 interface GuestDetailsPanelProps {
@@ -67,21 +67,12 @@ export function GuestDetailsPanel({
     identity: buyerIdentity,
   })
 
-  /** The lead occupant's name is the contact row's job, never a card's. */
-  const leadNamedAbove = requireGuestNames || buyerIdentity.namesLeadGuest
   const asksOf = (index: number) =>
     fieldsAskedOf(guestFields, index, buyerIdentity)
-  const cardIndexes = Array.from(
-    { length: item.guestCount },
-    (_, index) => index,
-  ).filter((index) =>
-    // The buyer is on the contact row already, so their card earns its
-    // place only by asking something. Everyone else is a person this
-    // checkout has never heard of and always gets one.
-    index > 0
-      ? requireGuestNames || guestFields.length > 0
-      : asksOf(0).length > 0,
-  )
+  const cardIndexes = guestCardIndexes(item, {
+    requireGuestNames,
+    identity: buyerIdentity,
+  })
 
   const where = `${item.propertyName} Â· ${formatCheckoutDate(item.checkIn)} â†’ ${formatCheckoutDate(item.checkOut)}`
 
@@ -94,25 +85,6 @@ export function GuestDetailsPanel({
         <p className="font-medium">{item.name}</p>
         <p className="truncate text-xs text-muted-foreground">{where}</p>
       </div>
-
-      {(leadNamedAbove || buyerIdentity.name || buyerIdentity.email) && (
-        <BookingContactRow
-          identity={buyerIdentity}
-          name={item.guests[0]?.name ?? ""}
-          onNameChange={
-            leadNamedAbove
-              ? (name) =>
-                  setAccommodationGuestName(
-                    item.accommodationId,
-                    item.checkIn,
-                    item.checkOut,
-                    0,
-                    name,
-                  )
-              : null
-          }
-        />
-      )}
 
       {bookerFields.length > 0 && (
         <div className="flex flex-col gap-3 rounded-xl border bg-background p-3">
@@ -173,15 +145,13 @@ export function GuestDetailsPanel({
               index={index}
               guest={item.guests[index] ?? { name: "", answers: {} }}
               fields={asksOf(index)}
-              requireName={requireGuestNames && index > 0}
+              requireName={
+                requireGuestNames &&
+                (index > 0 || !buyerIdentity.namesLeadGuest)
+              }
               defaultOpen={index === cardIndexes[0]}
               copyableKeys={index > 0 ? sharedKeys : []}
-              summary={
-                index === 0
-                  ? buyerIdentity.name ||
-                    t("checkout.accommodation.contact.you")
-                  : undefined
-              }
+              summary={index === 0 ? buyerIdentity.name : undefined}
               onName={(name) =>
                 setAccommodationGuestName(
                   item.accommodationId,

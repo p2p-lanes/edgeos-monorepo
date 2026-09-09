@@ -190,12 +190,66 @@ export function fieldsAskedOf(
   return fields.filter((field) => !identity.covers.has(field.key))
 }
 
+/**
+ * The occupants with a card of their own.
+ *
+ * An occupant earns one by being asked something. The buyer usually is not:
+ * their answers come from the buyer step or the account, and their name with
+ * them. The exception is an account that carries no name at all, where the
+ * step is the only thing left that can ask for one, and skipping their card
+ * would leave `checkStayAnswers` demanding a name no field on the screen
+ * collects.
+ */
+export function guestCardIndexes(
+  item: Pick<SelectedAccommodationItem, "guestForm" | "guestCount">,
+  { requireGuestNames, identity = NO_BUYER_IDENTITY }: StayCheckOptions,
+): number[] {
+  const fields = guestFieldsOf(item.guestForm)
+  const indexes: number[] = []
+  for (let index = 0; index < item.guestCount; index += 1) {
+    if (
+      asksNameOf(index, { requireGuestNames, identity }) ||
+      fieldsAskedOf(fields, index, identity).length > 0
+    ) {
+      indexes.push(index)
+    }
+  }
+  return indexes
+}
+
+/** Whether this booking has a single question left for the buyer to answer. */
+export function stayAsksAnything(
+  item: Pick<SelectedAccommodationItem, "guestForm" | "guestCount">,
+  options: StayCheckOptions,
+): boolean {
+  return (
+    bookerFieldsAsked(item.guestForm, options.identity ?? NO_BUYER_IDENTITY)
+      .length > 0 || guestCardIndexes(item, options).length > 0
+  )
+}
+
 /** The booking-wide questions still worth putting on screen. */
 export function bookerFieldsAsked(
   form: AccommodationGuestForm | null | undefined,
   identity: BuyerIdentity,
 ): GuestFormField[] {
   return bookerFieldsOf(form).filter((field) => !identity.covers.has(field.key))
+}
+
+/**
+ * Whether this occupant is asked to type a name.
+ *
+ * The lead occupant is the buyer, so their name comes from wherever the
+ * buyer is known and is not typed here. When nothing knows it, the step asks
+ * after all: a name the funnel requires and no field collects is a checkout
+ * that cannot be finished.
+ */
+function asksNameOf(
+  index: number,
+  { requireGuestNames, identity }: Required<StayCheckOptions>,
+): boolean {
+  if (!requireGuestNames) return false
+  return index > 0 || !identity.namesLeadGuest
 }
 
 interface StayCheckOptions {
@@ -226,11 +280,13 @@ export function checkStayAnswers(
   const guestFields = guestFieldsOf(form)
   for (let index = 0; index < item.guestCount; index += 1) {
     const guest = item.guests[index]
-    // The lead occupant's name is the buyer's own, and in a direct sale it
-    // is typed a step later than this one. Refusing here would bounce a
-    // buyer back to a screen that no longer has the field on it.
-    const namedElsewhere = index === 0 && identity.namesLeadGuest
-    if (requireGuestNames && !namedElsewhere && !guest?.name?.trim()) {
+    // In a direct sale the buyer's name is typed a step later than this
+    // one. Refusing here would bounce them back to a screen that does not
+    // have the field on it.
+    if (
+      asksNameOf(index, { requireGuestNames, identity }) &&
+      !guest?.name?.trim()
+    ) {
       return {
         field: "name",
         guestIndex: index,
@@ -255,8 +311,9 @@ export function completeGuestCount(
   let complete = 0
   for (let index = 0; index < item.guestCount; index += 1) {
     const guest = item.guests[index]
-    const namedElsewhere = index === 0 && identity.namesLeadGuest
-    const named = !requireGuestNames || namedElsewhere || !!guest?.name?.trim()
+    const named =
+      !asksNameOf(index, { requireGuestNames, identity }) ||
+      !!guest?.name?.trim()
     const answered = fieldsAskedOf(fields, index, identity).every(
       (field) => !checkField(field, guest?.answers ?? {}),
     )

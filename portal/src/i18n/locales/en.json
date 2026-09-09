@@ -456,16 +456,6 @@
         "progress": "{{complete}} of {{total}} guests complete",
         "booking_contact": "Booking contact",
         "booking_contact_hint": "Who the property contacts about this room"
-      },
-      "contact": {
-        "for": "Booked in the name of {{name}}",
-        "pending": "Booked in the name you give before paying",
-        "from_you": "Taken from your details ({{email}}), so you only type them once",
-        "hint": "The property contacts you about this room",
-        "change": "Someone else is staying",
-        "name_label": "Name of whoever is staying",
-        "name_hint": "Leave it empty to book it in your own name",
-        "you": "You"
       }
     },
     "contribution": {

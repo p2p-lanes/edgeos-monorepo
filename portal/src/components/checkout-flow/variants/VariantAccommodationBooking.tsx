@@ -46,6 +46,7 @@ import {
 import {
   type AccommodationGuestForm,
   parseGuestForm,
+  stayAsksAnything,
 } from "@/lib/accommodationForm"
 import { cn } from "@/lib/utils"
 import { useCheckout } from "@/providers/checkoutProvider"
@@ -107,6 +108,7 @@ export default function VariantAccommodationBooking({
   const { t } = useTranslation()
   const { getCity } = useCityProvider()
   const {
+    buyerIdentity,
     cart,
     addAccommodation,
     removeAccommodation,
@@ -293,6 +295,12 @@ export default function VariantAccommodationBooking({
   )
 
   const selected = cart.accommodations[0]
+  const asksSomething =
+    !!selected &&
+    stayAsksAnything(selected, {
+      requireGuestNames: config.requireGuestNames,
+      identity: buyerIdentity,
+    })
 
   /**
    * Drop a room the stay has just made unbookable.
@@ -536,7 +544,11 @@ export default function VariantAccommodationBooking({
         onMoveStay={moveStay}
       />
 
-      {selected && (
+      {/* Nothing at all in the common case: the buyer's own details come
+          from the buyer step or their account, so a party of one with no
+          configured questions leaves this whole block off the screen rather
+          than unfolding a form under the room they just picked. */}
+      {selected && asksSomething && (
         <div className="flex flex-col gap-3">
           <h3 className="font-semibold">
             {t("checkout.accommodation.who_is_staying")}
