@@ -49,12 +49,13 @@ export function purchasesFromPayments(
 export function usePurchasesQuery(
   popupId: string | null,
   attendees: PurchaseAttendee[],
+  enabled = true,
 ) {
   const isAuthenticated = useIsAuthenticated()
   const query = useQuery({
     queryKey: queryKeys.purchases.byPopup(popupId ?? ""),
     queryFn: () => PaymentsService.listMyPaymentsByPopup({ popupId: popupId! }),
-    enabled: !!popupId && isAuthenticated,
+    enabled: enabled && !!popupId && isAuthenticated,
   })
 
   const data = useMemo(
