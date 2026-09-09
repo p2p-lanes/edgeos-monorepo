@@ -3,6 +3,7 @@
 import Cookies from "js-cookie"
 import { ensureSafeServiceWorker } from "./service-worker"
 import {
+  hasVerifiedSession,
   type PortalSession,
   type SessionSnapshot,
   sessionIdentity,
@@ -71,7 +72,7 @@ export async function authRequest(
   return data
 }
 
-async function readCurrentSession(): Promise<{
+async function readCurrentSession(onRejected: () => void): Promise<{
   session: PortalSession | null
 }> {
   try {
@@ -82,6 +83,7 @@ async function readCurrentSession(): Promise<{
       error.code !== "session_invalid"
     )
       throw error
+    onRejected()
     clearSessionDrafts()
     await authRequest("logout")
     return { session: null }
@@ -136,23 +138,24 @@ export class SessionLifecycle {
         if (this.snapshot.status === "changing") return this.revalidate(migrate)
       })
     const revision = this.revision
+    let readOnly = true
+    const onRejected = () => {
+      readOnly = false
+      if (revision !== this.revision) return
+      rotateSessionRequests(true)
+      this.publish({ status: "changing", session: null })
+    }
     this.pending = (async () => {
       this.retry = () => this.revalidate()
       try {
-        await ensureSafeServiceWorker()
         const legacy = migrate ? localStorage.getItem("token") : null
-        if (
-          migrate &&
-          !legacy &&
-          this.snapshot.status === "authenticated" &&
-          Date.parse(this.snapshot.session!.expires_at) > Date.now()
-        )
-          return
+        readOnly = !legacy
+        if (migrate && !legacy && hasVerifiedSession(this.snapshot)) return
         let result: { session: PortalSession | null }
         try {
           result = legacy
             ? await authRequest("migrate", { access_token: legacy })
-            : await readCurrentSession()
+            : await readCurrentSession(onRejected)
         } catch (error) {
           if (
             error instanceof SessionRequestError &&
@@ -162,7 +165,7 @@ export class SessionLifecycle {
             if (legacy) localStorage.removeItem("token")
             // Rejecting an imported credential says nothing about a different
             // valid cookie already in this browser. Verify that cookie separately.
-            result = await readCurrentSession()
+            result = await readCurrentSession(onRejected)
           } else throw error
         }
         if (revision !== this.revision) return
@@ -183,6 +186,15 @@ export class SessionLifecycle {
       } catch (error) {
         if (revision !== this.revision) return
         this.retry = () => this.revalidate(migrate)
+        // A failed read is not a revocation. Retain only a still-current,
+        // unexpired verified identity, never a retired or mutation-uncertain one.
+        // Definitive rejection retires it before attempting cookie cleanup.
+        if (
+          readOnly &&
+          hasVerifiedSession(this.snapshot) &&
+          (!(error instanceof SessionRequestError) || error.retryable)
+        )
+          return
         this.publish({
           status:
             error instanceof SessionRequestError && error.status === 409

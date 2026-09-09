@@ -1,6 +1,5 @@
 {
   "session": {
-    "unavailable": "We could not check your session. Please try again.",
     "conflict": "This browser has a different saved sign-in. Continue with the current session without replacing it.",
     "continue_current": "Continue with current session",
     "retry": "Try again"

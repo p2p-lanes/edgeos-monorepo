@@ -89,6 +89,8 @@ const secondSession = {
     first_name: "SSR Buyer B",
   },
 }
+let sessionUnavailable = false
+let tenantUnavailable = false
 const backend = http.createServer((request, response) => {
   calls.push({ path: request.url, headers: request.headers })
   const currentSession =
@@ -97,8 +99,18 @@ const backend = http.createServer((request, response) => {
       : session
   response.setHeader("content-type", "application/json")
   if (request.url.startsWith("/api/v1/tenants/public/")) {
+    if (tenantUnavailable) {
+      response.statusCode = 503
+      response.end(JSON.stringify({ detail: "Fake tenant outage" }))
+      return
+    }
     response.end(JSON.stringify(tenant))
   } else if (request.url === "/api/v1/auth/human/session") {
+    if (sessionUnavailable) {
+      response.statusCode = 503
+      response.end(JSON.stringify({ detail: "Fake session read outage" }))
+      return
+    }
     response.end(JSON.stringify(currentSession))
   } else if (request.url === "/api/v1/auth/human/authenticate") {
     response.end(JSON.stringify({ access_token: "fake-runtime-token" }))
@@ -452,6 +464,41 @@ try {
       200,
     )
   }
+  sessionUnavailable = true
+  const failedCheckEntry = await (
+    await call("/auth", {
+      headers: { ...headers, cookie: cookie.split(";")[0] },
+    })
+  ).text()
+  const entryMarkup = failedCheckEntry.replace(
+    /<script\b[^>]*>[\s\S]*?<\/script>/gi,
+    "",
+  )
+  assert.ok(
+    !entryMarkup.includes('role="alert"'),
+    "An unavailable session read must not replace public sign-in entry with a global alert",
+  )
+  assert.ok(
+    !entryMarkup.includes("SSR Buyer A"),
+    "Failed verification must not expose private profile data",
+  )
+  const failedProtectedEntry = await (
+    await call("/portal/gathering/shop/general", {
+      headers: { ...headers, cookie: cookie.split(";")[0] },
+    })
+  ).text()
+  assert.ok(
+    !failedProtectedEntry.includes("SSR Admission Pass"),
+    "An unverified server request must not render private checkout content",
+  )
+  sessionUnavailable = false
+  tenantUnavailable = true
+  const failedTenantEntry = await (await call("/auth")).text()
+  assert.ok(
+    failedTenantEntry.includes("Network error. Please check your connection."),
+    "Missing tenant bootstrap needs honest connectivity recovery, not an invented tenant",
+  )
+  tenantUnavailable = false
   console.log(
     `PASS: isolated production Next authenticated checkout HTML, concurrent identity isolation, logout privacy, binary routes and static-host denial. Local fake-backend BFF sample: 3 upstream requests in ${bffMilliseconds.toFixed(1)} ms (not production latency).`,
   )
