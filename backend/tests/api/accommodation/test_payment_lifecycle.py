@@ -781,6 +781,49 @@ class TestStepGate:
         response = _purchase(client, popup, tenant_a, [_booking_line(accommodation)])
         assert response.status_code == 200, response.text
 
+    def test_a_step_with_no_product_category_still_sells_its_rooms(
+        self, client: TestClient, db: Session, tenant_a: Tenants
+    ) -> None:
+        """What a step created from the backoffice actually looks like.
+
+        The accommodation template is content-only there, so a step made
+        with it is saved with ``product_category = None``. Every other test
+        in this file reuses the *seeded* housing slot, which carries
+        ``"housing"``, and that category is the only reason their rooms got
+        past the generic offer gate at all: it swept the shadow products up
+        by accident. A step of the kind operators really create had its
+        every booking refused with ``product_not_in_flow``.
+        """
+        popup = _make_popup(db, tenant_a)
+        step = _enable_step(db, popup)
+        step.product_category = None
+        db.add(step)
+        _, accommodation = _make_inventory(db, popup)
+        db.commit()
+
+        response = _purchase(client, popup, tenant_a, [_booking_line(accommodation)])
+
+        assert response.status_code == 200, response.text
+
+    def test_the_subset_still_narrows_with_no_product_category(
+        self, client: TestClient, db: Session, tenant_a: Tenants
+    ) -> None:
+        # Offering the rooms must not mean offering all of them: the step's
+        # property subset is read here too, so nothing is opened up wider
+        # than the checkout displays.
+        popup = _make_popup(db, tenant_a)
+        offered, _ = _make_inventory(db, popup)
+        _, hidden_room = _make_inventory(db, popup)
+        step = _enable_step(db, popup, config={"property_ids": [str(offered.id)]})
+        step.product_category = None
+        db.add(step)
+        db.commit()
+
+        response = _purchase(client, popup, tenant_a, [_booking_line(hidden_room)])
+
+        assert response.status_code == 403
+        assert response.json()["detail"]["code"] == "product_not_in_flow"
+
     def test_preview_and_purchase_refuse_a_room_from_another_flow(
         self, client: TestClient, db: Session, tenant_a: Tenants
     ) -> None:
