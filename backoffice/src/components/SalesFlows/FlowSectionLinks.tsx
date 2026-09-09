@@ -9,7 +9,6 @@ import {
 } from "lucide-react"
 
 import { SalesFlowsService } from "@/client"
-import { useFlowEditorPrefetch } from "@/hooks/useFlowEditorPrefetch"
 
 interface FlowSectionLinksProps {
   popupId: string
@@ -42,7 +41,6 @@ export function FlowSectionLinks({
   flowId,
   flowType,
 }: FlowSectionLinksProps) {
-  const { prefetch } = useFlowEditorPrefetch()
   const { data: readiness } = useQuery({
     queryKey: ["sales-flows", "readiness", { popupId }],
     queryFn: () => SalesFlowsService.listSalesFlowReadiness({ popupId }),
@@ -103,8 +101,6 @@ export function FlowSectionLinks({
           key={link.to}
           to={link.to}
           search={{ flow: flowId }}
-          onPointerEnter={() => prefetch(link.to, flowId, popupId)}
-          onFocus={() => prefetch(link.to, flowId, popupId)}
           className={`flex items-start gap-3 rounded-lg border px-4 py-3 transition-colors ${
             link.blocked
               ? "border-destructive/40 hover:border-destructive/70"

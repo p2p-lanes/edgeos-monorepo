@@ -4,9 +4,6 @@ import UserInfoForm from "."
 
 const mockUseApplicationData = vi.fn()
 const mockUseEmailVerification = vi.fn()
-vi.mock("@/providers/sessionProvider", () => ({
-  useSession: () => ({ lifecycle: { logout: vi.fn() } }),
-}))
 
 vi.mock("react-i18next", async () => {
   const actual =

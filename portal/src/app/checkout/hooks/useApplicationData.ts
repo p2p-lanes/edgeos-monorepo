@@ -132,7 +132,8 @@ export const useApplicationData = ({
     queryKey: [...queryKeys.applications.mine(), "checkout", groupPopupCityId],
     queryFn: async (): Promise<ExtendedApplicationData | null> => {
       if (!schema) return null
-      if (!isAuthenticated) return null
+      const token = window?.localStorage?.getItem("token")
+      if (!token) return null
 
       const human = await HumansService.getCurrentHumanInfo()
       if (!human?.email) return null

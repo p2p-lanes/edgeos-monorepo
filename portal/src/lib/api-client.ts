@@ -1,19 +1,30 @@
 import { OpenAPI } from "@/client"
 import { resolveRequestLanguage } from "@/lib/language-storage"
-import { notifyInvalidSession, sessionRequestSignal } from "./session-network"
 
-OpenAPI.BASE = ""
-OpenAPI.TOKEN = undefined
+if (!process.env.NEXT_PUBLIC_API_URL) {
+  throw new Error("NEXT_PUBLIC_API_URL is not configured")
+}
 
-OpenAPI.interceptors.request.use(async (config) => {
-  // Browser SDK configuration never supplies server credentials. SSR and public
-  // metadata use the separate fixed-origin server transport.
-  if (typeof window === "undefined") {
-    throw new Error("Use request-local server transport during SSR")
+OpenAPI.BASE = process.env.NEXT_PUBLIC_API_URL
+
+OpenAPI.TOKEN = async () => {
+  if (typeof window !== "undefined") {
+    return localStorage.getItem("token") ?? ""
   }
-  config.signal = await sessionRequestSignal(
-    config.signal as AbortSignal | undefined,
-  )
+  return ""
+}
+
+OpenAPI.interceptors.request.use((config) => {
+  // `localStorage` only exists in the browser. During SSR (e.g. checkout
+  // `generateMetadata`) this interceptor still runs, so guard the access or it
+  // throws `ReferenceError` and the caller silently falls back to null.
+  if (typeof window === "undefined") {
+    return config
+  }
+  const tenantId = localStorage.getItem("portal_tenant_id")
+  if (tenantId) {
+    config.headers = { ...config.headers, "X-Tenant-Id": tenantId }
+  }
   // Prefer the language the provider is currently showing (set synchronously
   // on switch), then the ?lang/?locale URL param, then the stored language.
   // The in-memory value wins because a mid-session switch updates the UI before
@@ -33,11 +44,5 @@ OpenAPI.interceptors.request.use(async (config) => {
   return config
 })
 
-OpenAPI.interceptors.response.use((response) => {
-  notifyInvalidSession(
-    response.status,
-    response.headers["x-portal-response"] === "upstream",
-    response.data?.code,
-  )
-  return response
-})
+/** @deprecated No-op — API client auto-configures on import. Kept for checkout compat. */
+export function configureApiClient(_token?: string) {}

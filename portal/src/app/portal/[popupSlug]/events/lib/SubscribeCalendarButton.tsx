@@ -5,6 +5,7 @@ import { useState } from "react"
 import { useTranslation } from "react-i18next"
 import { toast } from "sonner"
 
+import { OpenAPI } from "@/client"
 import { Button } from "@/components/ui/button"
 import {
   Popover,
@@ -24,7 +25,7 @@ export function SubscribeCalendarButton({ popupId }: { popupId: string }) {
   const { t } = useTranslation()
   const [copied, setCopied] = useState(false)
 
-  const feedUrl = `${process.env.NEXT_PUBLIC_API_URL}/api/v1/events/public/calendar.ics?popup_id=${popupId}`
+  const feedUrl = `${OpenAPI.BASE}/api/v1/events/public/calendar.ics?popup_id=${popupId}`
   const webcalUrl = feedUrl.replace(/^https?:\/\//, "webcal://")
   const googleUrl = `https://calendar.google.com/calendar/r?cid=${encodeURIComponent(
     webcalUrl,

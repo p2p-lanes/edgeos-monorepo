@@ -1,5 +1,4 @@
 import uuid
-from datetime import datetime
 
 from pydantic import BaseModel, EmailStr, Field, field_validator
 
@@ -84,19 +83,3 @@ class AuthCodeSentResponse(BaseModel):
     message: str
     email: str
     expires_in_minutes: int = 15
-
-
-class HumanSessionProfile(BaseModel):
-    """Explicit safe projection; never expose assessment or authentication fields."""
-
-    id: uuid.UUID
-    tenant_id: uuid.UUID
-    email: str
-    first_name: str | None = None
-    last_name: str | None = None
-    picture_url: str | None = None
-
-
-class HumanSession(BaseModel):
-    human: HumanSessionProfile
-    expires_at: datetime

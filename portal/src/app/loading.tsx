@@ -1,6 +1,6 @@
 import { Loader } from "@/components/ui/Loader"
 
 const loading = () => {
-  return <Loader fullscreen />
+  return <Loader />
 }
 export default loading

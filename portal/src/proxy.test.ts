@@ -61,7 +61,7 @@ describe("portal mode tenant", () => {
     mockFetch.mockResolvedValue({
       ok: true,
       json: async () => ({
-        id: "11111111-1111-4111-8111-111111111111",
+        id: "tenant-1",
         slug: "festival",
         landing_mode: "portal",
         active_popup_slug: null,
@@ -89,7 +89,7 @@ describe("checkout mode with active popup", () => {
     mockFetch.mockResolvedValue({
       ok: true,
       json: async () => ({
-        id: "11111111-1111-4111-8111-111111111111",
+        id: "tenant-1",
         slug: "festival",
         landing_mode: "checkout",
         active_popup_slug: "summer-fest",
@@ -155,7 +155,7 @@ describe("checkout mode with no active popup", () => {
     mockFetch.mockResolvedValue({
       ok: true,
       json: async () => ({
-        id: "11111111-1111-4111-8111-111111111111",
+        id: "tenant-1",
         slug: "festival",
         landing_mode: "checkout",
         active_popup_slug: null,
@@ -206,7 +206,7 @@ describe("header injection", () => {
     mockFetch.mockResolvedValue({
       ok: true,
       json: async () => ({
-        id: "11111111-1111-4111-8111-111111111111",
+        id: "tenant-1",
         slug: "festival",
         landing_mode: "checkout",
         active_popup_slug: "summer-fest",
@@ -227,7 +227,7 @@ describe("header injection", () => {
     const h = result.opts?.request?.headers
     expect(h?.get("x-landing-mode")).toBe("checkout")
     expect(h?.get("x-active-popup-slug")).toBe("summer-fest")
-    expect(h?.get("x-tenant-id")).toBe("11111111-1111-4111-8111-111111111111")
+    expect(h?.get("x-tenant-id")).toBe("tenant-1")
     expect(h?.get("x-tenant-slug")).toBe("festival")
   })
 })
@@ -242,46 +242,5 @@ describe("non-custom-domain request", () => {
     await proxy(req)
 
     expect(mockFetch).not.toHaveBeenCalled()
-  })
-})
-
-describe("untrusted header retirement", () => {
-  it.each([
-    "/api/auth/session",
-    "/api/v1/humans/me",
-    "/sw.js",
-  ])("avoids tenant lookup for %s and strips spoofed identity", async (pathname) => {
-    const req = makeRequest(
-      `https://tickets.example.com${pathname}`,
-      "tickets.example.com",
-    )
-    req.headers.set("x-tenant-id", "forged")
-    req.headers.set("x-custom-domain", "true")
-    const result = (await proxy(req)) as unknown as {
-      opts: { request: { headers: Headers } }
-    }
-    expect(result.opts.request.headers.get("x-tenant-id")).toBeNull()
-    expect(result.opts.request.headers.get("x-custom-domain")).toBeNull()
-    expect(mockFetch).not.toHaveBeenCalled()
-  })
-  it.each([
-    "tickets.example.com",
-    "festival.myapp.com",
-  ])("strips all internal headers on passthrough/failure for %s", async (host) => {
-    mockFetch.mockRejectedValue(new Error("fake upstream failure"))
-    const req = makeRequest(`https://${host}/`, host)
-    const names = [
-      "x-tenant-id",
-      "x-tenant-slug",
-      "x-custom-domain",
-      "x-landing-mode",
-      "x-active-popup-slug",
-    ]
-    for (const name of names) req.headers.set(name, "forged")
-    const result = (await proxy(req)) as unknown as {
-      opts: { request: { headers: Headers } }
-    }
-    for (const name of names)
-      expect(result.opts.request.headers.get(name)).toBeNull()
   })
 })

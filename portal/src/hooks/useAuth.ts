@@ -1,14 +1,19 @@
 "use client"
 
-import { useQuery } from "@tanstack/react-query"
-import { type HumanPublic, HumansService } from "@/client"
+import { useQuery, useQueryClient } from "@tanstack/react-query"
+import { useRouter } from "next/navigation"
+import { useCallback } from "react"
+import { HumansService } from "@/client"
+import {
+  dispatchAuthChange,
+  useIsAuthenticated,
+} from "@/hooks/useIsAuthenticated"
 import { queryKeys } from "@/lib/query-keys"
-import { hasVerifiedSession } from "@/lib/session-contract"
-import { useSession } from "@/providers/sessionProvider"
 
 const useAuth = () => {
-  const { snapshot, lifecycle } = useSession()
-  const isAuthenticated = hasVerifiedSession(snapshot)
+  const router = useRouter()
+  const queryClient = useQueryClient()
+  const isAuthenticated = useIsAuthenticated()
 
   const {
     data: user = null,
@@ -20,18 +25,20 @@ const useAuth = () => {
     enabled: isAuthenticated,
   })
 
+  const logout = useCallback(() => {
+    localStorage.removeItem("token")
+    dispatchAuthChange()
+    queryClient.clear()
+
+    router.push("/auth")
+  }, [queryClient, router])
+
   return {
-    user: isAuthenticated
-      ? ((user ?? snapshot.session?.human ?? null) as HumanPublic | null)
-      : null,
-    isUserLoading:
-      snapshot.status === "unknown" ||
-      snapshot.status === "changing" ||
-      isUserLoading,
-    isLoggedIn: isAuthenticated,
-    isAnonymous: snapshot.status === "anonymous",
+    user,
+    isUserLoading,
+    isLoggedIn: !!user || isUserLoading,
     isError,
-    logout: () => lifecycle.logout("/auth"),
+    logout,
   }
 }
 

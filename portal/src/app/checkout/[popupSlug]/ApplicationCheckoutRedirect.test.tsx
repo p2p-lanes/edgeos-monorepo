@@ -5,8 +5,6 @@ const replace = vi.fn()
 
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ replace }),
-  useSearchParams: () =>
-    new URLSearchParams("lang=es&cid=cart&sig=proof&checkout=success"),
 }))
 
 vi.mock("@/components/ui/Loader", () => ({
@@ -16,42 +14,22 @@ vi.mock("@/components/ui/Loader", () => ({
 import { ApplicationCheckoutRedirect } from "./ApplicationCheckoutRedirect"
 
 describe("ApplicationCheckoutRedirect", () => {
-  beforeEach(() => {
-    replace.mockReset()
-    window.history.replaceState(null, "", "/")
-  })
+  beforeEach(() => replace.mockReset())
 
   it.each([
     [
       "attendee-flow-id",
-      "/portal/spring-fest/shop/attendee-flow-id?lang=es&cid=cart&sig=proof&checkout=success",
+      "/portal/spring-fest/passes/buy?flow=attendee-flow-id",
     ],
     [
       "volunteer-flow-id",
-      "/portal/spring-fest/shop/volunteer-flow-id?lang=es&cid=cart&sig=proof&checkout=success",
+      "/portal/spring-fest/passes/buy?flow=volunteer-flow-id",
     ],
-  ])("hands authenticated flow %s directly to canonical Shop", (flowSlug, target) => {
+  ])("hands authenticated flow %s to the legacy Buy route without dropping it", (flowId, target) => {
     render(
-      <ApplicationCheckoutRedirect
-        popupSlug="spring-fest"
-        flowSlug={flowSlug}
-      />,
+      <ApplicationCheckoutRedirect popupSlug="spring-fest" flowId={flowId} />,
     )
 
     expect(replace).toHaveBeenCalledWith(target)
-  })
-  it("preserves the hash across the public application handoff", () => {
-    window.history.replaceState(null, "", "/#confirm")
-    render(
-      <ApplicationCheckoutRedirect
-        popupSlug="spring-fest"
-        flowSlug="attendee"
-      />,
-    )
-    expect(replace).toHaveBeenCalledOnce()
-    expect(replace).toHaveBeenCalledWith(
-      "/portal/spring-fest/shop/attendee?lang=es&cid=cart&sig=proof&checkout=success#confirm",
-    )
-    window.history.replaceState(null, "", "/")
   })
 })

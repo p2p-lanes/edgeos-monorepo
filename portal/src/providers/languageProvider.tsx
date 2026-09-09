@@ -18,7 +18,6 @@ import {
   setActiveRequestLanguage,
 } from "@/lib/language-storage"
 import { CityContext } from "./cityProvider"
-import { useRequestLanguage } from "./requestLanguageProvider"
 
 // Bumped from "portal_language": prior versions auto-wrote on every render,
 // leaving stale "en" values that override the popup default_language.
@@ -108,15 +107,7 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
     popup?.default_language,
     supportedLanguages,
   )
-  const requestLanguage = useRequestLanguage(
-    defaultLanguage ?? DEFAULT_LANGUAGE,
-  )
-  const [currentLanguage, setCurrentLanguage] = useState(
-    () =>
-      resolveLanguageCandidate(requestLanguage, supportedLanguages) ??
-      defaultLanguage ??
-      DEFAULT_LANGUAGE,
-  )
+  const [currentLanguage, setCurrentLanguage] = useState(DEFAULT_LANGUAGE)
 
   useEffect(() => {
     const urlLanguage = resolveLanguageCandidate(

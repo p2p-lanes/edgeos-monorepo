@@ -34,8 +34,8 @@ vi.mock("@/components/checkout-flow/OpenCheckoutRuntime", () => ({
 }))
 
 vi.mock("./ApplicationCheckoutRedirect", () => ({
-  ApplicationCheckoutRedirect: ({ flowSlug }: { flowSlug?: string }) => (
-    <div>application-checkout:{flowSlug ?? "missing"}</div>
+  ApplicationCheckoutRedirect: ({ flowId }: { flowId?: string }) => (
+    <div>application-checkout:{flowId ?? "missing"}</div>
   ),
 }))
 
@@ -105,6 +105,8 @@ describe("CheckoutPageClient flow propagation", () => {
       <CheckoutPageClient popupSlug="festival-2026" flowSlug="attendee-pass" />,
     )
 
-    expect(screen.getByText("application-checkout:attendee-pass")).toBeTruthy()
+    expect(
+      screen.getByText("application-checkout:application-flow-id"),
+    ).toBeTruthy()
   })
 })

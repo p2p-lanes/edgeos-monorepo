@@ -1,25 +1,26 @@
 "use client"
 
-import { useMutation } from "@tanstack/react-query"
+import { useMutation, useQueryClient } from "@tanstack/react-query"
 import { motion } from "framer-motion"
 import Image from "next/image"
-import { useSearchParams } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import { useEffect, useRef, useState } from "react"
 import { useTranslation } from "react-i18next"
 import { z } from "zod/v4"
+import { ApiError, AuthService } from "@/client"
 import { ButtonAnimated } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { imageOptimization } from "@/lib/image-optimization"
+import { queryKeys } from "@/lib/query-keys"
 import { getSafeReturnTo } from "@/lib/safe-return-to"
-import { authRequest, SessionRequestError } from "@/lib/session-lifecycle"
-import { useSession } from "@/providers/sessionProvider"
 import { useTenant } from "@/providers/tenantProvider"
 
 export default function AuthForm() {
   const { t } = useTranslation()
   const { tenantId, tenant } = useTenant()
-  const { lifecycle } = useSession()
+  const router = useRouter()
   const searchParams = useSearchParams()
+  const queryClient = useQueryClient()
 
   const emailSchema = z.email(t("auth.invalid_email"))
   const codeSchema = z
@@ -56,15 +57,16 @@ export default function AuthForm() {
 
   const requestCodeMutation = useMutation({
     mutationFn: (data: { tenant_id: string; email: string }) =>
-      authRequest("login", { email: data.email }),
+      AuthService.humanLogin({ requestBody: data }),
     onSuccess: () => {
       setStep("code")
       setCode("")
       startCountdown()
     },
     onError: (err) => {
-      if (err instanceof SessionRequestError) {
-        setError(t("auth.failed_to_send_code"))
+      console.error("Failed to send verification code:", err)
+      if (err instanceof ApiError) {
+        setError(err.message || t("auth.failed_to_send_code"))
       } else {
         setError(t("auth.something_went_wrong"))
       }
@@ -77,20 +79,20 @@ export default function AuthForm() {
       tenant_id: string
       code: string
     }) => {
-      return lifecycle.verify(
-        data.email,
-        data.code,
-        getSafeReturnTo(searchParams.get("redirect")) ?? "/portal",
-      )
+      const result = await AuthService.humanAuthenticate({ requestBody: data })
+      localStorage.setItem("token", result.access_token)
+      return result
     },
     onSuccess: () => {
       if (timerRef.current) {
         clearInterval(timerRef.current)
         timerRef.current = null
       }
+      queryClient.invalidateQueries({ queryKey: queryKeys.profile.current })
+      router.replace(getSafeReturnTo(searchParams.get("redirect")) ?? "/portal")
     },
     onError: (err) => {
-      if (err instanceof SessionRequestError) {
+      if (err instanceof ApiError) {
         if (err.status === 401) {
           setError(t("auth.invalid_code"))
         } else if (err.status === 404) {

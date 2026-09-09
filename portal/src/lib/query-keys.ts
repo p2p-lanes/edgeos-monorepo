@@ -60,16 +60,10 @@ export const queryKeys = {
     // with the "es" language, and `runtime(slug)` alone still yields `{}` —
     // a filter that partially matches every flow/lang variant for broad
     // invalidation (see checkoutProvider.tsx).
-    runtime: (
-      slug: string,
-      flowSlug?: string | null,
-      lang?: string | null,
-      audience?: string,
-    ) => {
-      const filter: { flowSlug?: string; lang?: string; audience?: string } = {}
+    runtime: (slug: string, flowSlug?: string | null, lang?: string | null) => {
+      const filter: { flowSlug?: string; lang?: string } = {}
       if (flowSlug) filter.flowSlug = flowSlug
       if (lang) filter.lang = lang
-      if (audience) filter.audience = audience
       return ["checkout", "runtime", slug, filter] as const
     },
     coupon: (slug: string, code: string) =>

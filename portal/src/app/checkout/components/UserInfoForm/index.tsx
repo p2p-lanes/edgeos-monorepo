@@ -11,7 +11,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card"
-import { useSession } from "@/providers/sessionProvider"
+import { dispatchAuthChange } from "@/hooks/useIsAuthenticated"
 import type { ApplicationFormSchema } from "@/types/form-schema"
 import { useApplicationData } from "../../hooks/useApplicationData"
 import { useEmailVerification } from "../../hooks/useEmailVerification"
@@ -41,7 +41,6 @@ const UserInfoForm = ({
   isSubmitting,
 }: UserInfoFormProps) => {
   const { t } = useTranslation()
-  const { lifecycle } = useSession()
   const [_isAutoFilled, setIsAutoFilled] = useState(false)
 
   const {
@@ -92,7 +91,7 @@ const UserInfoForm = ({
     handleChangeEmail,
   } = useEmailVerification({
     email: String(formData.email ?? ""),
-    onVerificationSuccess: () => {
+    onVerificationSuccess: (_token) => {
       setEmailVerified(String(formData.email ?? ""))
       refreshApplicationData()
     },
@@ -102,7 +101,11 @@ const UserInfoForm = ({
     handleChangeEmail()
     resetForm()
     setIsAutoFilled(false)
-    void lifecycle.logout()
+    window?.localStorage?.removeItem("token")
+    // Notify useIsAuthenticated subscribers so the checkout shell re-evaluates
+    // immediately. Without this, the token-removed state only propagates after
+    // the next unrelated re-render — making the user click "Change email" twice.
+    dispatchAuthChange()
   }
 
   const handleSubmit = async (e: React.FormEvent) => {

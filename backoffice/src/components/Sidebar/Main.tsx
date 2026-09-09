@@ -22,10 +22,9 @@ export type Item = {
 
 interface MainProps {
   items: Item[]
-  onIntent?: (destination: string) => void
 }
 
-export function Main({ items, onIntent }: MainProps) {
+export function Main({ items }: MainProps) {
   const { isMobile, setOpenMobile } = useSidebar()
   const router = useRouterState()
   const currentPath = router.location.pathname
@@ -50,12 +49,7 @@ export function Main({ items, onIntent }: MainProps) {
                   isActive={isActive}
                   asChild
                 >
-                  <RouterLink
-                    to={item.path}
-                    onClick={handleMenuClick}
-                    onPointerEnter={() => onIntent?.(item.path)}
-                    onFocus={() => onIntent?.(item.path)}
-                  >
+                  <RouterLink to={item.path} onClick={handleMenuClick}>
                     <item.icon />
                     <span>{item.title}</span>
                   </RouterLink>

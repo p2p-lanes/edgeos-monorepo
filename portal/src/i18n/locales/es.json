@@ -1,9 +1,4 @@
 {
-  "session": {
-    "conflict": "Este navegador tiene otro acceso guardado. Continúa con la sesión actual sin reemplazarla.",
-    "continue_current": "Continuar con la sesión actual",
-    "retry": "Intentar de nuevo"
-  },
   "help": {
     "aria_label": "Obtener ayuda",
     "title": "¿Necesitas ayuda?",

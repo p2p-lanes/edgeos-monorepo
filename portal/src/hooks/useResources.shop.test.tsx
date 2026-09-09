@@ -61,10 +61,6 @@ vi.mock("@/providers/cityProvider", () => ({
 
 import useResources from "./useResources"
 
-vi.mock("@/hooks/useRouteSalesFlow", () => ({
-  useRouteSalesFlow: () => ({ flowId: null }),
-}))
-
 const shopPath = "/portal/summit/shop"
 const attendeeFlow = { id: "attendee-1", slug: "attendee", name: "Attendee" }
 const directFlow = { id: "direct-1", slug: "merch-store", name: "Merch Store" }

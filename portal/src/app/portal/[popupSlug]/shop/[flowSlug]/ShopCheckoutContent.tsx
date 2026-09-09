@@ -1,66 +1,80 @@
 "use client"
 
-import { useRouter, useSearchParams } from "next/navigation"
+import Link from "next/link"
+import { useRouter } from "next/navigation"
 import { useEffect } from "react"
 import { useTranslation } from "react-i18next"
 import CheckoutPageClient from "@/app/checkout/[popupSlug]/CheckoutPageClient"
-import type { CheckoutRuntimeResponse } from "@/client"
 import { Loader } from "@/components/ui/Loader"
 import { usePortalDirectSalesFlows } from "@/hooks/usePortalDirectSalesFlows"
 import { usePortalSalesFlows } from "@/hooks/usePortalSalesFlows"
 import { usePortalUpsaleFlows } from "@/hooks/usePortalUpsaleFlows"
-import { canonicalShopTarget, isFlowUuid } from "@/lib/shop-route"
+import { useApplication } from "@/providers/applicationProvider"
 import { resolveShopFlowSlug } from "../components/ShopContent"
 
 interface ShopCheckoutContentProps {
   popupId: string | undefined
   popupSlug: string
   flowSlug: string
-  initialRuntime?: CheckoutRuntimeResponse
-  initialRuntimeLanguage?: string | null
-  initialRuntimeAudience?: string
 }
 
 export function ShopCheckoutContent({
   popupId,
   popupSlug,
   flowSlug,
-  initialRuntime,
-  initialRuntimeLanguage,
-  initialRuntimeAudience,
 }: ShopCheckoutContentProps) {
   const { t } = useTranslation()
   const router = useRouter()
-  const search = useSearchParams().toString()
-  const application = usePortalSalesFlows(popupId)
-  const direct = usePortalDirectSalesFlows(popupId)
-  const upsale = usePortalUpsaleFlows(popupId)
-  const flows = [
-    ...(application.data ?? []),
-    ...(direct.data ?? []),
-    ...(upsale.data ?? []),
-  ]
-  const knownSlug = resolveShopFlowSlug(flowSlug, flows)
-  const isAlias =
-    isFlowUuid(flowSlug) || Boolean(knownSlug && knownSlug !== flowSlug)
-  const canonicalSlug = isAlias ? knownSlug : flowSlug
-  const collectionsLoading =
-    application.isLoading || direct.isLoading || upsale.isLoading
+  const applicationQuery = usePortalSalesFlows(popupId)
+  const directQuery = usePortalDirectSalesFlows(popupId)
+  const upsaleQuery = usePortalUpsaleFlows(popupId)
+  const application = applicationQuery.data ?? []
+  const direct = directQuery.data ?? []
+  const upsale = upsaleQuery.data ?? []
+  const flows = [...application, ...direct, ...upsale]
+  const canonicalSlug = resolveShopFlowSlug(flowSlug, flows)
   const flow = flows.find((item) => item.slug === canonicalSlug)
+  const applicationFlow = application.find(
+    (item) => item.slug === canonicalSlug,
+  )
+  const { getRelevantApplication, participation } = useApplication()
+  const currentApplication = getRelevantApplication()
+  const isApplicationApproved =
+    participation?.type === "companion"
+      ? participation.application_status === "accepted"
+      : currentApplication?.status === "accepted"
+  const collectionsLoading =
+    applicationQuery.isLoading || directQuery.isLoading || upsaleQuery.isLoading
 
   useEffect(() => {
-    if (!isAlias || (!canonicalSlug && collectionsLoading)) return
+    if (collectionsLoading || canonicalSlug === flowSlug) return
     router.replace(
-      canonicalShopTarget(
-        popupSlug,
-        canonicalSlug,
-        search,
-        window.location.hash,
-      ),
+      canonicalSlug
+        ? `/portal/${popupSlug}/shop/${canonicalSlug}`
+        : `/portal/${popupSlug}/shop`,
     )
-  }, [isAlias, canonicalSlug, collectionsLoading, popupSlug, search, router])
+  }, [canonicalSlug, collectionsLoading, flowSlug, popupSlug, router])
 
-  if (!canonicalSlug) return <Loader />
+  if (collectionsLoading || !canonicalSlug) return <Loader />
+
+  if (applicationFlow && !isApplicationApproved) {
+    return (
+      <section className="mx-auto max-w-5xl p-6">
+        <h1 className="text-2xl font-semibold">
+          {t("shop.approval_required_title")}
+        </h1>
+        <p className="mt-2 text-sm text-muted-foreground">
+          {t("shop.approval_required_description")}
+        </p>
+        <Link
+          href={`/portal/${popupSlug}?flow=${applicationFlow.id}`}
+          className="mt-6 inline-flex text-sm font-medium text-primary hover:underline"
+        >
+          {t("shop.approval_required_cta")}
+        </Link>
+      </section>
+    )
+  }
 
   return (
     <div className="min-h-full">
@@ -71,15 +85,9 @@ export function ShopCheckoutContent({
         </header>
       ) : null}
       <CheckoutPageClient
-        key={`${popupSlug}:${canonicalSlug}`}
         popupSlug={popupSlug}
-        flowSlug={canonicalSlug}
+        flowSlug={canonicalSlug ?? flowSlug}
         showQuoteStatus
-        portalCheckout
-        initialRuntime={initialRuntime}
-        initialRuntimeLanguage={initialRuntimeLanguage}
-        initialRuntimeAudience={initialRuntimeAudience}
-        initialDataUpdatedAt={initialRuntime ? Date.now() : undefined}
       />
     </div>
   )

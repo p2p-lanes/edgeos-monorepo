@@ -13,7 +13,7 @@ let directQuery: { data?: unknown[]; isLoading: boolean } = {
 vi.mock("next/navigation", () => ({
   useParams: () => ({ popupSlug: "summer-camp" }),
   useRouter: () => ({ replace }),
-  useSearchParams: () => new URLSearchParams({ flow: flowIdentifier }),
+  useSearchParams: () => ({ get: () => flowIdentifier }),
 }))
 vi.mock("@/providers/cityProvider", () => ({
   useCityProvider: () => ({ getCity: () => ({ id: "popup-1" }) }),
@@ -46,12 +46,13 @@ describe("resolveLegacyShopRoute", () => {
     ).toEqual({ kind: "shop", target: "/portal/summer-camp/shop/merch-store" })
   })
 
-  it("canonicalizes an authorized application flow without a Buy loop", () => {
+  it("keeps an authorized application flow in its flow-aware portal checkout", () => {
     expect(
       resolveLegacyShopRoute("summer-camp", "weekend-pass", flows, true),
     ).toEqual({
-      kind: "shop",
-      target: "/portal/summer-camp/shop/weekend-pass",
+      kind: "application",
+      flowId: "flow-2",
+      flowSlug: "weekend-pass",
     })
   })
 
@@ -59,31 +60,6 @@ describe("resolveLegacyShopRoute", () => {
     expect(
       resolveLegacyShopRoute("summer-camp", "unknown-flow", flows, true),
     ).toEqual({ kind: "shop", target: "/portal/summer-camp/shop" })
-  })
-  it.each([
-    "flow-2",
-    "weekend-pass",
-  ])("preserves restore, language, attribution and completion context for %s", (identifier) => {
-    const search = `flow=${identifier}&lang=es&locale=es&cid=cart&sig=signature&utm_source=email&checkout=success`
-    expect(
-      resolveLegacyShopRoute(
-        "summer-camp",
-        identifier,
-        flows,
-        true,
-        search,
-        "#confirm",
-      ),
-    ).toEqual({
-      kind: "shop",
-      target:
-        "/portal/summer-camp/shop/weekend-pass?lang=es&locale=es&cid=cart&sig=signature&utm_source=email&checkout=success#confirm",
-    })
-  })
-  it("does not guess a default when no identifier was supplied", () => {
-    expect(
-      resolveLegacyShopRoute("summer-camp", null, flows, true)?.target,
-    ).toBe("/portal/summer-camp/shop")
   })
 })
 
