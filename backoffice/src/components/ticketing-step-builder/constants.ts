@@ -36,6 +36,17 @@ export interface TemplateDefinition {
    *  template), a title-derived type like "your-information" would leave the
    *  step configured and invisible. */
   stepType?: string
+  /**
+   * The key of the template that replaces this one.
+   *
+   * Deprecating rather than deleting, because a template is not just an
+   * entry in this list: it is a column value on rows that already exist.
+   * Tenants are still selling through steps on the old template and the
+   * checkout still renders them, so removing it here would leave those
+   * steps pointing at a template the backoffice cannot name or configure.
+   * What this does is stop it being chosen again.
+   */
+  deprecatedBy?: string
 }
 
 export const TEMPLATE_DEFINITIONS: TemplateDefinition[] = [
@@ -76,6 +87,10 @@ export const TEMPLATE_DEFINITIONS: TemplateDefinition[] = [
     label: "Housing (legacy)",
     description: "Property cards with date range, priced as plain products",
     icon: HomeIcon,
+    // Accommodation does the same job against real inventory: it knows what
+    // is free on the chosen nights, quotes the stay on the server instead of
+    // multiplying a product price, and records who is staying.
+    deprecatedBy: "accommodation-booking",
   },
   {
     key: "merch-image",
