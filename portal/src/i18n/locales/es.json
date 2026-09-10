@@ -462,6 +462,7 @@
       "choose": "Elegir esta habitación",
       "choose_room": "Elegí una habitación",
       "your_room": "Tu habitación",
+      "change_room": "Cambiar habitación",
       "beds_label": "Camas",
       "min_stay_label": "Estadía mínima",
       "about_property": "Sobre {{name}}",

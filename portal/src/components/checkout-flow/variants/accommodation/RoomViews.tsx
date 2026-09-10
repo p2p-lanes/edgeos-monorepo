@@ -24,6 +24,12 @@
  * saying Remove, which puts the way out somewhere other than where the way
  * in was.
  *
+ * In practice the step folds the board away the moment a room is chosen, so
+ * it is `SelectedRoomSummary` the buyer clicks to release one. These three
+ * keep `selected` because a radio has to say whether it is checked, and
+ * they keep the toggle because the summary inherited that behaviour rather
+ * than replacing it.
+ *
  * What none of these cards can do is make the case for its room. That is the
  * dialog's job, and every layout has the same way into it, bottom right,
  * where the price the buyer is reading about already is.

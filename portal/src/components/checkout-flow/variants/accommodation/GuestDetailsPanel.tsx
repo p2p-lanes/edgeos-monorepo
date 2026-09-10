@@ -13,10 +13,7 @@ import {
   guestFieldsOf,
 } from "@/lib/accommodationForm"
 import { useCheckout } from "@/providers/checkoutProvider"
-import {
-  formatCheckoutDate,
-  type SelectedAccommodationItem,
-} from "@/types/checkout"
+import type { SelectedAccommodationItem } from "@/types/checkout"
 import { GuestCard, toSchema } from "./GuestCard"
 
 interface GuestDetailsPanelProps {
@@ -36,8 +33,8 @@ interface GuestDetailsPanelProps {
  * the stay, which is the only thing worth a form in the middle of a booking.
  *
  * The consequence worth stating: with a party of one and no extra questions,
- * this panel is a single line saying whose room it is. That is the common
- * case, and it used to be a form.
+ * this panel is not on screen at all. That is the common case, and it
+ * used to be a form.
  *
  * What each occupant is asked is still decided by the server and arrives
  * resolved on the room's step config, so this renders a form rather than
@@ -74,17 +71,12 @@ export function GuestDetailsPanel({
     identity: buyerIdentity,
   })
 
-  const where = `${item.propertyName} Â· ${formatCheckoutDate(item.checkIn)} â†’ ${formatCheckoutDate(item.checkOut)}`
-
   return (
     <div className="flex flex-col gap-4 rounded-xl border bg-muted/30 p-4">
-      <div className="min-w-0">
-        {/* No party-size input here any more: it moved above the rooms,
-            where it filters which rooms exist rather than resizing a booking
-            that was already made against a room that may not fit. */}
-        <p className="font-medium">{item.name}</p>
-        <p className="truncate text-xs text-muted-foreground">{where}</p>
-      </div>
+      {/* No room name, no dates and no party-size input. The compacted room
+          sits directly above this panel and says all three; this block used
+          to repeat them a centimetre lower, and the party size moved out
+          entirely when it became the thing that filters the board. */}
 
       {bookerFields.length > 0 && (
         <div className="flex flex-col gap-3 rounded-xl border bg-background p-3">

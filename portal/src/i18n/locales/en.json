@@ -462,6 +462,7 @@
       "choose": "Choose this room",
       "choose_room": "Choose a room",
       "your_room": "Your room",
+      "change_room": "Change room",
       "beds_label": "Beds",
       "min_stay_label": "Minimum stay",
       "about_property": "About {{name}}",
