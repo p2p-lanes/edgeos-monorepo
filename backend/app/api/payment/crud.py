@@ -1799,7 +1799,10 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
             f"{portal_base}/portal/{popup.slug}/application"
             f"?flow={application.sales_flow_id}"
         )
-        success_path = f"{cancel_path}&checkout=success"
+        success_path = (
+            f"{portal_base}/portal/{popup.slug}"
+            f"?flow={application.sales_flow_id}&checkout=success"
+        )
 
         reference = {
             "email": application.human.email if application.human else "",
