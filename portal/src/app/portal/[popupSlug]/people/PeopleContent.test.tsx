@@ -1,25 +1,20 @@
 import { render, screen } from "@testing-library/react"
 import { describe, expect, it, vi } from "vitest"
+import en from "@/i18n/locales/en.json"
 import { PeopleContent } from "./PeopleContent"
 
-const translations: Record<string, string> = {
-  "people.title": "People",
-  "people.description": "People you can manage for this event.",
-  "people.primary": "Primary attendee",
-  "people.dependent": "Dependent",
-  "people.can_manage": "Managed by you",
-  "people.empty_title": "No people yet",
-  "people.empty_description": "People you manage will appear here.",
-}
-
 vi.mock("react-i18next", () => ({
-  useTranslation: () => ({ t: (key: string) => translations[key] ?? key }),
+  useTranslation: () => ({
+    t: (key: string) =>
+      en.people[key.replace("people.", "") as keyof typeof en.people] ?? key,
+  }),
 }))
 
 describe("PeopleContent", () => {
   it("shows a zero-ticket dependent with management rights and excludes tickets", () => {
     render(
       <PeopleContent
+        popupSlug="egypt-eclipse"
         people={[
           {
             id: "dependent",
@@ -35,12 +30,20 @@ describe("PeopleContent", () => {
     expect(screen.getByText("Dependent")).toBeTruthy()
     expect(screen.getByText("Managed by you")).toBeTruthy()
     expect(screen.queryByText("General Admission")).toBeNull()
+    expect(screen.queryByRole("link", { name: "Browse tickets" })).toBeNull()
   })
 
   it("shows the dedicated empty state when no authorized people exist", () => {
-    render(<PeopleContent people={[]} />)
+    render(<PeopleContent people={[]} popupSlug="egypt-eclipse" />)
 
-    expect(screen.getByText("No people yet")).toBeTruthy()
-    expect(screen.getByText("People you manage will appear here.")).toBeTruthy()
+    expect(
+      screen.getByRole("heading", { name: "You & companions", level: 1 }),
+    ).toBeTruthy()
+    expect(screen.getByText(en.people.description)).toBeTruthy()
+    expect(screen.getByText("No attendees linked yet")).toBeTruthy()
+    expect(screen.getByText(en.people.empty_description)).toBeTruthy()
+    expect(
+      screen.getByRole("link", { name: "Browse tickets" }).getAttribute("href"),
+    ).toBe("/portal/egypt-eclipse/shop")
   })
 })

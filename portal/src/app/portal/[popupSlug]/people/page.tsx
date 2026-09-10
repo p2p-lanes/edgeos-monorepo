@@ -13,5 +13,10 @@ export default function PeoplePage() {
 
   if (!city || attendees.isLoading) return <Loader />
 
-  return <PeopleContent people={projectPeople(attendees.data ?? [])} />
+  return (
+    <PeopleContent
+      people={projectPeople(attendees.data ?? [])}
+      popupSlug={city.slug}
+    />
+  )
 }

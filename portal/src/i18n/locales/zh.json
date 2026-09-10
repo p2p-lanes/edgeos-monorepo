@@ -120,13 +120,14 @@
     }
   },
   "people": {
-    "title": "人员",
-    "description": "您可以为此活动管理的人员。",
+    "title": "您与同行者",
+    "description": "您本人以及由您管理的同行者在此活动中的参与信息。",
     "primary": "主要参与者",
     "dependent": "受抚养人",
     "can_manage": "由您管理",
-    "empty_title": "暂无人员",
-    "empty_description": "您管理的人员将显示在这里。"
+    "empty_title": "尚未关联参与者",
+    "empty_description": "门票确认后，您和由您管理的同行者将显示在这里。",
+    "browse_tickets": "浏览门票"
   },
   "tickets_access": {
     "title": "票券和访问权限",
@@ -613,7 +614,7 @@
     "community": "社区",
     "shop": "商店",
     "orders": "订单",
-    "people": "人员",
+    "people": "您与同行者",
     "tickets_access": "门票和访问权限",
     "passes": "通行证",
     "attendee_directory": "名录",
