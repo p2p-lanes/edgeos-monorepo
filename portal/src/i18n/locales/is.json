@@ -391,6 +391,19 @@
         "over_capacity": "Ekki nægilegt pláss fyrir hópinn",
         "inactive": "Ekki í boði",
         "default": "Ekki í boði á þessum dagsetningum"
+      },
+      "form": {
+        "lead_guest": "Aðalgestur",
+        "guest_number": "Gestur {{number}}",
+        "name": "Fullt nafn",
+        "not_filled_in": "Ekki útfyllt",
+        "complete": "Lokið",
+        "missing_count_one": "{{count}} vantar",
+        "missing_count_other": "{{count}} vantar",
+        "same_as_lead": "Sama og aðalgestur",
+        "progress": "{{complete}} af {{total}} gestum lokið",
+        "booking_contact": "Tengiliður bókunar",
+        "booking_contact_hint": "Hvern gististaðurinn hefur samband við vegna herbergisins"
       }
     },
     "contribution": {
@@ -417,7 +430,8 @@
     "pending_payment_wait": "Þú ert með greiðslu í bið. Bíddu í nokkrar mínútur.",
     "payment_cancel_failed": "Okkur tókst ekki að afgreiða greiðsluna. Reyndu aftur.",
     "flow_restriction_violated": "Þú uppfyllir ekki skilyrði til að kaupa í gegnum þessa leið.",
-    "product_not_in_flow": "Þessi vara er ekki í boði í gegnum þessa leið."
+    "product_not_in_flow": "Þessi vara er ekki í boði í gegnum þessa leið.",
+    "toast_guest_details_incomplete": "Það vantar upplýsingar um gesti áður en hægt er að greiða."
   },
   "openCheckout": {
     "loading": "Hleður greiðslu...",

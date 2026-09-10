@@ -416,6 +416,68 @@
         "over_capacity": "Too small for your party",
         "inactive": "Not available",
         "default": "Not available for these dates"
+      },
+      "stay": {
+        "fewer_guests": "One guest fewer",
+        "more_guests": "One guest more",
+        "checking": "Checking what's free…",
+        "results_one": "{{count}} room for these nights",
+        "results_other": "{{count}} rooms for these nights"
+      },
+      "removed": {
+        "extend_stay_one": "{{count}} more room opens at {{nights}} nights.",
+        "extend_stay_other": "{{count}} more rooms open at {{nights}} nights.",
+        "extend_stay_cta_one": "Stay {{count}} night",
+        "extend_stay_cta_other": "Stay {{count}} nights",
+        "opens_later_one": "{{count}} more room opens on {{date}}.",
+        "opens_later_other": "{{count}} more rooms open on {{date}}.",
+        "move_stay_cta": "Move to {{date}}",
+        "closed_earlier_one": "{{count}} room was bookable until {{date}}.",
+        "closed_earlier_other": "{{count}} rooms were bookable until {{date}}.",
+        "party_too_big_one": "{{count}} room sleeps fewer than {{guests}}. The largest here sleeps {{largest}}.",
+        "party_too_big_other": "{{count}} rooms sleep fewer than {{guests}}. The largest here sleeps {{largest}}.",
+        "taken_one": "{{count}} room is booked for these nights.",
+        "taken_other": "{{count}} rooms are booked for these nights."
+      },
+      "empty": {
+        "title": "No rooms for {{from}} to {{to}}",
+        "body": "Every room here is either booked, too small for your party, or asks for a longer stay."
+      },
+      "dropped": "{{room}} left your stay: {{reason}}.",
+      "form": {
+        "lead_guest": "Lead guest",
+        "guest_number": "Guest {{number}}",
+        "name": "Full name",
+        "not_filled_in": "Not filled in yet",
+        "complete": "Complete",
+        "missing_count_one": "{{count}} missing",
+        "missing_count_other": "{{count}} missing",
+        "same_as_lead": "Same as lead guest",
+        "progress": "{{complete}} of {{total}} guests complete",
+        "booking_contact": "Booking contact",
+        "booking_contact_hint": "Who the property contacts about this room"
+      },
+      "view_details": "View details",
+      "choose": "Choose this room",
+      "choose_room": "Choose a room",
+      "your_room": "Your room",
+      "beds_label": "Beds",
+      "min_stay_label": "Minimum stay",
+      "about_property": "About {{name}}",
+      "kinds": {
+        "room": "Room",
+        "apartment": "Apartment",
+        "studio": "Studio",
+        "tent": "Tent",
+        "cabin": "Cabin",
+        "other": "Accommodation"
+      },
+      "gallery": {
+        "previous": "Previous photo",
+        "next": "Next photo",
+        "position": "{{current}} of {{total}}",
+        "go_to": "Photo {{number}}",
+        "no_photos": "No photos of this room yet"
       }
     },
     "contribution": {
@@ -495,7 +557,8 @@
       "catalog_add_aria": "Add {{product}}",
       "catalog_add_one_aria": "Add one more {{product}}",
       "catalog_remove_one_aria": "Remove one {{product}}"
-    }
+    },
+    "toast_guest_details_incomplete": "Some guest details are missing before this booking can be paid."
   },
   "openCheckout": {
     "loading": "Loading checkout...",

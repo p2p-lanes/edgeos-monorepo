@@ -87,10 +87,13 @@ class TestDefaults:
         config = response.json()["template_config"]
         assert config == {
             "property_ids": [],
-            "layout": "grid",
+            "layout": "rows",
             "show_property_headers": True,
             "require_guest_names": True,
             "notice_text": None,
+            # No questions until an operator writes some: the step asks for a
+            # name per guest and nothing else out of the box.
+            "guest_form": None,
         }
 
     def test_a_null_config_is_left_alone(
@@ -126,7 +129,7 @@ class TestDefaults:
                 popup_tenant_a,
                 {
                     "property_ids": [str(property_row.id)],
-                    "layout": "list",
+                    "layout": "sheet",
                     "show_property_headers": False,
                     "require_guest_names": False,
                     "notice_text": "Paid in full, non-refundable.",
@@ -136,10 +139,51 @@ class TestDefaults:
         assert response.status_code == 201, response.text
         config = response.json()["template_config"]
         assert config["property_ids"] == [str(property_row.id)]
-        assert config["layout"] == "list"
+        assert config["layout"] == "sheet"
         assert config["show_property_headers"] is False
         assert config["require_guest_names"] is False
         assert config["notice_text"] == "Paid in full, non-refundable."
+
+
+class TestLayoutNames:
+    """The step shipped with two layouts and now offers three.
+
+    "grid" and "list" are stored on every step configured before that, so
+    they are still accepted and are renamed on the way in. A step nobody has
+    edited since must not start answering 422 to its own stored config.
+    """
+
+    def test_the_old_names_are_renamed(
+        self,
+        client: TestClient,
+        db: Session,
+        admin_token_tenant_a: str,
+        popup_tenant_a: Popups,
+    ) -> None:
+        for stored, expected in (("grid", "cards"), ("list", "rows")):
+            response = client.post(
+                BASE,
+                headers=_auth(admin_token_tenant_a),
+                json=_step_payload(db, popup_tenant_a, {"layout": stored}),
+            )
+            assert response.status_code == 201, response.text
+            assert response.json()["template_config"]["layout"] == expected
+
+    def test_every_current_layout_is_accepted(
+        self,
+        client: TestClient,
+        db: Session,
+        admin_token_tenant_a: str,
+        popup_tenant_a: Popups,
+    ) -> None:
+        for layout in ("rows", "cards", "sheet"):
+            response = client.post(
+                BASE,
+                headers=_auth(admin_token_tenant_a),
+                json=_step_payload(db, popup_tenant_a, {"layout": layout}),
+            )
+            assert response.status_code == 201, response.text
+            assert response.json()["template_config"]["layout"] == layout
 
 
 class TestShapeValidation:
@@ -299,7 +343,7 @@ class TestOtherTemplatesAreUnaffected:
         created = client.post(
             BASE,
             headers=_auth(admin_token_tenant_a),
-            json=_step_payload(db, popup_tenant_a, {"layout": "list"}),
+            json=_step_payload(db, popup_tenant_a, {"layout": "sheet"}),
         )
         step_id = created.json()["id"]
 
@@ -309,4 +353,124 @@ class TestOtherTemplatesAreUnaffected:
             json={"order": 3},
         )
         assert patched.status_code == 200, patched.text
-        assert patched.json()["template_config"]["layout"] == "list"
+        assert patched.json()["template_config"]["layout"] == "sheet"
+
+
+class TestGuestForm:
+    """The questions asked about the people staying.
+
+    Stored on the step, so an operator writes them once and every room this
+    checkout offers asks the same thing.
+    """
+
+    FORM = {
+        "booker": {
+            "fields": [
+                {
+                    "key": "full_name",
+                    "type": "text",
+                    "label": "Full name",
+                    "required": True,
+                }
+            ]
+        }
+    }
+
+    def _create(self, client, db, token, popup, config):
+        return client.post(
+            BASE, headers=_auth(token), json=_step_payload(db, popup, config)
+        )
+
+    def test_a_form_is_stored_in_its_canonical_shape(
+        self,
+        client: TestClient,
+        db: Session,
+        admin_token_tenant_a: str,
+        popup_tenant_a: Popups,
+    ) -> None:
+        """Saved filled in, not as sent: the portal and the export both read
+        this back, and neither should have to cope with an absent section."""
+        response = self._create(
+            client, db, admin_token_tenant_a, popup_tenant_a, {"guest_form": self.FORM}
+        )
+
+        assert response.status_code == 201, response.text
+        form = response.json()["template_config"]["guest_form"]
+        assert form["version"] == 1
+        assert form["guests"] == {
+            "title": None,
+            "description": None,
+            "fields": [],
+            "mode": "same_as_booker",
+        }
+        assert form["booker"]["fields"][0]["options"] == []
+
+    def test_a_field_type_the_checkout_cannot_render_is_rejected(
+        self,
+        client: TestClient,
+        db: Session,
+        admin_token_tenant_a: str,
+        popup_tenant_a: Popups,
+    ) -> None:
+        response = self._create(
+            client,
+            db,
+            admin_token_tenant_a,
+            popup_tenant_a,
+            {
+                "guest_form": {
+                    "booker": {
+                        "fields": [
+                            {"key": "sig", "type": "signature", "label": "Sign here"}
+                        ]
+                    }
+                }
+            },
+        )
+
+        assert response.status_code == 422, response.text
+
+    def test_two_questions_cannot_share_a_key(
+        self,
+        client: TestClient,
+        db: Session,
+        admin_token_tenant_a: str,
+        popup_tenant_a: Popups,
+    ) -> None:
+        """The key is where the answer is stored, so a duplicate is one
+        question quietly overwriting the other's answer."""
+        field = {"key": "age", "type": "number", "label": "Age"}
+        response = self._create(
+            client,
+            db,
+            admin_token_tenant_a,
+            popup_tenant_a,
+            {"guest_form": {"booker": {"fields": [field, {**field, "label": "Age?"}]}}},
+        )
+
+        assert response.status_code == 422, response.text
+
+    def test_renaming_the_step_does_not_wipe_the_form(
+        self,
+        client: TestClient,
+        db: Session,
+        admin_token_tenant_a: str,
+        popup_tenant_a: Popups,
+    ) -> None:
+        """The form is the most expensive thing in this config to lose: an
+        operator built it by hand, and an inline rename sends no
+        template_config at all."""
+        created = self._create(
+            client, db, admin_token_tenant_a, popup_tenant_a, {"guest_form": self.FORM}
+        )
+        step_id = created.json()["id"]
+
+        patched = client.patch(
+            f"{BASE}/{step_id}",
+            headers=_auth(admin_token_tenant_a),
+            json={"title": "Where you sleep"},
+        )
+
+        assert patched.status_code == 200, patched.text
+        form = patched.json()["template_config"]["guest_form"]
+        assert [field["key"] for field in form["booker"]["fields"]] == ["full_name"]

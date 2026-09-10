@@ -49,6 +49,8 @@ import { useOpenCartPersistence } from "@/hooks/checkout/useOpenCartPersistence"
 import { useStepProductResolver } from "@/hooks/checkout/useStepProductResolver"
 import useGetPassesData from "@/hooks/useGetPassesData"
 import { useIsAuthenticated } from "@/hooks/useIsAuthenticated"
+import { firstIncompleteStay } from "@/lib/accommodationForm"
+import { type BuyerIdentity, buildBuyerIdentity } from "@/lib/buyerIdentity"
 import { buildFormZodSchema } from "@/lib/form-schema-builder"
 import { trackGAAddToCart } from "@/lib/google-analytics"
 import { trackMetaAddToCart } from "@/lib/meta-pixel"
@@ -167,6 +169,29 @@ interface CheckoutContextValue {
     index: number,
     name: string,
   ) => void
+  setAccommodationBookerAnswer: (
+    accommodationId: string,
+    checkIn: string,
+    checkOut: string,
+    key: string,
+    value: unknown,
+  ) => void
+  setAccommodationGuestAnswer: (
+    accommodationId: string,
+    checkIn: string,
+    checkOut: string,
+    index: number,
+    key: string,
+    value: unknown,
+  ) => void
+  /** Copy the shared answers from the lead guest onto one occupant. */
+  copyBookerAnswersToGuest: (
+    accommodationId: string,
+    checkIn: string,
+    checkOut: string,
+    index: number,
+    keys: string[],
+  ) => void
   /** Drop rooms booked for other dates. Called when the buyer moves the stay:
    *  their quotes were for the old nights. */
   clearAccommodationsOutsideStay: (checkIn: string, checkOut: string) => void
@@ -201,6 +226,9 @@ interface CheckoutContextValue {
     qty: number,
   ) => void
   buyerFormSchema: ApplicationFormSchema | null
+  /** What the checkout already knows about the buyer, so the accommodation
+   *  step neither asks for it nor gates on it. */
+  buyerIdentity: BuyerIdentity
   buyerValues: Record<string, unknown>
   buyerErrors: Record<string, string>
   buyerGeneralError: string | null
@@ -388,9 +416,39 @@ export function CheckoutProvider({
   // other — a popup without one collects no buyer info.
   const configuredSteps = configuredStepsOverride ?? stepsData?.results ?? []
 
+  // Whether the accommodation step collects a name per guest. Read here as
+  // well as in the step itself because the pay-time gate has to apply the
+  // same rule from a screen where that step is not mounted.
+  const accommodationRequiresGuestNames =
+    (
+      configuredSteps.find(
+        (step) => step.template === "accommodation-booking" && step.is_enabled,
+      )?.template_config as Record<string, unknown> | undefined
+    )?.require_guest_names !== false
+
   const isBuyerInfoComplete =
     !buyerFormSchema ||
     buildFormZodSchema(buyerFormSchema, false).safeParse(buyerValues).success
+
+  /**
+   * Who is buying, so nothing asks them for it twice.
+   *
+   * The accommodation step used to collect a booking contact of its own and
+   * the buyer step then asked for the same email and name again. There is
+   * one payer per cart, so the contact is derived from whichever of the two
+   * funnels knows them: the buyer form in a direct sale, the signed-in
+   * account in an application flow (which has no buyer step at all, see
+   * `_direct_sale_only` in the backend's step constants).
+   */
+  const buyerIdentity = useMemo(
+    () =>
+      buildBuyerIdentity({
+        buyerFormSchema,
+        buyerValues,
+        human: application?.human ?? null,
+      }),
+    [buyerFormSchema, buyerValues, application?.human],
+  )
 
   // Returns the names of buyer-form fields that fail the current schema.
   // Returns [] when complete or when no schema is configured.
@@ -490,6 +548,9 @@ export function CheckoutProvider({
     removeAccommodation,
     setAccommodationGuestCount,
     setAccommodationGuestName,
+    setAccommodationBookerAnswer,
+    setAccommodationGuestAnswer,
+    copyBookerAnswersToGuest,
     clearAccommodationsOutsideStay,
   } = useAccommodationSelection()
 
@@ -1275,8 +1336,29 @@ export function CheckoutProvider({
     ) {
       return "buyer"
     }
+    // Guest details for a booked room. Validated from the cart rather than
+    // from the accommodation step, which may not be mounted: each room
+    // carries the form its property asks, resolved by the server when it was
+    // added. The rule mirrors the one the purchase enforces, so a buyer is
+    // never sent back by the server for something this could have caught.
+    if (
+      accommodations.length > 0 &&
+      (availableSteps as string[]).includes("housing") &&
+      firstIncompleteStay(accommodations, {
+        requireGuestNames: accommodationRequiresGuestNames,
+        identity: buyerIdentity,
+      })
+    ) {
+      return "housing"
+    }
     return null
-  }, [availableSteps, isBuyerInfoComplete])
+  }, [
+    accommodations,
+    accommodationRequiresGuestNames,
+    availableSteps,
+    buyerIdentity,
+    isBuyerInfoComplete,
+  ])
 
   // findFirstProductStep: pick a step to bounce the user back to when
   // the cart is empty at confirm time. Skips structural steps (buyer,
@@ -1513,6 +1595,7 @@ export function CheckoutProvider({
     selectedPasses,
     housing,
     accommodations,
+    buyerIdentity,
     merch,
     patron,
     selectedMealPlans,
@@ -1585,6 +1668,9 @@ export function CheckoutProvider({
     removeAccommodation,
     setAccommodationGuestCount,
     setAccommodationGuestName,
+    setAccommodationBookerAnswer,
+    setAccommodationGuestAnswer,
+    copyBookerAnswersToGuest,
     clearAccommodationsOutsideStay,
     addMealPlan,
     removeMealPlan,
@@ -1611,6 +1697,7 @@ export function CheckoutProvider({
     removeDynamicItem,
     updateDynamicQuantity,
     buyerFormSchema,
+    buyerIdentity,
     buyerValues,
     buyerErrors,
     buyerGeneralError,

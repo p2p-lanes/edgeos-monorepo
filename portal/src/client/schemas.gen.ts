@@ -431,6 +431,11 @@ export const AccommodationBookingCreateSchema = {
             type: 'array',
             title: 'Guests'
         },
+        booker_answers: {
+            additionalProperties: true,
+            type: 'object',
+            title: 'Booker Answers'
+        },
         primary_guest_name: {
             anyOf: [
                 {
@@ -477,6 +482,280 @@ export const AccommodationBookingCreateSchema = {
 
 \`\`unit_id\`\` is optional: without it the backend picks a free unit of the
 accommodation with the same best-fit logic the checkout uses.`
+} as const;
+
+export const AccommodationBookingDetailSchema = {
+    properties: {
+        tenant_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Tenant Id'
+        },
+        popup_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Popup Id'
+        },
+        accommodation_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Accommodation Id'
+        },
+        unit_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Unit Id'
+        },
+        kind: {
+            '$ref': '#/components/schemas/BookingKind',
+            default: 'guest'
+        },
+        status: {
+            '$ref': '#/components/schemas/BookingStatus',
+            default: 'hold'
+        },
+        check_in: {
+            type: 'string',
+            format: 'date',
+            title: 'Check In'
+        },
+        check_out: {
+            type: 'string',
+            format: 'date',
+            title: 'Check Out'
+        },
+        guest_count: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Guest Count'
+        },
+        guests: {
+            items: {
+                additionalProperties: true,
+                type: 'object'
+            },
+            type: 'array',
+            title: 'Guests'
+        },
+        booker_answers: {
+            additionalProperties: true,
+            type: 'object',
+            title: 'Booker Answers'
+        },
+        form_snapshot: {
+            anyOf: [
+                {
+                    additionalProperties: true,
+                    type: 'object'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Form Snapshot'
+        },
+        primary_guest_name: {
+            anyOf: [
+                {
+                    type: 'string',
+                    maxLength: 255
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Primary Guest Name'
+        },
+        primary_guest_email: {
+            anyOf: [
+                {
+                    type: 'string',
+                    maxLength: 255
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Primary Guest Email'
+        },
+        attendee_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Attendee Id'
+        },
+        human_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Human Id'
+        },
+        payment_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Payment Id'
+        },
+        payment_product_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Payment Product Id'
+        },
+        price_snapshot: {
+            anyOf: [
+                {
+                    additionalProperties: true,
+                    type: 'object'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Price Snapshot'
+        },
+        hold_expires_at: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Hold Expires At'
+        },
+        notes: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Notes'
+        },
+        created_by_user_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Created By User Id'
+        },
+        created_at: {
+            type: 'string',
+            format: 'date-time',
+            title: 'Created At'
+        },
+        updated_at: {
+            type: 'string',
+            format: 'date-time',
+            title: 'Updated At'
+        },
+        id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Id'
+        },
+        nights: {
+            type: 'integer',
+            title: 'Nights',
+            default: 0
+        },
+        property_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Property Id'
+        },
+        property_name: {
+            type: 'string',
+            title: 'Property Name'
+        },
+        property_address: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Property Address'
+        },
+        accommodation_name: {
+            type: 'string',
+            title: 'Accommodation Name'
+        },
+        unit_label: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Unit Label'
+        },
+        units: {
+            items: {
+                '$ref': '#/components/schemas/BookingUnitOption'
+            },
+            type: 'array',
+            title: 'Units',
+            default: []
+        }
+    },
+    type: 'object',
+    required: ['tenant_id', 'popup_id', 'accommodation_id', 'unit_id', 'check_in', 'check_out', 'id', 'property_id', 'property_name', 'accommodation_name'],
+    title: 'AccommodationBookingDetail',
+    description: `One booking with everything its own page needs, in one request.
+
+The context is denormalised on purpose. A detail screen that had to fetch
+the room to learn its name, the property to learn its address and the
+room again to list its other units would render in four steps and show
+three of them half-built.
+
+\`\`units\`\` carries every unit of the same room type, the booking's own
+included, because the only thing an operator does to a booking from here
+besides releasing it is move it to a different bed.`
 } as const;
 
 export const AccommodationBookingPublicSchema = {
@@ -537,6 +816,23 @@ export const AccommodationBookingPublicSchema = {
             },
             type: 'array',
             title: 'Guests'
+        },
+        booker_answers: {
+            additionalProperties: true,
+            type: 'object',
+            title: 'Booker Answers'
+        },
+        form_snapshot: {
+            anyOf: [
+                {
+                    additionalProperties: true,
+                    type: 'object'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Form Snapshot'
         },
         primary_guest_name: {
             anyOf: [
@@ -732,6 +1028,18 @@ export const AccommodationBookingUpdateSchema = {
                 }
             ],
             title: 'Guests'
+        },
+        booker_answers: {
+            anyOf: [
+                {
+                    additionalProperties: true,
+                    type: 'object'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Booker Answers'
         },
         primary_guest_name: {
             anyOf: [
@@ -6593,6 +6901,11 @@ export const BookingGuestSchema = {
             maxLength: 255,
             minLength: 1,
             title: 'Name'
+        },
+        answers: {
+            additionalProperties: true,
+            type: 'object',
+            title: 'Answers'
         }
     },
     type: 'object',
@@ -6601,7 +6914,9 @@ export const BookingGuestSchema = {
     description: `One occupant.
 
 Names are collected in the checkout and exported to the property owner,
-who needs them for their own registry.`
+who needs them for their own registry. \`\`answers\`\` holds whatever else the
+step's guest form asked, keyed by its field keys; it is empty when the
+step asks nothing, which is the default.`
 } as const;
 
 export const BookingKindSchema = {
@@ -6623,6 +6938,29 @@ export const BookingStatusSchema = {
 
 \`\`HOLD\`\` and \`\`CONFIRMED\`\` are the *blocking* states: they are the ones
 covered by the exclusion constraint, so only those two occupy a unit.`
+} as const;
+
+export const BookingUnitOptionSchema = {
+    properties: {
+        id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Id'
+        },
+        label: {
+            type: 'string',
+            title: 'Label'
+        },
+        is_active: {
+            type: 'boolean',
+            title: 'Is Active',
+            default: true
+        }
+    },
+    type: 'object',
+    required: ['id', 'label'],
+    title: 'BookingUnitOption',
+    description: 'A unit the booking could be moved to, or the one it is in.'
 } as const;
 
 export const BugReportCreateSchema = {
@@ -7007,10 +7345,15 @@ export const CartAccommodationLineSchema = {
         },
         guests: {
             items: {
-                type: 'string'
+                '$ref': '#/components/schemas/CartGuest'
             },
             type: 'array',
             title: 'Guests'
+        },
+        booker_answers: {
+            additionalProperties: true,
+            type: 'object',
+            title: 'Booker Answers'
         }
     },
     additionalProperties: false,
@@ -7022,11 +7365,7 @@ export const CartAccommodationLineSchema = {
 Keyed by \`\`accommodation_id\`\` rather than by the shadow \`\`product_id\`\`:
 the product is an implementation detail of how the booking travels
 through payments, and resolving it at purchase time means a cart saved
-before a room was re-synced still points at the right room.
-
-Guests are stored as plain names: the buyer types nothing else about
-them, and the \`\`{name: ...}\`\` shape the purchase needs is built when the
-payment is submitted.`
+before a room was re-synced still points at the right room.`
 } as const;
 
 export const CartAttendeeAssignmentSchema = {
@@ -7180,6 +7519,29 @@ export const CartDateRangeLineSchema = {
     required: ['assignment', 'kind', 'product_id', 'check_in', 'check_out'],
     title: 'CartDateRangeLine',
     description: 'A product selected for a date range, such as legacy housing.'
+} as const;
+
+export const CartGuestSchema = {
+    properties: {
+        name: {
+            type: 'string',
+            title: 'Name',
+            default: ''
+        },
+        answers: {
+            additionalProperties: true,
+            type: 'object',
+            title: 'Answers'
+        }
+    },
+    type: 'object',
+    title: 'CartGuest',
+    description: `One occupant as the cart holds them.
+
+\`\`name\`\` may be empty: the checkout renders a slot per guest before any of
+them is filled in, and half a party typed in is exactly what a saved cart
+is for. \`\`answers\`\` holds whatever else the step's guest form asked, keyed
+by its field keys.`
 } as const;
 
 export const CartHumanInfoSchema = {
