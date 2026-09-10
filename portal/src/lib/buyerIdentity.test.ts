@@ -9,8 +9,8 @@
  */
 
 import { describe, expect, it } from "vitest"
-import type { ApplicationFormSchema } from "@/types/form-schema"
 import type { SelectedAccommodationItem } from "@/types/checkout"
+import type { ApplicationFormSchema } from "@/types/form-schema"
 import {
   buildBuyerIdentity,
   NO_BUYER_IDENTITY,

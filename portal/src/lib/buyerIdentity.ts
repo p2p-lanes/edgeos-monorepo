@@ -25,8 +25,8 @@
  * that is not the buyer's: an emergency contact.
  */
 
-import type { ApplicationFormSchema } from "@/types/form-schema"
 import type { SelectedAccommodationItem } from "@/types/checkout"
+import type { ApplicationFormSchema } from "@/types/form-schema"
 
 /**
  * Guest-form keys the checkout can answer on the buyer's behalf, mapped to

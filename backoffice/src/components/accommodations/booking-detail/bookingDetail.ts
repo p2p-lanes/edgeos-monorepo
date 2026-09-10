@@ -122,9 +122,9 @@ export function personBlocks(booking: {
 }): PersonBlock[] {
   const snapshot = (booking.form_snapshot ?? null) as BookingFormSnapshot | null
   const bookerAnswers = (booking.booker_answers ?? {}) as Answers
-  const guests = (Array.isArray(booking.guests)
-    ? booking.guests
-    : []) as BookingGuest[]
+  const guests = (
+    Array.isArray(booking.guests) ? booking.guests : []
+  ) as BookingGuest[]
 
   const blocks: PersonBlock[] = []
 

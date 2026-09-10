@@ -51,9 +51,7 @@ export function GuestDetailsCard({
                         // The question is gone from the form but the answer
                         // is on file. Showing it unlabelled would be worse
                         // than showing it with the key it was stored under.
-                        <span className="ml-1 italic">
-                          no longer asked
-                        </span>
+                        <span className="ml-1 italic">no longer asked</span>
                       )}
                     </dt>
                     <dd className="text-sm">

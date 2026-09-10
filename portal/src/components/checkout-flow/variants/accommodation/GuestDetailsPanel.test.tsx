@@ -16,13 +16,12 @@
 
 import { fireEvent, render, screen, within } from "@testing-library/react"
 import { beforeEach, describe, expect, it, vi } from "vitest"
-
+import { stayAsksAnything } from "@/lib/accommodationForm"
 import {
   type BuyerIdentity,
   buildBuyerIdentity,
   NO_BUYER_IDENTITY,
 } from "@/lib/buyerIdentity"
-import { stayAsksAnything } from "@/lib/accommodationForm"
 import type { SelectedAccommodationItem } from "@/types/checkout"
 
 /**

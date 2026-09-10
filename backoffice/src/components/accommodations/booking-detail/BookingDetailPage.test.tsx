@@ -30,7 +30,10 @@ vi.mock("@tanstack/react-router", () => ({
   Link: ({ children }: { children: ReactNode }) => <a href="/">{children}</a>,
 }))
 
-import { type AccommodationBookingDetail, AccommodationsService } from "@/client"
+import {
+  type AccommodationBookingDetail,
+  AccommodationsService,
+} from "@/client"
 import { BookingDetailPage } from "./BookingDetailPage"
 
 const mockUpdate = vi.mocked(AccommodationsService.updateBooking)
@@ -162,7 +165,9 @@ describe("a blocked range is not a guest", () => {
   it("offers to unblock, not to cancel a booking", () => {
     renderPage(blocked)
 
-    expect(screen.getByRole("button", { name: "Unblock these dates" })).toBeTruthy()
+    expect(
+      screen.getByRole("button", { name: "Unblock these dates" }),
+    ).toBeTruthy()
   })
 })
 
