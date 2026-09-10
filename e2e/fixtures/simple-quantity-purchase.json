@@ -1,0 +1,38 @@
+{
+  "buyer": {
+    "email": "taylor@example.com",
+    "first_name": "Taylor",
+    "last_name": "Buyer",
+    "form_data": {}
+  },
+  "products": [
+    {
+      "product_id": "7455c9f7-b798-4556-a878-1f96fb19a638",
+      "recipient_key": "open-ticket:7455c9f7-b798-4556-a878-1f96fb19a638:0",
+      "quantity": 1
+    },
+    {
+      "product_id": "7455c9f7-b798-4556-a878-1f96fb19a638",
+      "recipient_key": "open-ticket:7455c9f7-b798-4556-a878-1f96fb19a638:1",
+      "quantity": 1
+    },
+    {
+      "product_id": "90df7404-6d04-4591-8e60-1568135b36b6",
+      "quantity": 1
+    }
+  ],
+  "recipients": [
+    {
+      "recipient_key": "open-ticket:7455c9f7-b798-4556-a878-1f96fb19a638:0",
+      "name": "Taylor Buyer",
+      "email": "taylor@example.com",
+      "category_id": null
+    },
+    {
+      "recipient_key": "open-ticket:7455c9f7-b798-4556-a878-1f96fb19a638:1",
+      "name": "Taylor Buyer",
+      "email": "taylor@example.com",
+      "category_id": null
+    }
+  ]
+}
