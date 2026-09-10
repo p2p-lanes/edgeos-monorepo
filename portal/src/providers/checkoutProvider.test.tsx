@@ -363,6 +363,139 @@ describe("checkoutProvider — public checkout flow propagation", () => {
   })
 })
 
+describe("checkoutProvider — entry-link coupons", () => {
+  const products = [
+    makeProduct({ id: "p1", category: "merch" }),
+    makeProduct({ id: "excluded", category: "merch", discountable: false }),
+  ]
+
+  beforeEach(() => localStorage.clear())
+
+  it("applies an entry coupon after open-cart restoration and release settle", async () => {
+    cityState.current = { id: "popup-1", allows_coupons: true }
+    const validate = vi.fn().mockResolvedValue(20)
+    const { result } = renderHook(() => useCheckout(), {
+      wrapper: makeWrapper([], products, {
+        salesFlowId: "flow-friends",
+        salesFlowSlug: "friends",
+        submitMode: "open-ticketing",
+        submitPopupSlug: "festival",
+        openCartPopupSlug: "festival",
+        initialPromoCode: " friends20 ",
+        validatePromoCodeOverride: validate,
+      }),
+      reactStrictMode: true,
+    })
+
+    await waitFor(() =>
+      expect(validate).toHaveBeenCalledExactlyOnceWith("FRIENDS20"),
+    )
+    await waitFor(() => expect(result.current.cart.promoCodeValid).toBe(true))
+    expect(result.current.cart.promoCode).toBe("FRIENDS20")
+    expect(validate).toHaveBeenCalledExactlyOnceWith("FRIENDS20")
+
+    // Selecting an excluded product first must not discard the link code.
+    act(() => result.current.updateMerchQuantity("excluded", 1))
+    expect(result.current.cart.promoCodeValid).toBe(true)
+    expect(result.current.summary.discount).toBe(0)
+    act(() => result.current.updateMerchQuantity("p1", 1))
+    expect(result.current.summary.discount).toBe(2)
+    expect(result.current.summary.grandTotal).toBe(18)
+    act(() => result.current.updateMerchQuantity("p1", 0))
+    expect(result.current.cart.promoCode).toBe("FRIENDS20")
+    expect(result.current.summary.discount).toBe(0)
+    expect(validate).toHaveBeenCalledTimes(1)
+  })
+
+  it("waits for signed cart recovery and release before replacing a saved coupon", async () => {
+    cityState.current = { id: "popup-1", allows_coupons: true }
+    let resolveRestore!: (value: unknown) => void
+    let resolveRelease!: (value: { released: boolean }) => void
+    vi.mocked(CheckoutService.restoreFlowCart).mockReturnValueOnce(
+      new Promise((resolve) => {
+        resolveRestore = resolve
+      }) as never,
+    )
+    vi.mocked(CheckoutService.releasePendingOpen).mockReturnValueOnce(
+      new Promise((resolve) => {
+        resolveRelease = resolve
+      }) as never,
+    )
+    const validate = vi.fn().mockResolvedValue(20)
+    const { result } = renderHook(() => useCheckout(), {
+      wrapper: makeWrapper([], products, {
+        salesFlowId: "flow-friends",
+        salesFlowSlug: "friends",
+        submitMode: "open-ticketing",
+        submitPopupSlug: "festival",
+        openCartPopupSlug: "festival",
+        openCartCid: "cart-id",
+        openCartSig: "test-proof",
+        initialBuyerValues: { email: "buyer@example.com" },
+        initialPromoCode: "FRIENDS20",
+        validatePromoCodeOverride: validate,
+      }),
+    })
+    expect(validate).not.toHaveBeenCalled()
+
+    await act(async () =>
+      resolveRestore({
+        id: "cart-id",
+        restore_token: "test-proof",
+        items: {
+          lines: [],
+          recipients: [],
+          promo_code: "SAVED10",
+          insurance: false,
+          current_step: null,
+        },
+      }),
+    )
+    expect(CheckoutService.releasePendingOpen).toHaveBeenCalledWith({
+      slug: "festival",
+      flowSlug: "friends",
+      requestBody: {
+        cid: "cart-id",
+        sig: "test-proof",
+        email: "buyer@example.com",
+      },
+    })
+    expect(validate).not.toHaveBeenCalled()
+
+    await act(async () => resolveRelease({ released: false }))
+    await waitFor(() => expect(result.current.cart.promoCodeValid).toBe(true))
+    expect(result.current.cart.promoCode).toBe("FRIENDS20")
+    expect(validate).toHaveBeenCalledExactlyOnceWith("FRIENDS20")
+  })
+
+  it.each([
+    { allowsCoupons: false, previewMode: false },
+    { allowsCoupons: true, previewMode: true },
+  ])("ignores entry coupons when disabled or previewing: %o", async ({
+    allowsCoupons,
+    previewMode,
+  }) => {
+    cityState.current = { id: "popup-1", allows_coupons: allowsCoupons }
+    const validate = vi.fn().mockResolvedValue(20)
+    const { result } = renderHook(() => useCheckout(), {
+      wrapper: makeWrapper([], products, {
+        salesFlowId: "flow-friends",
+        salesFlowSlug: "friends",
+        submitMode: "open-ticketing",
+        submitPopupSlug: "festival",
+        openCartPopupSlug: "festival",
+        initialPromoCode: "FRIENDS20",
+        validatePromoCodeOverride: validate,
+        previewMode,
+      }),
+    })
+
+    await act(async () => {})
+    expect(result.current.cart.promoCodeValid).toBe(false)
+    expect(validate).not.toHaveBeenCalled()
+  })
+})
+
 describe("checkoutProvider — Sales Flow checkout boundary", () => {
   const stay = {
     accommodationId: "room-1",

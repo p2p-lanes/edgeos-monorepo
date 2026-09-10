@@ -306,6 +306,8 @@ interface CheckoutProviderProps {
   flowType?: string | null
   accountCreditOverride?: number
   validatePromoCodeOverride?: (code: string) => Promise<number | null>
+  /** Optional ?coupon= entry-link code for open checkout. */
+  initialPromoCode?: string | null
   submitMode?: "application" | "open-ticketing"
   submitPopupSlug?: string | null
   buyerFormSchema?: ApplicationFormSchema | null
@@ -339,6 +341,7 @@ export function CheckoutProvider({
   flowType = null,
   accountCreditOverride,
   validatePromoCodeOverride,
+  initialPromoCode = null,
   submitMode = "application",
   submitPopupSlug = null,
   buyerFormSchema = null,
@@ -787,6 +790,11 @@ export function CheckoutProvider({
     paymentCompleteRef,
   })
 
+  const entryPromoCode =
+    !previewMode && submitMode === "open-ticketing" && city?.allows_coupons
+      ? initialPromoCode?.trim().toUpperCase() || null
+      : null
+
   // Promo code hook — must run BEFORE useOpenCartPersistence so setPromoCode
   // is stable when passed as a restoration setter.
   const {
@@ -808,6 +816,7 @@ export function CheckoutProvider({
     savedCart,
     hasRestoredCheckoutRef,
     validatePromoCodeOverride,
+    initialPromoCode: entryPromoCode,
     releaseSettled: pendingReleaseSettled,
   })
 
@@ -1245,10 +1254,20 @@ export function CheckoutProvider({
   // single-use coupons would be wasted. Drop any applied coupon so the UI
   // stays consistent with the hidden input below.
   useEffect(() => {
+    // Entry coupons must survive an empty/non-discountable cart while the
+    // buyer chooses products. Open-ticketing pricing ignores the coupon if
+    // nothing discountable is purchased, so this cannot waste a redemption.
+    if (entryPromoCode && promoCode === entryPromoCode) return
     if (discountableProductsSubtotal === 0 && (promoCodeValid || promoCode)) {
       clearPromoCode()
     }
-  }, [discountableProductsSubtotal, promoCodeValid, promoCode, clearPromoCode])
+  }, [
+    discountableProductsSubtotal,
+    promoCodeValid,
+    promoCode,
+    clearPromoCode,
+    entryPromoCode,
+  ])
 
   // Loading states
   const isLoading = promoIsLoading
