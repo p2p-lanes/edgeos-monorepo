@@ -54,7 +54,10 @@ export function usePromoCode({
   activePromoScopeRef.current = promoScope
 
   const applyPromoCode = useCallback(
-    async (code: string): Promise<boolean> => {
+    async (
+      code: string,
+      { silent = false }: { silent?: boolean } = {},
+    ): Promise<boolean> => {
       if (!cityId && !validatePromoCodeOverride) return false
       const validationScope = promoScope
 
@@ -82,7 +85,7 @@ export function usePromoCode({
         // A 0% (or missing) discount is meaningless — surfacing it as a valid
         // applied code confuses users ("Code applied!" + unchanged total).
         if (discountValue <= 0) {
-          setError(t("checkout.errors.confirm_coupon_invalid"))
+          if (!silent) setError(t("checkout.errors.confirm_coupon_invalid"))
           return false
         }
 
@@ -165,15 +168,12 @@ export function usePromoCode({
     const entryCode = initialPromoCode?.trim()
     if (entryCode) {
       hasRevalidatedPromoRef.current = true
-      const validationScope = promoScope
       // An explicit entry-link code wins over a restored one. Clear the
       // restored state first so a rejected URL code never appears applied.
+      // URL coupons are best-effort: invalid, expired, disabled, or failed
+      // validation must leave a normal checkout, without an error banner.
       clearPromoCode()
-      void applyPromoCode(entryCode).then((applied) => {
-        if (!applied && activePromoScopeRef.current === validationScope) {
-          setError(t("checkout.errors.confirm_coupon_invalid"))
-        }
-      })
+      void applyPromoCode(entryCode, { silent: true })
       return
     }
 

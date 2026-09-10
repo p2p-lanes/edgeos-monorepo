@@ -105,19 +105,23 @@ describe("usePromoCode entry-link coupon", () => {
   })
 
   it.each([
-    "invalid",
+    "zero-discount",
+    "api-rejection",
     "network",
-  ])("does not apply a rejected code (%s), and allows manual recovery", async (failure) => {
+  ])("silently ignores a rejected URL code (%s), and allows manual recovery", async (failure) => {
     const { result, validate, setDiscount, ready, rerender } = setup()
-    if (failure === "invalid") validate.mockResolvedValueOnce(0)
+    if (failure === "zero-discount") validate.mockResolvedValueOnce(0)
+    else if (failure === "api-rejection")
+      validate.mockRejectedValueOnce({
+        status: 400,
+        body: { detail: "Invalid coupon" },
+      })
     else validate.mockRejectedValueOnce(new Error("Validation failed"))
     act(() => result.current.setPromoCode("SAVED10"))
     ready()
-    await waitFor(() =>
-      expect(result.current.promoError).toBe(
-        "checkout.errors.confirm_coupon_invalid",
-      ),
-    )
+    expect(validate).toHaveBeenCalledExactlyOnceWith("FRIENDS20")
+    await waitFor(() => expect(result.current.promoIsLoading).toBe(false))
+    expect(result.current.promoError).toBeNull()
     expect(result.current.promoCode).toBe("")
     expect(result.current.promoCodeValid).toBe(false)
     expect(result.current.promoCodeDiscount).toBe(0)

@@ -407,6 +407,37 @@ describe("checkoutProvider — entry-link coupons", () => {
     expect(validate).toHaveBeenCalledTimes(1)
   })
 
+  it.each([
+    "disabled",
+    "zero-discount",
+    "rejected",
+  ])("keeps normal checkout totals without an error for a %s URL coupon", async (reason) => {
+    cityState.current = { id: "popup-1", allows_coupons: reason !== "disabled" }
+    const validate = vi.fn().mockResolvedValue(0)
+    if (reason === "rejected") validate.mockRejectedValue({ status: 400 })
+    const { result } = renderHook(() => useCheckout(), {
+      wrapper: makeWrapper([], products, {
+        salesFlowId: "flow-friends",
+        salesFlowSlug: "friends",
+        submitMode: "open-ticketing",
+        submitPopupSlug: "festival",
+        openCartPopupSlug: "festival",
+        initialPromoCode: "INVALID",
+        validatePromoCodeOverride: validate,
+      }),
+      reactStrictMode: true,
+    })
+    await act(async () => {})
+    await waitFor(() => expect(result.current.isLoading).toBe(false))
+    expect(validate).toHaveBeenCalledTimes(reason === "disabled" ? 0 : 1)
+    act(() => result.current.updateMerchQuantity("p1", 1))
+    expect(result.current.cart.promoCode).toBe("")
+    expect(result.current.cart.promoCodeValid).toBe(false)
+    expect(result.current.error).toBeNull()
+    expect(result.current.summary.discount).toBe(0)
+    expect(result.current.summary.grandTotal).toBe(10)
+  })
+
   it("waits for signed cart recovery and release before replacing a saved coupon", async () => {
     cityState.current = { id: "popup-1", allows_coupons: true }
     let resolveRestore!: (value: unknown) => void
