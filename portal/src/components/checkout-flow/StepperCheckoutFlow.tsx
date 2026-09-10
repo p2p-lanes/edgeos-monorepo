@@ -67,7 +67,7 @@ const NAV_OUTER: Record<
   { className: string; style?: CSSProperties }
 > = {
   default: {
-    className: "sticky top-0 z-40 bg-background/90 backdrop-blur",
+    className: "sticky top-0 z-40 bg-checkout-navbar-bg backdrop-blur",
   },
   amanita: {
     className: "pointer-events-none fixed inset-x-0 top-0 z-40",
@@ -105,8 +105,10 @@ const PILL: Record<
 > = {
   default: {
     base: "shrink-0 whitespace-nowrap rounded-full border px-3.5 py-1.5 text-xs font-medium transition-colors",
-    active: "border-foreground bg-foreground text-background",
-    inactive: "border-border text-muted-foreground hover:text-foreground",
+    active:
+      "border-checkout-nav-text bg-checkout-badge-bg text-checkout-nav-text",
+    inactive:
+      "border-checkout-nav-text/30 text-checkout-nav-text/70 hover:text-checkout-nav-text",
   },
   amanita: {
     base: "flex shrink-0 items-center whitespace-nowrap rounded-full border px-3.5 py-1.5 font-condensed text-xs font-medium uppercase tracking-[0.08em] transition-colors",
@@ -147,7 +149,7 @@ const BOTTOM_INNER: Record<
 > = {
   default: {
     className:
-      "mx-auto max-w-2xl items-center gap-3 rounded-2xl border bg-background/95 px-4 py-3 shadow-lg backdrop-blur",
+      "mx-auto max-w-2xl items-center gap-3 rounded-2xl border border-white/10 bg-checkout-bottom-bar-bg px-4 py-3 text-checkout-bottom-bar-text shadow-lg backdrop-blur",
   },
   amanita: {
     className:
@@ -167,7 +169,7 @@ const BACK_BUTTON: Record<
 > = {
   default: {
     className:
-      "inline-flex shrink-0 items-center gap-1.5 text-xs font-medium text-muted-foreground hover:text-foreground disabled:opacity-40",
+      "inline-flex shrink-0 items-center gap-1.5 text-xs font-medium text-checkout-bottom-bar-text/60 hover:text-checkout-bottom-bar-text disabled:opacity-40",
   },
   amanita: {
     className:
@@ -177,13 +179,14 @@ const BACK_BUTTON: Record<
 }
 
 const TOTAL_LABEL_CLASSES: Record<CheckoutSkin, string> = {
-  default: "text-[10px] uppercase tracking-wider text-muted-foreground",
+  default:
+    "text-[10px] uppercase tracking-wider text-checkout-bottom-bar-text/60",
   amanita:
     "font-condensed text-[0.6rem] font-medium uppercase tracking-[0.24em] text-sand",
 }
 
 const TOTAL_VALUE_CLASSES: Record<CheckoutSkin, string> = {
-  default: "text-lg font-bold text-foreground",
+  default: "text-lg font-bold text-checkout-bottom-bar-text",
   amanita: "font-condensed text-lg leading-tight text-cream md:text-xl",
 }
 
@@ -194,7 +197,9 @@ const HINT_CLASSES: Record<
   CheckoutSkin,
   { className: string; style?: CSSProperties }
 > = {
-  default: { className: "min-w-0 text-sm text-muted-foreground" },
+  default: {
+    className: "min-w-0 text-sm text-checkout-bottom-bar-text/85",
+  },
   amanita: {
     className: "min-w-0 text-sm leading-snug md:text-base",
     style: { color: "rgba(241,235,227,0.85)" },
@@ -213,7 +218,7 @@ const HINT_CLASSES: Record<
  * needs it. */
 const CTA_BUTTON_CLASSES: Record<CheckoutSkin, string> = {
   default:
-    "inline-flex shrink-0 items-center justify-center gap-1.5 rounded-xl bg-primary px-5 py-2 text-sm font-semibold text-primary-foreground hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50",
+    "inline-flex shrink-0 items-center justify-center gap-1.5 rounded-xl bg-checkout-button px-5 py-2 text-sm font-semibold text-checkout-button-title hover:opacity-90 disabled:cursor-not-allowed disabled:bg-checkout-button-disabled disabled:text-checkout-button-title-disabled",
   amanita:
     "btn-ornate-2 btn-gold-fill ck-gold flex shrink-0 items-center justify-center gap-1.5 whitespace-nowrap !px-4 py-2.5 font-condensed text-xs font-medium uppercase tracking-[0.12em] transition-all duration-200 hover:-translate-y-0.5 md:!px-6 md:text-sm disabled:cursor-not-allowed disabled:opacity-50",
 }

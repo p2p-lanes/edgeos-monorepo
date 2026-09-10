@@ -13,6 +13,6 @@ const Page = () => {
     router.push(loggedIn ? "/portal" : "/auth")
   }, [loggedIn, router])
 
-  return <Loader />
+  return <Loader fullScreen />
 }
 export default Page

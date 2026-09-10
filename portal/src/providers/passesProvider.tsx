@@ -425,7 +425,10 @@ const PassesProvider = ({
   >([])
 
   const [isEditing, setIsEditing] = useState(false)
-  const { products: queriedProducts } = useGetPassesData(salesFlowId)
+  const { products: queriedProducts } = useGetPassesData(
+    salesFlowId,
+    productsOverride === undefined,
+  )
   const products = productsOverride ?? queriedProducts
   const { getCity } = useCityProvider()
   const city = getCity()
@@ -441,7 +444,11 @@ const PassesProvider = ({
   )
 
   // Dedicated purchases query — granular invalidation after payment
-  const { data: queriedPurchasesData } = usePurchasesQuery(cityId, attendees)
+  const { data: queriedPurchasesData } = usePurchasesQuery(
+    cityId,
+    attendees,
+    purchasesOverride === undefined,
+  )
   const purchasesData = purchasesOverride ?? queriedPurchasesData
   const purchasesMap = useMemo(
     () => buildPurchasesMap(purchasesData),

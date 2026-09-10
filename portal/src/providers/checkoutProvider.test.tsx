@@ -24,6 +24,10 @@ const paymentSubmitSpy = vi.hoisted(() =>
 const cityState = vi.hoisted(() => ({
   current: null as Record<string, unknown> | null,
 }))
+const queryState = vi.hoisted(() => ({ loading: false, authenticated: false }))
+const passesDataSpy = vi.hoisted(() =>
+  vi.fn(() => ({ products: [], loading: queryState.loading })),
+)
 
 // Minimal mocks to avoid network/provider dependencies
 vi.mock("@/client", () => ({
@@ -58,6 +62,9 @@ vi.mock("@/providers/cityProvider", () => ({
 
 beforeEach(() => {
   cityState.current = null
+  queryState.loading = false
+  queryState.authenticated = false
+  passesDataSpy.mockClear()
 })
 vi.mock("@/providers/discountProvider", () => ({
   useDiscount: () => ({
@@ -75,13 +82,13 @@ vi.mock("@/providers/passesProvider", () => ({
   }),
 }))
 vi.mock("@/hooks/useGetPassesData", () => ({
-  default: () => ({ products: [], loading: false }),
+  default: passesDataSpy,
 }))
 vi.mock("@/hooks/useIsAuthenticated", () => ({
-  useIsAuthenticated: () => false,
+  useIsAuthenticated: () => queryState.authenticated,
 }))
 vi.mock("@tanstack/react-query", () => ({
-  useQuery: () => ({ data: undefined, isLoading: false }),
+  useQuery: () => ({ data: undefined, isLoading: queryState.loading }),
   useQueryClient: () => ({
     getQueryData: vi.fn(),
     setQueryData: vi.fn(),
@@ -168,6 +175,37 @@ function makeWrapper(
     ) as ReactNode
   }
 }
+
+describe("checkoutProvider override loading", () => {
+  it.each([false, true])("uses supplied sources: nonempty=%s", (nonempty) => {
+    cityState.current = { id: "popup-1" }
+    queryState.authenticated = true
+    queryState.loading = true
+    const products = nonempty
+      ? [makeProduct({ id: "p1", category: "ticket" })]
+      : []
+    const props: Partial<ComponentProps<typeof CheckoutProvider>> = {
+      salesFlowId: "flow-1",
+      productsOverride: products,
+      configuredStepsOverride: [],
+    }
+    const { result, rerender } = renderHook(() => useCheckout(), {
+      wrapper: makeWrapper([], [], props),
+    })
+    expect(result.current.allProducts).toEqual(products)
+    expect(result.current.isInitialLoading).toBe(false)
+    expect(passesDataSpy).toHaveBeenLastCalledWith("flow-1", false)
+
+    props.productsOverride = undefined
+    rerender()
+    expect(passesDataSpy).toHaveBeenLastCalledWith("flow-1", true)
+    expect(result.current.isInitialLoading).toBe(true)
+    props.productsOverride = products
+    props.configuredStepsOverride = undefined
+    rerender()
+    expect(result.current.isInitialLoading).toBe(true)
+  })
+})
 
 // The provider used to synthesize a buyer step whenever an open-ticketing
 // popup carried no `buyer` row, which meant the step could not be left out:

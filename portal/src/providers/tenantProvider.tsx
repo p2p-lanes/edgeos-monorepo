@@ -126,7 +126,7 @@ export const TenantProvider = ({
   }, [initialTenantId, initialTenantSlug])
 
   if (isLoading) {
-    return <Loader />
+    return <Loader fullScreen />
   }
 
   if (error) {

@@ -55,7 +55,9 @@ export function ShopCheckoutContent({
     )
   }, [canonicalSlug, collectionsLoading, flowSlug, popupSlug, router])
 
-  if (collectionsLoading || !canonicalSlug) return <Loader />
+  if (!canonicalSlug || (collectionsLoading && canonicalSlug !== flowSlug)) {
+    return <Loader />
+  }
 
   if (applicationFlow && !isApplicationApproved) {
     return (
