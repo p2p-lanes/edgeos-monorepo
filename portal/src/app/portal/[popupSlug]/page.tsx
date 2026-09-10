@@ -1,6 +1,6 @@
 "use client"
 
-import { useRouter } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import { useEffect } from "react"
 import type { CompanionParticipation } from "@/client"
 import { EventCard } from "@/components/Card/EventCard"
@@ -13,11 +13,16 @@ import { Loader } from "@/components/ui/Loader"
 import { useGatheringDoors } from "@/hooks/useGatheringDoors"
 import { useApplication } from "@/providers/applicationProvider"
 import { useCityProvider } from "@/providers/cityProvider"
+import { FeePaymentBanner } from "./application/components/fee-payment-banner"
 
 export default function Home() {
   const { getCity, popupsLoaded } = useCityProvider()
   const { getRelevantApplication, participation } = useApplication()
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const feeFlowId = searchParams.has("checkout", "success")
+    ? searchParams.get("flow")
+    : null
   const city = getCity()
   const {
     doors,
@@ -39,6 +44,17 @@ export default function Home() {
   // One relationship is unambiguous, so nothing has to be named and the
   // page stays exactly as it was. This is almost every gathering.
   const relevantApplication = getRelevantApplication()
+  // Only poll the application named by the fee return. A buyer can have
+  // multiple applications here; never confirm whichever happens to be first.
+  const feeApplication = feeFlowId ? getRelevantApplication(feeFlowId) : null
+  const feeBanner =
+    !nobodyApplies && feeApplication ? (
+      <FeePaymentBanner
+        key={feeApplication.id}
+        application={feeApplication}
+        isReturnFromCheckout
+      />
+    ) : null
 
   if (!nobodyApplies && participation?.type === "companion") {
     return (
@@ -61,6 +77,7 @@ export default function Home() {
     return (
       <section className="container mx-auto">
         <div className="mx-auto max-w-5xl space-y-6 p-6">
+          {feeBanner}
           <EventCard popup={city} status="not_started">
             <EventCard.Image />
             <EventCard.Content>
@@ -104,6 +121,7 @@ export default function Home() {
   return (
     <section className="container mx-auto">
       <div className="space-y-6 max-w-5xl p-6 mx-auto">
+        {feeBanner}
         <EventCard popup={city} status={status}>
           <EventCard.Image />
           <EventCard.Content>
