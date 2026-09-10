@@ -418,6 +418,9 @@ importers:
       clsx:
         specifier: ^2.1.1
         version: 2.1.1
+      dompurify:
+        specifier: ^3.4.0
+        version: 3.4.3
       libphonenumber-js:
         specifier: ^1.11.0
         version: 1.13.1

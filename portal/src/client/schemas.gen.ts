@@ -19767,6 +19767,22 @@ export const PopupAdminSchema = {
             ],
             title: 'Application Fee Amount'
         },
+        custom_home_enabled: {
+            type: 'boolean',
+            title: 'Custom Home Enabled',
+            default: false
+        },
+        custom_home_html: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Custom Home Html'
+        },
         theme_config: {
             anyOf: [
                 {
@@ -20087,6 +20103,23 @@ export const PopupAdminSchema = {
 
 export const PopupCreateSchema = {
     properties: {
+        custom_home_html: {
+            anyOf: [
+                {
+                    type: 'string',
+                    maxLength: 200000
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Custom Home Html'
+        },
+        custom_home_enabled: {
+            type: 'boolean',
+            title: 'Custom Home Enabled',
+            default: false
+        },
         tenant_id: {
             anyOf: [
                 {
@@ -20675,6 +20708,22 @@ export const PopupCreateSchema = {
 
 export const PopupPublicSchema = {
     properties: {
+        custom_home_enabled: {
+            type: 'boolean',
+            title: 'Custom Home Enabled',
+            default: false
+        },
+        custom_home_html: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Custom Home Html'
+        },
         id: {
             type: 'string',
             format: 'uuid',
@@ -21253,6 +21302,29 @@ export const PopupStatusSchema = {
 
 export const PopupUpdateSchema = {
     properties: {
+        custom_home_html: {
+            anyOf: [
+                {
+                    type: 'string',
+                    maxLength: 200000
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Custom Home Html'
+        },
+        custom_home_enabled: {
+            anyOf: [
+                {
+                    type: 'boolean'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Custom Home Enabled'
+        },
         name: {
             anyOf: [
                 {
