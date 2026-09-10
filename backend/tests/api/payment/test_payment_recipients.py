@@ -25,8 +25,11 @@ from app.api.payment.schemas import (
 )
 from app.api.popup.models import Popups
 from app.api.product.models import Products
+from app.api.sales_flow.models import SalesFlows
 from app.api.shared.enums import SaleType
 from app.api.tenant.models import Tenants
+from app.api.tenant.utils import get_portal_url
+from app.api.ticketing_step.constants import seed_ticketing_steps_for_popup
 from tests._flow_helpers import seed_default_steps
 
 
@@ -107,6 +110,73 @@ def _request(
         ],
         products=[PaymentProductRequest(product_id=product.id, recipient_key="child")],
     )
+
+
+@pytest.mark.parametrize("payment_kind", ["passes", "application_fee"])
+@pytest.mark.parametrize("secondary_flow", [False, True])
+def test_application_payment_redirects_preserve_the_application_flow(
+    db: Session,
+    tenant_a: Tenants,
+    payment_kind: str,
+    secondary_flow: bool,
+) -> None:
+    popup, flow, buyer, category, application, product = _payment_context(db, tenant_a)
+    if secondary_flow:
+        # The same buyer also has an application through the default flow.
+        # Neither that application nor the popup default should win on return.
+        flow = SalesFlows(
+            tenant_id=tenant_a.id,
+            popup_id=popup.id,
+            slug="partners",
+            name="Partners",
+            type=SaleType.application.value,
+        )
+        db.add(flow)
+        db.flush()
+        seed_ticketing_steps_for_popup(
+            db,
+            popup_id=popup.id,
+            tenant_id=tenant_a.id,
+            sales_flow_id=flow.id,
+            flow_type=flow.type,
+        )
+        application = Applications(
+            tenant_id=tenant_a.id,
+            popup_id=popup.id,
+            human_id=buyer.id,
+            sales_flow_id=flow.id,
+            status=ApplicationStatus.ACCEPTED.value,
+        )
+        db.add(application)
+
+    if payment_kind == "application_fee":
+        flow.requires_application_fee = True
+        flow.application_fee_amount = Decimal("12")
+        application.status = ApplicationStatus.PENDING_FEE.value
+        db.add_all([flow, application])
+    db.commit()
+
+    with patch("app.services.simplefi.get_simplefi_client") as get_client:
+        provider = get_client.return_value
+        provider.create_payment.return_value = SimpleNamespace(
+            id=f"redirect-provider-{uuid.uuid4().hex}",
+            status="pending",
+            checkout_url="https://pay.test/redirect-test",
+            is_installment_plan=False,
+        )
+        if payment_kind == "application_fee":
+            payments_crud.create_fee_payment(db, application, popup)
+        else:
+            payments_crud.create_payment(db, _request(application, product, category))
+
+    path = "application" if payment_kind == "application_fee" else "passes/buy"
+    expected_cancel = (
+        f"{get_portal_url(tenant_a)}/portal/{popup.slug}/{path}?flow={flow.id}"
+    )
+    provider.create_payment.assert_called_once()
+    sent = provider.create_payment.call_args.kwargs
+    assert sent["cancel_path"] == expected_cancel
+    assert sent["success_path"] == f"{expected_cancel}&checkout=success"
 
 
 def test_payment_attempts_write_distinct_immutable_recipient_snapshots(
