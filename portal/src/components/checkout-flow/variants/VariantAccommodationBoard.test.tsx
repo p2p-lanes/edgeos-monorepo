@@ -497,3 +497,81 @@ describe("the details dialog", () => {
     expect(screen.queryByRole("dialog")).toBeNull()
   })
 })
+
+/**
+ * What a made decision looks like.
+ *
+ * The board is a comparison, and a comparison the buyer has finished with
+ * is just scroll between them and the form they still have to fill in. So
+ * choosing a room folds the rest of the board away and leaves the chosen
+ * one compacted in its place, with the way back stated as a button rather
+ * than left to be rediscovered. That has to hold in all three layouts,
+ * because the layout only ever described how to compare rooms and there is
+ * nothing left to compare.
+ */
+describe("once a room is chosen", () => {
+  it("folds every other room away, in all three layouts", async () => {
+    for (const layout of ["rows", "cards", "sheet"]) {
+      checkoutValue.cart.accommodations = [chosen()]
+      const view = renderStep({ layout })
+
+      expect(await screen.findByText("Your room")).toBeTruthy()
+      expect(screen.getByText("Garden Studio")).toBeTruthy()
+      // The two rooms that were bookable-adjacent on the board are gone,
+      // not merely scrolled past.
+      expect(screen.queryByText("Casita Azul")).toBeNull()
+      expect(screen.queryByText("Twin Room")).toBeNull()
+      expect(screen.getAllByRole("radio")).toHaveLength(1)
+      view.unmount()
+    }
+  })
+
+  it("puts the way back on screen instead of leaving it to be found", async () => {
+    for (const layout of ["rows", "cards", "sheet"]) {
+      checkoutValue.cart.accommodations = [chosen()]
+      const view = renderStep({ layout })
+
+      fireEvent.click(
+        await screen.findByRole("button", { name: "Change room" }),
+      )
+
+      expect(removeAccommodation).toHaveBeenCalledWith(
+        "studio",
+        "2026-08-01",
+        "2026-08-03",
+      )
+      expect(addAccommodation).not.toHaveBeenCalled()
+      removeAccommodation.mockClear()
+      view.unmount()
+    }
+  })
+
+  it("shows the stay it was booked for, not a nightly rate", async () => {
+    checkoutValue.cart.accommodations = [chosen()]
+    renderStep()
+
+    expect(await screen.findByText("Your room")).toBeTruthy()
+    expect(screen.getByText("$290")).toBeTruthy()
+    expect(screen.getByText(/2 nights · 1 guest/)).toBeTruthy()
+  })
+
+  it("stops offering ways to unlock rooms nobody is choosing between", async () => {
+    // "1 more room opens at 4 nights" is help while the buyer is still
+    // comparing. Once one is booked it is an invitation to move the stay
+    // out from under the booking.
+    checkoutValue.cart.accommodations = [chosen()]
+    renderStep()
+
+    await screen.findByText("Your room")
+    expect(screen.queryByText("1 more room opens at 4 nights.")).toBeNull()
+    expect(screen.queryByRole("button", { name: "Stay 4 nights" })).toBeNull()
+  })
+
+  it("keeps the stay editable, because moving it is what un-books a room", async () => {
+    checkoutValue.cart.accommodations = [chosen()]
+    renderStep()
+
+    await screen.findByText("Your room")
+    expect(screen.getByRole("button", { name: "One guest more" })).toBeTruthy()
+  })
+})

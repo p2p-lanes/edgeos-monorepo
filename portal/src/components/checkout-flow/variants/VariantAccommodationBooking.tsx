@@ -10,6 +10,13 @@
  * nightly rate times nights is wrong as soon as a date-range rule or the
  * long-stay rate applies, so the client never multiplies.
  *
+ * Choosing one folds the rest away. The board is a comparison, and a
+ * comparison the buyer has finished with is only scroll between them and
+ * the questions still to answer, so the chosen room compacts to a line and
+ * the guest form unfolds under it as one block. All three layouts collapse
+ * to the same line, because `layout` only ever described how to compare
+ * rooms. `SelectedRoomSummary` has the rest of that argument.
+ *
  * A room the buyer cannot book is not shown. It used to be greyed out with
  * the reason printed inside the button that would have booked it, which put
  * a label where the affordance was and left it at disabled contrast. What
@@ -25,6 +32,7 @@
  */
 
 import { keepPreviousData, useQuery } from "@tanstack/react-query"
+import { AnimatePresence } from "framer-motion"
 import { Info, Loader2 } from "lucide-react"
 import { useEffect, useMemo, useRef, useState } from "react"
 import { useTranslation } from "react-i18next"
@@ -57,10 +65,12 @@ import {
   type SelectedAccommodationItem,
 } from "@/types/checkout"
 import type { VariantProps } from "../registries/variantRegistry"
+import { Fold } from "./accommodation/Fold"
 import { GuestDetailsPanel } from "./accommodation/GuestDetailsPanel"
 import { RecoveryNotes } from "./accommodation/RecoveryNotes"
 import { RoomDetailsDialog } from "./accommodation/RoomDetailsDialog"
 import { RoomCard, RoomRow, RoomSheetRow } from "./accommodation/RoomViews"
+import { SelectedRoomSummary } from "./accommodation/SelectedRoomSummary"
 import { StayBar } from "./accommodation/StayBar"
 
 type Layout = "rows" | "cards" | "sheet"
@@ -181,6 +191,34 @@ export default function VariantAccommodationBooking({
     name: string
     reason: string
   } | null>(null)
+
+  /**
+   * Where the board was, and where the booking that replaces it goes.
+   *
+   * Picking the eighth room on a long board leaves the buyer scrolled past
+   * everything the board just collapsed away, looking at the notice at the
+   * bottom of the step. The fold is what makes that recoverable and also
+   * what makes it necessary, so the swap scrolls itself back into view once
+   * it has settled at its real height. `nearest` does nothing at all when
+   * the booking is already on screen, which is the common case.
+   */
+  const swapRef = useRef<HTMLDivElement>(null)
+  /**
+   * Only ever after the buyer picks a room, which is why this is a flag set
+   * on the way in rather than an effect watching the cart. A checkout that
+   * opens with a room already in it would otherwise scroll itself to a step
+   * the buyer has not reached yet, which is a worse thing to do than the
+   * scroll it saves.
+   */
+  const justBookedRef = useRef(false)
+  const revealBooking = () => {
+    if (!justBookedRef.current) return
+    justBookedRef.current = false
+    swapRef.current?.scrollIntoView?.({
+      block: "nearest",
+      behavior: "smooth",
+    })
+  }
 
   const accommodationScope = isOpenCheckout
     ? `open:${slug}:${salesFlowSlug ?? ""}`
@@ -399,6 +437,7 @@ export default function VariantAccommodationBooking({
       totalPrice: Number(row.quote.total),
       imageUrl: room.images?.[0]?.url ?? null,
     }
+    justBookedRef.current = true
     addAccommodation(item)
   }
 
@@ -429,6 +468,14 @@ export default function VariantAccommodationBooking({
   // and its dialog goes with it instead of describing an offer that is gone.
   const detailsEntry =
     board.bookable.find((entry) => entry.room.id === detailsRoomId) ?? null
+  // The chosen room is described by the cart, which is why it can be shown
+  // before the board is priced. Its board entry is needed only to open its
+  // own screen, so that link is absent until there is one.
+  const selectedEntry = selected
+    ? (board.bookable.find(
+        (entry) => entry.room.id === selected.accommodationId,
+      ) ?? null)
+    : null
 
   const renderEntries = (entries: typeof board.bookable) => {
     if (config.layout === "sheet") {
@@ -506,71 +553,113 @@ export default function VariantAccommodationBooking({
         </p>
       )}
 
-      {board.bookable.length === 0 && !settling ? (
-        <div className="flex flex-col gap-2 rounded-2xl border bg-card p-6">
-          <p className="font-medium">
-            {t("checkout.accommodation.empty.title", {
-              from: formatCheckoutDate(checkIn),
-              to: formatCheckoutDate(checkOut),
-            })}
-          </p>
-          <p className="text-sm text-muted-foreground">
-            {t("checkout.accommodation.empty.body")}
-          </p>
-        </div>
-      ) : (
-        // One group, however many property headings it is broken up by: the
-        // cart holds a single room, so choosing one anywhere on this board
-        // un-chooses whatever was chosen anywhere else on it.
-        <div
-          role="radiogroup"
-          aria-label={t("checkout.accommodation.choose_room")}
-          className="flex flex-col gap-6"
-        >
-          {grouped.map(({ property, entries }) => (
-            <div
-              key={property?.id ?? "unknown"}
-              className="flex flex-col gap-3"
-            >
-              {config.showPropertyHeaders && property && (
-                <div>
-                  <h3 className="font-semibold">{property.name}</h3>
-                  {property.address && (
-                    <p className="text-muted-foreground text-xs">
-                      {property.address}
+      {/* Board or booking, never both. `mode="wait"` is what makes it read
+          as one thing folding into the other: the rooms collapse their own
+          height away first, and the chosen room unfolds into the gap they
+          leave, instead of the two crossing over and shoving the page
+          around while they do. */}
+      <div ref={swapRef}>
+        <AnimatePresence mode="wait" initial={false}>
+          {selected ? (
+            <Fold key="chosen" onSettled={revealBooking}>
+              <div className="flex flex-col gap-6">
+                <SelectedRoomSummary
+                  item={selected}
+                  currency={currency}
+                  onOpenDetails={
+                    selectedEntry
+                      ? () => setDetailsRoomId(selected.accommodationId)
+                      : undefined
+                  }
+                  onRelease={() =>
+                    removeAccommodation(
+                      selected.accommodationId,
+                      selected.checkIn,
+                      selected.checkOut,
+                    )
+                  }
+                />
+
+                {/* Nothing at all in the common case: the buyer's own
+                    details come from the buyer step or their account, so a
+                    party of one with no configured questions leaves this
+                    whole block off the screen. It rides inside the same
+                    fold as the room above it so the two arrive as one
+                    block, which is the point of collapsing the board: the
+                    form is already on screen, not a scroll away. */}
+                {asksSomething && (
+                  <div className="flex flex-col gap-3">
+                    <h3 className="font-semibold">
+                      {t("checkout.accommodation.who_is_staying")}
+                    </h3>
+                    <GuestDetailsPanel
+                      key={`${selected.accommodationId}-${selected.checkIn}`}
+                      item={selected}
+                      requireGuestNames={config.requireGuestNames}
+                    />
+                  </div>
+                )}
+              </div>
+            </Fold>
+          ) : (
+            <Fold key="board">
+              <div className="flex flex-col gap-6">
+                {board.bookable.length === 0 && !settling ? (
+                  <div className="flex flex-col gap-2 rounded-2xl border bg-card p-6">
+                    <p className="font-medium">
+                      {t("checkout.accommodation.empty.title", {
+                        from: formatCheckoutDate(checkIn),
+                        to: formatCheckoutDate(checkOut),
+                      })}
                     </p>
-                  )}
-                </div>
-              )}
-              {renderEntries(entries)}
-            </div>
-          ))}
-        </div>
-      )}
+                    <p className="text-sm text-muted-foreground">
+                      {t("checkout.accommodation.empty.body")}
+                    </p>
+                  </div>
+                ) : (
+                  // One group, however many property headings it is broken
+                  // up by: the cart holds a single room, so choosing one
+                  // anywhere on this board un-chooses whatever was chosen
+                  // anywhere else on it.
+                  <div
+                    role="radiogroup"
+                    aria-label={t("checkout.accommodation.choose_room")}
+                    className="flex flex-col gap-6"
+                  >
+                    {grouped.map(({ property, entries }) => (
+                      <div
+                        key={property?.id ?? "unknown"}
+                        className="flex flex-col gap-3"
+                      >
+                        {config.showPropertyHeaders && property && (
+                          <div>
+                            <h3 className="font-semibold">{property.name}</h3>
+                            {property.address && (
+                              <p className="text-muted-foreground text-xs">
+                                {property.address}
+                              </p>
+                            )}
+                          </div>
+                        )}
+                        {renderEntries(entries)}
+                      </div>
+                    ))}
+                  </div>
+                )}
 
-      <RecoveryNotes
-        recoveries={recoveries}
-        guests={guests}
-        onExtendStay={extendStay}
-        onMoveStay={moveStay}
-      />
-
-      {/* Nothing at all in the common case: the buyer's own details come
-          from the buyer step or their account, so a party of one with no
-          configured questions leaves this whole block off the screen rather
-          than unfolding a form under the room they just picked. */}
-      {selected && asksSomething && (
-        <div className="flex flex-col gap-3">
-          <h3 className="font-semibold">
-            {t("checkout.accommodation.who_is_staying")}
-          </h3>
-          <GuestDetailsPanel
-            key={`${selected.accommodationId}-${selected.checkIn}`}
-            item={selected}
-            requireGuestNames={config.requireGuestNames}
-          />
-        </div>
-      )}
+                {/* Ways to get a removed room back, which is only worth
+                    saying while the buyer is still choosing one. */}
+                <RecoveryNotes
+                  recoveries={recoveries}
+                  guests={guests}
+                  onExtendStay={extendStay}
+                  onMoveStay={moveStay}
+                />
+              </div>
+            </Fold>
+          )}
+        </AnimatePresence>
+      </div>
 
       <div className="flex items-start gap-2 rounded-xl bg-muted/50 p-3 text-muted-foreground text-xs">
         <Info className="mt-0.5 h-4 w-4 shrink-0" />
