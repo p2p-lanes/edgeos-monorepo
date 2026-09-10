@@ -233,6 +233,26 @@ def _resolve_open_checkout_success_url(
     return build_unsigned_redirect_url(internal, payload)
 
 
+def _resolve_open_checkout_cancel_url(
+    flow: "SalesFlows", portal_base: str, popup: "Popups", *, locale: str
+) -> str:
+    """Return to the same sales flow, unless it explicitly overrides cancellation.
+
+    Always use the canonical flow link, including on checkout-landing domains:
+    their root rewrites to the default `checkout` flow, not necessarily this one.
+    Keeping the flow also restores the correct flow-scoped cart on return.
+    """
+    from app.api.sales_flow.resolver import build_effective_config  # noqa: PLC0415
+
+    custom = build_effective_config(flow).open_checkout_cancel_url
+    if custom:
+        return custom
+    return append_query_params(
+        f"{portal_base}/checkout/{popup.slug}/{flow.slug}",
+        [("cancelled", "1"), ("lang", locale)],
+    )
+
+
 def _internal_open_checkout_thank_you_url(
     portal_base: str, landing_is_checkout: bool, popup: "Popups", payment: Payments
 ) -> str:
@@ -1384,20 +1404,15 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
 
             # SimpleFi performs the redirect, so hand it the resolved success URL
             # (custom-signed, or the portal thank-you with the order data). The
-            # cancel URL stays the landing-aware portal page unless the flow
-            # overrides it. Application fee / pass purchase are untouched.
+            # cancel URL returns to this sales flow unless it overrides it.
+            # Application-backed payments use their own redirects below.
             success_url = success_redirect
-            if landing_is_checkout:
-                cancel_url = f"{portal_base}/?cancelled=1"
-            else:
-                cancel_url = f"{portal_base}/checkout/{popup.slug}?cancelled=1"
-            flow_cancel_url = (
-                build_effective_config(target_flow).open_checkout_cancel_url
-                if target_flow is not None
-                else None
+            cancel_url = _resolve_open_checkout_cancel_url(
+                target_flow,
+                portal_base,
+                popup,
+                locale=obj.locale or popup.default_language or "en",
             )
-            if flow_cancel_url:
-                cancel_url = flow_cancel_url
             reference = {
                 "email": buyer.email,
                 "human_id": str(buyer.id),
@@ -1778,10 +1793,13 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
 
         simplefi_client = get_simplefi_client(simplefi_api_key)
 
-        # Build success/cancel paths for fee flow
+        # Keep both returns scoped to the application that incurred this fee.
         portal_base = get_portal_url(popup.tenant)
-        success_path = f"{portal_base}/portal/{popup.slug}/application?checkout=success"
-        cancel_path = f"{portal_base}/portal/{popup.slug}/application"
+        cancel_path = (
+            f"{portal_base}/portal/{popup.slug}/application"
+            f"?flow={application.sales_flow_id}"
+        )
+        success_path = f"{cancel_path}&checkout=success"
 
         reference = {
             "email": application.human.email if application.human else "",
@@ -3409,6 +3427,15 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
         try:
             from app.api.tenant.utils import get_portal_url
 
+            # An unscoped /passes/buy sends the buyer to the generic shop.
+            # Use the application's own flow, never the popup's default flow.
+            portal_base = get_portal_url(application.popup.tenant)
+            cancel_path = (
+                f"{portal_base}/portal/{application.popup.slug}/passes/buy"
+                f"?flow={application.sales_flow_id}"
+            )
+            success_path = f"{cancel_path}&checkout=success"
+
             logger.info(
                 "Creating SimpleFI pass payment: application_id={} popup_id={} tenant_id={} amount={} currency={} product_count={} coupon_code={} edit_passes={} insurance={} max_installments={}",
                 application.id,
@@ -3429,7 +3456,9 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
                 currency=preview.currency,
                 reference=reference,
                 memo=application.popup.tenant.name,
-                portal_base_override=get_portal_url(application.popup.tenant),
+                portal_base_override=portal_base,
+                success_path=success_path,
+                cancel_path=cancel_path,
                 max_installments=max_installments,
                 installment_interval=_installment_interval(terms),
                 installment_interval_count=_installment_interval_count(terms),
