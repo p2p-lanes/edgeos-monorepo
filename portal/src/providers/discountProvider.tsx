@@ -66,10 +66,13 @@ const DiscountProvider = ({ children }: { children: ReactNode }) => {
           discount_value: groupDiscount,
           discount_type: "percentage",
           discount_code: null,
+          // Keep the popup scope or the reset effect above removes this
+          // discount, causing both effects to alternate indefinitely.
+          city_id: city?.id,
         })
       }
     }
-  }, [application?.group_id, groups, discountApplied.discount_value])
+  }, [application?.group_id, groups, discountApplied.discount_value, city?.id])
 
   const discountRef = useRef(discountApplied)
   discountRef.current = discountApplied
