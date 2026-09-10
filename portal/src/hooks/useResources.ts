@@ -137,7 +137,7 @@ const useResources = () => {
         name: t("sidebar.people"),
         icon: Users,
         status: "active",
-        path: `/portal/${city?.slug}/people`,
+        path: `/portal/${city?.slug}/people${flowQuery}`,
         group: "participation",
       },
       {
@@ -187,7 +187,7 @@ const useResources = () => {
         name: t("sidebar.people"),
         icon: Users,
         status: "active",
-        path: `/portal/${city?.slug}/people`,
+        path: `/portal/${city?.slug}/people${flowQuery}`,
         group: "participation",
       },
       {
@@ -271,7 +271,7 @@ const useResources = () => {
       name: t("sidebar.people"),
       icon: Users,
       status: canSeeAttendees ? "active" : "hidden",
-      path: `/portal/${city?.slug}/people`,
+      path: `/portal/${city?.slug}/people${flowQuery}`,
       group: "participation",
     },
     {

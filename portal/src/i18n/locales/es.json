@@ -134,13 +134,14 @@
     }
   },
   "people": {
-    "title": "Personas",
-    "description": "Personas que puedes administrar para este evento.",
+    "title": "Tú y tus acompañantes",
+    "description": "Tus datos como asistente y los de los acompañantes que gestionas para este evento.",
     "primary": "Asistente principal",
     "dependent": "Dependiente",
     "can_manage": "Administrado por ti",
-    "empty_title": "Aún no hay personas",
-    "empty_description": "Las personas que administras aparecerán aquí."
+    "empty_title": "Aún no hay asistentes vinculados",
+    "empty_description": "Cuando se confirmen tus entradas, tú y los acompañantes que gestionas aparecerán aquí.",
+    "browse_tickets": "Ver entradas"
   },
   "tickets_access": {
     "title": "Pases y acceso",
@@ -730,7 +731,7 @@
     "community": "Comunidad",
     "shop": "Tienda",
     "orders": "Pedidos",
-    "people": "Personas",
+    "people": "Tú y tus acompañantes",
     "tickets_access": "Entradas y acceso",
     "passes": "Pases",
     "attendee_directory": "Directorio",

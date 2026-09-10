@@ -134,13 +134,14 @@
     }
   },
   "people": {
-    "title": "People",
-    "description": "People you can manage for this event.",
+    "title": "You & companions",
+    "description": "Your attendee details and those of companions you manage for this event.",
     "primary": "Primary attendee",
     "dependent": "Dependent",
     "can_manage": "Managed by you",
-    "empty_title": "No people yet",
-    "empty_description": "People you manage will appear here."
+    "empty_title": "No attendees linked yet",
+    "empty_description": "After your tickets are confirmed, you and any companions you manage will appear here.",
+    "browse_tickets": "Browse tickets"
   },
   "tickets_access": {
     "title": "Tickets & Access",
@@ -731,7 +732,7 @@
     "community": "Community",
     "shop": "Shop",
     "orders": "Orders",
-    "people": "People",
+    "people": "You & companions",
     "tickets_access": "Tickets & Access",
     "passes": "Passes",
     "attendee_directory": "Directory",
