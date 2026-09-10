@@ -20,6 +20,9 @@ interface UsePromoCodeParams {
   savedCart: CartState | null | undefined
   hasRestoredCheckoutRef: MutableRefObject<boolean>
   validatePromoCodeOverride?: (code: string) => Promise<number | null>
+  /** Entry-link coupon. Validated once per flow, after cart restore/release,
+   *  instead of the saved cart's code. Buyers can still remove or replace it. */
+  initialPromoCode?: string | null
   /** When true, allows re-validation of a restored promo code to proceed.
    *  Used to gate open-cart promo re-validation until the release-on-mount
    *  call settles so the coupon field never flashes "Invalid" before the
@@ -36,6 +39,7 @@ export function usePromoCode({
   savedCart,
   hasRestoredCheckoutRef,
   validatePromoCodeOverride,
+  initialPromoCode = null,
   releaseSettled = true,
 }: UsePromoCodeParams) {
   const { t } = useTranslation()
@@ -158,6 +162,21 @@ export function usePromoCode({
       return
     }
 
+    const entryCode = initialPromoCode?.trim()
+    if (entryCode) {
+      hasRevalidatedPromoRef.current = true
+      const validationScope = promoScope
+      // An explicit entry-link code wins over a restored one. Clear the
+      // restored state first so a rejected URL code never appears applied.
+      clearPromoCode()
+      void applyPromoCode(entryCode).then((applied) => {
+        if (!applied && activePromoScopeRef.current === validationScope) {
+          setError(t("checkout.errors.confirm_coupon_invalid"))
+        }
+      })
+      return
+    }
+
     // Open-cart path: savedCart is null (cartPersistenceEnabled=false) but
     // hydrateFromSnapshot has already called setPromoCode with the restored code.
     // Re-validate via the override (uses public slug-based endpoint, no cityId needed).
@@ -244,6 +263,9 @@ export function usePromoCode({
     savedCart,
     cityId,
     salesFlowId,
+    initialPromoCode,
+    applyPromoCode,
+    clearPromoCode,
     promoCode,
     setDiscount,
     hasRestoredCheckoutRef.current,

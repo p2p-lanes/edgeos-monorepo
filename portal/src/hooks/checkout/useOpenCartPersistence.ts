@@ -644,11 +644,15 @@ export function useOpenCartPersistence({
   // localStorage + optional token-refresh kick. We expose a promise that
   // resolves once all three restore paths have finished. Never rejects.
   const restorationResolveRef = useRef<(() => void) | null>(null)
-  const restorationPromiseRef = useRef<Promise<void>>(
-    new Promise<void>((resolve) => {
+  const restorationPromiseRef = useRef<Promise<void> | null>(null)
+  // Initialize the promise and its resolver together exactly once. A Promise
+  // passed directly to useRef is constructed on every render, overwriting the
+  // resolver while retaining the original promise (notably in Strict Mode).
+  if (restorationPromiseRef.current === null) {
+    restorationPromiseRef.current = new Promise<void>((resolve) => {
       restorationResolveRef.current = resolve
-    }),
-  )
+    })
+  }
   const previousScopeRef = useRef(scope.storageKey)
 
   if (previousScopeRef.current !== scope.storageKey) {
