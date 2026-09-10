@@ -31,7 +31,10 @@ import type {
   SelectedPassItem,
   SelectedPatronItem,
 } from "@/types/checkout"
-import { buildPaymentProducts } from "./buildPaymentProducts"
+import {
+  buildPaymentProducts,
+  MissingTicketBuyerError,
+} from "./buildPaymentProducts"
 import {
   dispatchPaymentError,
   extractCartMeta,
@@ -280,6 +283,7 @@ export function usePaymentSubmit({
         checkoutMode,
         editPassesEnabled,
         submitMode,
+        openTicketBuyer: buyerData,
       })
 
       const result =
@@ -437,6 +441,13 @@ export function usePaymentSubmit({
       setIsSubmitting(false)
       return { success: true }
     } catch (err: unknown) {
+      if (err instanceof MissingTicketBuyerError) {
+        const message = t("checkout.toast_buyer_incomplete_pay")
+        setCurrentStep("buyer")
+        toast.error(message)
+        setIsSubmitting(false)
+        return { success: false, error: message }
+      }
       console.error("Payment failed:", err)
       trackPortalTelemetry("checkout_failed")
 
