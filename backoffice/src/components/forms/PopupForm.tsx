@@ -1,3 +1,4 @@
+import { CUSTOM_HOME_HTML_MAX_LENGTH } from "@edgeos/shared-form-ui/popup-home"
 import { useForm } from "@tanstack/react-form"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { useNavigate } from "@tanstack/react-router"
@@ -21,6 +22,7 @@ import {
   ShoppingCart,
   Users,
 } from "lucide-react"
+import { useState } from "react"
 import {
   ApprovalStrategiesService,
   type CheckoutMode,
@@ -36,6 +38,7 @@ import { DangerZone } from "@/components/Common/DangerZone"
 import { FieldError } from "@/components/Common/FieldError"
 import { FormErrorSummary } from "@/components/Common/FormErrorSummary"
 import { ApprovalStrategyForm } from "@/components/forms/ApprovalStrategyForm"
+import { PopupHomeEditor } from "@/components/forms/PopupHomeEditor"
 import { applicationReviewVisibility } from "@/components/forms/popupApplicationReviewVisibility"
 import { getMissingLaunchFields } from "@/components/forms/popupLaunchChecklist"
 import { ReviewersManager } from "@/components/forms/ReviewersManager"
@@ -129,6 +132,7 @@ function deriveCheckoutMode(saleType: SaleType): CheckoutMode {
 }
 
 export function PopupForm({ defaultValues, onSuccess }: PopupFormProps) {
+  const [activeTab, setActiveTab] = useState("general")
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const { showSuccessToast, showErrorToast, showWarningToast } =
@@ -228,6 +232,8 @@ export function PopupForm({ defaultValues, onSuccess }: PopupFormProps) {
       invoice_company_email: defaultValues?.invoice_company_email ?? "",
       default_language: defaultValues?.default_language ?? "en",
       supported_languages: defaultValues?.supported_languages ?? ["en"],
+      custom_home_enabled: defaultValues?.custom_home_enabled ?? false,
+      custom_home_html: defaultValues?.custom_home_html ?? "",
       events_enabled: defaultValues?.events_enabled ?? true,
       edit_passes_enabled: defaultValues?.edit_passes_enabled ?? false,
       self_check_in_enabled: defaultValues?.self_check_in_enabled ?? false,
@@ -237,6 +243,13 @@ export function PopupForm({ defaultValues, onSuccess }: PopupFormProps) {
     },
     onSubmit: ({ value }) => {
       if (readOnly) return
+      if (value.custom_home_html.length > CUSTOM_HOME_HTML_MAX_LENGTH) {
+        setActiveTab("home")
+        showErrorToast(
+          `Home page HTML must be ${CUSTOM_HOME_HTML_MAX_LENGTH.toLocaleString()} characters or fewer.`,
+        )
+        return
+      }
       const toUTCDate = (dateStr: string) => {
         if (!dateStr) return null
         return `${dateStr.slice(0, 10)}T00:00:00.000Z`
@@ -268,6 +281,10 @@ export function PopupForm({ defaultValues, onSuccess }: PopupFormProps) {
         // existing event the door owns its own type, and sending this would
         // retype it from a screen that never asked.
         ...(isEdit ? {} : { sale_type: value.sale_type }),
+        custom_home_enabled: value.custom_home_enabled,
+        custom_home_html: value.custom_home_html.trim()
+          ? value.custom_home_html
+          : null,
         events_enabled: value.events_enabled,
         edit_passes_enabled: value.edit_passes_enabled,
         self_check_in_enabled: value.self_check_in_enabled,
@@ -313,7 +330,7 @@ export function PopupForm({ defaultValues, onSuccess }: PopupFormProps) {
             form.handleSubmit()
           }
         }}
-        className="mx-auto max-w-2xl space-y-6"
+        className={`mx-auto w-full min-w-0 space-y-6 ${activeTab === "home" ? "max-w-none" : "max-w-2xl"}`}
       >
         <FormErrorSummary
           form={form}
@@ -327,10 +344,14 @@ export function PopupForm({ defaultValues, onSuccess }: PopupFormProps) {
           }}
         />
 
-        <Tabs defaultValue="general" className="space-y-6">
+        <Tabs
+          value={activeTab}
+          onValueChange={setActiveTab}
+          className="space-y-6"
+        >
           {/* data-tour anchors let the product tour spotlight and switch the
               tabs — see components/onboarding/tourSteps.ts. */}
-          <TabsList data-tour="popup-form-tabs">
+          <TabsList data-tour="popup-form-tabs" className="h-auto flex-wrap">
             <TabsTrigger value="general" data-tour="popup-tab-general">
               General
             </TabsTrigger>
@@ -341,6 +362,7 @@ export function PopupForm({ defaultValues, onSuccess }: PopupFormProps) {
               Features
             </TabsTrigger>
             <TabsTrigger value="branding">Branding</TabsTrigger>
+            <TabsTrigger value="home">Home page</TabsTrigger>
             <TabsTrigger value="languages">Languages</TabsTrigger>
           </TabsList>
 
@@ -1172,6 +1194,26 @@ export function PopupForm({ defaultValues, onSuccess }: PopupFormProps) {
                 )}
               </form.Field>
             </InlineSection>
+          </TabsContent>
+
+          <TabsContent value="home" className="space-y-6">
+            <form.Subscribe selector={(state) => state.values}>
+              {(values) => (
+                <PopupHomeEditor
+                  html={values.custom_home_html}
+                  enabled={values.custom_home_enabled}
+                  onHtmlChange={(html) =>
+                    form.setFieldValue("custom_home_html", html)
+                  }
+                  onEnabledChange={(enabled) =>
+                    form.setFieldValue("custom_home_enabled", enabled)
+                  }
+                  popup={values}
+                  locale={values.default_language}
+                  readOnly={readOnly}
+                />
+              )}
+            </form.Subscribe>
           </TabsContent>
 
           {/* ─── Languages & Translations ───────────────────────────── */}

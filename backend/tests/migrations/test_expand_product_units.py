@@ -15,7 +15,7 @@ from app.api.payment.schemas import PaymentProductResponse
 
 REVISION = "b7d3e1f8c2a4"
 PREVIOUS_REVISION = "a6f4c8d2e9b1"
-HEAD_REVISION = "a4f1c8b2e7d3"
+HEAD_REVISION = "d9e4c2a7b6f1"
 
 
 def _config(connection) -> Config:

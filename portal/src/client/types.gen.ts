@@ -4268,6 +4268,8 @@ export type PopupAdmin = {
     currency?: string;
     requires_application_fee?: boolean;
     application_fee_amount?: (string | null);
+    custom_home_enabled?: boolean;
+    custom_home_html?: (string | null);
     theme_config?: ({
     [key: string]: unknown;
 } | null);
@@ -4311,6 +4313,8 @@ export type PopupAdmin = {
 };
 
 export type PopupCreate = {
+    custom_home_html?: (string | null);
+    custom_home_enabled?: boolean;
     tenant_id?: (string | null);
     name: string;
     tagline?: (string | null);
@@ -4381,6 +4385,8 @@ export type PopupCreate = {
  * Public popup schema — excludes sensitive/internal fields.
  */
 export type PopupPublic = {
+    custom_home_enabled?: boolean;
+    custom_home_html?: (string | null);
     id: string;
     name: string;
     tagline?: (string | null);
@@ -4477,6 +4483,8 @@ export type PopupReviewerUpdate = {
 export type PopupStatus = 'draft' | 'active' | 'archived' | 'ended';
 
 export type PopupUpdate = {
+    custom_home_html?: (string | null);
+    custom_home_enabled?: (boolean | null);
     name?: (string | null);
     tagline?: (string | null);
     location?: (string | null);

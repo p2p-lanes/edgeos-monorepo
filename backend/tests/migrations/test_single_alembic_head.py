@@ -3,7 +3,7 @@ from pathlib import Path
 from alembic.config import Config
 from alembic.script import ScriptDirectory
 
-MERGE_HEAD = "a4f1c8b2e7d3"
+HEAD_REVISION = "d9e4c2a7b6f1"
 
 
 def test_repository_has_one_alembic_head() -> None:
@@ -11,4 +11,4 @@ def test_repository_has_one_alembic_head() -> None:
     config = Config(str(backend_dir / "alembic.ini"))
     config.set_main_option("script_location", str(backend_dir / "app" / "alembic"))
 
-    assert ScriptDirectory.from_config(config).get_heads() == [MERGE_HEAD]
+    assert ScriptDirectory.from_config(config).get_heads() == [HEAD_REVISION]
