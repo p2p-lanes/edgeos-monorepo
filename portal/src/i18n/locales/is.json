@@ -120,7 +120,7 @@
     }
   },
   "people": {
-    "title": "Þú og samferðafólk",
+    "title": "Þú og hópurinn þinn",
     "description": "Upplýsingar um þig og samferðafólk sem þú sérð um á þessum viðburði.",
     "primary": "Aðalþátttakandi",
     "dependent": "Aðstandandi",
@@ -604,7 +604,7 @@
     "community": "Samfélag",
     "shop": "Verslun",
     "orders": "Pantanir",
-    "people": "Þú og samferðafólk",
+    "people": "Þínar upplýsingar",
     "tickets_access": "Passar og aðgangur",
     "passes": "Passar",
     "attendee_directory": "Skrá",
