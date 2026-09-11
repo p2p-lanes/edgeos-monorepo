@@ -127,7 +127,10 @@ describe("YourPasses selected projection", () => {
   it("scopes catalog and ticketing-step queries to the selected flow", async () => {
     const ticketingSteps = vi
       .spyOn(TicketingStepsService, "listPortalTicketingSteps")
-      .mockResolvedValue({ results: [], count: 0 })
+      .mockResolvedValue({
+        results: [],
+        paging: { offset: 0, limit: 0, total: 0 },
+      })
 
     render(
       <YourPasses
