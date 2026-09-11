@@ -34,6 +34,7 @@
   "status": {
     "not_started": "未开始",
     "draft": "草稿",
+    "pending_fee": "申请费待支付",
     "in_review": "申请已提交",
     "accepted": "申请已通过",
     "rejected": "申请被拒绝",
@@ -48,6 +49,7 @@
   "cta": {
     "not_started": "申请",
     "draft": "继续申请",
+    "pending_fee": "支付申请费",
     "in_review": "编辑申请",
     "accepted": "查看通行证",
     "rejected": "",

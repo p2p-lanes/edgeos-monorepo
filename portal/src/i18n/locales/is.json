@@ -34,6 +34,7 @@
   "status": {
     "not_started": "Ekki hafið",
     "draft": "Drög",
+    "pending_fee": "Umsóknargjald ógreitt",
     "in_review": "Umsókn send",
     "accepted": "Umsókn samþykkt",
     "rejected": "Umsókn hafnað",
@@ -48,6 +49,7 @@
   "cta": {
     "not_started": "Sækja um",
     "draft": "Halda áfram með umsókn",
+    "pending_fee": "Greiða umsóknargjald",
     "in_review": "Breyta umsókn",
     "accepted": "Skoða passa",
     "rejected": "",
