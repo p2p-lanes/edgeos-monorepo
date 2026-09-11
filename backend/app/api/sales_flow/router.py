@@ -23,6 +23,7 @@ from app.api.sales_flow.schemas import (
     SalesFlowType,
     SalesFlowUpdate,
     fields_for,
+    parse_portal_theme_config,
 )
 from app.api.shared.response import ListModel, PaginationLimit, PaginationSkip, Paging
 from app.api.ticketing_step.constants import seed_ticketing_steps_for_popup
@@ -47,6 +48,7 @@ def _portal_flow_public(db: Session, flow: SalesFlows) -> SalesFlowPortalPublic:
         order=flow.order,
         type=flow.type,
         price_summary=crud.sales_flows_crud.resolve_portal_price_summary(db, flow),
+        theme_config=parse_portal_theme_config(flow.theme_config),
     )
 
 
@@ -288,11 +290,15 @@ async def create_sales_flow(
             commit=False,
         )
 
-        # A fresh flow needs its own type-required technical checkout baseline.
-        # An explicit source is copied separately by the caller, so seeding it
-        # here would duplicate the source's checkout steps.
+        # Application flows still need their system form defaults when they
+        # start from scratch. An explicit source is copied separately.
         if flow_in.start_from is None or flow_in.start_from == START_FRESH:
             seed_application_defaults(db, popup=popup, flow=flow)
+
+        # Omitted/null callers retain the legacy checkout baseline. The
+        # Backoffice sends "fresh" explicitly so its Ticketing Steps stage
+        # starts empty, while flow-copy paths continue copying their source.
+        if flow_in.start_from is None:
             seed_ticketing_steps_for_popup(
                 db,
                 popup_id=flow.popup_id,

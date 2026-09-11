@@ -52,17 +52,15 @@ def _enabled_step_count(session: Session, flow_id: uuid.UUID) -> int:
     )
 
 
-def _form_field_count(session: Session, flow_id: uuid.UUID) -> int:
-    from app.api.form_field.models import FormFields
+def _form_field_count(
+    session: Session,
+    popup_id: uuid.UUID,
+    flow_id: uuid.UUID,
+) -> int:
+    from app.api.form_field.crud import form_fields_crud
 
-    return (
-        session.exec(
-            select(func.count())
-            .select_from(FormFields)
-            .where(FormFields.sales_flow_id == flow_id)
-        ).one()
-        or 0
-    )
+    schema = form_fields_crud.build_schema_for_flow(session, popup_id, flow_id)
+    return len(schema["base_fields"]) + len(schema["custom_fields"])
 
 
 def flow_readiness(session: Session, flow: SalesFlows) -> SalesFlowReadiness:
@@ -72,7 +70,7 @@ def flow_readiness(session: Session, flow: SalesFlows) -> SalesFlowReadiness:
 
     step_count = _enabled_step_count(session, flow.id)
     offered = flow_offered_product_ids(session, flow.id, flow.popup_id)
-    field_count = _form_field_count(session, flow.id)
+    field_count = _form_field_count(session, flow.popup_id, flow.id)
     is_application = flow.type == SalesFlowType.application
     strategy = (
         approval_strategies_crud.get_by_flow(session, flow.id)

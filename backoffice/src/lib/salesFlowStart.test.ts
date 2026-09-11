@@ -38,6 +38,9 @@ describe("startChoicesFor", () => {
     // preset values.
     const { offered } = startChoicesFor("application", [])
     expect(offered.map((o) => o.id)).toEqual([START_FRESH])
+    expect(offered[0]?.description).toBe(
+      "No settings or checkout steps copied.",
+    )
   })
 
   it("offers only doors that can produce the kind being opened", () => {

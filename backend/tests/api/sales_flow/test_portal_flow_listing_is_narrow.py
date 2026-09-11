@@ -33,7 +33,15 @@ from tests._flow_helpers import provision_default_flow
 # Every entry here was added on purpose. That is the point of asserting the
 # exact set: the next field to leak has not been added yet, and this test is
 # what makes adding one a decision rather than an accident.
-ALLOWED_KEYS = {"id", "slug", "name", "order", "type", "price_summary"}
+ALLOWED_KEYS = {
+    "id",
+    "slug",
+    "name",
+    "order",
+    "type",
+    "price_summary",
+    "theme_config",
+}
 
 
 def _popup_with_flows(db: Session, tenant: Tenants) -> Popups:
@@ -50,6 +58,19 @@ def _popup_with_flows(db: Session, tenant: Tenants) -> Popups:
     flow = provision_default_flow(db, popup, sale_type=SaleType.application.value)
     flow.open_checkout_signing_secret = "the-key-that-signs-orders"
     flow.contribution_percentage = 7
+    flow.theme_config = {
+        "colors": {
+            "mode": "light",
+            "primary_color": "#0E7490",
+            "card_background_color": "#FFFFFF",
+            "border_color": "#8A94A2",
+            "input_color": "#8A94A2",
+            "internal_color_setting": "must-not-leak",
+        },
+        "typography": {"font_family": "Inter", "internal_font_id": "private"},
+        "radius": "0.75rem",
+        "internal_theme_setting": "must-not-leak",
+    }
     db.add(flow)
     db.commit()
     return popup
@@ -85,6 +106,17 @@ class TestPortalFlowListing:
                 f"portal listing exposes {set(flow) - ALLOWED_KEYS}"
             )
             assert flow["price_summary"] is None
+            assert flow["theme_config"] == {
+                "colors": {
+                    "mode": "light",
+                    "primary_color": "#0E7490",
+                    "card_background_color": "#FFFFFF",
+                    "border_color": "#8A94A2",
+                    "input_color": "#8A94A2",
+                },
+                "typography": {"font_family": "Inter"},
+                "radius": "0.75rem",
+            }
 
     def test_the_signing_secret_never_reaches_a_buyer(
         self, client: TestClient, db: Session, tenant_a: Tenants

@@ -37,9 +37,7 @@ export const TYPE_COPY: Record<
   },
 }
 
-// It is not "nothing": the flow still gets its kind's checkout steps, and
-// that is the one thing worth saying about starting clean.
-const FRESH_DESCRIPTION = "No settings copied. Checkout steps included."
+const FRESH_DESCRIPTION = "No settings or checkout steps copied."
 
 /** Facts, and silence when there are none. The fallback prose read as filler
  * because that is what it was. */

@@ -21,6 +21,8 @@ import uuid
 from fastapi.testclient import TestClient
 from sqlmodel import Session
 
+from app.api.base_field_config.models import BaseFieldConfigs
+from app.api.form_section.models import FormSections
 from app.api.popup.models import Popups
 from app.api.product.models import Products
 from app.api.sales_flow.crud import sales_flows_crud
@@ -115,6 +117,27 @@ def _make_step(
     return step
 
 
+def _make_base_field(
+    db: Session,
+    popup: Popups,
+    flow: SalesFlows,
+    *,
+    section_id: uuid.UUID | None = None,
+) -> BaseFieldConfigs:
+    field = BaseFieldConfigs(
+        tenant_id=popup.tenant_id,
+        popup_id=popup.id,
+        sales_flow_id=flow.id,
+        field_name="first_name",
+        label="First name",
+        section_id=section_id,
+    )
+    db.add(field)
+    db.commit()
+    db.refresh(field)
+    return field
+
+
 class TestBlockers:
     def test_a_flow_with_no_steps_cannot_sell(
         self, db: Session, tenant_a: Tenants
@@ -170,7 +193,48 @@ class TestBlockers:
         _make_product(db, popup)
         _make_step(db, popup, flow)
 
-        assert NO_FORM in flow_readiness(db, flow).blockers
+        readiness = flow_readiness(db, flow)
+
+        assert readiness.form_field_count == 0
+        assert NO_FORM in readiness.blockers
+
+    def test_an_application_flow_with_only_a_base_field_has_a_form(
+        self, db: Session, tenant_a: Tenants
+    ) -> None:
+        popup = _make_popup(db, tenant_a)
+        flow = _make_flow(db, popup, flow_type="application")
+        _make_product(db, popup)
+        _make_step(db, popup, flow)
+        _make_base_field(db, popup, flow)
+
+        readiness = flow_readiness(db, flow)
+
+        assert readiness.form_field_count == 1
+        assert NO_FORM not in readiness.blockers
+
+    def test_hidden_base_fields_do_not_count_as_a_form(
+        self, db: Session, tenant_a: Tenants
+    ) -> None:
+        popup = _make_popup(db, tenant_a)
+        flow = _make_flow(db, popup, flow_type="application")
+        _make_product(db, popup)
+        _make_step(db, popup, flow)
+        section = FormSections(
+            tenant_id=popup.tenant_id,
+            popup_id=popup.id,
+            sales_flow_id=flow.id,
+            label="Hidden profile",
+            hidden=True,
+        )
+        db.add(section)
+        db.commit()
+        db.refresh(section)
+        _make_base_field(db, popup, flow, section_id=section.id)
+
+        readiness = flow_readiness(db, flow)
+
+        assert readiness.form_field_count == 0
+        assert NO_FORM in readiness.blockers
 
     def test_a_direct_flow_never_needs_a_form(
         self, db: Session, tenant_a: Tenants
