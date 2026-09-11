@@ -134,7 +134,7 @@
     }
   },
   "people": {
-    "title": "You & companions",
+    "title": "You & your group",
     "description": "Your attendee details and those of companions you manage for this event.",
     "primary": "Primary attendee",
     "dependent": "Dependent",
@@ -733,7 +733,7 @@
     "community": "Community",
     "shop": "Shop",
     "orders": "Orders",
-    "people": "You & companions",
+    "people": "Your Details",
     "tickets_access": "Tickets & Access",
     "passes": "Passes",
     "attendee_directory": "Directory",

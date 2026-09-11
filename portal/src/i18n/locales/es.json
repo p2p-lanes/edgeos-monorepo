@@ -134,7 +134,7 @@
     }
   },
   "people": {
-    "title": "Tú y tus acompañantes",
+    "title": "Tú y tu grupo",
     "description": "Tus datos como asistente y los de los acompañantes que gestionas para este evento.",
     "primary": "Asistente principal",
     "dependent": "Dependiente",
@@ -732,7 +732,7 @@
     "community": "Comunidad",
     "shop": "Tienda",
     "orders": "Pedidos",
-    "people": "Tú y tus acompañantes",
+    "people": "Tus datos",
     "tickets_access": "Entradas y acceso",
     "passes": "Pases",
     "attendee_directory": "Directorio",
