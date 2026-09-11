@@ -48,6 +48,7 @@
   "status": {
     "not_started": "No iniciado",
     "draft": "Borrador",
+    "pending_fee": "Tarifa de aplicación pendiente",
     "in_review": "Aplicación enviada",
     "accepted": "Aplicación aceptada",
     "rejected": "Aplicación rechazada",
@@ -62,6 +63,7 @@
   "cta": {
     "not_started": "Aplicar",
     "draft": "Continuar aplicación",
+    "pending_fee": "Pagar tarifa de aplicación",
     "in_review": "Editar aplicación",
     "accepted": "Ver pases",
     "rejected": "",
