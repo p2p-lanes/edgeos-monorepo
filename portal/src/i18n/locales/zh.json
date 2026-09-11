@@ -76,23 +76,6 @@
     }
   },
   "shop": {
-    "title": "商店",
-    "description": "请选择可用选项。",
-    "catalog": "可用选项",
-    "application": "申请",
-    "direct": "直接购买",
-    "upsale": "为您提供",
-    "open": "查看选项",
-    "source": "来源：{{source}}",
-    "eligibility": {
-      "application": "仅向已获批准的申请人提供",
-      "direct": "向所有参与者提供",
-      "upsale": "完成符合条件的购买后可用"
-    },
-    "price_from": "起价 {{price}}",
-    "price_unavailable": "价格暂不可用",
-    "empty_title": "目前没有可用选项",
-    "empty_description": "请稍后回来查看新选项。",
     "approval_required_title": "需要批准",
     "approval_required_description": "您的申请获得批准后，才能购买此选项。",
     "approval_required_cta": "查看申请",
@@ -100,12 +83,12 @@
     "definitive_total": "总额"
   },
   "orders": {
-    "title": "订单",
+    "title": "付款",
     "description": "您在此活动中的付款记录。",
-    "empty_title": "暂无订单",
+    "empty_title": "暂无付款记录",
     "empty_description": "您的付款记录将显示在这里。",
     "total": "总计",
-    "lines": "订单项目",
+    "lines": "付款项目",
     "line_quantity": "数量：{{count}}",
     "legacy_purchase": "历史购买记录",
     "invoice": "发票",
@@ -119,17 +102,8 @@
       "unknown": "付款状态未知"
     }
   },
-  "people": {
-    "title": "人员",
-    "description": "您可以为此活动管理的人员。",
-    "primary": "主要参与者",
-    "dependent": "受抚养人",
-    "can_manage": "由您管理",
-    "empty_title": "暂无人员",
-    "empty_description": "您管理的人员将显示在这里。"
-  },
   "tickets_access": {
-    "title": "票券和访问权限",
+    "title": "门票",
     "description": "您的有效活动票券和签到项目。",
     "empty_title": "暂无票券或签到项目",
     "empty_description": "有效活动票券和签到项目将显示在这里。",
@@ -462,8 +436,17 @@
     "flow_restriction_violated": "您不符合通过此渠道购买的条件。",
     "product_not_in_flow": "此商品无法通过此渠道购买。"
   },
+  "portalThankYou": {
+    "title": "购买已完成",
+    "description": "您的购买已完成。您可以在门户中查看通行证。",
+    "passes_cta": "查看我的通行证"
+  },
   "passes": {
     "your_passes": "我的通行证",
+    "other_passes": "其他通行证",
+    "choose_flow": "选择通行证类型",
+    "choose_flow_description": "选择您想查看的通行证。",
+    "change_flow": "更改通行证类型",
     "companion_attending": "您以同行人身份参加。",
     "companion_attending_city": "您以同行人身份参加 {{city}}。",
     "companion_no_passes": "尚未分配通行证。请稍后再查看。",
@@ -596,11 +579,10 @@
     "general": "常规",
     "participation": "参与",
     "commerce": "购物",
+    "checkouts": "结账",
     "community": "社区",
-    "shop": "商店",
-    "orders": "订单",
-    "people": "人员",
-    "tickets_access": "门票和访问权限",
+    "tickets": "门票",
+    "orders": "付款",
     "passes": "通行证",
     "attendee_directory": "名录",
     "companion": "同伴",

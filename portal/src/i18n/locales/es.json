@@ -90,23 +90,6 @@
     }
   },
   "shop": {
-    "title": "Tienda",
-    "description": "Elija una opción disponible.",
-    "catalog": "Opciones disponibles",
-    "application": "Solicitud",
-    "direct": "Compra directa",
-    "upsale": "Disponible para usted",
-    "open": "Ver opción",
-    "source": "Origen: {{source}}",
-    "eligibility": {
-      "application": "Disponible para solicitantes aprobados",
-      "direct": "Disponible para todos los asistentes",
-      "upsale": "Disponible después de una compra elegible"
-    },
-    "price_from": "Desde {{price}}",
-    "price_unavailable": "Precio no disponible",
-    "empty_title": "No hay opciones disponibles por ahora",
-    "empty_description": "Vuelva más tarde para consultar nuevas opciones.",
     "approval_required_title": "Se requiere aprobación",
     "approval_required_description": "Su solicitud debe ser aprobada antes de poder comprar esta opción.",
     "approval_required_cta": "Ver solicitud",
@@ -114,12 +97,12 @@
     "definitive_total": "Total"
   },
   "orders": {
-    "title": "Pedidos",
+    "title": "Pagos",
     "description": "Tu historial de pagos para este evento.",
-    "empty_title": "Todavía no hay pedidos",
+    "empty_title": "Todavía no hay pagos",
     "empty_description": "Tu historial de pagos aparecerá aquí.",
     "total": "Total",
-    "lines": "Artículos del pedido",
+    "lines": "Artículos del pago",
     "line_quantity": "Cantidad: {{count}}",
     "legacy_purchase": "Compra heredada",
     "invoice": "Factura",
@@ -133,17 +116,8 @@
       "unknown": "Estado de pago desconocido"
     }
   },
-  "people": {
-    "title": "Personas",
-    "description": "Personas que puedes administrar para este evento.",
-    "primary": "Asistente principal",
-    "dependent": "Dependiente",
-    "can_manage": "Administrado por ti",
-    "empty_title": "Aún no hay personas",
-    "empty_description": "Las personas que administras aparecerán aquí."
-  },
   "tickets_access": {
-    "title": "Pases y acceso",
+    "title": "Entradas",
     "description": "Tus entradas activas y artículos con check-in para este evento.",
     "empty_title": "Aún no hay entradas ni artículos con check-in",
     "empty_description": "Las entradas activas y los artículos con check-in aparecerán aquí.",
@@ -530,8 +504,17 @@
     "flow_restriction_violated": "No sos elegible para comprar a través de este canal.",
     "product_not_in_flow": "Este producto no está disponible a través de este canal."
   },
+  "portalThankYou": {
+    "title": "Compra completada",
+    "description": "Tu compra se completó. Tus pases están disponibles en el portal.",
+    "passes_cta": "Ver mis pases"
+  },
   "passes": {
     "your_passes": "Tus Pases",
+    "other_passes": "Otros pases",
+    "choose_flow": "Elige un tipo de pase",
+    "choose_flow_description": "Selecciona los pases que quieres ver.",
+    "change_flow": "Cambiar tipo de pase",
     "companion_attending": "Asistís como acompañante.",
     "companion_attending_city": "Asistís a {{city}} como acompañante.",
     "companion_no_passes": "Todavía no tenés pases asignados. Volvé a consultar más tarde.",
@@ -664,11 +647,10 @@
     "general": "General",
     "participation": "Participación",
     "commerce": "Comercio",
+    "checkouts": "Compras",
     "community": "Comunidad",
-    "shop": "Tienda",
-    "orders": "Pedidos",
-    "people": "Personas",
-    "tickets_access": "Entradas y acceso",
+    "tickets": "Entradas",
+    "orders": "Pagos",
     "passes": "Pases",
     "attendee_directory": "Directorio",
     "companion": "Acompañante",
