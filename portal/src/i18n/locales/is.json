@@ -120,13 +120,14 @@
     }
   },
   "people": {
-    "title": "Fólk",
-    "description": "Fólk sem þú getur stýrt fyrir þennan viðburð.",
+    "title": "Þú og hópurinn þinn",
+    "description": "Upplýsingar um þig og samferðafólk sem þú sérð um á þessum viðburði.",
     "primary": "Aðalþátttakandi",
     "dependent": "Aðstandandi",
     "can_manage": "Stýrt af þér",
-    "empty_title": "Ekkert fólk enn",
-    "empty_description": "Fólkið sem þú stýrir birtist hér."
+    "empty_title": "Engir þátttakendur tengdir enn",
+    "empty_description": "Þegar miðarnir þínir hafa verið staðfestir birtist þú hér ásamt samferðafólki sem þú sérð um.",
+    "browse_tickets": "Skoða miða"
   },
   "tickets_access": {
     "title": "Passar og aðgangur",
@@ -391,6 +392,19 @@
         "over_capacity": "Ekki nægilegt pláss fyrir hópinn",
         "inactive": "Ekki í boði",
         "default": "Ekki í boði á þessum dagsetningum"
+      },
+      "form": {
+        "lead_guest": "Aðalgestur",
+        "guest_number": "Gestur {{number}}",
+        "name": "Fullt nafn",
+        "not_filled_in": "Ekki útfyllt",
+        "complete": "Lokið",
+        "missing_count_one": "{{count}} vantar",
+        "missing_count_other": "{{count}} vantar",
+        "same_as_lead": "Sama og aðalgestur",
+        "progress": "{{complete}} af {{total}} gestum lokið",
+        "booking_contact": "Tengiliður bókunar",
+        "booking_contact_hint": "Hvern gististaðurinn hefur samband við vegna herbergisins"
       }
     },
     "contribution": {
@@ -417,7 +431,8 @@
     "pending_payment_wait": "Þú ert með greiðslu í bið. Bíddu í nokkrar mínútur.",
     "payment_cancel_failed": "Okkur tókst ekki að afgreiða greiðsluna. Reyndu aftur.",
     "flow_restriction_violated": "Þú uppfyllir ekki skilyrði til að kaupa í gegnum þessa leið.",
-    "product_not_in_flow": "Þessi vara er ekki í boði í gegnum þessa leið."
+    "product_not_in_flow": "Þessi vara er ekki í boði í gegnum þessa leið.",
+    "toast_guest_details_incomplete": "Það vantar upplýsingar um gesti áður en hægt er að greiða."
   },
   "openCheckout": {
     "loading": "Hleður greiðslu...",
@@ -589,7 +604,7 @@
     "community": "Samfélag",
     "shop": "Verslun",
     "orders": "Pantanir",
-    "people": "Fólk",
+    "people": "Þínar upplýsingar",
     "tickets_access": "Passar og aðgangur",
     "passes": "Passar",
     "attendee_directory": "Skrá",

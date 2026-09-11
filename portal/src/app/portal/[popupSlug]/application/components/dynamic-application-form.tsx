@@ -117,7 +117,6 @@ const BaseField = memo(function BaseField({
             value={value}
             error={error}
             onChange={onChange}
-            hideLabelAndSubtitle={name === "info_not_shared"}
           />
         </div>
       </div>
@@ -131,7 +130,6 @@ const BaseField = memo(function BaseField({
         value={value}
         error={error}
         onChange={onChange}
-        hideLabelAndSubtitle={name === "info_not_shared"}
       />
     </div>
   )

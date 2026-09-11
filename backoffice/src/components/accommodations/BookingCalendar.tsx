@@ -1,4 +1,5 @@
 import { useQuery } from "@tanstack/react-query"
+import { useNavigate } from "@tanstack/react-router"
 import {
   CalendarPlus,
   ChevronLeft,
@@ -27,11 +28,6 @@ import {
 import { Skeleton } from "@/components/ui/skeleton"
 import useCustomToast from "@/hooks/useCustomToast"
 import { cn } from "@/lib/utils"
-import {
-  type BookingDetail,
-  BookingDetailDialog,
-  detailFromCalendar,
-} from "./BookingDetailDialog"
 import { BlockDatesDialog, NewBookingDialog } from "./BookingDialog"
 import {
   BOOKING_APPEARANCE,
@@ -295,14 +291,10 @@ function Legend() {
 
 export function BookingCalendar({ popupId }: { popupId: string }) {
   const { showErrorToast } = useCustomToast()
+  const navigate = useNavigate()
   const [anchor, setAnchor] = useState(() => monthWindow(todayKey()).from)
   const [propertyId, setPropertyId] = useState(ALL_PROPERTIES)
   const [search, setSearch] = useState("")
-  const [detail, setDetail] = useState<{
-    booking: BookingDetail
-    roomName: string
-    units: { id: string; label: string }[]
-  } | null>(null)
   const [newBooking, setNewBooking] = useState<{
     accommodationId?: string
     unitId?: string
@@ -468,15 +460,9 @@ export function BookingCalendar({ popupId }: { popupId: string }) {
                           to={to}
                           bookings={(unit.bookings ?? []).filter(matchesSearch)}
                           onBookingClick={(booking) =>
-                            setDetail({
-                              booking: detailFromCalendar(booking),
-                              roomName: accommodation.name,
-                              units: (accommodation.units ?? []).map(
-                                (item) => ({
-                                  id: item.id,
-                                  label: item.label,
-                                }),
-                              ),
+                            navigate({
+                              to: "/accommodations/bookings/$id",
+                              params: { id: booking.id },
                             })
                           }
                           onEmptyClick={(day) =>
@@ -509,14 +495,6 @@ export function BookingCalendar({ popupId }: { popupId: string }) {
       )}
 
       <Legend />
-
-      <BookingDetailDialog
-        booking={detail?.booking ?? null}
-        roomName={detail?.roomName ?? ""}
-        units={detail?.units ?? []}
-        open={!!detail}
-        onOpenChange={(open) => !open && setDetail(null)}
-      />
 
       {newBooking && (
         <NewBookingDialog
