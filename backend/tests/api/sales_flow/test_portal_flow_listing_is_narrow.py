@@ -27,13 +27,21 @@ from app.core.security import create_access_token
 from tests._flow_helpers import provision_default_flow
 
 # What a buyer legitimately needs to pick a way in and list them in order,
-# plus `type` and an optional price summary — the only display facts needed to
-# select and describe this way in before entering checkout.
+# plus `type`, an optional price summary, and public theme overrides — the
+# display facts needed to select and describe this way in before checkout.
 #
 # Every entry here was added on purpose. That is the point of asserting the
 # exact set: the next field to leak has not been added yet, and this test is
 # what makes adding one a decision rather than an accident.
-ALLOWED_KEYS = {"id", "slug", "name", "order", "type", "price_summary"}
+ALLOWED_KEYS = {
+    "id",
+    "slug",
+    "name",
+    "order",
+    "type",
+    "price_summary",
+    "theme_config",
+}
 
 
 def _popup_with_flows(db: Session, tenant: Tenants) -> Popups:

@@ -259,7 +259,7 @@ def _internal_open_checkout_thank_you_url(
     popup: "Popups",
     payment: Payments,
     *,
-    flow_slug: str,
+    flow_slug: str | None = None,
     return_context: str = "direct",
 ) -> str:
     """Internal thank-you URL for the request's explicit checkout context."""
@@ -269,9 +269,10 @@ def _internal_open_checkout_thank_you_url(
         base = f"{portal_base}/thank-you"
     else:
         base = f"{portal_base}/checkout/{popup.slug}/thank-you"
-    return append_query_params(
-        base, [("payment_id", str(payment.id)), ("flow", flow_slug)]
-    )
+    query = [("payment_id", str(payment.id))]
+    if flow_slug is not None:
+        query.append(("flow", flow_slug))
+    return append_query_params(base, query)
 
 
 def resolve_patron_template_config(
