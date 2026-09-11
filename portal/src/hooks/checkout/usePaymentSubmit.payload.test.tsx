@@ -18,6 +18,8 @@ const createMyPayment = vi.hoisted(() =>
 )
 const telemetry = vi.hoisted(() => ({ trackPortalTelemetry: vi.fn() }))
 const queryClient = vi.hoisted(() => ({ invalidateQueries: vi.fn() }))
+const routerReplace = vi.hoisted(() => vi.fn())
+const navigateBrowser = vi.hoisted(() => vi.fn())
 
 vi.mock("@/client", () => ({
   ApiError: class ApiError extends Error {},
@@ -28,14 +30,16 @@ vi.mock("@tanstack/react-query", () => ({
   useQueryClient: () => queryClient,
 }))
 vi.mock("next/navigation", () => ({
-  useRouter: () => ({ replace: vi.fn() }),
+  useRouter: () => ({ replace: routerReplace }),
 }))
 vi.mock("react-i18next", () => ({
   useTranslation: () => ({ t: (key: string) => key, i18n: { language: "en" } }),
 }))
 vi.mock("@/helpers/checkout", () => ({
-  withCheckoutLocale: (url: string) => url,
+  withCheckoutLocale: (url: string, locale: string) =>
+    `${url}?locale=${locale}`,
 }))
+vi.mock("@/lib/browser-navigation", () => ({ navigateBrowser }))
 vi.mock("@/lib/attribution", () => ({
   getAttribution: () => ({}),
 }))
@@ -95,6 +99,7 @@ function renderPaymentSubmit(
     mealPlans?: SelectedMealPlanItem[]
     accommodations?: SelectedAccommodationItem[]
     dynamicItems?: Record<string, SelectedDynamicItem[]>
+    returnContext?: "direct" | "portal"
   } = {},
 ) {
   const submitMode = options.submitMode ?? "open-ticketing"
@@ -125,6 +130,7 @@ function renderPaymentSubmit(
       clearPromoCode: vi.fn(),
       paymentCompleteRef: { current: false },
       submitMode,
+      returnContext: options.returnContext,
       buyerData: {
         email: "taylor@example.com",
         firstName: "Taylor",
@@ -142,6 +148,8 @@ describe("usePaymentSubmit public purchase payload", () => {
     createMyPayment.mockClear()
     telemetry.trackPortalTelemetry.mockClear()
     queryClient.invalidateQueries.mockClear()
+    routerReplace.mockClear()
+    navigateBrowser.mockClear()
   })
 
   it.each([
@@ -173,6 +181,58 @@ describe("usePaymentSubmit public purchase payload", () => {
         },
       }),
     })
+  })
+
+  it("marks purchases initiated by the portal with an explicit return context", async () => {
+    const { result } = renderPaymentSubmit("merch-store", {
+      returnContext: "portal",
+    })
+
+    await act(async () => {
+      await result.current.submitPayment()
+    })
+
+    expect(
+      purchaseOpenTicketing.mock.calls[0]?.[0].requestBody.return_context,
+    ).toBe("portal")
+  })
+
+  it("sends a paid portal purchase to SimpleFI with locale", async () => {
+    purchaseOpenTicketing.mockResolvedValueOnce({
+      status: "pending",
+      checkout_url: "https://simplefi.test/checkout/payment-1",
+    })
+    const { result } = renderPaymentSubmit("merch-store", {
+      returnContext: "portal",
+    })
+
+    await act(async () => {
+      await result.current.submitPayment()
+    })
+
+    expect(navigateBrowser).toHaveBeenCalledWith(
+      "https://simplefi.test/checkout/payment-1?locale=en",
+    )
+  })
+
+  it("follows the backend-resolved portal redirect for a zero-price purchase", async () => {
+    const redirectUrl =
+      "https://portal.test/portal/festival-2026/thank-you?lang=en"
+    purchaseOpenTicketing.mockResolvedValueOnce({
+      status: "approved",
+      payment_id: "payment-1",
+      redirect_url: redirectUrl,
+    })
+    const { result } = renderPaymentSubmit("merch-store", {
+      returnContext: "portal",
+    })
+
+    await act(async () => {
+      await result.current.submitPayment()
+    })
+
+    expect(navigateBrowser).toHaveBeenCalledWith(redirectUrl)
+    expect(routerReplace).not.toHaveBeenCalled()
   })
 
   it.each([

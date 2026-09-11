@@ -30,6 +30,8 @@ interface CheckoutPageClientProps {
   initialRuntimeLanguage?: string | null
   /** Show server-authoritative estimate/definitive status in an authenticated shell. */
   showQuoteStatus?: boolean
+  /** Where successful open-ticketing purchases should return. */
+  returnContext?: "direct" | "portal"
 }
 
 export default function CheckoutPageClient({
@@ -39,6 +41,7 @@ export default function CheckoutPageClient({
   initialDataUpdatedAt,
   initialRuntimeLanguage = null,
   showQuoteStatus = false,
+  returnContext = "direct",
 }: CheckoutPageClientProps) {
   const { t } = useTranslation()
   // Resolved in a state initializer rather than an effect so the very first
@@ -150,6 +153,7 @@ export default function CheckoutPageClient({
           flowSlug={runtime.selected_flow.slug}
           prefilledBuyer={prefilledBuyer}
           showQuoteStatus={showQuoteStatus}
+          returnContext={returnContext}
         />
       </CheckoutShell>
     </ThemeProvider>
