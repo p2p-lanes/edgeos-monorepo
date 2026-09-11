@@ -20,6 +20,9 @@ interface UsePromoCodeParams {
   savedCart: CartState | null | undefined
   hasRestoredCheckoutRef: MutableRefObject<boolean>
   validatePromoCodeOverride?: (code: string) => Promise<number | null>
+  /** Entry-link coupon. Validated once per flow, after cart restore/release,
+   *  instead of the saved cart's code. Buyers can still remove or replace it. */
+  initialPromoCode?: string | null
   /** When true, allows re-validation of a restored promo code to proceed.
    *  Used to gate open-cart promo re-validation until the release-on-mount
    *  call settles so the coupon field never flashes "Invalid" before the
@@ -36,6 +39,7 @@ export function usePromoCode({
   savedCart,
   hasRestoredCheckoutRef,
   validatePromoCodeOverride,
+  initialPromoCode = null,
   releaseSettled = true,
 }: UsePromoCodeParams) {
   const { t } = useTranslation()
@@ -50,7 +54,10 @@ export function usePromoCode({
   activePromoScopeRef.current = promoScope
 
   const applyPromoCode = useCallback(
-    async (code: string): Promise<boolean> => {
+    async (
+      code: string,
+      { silent = false }: { silent?: boolean } = {},
+    ): Promise<boolean> => {
       if (!cityId && !validatePromoCodeOverride) return false
       const validationScope = promoScope
 
@@ -78,7 +85,7 @@ export function usePromoCode({
         // A 0% (or missing) discount is meaningless — surfacing it as a valid
         // applied code confuses users ("Code applied!" + unchanged total).
         if (discountValue <= 0) {
-          setError(t("checkout.errors.confirm_coupon_invalid"))
+          if (!silent) setError(t("checkout.errors.confirm_coupon_invalid"))
           return false
         }
 
@@ -155,6 +162,18 @@ export function usePromoCode({
     // promoCodeDiscount to 0 if the API response is missing discount_value.
     if (promoCodeValid) {
       hasRevalidatedPromoRef.current = true
+      return
+    }
+
+    const entryCode = initialPromoCode?.trim()
+    if (entryCode) {
+      hasRevalidatedPromoRef.current = true
+      // An explicit entry-link code wins over a restored one. Clear the
+      // restored state first so a rejected URL code never appears applied.
+      // URL coupons are best-effort: invalid, expired, disabled, or failed
+      // validation must leave a normal checkout, without an error banner.
+      clearPromoCode()
+      void applyPromoCode(entryCode, { silent: true })
       return
     }
 
@@ -244,6 +263,9 @@ export function usePromoCode({
     savedCart,
     cityId,
     salesFlowId,
+    initialPromoCode,
+    applyPromoCode,
+    clearPromoCode,
     promoCode,
     setDiscount,
     hasRestoredCheckoutRef.current,

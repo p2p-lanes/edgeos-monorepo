@@ -189,7 +189,7 @@ export const CONFIG_SECTIONS: {
         key: "open_checkout_cancel_url",
         label: "Cancel URL",
         description:
-          "Where a buyer goes after cancelling. Defaults to the portal checkout page.",
+          "Where a buyer goes after cancelling. Defaults to this sales flow's checkout page.",
         kind: "text",
       },
       {

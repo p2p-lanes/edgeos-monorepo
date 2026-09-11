@@ -78,6 +78,7 @@ import { Route as LayoutCouponsIdEditRouteImport } from './routes/_layout/coupon
 import { Route as LayoutAdminIdEditRouteImport } from './routes/_layout/admin/$id.edit'
 import { Route as LayoutAccommodationsRoomsNewRouteImport } from './routes/_layout/accommodations/rooms/new'
 import { Route as LayoutAccommodationsPropertiesNewRouteImport } from './routes/_layout/accommodations/properties/new'
+import { Route as LayoutAccommodationsBookingsIdRouteImport } from './routes/_layout/accommodations/bookings/$id'
 import { Route as LayoutFormBuilderSectionsIdEditRouteImport } from './routes/_layout/form-builder/sections/$id.edit'
 import { Route as LayoutEventsVenuesVenueIdScheduleRouteImport } from './routes/_layout/events/venues/$venueId.schedule'
 import { Route as LayoutEventsVenuesVenueIdEditRouteImport } from './routes/_layout/events/venues/$venueId.edit'
@@ -442,6 +443,12 @@ const LayoutAccommodationsPropertiesNewRoute =
     path: '/accommodations/properties/new',
     getParentRoute: () => LayoutRoute,
   } as any)
+const LayoutAccommodationsBookingsIdRoute =
+  LayoutAccommodationsBookingsIdRouteImport.update({
+    id: '/accommodations/bookings/$id',
+    path: '/accommodations/bookings/$id',
+    getParentRoute: () => LayoutRoute,
+  } as any)
 const LayoutFormBuilderSectionsIdEditRoute =
   LayoutFormBuilderSectionsIdEditRouteImport.update({
     id: '/form-builder/sections/$id/edit',
@@ -529,6 +536,7 @@ export interface FileRoutesByFullPath {
   '/tasks/': typeof LayoutTasksIndexRoute
   '/theme/': typeof LayoutThemeIndexRoute
   '/ticketing-steps/': typeof LayoutTicketingStepsIndexRoute
+  '/accommodations/bookings/$id': typeof LayoutAccommodationsBookingsIdRoute
   '/accommodations/properties/new': typeof LayoutAccommodationsPropertiesNewRoute
   '/accommodations/rooms/new': typeof LayoutAccommodationsRoomsNewRoute
   '/admin/$id/edit': typeof LayoutAdminIdEditRoute
@@ -605,6 +613,7 @@ export interface FileRoutesByTo {
   '/tasks': typeof LayoutTasksIndexRoute
   '/theme': typeof LayoutThemeIndexRoute
   '/ticketing-steps': typeof LayoutTicketingStepsIndexRoute
+  '/accommodations/bookings/$id': typeof LayoutAccommodationsBookingsIdRoute
   '/accommodations/properties/new': typeof LayoutAccommodationsPropertiesNewRoute
   '/accommodations/rooms/new': typeof LayoutAccommodationsRoomsNewRoute
   '/admin/$id/edit': typeof LayoutAdminIdEditRoute
@@ -683,6 +692,7 @@ export interface FileRoutesById {
   '/_layout/tasks/': typeof LayoutTasksIndexRoute
   '/_layout/theme/': typeof LayoutThemeIndexRoute
   '/_layout/ticketing-steps/': typeof LayoutTicketingStepsIndexRoute
+  '/_layout/accommodations/bookings/$id': typeof LayoutAccommodationsBookingsIdRoute
   '/_layout/accommodations/properties/new': typeof LayoutAccommodationsPropertiesNewRoute
   '/_layout/accommodations/rooms/new': typeof LayoutAccommodationsRoomsNewRoute
   '/_layout/admin/$id/edit': typeof LayoutAdminIdEditRoute
@@ -761,6 +771,7 @@ export interface FileRouteTypes {
     | '/tasks/'
     | '/theme/'
     | '/ticketing-steps/'
+    | '/accommodations/bookings/$id'
     | '/accommodations/properties/new'
     | '/accommodations/rooms/new'
     | '/admin/$id/edit'
@@ -837,6 +848,7 @@ export interface FileRouteTypes {
     | '/tasks'
     | '/theme'
     | '/ticketing-steps'
+    | '/accommodations/bookings/$id'
     | '/accommodations/properties/new'
     | '/accommodations/rooms/new'
     | '/admin/$id/edit'
@@ -914,6 +926,7 @@ export interface FileRouteTypes {
     | '/_layout/tasks/'
     | '/_layout/theme/'
     | '/_layout/ticketing-steps/'
+    | '/_layout/accommodations/bookings/$id'
     | '/_layout/accommodations/properties/new'
     | '/_layout/accommodations/rooms/new'
     | '/_layout/admin/$id/edit'
@@ -1431,6 +1444,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof LayoutAccommodationsPropertiesNewRouteImport
       parentRoute: typeof LayoutRoute
     }
+    '/_layout/accommodations/bookings/$id': {
+      id: '/_layout/accommodations/bookings/$id'
+      path: '/accommodations/bookings/$id'
+      fullPath: '/accommodations/bookings/$id'
+      preLoaderRoute: typeof LayoutAccommodationsBookingsIdRouteImport
+      parentRoute: typeof LayoutRoute
+    }
     '/_layout/form-builder/sections/$id/edit': {
       id: '/_layout/form-builder/sections/$id/edit'
       path: '/form-builder/sections/$id/edit'
@@ -1525,6 +1545,7 @@ interface LayoutRouteChildren {
   LayoutTasksIndexRoute: typeof LayoutTasksIndexRoute
   LayoutThemeIndexRoute: typeof LayoutThemeIndexRoute
   LayoutTicketingStepsIndexRoute: typeof LayoutTicketingStepsIndexRoute
+  LayoutAccommodationsBookingsIdRoute: typeof LayoutAccommodationsBookingsIdRoute
   LayoutAccommodationsPropertiesNewRoute: typeof LayoutAccommodationsPropertiesNewRoute
   LayoutAccommodationsRoomsNewRoute: typeof LayoutAccommodationsRoomsNewRoute
   LayoutAdminIdEditRoute: typeof LayoutAdminIdEditRoute
@@ -1601,6 +1622,7 @@ const LayoutRouteChildren: LayoutRouteChildren = {
   LayoutTasksIndexRoute: LayoutTasksIndexRoute,
   LayoutThemeIndexRoute: LayoutThemeIndexRoute,
   LayoutTicketingStepsIndexRoute: LayoutTicketingStepsIndexRoute,
+  LayoutAccommodationsBookingsIdRoute: LayoutAccommodationsBookingsIdRoute,
   LayoutAccommodationsPropertiesNewRoute:
     LayoutAccommodationsPropertiesNewRoute,
   LayoutAccommodationsRoomsNewRoute: LayoutAccommodationsRoomsNewRoute,
