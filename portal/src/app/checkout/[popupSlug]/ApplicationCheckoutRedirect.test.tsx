@@ -17,15 +17,9 @@ describe("ApplicationCheckoutRedirect", () => {
   beforeEach(() => replace.mockReset())
 
   it.each([
-    [
-      "attendee-flow-id",
-      "/portal/spring-fest/passes/buy?flow=attendee-flow-id",
-    ],
-    [
-      "volunteer-flow-id",
-      "/portal/spring-fest/passes/buy?flow=volunteer-flow-id",
-    ],
-  ])("hands authenticated flow %s to the legacy Buy route without dropping it", (flowId, target) => {
+    ["attendee-flow-id", "/portal/spring-fest/shop/attendee-flow-id"],
+    ["volunteer-flow-id", "/portal/spring-fest/shop/volunteer-flow-id"],
+  ])("hands authenticated flow %s to its resolvable Shop route", (flowId, target) => {
     render(
       <ApplicationCheckoutRedirect popupSlug="spring-fest" flowId={flowId} />,
     )

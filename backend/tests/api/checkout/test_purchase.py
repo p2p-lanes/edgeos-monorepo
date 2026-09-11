@@ -876,6 +876,7 @@ def test_zero_amount_purchase_returns_custom_success_redirect_url(
                     "form_data": {},
                 },
                 "coupon_code": "FREEPASS",
+                "return_context": "portal",
             },
             headers={"X-Tenant-Id": str(tenant_a.id)},
         )
@@ -887,6 +888,7 @@ def test_zero_amount_purchase_returns_custom_success_redirect_url(
     # The checkout language always travels as a lang query param (popup
     # default when the request carries no locale).
     assert body["redirect_url"] == "https://brand.example.com/thank-you?lang=en"
+    assert "flow=" not in body["redirect_url"]
     mock_get_client.assert_not_called()
 
 
@@ -945,6 +947,7 @@ def test_paid_purchase_signs_order_payload_into_simplefi_success_url(
                     "last_name": "Walter",
                     "form_data": {},
                 },
+                "return_context": "portal",
             },
             headers={"X-Tenant-Id": str(tenant_a.id)},
         )
@@ -959,6 +962,7 @@ def test_paid_purchase_signs_order_payload_into_simplefi_success_url(
     # never affects HMAC verification (contract with the external page).
     query = parse_qs(urlparse(success_url).query)
     assert query["lang"] == ["en"]
+    assert "flow" not in query
     payload = _verify_signed_redirect(success_url, secret)
     assert "lang" not in payload
     assert payload["first_name"] == "Matias"
@@ -1027,6 +1031,7 @@ def test_signed_redirect_substitutes_locale_placeholder(
     assert "{locale}" not in success_url
     # The same locale is forwarded as the lang query param.
     assert parse_qs(urlparse(success_url).query)["lang"] == ["en"]
+    assert "flow" not in parse_qs(urlparse(success_url).query)
 
 
 def test_each_flow_lands_its_buyers_on_its_own_page(
@@ -1274,10 +1279,77 @@ def test_paid_purchase_injects_order_data_into_portal_thank_you(
     # The internal thank-you also receives lang so the portal keeps the
     # buyer's checkout language after the provider redirect.
     assert parse_qs(urlparse(success_url).query)["lang"] == ["en"]
+    assert parse_qs(urlparse(success_url).query)["flow"] == ["checkout"]
     payload = _decode_data_param(success_url)
     assert payload["first_name"] == "Matias"
     assert payload["amount_total"] == 240.0
     assert payload["items"] == [{"title": product.name, "qty": 2, "price": 120.0}]
+
+
+def test_paid_portal_purchase_returns_to_portal_native_thank_you(
+    client: TestClient,
+    db: Session,
+    tenant_a: Tenants,
+) -> None:
+    popup = _make_popup(db, tenant_a, slug_prefix="paid-portal-return")
+    flow = SalesFlows(
+        tenant_id=popup.tenant_id,
+        popup_id=popup.id,
+        slug=f"curated-{uuid.uuid4().hex[:6]}",
+        name="Curated experience",
+        type=SaleType.direct.value,
+    )
+    db.add(flow)
+    db.flush()
+    seed_ticketing_steps_for_popup(
+        db,
+        popup_id=popup.id,
+        tenant_id=popup.tenant_id,
+        sales_flow_id=flow.id,
+        flow_type=flow.type,
+    )
+    product = _make_product(db, popup, price="120.00")
+    db.commit()
+
+    with patch("app.services.simplefi.get_simplefi_client") as mock_get_client:
+        mock_get_client.return_value.create_payment.return_value = SimpleNamespace(
+            id="sf_portal_return_1",
+            status="pending",
+            checkout_url="https://simplefi.test/checkout/portal-return",
+            is_installment_plan=False,
+        )
+        response = client.post(
+            f"/api/v1/checkout/{popup.slug}/{flow.slug}/purchase",
+            json={
+                "products": [
+                    {
+                        "product_id": str(product.id),
+                        "quantity": 1,
+                        "recipient_key": "buyer",
+                    }
+                ],
+                "recipients": [_recipient(product)],
+                "buyer": {
+                    "email": "buyer@test.com",
+                    "first_name": "Matias",
+                    "last_name": "Walter",
+                    "form_data": {},
+                },
+                "locale": "es",
+                "return_context": "portal",
+            },
+            headers={"X-Tenant-Id": str(tenant_a.id)},
+        )
+
+    assert response.status_code == 200, response.text
+    success_url = mock_get_client.return_value.create_payment.call_args.kwargs[
+        "success_path"
+    ]
+    assert f"/portal/{popup.slug}/thank-you" in success_url
+    assert f"/checkout/{popup.slug}/thank-you" not in success_url
+    assert parse_qs(urlparse(success_url).query)["lang"] == ["es"]
+    assert parse_qs(urlparse(success_url).query)["flow"] == [flow.slug]
+    assert _decode_data_param(success_url)["amount_total"] == 120.0
 
 
 def test_zero_amount_purchase_injects_order_data_into_portal_thank_you(
@@ -1320,9 +1392,52 @@ def test_zero_amount_purchase_injects_order_data_into_portal_thank_you(
     assert body["status"] == "approved"
     redirect_url = body["redirect_url"]
     assert f"/checkout/{popup.slug}/thank-you" in redirect_url
+    assert parse_qs(urlparse(redirect_url).query)["flow"] == ["checkout"]
     payload = _decode_data_param(redirect_url)
     assert payload["amount_total"] == 0.0
     assert payload["items"] == [{"title": product.name, "qty": 1, "price": 75.0}]
+    mock_get_client.assert_not_called()
+
+
+def test_zero_amount_portal_purchase_returns_portal_native_redirect(
+    client: TestClient,
+    db: Session,
+    tenant_a: Tenants,
+) -> None:
+    popup = _make_popup(db, tenant_a, slug_prefix="free-portal-return")
+    product = _make_product(db, popup, price="75.00")
+    _make_coupon(db, popup, code="FREEPASS", discount_value=100)
+    db.commit()
+
+    with patch("app.services.simplefi.get_simplefi_client") as mock_get_client:
+        response = client.post(
+            f"/api/v1/checkout/{popup.slug}/checkout/purchase",
+            json={
+                "products": [
+                    {
+                        "product_id": str(product.id),
+                        "quantity": 1,
+                        "recipient_key": "buyer",
+                    }
+                ],
+                "recipients": [_recipient(product)],
+                "buyer": {
+                    "email": "buyer@test.com",
+                    "first_name": "Matias",
+                    "last_name": "Walter",
+                    "form_data": {},
+                },
+                "coupon_code": "FREEPASS",
+                "return_context": "portal",
+            },
+            headers={"X-Tenant-Id": str(tenant_a.id)},
+        )
+
+    assert response.status_code == 200, response.text
+    redirect_url = response.json()["redirect_url"]
+    assert f"/portal/{popup.slug}/thank-you" in redirect_url
+    assert parse_qs(urlparse(redirect_url).query)["flow"] == ["checkout"]
+    assert _decode_data_param(redirect_url)["amount_total"] == 0.0
     mock_get_client.assert_not_called()
 
 

@@ -18015,6 +18015,12 @@ export const OpenTicketingPurchaseCreateSchema = {
             ],
             title: 'Locale'
         },
+        return_context: {
+            type: 'string',
+            enum: ['direct', 'portal'],
+            title: 'Return Context',
+            default: 'direct'
+        },
         attribution: {
             anyOf: [
                 {
@@ -24779,6 +24785,16 @@ export const SalesFlowPortalPublicSchema = {
                     type: 'null'
                 }
             ]
+        },
+        theme_config: {
+            anyOf: [
+                {
+                    '$ref': '#/components/schemas/SalesFlowPortalThemeConfig'
+                },
+                {
+                    type: 'null'
+                }
+            ]
         }
     },
     type: 'object',
@@ -24796,6 +24812,132 @@ forge a completed order against that page.
 The portal needs a door's name, its slug and the order to list them in.
 Anything a flow decides about selling is the organiser's business, so it is
 added here one field at a time, on purpose, or not at all.`
+} as const;
+
+export const SalesFlowPortalThemeColorsSchema = {
+    properties: {
+        mode: {
+            type: 'string',
+            enum: ['light', 'dark'],
+            title: 'Mode'
+        },
+        primary_color: {
+            type: 'string',
+            title: 'Primary Color'
+        },
+        primary_foreground_color: {
+            type: 'string',
+            title: 'Primary Foreground Color'
+        },
+        secondary_color: {
+            type: 'string',
+            title: 'Secondary Color'
+        },
+        accent_color: {
+            type: 'string',
+            title: 'Accent Color'
+        },
+        checkout_navbar_bg: {
+            type: 'string',
+            title: 'Checkout Navbar Bg'
+        },
+        checkout_subtitle_color: {
+            type: 'string',
+            title: 'Checkout Subtitle Color'
+        },
+        checkout_bottom_bar_bg_color: {
+            type: 'string',
+            title: 'Checkout Bottom Bar Bg Color'
+        },
+        checkout_bottom_bar_text_color: {
+            type: 'string',
+            title: 'Checkout Bottom Bar Text Color'
+        },
+        checkout_watermark_color: {
+            type: 'string',
+            title: 'Checkout Watermark Color'
+        },
+        checkout_nav_text_color: {
+            type: 'string',
+            title: 'Checkout Nav Text Color'
+        },
+        checkout_nav_monochrome_emoji: {
+            anyOf: [
+                {
+                    type: 'boolean'
+                },
+                {
+                    type: 'string'
+                }
+            ],
+            title: 'Checkout Nav Monochrome Emoji'
+        },
+        card_background_color: {
+            type: 'string',
+            title: 'Card Background Color'
+        },
+        card_foreground_color: {
+            type: 'string',
+            title: 'Card Foreground Color'
+        },
+        border_color: {
+            type: 'string',
+            title: 'Border Color'
+        },
+        input_color: {
+            type: 'string',
+            title: 'Input Color'
+        }
+    },
+    type: 'object',
+    title: 'SalesFlowPortalThemeColors',
+    description: 'Theme color tokens safe for a buyer-facing checkout.'
+} as const;
+
+export const SalesFlowPortalThemeConfigSchema = {
+    properties: {
+        colors: {
+            '$ref': '#/components/schemas/SalesFlowPortalThemeColors'
+        },
+        typography: {
+            '$ref': '#/components/schemas/SalesFlowPortalThemeTypography'
+        },
+        radius: {
+            type: 'string',
+            title: 'Radius'
+        },
+        border_radius: {
+            type: 'string',
+            title: 'Border Radius'
+        }
+    },
+    type: 'object',
+    title: 'SalesFlowPortalThemeConfig',
+    description: 'Narrow selected-flow theme consumed by the Portal ThemeProvider.'
+} as const;
+
+export const SalesFlowPortalThemeTypographySchema = {
+    properties: {
+        font_base_size: {
+            type: 'string',
+            title: 'Font Base Size'
+        },
+        font_heading_scale: {
+            type: 'number',
+            title: 'Font Heading Scale'
+        },
+        font_family: {
+            type: 'string',
+            title: 'Font Family'
+        },
+        font_heading_family: {
+            type: 'string',
+            title: 'Font Heading Family'
+        }
+    },
+    type: 'object',
+    title: 'SalesFlowPortalThemeTypography',
+    description: 'Theme typography tokens safe for a buyer-facing checkout.'
 } as const;
 
 export const SalesFlowPriceKindSchema = {

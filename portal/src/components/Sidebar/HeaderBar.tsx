@@ -151,9 +151,8 @@ const HeaderBar = () => {
   )
 
   // Build cumulative href per segment so each breadcrumb links back to its
-  // own level. Anchored at `/portal/{slug}` when a slug is present;
-  // otherwise we hand the raw path through and let the segment render as
-  // a non-clickable label via `href=undefined`.
+  // own level. Shop has no aggregate route, so it remains a label. Without a
+  // city slug, all segments render as non-clickable labels.
   const base = city?.slug ? `/portal/${city.slug}` : null
 
   return (
@@ -177,7 +176,7 @@ const HeaderBar = () => {
           {pathsToDisplay.map((path, idx) => {
             const isCurrent = idx === pathsToDisplay.length - 1
             const href =
-              base != null
+              base != null && path !== "shop"
                 ? `${base}/${pathsToDisplay.slice(0, idx + 1).join("/")}`
                 : undefined
             return (

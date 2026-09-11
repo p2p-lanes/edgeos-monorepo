@@ -513,18 +513,13 @@ class TestCreatingThroughTheApi:
         assert body["contribution_enabled"] is None
         assert body["installments_enabled"] is None
 
-    def test_a_door_that_starts_clean_still_has_a_checkout(
+    def test_explicit_scratch_starts_with_no_ticketing_steps(
         self,
         client: TestClient,
         db: Session,
         tenant_a: Tenants,
         admin_token_tenant_a: str,
     ) -> None:
-        """Somebody asking to start fresh is asking about settings. A door
-        with no steps renders nothing and sells nothing, which is not what
-        they meant."""
-        from app.api.ticketing_step.models import TicketingSteps
-
         popup = _popup(db, tenant_a)
         _partner_default(db, popup)
 
@@ -546,7 +541,7 @@ class TestCreatingThroughTheApi:
                 TicketingSteps.sales_flow_id == uuid.UUID(resp.json()["id"])
             )
         ).all()
-        assert steps, "a way in with no steps cannot open"
+        assert steps == []
 
     def test_an_omitted_start_from_still_has_a_checkout(
         self,

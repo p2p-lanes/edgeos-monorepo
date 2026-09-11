@@ -7,11 +7,13 @@ import OpenCheckoutThankYouPage from "./page"
 
 const mockPush = vi.fn()
 const mockUseTenant = vi.fn()
+const mockUseCheckoutRuntime = vi.fn()
+let mockSearchParams = new URLSearchParams()
 
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: mockPush }),
   useParams: () => ({ popupSlug: "summer-fest" }),
-  useSearchParams: () => new URLSearchParams(),
+  useSearchParams: () => mockSearchParams,
 }))
 
 vi.mock("react-i18next", () => ({
@@ -23,7 +25,7 @@ vi.mock("@/providers/tenantProvider", () => ({
 }))
 
 vi.mock("../hooks/useCheckoutRuntime", () => ({
-  useCheckoutRuntime: () => ({ data: undefined }),
+  useCheckoutRuntime: (...args: unknown[]) => mockUseCheckoutRuntime(...args),
 }))
 
 // ---------------------------------------------------------------------------
@@ -69,6 +71,9 @@ const portalModeTenant = {
 describe("OpenCheckoutThankYouPage", () => {
   beforeEach(() => {
     mockPush.mockReset()
+    mockSearchParams = new URLSearchParams()
+    mockUseCheckoutRuntime.mockReset()
+    mockUseCheckoutRuntime.mockReturnValue({ data: undefined })
   })
 
   it("TY-1: back-to-portal CTA is not rendered in checkout mode", () => {
@@ -114,5 +119,43 @@ describe("OpenCheckoutThankYouPage", () => {
     expect(screen.getByText("openCheckout.thank_you_title")).toBeTruthy()
     expect(screen.getByText("openCheckout.thank_you_description")).toBeTruthy()
     expect(screen.getByText("openCheckout.thank_you_cta")).toBeTruthy()
+  })
+
+  it("loads and renders the flow-owned thank-you config", () => {
+    mockUseTenant.mockReturnValue(portalModeTenant)
+    mockSearchParams = new URLSearchParams({ flow: "curated-experience" })
+    mockUseCheckoutRuntime.mockReturnValue({
+      data: {
+        popup: {},
+        theme_config: {
+          thank_you: {
+            title: "You're all set, {first_name}",
+            description: "Order {order_id} is confirmed.",
+          },
+        },
+      },
+    })
+    mockSearchParams.set(
+      "data",
+      btoa(JSON.stringify({ first_name: "Taylor", order_id: "order-7" })),
+    )
+
+    render(<OpenCheckoutThankYouPage />)
+
+    expect(mockUseCheckoutRuntime).toHaveBeenCalledWith("summer-fest", {
+      flowSlug: "curated-experience",
+    })
+    expect(screen.getByText("You're all set, Taylor")).toBeTruthy()
+    expect(screen.getByText("Order order-7 is confirmed.")).toBeTruthy()
+  })
+
+  it("uses the legacy checkout flow when the URL has no flow", () => {
+    mockUseTenant.mockReturnValue(portalModeTenant)
+
+    render(<OpenCheckoutThankYouPage />)
+
+    expect(mockUseCheckoutRuntime).toHaveBeenCalledWith("summer-fest", {
+      flowSlug: "checkout",
+    })
   })
 })

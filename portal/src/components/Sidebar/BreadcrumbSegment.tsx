@@ -18,7 +18,9 @@ interface BreadcrumbSegmentProps {
 const KNOWN_SEGMENTS: Record<string, string> = {
   application: "breadcrumbs.application",
   passes: "breadcrumbs.passes",
-  shop: "shop.title",
+  shop: "sidebar.commerce",
+  tickets: "sidebar.tickets",
+  orders: "orders.title",
   buy: "breadcrumbs.buy",
   attendees: "breadcrumbs.attendees",
   groups: "breadcrumbs.groups",
@@ -59,10 +61,18 @@ const BreadcrumbSegment = ({
   }
 
   // Last segment is the current page — non-clickable by convention.
-  if (isCurrent || !href) {
+  if (isCurrent) {
     return (
       <BreadcrumbItem>
         <BreadcrumbPage>{formattedText}</BreadcrumbPage>
+      </BreadcrumbItem>
+    )
+  }
+
+  if (!href) {
+    return (
+      <BreadcrumbItem>
+        <span>{formattedText}</span>
       </BreadcrumbItem>
     )
   }

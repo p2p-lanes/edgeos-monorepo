@@ -60,6 +60,6 @@ describe("UpsaleFlowsPanel", () => {
     )
 
     const link = await screen.findByRole("link", { name: "VIP Add-on" })
-    expect(link.getAttribute("href")).toBe("/checkout/my-event/vip-addon")
+    expect(link.getAttribute("href")).toBe("/portal/my-event/shop/vip-addon")
   })
 })

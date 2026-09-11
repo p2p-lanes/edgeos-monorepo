@@ -254,12 +254,25 @@ def _resolve_open_checkout_cancel_url(
 
 
 def _internal_open_checkout_thank_you_url(
-    portal_base: str, landing_is_checkout: bool, popup: "Popups", payment: Payments
+    portal_base: str,
+    landing_is_checkout: bool,
+    popup: "Popups",
+    payment: Payments,
+    *,
+    flow_slug: str | None = None,
+    return_context: str = "direct",
 ) -> str:
-    """Portal thank-you URL for the open-checkout flow (landing-mode aware)."""
-    if landing_is_checkout:
-        return f"{portal_base}/thank-you?payment_id={payment.id}"
-    return f"{portal_base}/checkout/{popup.slug}/thank-you?payment_id={payment.id}"
+    """Internal thank-you URL for the request's explicit checkout context."""
+    if return_context == "portal":
+        base = f"{portal_base}/portal/{popup.slug}/thank-you"
+    elif landing_is_checkout:
+        base = f"{portal_base}/thank-you"
+    else:
+        base = f"{portal_base}/checkout/{popup.slug}/thank-you"
+    query = [("payment_id", str(payment.id))]
+    if flow_slug is not None:
+        query.append(("flow", flow_slug))
+    return append_query_params(base, query)
 
 
 def resolve_patron_template_config(
@@ -1148,6 +1161,7 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
                     email=obj.buyer.email,
                     popup_id=popup.id,
                     locale=obj.locale,
+                    return_context=obj.return_context,
                 )
 
                 # ADR-2 advisory lock: serialize concurrent open-checkout
@@ -1353,7 +1367,12 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
             success_redirect = _resolve_open_checkout_success_url(
                 target_flow,
                 _internal_open_checkout_thank_you_url(
-                    portal_base, landing_is_checkout, popup, payment
+                    portal_base,
+                    landing_is_checkout,
+                    popup,
+                    payment,
+                    flow_slug=target_flow.slug,
+                    return_context=obj.return_context,
                 ),
                 thank_you_payload,
                 locale=obj.locale or popup.default_language or "en",
@@ -4472,6 +4491,7 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
         email: str | None = None,
         popup_id: uuid.UUID | None = None,
         locale: str | None = None,
+        return_context: str = "direct",
     ) -> None:
         """Cancel any prior PENDING SimpleFi payment for this buyer before creating a new one.
 
@@ -4492,9 +4512,9 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
           release of coupon, stock, and credit holds.  Returns normally.
         - ALREADY_APPROVED: calls ``_reconcile_approved`` (idempotent approve),
           then raises HTTP 409 ``previous_payment_completed``. The detail body
-          carries no payment identifiers; for open checkout it includes a
-          SIGNED thank-you redirect URL only when the popup has signing
-          configured, otherwise no URL at all.
+          carries no payment identifiers; open checkout uses a signed external
+          redirect when configured, or a generic internal page for an explicit
+          portal return context with no external destination.
         - Any exception (CancelOutcomeAmbiguousError, transport, 5xx): raises
           HTTP 502 ``payment_cancel_failed``.  Holds are NOT released — never
           release without SimpleFi confirmation.
@@ -4507,7 +4527,8 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
             email: Buyer email for open-checkout lookup (requires popup_id).
             popup_id: Required when email is provided.
             locale: Checkout language of the new purchase attempt, forwarded
-                to the 409 signed redirect. Falls back to the popup default.
+                to the resolved 409 redirect. Falls back to the popup default.
+            return_context: Explicit direct or portal origin for safe fallback.
         """
 
         # Locate the prior PENDING SimpleFi payment for this buyer
@@ -4529,7 +4550,11 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
             return  # No prior pending payment — nothing to supersede
 
         self._supersede_located_pending(
-            session, prior, anonymous=(application_id is None), locale=locale
+            session,
+            prior,
+            anonymous=(application_id is None),
+            locale=locale,
+            return_context=return_context,
         )
 
     def _supersede_located_pending(
@@ -4539,6 +4564,7 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
         *,
         anonymous: bool,
         locale: str | None = None,
+        return_context: str = "direct",
     ) -> None:
         """Cancel an already-located PENDING SimpleFi payment and release its holds.
 
@@ -4655,11 +4681,11 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
             # Build a safe redirect URL for the 409 response.
             # Security contract (S1):
             #   - Never expose the raw payment UUID to anonymous callers.
-            #   - Open checkout: return a SIGNED external redirect ONLY when
-            #     both a signing secret AND an external success URL are configured.
-            #     Any other case omits redirect_url (portal falls back to
-            #     message-only).  An unsigned internal portal URL MUST NOT be
-            #     returned here — it carries the raw payment UUID in the path.
+            #   - Open checkout: return a SIGNED external redirect when both a
+            #     signing secret and external success URL are configured.
+            #     An explicit portal request with no external destination may
+            #     use the generic portal completion page because it carries no
+            #     payment UUID. Direct checkout otherwise remains message-only.
             #   - Authenticated: redirect to the buyer's own passes page; no
             #     payment UUID is needed or included.
             redirect_url: str | None = None
@@ -4720,7 +4746,20 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
                     redirect_url = build_signed_redirect_url(
                         success_base, payload, secret
                     )
-                # else: no signing secret or no external URL — omit redirect_url
+                # When a portal checkout has no resolved external destination,
+                # the request-level context can safely return a generic internal
+                # completion page without exposing the payment id.
+                if (
+                    redirect_url is None
+                    and return_context == "portal"
+                    and not (_config and _config.open_checkout_success_url)
+                ):
+                    portal_base = get_portal_url(_tenant)
+                    lang = locale or _popup.default_language or "en"
+                    redirect_url = append_query_params(
+                        f"{portal_base}/portal/{_popup.slug}/thank-you",
+                        [("lang", lang), ("flow", _flow.slug)],
+                    )
 
             elif not anonymous and _popup is not None and _tenant is not None:
                 # Authenticated path: send buyer to their own passes page.

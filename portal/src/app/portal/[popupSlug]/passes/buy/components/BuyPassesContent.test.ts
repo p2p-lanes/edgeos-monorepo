@@ -1,10 +1,16 @@
 import { render } from "@testing-library/react"
 import { createElement } from "react"
 import { beforeEach, describe, expect, it, vi } from "vitest"
-import BuyPassesContent, { resolveLegacyShopRoute } from "./BuyPassesContent"
+import LegacyBuyPassesRedirect, {
+  resolveLegacyShopRoute,
+} from "./BuyPassesContent"
 
 const replace = vi.fn()
 let flowIdentifier = "flow-1"
+let applicationQuery: { data?: unknown[]; isLoading: boolean } = {
+  data: [],
+  isLoading: false,
+}
 let directQuery: { data?: unknown[]; isLoading: boolean } = {
   data: [],
   isLoading: false,
@@ -19,7 +25,7 @@ vi.mock("@/providers/cityProvider", () => ({
   useCityProvider: () => ({ getCity: () => ({ id: "popup-1" }) }),
 }))
 vi.mock("@/hooks/usePortalSalesFlows", () => ({
-  usePortalSalesFlows: () => ({ data: [], isLoading: false }),
+  usePortalSalesFlows: () => applicationQuery,
 }))
 vi.mock("@/hooks/usePortalDirectSalesFlows", () => ({
   usePortalDirectSalesFlows: () => directQuery,
@@ -46,34 +52,34 @@ describe("resolveLegacyShopRoute", () => {
     ).toEqual({ kind: "shop", target: "/portal/summer-camp/shop/merch-store" })
   })
 
-  it("keeps an authorized application flow in its flow-aware portal checkout", () => {
+  it("canonicalizes an application legacy identifier to its readable Shop URL", () => {
     expect(
       resolveLegacyShopRoute("summer-camp", "weekend-pass", flows, true),
     ).toEqual({
-      kind: "application",
-      flowId: "flow-2",
-      flowSlug: "weekend-pass",
+      kind: "shop",
+      target: "/portal/summer-camp/shop/weekend-pass",
     })
   })
 
-  it("returns only Shop root for an unknown identifier without selecting another flow", () => {
+  it("returns to the Portal root for an unknown identifier without selecting another flow", () => {
     expect(
       resolveLegacyShopRoute("summer-camp", "unknown-flow", flows, true),
-    ).toEqual({ kind: "shop", target: "/portal/summer-camp/shop" })
+    ).toEqual({ kind: "shop", target: "/portal/summer-camp" })
   })
 })
 
-describe("BuyPassesContent legacy route", () => {
+describe("LegacyBuyPassesRedirect", () => {
   beforeEach(() => {
     replace.mockReset()
     flowIdentifier = "flow-1"
+    applicationQuery = { data: [], isLoading: false }
     directQuery = { data: [], isLoading: false }
   })
 
   it("does not redirect a fresh legacy link before authorized collections resolve", () => {
     directQuery = { data: undefined, isLoading: true }
 
-    render(createElement(BuyPassesContent))
+    render(createElement(LegacyBuyPassesRedirect))
 
     expect(replace).not.toHaveBeenCalled()
   })
@@ -84,8 +90,20 @@ describe("BuyPassesContent legacy route", () => {
       isLoading: false,
     }
 
-    render(createElement(BuyPassesContent))
+    render(createElement(LegacyBuyPassesRedirect))
 
     expect(replace).toHaveBeenCalledWith("/portal/summer-camp/shop/merch-store")
+  })
+
+  it("redirects a legacy application-flow UUID to its canonical Shop URL", () => {
+    flowIdentifier = "application-id"
+    applicationQuery = {
+      data: [{ id: "application-id", slug: "attendee", type: "application" }],
+      isLoading: false,
+    }
+
+    render(createElement(LegacyBuyPassesRedirect))
+
+    expect(replace).toHaveBeenCalledWith("/portal/summer-camp/shop/attendee")
   })
 })

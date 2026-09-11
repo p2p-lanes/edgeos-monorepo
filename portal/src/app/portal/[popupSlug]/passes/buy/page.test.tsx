@@ -24,7 +24,7 @@ vi.mock("@/hooks/useHumanPopupAccess", () => ({
 
 vi.mock("@/providers/cityProvider", () => ({
   useCityProvider: () => ({
-    getCity: () => ({ id: "popup-1", takes_applications: true }),
+    getCity: () => ({ id: "popup-1", takes_applications: false }),
   }),
 }))
 
@@ -40,7 +40,7 @@ describe("BuyPassesPage", () => {
     mocks.buyPassesContent.mockClear()
   })
 
-  it("delegates an authorized application flow UUID to BuyPassesContent without a Shop redirect", () => {
+  it("delegates an authorized direct-sale legacy URL to the Shop compatibility redirect", () => {
     render(<BuyPassesPage />)
 
     expect(screen.getByTestId("buy-passes-content")).toBeTruthy()

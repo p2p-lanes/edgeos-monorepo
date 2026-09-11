@@ -5,18 +5,17 @@ const t = (key: string) =>
   key === "sidebar.attendee_directory" ? "Directory" : key
 
 describe("buildDirectoryResource", () => {
-  it("keeps the localized Directory route and selected-flow query for authorized attendees", () => {
+  it("keeps the localized Directory route popup-scoped", () => {
     expect(
       buildDirectoryResource({
         t,
         slug: "summit",
-        flowQuery: "?flow=team",
-        canSeeAttendees: true,
+        hasAcceptedParticipation: true,
         attendeeDirectoryEnabled: true,
       }),
     ).toMatchObject({
       name: "Directory",
-      path: "/portal/summit/attendees?flow=team",
+      path: "/portal/summit/attendees",
       status: "active",
       group: "community",
     })
@@ -27,8 +26,7 @@ describe("buildDirectoryResource", () => {
       buildDirectoryResource({
         t,
         slug: "summit",
-        flowQuery: "?flow=team",
-        canSeeAttendees: true,
+        hasAcceptedParticipation: true,
         attendeeDirectoryEnabled: false,
       }).status,
     ).toBe("hidden")
@@ -39,8 +37,7 @@ describe("buildDirectoryResource", () => {
       buildDirectoryResource({
         t,
         slug: "summit",
-        flowQuery: "",
-        canSeeAttendees: false,
+        hasAcceptedParticipation: false,
         attendeeDirectoryEnabled: true,
       }).status,
     ).toBe("hidden")

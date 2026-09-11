@@ -310,6 +310,7 @@ interface CheckoutProviderProps {
   initialPromoCode?: string | null
   submitMode?: "application" | "open-ticketing"
   submitPopupSlug?: string | null
+  returnContext?: "direct" | "portal"
   buyerFormSchema?: ApplicationFormSchema | null
   initialBuyerValues?: Record<string, unknown>
   cartPersistenceEnabled?: boolean
@@ -344,6 +345,7 @@ export function CheckoutProvider({
   initialPromoCode = null,
   submitMode = "application",
   submitPopupSlug = null,
+  returnContext = "direct",
   buyerFormSchema = null,
   initialBuyerValues = {},
   cartPersistenceEnabled = true,
@@ -1630,6 +1632,7 @@ export function CheckoutProvider({
     clearPromoCode,
     paymentCompleteRef,
     submitMode,
+    returnContext,
     editPassesEnabled,
     popupName: city?.name ?? null,
     openCartMetaRef,

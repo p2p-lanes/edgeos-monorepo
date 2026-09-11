@@ -15,6 +15,7 @@ import {
 } from "@/client"
 import { withCheckoutLocale } from "@/helpers/checkout"
 import { getAttribution } from "@/lib/attribution"
+import { navigateBrowser } from "@/lib/browser-navigation"
 import type { BuyerIdentity } from "@/lib/buyerIdentity"
 import { trackGAPurchase } from "@/lib/google-analytics"
 import { getMetaAttribution, trackMetaPurchase } from "@/lib/meta-pixel"
@@ -71,6 +72,7 @@ interface UsePaymentSubmitParams {
   clearPromoCode: () => void
   paymentCompleteRef: React.MutableRefObject<boolean>
   submitMode: "application" | "open-ticketing"
+  returnContext?: "direct" | "portal"
   buyerData: {
     email: string
     firstName: string
@@ -175,6 +177,7 @@ export function usePaymentSubmit({
   clearPromoCode,
   paymentCompleteRef,
   submitMode,
+  returnContext = "direct",
   buyerData,
   editPassesEnabled,
   popupName,
@@ -294,6 +297,7 @@ export function usePaymentSubmit({
               requestBody: {
                 ...getMetaAttribution(),
                 locale: i18n.language,
+                return_context: returnContext,
                 ...(Object.keys(getAttribution()).length
                   ? { attribution: getAttribution() }
                   : {}),
@@ -343,10 +347,7 @@ export function usePaymentSubmit({
       }
 
       if (data.status === "pending" && data.checkout_url) {
-        window.location.href = withCheckoutLocale(
-          data.checkout_url,
-          i18n.language,
-        )
+        navigateBrowser(withCheckoutLocale(data.checkout_url, i18n.language))
         return { success: true }
       }
 
@@ -424,7 +425,7 @@ export function usePaymentSubmit({
             // success URL: SimpleFI was bypassed, so we perform the redirect
             // the provider would have done on a paid purchase. The backend
             // returns the configured URL in redirect_url for this case.
-            window.location.href = data.redirect_url
+            navigateBrowser(data.redirect_url)
           } else {
             const qs = paymentId ? `?payment_id=${paymentId}` : ""
             router.replace(`/checkout/${popupSlug}/thank-you${qs}`)
@@ -475,7 +476,7 @@ export function usePaymentSubmit({
           if (dispatch.blockResubmit) paymentCompleteRef.current = true
           if (dispatch.setPersistentError) setPromoError(msg)
           if (dispatch.navigate?.type === "href") {
-            window.location.href = dispatch.navigate.url
+            navigateBrowser(dispatch.navigate.url)
           } else if (dispatch.navigate?.type === "router-push") {
             router.push(dispatch.navigate.path)
           }
@@ -540,6 +541,7 @@ export function usePaymentSubmit({
     popupSlug,
     salesFlowSlug,
     submitMode,
+    returnContext,
     popupName,
     router,
     editPassesEnabled,

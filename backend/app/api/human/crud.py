@@ -2,7 +2,7 @@ import uuid
 from typing import TypedDict
 
 from loguru import logger
-from sqlalchemy import Text, cast, delete, exists, or_
+from sqlalchemy import Text, cast, delete, exists, or_, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import selectinload
 from sqlmodel import Session, col, func, select
@@ -429,6 +429,7 @@ class HumansCRUD(BaseCRUD[Humans, HumanCreate, HumanUpdate]):
         from app.api.payment.models import (
             PaymentInstallments,
             PaymentProducts,
+            PaymentRecipients,
             Payments,
         )
 
@@ -437,21 +438,42 @@ class HumansCRUD(BaseCRUD[Humans, HumanCreate, HumanUpdate]):
                 select(Applications.id).where(Applications.human_id == human_id)
             ).all()
         )
-        attendee_conds = [Attendees.human_id == human_id]
+        attendee_conds = [
+            Attendees.human_id == human_id,
+            Attendees.managed_by_human_id == human_id,
+        ]
         if application_ids:
             attendee_conds.append(col(Attendees.application_id).in_(application_ids))
         attendee_ids = list(
             session.exec(select(Attendees.id).where(or_(*attendee_conds))).all()
         )
-        payment_ids = (
+        payment_conds = [Payments.buyer_human_id == human_id]
+        if application_ids:
+            payment_conds.append(col(Payments.application_id).in_(application_ids))
+        if attendee_ids:
+            payment_conds.append(
+                Payments.id.in_(
+                    select(PaymentProducts.payment_id)
+                    .join(Payments, Payments.id == PaymentProducts.payment_id)
+                    .where(
+                        col(Payments.application_id).is_(None),
+                        col(Payments.buyer_human_id).is_(None),
+                        col(PaymentProducts.attendee_id).in_(attendee_ids),
+                    )
+                )
+            )
+        payment_ids = list(
+            session.exec(select(Payments.id).where(or_(*payment_conds))).all()
+        )
+        payment_product_ids = (
             list(
                 session.exec(
-                    select(Payments.id).where(
-                        col(Payments.application_id).in_(application_ids)
+                    select(PaymentProducts.id).where(
+                        col(PaymentProducts.payment_id).in_(payment_ids)
                     )
                 ).all()
             )
-            if application_ids
+            if payment_ids
             else []
         )
         summary: HardDeleteSummary = {
@@ -467,23 +489,35 @@ class HumansCRUD(BaseCRUD[Humans, HumanCreate, HumanUpdate]):
         }
 
         try:
-            if attendee_ids or payment_ids:
+            if attendee_ids or payment_ids or payment_product_ids:
                 conds = []
                 if attendee_ids:
                     conds.append(col(AttendeeProducts.attendee_id).in_(attendee_ids))
                 if payment_ids:
                     conds.append(col(AttendeeProducts.payment_id).in_(payment_ids))
+                if payment_product_ids:
+                    conds.append(
+                        col(AttendeeProducts.payment_product_id).in_(
+                            payment_product_ids
+                        )
+                    )
                 result = session.execute(delete(AttendeeProducts).where(or_(*conds)))
                 summary["attendee_products"] = result.rowcount or 0
 
-            if payment_ids or attendee_ids:
-                conds = []
-                if payment_ids:
-                    conds.append(col(PaymentProducts.payment_id).in_(payment_ids))
-                if attendee_ids:
-                    conds.append(col(PaymentProducts.attendee_id).in_(attendee_ids))
-                result = session.execute(delete(PaymentProducts).where(or_(*conds)))
+            if payment_ids:
+                result = session.execute(
+                    delete(PaymentProducts).where(
+                        col(PaymentProducts.payment_id).in_(payment_ids)
+                    )
+                )
                 summary["payment_products"] = result.rowcount or 0
+
+            if attendee_ids:
+                session.execute(
+                    update(PaymentProducts)
+                    .where(col(PaymentProducts.attendee_id).in_(attendee_ids))
+                    .values(attendee_id=None)
+                )
 
             if payment_ids:
                 result = session.execute(
@@ -498,7 +532,34 @@ class HumansCRUD(BaseCRUD[Humans, HumanCreate, HumanUpdate]):
 
             if payment_ids:
                 session.execute(
+                    delete(PaymentRecipients).where(
+                        col(PaymentRecipients.payment_id).in_(payment_ids)
+                    )
+                )
+                session.execute(
                     delete(Payments).where(col(Payments.id).in_(payment_ids))
+                )
+
+            # Recipient rows are immutable financial snapshots owned by their
+            # payment. Retain snapshots from other buyers, but remove nullable
+            # live identity links before deleting this Human and their attendees.
+            session.execute(
+                update(PaymentRecipients)
+                .where(PaymentRecipients.human_id == human_id)
+                .values(human_id=None)
+            )
+            if attendee_ids:
+                session.execute(
+                    update(PaymentRecipients)
+                    .where(
+                        col(PaymentRecipients.existing_attendee_id).in_(attendee_ids)
+                    )
+                    .values(existing_attendee_id=None)
+                )
+                session.execute(
+                    update(PaymentRecipients)
+                    .where(col(PaymentRecipients.attendee_id).in_(attendee_ids))
+                    .values(attendee_id=None)
                 )
 
             if attendee_ids:
