@@ -6,7 +6,12 @@ import {
   type CheckoutMode,
 } from "@/checkout/popupCheckoutPolicy"
 import { CheckoutService, type PaymentRecipientRequest } from "@/client"
-import type { CartAssignment, CartLine, CartState } from "@/hooks/useCartApi"
+import type {
+  CartAssignment,
+  CartGuest,
+  CartLine,
+  CartState,
+} from "@/hooks/useCartApi"
 import { getProductAvailability } from "@/lib/product-availability"
 import type {
   CheckoutStep,
@@ -150,6 +155,22 @@ function dateString(value: unknown): string | null {
     date.toISOString().slice(0, 10) === parsed
     ? parsed
     : null
+}
+
+/** One guest out of a legacy snapshot, in the shape the line now uses.
+ *
+ *  Returns an array so callers can `flatMap` it: an entry that is neither a
+ *  name nor a record is dropped rather than turned into a blank occupant. */
+function legacyGuest(value: unknown): CartGuest[] {
+  if (typeof value === "string") return [{ name: value }]
+  if (!isRecord(value)) return []
+  const answers = value.answers
+  return [
+    {
+      name: typeof value.name === "string" ? value.name : "",
+      ...(isRecord(answers) ? { answers } : {}),
+    },
+  ]
 }
 
 function parseRecipients(value: unknown): PaymentRecipientRequest[] {
@@ -302,10 +323,11 @@ function migrateLegacySnapshot(value: UnknownRecord): CartState {
       check_in: checkIn,
       check_out: checkOut,
       guest_count: guestCount || null,
+      // A legacy cart holds bare names; one saved after the guest form
+      // landed holds `{name, answers}`. Both are read, because both are on
+      // disk in somebody's browser right now.
       guests: Array.isArray(entry.guests)
-        ? entry.guests.filter(
-            (guest): guest is string => typeof guest === "string",
-          )
+        ? entry.guests.flatMap(legacyGuest)
         : [],
     })
   }
@@ -622,11 +644,15 @@ export function useOpenCartPersistence({
   // localStorage + optional token-refresh kick. We expose a promise that
   // resolves once all three restore paths have finished. Never rejects.
   const restorationResolveRef = useRef<(() => void) | null>(null)
-  const restorationPromiseRef = useRef<Promise<void>>(
-    new Promise<void>((resolve) => {
+  const restorationPromiseRef = useRef<Promise<void> | null>(null)
+  // Initialize the promise and its resolver together exactly once. A Promise
+  // passed directly to useRef is constructed on every render, overwriting the
+  // resolver while retaining the original promise (notably in Strict Mode).
+  if (restorationPromiseRef.current === null) {
+    restorationPromiseRef.current = new Promise<void>((resolve) => {
       restorationResolveRef.current = resolve
-    }),
-  )
+    })
+  }
   const previousScopeRef = useRef(scope.storageKey)
 
   if (previousScopeRef.current !== scope.storageKey) {

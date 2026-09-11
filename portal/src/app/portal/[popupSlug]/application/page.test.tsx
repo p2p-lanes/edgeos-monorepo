@@ -16,6 +16,7 @@ const mocks = vi.hoisted(() => ({
     isLoadingError: false,
   },
   flowIdentifier: "flow-a" as string | null,
+  checkoutSuccess: false,
   portalFlows: undefined as
     | Array<{ id: string; slug: string; name: string }>
     | undefined,
@@ -38,10 +39,12 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ replace: mocks.replace }),
-  useSearchParams: () =>
-    new URLSearchParams(
-      mocks.flowIdentifier ? `flow=${mocks.flowIdentifier}` : "",
-    ),
+  useSearchParams: () => {
+    const params = new URLSearchParams()
+    if (mocks.flowIdentifier) params.set("flow", mocks.flowIdentifier)
+    if (mocks.checkoutSuccess) params.set("checkout", "success")
+    return params
+  },
 }))
 
 vi.mock("react-i18next", () => ({
@@ -124,6 +127,7 @@ describe("application flow routing", () => {
   beforeEach(() => {
     vi.clearAllMocks()
     mocks.flowIdentifier = "flow-a"
+    mocks.checkoutSuccess = false
     mocks.portalFlows = MULTI_FLOWS
     mocks.applicationsQueryState = {
       isPending: false,
@@ -179,6 +183,27 @@ describe("application flow routing", () => {
     expect(screen.queryByTestId("loader")).toBeNull()
     expect(screen.queryByTestId("application-form")).toBeNull()
     expect(mocks.replace).not.toHaveBeenCalled()
+  })
+
+  it.each([
+    "pending_fee",
+    "in review",
+    "accepted",
+  ])("forwards legacy fee-success links to the overview when the application is %s", (status) => {
+    mocks.checkoutSuccess = true
+    mocks.getRelevantApplication.mockReturnValue({
+      id: "application-a",
+      sales_flow_id: "flow-a",
+      status,
+    })
+
+    render(<FormPage />)
+
+    expect(mocks.replace).toHaveBeenCalledWith(
+      "/portal/gathering?flow=flow-a&checkout=success",
+    )
+    expect(screen.getByTestId("loader")).toBeTruthy()
+    expect(screen.queryByTestId("application-form")).toBeNull()
   })
 
   it("renders the selected-flow form without the redundant chooser panel", () => {

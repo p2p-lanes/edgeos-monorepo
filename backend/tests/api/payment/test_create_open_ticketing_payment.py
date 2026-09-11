@@ -27,7 +27,7 @@ from app.api.payment.schemas import PaymentRecipientRequest, PaymentStatus
 from app.api.popup.models import Popups
 from app.api.product.models import Products
 from app.api.sales_flow.models import SalesFlows
-from app.api.shared.enums import SaleType
+from app.api.shared.enums import LandingMode, SaleType
 from app.api.tenant.models import Tenants
 from app.services.simplefi.client import CancelOutcome
 from tests._flow_helpers import (
@@ -206,6 +206,61 @@ def _purchase_create(
         ),
         coupon_code=coupon_code,
         insurance=insurance,
+    )
+
+
+@pytest.mark.parametrize("landing_mode", [LandingMode.portal, LandingMode.checkout])
+@pytest.mark.parametrize("flow_slug", ["checkout", "sponsors"])
+@pytest.mark.parametrize("custom_cancel", [None, "https://partner.example.com/retry"])
+def test_payment_provider_cancel_url_returns_to_flow(
+    db: Session,
+    tenant_a: Tenants,
+    landing_mode: LandingMode,
+    flow_slug: str,
+    custom_cancel: str | None,
+) -> None:
+    popup = _make_popup(db, tenant_a, slug_prefix="cancel-flow")
+    product = _make_product(db, popup, name="GA", price="50.00")
+    flow = db.get(SalesFlows, default_flow_id(db, popup.id))
+    assert flow is not None
+    flow.slug = flow_slug
+    flow.open_checkout_cancel_url = custom_cancel
+    db.add(flow)
+    db.commit()
+
+    # A detached tenant configuration avoids mutating the shared DB fixture.
+    tenant = Tenants(
+        id=tenant_a.id,
+        name=tenant_a.name,
+        slug=tenant_a.slug,
+        landing_mode=landing_mode,
+        custom_domain="tickets.example.com",
+        custom_domain_active=True,
+    )
+    obj = _purchase_create(
+        email="cancel-buyer@test.com",
+        first_name="Test",
+        last_name="Buyer",
+        products=[(product, 1)],
+        form_data={},
+    )
+    obj.locale = "es"
+
+    with patch("app.services.simplefi.get_simplefi_client") as mock_get_client:
+        mock_client = mock_get_client.return_value
+        mock_client.create_payment.return_value = SimpleNamespace(
+            id=f"sf_{uuid.uuid4().hex}",
+            status="pending",
+            checkout_url="https://simplefi.test/checkout/1",
+            is_installment_plan=False,
+        )
+        payments_crud.create_open_ticketing_payment(
+            db, obj=obj, popup=popup, tenant=tenant, flow_slug=flow_slug
+        )
+
+    assert mock_client.create_payment.call_args.kwargs["cancel_path"] == (
+        custom_cancel
+        or f"https://tickets.example.com/checkout/{popup.slug}/{flow_slug}?cancelled=1&lang=es"
     )
 
 

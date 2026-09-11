@@ -64,10 +64,68 @@ export type AccommodationBookingCreate = {
     check_out: string;
     guest_count?: (number | null);
     guests?: Array<BookingGuest>;
+    booker_answers?: {
+        [key: string]: unknown;
+    };
     primary_guest_name?: (string | null);
     primary_guest_email?: (string | null);
     notes?: (string | null);
     ignore_restrictions?: boolean;
+};
+
+/**
+ * One booking with everything its own page needs, in one request.
+ *
+ * The context is denormalised on purpose. A detail screen that had to fetch
+ * the room to learn its name, the property to learn its address and the
+ * room again to list its other units would render in four steps and show
+ * three of them half-built.
+ *
+ * ``units`` carries every unit of the same room type, the booking's own
+ * included, because the only thing an operator does to a booking from here
+ * besides releasing it is move it to a different bed.
+ */
+export type AccommodationBookingDetail = {
+    tenant_id: string;
+    popup_id: string;
+    accommodation_id: string;
+    unit_id: string;
+    kind?: BookingKind;
+    status?: BookingStatus;
+    check_in: string;
+    check_out: string;
+    guest_count?: (number | null);
+    guests?: Array<{
+        [key: string]: unknown;
+    }>;
+    booker_answers?: {
+        [key: string]: unknown;
+    };
+    form_snapshot?: ({
+    [key: string]: unknown;
+} | null);
+    primary_guest_name?: (string | null);
+    primary_guest_email?: (string | null);
+    attendee_id?: (string | null);
+    human_id?: (string | null);
+    payment_id?: (string | null);
+    payment_product_id?: (string | null);
+    price_snapshot?: ({
+    [key: string]: unknown;
+} | null);
+    hold_expires_at?: (string | null);
+    notes?: (string | null);
+    created_by_user_id?: (string | null);
+    created_at?: string;
+    updated_at?: string;
+    id: string;
+    nights?: number;
+    property_id: string;
+    property_name: string;
+    property_address?: (string | null);
+    accommodation_name: string;
+    unit_label?: (string | null);
+    units?: Array<BookingUnitOption>;
 };
 
 export type AccommodationBookingPublic = {
@@ -83,6 +141,12 @@ export type AccommodationBookingPublic = {
     guests?: Array<{
         [key: string]: unknown;
     }>;
+    booker_answers?: {
+        [key: string]: unknown;
+    };
+    form_snapshot?: ({
+    [key: string]: unknown;
+} | null);
     primary_guest_name?: (string | null);
     primary_guest_email?: (string | null);
     attendee_id?: (string | null);
@@ -106,6 +170,9 @@ export type AccommodationBookingUpdate = {
     status?: (BookingStatus | null);
     guest_count?: (number | null);
     guests?: (Array<BookingGuest> | null);
+    booker_answers?: ({
+    [key: string]: unknown;
+} | null);
     primary_guest_name?: (string | null);
     primary_guest_email?: (string | null);
     notes?: (string | null);
@@ -1375,10 +1442,15 @@ export type BlockRangeResult = {
  * One occupant.
  *
  * Names are collected in the checkout and exported to the property owner,
- * who needs them for their own registry.
+ * who needs them for their own registry. ``answers`` holds whatever else the
+ * step's guest form asked, keyed by its field keys; it is empty when the
+ * step asks nothing, which is the default.
  */
 export type BookingGuest = {
     name: string;
+    answers?: {
+        [key: string]: unknown;
+    };
 };
 
 /**
@@ -1397,6 +1469,15 @@ export type BookingKind = 'guest' | 'block' | 'maintenance';
  * covered by the exclusion constraint, so only those two occupy a unit.
  */
 export type BookingStatus = 'hold' | 'confirmed' | 'cancelled' | 'expired';
+
+/**
+ * A unit the booking could be moved to, or the one it is in.
+ */
+export type BookingUnitOption = {
+    id: string;
+    label: string;
+    is_active?: boolean;
+};
 
 /**
  * The 'report a bug' payload, open to every backoffice user.
@@ -1492,10 +1573,6 @@ export type CalendarUnit = {
  * the product is an implementation detail of how the booking travels
  * through payments, and resolving it at purchase time means a cart saved
  * before a room was re-synced still points at the right room.
- *
- * Guests are stored as plain names: the buyer types nothing else about
- * them, and the ``{name: ...}`` shape the purchase needs is built when the
- * payment is submitted.
  */
 export type CartAccommodationLine = {
     assignment: (CartUnassigned | CartAttendeeAssignment | CartRecipientAssignment);
@@ -1505,7 +1582,10 @@ export type CartAccommodationLine = {
     check_in: string;
     check_out: string;
     guest_count?: (number | null);
-    guests?: Array<(string)>;
+    guests?: Array<CartGuest>;
+    booker_answers?: {
+        [key: string]: unknown;
+    };
 };
 
 export type CartAttendeeAssignment = {
@@ -1536,6 +1616,21 @@ export type CartDateRangeLine = {
     check_in: string;
     check_out: string;
     quantity?: number;
+};
+
+/**
+ * One occupant as the cart holds them.
+ *
+ * ``name`` may be empty: the checkout renders a slot per guest before any of
+ * them is filled in, and half a party typed in is exactly what a saved cart
+ * is for. ``answers`` holds whatever else the step's guest form asked, keyed
+ * by its field keys.
+ */
+export type CartGuest = {
+    name?: string;
+    answers?: {
+        [key: string]: unknown;
+    };
 };
 
 /**
@@ -4176,6 +4271,8 @@ export type PopupAdmin = {
     currency?: string;
     requires_application_fee?: boolean;
     application_fee_amount?: (string | null);
+    custom_home_enabled?: boolean;
+    custom_home_html?: (string | null);
     theme_config?: ({
     [key: string]: unknown;
 } | null);
@@ -4219,6 +4316,8 @@ export type PopupAdmin = {
 };
 
 export type PopupCreate = {
+    custom_home_html?: (string | null);
+    custom_home_enabled?: boolean;
     tenant_id?: (string | null);
     name: string;
     tagline?: (string | null);
@@ -4289,6 +4388,8 @@ export type PopupCreate = {
  * Public popup schema — excludes sensitive/internal fields.
  */
 export type PopupPublic = {
+    custom_home_enabled?: boolean;
+    custom_home_html?: (string | null);
     id: string;
     name: string;
     tagline?: (string | null);
@@ -4385,6 +4486,8 @@ export type PopupReviewerUpdate = {
 export type PopupStatus = 'draft' | 'active' | 'archived' | 'ended';
 
 export type PopupUpdate = {
+    custom_home_html?: (string | null);
+    custom_home_enabled?: (boolean | null);
     name?: (string | null);
     tagline?: (string | null);
     location?: (string | null);
@@ -6210,12 +6313,12 @@ export type AccommodationsCreateManualBookingData = {
 
 export type AccommodationsCreateManualBookingResponse = (AccommodationBookingPublic);
 
-export type AccommodationsBlockRangeData = {
-    requestBody: AccommodationBlockRange;
+export type AccommodationsGetBookingData = {
+    bookingId: string;
     xTenantId?: (string | null);
 };
 
-export type AccommodationsBlockRangeResponse = (BlockRangeResult);
+export type AccommodationsGetBookingResponse = (AccommodationBookingDetail);
 
 export type AccommodationsUpdateBookingData = {
     bookingId: string;
@@ -6224,6 +6327,13 @@ export type AccommodationsUpdateBookingData = {
 };
 
 export type AccommodationsUpdateBookingResponse = (AccommodationBookingPublic);
+
+export type AccommodationsBlockRangeData = {
+    requestBody: AccommodationBlockRange;
+    xTenantId?: (string | null);
+};
+
+export type AccommodationsBlockRangeResponse = (BlockRangeResult);
 
 export type AccommodationsExportBookingsData = {
     accommodationId?: (string | null);

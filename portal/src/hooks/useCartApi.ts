@@ -45,13 +45,25 @@ export interface CartMealPlanLine extends CartLineBase {
   special_request: string | null
 }
 
+/** One occupant as the saved cart holds them.
+ *
+ *  `name` may be empty: the checkout renders a slot per guest before any of
+ *  them is filled in. `answers` holds whatever else the step's guest form
+ *  asked, keyed by its field keys. The backend still accepts a bare name for
+ *  carts saved before the form existed, but nothing here writes that shape. */
+export interface CartGuest {
+  name: string
+  answers?: Record<string, unknown>
+}
+
 export interface CartAccommodationLine extends CartLineBase {
   kind: "accommodation"
   accommodation_id: string
   check_in: string
   check_out: string
   guest_count: number | null
-  guests: string[]
+  guests: CartGuest[]
+  booker_answers?: Record<string, unknown>
 }
 
 export type CartLine =

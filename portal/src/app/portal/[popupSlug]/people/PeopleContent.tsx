@@ -1,10 +1,18 @@
-import { Users } from "lucide-react"
+import { ArrowRight, Users } from "lucide-react"
+import Link from "next/link"
 import { useTranslation } from "react-i18next"
 import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
 import { getPersonInitials, orderPeopleForDisplay } from "./peoplePresentation"
 import type { PortalPerson } from "./peopleProjection"
 
-export function PeopleContent({ people }: { people: PortalPerson[] }) {
+export function PeopleContent({
+  people,
+  popupSlug,
+}: {
+  people: PortalPerson[]
+  popupSlug: string
+}) {
   const { t } = useTranslation()
 
   return (
@@ -24,12 +32,21 @@ export function PeopleContent({ people }: { people: PortalPerson[] }) {
       {people.length === 0 ? (
         <div className="rounded-xl border bg-card px-6 py-10 text-center shadow-sm">
           <div className="mx-auto grid size-12 place-items-center rounded-full bg-muted">
-            <Users className="size-6 text-muted-foreground" />
+            <Users
+              className="size-6 text-muted-foreground"
+              aria-hidden="true"
+            />
           </div>
           <h2 className="mt-3 font-semibold">{t("people.empty_title")}</h2>
-          <p className="mt-1 text-sm text-muted-foreground">
+          <p className="mx-auto mt-2 max-w-sm text-sm leading-relaxed text-muted-foreground">
             {t("people.empty_description")}
           </p>
+          <Button asChild className="mt-6">
+            <Link href={`/portal/${popupSlug}/shop`}>
+              {t("people.browse_tickets")}
+              <ArrowRight className="size-4" aria-hidden="true" />
+            </Link>
+          </Button>
         </div>
       ) : (
         <ul className="overflow-hidden rounded-xl border bg-card shadow-sm">

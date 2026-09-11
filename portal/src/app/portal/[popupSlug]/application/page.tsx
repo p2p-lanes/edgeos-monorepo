@@ -17,7 +17,6 @@ import { useCityProvider } from "@/providers/cityProvider"
 import { useFileUpload } from "../events/lib/useFileUpload"
 import { DynamicApplicationForm } from "./components/dynamic-application-form"
 import { ExistingApplicationCard } from "./components/existing-application-card"
-import { FeePaymentBanner } from "./components/fee-payment-banner"
 import { FormHeader } from "./components/form-header"
 import { SectionSeparator } from "./components/section-separator"
 import { resolveApplicationFlowId } from "./lib/resolveApplicationFlowId"
@@ -78,8 +77,8 @@ export default function FormPage() {
   const city = getCity()
   const router = useRouter()
   const searchParams = useSearchParams()
-  // Capture once on mount so a later URL change doesn't tear down the fee
-  // banner while it's still polling for the payment webhook.
+  // Older provider checkouts still return here. Forward them to the overview,
+  // where the fee confirmation is shown alongside the application status.
   const [isReturnFromCheckout] = useState(() =>
     searchParams.has("checkout", "success"),
   )
@@ -149,9 +148,15 @@ export default function FormPage() {
   // draft/pending_fee/in review stay editable so the applicant can still
   // finish, retry the fee payment, or update details while under review.
   useEffect(() => {
+    if (isReturnFromCheckout && city && selectedFlowId) {
+      router.replace(
+        `/portal/${city.slug}?flow=${selectedFlowId}&checkout=success`,
+      )
+      return
+    }
     if (!application || !shouldRedirectToStatus(application.status)) return
     router.replace(resolvedApplicationDestination(city?.slug, application))
-  }, [application, city, router])
+  }, [application, city, isReturnFromCheckout, router, selectedFlowId])
 
   useEffect(() => {
     if (city?.takes_applications === false) {
@@ -204,19 +209,8 @@ export default function FormPage() {
     return <Loader />
   }
 
-  // Returning from the fee checkout: show only the confirmation banner while we
-  // poll for the payment webhook. The form must not reappear after paying.
-  if (isReturnFromCheckout) {
-    return (
-      <main className="container py-6 md:py-12 mb-8 px-8 md:px-12">
-        {application ? (
-          <FeePaymentBanner application={application} isReturnFromCheckout />
-        ) : (
-          <Loader />
-        )}
-      </main>
-    )
-  }
+  // Do not flash the form while forwarding a legacy fee-success link.
+  if (isReturnFromCheckout) return <Loader />
 
   if (schemaLoadingError || !schema) return <ApplicationUnavailable />
 
