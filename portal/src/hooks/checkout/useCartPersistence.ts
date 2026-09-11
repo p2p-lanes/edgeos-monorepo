@@ -14,6 +14,7 @@ import {
   useSaveCart,
 } from "@/hooks/useCartApi"
 import { checkAndClearPurchasePending } from "@/hooks/usePaymentRedirect"
+import { guestsForWire } from "@/lib/accommodationForm"
 import { getProductAvailability } from "@/lib/product-availability"
 import { queryKeys } from "@/lib/query-keys"
 import type {
@@ -206,7 +207,10 @@ export function buildPersistedCartState(state: CartSelectionState): CartState {
       check_in: item.checkIn,
       check_out: item.checkOut,
       guest_count: item.guestCount,
-      guests: item.guests.filter(Boolean),
+      // Slots the buyer has actually touched, name or answers. An untouched
+      // one is a guest they have not got to yet, not a nameless occupant.
+      guests: guestsForWire(item.guests),
+      booker_answers: item.bookerAnswers,
     })
   }
   for (const item of Object.values(state.dynamicItems).flat()) {

@@ -1,132 +1,38 @@
 "use client"
 
+import {
+  hasCustomHome,
+  PopupHomeFrame,
+} from "@edgeos/shared-form-ui/popup-home"
 import { useRouter } from "next/navigation"
 import { useEffect } from "react"
-import type { CompanionParticipation } from "@/client"
-import { EventCard } from "@/components/Card/EventCard"
-import type { EventStatus } from "@/components/Card/EventProgressBar"
-import { CompanionView } from "@/components/CompanionView"
-import { ApplicationUnavailable } from "@/components/Portal/ApplicationUnavailable"
-import { GatheringDoorCard } from "@/components/Portal/GatheringDoorCard"
-import { ScholarshipStatusBadge } from "@/components/ScholarshipStatusBadge"
+import { useTranslation } from "react-i18next"
+import DefaultPopupHome from "@/components/Portal/DefaultPopupHome"
 import { Loader } from "@/components/ui/Loader"
-import { useGatheringDoors } from "@/hooks/useGatheringDoors"
-import { useApplication } from "@/providers/applicationProvider"
 import { useCityProvider } from "@/providers/cityProvider"
 
 export default function Home() {
   const { getCity, popupsLoaded } = useCityProvider()
-  const { getRelevantApplication, participation } = useApplication()
-  const router = useRouter()
   const city = getCity()
-  const {
-    doors,
-    isLoading: doorsLoading,
-    isError: doorsError,
-  } = useGatheringDoors(city?.id ? String(city.id) : null)
+  const router = useRouter()
+  const { i18n } = useTranslation()
 
   useEffect(() => {
     if (popupsLoaded && !city) router.replace("/portal")
   }, [city, popupsLoaded, router])
 
   if (!city) return popupsLoaded ? null : <Loader />
-
-  const nobodyApplies = city?.takes_applications === false
-
-  if (!nobodyApplies && doorsLoading) return <Loader />
-  if (!nobodyApplies && doorsError) return <ApplicationUnavailable />
-
-  // One relationship is unambiguous, so nothing has to be named and the
-  // page stays exactly as it was. This is almost every gathering.
-  const relevantApplication = getRelevantApplication()
-
-  if (!nobodyApplies && participation?.type === "companion") {
-    return (
-      <section className="container mx-auto">
-        <div className="space-y-6 max-w-5xl p-6 mx-auto">
-          <CompanionView
-            participation={participation as CompanionParticipation}
-          />
-        </div>
-      </section>
-    )
-  }
-
-  // More than one way in, and the page cannot speak for all of them at
-  // once: a volunteer accepted and a general application in review are two
-  // states, two sets of attendees and two different next steps. Drawing
-  // them side by side is also the only place a person can find out they
-  // hold both (sdd/sales-flows-rediseno).
-  if (!nobodyApplies && doors.length > 1) {
-    return (
-      <section className="container mx-auto">
-        <div className="mx-auto max-w-5xl space-y-6 p-6">
-          <EventCard popup={city} status="not_started">
-            <EventCard.Image />
-            <EventCard.Content>
-              <EventCard.Title />
-              <EventCard.Tagline />
-              <EventCard.Location />
-              <EventCard.DateRange />
-            </EventCard.Content>
-          </EventCard>
-          <div className="grid gap-4 sm:grid-cols-2">
-            {doors.map((door) => (
-              <GatheringDoorCard
-                key={door.flowId}
-                door={door}
-                popupSlug={city.slug}
-                showName
-              />
-            ))}
-          </div>
-        </div>
-      </section>
-    )
-  }
-
-  const status: EventStatus = nobodyApplies
-    ? "not_started"
-    : ((relevantApplication?.status as EventStatus) ?? "not_started")
-
-  const onClickApply = () => {
-    if (nobodyApplies) {
-      router.push(`/checkout/${city.slug}/checkout`)
-      return
-    }
-    if (status === "accepted") {
-      router.push(`/portal/${city.slug}/passes`)
-      return
-    }
-    router.push(`/portal/${city.slug}/application`)
-  }
+  if (!hasCustomHome(city)) return <DefaultPopupHome />
 
   return (
-    <section className="container mx-auto">
-      <div className="space-y-6 max-w-5xl p-6 mx-auto">
-        <EventCard popup={city} status={status}>
-          <EventCard.Image />
-          <EventCard.Content>
-            <EventCard.Title />
-            <EventCard.Tagline />
-            <EventCard.Location />
-            <EventCard.DateRange />
-            {!nobodyApplies && <EventCard.Progress />}
-            {!nobodyApplies && relevantApplication && (
-              <ScholarshipStatusBadge
-                application={relevantApplication}
-                popup={city}
-              />
-            )}
-            {city.status !== "ended" && (
-              <EventCard.ApplyButton
-                onClick={onClickApply}
-                labelKey={nobodyApplies ? "cta.buy_tickets" : undefined}
-              />
-            )}
-          </EventCard.Content>
-        </EventCard>
-      </div>
-    </section>
+    <PopupHomeFrame
+      // A popup switch must not momentarily display the previous popup's HTML.
+      key={city.id}
+      html={city.custom_home_html!}
+      popup={city}
+      locale={i18n.resolvedLanguage ?? city.default_language ?? "en"}
+      title={city.name}
+      className="block h-full min-h-[480px] w-full border-0 bg-white"
+    />
   )
 }

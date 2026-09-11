@@ -1,5 +1,10 @@
 import { act, renderHook } from "@testing-library/react"
 import { beforeEach, describe, expect, it, vi } from "vitest"
+import {
+  type BuyerIdentity,
+  buildBuyerIdentity,
+  NO_BUYER_IDENTITY,
+} from "@/lib/buyerIdentity"
 import type { AttendeePassState } from "@/types/Attendee"
 import type {
   CheckoutRecipientDraft,
@@ -9,6 +14,7 @@ import type {
   SelectedPassItem,
 } from "@/types/checkout"
 import type { ProductsPass } from "@/types/Products"
+import simpleQuantityPurchase from "../../../../e2e/fixtures/simple-quantity-purchase.json"
 
 const purchaseOpenTicketing = vi.hoisted(() =>
   vi.fn().mockResolvedValue({ status: "created" }),
@@ -95,6 +101,9 @@ function renderPaymentSubmit(
     mealPlans?: SelectedMealPlanItem[]
     accommodations?: SelectedAccommodationItem[]
     dynamicItems?: Record<string, SelectedDynamicItem[]>
+    buyerIdentity?: BuyerIdentity
+    buyerData?: Parameters<typeof usePaymentSubmit>[0]["buyerData"]
+    checkoutMode?: "pass_system" | "simple_quantity"
   } = {},
 ) {
   const submitMode = options.submitMode ?? "open-ticketing"
@@ -105,8 +114,9 @@ function renderPaymentSubmit(
       popupSlug: "festival-2026",
       salesFlowSlug,
       appCredit: 0,
-      checkoutMode: "pass_system",
+      checkoutMode: options.checkoutMode ?? "pass_system",
       attendeePasses: options.attendees ?? [attendee],
+      buyerIdentity: options.buyerIdentity ?? NO_BUYER_IDENTITY,
       selectedPasses: options.passes ?? selectedPasses,
       housing: null,
       accommodations: options.accommodations ?? [],
@@ -125,7 +135,7 @@ function renderPaymentSubmit(
       clearPromoCode: vi.fn(),
       paymentCompleteRef: { current: false },
       submitMode,
-      buyerData: {
+      buyerData: options.buyerData ?? {
         email: "taylor@example.com",
         firstName: "Taylor",
         lastName: "Buyer",
@@ -142,6 +152,81 @@ describe("usePaymentSubmit public purchase payload", () => {
     createMyPayment.mockClear()
     telemetry.trackPortalTelemetry.mockClear()
     queryClient.invalidateQueries.mockClear()
+  })
+
+  it("sends the shared backend contract for a simple-quantity ticket and merch order", async () => {
+    const ticket = {
+      ...product,
+      id: simpleQuantityPurchase.products[0].product_id,
+    }
+    const merch = {
+      ...product,
+      id: simpleQuantityPurchase.products[2].product_id,
+      category: "merch",
+    }
+    const { result } = renderPaymentSubmit("direct-sale", {
+      checkoutMode: "simple_quantity",
+      attendees: [],
+      passes: [],
+      dynamicItems: {
+        tickets: [
+          {
+            productId: ticket.id,
+            product: ticket,
+            quantity: 2,
+            price: 198,
+            stepType: "tickets",
+          },
+        ],
+        merch: [
+          {
+            productId: merch.id,
+            product: merch,
+            quantity: 1,
+            price: 20,
+            stepType: "merch",
+          },
+        ],
+      },
+    })
+    await act(async () => {
+      await result.current.submitPayment()
+    })
+    expect(purchaseOpenTicketing).toHaveBeenCalledOnce()
+    const body = purchaseOpenTicketing.mock.calls[0][0].requestBody
+    expect({
+      buyer: body.buyer,
+      products: body.products,
+      recipients: body.recipients,
+    }).toEqual(simpleQuantityPurchase)
+  })
+
+  it("blocks unassigned ticket submission when buyer details are blank", async () => {
+    const { result } = renderPaymentSubmit("direct-sale", {
+      checkoutMode: "simple_quantity",
+      attendees: [],
+      passes: [],
+      buyerData: { email: " ", firstName: " ", lastName: "", formData: {} },
+      dynamicItems: {
+        tickets: [
+          {
+            productId: product.id,
+            product,
+            quantity: 1,
+            price: 99,
+            stepType: "tickets",
+          },
+        ],
+      },
+    })
+    await act(async () => {
+      expect(await result.current.submitPayment()).toEqual({
+        success: false,
+        error: "checkout.toast_buyer_incomplete_pay",
+      })
+    })
+    expect(purchaseOpenTicketing).not.toHaveBeenCalled()
+    expect(result.current.isSubmitting).toBe(false)
   })
 
   it.each([
@@ -291,7 +376,10 @@ describe("usePaymentSubmit public purchase payload", () => {
         specialRequest: null,
       },
     ] satisfies SelectedMealPlanItem[]
-    const sideProduct = typedProduct("ownerless-extra")
+    const sideProduct = {
+      ...typedProduct("ownerless-extra"),
+      category: "merch",
+    }
     const { result } = renderPaymentSubmit("merch-store", {
       submitMode,
       passes: mixedPasses,
@@ -366,7 +454,9 @@ describe("usePaymentSubmit public purchase payload", () => {
         checkOut,
         nights: 2,
         guestCount: 1,
-        guests: ["Taylor Buyer"],
+        guests: [{ name: "Taylor Buyer", answers: {} }],
+        bookerAnswers: {},
+        guestForm: null,
         subtotal: 100,
         tax: 10,
         totalPrice: 110,
@@ -402,6 +492,63 @@ describe("usePaymentSubmit public purchase payload", () => {
     expect(
       lines.every((line: { attendee_id?: string }) => !line.attendee_id),
     ).toBe(true)
+  })
+
+  it("sends the buyer's own details for a booking that stopped asking for them", async () => {
+    // The accommodation step no longer asks the buyer for an email or a name
+    // that the buyer step already collects. This is the single place those
+    // answers become real ones, and the backend's `validate_answers` refuses
+    // the purchase without them, so the wire is where it has to be pinned.
+    const { result } = renderPaymentSubmit("merch-store", {
+      passes: [],
+      buyerIdentity: buildBuyerIdentity({
+        buyerFormSchema: {
+          base_fields: {
+            email: { type: "email", label: "Email", required: true },
+            first_name: { type: "text", label: "First name", required: true },
+            last_name: { type: "text", label: "Last name", required: true },
+          },
+          custom_fields: {},
+          sections: [],
+        },
+        buyerValues: {
+          email: "ada@example.com",
+          first_name: "Ada",
+          last_name: "Lovelace",
+        },
+      }),
+      accommodations: [
+        {
+          accommodationId: "room-1",
+          productId: "room-product",
+          name: "Double room",
+          propertyId: "property-1",
+          propertyName: "Hotel",
+          checkIn: "2026-09-01",
+          checkOut: "2026-09-03",
+          nights: 2,
+          guestCount: 1,
+          guests: [{ name: "", answers: {} }],
+          bookerAnswers: {},
+          guestForm: null,
+          subtotal: 100,
+          tax: 10,
+          totalPrice: 110,
+        } satisfies SelectedAccommodationItem,
+      ],
+    })
+
+    await act(async () => {
+      await result.current.submitPayment()
+    })
+
+    const [line] = purchaseOpenTicketing.mock.calls[0][0].requestBody.products
+    expect(line.purchase_metadata.booker_answers).toEqual(
+      expect.objectContaining({ email: "ada@example.com" }),
+    )
+    expect(line.purchase_metadata.guests).toEqual([
+      expect.objectContaining({ name: "Ada Lovelace" }),
+    ])
   })
 
   it("invalidates the popup upsale catalog after an approved payment", async () => {
