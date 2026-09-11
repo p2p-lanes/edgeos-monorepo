@@ -72,7 +72,7 @@ const CartBadge = () => {
           ))}
         </ul>
         <Link
-          href={`/portal/${city.slug}/shop`}
+          href={`/portal/${city.slug}`}
           className={cn(buttonVariants({ size: "sm" }), "w-full")}
         >
           {t("cartBadge.go_to_checkout")}

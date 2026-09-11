@@ -134,9 +134,15 @@ function resolveAspectClass(aspect?: SectionImageAspect): string {
 }
 
 function resolveSurfaceStyle(surface: TicketCardSurface): CSSProperties {
-  return surface === "theme"
-    ? stepCardSurfaceStyle()
-    : (SURFACE_STYLE[surface] as CSSProperties)
+  const surfaceStyle =
+    surface === "theme"
+      ? stepCardSurfaceStyle()
+      : (SURFACE_STYLE[surface] as CSSProperties)
+
+  return {
+    ...surfaceStyle,
+    "--border": "color-mix(in srgb, currentColor 10%, transparent)",
+  } as CSSProperties
 }
 
 // ---------------------------------------------------------------------------

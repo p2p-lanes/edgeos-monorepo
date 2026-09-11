@@ -17,14 +17,14 @@ const translate = (key: string, values?: { count?: number }) => {
   const translation =
     (
       {
-        "orders.title": "Orders",
+        "orders.title": "Payments",
         "orders.description": "Your payment history for this event.",
         "orders.status.approved": "Approved",
         "orders.status.unknown": "Unknown payment status",
         "orders.legacy_purchase": "Legacy purchase",
         "orders.total": "Total",
         "orders.invoice": "Invoice",
-        "orders.empty_title": "No orders yet",
+        "orders.empty_title": "No payments yet",
         "orders.empty_description": "Your payment history will appear here.",
         "orders.line_quantity": "Quantity: {{count}}",
         "orders.download_invoice_error": "Could not download your invoice.",
@@ -122,6 +122,8 @@ describe("OrdersContent", () => {
       />,
     )
 
+    expect(screen.getByRole("heading", { name: "Payments" })).toBeTruthy()
+    expect(screen.queryByText("Orders")).toBeNull()
     expect(screen.getByText("Event shirt")).toBeTruthy()
     expect(screen.getByText("Approved")).toBeTruthy()
     expect(screen.getByText("Total")).toBeTruthy()

@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from "vitest"
 import { AccessContent } from "./AccessContent"
 
 const translations: Record<string, string> = {
-  "tickets_access.title": "Tickets & Access",
+  "tickets_access.title": "Tickets",
   "tickets_access.description": "Your active event tickets and check-in items.",
   "tickets_access.empty_title": "No tickets or check-in items yet",
   "tickets_access.empty_description":
@@ -75,6 +75,10 @@ describe("AccessContent", () => {
       />,
     )
 
+    expect(
+      screen.getByRole("heading", { level: 1, name: "Tickets" }),
+    ).toBeTruthy()
+    expect(screen.queryByText("Tickets & Access")).toBeNull()
     expect(
       screen.getByText("Your active event tickets and check-in items."),
     ).toBeTruthy()

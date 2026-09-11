@@ -153,6 +153,42 @@ describe("useResolvedAttendees", () => {
     )
   })
 
+  it("preserves same-product tickets with distinct physical identities", () => {
+    const attendee = makeAttendee({
+      id: "attendee-1",
+      name: "Direct Buyer",
+      products: [
+        {
+          id: "ticket-a",
+          attendee_id: "attendee-1",
+          product_id: "shared-product",
+          payment_id: "payment-a",
+          check_in_code: "code-a",
+        },
+        {
+          id: "ticket-b",
+          attendee_id: "attendee-1",
+          product_id: "shared-product",
+          payment_id: "payment-b",
+          check_in_code: "code-b",
+        },
+      ],
+    })
+    mockUseHumanAttendeesQuery.mockReturnValue({ data: [attendee] })
+
+    const { result } = renderHook(() => useResolvedAttendees())
+
+    expect(
+      result.current[0]?.ticket_entries?.map((entry) => ({
+        id: entry.id,
+        payment_id: entry.payment_id,
+      })),
+    ).toEqual([
+      { id: "ticket-a", payment_id: "payment-a" },
+      { id: "ticket-b", payment_id: "payment-b" },
+    ])
+  })
+
   it("uses the synthetic attendee after a successful empty response", () => {
     mockUseHumanAttendeesQuery.mockReturnValue({ data: [] })
 

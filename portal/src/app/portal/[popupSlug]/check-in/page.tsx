@@ -174,7 +174,7 @@ export default function SelfCheckInPage() {
             You don't have any tickets for {popup.name}, buy your tickets here
           </p>
           <Button asChild className="mt-6 w-full">
-            <Link href={`/portal/${popupSlug}/passes/buy`}>Buy tickets</Link>
+            <Link href={`/portal/${popupSlug}`}>Buy tickets</Link>
           </Button>
         </div>
       ) : (

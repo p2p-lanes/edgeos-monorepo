@@ -17,7 +17,7 @@ from app.api.cart.models import Carts
 from app.api.group.models import GroupLeaders, GroupMembers, Groups
 from app.api.human.crud import humans_crud
 from app.api.human.models import Humans
-from app.api.payment.models import PaymentProducts, Payments
+from app.api.payment.models import PaymentProducts, PaymentRecipients, Payments
 from app.api.popup.models import Popups
 from app.api.tenant.models import Tenants
 from tests._flow_helpers import (
@@ -101,10 +101,113 @@ def test_cascade_removes_application_and_attendees(
     assert db.get(Humans, human.id) is None
 
 
-def test_cascade_removes_payments_and_product_snapshots(
+def test_cascade_removes_managed_purchased_companion(
     db: Session, tenant_a: Tenants, popup_tenant_a: Popups
 ) -> None:
-    """Payments + payment_products + attendee_products are wiped along the chain."""
+    """Deleting a buyer also removes accountless attendees they manage."""
+    from decimal import Decimal
+
+    from app.api.payment.schemas import PaymentStatus
+    from app.api.product.models import Products
+
+    human = _make_human(db, tenant_a.id, "manager")
+    companion = Attendees(
+        id=uuid.uuid4(),
+        tenant_id=tenant_a.id,
+        popup_id=popup_tenant_a.id,
+        managed_by_human_id=human.id,
+        name="Managed Companion",
+    )
+    product = Products(
+        id=uuid.uuid4(),
+        tenant_id=tenant_a.id,
+        popup_id=popup_tenant_a.id,
+        name="Companion ticket",
+        slug=f"companion-ticket-{uuid.uuid4().hex[:6]}",
+        price=Decimal("10.00"),
+        category="ticket",
+        is_active=True,
+    )
+    db.add_all([companion, product])
+    db.flush()
+
+    payment = Payments(
+        id=uuid.uuid4(),
+        tenant_id=tenant_a.id,
+        buyer_human_id=human.id,
+        popup_id=popup_tenant_a.id,
+        amount=Decimal("10.00"),
+        currency="USD",
+        status=PaymentStatus.APPROVED.value,
+    )
+    db.add(payment)
+    db.flush()
+    recipient = PaymentRecipients(
+        tenant_id=tenant_a.id,
+        payment_id=payment.id,
+        recipient_key="companion",
+        existing_attendee_id=companion.id,
+        attendee_id=companion.id,
+        name=companion.name,
+    )
+    db.add(recipient)
+    db.flush()
+    payment_product = PaymentProducts(
+        tenant_id=tenant_a.id,
+        payment_id=payment.id,
+        product_id=product.id,
+        attendee_id=companion.id,
+        payment_recipient_id=recipient.id,
+        quantity=1,
+        product_name=product.name,
+        product_price=product.price,
+        effective_unit_price=product.price,
+        product_category="ticket",
+        product_currency="USD",
+    )
+    db.add(payment_product)
+    db.flush()
+    attendee_product = AttendeeProducts(
+        tenant_id=tenant_a.id,
+        attendee_id=companion.id,
+        product_id=product.id,
+        payment_id=payment.id,
+        payment_product_id=payment_product.id,
+        unit_index=0,
+        check_in_code=f"managed-{uuid.uuid4().hex[:8]}",
+        product_category_snapshot="ticket",
+    )
+    db.add(attendee_product)
+    db.commit()
+    human_id = human.id
+    companion_id = companion.id
+    payment_id = payment.id
+    recipient_id = recipient.id
+    payment_product_id = payment_product.id
+    attendee_product_id = attendee_product.id
+    product_id = product.id
+
+    summary = humans_crud.hard_delete_cascade(db, human_id)
+
+    assert summary["applications"] == 0
+    assert summary["attendees"] == 1
+    assert summary["payments"] == 1
+    assert summary["attendee_products"] == 1
+    assert summary["payment_products"] == 1
+    db.expire_all()
+    assert db.get(Humans, human_id) is None
+    assert db.get(Attendees, companion_id) is None
+    assert db.get(Payments, payment_id) is None
+    assert db.get(PaymentRecipients, recipient_id) is None
+    assert db.get(PaymentProducts, payment_product_id) is None
+    assert db.get(AttendeeProducts, attendee_product_id) is None
+    assert db.get(Products, product_id) is not None
+
+
+def test_cascade_removes_legacy_direct_payment_and_product_snapshots(
+    db: Session, tenant_a: Tenants, popup_tenant_a: Popups
+) -> None:
+    """A direct payment is owned through its attendee when no buyer was backfilled."""
     from decimal import Decimal
 
     from app.api.payment.schemas import PaymentStatus
@@ -152,7 +255,6 @@ def test_cascade_removes_payments_and_product_snapshots(
     payment = Payments(
         id=uuid.uuid4(),
         tenant_id=tenant_a.id,
-        application_id=application.id,
         popup_id=popup_tenant_a.id,
         amount=Decimal("10.00"),
         currency="USD",
@@ -273,6 +375,158 @@ def test_http_delete_succeeds_for_admin_same_tenant(
     assert resp.status_code == 200, resp.text
     db.expire_all()
     assert db.get(Humans, human_id) is None
+
+
+def test_http_delete_human_with_payment_recipients_removes_payment_aggregate(
+    client: TestClient,
+    db: Session,
+    admin_token_tenant_a: str,
+    tenant_a: Tenants,
+    popup_tenant_a: Popups,
+) -> None:
+    """Deleting a buyer removes attempt-local recipients with the payment."""
+    from decimal import Decimal
+
+    from app.api.payment.schemas import PaymentStatus
+    from app.api.product.models import Products
+
+    human = _make_human(db, tenant_a.id, "buyer")
+    third_party = _make_human(db, tenant_a.id, "recipient")
+    application = Applications(
+        sales_flow_id=application_flow_id(db, popup_tenant_a.id),
+        id=uuid.uuid4(),
+        tenant_id=tenant_a.id,
+        human_id=human.id,
+        popup_id=popup_tenant_a.id,
+        status=ApplicationStatus.ACCEPTED.value,
+        first_name="Buyer",
+        last_name="Delete",
+        email=human.email,
+    )
+    db.add(application)
+    db.flush()
+
+    attendee = Attendees(
+        id=uuid.uuid4(),
+        tenant_id=tenant_a.id,
+        application_id=application.id,
+        popup_id=popup_tenant_a.id,
+        human_id=human.id,
+        name="Buyer Delete",
+    )
+    product = Products(
+        id=uuid.uuid4(),
+        tenant_id=tenant_a.id,
+        popup_id=popup_tenant_a.id,
+        name="Shared order line",
+        slug=f"shared-line-{uuid.uuid4().hex[:6]}",
+        price=Decimal("5.00"),
+        category="ticket",
+        is_active=True,
+    )
+    db.add_all([attendee, product])
+    db.flush()
+
+    payment = Payments(
+        id=uuid.uuid4(),
+        tenant_id=tenant_a.id,
+        application_id=application.id,
+        buyer_human_id=human.id,
+        popup_id=popup_tenant_a.id,
+        amount=Decimal("10.00"),
+        currency="USD",
+        status=PaymentStatus.APPROVED.value,
+    )
+    db.add(payment)
+    db.flush()
+
+    recipients = [
+        PaymentRecipients(
+            tenant_id=tenant_a.id,
+            payment_id=payment.id,
+            recipient_key="self",
+            human_id=human.id,
+            name="Buyer Delete",
+        ),
+        PaymentRecipients(
+            tenant_id=tenant_a.id,
+            payment_id=payment.id,
+            recipient_key="guest",
+            human_id=third_party.id,
+            name="Third Party",
+        ),
+    ]
+    db.add_all(recipients)
+    retained_payment = Payments(
+        id=uuid.uuid4(),
+        tenant_id=tenant_a.id,
+        buyer_human_id=third_party.id,
+        popup_id=popup_tenant_a.id,
+        amount=Decimal("5.00"),
+        currency="USD",
+        status=PaymentStatus.APPROVED.value,
+    )
+    db.add(retained_payment)
+    db.flush()
+    retained_recipient = PaymentRecipients(
+        tenant_id=tenant_a.id,
+        payment_id=retained_payment.id,
+        recipient_key="former-human",
+        human_id=human.id,
+        existing_attendee_id=attendee.id,
+        attendee_id=attendee.id,
+        name="Buyer Delete",
+    )
+    db.add(retained_recipient)
+    db.flush()
+    retained_line = PaymentProducts(
+        tenant_id=tenant_a.id,
+        payment_id=retained_payment.id,
+        product_id=product.id,
+        attendee_id=attendee.id,
+        payment_recipient_id=retained_recipient.id,
+        quantity=1,
+        product_name=product.name,
+        product_price=Decimal("5.00"),
+        effective_unit_price=Decimal("5.00"),
+        product_category="ticket",
+        product_currency="USD",
+    )
+    db.add(retained_line)
+    db.commit()
+    human_id = human.id
+    application_id = application.id
+    payment_id = payment.id
+    recipient_ids = [recipient.id for recipient in recipients]
+    third_party_id = third_party.id
+    retained_payment_id = retained_payment.id
+    retained_recipient_id = retained_recipient.id
+    retained_line_id = retained_line.id
+
+    response = client.delete(
+        f"/api/v1/humans/{human_id}", headers=_auth(admin_token_tenant_a)
+    )
+
+    assert response.status_code == 200, response.text
+    assert response.json()["payments"] == 1
+    db.expire_all()
+    assert db.get(Humans, human_id) is None
+    assert db.get(Applications, application_id) is None
+    assert db.get(Payments, payment_id) is None
+    assert all(
+        db.get(PaymentRecipients, recipient_id) is None
+        for recipient_id in recipient_ids
+    )
+    assert db.get(Humans, third_party_id) is not None
+    assert db.get(Payments, retained_payment_id) is not None
+    retained_recipient = db.get(PaymentRecipients, retained_recipient_id)
+    assert retained_recipient is not None
+    assert retained_recipient.human_id is None
+    assert retained_recipient.existing_attendee_id is None
+    assert retained_recipient.attendee_id is None
+    retained_line = db.get(PaymentProducts, retained_line_id)
+    assert retained_line is not None
+    assert retained_line.attendee_id is None
 
 
 def test_http_delete_admin_cannot_delete_other_tenant(

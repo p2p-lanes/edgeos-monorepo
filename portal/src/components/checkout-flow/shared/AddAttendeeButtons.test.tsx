@@ -202,6 +202,32 @@ describe("AddAttendeeButtons", () => {
     })
   })
 
+  it("persists an attendee in management mode without creating a checkout draft", async () => {
+    mocks.addAttendee.mockResolvedValue({ id: "attendee-1" })
+    const onAttendeeAdded = vi.fn()
+    render(
+      <AddAttendeeButtons
+        mode="management"
+        allowedCategoryIds={["spouse"]}
+        onAttendeeAdded={onAttendeeAdded}
+      />,
+    )
+
+    fireEvent.click(screen.getByRole("button", { name: "Add Spouse" }))
+    fireEvent.click(screen.getByRole("button", { name: "Submit companion" }))
+
+    await waitFor(() => expect(mocks.addAttendee).toHaveBeenCalledOnce())
+    expect(mocks.addAttendee).toHaveBeenCalledWith({
+      name: "Sam Companion",
+      email: " sam@example.com ",
+      category_id: "spouse",
+      gender: "nonbinary",
+      additional_data: { residence: "Lisbon" },
+    })
+    expect(mocks.addRecipientDraft).not.toHaveBeenCalled()
+    expect(onAttendeeAdded).toHaveBeenCalledWith("attendee-1")
+  })
+
   it("counts persisted and local companion drafts against the category cap", () => {
     mocks.attendeePasses = [
       { id: "persisted-spouse", category_id: "spouse" },

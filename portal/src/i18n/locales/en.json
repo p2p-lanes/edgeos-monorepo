@@ -90,23 +90,6 @@
     }
   },
   "shop": {
-    "title": "Shop",
-    "description": "Choose an available option.",
-    "catalog": "Available options",
-    "application": "Application",
-    "direct": "Direct purchase",
-    "upsale": "Available to you",
-    "open": "View option",
-    "source": "Source: {{source}}",
-    "eligibility": {
-      "application": "Available to approved applicants",
-      "direct": "Available to all attendees",
-      "upsale": "Available after an eligible purchase"
-    },
-    "price_from": "From {{price}}",
-    "price_unavailable": "Price unavailable",
-    "empty_title": "Nothing available right now",
-    "empty_description": "Check back later for new options.",
     "approval_required_title": "Approval required",
     "approval_required_description": "Your application must be approved before you can purchase this option.",
     "approval_required_cta": "View application",
@@ -114,12 +97,12 @@
     "definitive_total": "Total"
   },
   "orders": {
-    "title": "Orders",
+    "title": "Payments",
     "description": "Your payment history for this event.",
-    "empty_title": "No orders yet",
+    "empty_title": "No payments yet",
     "empty_description": "Your payment history will appear here.",
     "total": "Total",
-    "lines": "Order items",
+    "lines": "Payment items",
     "line_quantity": "Quantity: {{count}}",
     "legacy_purchase": "Legacy purchase",
     "invoice": "Invoice",
@@ -144,7 +127,7 @@
     "browse_tickets": "Browse tickets"
   },
   "tickets_access": {
-    "title": "Tickets & Access",
+    "title": "Tickets",
     "description": "Your active event tickets and check-in items.",
     "empty_title": "No tickets or check-in items yet",
     "empty_description": "Active event tickets and check-in items will appear here.",
@@ -595,8 +578,17 @@
     "flow_restriction_violated": "You are not eligible to purchase from this flow.",
     "product_not_in_flow": "This product is not available through this flow."
   },
+  "portalThankYou": {
+    "title": "Purchase completed",
+    "description": "Your purchase is complete. Your passes are ready in the portal.",
+    "passes_cta": "View my passes"
+  },
   "passes": {
     "your_passes": "Your Passes",
+    "other_passes": "Other passes",
+    "choose_flow": "Choose a pass type",
+    "choose_flow_description": "Select which passes you want to view.",
+    "change_flow": "Change pass type",
     "companion_attending": "You are attending as a companion.",
     "companion_attending_city": "You are attending {{city}} as a companion.",
     "companion_no_passes": "No passes assigned yet. Check back later.",
@@ -730,9 +722,11 @@
     "general": "General",
     "participation": "Participation",
     "commerce": "Commerce",
+    "checkouts": "Checkouts",
     "community": "Community",
+    "tickets": "Tickets",
+    "orders": "Payments",
     "shop": "Shop",
-    "orders": "Orders",
     "people": "Your Details",
     "tickets_access": "Tickets & Access",
     "passes": "Passes",

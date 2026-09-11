@@ -27,12 +27,7 @@ const statusColor = (status: string) => {
   return "bg-gray-100 text-gray-800"
 }
 
-const resourceGroups: ResourceGroup[] = [
-  "general",
-  "participation",
-  "commerce",
-  "community",
-]
+const resourceGroups: ResourceGroup[] = ["commerce", "checkouts", "community"]
 
 const ResourceItem: React.FC<{
   resource: Resource
@@ -126,7 +121,7 @@ const ResourcesMenu = () => {
                 <SidebarMenu>
                   {groupResources.map((resource) => (
                     <ResourceItem
-                      key={resource.name}
+                      key={resource.path ?? resource.name}
                       resource={resource}
                       onNavigate={handleNavigate}
                       pathname={pathname}
