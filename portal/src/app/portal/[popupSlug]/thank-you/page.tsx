@@ -3,12 +3,10 @@
 import { Suspense } from "react"
 import { FlowThankYouContent } from "@/components/checkout-flow/FlowThankYouContent"
 
-export default function OpenCheckoutThankYouPage() {
+export default function PortalThankYouPage() {
   return (
     <Suspense fallback={null}>
-      <div className="min-h-screen">
-        <FlowThankYouContent context="direct" />
-      </div>
+      <FlowThankYouContent context="portal" />
     </Suspense>
   )
 }
