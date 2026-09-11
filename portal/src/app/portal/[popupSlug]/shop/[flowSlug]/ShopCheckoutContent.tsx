@@ -9,8 +9,9 @@ import { Loader } from "@/components/ui/Loader"
 import { usePortalDirectSalesFlows } from "@/hooks/usePortalDirectSalesFlows"
 import { usePortalSalesFlows } from "@/hooks/usePortalSalesFlows"
 import { usePortalUpsaleFlows } from "@/hooks/usePortalUpsaleFlows"
+import { resolvePortalFlowSlug } from "@/lib/portal-sales-flows"
 import { useApplication } from "@/providers/applicationProvider"
-import { resolveShopFlowSlug } from "../components/ShopContent"
+import { ApplicationShopCheckout } from "./ApplicationShopCheckout"
 
 interface ShopCheckoutContentProps {
   popupId: string | undefined
@@ -32,17 +33,13 @@ export function ShopCheckoutContent({
   const direct = directQuery.data ?? []
   const upsale = upsaleQuery.data ?? []
   const flows = [...application, ...direct, ...upsale]
-  const canonicalSlug = resolveShopFlowSlug(flowSlug, flows)
-  const flow = flows.find((item) => item.slug === canonicalSlug)
+  const canonicalSlug = resolvePortalFlowSlug(flowSlug, flows)
   const applicationFlow = application.find(
     (item) => item.slug === canonicalSlug,
   )
-  const { getRelevantApplication, participation } = useApplication()
-  const currentApplication = getRelevantApplication()
-  const isApplicationApproved =
-    participation?.type === "companion"
-      ? participation.application_status === "accepted"
-      : currentApplication?.status === "accepted"
+  const { getRelevantApplication } = useApplication()
+  const currentApplication = getRelevantApplication(applicationFlow?.id)
+  const isApplicationApproved = currentApplication?.status === "accepted"
   const collectionsLoading =
     applicationQuery.isLoading || directQuery.isLoading || upsaleQuery.isLoading
 
@@ -51,7 +48,7 @@ export function ShopCheckoutContent({
     router.replace(
       canonicalSlug
         ? `/portal/${popupSlug}/shop/${canonicalSlug}`
-        : `/portal/${popupSlug}/shop`,
+        : `/portal/${popupSlug}`,
     )
   }, [canonicalSlug, collectionsLoading, flowSlug, popupSlug, router])
 
@@ -78,18 +75,24 @@ export function ShopCheckoutContent({
     )
   }
 
+  if (applicationFlow) {
+    return (
+      <ApplicationShopCheckout
+        flowId={applicationFlow.id}
+        flowSlug={applicationFlow.slug}
+        popupSlug={popupSlug}
+        themeConfig={applicationFlow.theme_config}
+      />
+    )
+  }
+
   return (
     <div className="min-h-full">
-      {flow ? (
-        <header className="border-b bg-card px-6 py-4">
-          <p className="text-sm text-muted-foreground">{t("shop.title")}</p>
-          <h1 className="text-xl font-semibold">{flow.name}</h1>
-        </header>
-      ) : null}
       <CheckoutPageClient
         popupSlug={popupSlug}
         flowSlug={canonicalSlug ?? flowSlug}
         showQuoteStatus
+        returnContext="portal"
       />
     </div>
   )

@@ -6,6 +6,7 @@ export type ResourceGroup =
   | "general"
   | "participation"
   | "commerce"
+  | "checkouts"
   | "community"
 
 export interface Resource {

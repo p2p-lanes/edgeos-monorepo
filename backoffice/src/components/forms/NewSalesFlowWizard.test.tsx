@@ -141,7 +141,7 @@ describe("NewSalesFlowWizard", () => {
     })
   })
 
-  it("replaces the creation route after success", async () => {
+  it("creates scratch explicitly without copying and replaces the route", async () => {
     render(
       <Wrapper>
         <NewSalesFlowWizard popupId="popup-1" />
@@ -156,6 +156,19 @@ describe("NewSalesFlowWizard", () => {
       screen.getByRole("button", { name: /create the flow/i }),
     )
 
+    await waitFor(() => {
+      expect(mockCreateSalesFlow).toHaveBeenCalledWith({
+        requestBody: {
+          popup_id: "popup-1",
+          name: "Volunteers",
+          slug: "volunteers",
+          type: "application",
+          start_from: "fresh",
+        },
+      })
+    })
+    expect(mockCopyStepsToFlow).not.toHaveBeenCalled()
+    expect(mockCopyFormToFlow).not.toHaveBeenCalled()
     await waitFor(() =>
       expect(navigate).toHaveBeenCalledWith({
         to: "/sales-flows/$id/edit",

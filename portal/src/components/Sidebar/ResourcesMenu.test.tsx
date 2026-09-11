@@ -1,6 +1,6 @@
-import { render, screen } from "@testing-library/react"
+import { render, screen, within } from "@testing-library/react"
 import { useEffect } from "react"
-import { describe, expect, it, vi } from "vitest"
+import { beforeEach, describe, expect, it, vi } from "vitest"
 
 const SidebarComponents = await vi.importActual<
   typeof import("./SidebarComponents")
@@ -11,31 +11,37 @@ const resources = [
     name: "Application",
     status: "active" as const,
     path: "/portal/summit",
-    group: "general" as const,
-  },
-  {
-    name: "People",
-    status: "active" as const,
-    path: "/portal/summit/people",
-    group: "participation" as const,
-  },
-  {
-    name: "Tickets & Access",
-    status: "active" as const,
-    path: "/portal/summit/tickets",
-    group: "participation" as const,
-  },
-  {
-    name: "Shop",
-    status: "active" as const,
-    path: "/portal/summit/shop",
     group: "commerce" as const,
   },
   {
-    name: "Orders",
+    name: "Passes",
+    status: "active" as const,
+    path: "/portal/summit/passes",
+    group: "commerce" as const,
+  },
+  {
+    name: "Payments",
     status: "active" as const,
     path: "/portal/summit/orders",
     group: "commerce" as const,
+  },
+  {
+    name: "Attendee",
+    status: "active" as const,
+    path: "/portal/summit/shop/attendee",
+    group: "checkouts" as const,
+  },
+  {
+    name: "Volunteer",
+    status: "active" as const,
+    path: "/portal/summit/shop/volunteer",
+    group: "checkouts" as const,
+  },
+  {
+    name: "Merch Store",
+    status: "active" as const,
+    path: "/portal/summit/shop/merch-store",
+    group: "checkouts" as const,
   },
   {
     name: "Attendee Directory",
@@ -45,8 +51,10 @@ const resources = [
   },
 ]
 
+let includeCheckoutResources = true
+
 vi.mock("next/navigation", () => ({
-  usePathname: () => "/portal/summit/shop",
+  usePathname: () => "/portal/summit/shop/attendee",
   useRouter: () => ({ push: vi.fn() }),
 }))
 
@@ -55,9 +63,8 @@ vi.mock("react-i18next", () => ({
     t: (key: string) =>
       ({
         "sidebar.navigation": "Portal navigation",
-        "sidebar.general": "General",
-        "sidebar.participation": "Participation",
         "sidebar.commerce": "Commerce",
+        "sidebar.checkouts": "Checkouts",
         "sidebar.community": "Community",
         "sidebar.mobile_navigation": "Portal navigation menu",
       })[key] ?? key,
@@ -65,7 +72,12 @@ vi.mock("react-i18next", () => ({
 }))
 
 vi.mock("@/hooks/useResources", () => ({
-  default: () => ({ resources, doorName: null }),
+  default: () => ({
+    resources: includeCheckoutResources
+      ? resources
+      : resources.filter((resource) => resource.group !== "checkouts"),
+    doorName: null,
+  }),
 }))
 
 let isMobile = true
@@ -130,24 +142,65 @@ vi.mock("./SidebarComponents", () => ({
 import ResourcesMenu from "./ResourcesMenu"
 
 describe("ResourcesMenu", () => {
-  it("groups separate navigation responsibilities by user intent", () => {
+  beforeEach(() => {
+    includeCheckoutResources = true
+  })
+
+  it("renders Commerce, translated Checkouts, and Community in order", () => {
     render(<ResourcesMenu />)
 
     expect(
       screen.getByRole("navigation", { name: "Portal navigation" }),
     ).toBeTruthy()
-    expect(screen.getByRole("heading", { name: "General" })).toBeTruthy()
-    expect(screen.getByRole("heading", { name: "Participation" })).toBeTruthy()
+    expect(screen.getByRole("heading", { name: "Commerce" })).toBeTruthy()
+    expect(screen.getByRole("heading", { name: "Checkouts" })).toBeTruthy()
+    expect(screen.getByRole("heading", { name: "Community" })).toBeTruthy()
+    expect(
+      screen.getAllByRole("heading").map((heading) => heading.textContent),
+    ).toEqual(["Commerce", "Checkouts", "Community"])
+    expect(screen.queryByText("People")).toBeNull()
+    expect(screen.queryByText("Shop")).toBeNull()
+    expect(screen.queryByText("Orders")).toBeNull()
+    expect(screen.getAllByText("Payments")).not.toHaveLength(0)
+    expect(screen.getAllByText("Merch Store")).not.toHaveLength(0)
+    const commerce = screen.getByRole("region", { name: "Commerce" })
+    const checkouts = screen.getByRole("region", { name: "Checkouts" })
+    expect(
+      within(commerce)
+        .getAllByRole("link")
+        .map((link) => link.textContent),
+    ).toEqual(["Application", "Passes", "Payments"])
+    expect(
+      within(checkouts)
+        .getAllByRole("link")
+        .map((link) => link.textContent),
+    ).toEqual(["Attendee", "Volunteer", "Merch Store"])
+    expect(
+      screen.getByRole("link", { name: "Passes" }).getAttribute("href"),
+    ).toBe("/portal/summit/passes")
+    expect(
+      screen
+        .getByRole("link", { name: "Attendee" })
+        .getAttribute("aria-current"),
+    ).toBe("page")
+    expect(
+      screen.getByRole("link", { name: "Attendee" }).getAttribute("href"),
+    ).toBe("/portal/summit/shop/attendee")
+    expect(
+      screen
+        .getByRole("link", { name: "Volunteer" })
+        .getAttribute("aria-current"),
+    ).toBeNull()
+  })
+
+  it("does not render an empty Checkouts group", () => {
+    includeCheckoutResources = false
+
+    render(<ResourcesMenu />)
+
+    expect(screen.queryByRole("heading", { name: "Checkouts" })).toBeNull()
     expect(screen.getByRole("heading", { name: "Commerce" })).toBeTruthy()
     expect(screen.getByRole("heading", { name: "Community" })).toBeTruthy()
-    expect(screen.getAllByText("People")).not.toHaveLength(0)
-    expect(screen.getAllByText("Tickets & Access")).not.toHaveLength(0)
-    expect(screen.getAllByText("Shop")).not.toHaveLength(0)
-    expect(screen.getAllByText("Orders")).not.toHaveLength(0)
-    expect(screen.getByRole("region", { name: "Commerce" })).toBeTruthy()
-    expect(
-      screen.getByRole("link", { name: "Shop" }).getAttribute("aria-current"),
-    ).toBe("page")
   })
 
   it("uses the localized name for the mobile navigation sheet", () => {
