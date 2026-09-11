@@ -120,7 +120,7 @@
     }
   },
   "people": {
-    "title": "您与同行者",
+    "title": "您和您的同行团队",
     "description": "您本人以及由您管理的同行者在此活动中的参与信息。",
     "primary": "主要参与者",
     "dependent": "受抚养人",
@@ -614,7 +614,7 @@
     "community": "社区",
     "shop": "商店",
     "orders": "订单",
-    "people": "您与同行者",
+    "people": "您的信息",
     "tickets_access": "门票和访问权限",
     "passes": "通行证",
     "attendee_directory": "名录",

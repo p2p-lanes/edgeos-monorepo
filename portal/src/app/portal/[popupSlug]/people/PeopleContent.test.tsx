@@ -37,7 +37,7 @@ describe("PeopleContent", () => {
     render(<PeopleContent people={[]} popupSlug="egypt-eclipse" />)
 
     expect(
-      screen.getByRole("heading", { name: "You & companions", level: 1 }),
+      screen.getByRole("heading", { name: "You & your group", level: 1 }),
     ).toBeTruthy()
     expect(screen.getByText(en.people.description)).toBeTruthy()
     expect(screen.getByText("No attendees linked yet")).toBeTruthy()
