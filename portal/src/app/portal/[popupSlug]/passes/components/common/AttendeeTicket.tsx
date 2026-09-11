@@ -20,7 +20,6 @@ import { imageOptimization } from "@/lib/image-optimization"
 import { deriveProductState } from "@/lib/product-state"
 import { cn } from "@/lib/utils"
 import { useCityProvider } from "@/providers/cityProvider"
-import { usePassesProvider } from "@/providers/passesProvider"
 import type { AttendeePassState, TicketEntry } from "@/types/Attendee"
 import type { ProductsPass } from "@/types/Products"
 import { badgeName } from "../../constants/multiuse"
@@ -52,11 +51,17 @@ const AttendeeTicket = ({
   toggleProduct,
   isDayCheckout,
   onSwitchToBuy,
+  products,
+  readOnly = false,
+  salesFlowId,
 }: {
   attendee: AttendeePassState
   toggleProduct?: (attendeeId: string, product: ProductsPass) => void
   isDayCheckout?: boolean
-  onSwitchToBuy?: () => void
+  onSwitchToBuy?: (attendee: AttendeePassState) => void
+  products: ProductsPass[]
+  readOnly?: boolean
+  salesFlowId: string | null
 }) => {
   const { t } = useTranslation()
   const standardProducts = attendee.products
@@ -69,23 +74,31 @@ const AttendeeTicket = ({
     .sort(sortProductsByPriority)
   const { getCity } = useCityProvider()
   const city = getCity()
-  const { products } = usePassesProvider()
   const { handleEdit, handleCloseModal, modal, handleDelete } = useModal()
   const { removeAttendee, editAttendee } = useAttendee()
-  const hasPurchased = attendee.products.some((product) => product.purchased)
+  const hasPurchased =
+    attendee.products.some((product) => product.purchased) ||
+    (attendee.ticket_entries ?? []).some(
+      (entry) => entry.product_category !== "patreon",
+    )
   const isMainAttendee = attendee.category === "main"
 
   // Meal-plan editing: resolve which purchased tickets are meal-plan weeks via
-  // the popup's meal-plan-select step config (more robust than matching a
-  // configurable category string). Reuses the same portal query as YourPasses,
-  // so React Query dedupes it by key.
+  // the selected flow's meal-plan-select step config (more robust than matching
+  // a configurable category string). React Query dedupes this with YourPasses.
   const popupId = city?.id ? String(city.id) : null
-  const { data: ticketingStepsData } = useQuery({
-    queryKey: ["ticketing-steps-portal", popupId],
+  const { data: queriedTicketingStepsData } = useQuery({
+    queryKey: ["ticketing-steps-portal", popupId, salesFlowId],
     queryFn: () =>
-      TicketingStepsService.listPortalTicketingSteps({ popupId: popupId! }),
-    enabled: !!popupId,
+      TicketingStepsService.listPortalTicketingSteps({
+        popupId: popupId!,
+        salesFlowId: salesFlowId!,
+      }),
+    enabled: !!popupId && salesFlowId !== null,
   })
+  const ticketingStepsData =
+    salesFlowId === null ? undefined : queriedTicketingStepsData
+  const flowProducts = salesFlowId === null ? [] : products
   const mealPlanStep = (ticketingStepsData?.results ?? []).find(
     (s) => s.template === "meal-plan-select",
   )
@@ -101,7 +114,7 @@ const AttendeeTicket = ({
   const mealPlanInfoById = useMemo(() => {
     const { sections } = parseMealPlanTemplateConfig(
       mealPlanTemplateConfig,
-      products,
+      flowProducts,
     )
     const map = new Map<
       string,
@@ -113,7 +126,7 @@ const AttendeeTicket = ({
       }
     }
     return map
-  }, [mealPlanTemplateConfig, products])
+  }, [flowProducts, mealPlanTemplateConfig])
 
   const isMealPlanEntryEditable = (entry: TicketEntry): boolean => {
     const product = mealPlanInfoById.get(entry.product_id)?.product
@@ -245,7 +258,7 @@ const AttendeeTicket = ({
                     </span>
                   </div>
                 </div>
-                {!isMainAttendee && (
+                {!readOnly && !isMainAttendee && (
                   <OptionsMenu
                     onEdit={handleEditAttendee}
                     onDelete={hasPurchased ? undefined : handleRemoveAttendee}
@@ -278,7 +291,7 @@ const AttendeeTicket = ({
             )}
           >
             {/* Options menu - desktop only */}
-            {!hasPurchased && !isMainAttendee && (
+            {!readOnly && !hasPurchased && !isMainAttendee && (
               <OptionsMenu
                 onEdit={handleEditAttendee}
                 onDelete={handleRemoveAttendee}
@@ -286,7 +299,7 @@ const AttendeeTicket = ({
               />
             )}
 
-            {standardProducts.length === 0 ? (
+            {standardProducts.length === 0 && !hasPurchased ? (
               <p className="text-sm font-medium text-neutral-500">
                 {t("passes.coming_soon")}
               </p>
@@ -294,13 +307,17 @@ const AttendeeTicket = ({
               /* View mode - no purchased passes */
               <p className="text-pass-text max-w-xs lg:max-w-sm leading-relaxed">
                 {t("passes.no_passes_yet_prefix", { city: city?.name })}{" "}
-                <button
-                  type="button"
-                  onClick={onSwitchToBuy}
-                  className="font-bold text-pass-title hover:underline cursor-pointer"
-                >
-                  {t("passes.buy_passes")}
-                </button>{" "}
+                {!readOnly && onSwitchToBuy && (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => onSwitchToBuy(attendee)}
+                      className="font-bold text-pass-title hover:underline cursor-pointer"
+                    >
+                      {t("passes.buy_passes")}
+                    </button>{" "}
+                  </>
+                )}
                 {t("passes.no_passes_yet_suffix")}
               </p>
             ) : !toggleProduct && hasPurchased ? (
@@ -339,7 +356,8 @@ const AttendeeTicket = ({
                           {entry.product_name}
                         </span>
                       </div>
-                      {mealPlanIds.has(entry.product_id) &&
+                      {!readOnly &&
+                        mealPlanIds.has(entry.product_id) &&
                         isMealPlanEntryEditable(entry) && (
                           <button
                             type="button"
@@ -549,7 +567,7 @@ const AttendeeTicket = ({
             (e) => e.id === editingEntryId,
           )}
           templateConfig={mealPlanTemplateConfig}
-          products={products}
+          products={flowProducts}
         />
       )}
     </div>

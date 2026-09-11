@@ -50,6 +50,7 @@ vi.mock("@/hooks/usePortalUpsaleFlows", () => ({
 
 vi.mock("@/providers/applicationProvider", () => ({
   useApplication: () => ({
+    getApplicationsForPopup: () => [],
     getRelevantApplication: () => null,
     participation: null,
   }),
@@ -82,7 +83,7 @@ describe("useResources", () => {
     expect(result.current.resources).toEqual([])
   })
 
-  it("removes commerce links from an ended direct-sale popup while retaining Orders", () => {
+  it("removes flow links from an ended direct-sale popup while retaining Payments", () => {
     const { result } = renderHook(() => useResources())
     const paths = result.current.resources.map((resource) => resource.path)
 
@@ -90,7 +91,7 @@ describe("useResources", () => {
     expect(paths).toContain("/portal/summit/orders")
   })
 
-  it("keeps Shop available for an active direct-sale popup", () => {
+  it("lists an eligible flow directly for an active direct-sale popup", () => {
     if (mocks.city) mocks.city.status = "active"
     mocks.directFlows = [
       { id: "direct-1", slug: "merch-store", name: "Merch Store" },
@@ -99,6 +100,7 @@ describe("useResources", () => {
     const { result } = renderHook(() => useResources())
     const paths = result.current.resources.map((resource) => resource.path)
 
-    expect(paths).toContain("/portal/summit/shop")
+    expect(paths).toContain("/portal/summit/shop/merch-store")
+    expect(paths).not.toContain("/portal/summit/shop")
   })
 })

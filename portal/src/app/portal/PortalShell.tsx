@@ -15,13 +15,19 @@ export default function PortalShell({
 }) {
   const pathname = usePathname()
   const isProfilePage = pathname === "/portal/profile"
+  const segments = pathname.split("/").filter(Boolean)
+  const isCheckoutPage =
+    segments[0] === "portal" &&
+    segments.length >= 4 &&
+    ((segments[2] === "shop" && Boolean(segments[3])) ||
+      (segments[2] === "passes" && segments[3] === "buy"))
 
   return (
     <Authentication>
       <Providers>
         <BackofficeSidebar collapsible="icon" />
         <SidebarInset className="portal-chrome max-h-svh overflow-hidden bg-muted/30 text-foreground">
-          {!isProfilePage && <HeaderBar />}
+          {!isProfilePage && !isCheckoutPage && <HeaderBar />}
           {/* `id` lets pages target this exact element for scroll-position
               save/restore. `document.querySelector("main")` would resolve to
               the outer <main> rendered by SidebarInset, which has

@@ -4,6 +4,7 @@ import { Plus } from "lucide-react"
 import { useState } from "react"
 import { AttendeeModal } from "@/app/portal/[popupSlug]/passes/components/AttendeeModal"
 import type { AttendeeCategoryPublic } from "@/client"
+import useAttendee from "@/hooks/useAttendee"
 import { useAttendeeCategories } from "@/hooks/useAttendeeCategories"
 import { cn } from "@/lib/utils"
 import { useCityProvider } from "@/providers/cityProvider"
@@ -14,6 +15,7 @@ interface AddAttendeeButtonsProps {
   onAttendeeAdded?: (attendeeId: string) => void
   className?: string
   allowedCategoryIds?: string[] | null
+  mode?: "checkout" | "management"
 }
 
 function resolveLabel(cat: AttendeeCategoryPublic): string {
@@ -29,12 +31,14 @@ export default function AddAttendeeButtons({
   onAttendeeAdded,
   className,
   allowedCategoryIds,
+  mode = "checkout",
 }: AddAttendeeButtonsProps) {
   const { getCity } = useCityProvider()
   const city = getCity()
   const popupId = city?.id ? String(city.id) : ""
   const { categories } = useAttendeeCategories(popupId)
   const { attendeePasses: attendees, addRecipientDraft } = usePassesProvider()
+  const { addAttendee, loading } = useAttendee()
 
   const [selectedCategory, setSelectedCategory] =
     useState<AttendeeCategoryPublic | null>(null)
@@ -67,6 +71,19 @@ export default function AddAttendeeButtons({
     data: AttendeePassState & { category_id?: string },
   ) => {
     if (!selectedCategory) return
+    if (mode === "management") {
+      const attendee = await addAttendee({
+        name: data.name ?? "",
+        email: data.email ?? "",
+        category_id: data.category_id ?? selectedCategory.id,
+        gender: data.gender ?? "",
+        additional_data: data.additional_data,
+      })
+      setSelectedCategory(null)
+      if (attendee?.id) onAttendeeAdded?.(attendee.id)
+      return
+    }
+
     const recipientKey = `draft:${crypto.randomUUID()}`
     const email = data.email?.trim()
     const attendeeId = addRecipientDraft({
@@ -91,6 +108,7 @@ export default function AddAttendeeButtons({
           key={cat.id}
           type="button"
           onClick={() => setSelectedCategory(cat)}
+          disabled={mode === "management" && loading}
           className={cn(
             "flex items-center gap-1.5 text-pass-text hover:text-pass-title transition-colors whitespace-nowrap disabled:opacity-50",
             className,

@@ -15,8 +15,8 @@ type Translator = (key: string, opts?: Record<string, unknown>) => string
 
 /**
  * Sidebar resources for an ended popup. Application points at the home card
- * (root) and stays active; authorized participants retain read-only Tickets
- * & Access and Orders. Events and the attendee directory honor the popup's
+ * (root) and stays active; authorized participants retain read-only attendee
+ * passes and payment history. Events and the attendee directory honor the popup's
  * events/directory feature flags.
  */
 export function buildEndedResources({
@@ -42,21 +42,14 @@ export function buildEndedResources({
       icon: FileText,
       status: "active",
       path: `/portal/${city?.slug}`,
-      group: "general",
+      group: "commerce",
     },
     {
-      name: t("sidebar.people"),
-      icon: Users,
-      status: participated ? "active" : "hidden",
-      path: `/portal/${city?.slug}/people`,
-      group: "participation",
-    },
-    {
-      name: t("sidebar.tickets_access"),
+      name: t("sidebar.passes"),
       icon: Ticket,
       status: participated ? "active" : "hidden",
-      path: `/portal/${city?.slug}/tickets`,
-      group: "participation",
+      path: `/portal/${city?.slug}/passes`,
+      group: "commerce",
     },
     {
       name: t("sidebar.orders"),

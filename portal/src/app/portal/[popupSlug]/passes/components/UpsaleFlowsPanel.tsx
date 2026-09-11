@@ -14,8 +14,8 @@ interface UpsaleFlowsPanelProps {
  *
  * Renders nothing while loading or when the human has no eligible upsale
  * flows (eligibility is server-side: >=1 APPROVED payment in the popup —
- * see `usePortalUpsaleFlows`). Each entry links to that flow's own
- * checkout page, which enforces the same eligibility gate server-side.
+ * see `usePortalUpsaleFlows`). Each entry links to that flow's canonical
+ * authenticated Shop route, which enforces the same eligibility gate.
  */
 export function UpsaleFlowsPanel({
   popupSlug,
@@ -40,7 +40,7 @@ export function UpsaleFlowsPanel({
         {flows.map((flow) => (
           <Link
             key={flow.id}
-            href={`/checkout/${popupSlug}/${flow.slug}`}
+            href={`/portal/${popupSlug}/shop/${flow.slug}`}
             className="rounded-xl border p-4 text-left transition-colors hover:border-primary"
           >
             <span className="font-medium">{flow.name}</span>

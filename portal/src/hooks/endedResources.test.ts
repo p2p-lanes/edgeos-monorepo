@@ -22,15 +22,26 @@ const byName = (rs: ReturnType<typeof buildEndedResources>) =>
 
 describe("buildEndedResources", () => {
   it("keeps application active and exposes read-only access", () => {
-    const rs = byName(
-      buildEndedResources({ t, city: city({}), participated: true }),
-    )
+    const resources = buildEndedResources({
+      t,
+      city: city({}),
+      participated: true,
+    })
+    const rs = byName(resources)
+    expect(resources.slice(0, 2).map((resource) => resource.name)).toEqual([
+      "sidebar.application",
+      "sidebar.passes",
+    ])
     expect(rs["sidebar.application"]).toBe("active")
-    expect(rs["sidebar.tickets_access"]).toBe("active")
-    expect(rs["sidebar.passes"]).toBeUndefined()
+    expect(rs["sidebar.passes"]).toBe("active")
+    expect(
+      resources.find((resource) => resource.name === "sidebar.passes")?.path,
+    ).toBe("/portal/p/passes")
+    expect(rs["sidebar.people"]).toBeUndefined()
+    expect(rs["sidebar.tickets"]).toBeUndefined()
   })
 
-  it("keeps orders available as read-only history", () => {
+  it("keeps payments available as read-only history", () => {
     const rs = byName(
       buildEndedResources({ t, city: city({}), participated: false }),
     )

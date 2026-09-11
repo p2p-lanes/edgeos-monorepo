@@ -1,7 +1,7 @@
 import { render } from "@testing-library/react"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 
-let pathname = "/portal/summit/shop"
+let pathname = "/portal/summit/orders"
 
 vi.mock("next/navigation", () => ({
   usePathname: () => pathname,
@@ -57,7 +57,7 @@ vi.mock("@/components/Sidebar/hooks/useBreadcrumbNameMapping", () => ({
 }))
 
 vi.mock("@/components/Sidebar/BreadcrumbSegment", () => ({
-  default: () => <span>Shop</span>,
+  default: () => <span>Payments</span>,
 }))
 
 vi.mock("@/hooks/useIsMobile", () => ({ useIsMobile: () => false }))
@@ -81,7 +81,7 @@ function expectPortalBoundary(getByTestId: (id: string) => HTMLElement) {
 
 describe("PortalShell", () => {
   beforeEach(() => {
-    pathname = "/portal/summit/shop"
+    pathname = "/portal/summit/orders"
     document.documentElement.style.setProperty("--background", "#111111")
     document.documentElement.style.setProperty("--foreground", "#f5f5f5")
   })
@@ -89,7 +89,7 @@ describe("PortalShell", () => {
   it("keeps Portal chrome and canvas inside the fixed token boundary", () => {
     const { getByTestId } = render(
       <PortalShell>
-        <div>Shop content</div>
+        <div>Payments content</div>
       </PortalShell>,
     )
 
@@ -118,6 +118,22 @@ describe("PortalShell", () => {
     const { getByTestId } = render(
       <PortalShell>
         <div>Profile content</div>
+      </PortalShell>,
+    )
+
+    expect(document.querySelector("header")).toBeNull()
+    expectPortalBoundary(getByTestId)
+  })
+
+  it.each([
+    "/portal/summit/shop/volunteers",
+    "/portal/summit/passes/buy",
+  ])("hides the Portal header on checkout route %s", (checkoutPath) => {
+    pathname = checkoutPath
+
+    const { getByTestId } = render(
+      <PortalShell>
+        <div>Checkout content</div>
       </PortalShell>,
     )
 

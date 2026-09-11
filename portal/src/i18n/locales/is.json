@@ -76,23 +76,6 @@
     }
   },
   "shop": {
-    "title": "Verslun",
-    "description": "Veldu tiltækan möguleika.",
-    "catalog": "Tiltækir möguleikar",
-    "application": "Umsókn",
-    "direct": "Bein kaup",
-    "upsale": "Í boði fyrir þig",
-    "open": "Skoða möguleika",
-    "source": "Uppruni: {{source}}",
-    "eligibility": {
-      "application": "Í boði fyrir samþykkta umsækjendur",
-      "direct": "Í boði fyrir alla þátttakendur",
-      "upsale": "Í boði eftir gjaldgeng kaup"
-    },
-    "price_from": "Frá {{price}}",
-    "price_unavailable": "Verð ekki í boði",
-    "empty_title": "Ekkert í boði núna",
-    "empty_description": "Athugaðu aftur síðar fyrir nýja möguleika.",
     "approval_required_title": "Samþykki er krafist",
     "approval_required_description": "Umsóknin þín verður að vera samþykkt áður en þú getur keypt þennan möguleika.",
     "approval_required_cta": "Skoða umsókn",
@@ -100,12 +83,12 @@
     "definitive_total": "Heildarupphæð"
   },
   "orders": {
-    "title": "Pantanir",
+    "title": "Greiðslur",
     "description": "Greiðsluferill þinn fyrir þennan viðburð.",
-    "empty_title": "Engar pantanir enn",
+    "empty_title": "Engar greiðslur enn",
     "empty_description": "Greiðsluferillinn þinn birtist hér.",
     "total": "Samtals",
-    "lines": "Vörur í pöntun",
+    "lines": "Greiðsluliðir",
     "line_quantity": "Magn: {{count}}",
     "legacy_purchase": "Eldri kaup",
     "invoice": "Reikningur",
@@ -130,7 +113,7 @@
     "browse_tickets": "Skoða miða"
   },
   "tickets_access": {
-    "title": "Passar og aðgangur",
+    "title": "Miðar",
     "description": "Virkir viðburðamiðar og innritunarvörur þínar.",
     "empty_title": "Engir miðar eða innritunarvörur enn",
     "empty_description": "Virkir viðburðamiðar og innritunarvörur birtast hér.",
@@ -467,8 +450,17 @@
     "flow_restriction_violated": "Þú uppfyllir ekki skilyrði til að kaupa í gegnum þessa leið.",
     "product_not_in_flow": "Þessi vara er ekki í boði í gegnum þessa leið."
   },
+  "portalThankYou": {
+    "title": "Kaupum lokið",
+    "description": "Kaupunum er lokið. Passarnir þínir eru tilbúnir í vefgáttinni.",
+    "passes_cta": "Skoða passana mína"
+  },
   "passes": {
     "your_passes": "Passarnir þínir",
+    "other_passes": "Aðrir passar",
+    "choose_flow": "Veldu tegund passa",
+    "choose_flow_description": "Veldu hvaða passa þú vilt skoða.",
+    "change_flow": "Breyta tegund passa",
     "companion_attending": "Þú mætir sem fylgdarmaður.",
     "companion_attending_city": "Þú mætir á {{city}} sem fylgdarmaður.",
     "companion_no_passes": "Engir passar hafa verið úthlutaðir enn. Athugaðu aftur síðar.",
@@ -601,9 +593,11 @@
     "general": "Almennt",
     "participation": "Þátttaka",
     "commerce": "Verslun",
+    "checkouts": "Kaup",
     "community": "Samfélag",
+    "tickets": "Miðar",
+    "orders": "Greiðslur",
     "shop": "Verslun",
-    "orders": "Pantanir",
     "people": "Þínar upplýsingar",
     "tickets_access": "Passar og aðgangur",
     "passes": "Passar",

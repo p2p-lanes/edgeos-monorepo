@@ -2,8 +2,8 @@ import { render, screen, waitFor } from "@testing-library/react"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 
 // ---------------------------------------------------------------------------
-// Compatibility redirects now live in the route pages. The layout must stay
-// transparent so legacy /passes routes can reach their canonical destinations.
+// Passes remains available as popup-scoped participation history. The layout
+// must not replace the canonical page with another route.
 // ---------------------------------------------------------------------------
 
 const mockReplace = vi.fn()
@@ -36,12 +36,12 @@ vi.mock("@/components/ui/Loader", () => ({
 
 import Layout from "./layout"
 
-describe("passes compatibility layout", () => {
+describe("Passes layout", () => {
   beforeEach(() => {
     mockReplace.mockClear()
   })
 
-  it("keeps legacy route children available when the popup has ended", async () => {
+  it("keeps Passes history available when the popup has ended", async () => {
     mockCity = { id: "city-1", slug: "festival", status: "ended" }
 
     render(
