@@ -6,6 +6,12 @@ import type {
   PaymentProductRequest_Input as PaymentProductRequest,
   PaymentRecipientRequest,
 } from "@/client"
+import { guestsForWire } from "@/lib/accommodationForm"
+import {
+  type BuyerIdentity,
+  NO_BUYER_IDENTITY,
+  withBuyerIdentity,
+} from "@/lib/buyerIdentity"
 import type { AttendeePassState } from "@/types/Attendee"
 import type {
   SelectedAccommodationItem,
@@ -17,11 +23,26 @@ import type {
   SelectedPatronItem,
 } from "@/types/checkout"
 
+export interface OpenTicketBuyer {
+  email: string
+  firstName: string
+  lastName: string
+}
+
+export class MissingTicketBuyerError extends Error {
+  constructor() {
+    super("Complete the buyer information before paying for tickets")
+  }
+}
+
 interface BuildPaymentProductsParams {
   attendeePasses: AttendeePassState[]
   selectedPasses: SelectedPassItem[]
   housing: SelectedHousingItem | null
   accommodations?: SelectedAccommodationItem[]
+  /** What the checkout already knows about the buyer. Defaults to knowing
+   *  nothing, which leaves every booking exactly as the cart holds it. */
+  buyerIdentity?: BuyerIdentity
   merch: SelectedMerchItem[]
   patron: SelectedPatronItem | null
   selectedMealPlans?: SelectedMealPlanItem[]
@@ -31,6 +52,7 @@ interface BuildPaymentProductsParams {
   checkoutMode?: CheckoutMode
   editPassesEnabled?: boolean
   submitMode?: "application" | "open-ticketing"
+  openTicketBuyer?: OpenTicketBuyer | null
 }
 
 interface BuildPaymentProductsResult {
@@ -82,6 +104,7 @@ export function buildPaymentProducts({
   selectedPasses,
   housing,
   accommodations = [],
+  buyerIdentity = NO_BUYER_IDENTITY,
   merch,
   patron,
   selectedMealPlans = [],
@@ -91,6 +114,7 @@ export function buildPaymentProducts({
   checkoutMode = CHECKOUT_MODE.PASS_SYSTEM,
   editPassesEnabled = false,
   submitMode = "application",
+  openTicketBuyer,
 }: BuildPaymentProductsParams): BuildPaymentProductsResult {
   const isMonthUpgrade =
     editPassesEnabled &&
@@ -253,12 +277,58 @@ export function buildPaymentProducts({
       })
     }
 
+    // Simple-quantity tickets have no attendee selector. Materialize one
+    // attempt-local recipient per unit from the buyer form, not from a human
+    // id inferred from email. Distinct keys keep guest tickets from collapsing
+    // onto one attendee at fulfillment. Rebuilt at submit time for BOTH fresh
+    // and restored carts so old unassigned carts and edited buyer details work.
+    // Keys are stable across retries, and counters span steps containing the
+    // same product. Explicit selected-pass identities above are left intact.
+    const ticketUnitCounts = new Map<string, number>()
+    const addOpenTicket = (item: SelectedDynamicItem) => {
+      const email = openTicketBuyer?.email.trim()
+      const name = [openTicketBuyer?.firstName, openTicketBuyer?.lastName]
+        .filter(Boolean)
+        .join(" ")
+        .trim()
+      if (!email || !name) throw new MissingTicketBuyerError()
+      for (let unit = 0; unit < item.quantity; unit++) {
+        let index = ticketUnitCounts.get(item.productId) ?? 0
+        let key: string
+        do {
+          key = `open-ticket:${item.productId}:${index++}`
+        } while (recipients.has(key))
+        ticketUnitCounts.set(item.productId, index)
+        // The quantity UI does not collect guest profiles. Preserve the buyer
+        // contact snapshot per unit, as anonymous checkout does, without
+        // claiming these drafts are an existing human or attendee.
+        recipients.set(key, {
+          recipient_key: key,
+          name,
+          email,
+          category_id: item.product.attendee_category_id ?? null,
+        })
+        products.push({
+          product_id: item.productId,
+          recipient_key: key,
+          quantity: 1,
+        })
+      }
+    }
+
     // Add dynamic step items
     for (const items of Object.values(dynamicItems)) {
       for (const item of items) {
         // A restored legacy cart can contain the same ticket in dynamicItems
         // and selectedPasses. Keep the attendee-scoped representation.
         if (item.quantity > 0 && !selectedPassProductIds.has(item.productId)) {
+          if (
+            submitMode === "open-ticketing" &&
+            item.product.category?.toLowerCase() === "ticket"
+          ) {
+            addOpenTicket(item)
+            continue
+          }
           products.push({
             product_id: item.productId,
             quantity: item.quantity,
@@ -272,7 +342,13 @@ export function buildPaymentProducts({
     // the dates in `purchase_metadata` and charges that, so a tampered price
     // has nothing to tamper with. `quantity` must be 1, because a second room is a
     // second line, because each one is assigned its own unit.
-    for (const item of accommodations) {
+    for (const stay of accommodations) {
+      // The step stopped asking the buyer for their own email, phone and
+      // name once the buyer step or the account already had them. This is
+      // where those answers become real ones, in the single place the
+      // booking leaves for the server, so the property's registry and the
+      // backend's `validate_answers` both see a complete form.
+      const item = withBuyerIdentity(stay, buyerIdentity)
       products.push({
         product_id: item.productId,
         ...(accommodationAttendeeId
@@ -285,10 +361,8 @@ export function buildPaymentProducts({
           check_in: item.checkIn,
           check_out: item.checkOut,
           guest_count: item.guestCount,
-          guests: item.guests
-            .map((name) => name.trim())
-            .filter(Boolean)
-            .map((name) => ({ name })),
+          guests: guestsForWire(item.guests),
+          booker_answers: item.bookerAnswers,
         },
       })
     }

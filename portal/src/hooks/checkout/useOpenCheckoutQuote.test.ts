@@ -61,7 +61,7 @@ describe("buildOpenCheckoutPreviewRequest", () => {
           checkIn: "2026-09-01",
           checkOut: "2026-09-03",
           guestCount: 1,
-          guests: ["Taylor Buyer"],
+          guests: [{ name: "Taylor Buyer", answers: {} }],
         },
         {
           productId: "room-product",
@@ -69,7 +69,7 @@ describe("buildOpenCheckoutPreviewRequest", () => {
           checkIn: "2026-09-10",
           checkOut: "2026-09-12",
           guestCount: 1,
-          guests: ["Taylor Buyer"],
+          guests: [{ name: "Taylor Buyer", answers: {} }],
         },
       ],
       merch: [],

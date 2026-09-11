@@ -21,10 +21,14 @@ const mocks = vi.hoisted(() => ({
   participation: null as { type: string } | null,
   directPanel: vi.fn(),
   replace: vi.fn(),
+  search: "",
+  getRelevantApplication: vi.fn(),
+  feeBanner: vi.fn(),
 }))
 
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: vi.fn(), replace: mocks.replace }),
+  useSearchParams: () => new URLSearchParams(mocks.search),
 }))
 
 vi.mock("react-i18next", () => ({
@@ -37,7 +41,7 @@ vi.mock("@/providers/cityProvider", () => ({
 
 vi.mock("@/providers/applicationProvider", () => ({
   useApplication: () => ({
-    getRelevantApplication: () => null,
+    getRelevantApplication: mocks.getRelevantApplication,
     participation: mocks.participation,
   }),
 }))
@@ -88,6 +92,16 @@ vi.mock("@/components/ScholarshipStatusBadge", () => ({
   ScholarshipStatusBadge: () => null,
 }))
 
+vi.mock("./application/components/fee-payment-banner", () => ({
+  FeePaymentBanner: (props: {
+    application: { id: string }
+    isReturnFromCheckout: boolean
+  }) => {
+    mocks.feeBanner(props)
+    return <div data-testid="fee-banner" />
+  },
+}))
+
 vi.mock("@/components/ui/Loader", () => ({
   Loader: () => <div data-testid="loader" />,
 }))
@@ -106,6 +120,9 @@ describe("portal event overview", () => {
     mocks.participation = null
     mocks.directPanel.mockClear()
     mocks.replace.mockClear()
+    mocks.search = ""
+    mocks.getRelevantApplication.mockReset().mockReturnValue(null)
+    mocks.feeBanner.mockClear()
   })
 
   it("does not mount direct sales for an event without applications", () => {
@@ -194,6 +211,69 @@ describe("portal event overview", () => {
     expect(screen.queryByTestId("application-door")).toBeNull()
     expect(screen.getByTestId("application-progress")).toBeTruthy()
     expect(screen.getByRole("button", { name: "Apply" })).toBeTruthy()
+  })
+
+  it.each([
+    1, 2,
+  ])("shows fee confirmation alongside the overview with %i application flows", (flowCount) => {
+    if (mocks.city) mocks.city.takes_applications = true
+    mocks.doors = Array.from({ length: flowCount }, (_, index) => ({
+      flowId: `flow-${index + 1}`,
+    }))
+    const flowId = `flow-${flowCount}`
+    const application = {
+      id: "paid-application",
+      sales_flow_id: flowId,
+      status: "pending_fee",
+    }
+    mocks.search = `flow=${flowId}&checkout=success`
+    mocks.getRelevantApplication.mockImplementation((selectedFlow?: string) =>
+      selectedFlow === flowId ? application : null,
+    )
+
+    render(<Home />)
+
+    expect(screen.getByTestId("event-card")).toBeTruthy()
+    expect(screen.getByTestId("fee-banner")).toBeTruthy()
+    expect(mocks.feeBanner).toHaveBeenCalledWith({
+      application,
+      isReturnFromCheckout: true,
+    })
+    if (flowCount > 1) {
+      expect(screen.getAllByTestId("application-door")).toHaveLength(flowCount)
+    }
+  })
+
+  it.each([
+    "",
+    "flow=flow-1",
+    "checkout=success",
+    "flow=flow-1&checkout=cancel",
+  ])("does not confirm an application without a flow-scoped fee success: %s", (search) => {
+    if (mocks.city) mocks.city.takes_applications = true
+    mocks.search = search
+    mocks.getRelevantApplication.mockReturnValue({
+      id: "unrelated-application",
+      status: "pending_fee",
+    })
+
+    render(<Home />)
+
+    expect(screen.queryByTestId("fee-banner")).toBeNull()
+    expect(mocks.feeBanner).not.toHaveBeenCalled()
+  })
+
+  it("does not fall back to another application for an unknown fee flow", () => {
+    if (mocks.city) mocks.city.takes_applications = true
+    mocks.search = "flow=unknown&checkout=success"
+    mocks.getRelevantApplication.mockImplementation((flowId?: string) =>
+      flowId ? null : { id: "other-application", status: "pending_fee" },
+    )
+
+    render(<Home />)
+
+    expect(screen.getByTestId("event-card")).toBeTruthy()
+    expect(screen.queryByTestId("fee-banner")).toBeNull()
   })
 
   it("does not mount direct sales for a companion overview", () => {

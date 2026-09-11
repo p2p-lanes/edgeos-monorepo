@@ -90,6 +90,9 @@ jobs:
       - name: Typecheck (portal)
         run: pnpm --filter portal exec tsc --noEmit
 
+      - name: Unit tests (portal)
+        run: pnpm --filter portal test
+
   ai-service:
     name: AI service (lint + typecheck + tests + build)
     runs-on: ubuntu-latest

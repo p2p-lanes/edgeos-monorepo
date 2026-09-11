@@ -45,10 +45,41 @@ def _string_map(value: Any) -> dict[str, str] | None:
     }
 
 
-def _strings(value: Any) -> list[str]:
+def _answers(value: Any) -> dict[str, Any]:
+    """Guest-form answers, whose values are whatever the field type produced.
+
+    Unlike ``_string_map`` this keeps numbers, booleans and lists: a number
+    field answers with a number and a multiselect with a list, and coercing
+    them to strings here would change what the purchase validates.
+    """
+    if not isinstance(value, dict):
+        return {}
+    return {key: item for key, item in value.items() if isinstance(key, str)}
+
+
+def _guests(value: Any) -> list[dict[str, Any]]:
+    """Accommodation guests, in the ``{name, answers}`` shape the line uses.
+
+    Legacy carts hold bare names, and carts saved after the guest form landed
+    hold the richer entries, so both are read. Empty slots are kept: a party
+    half typed in is what a saved cart is for, and the checkout counts on the
+    slots being there.
+    """
     if not isinstance(value, list):
         return []
-    return [item for item in value if isinstance(item, str)]
+    guests: list[dict[str, Any]] = []
+    for item in value:
+        if isinstance(item, str):
+            guests.append({"name": item, "answers": {}})
+        elif isinstance(item, dict):
+            name = item.get("name")
+            guests.append(
+                {
+                    "name": name if isinstance(name, str) else "",
+                    "answers": _answers(item.get("answers")),
+                }
+            )
+    return guests
 
 
 def _identity(entry: dict[str, Any], recipient_keys: set[str]) -> dict[str, Any]:
@@ -214,7 +245,8 @@ def _legacy_lines(raw: dict[str, Any]) -> list[dict[str, Any]]:
                 "check_in": entry.get("check_in"),
                 "check_out": entry.get("check_out"),
                 "guest_count": _optional_positive_int(entry.get("guest_count")),
-                "guests": _strings(entry.get("guests")),
+                "guests": _guests(entry.get("guests")),
+                "booker_answers": _answers(entry.get("booker_answers")),
                 "step_type": "housing",
                 **_identity(entry, recipient_keys),
             }

@@ -5,22 +5,35 @@
  *
  * Reads nothing from `products`: rooms are not products the buyer browses,
  * they are inventory that only means anything once dates exist. So the step
- * asks for dates first, then asks the server what is free and what it costs,
- * and only then shows cards. Every price on this screen is a server quote:
+ * asks for a stay first, then asks the server what is free and what it costs,
+ * and only then shows rooms. Every price on this screen is a server quote:
  * nightly rate times nights is wrong as soon as a date-range rule or the
  * long-stay rate applies, so the client never multiplies.
  *
+ * Choosing one folds the rest away. The board is a comparison, and a
+ * comparison the buyer has finished with is only scroll between them and
+ * the questions still to answer, so the chosen room compacts to a line and
+ * the guest form unfolds under it as one block. All three layouts collapse
+ * to the same line, because `layout` only ever described how to compare
+ * rooms. `SelectedRoomSummary` has the rest of that argument.
+ *
+ * A room the buyer cannot book is not shown. It used to be greyed out with
+ * the reason printed inside the button that would have booked it, which put
+ * a label where the affordance was and left it at disabled contrast. What
+ * replaces it is `accommodationBoard`: the board holds only bookable rooms,
+ * and everything removed is accounted for underneath, with a button where
+ * the offer itself says how to get it back.
+ *
  * `template_config` governs presentation only (`layout`,
- * `show_property_headers`, `require_guest_names`, `notice_text`). Which
- * properties are on offer is enforced by the backend, which filters both
- * endpoints by the step's subset. The client could not be trusted with that
- * and is not asked to be.
+ * `show_property_headers`, `require_guest_names`, `notice_text`) and the
+ * questions asked about the people staying. Which properties are on offer is
+ * enforced by the backend, which filters both endpoints by the step's subset.
+ * The client could not be trusted with that and is not asked to be.
  */
 
-import { useQuery } from "@tanstack/react-query"
-import type { TFunction } from "i18next"
-import { BedDouble, Check, Info, Loader2, Users } from "lucide-react"
-import Image from "next/image"
+import { keepPreviousData, useQuery } from "@tanstack/react-query"
+import { AnimatePresence } from "framer-motion"
+import { Info, Loader2 } from "lucide-react"
 import { useEffect, useMemo, useRef, useState } from "react"
 import { useTranslation } from "react-i18next"
 import {
@@ -31,26 +44,53 @@ import {
   type PublicAccommodationAvailability,
 } from "@/client"
 import { Button } from "@/components/ui/button"
-import { DatePicker } from "@/components/ui/date-picker"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { imageOptimization } from "@/lib/image-optimization"
+import {
+  addDays,
+  bookableBounds,
+  buildBoard,
+  largestParty,
+  recoveriesFor,
+} from "@/lib/accommodationBoard"
+import {
+  type AccommodationGuestForm,
+  parseGuestForm,
+  stayAsksAnything,
+} from "@/lib/accommodationForm"
 import { cn } from "@/lib/utils"
 import { useCheckout } from "@/providers/checkoutProvider"
 import { useCityProvider } from "@/providers/cityProvider"
 import {
   calculateNights,
   formatCheckoutDate,
-  formatCurrency,
   type SelectedAccommodationItem,
 } from "@/types/checkout"
 import type { VariantProps } from "../registries/variantRegistry"
+import { Fold } from "./accommodation/Fold"
+import { GuestDetailsPanel } from "./accommodation/GuestDetailsPanel"
+import { RecoveryNotes } from "./accommodation/RecoveryNotes"
+import { RoomDetailsDialog } from "./accommodation/RoomDetailsDialog"
+import { RoomCard, RoomRow, RoomSheetRow } from "./accommodation/RoomViews"
+import { SelectedRoomSummary } from "./accommodation/SelectedRoomSummary"
+import { StayBar } from "./accommodation/StayBar"
+
+type Layout = "rows" | "cards" | "sheet"
+
+/** What the first two layouts were called before there was a third. */
+const RENAMED_LAYOUTS: Record<string, Layout> = { grid: "cards", list: "rows" }
 
 interface AccommodationTemplateConfig {
-  layout: "grid" | "list"
+  layout: Layout
   showPropertyHeaders: boolean
   requireGuestNames: boolean
+  guestForm: AccommodationGuestForm | null
   noticeText: string
+}
+
+function parseLayout(raw: unknown): Layout {
+  if (typeof raw !== "string") return "rows"
+  const renamed = RENAMED_LAYOUTS[raw]
+  if (renamed) return renamed
+  return raw === "cards" || raw === "sheet" || raw === "rows" ? raw : "rows"
 }
 
 function parseConfig(
@@ -59,305 +99,17 @@ function parseConfig(
 ): AccommodationTemplateConfig {
   const config = (raw ?? {}) as Record<string, unknown>
   return {
-    layout: config.layout === "list" ? "list" : "grid",
+    layout: parseLayout(config.layout),
     showPropertyHeaders: config.show_property_headers !== false,
     requireGuestNames: config.require_guest_names !== false,
+    // The questions come from the step, not from the room: one form for the
+    // whole checkout, so a buyer booking two rooms is asked one thing.
+    guestForm: parseGuestForm(config.guest_form),
     noticeText:
       typeof config.notice_text === "string" && config.notice_text.trim()
         ? config.notice_text
         : defaultNotice,
   }
-}
-
-function toDateInput(date: Date): string {
-  // Local calendar parts, not toISOString(): the picker hands back local
-  // midnights, and their UTC rendering falls a day earlier east of UTC.
-  const year = date.getFullYear()
-  const month = String(date.getMonth() + 1).padStart(2, "0")
-  const day = String(date.getDate()).padStart(2, "0")
-  return `${year}-${month}-${day}`
-}
-
-function addDays(value: string, amount: number): string {
-  const [year, month, day] = value.split("-").map(Number)
-  const date = new Date(year, month - 1, day + amount)
-  return toDateInput(date)
-}
-
-/** The union of every room's bookable window: the outer bounds of the picker. */
-function bookableBounds(rooms: PublicAccommodation[]): {
-  from: string | null
-  to: string | null
-} {
-  if (rooms.length === 0) return { from: null, to: null }
-  return {
-    from: rooms.reduce(
-      (min, room) => (room.bookable_from < min ? room.bookable_from : min),
-      rooms[0].bookable_from,
-    ),
-    to: rooms.reduce(
-      (max, room) => (room.bookable_to > max ? room.bookable_to : max),
-      rooms[0].bookable_to,
-    ),
-  }
-}
-
-function bedSummary(room: PublicAccommodation, t: TFunction): string {
-  const beds = room.beds ?? []
-  if (beds.length === 0) return ""
-  return beds
-    .map((bed) =>
-      t("checkout.accommodation.bed_count", {
-        count: bed.count,
-        type: t(`checkout.accommodation.bed_types.${bed.type}`),
-      }),
-    )
-    .join(" · ")
-}
-
-/**
- * Why a room cannot be booked, in words the buyer can act on.
- *
- * The codes are the backend's stable `REASON_*` strings; an unrecognised one
- * degrades to a neutral sentence rather than showing a raw identifier.
- */
-function unavailableCopy(
-  reason: string | null | undefined,
-  t: TFunction,
-): string | null {
-  switch (reason) {
-    case null:
-    case undefined:
-      return null
-    case "sold_out":
-      return t("checkout.accommodation.unavailable.sold_out")
-    case "min_stay_not_met":
-      return t("checkout.accommodation.unavailable.min_stay_not_met")
-    case "outside_bookable_window":
-      return t("checkout.accommodation.unavailable.outside_bookable_window")
-    case "over_capacity":
-      return t("checkout.accommodation.unavailable.over_capacity")
-    case "inactive":
-      return t("checkout.accommodation.unavailable.inactive")
-    default:
-      return t("checkout.accommodation.unavailable.default")
-  }
-}
-
-interface RoomCardProps {
-  room: PublicAccommodation
-  availability: PublicAccommodationAvailability | undefined
-  currency: string | undefined
-  selected: SelectedAccommodationItem | undefined
-  nights: number
-  isPending: boolean
-  onSelect: () => void
-  onRemove: () => void
-}
-
-function RoomCard({
-  room,
-  availability,
-  currency,
-  selected,
-  nights,
-  isPending,
-  onSelect,
-  onRemove,
-}: RoomCardProps) {
-  const { t } = useTranslation()
-  const cover = room.images?.[0]?.url
-  const quote = availability?.quote
-  const blocked = unavailableCopy(availability?.unavailable_reason, t)
-  const beds = bedSummary(room, t)
-
-  return (
-    <div
-      className={cn(
-        "flex flex-col overflow-hidden rounded-2xl border bg-card transition-colors",
-        selected && "border-primary ring-1 ring-primary",
-        blocked && !selected && "opacity-60",
-      )}
-    >
-      {cover && (
-        <div className="relative h-40 w-full">
-          <Image
-            src={cover}
-            alt={room.name}
-            fill
-            sizes="(max-width: 768px) 100vw, 33vw"
-            className="object-cover"
-            {...imageOptimization(cover)}
-          />
-        </div>
-      )}
-
-      <div className="flex flex-1 flex-col gap-2 p-4">
-        <div className="flex items-start justify-between gap-2">
-          <h4 className="font-semibold leading-tight">{room.name}</h4>
-          {selected && (
-            <span className="flex shrink-0 items-center gap-1 text-xs font-medium text-primary">
-              <Check className="h-3.5 w-3.5" />
-              {t("checkout.accommodation.in_cart")}
-            </span>
-          )}
-        </div>
-
-        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
-          <span className="flex items-center gap-1">
-            <Users className="h-3.5 w-3.5" />
-            {t("checkout.accommodation.sleeps", {
-              count: room.guest_capacity,
-            })}
-          </span>
-          {beds && (
-            <span className="flex items-center gap-1">
-              <BedDouble className="h-3.5 w-3.5" />
-              {beds}
-            </span>
-          )}
-        </div>
-
-        {room.description && (
-          <p className="text-sm text-muted-foreground">{room.description}</p>
-        )}
-
-        <div className="mt-auto pt-3">
-          {quote ? (
-            <div className="flex items-baseline justify-between gap-2">
-              <span className="text-lg font-semibold">
-                {formatCurrency(Number(quote.total), currency)}
-              </span>
-              <span className="text-xs text-muted-foreground">
-                {t("checkout.accommodation.nights", { count: nights })}
-                {quote.applied_rule === "long_stay" &&
-                  ` · ${t("checkout.accommodation.monthly_rate")}`}
-              </span>
-            </div>
-          ) : (
-            <span className="text-sm text-muted-foreground">
-              {formatCurrency(Number(room.default_nightly_price), currency)} /{" "}
-              {t("checkout.accommodation.per_night")}
-            </span>
-          )}
-
-          {quote && Number(quote.tax) > 0 && (
-            <p className="text-xs text-muted-foreground">
-              {t("checkout.accommodation.includes_tax", {
-                amount: formatCurrency(Number(quote.tax), currency),
-              })}
-            </p>
-          )}
-
-          <div className="mt-3">
-            {selected ? (
-              <Button variant="outline" className="w-full" onClick={onRemove}>
-                {t("checkout.accommodation.remove")}
-              </Button>
-            ) : (
-              <Button
-                className="w-full"
-                disabled={!!blocked || isPending || !quote}
-                onClick={onSelect}
-              >
-                {isPending ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  (blocked ?? t("checkout.accommodation.select"))
-                )}
-              </Button>
-            )}
-          </div>
-
-          {availability &&
-            availability.available > 0 &&
-            availability.available <= 3 && (
-              <p className="mt-2 text-center text-xs text-amber-600">
-                {t("checkout.accommodation.only_left", {
-                  count: availability.available,
-                })}
-              </p>
-            )}
-        </div>
-      </div>
-    </div>
-  )
-}
-
-/** The party in one booked room: how many, and who. */
-function GuestBlock({
-  item,
-  room,
-  requireGuestNames,
-}: {
-  item: SelectedAccommodationItem
-  room: PublicAccommodation | undefined
-  requireGuestNames: boolean
-}) {
-  const { t } = useTranslation()
-  const { setAccommodationGuestCount, setAccommodationGuestName } =
-    useCheckout()
-  const capacity = room?.guest_capacity ?? item.guestCount
-
-  return (
-    <div className="rounded-xl border bg-muted/30 p-4">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <p className="font-medium">{item.name}</p>
-          <p className="text-xs text-muted-foreground">
-            {item.propertyName} · {formatCheckoutDate(item.checkIn)} →{" "}
-            {formatCheckoutDate(item.checkOut)}
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          <Label htmlFor={`guests-${item.accommodationId}`} className="text-xs">
-            {t("checkout.accommodation.guests_label")}
-          </Label>
-          <Input
-            id={`guests-${item.accommodationId}`}
-            type="number"
-            min={1}
-            max={capacity}
-            className="w-20"
-            value={item.guestCount}
-            onChange={(event) =>
-              setAccommodationGuestCount(
-                item.accommodationId,
-                item.checkIn,
-                item.checkOut,
-                Number(event.target.value) || 1,
-              )
-            }
-          />
-        </div>
-      </div>
-
-      {requireGuestNames && (
-        <div className="mt-3 grid gap-2 sm:grid-cols-2">
-          {item.guests.map((guest, index) => (
-            <Input
-              // Positional slots: a guest has no id until the booking exists,
-              // and this UI never reorders them.
-              key={index}
-              placeholder={t("checkout.accommodation.guest_name_placeholder", {
-                number: index + 1,
-              })}
-              value={guest}
-              onChange={(event) =>
-                setAccommodationGuestName(
-                  item.accommodationId,
-                  item.checkIn,
-                  item.checkOut,
-                  index,
-                  event.target.value,
-                )
-              }
-            />
-          ))}
-        </div>
-      )}
-    </div>
-  )
 }
 
 export default function VariantAccommodationBooking({
@@ -367,9 +119,11 @@ export default function VariantAccommodationBooking({
   const { t } = useTranslation()
   const { getCity } = useCityProvider()
   const {
+    buyerIdentity,
     cart,
     addAccommodation,
     removeAccommodation,
+    setAccommodationGuestCount,
     clearAccommodationsOutsideStay,
     previewToken,
     salesFlowId,
@@ -427,9 +181,45 @@ export default function VariantAccommodationBooking({
 
   const rooms = useMemo(() => offer?.accommodations ?? [], [offer])
   const bounds = useMemo(() => bookableBounds(rooms), [rooms])
+  const maxGuests = useMemo(() => largestParty(rooms), [rooms])
 
   const [checkIn, setCheckIn] = useState("")
   const [checkOut, setCheckOut] = useState("")
+  const [guests, setGuests] = useState(1)
+  const [detailsRoomId, setDetailsRoomId] = useState<string | null>(null)
+  const [dropped, setDropped] = useState<{
+    name: string
+    reason: string
+  } | null>(null)
+
+  /**
+   * Where the board was, and where the booking that replaces it goes.
+   *
+   * Picking the eighth room on a long board leaves the buyer scrolled past
+   * everything the board just collapsed away, looking at the notice at the
+   * bottom of the step. The fold is what makes that recoverable and also
+   * what makes it necessary, so the swap scrolls itself back into view once
+   * it has settled at its real height. `nearest` does nothing at all when
+   * the booking is already on screen, which is the common case.
+   */
+  const swapRef = useRef<HTMLDivElement>(null)
+  /**
+   * Only ever after the buyer picks a room, which is why this is a flag set
+   * on the way in rather than an effect watching the cart. A checkout that
+   * opens with a room already in it would otherwise scroll itself to a step
+   * the buyer has not reached yet, which is a worse thing to do than the
+   * scroll it saves.
+   */
+  const justBookedRef = useRef(false)
+  const revealBooking = () => {
+    if (!justBookedRef.current) return
+    justBookedRef.current = false
+    swapRef.current?.scrollIntoView?.({
+      block: "nearest",
+      behavior: "smooth",
+    })
+  }
+
   const accommodationScope = isOpenCheckout
     ? `open:${slug}:${salesFlowSlug ?? ""}`
     : `portal:${popupId}:${salesFlowId ?? ""}`
@@ -440,14 +230,15 @@ export default function VariantAccommodationBooking({
     previousAccommodationScopeRef.current = accommodationScope
     setCheckIn("")
     setCheckOut("")
+    setGuests(1)
   }, [accommodationScope])
 
   /**
    * The shortest stay that any room here accepts.
    *
-   * Seeding one night would open the step on "Needs a longer stay" wherever a
-   * minimum is configured, and the buyer would have to guess that the fix is to
-   * push check-out out, before ever seeing a price.
+   * Seeding one night would open the step on an empty board wherever a
+   * minimum is configured, and the buyer would have to guess that the fix is
+   * to push check-out out, before ever seeing a price.
    */
   const shortestStay = useMemo(
     () =>
@@ -486,6 +277,7 @@ export default function VariantAccommodationBooking({
       previewToken,
       checkIn,
       checkOut,
+      guests,
     ],
     queryFn: () =>
       isOpenCheckout
@@ -493,16 +285,28 @@ export default function VariantAccommodationBooking({
             slug,
             flowSlug: salesFlowSlug!,
             xCheckoutPreviewToken: previewToken ?? undefined,
-            requestBody: { check_in: checkIn, check_out: checkOut },
+            requestBody: {
+              check_in: checkIn,
+              check_out: checkOut,
+              guest_count: guests,
+            },
           })
         : AccommodationsService.checkPortalAccommodationAvailability({
             popupId,
             salesFlowId: salesFlowId!,
-            requestBody: { check_in: checkIn, check_out: checkOut },
+            requestBody: {
+              check_in: checkIn,
+              check_out: checkOut,
+              guest_count: guests,
+            },
           }),
     enabled: canFetch && datesReady,
     staleTime: 30_000,
     retry: false,
+    // Keep the previous board while the next one is being priced. Rooms
+    // vanishing and reappearing on every date change reads as a broken page,
+    // and it is the one thing hiding them makes worse than greying them out.
+    placeholderData: keepPreviousData,
   })
 
   const availabilityById = useMemo(
@@ -511,48 +315,106 @@ export default function VariantAccommodationBooking({
     [availability],
   )
 
+  const board = useMemo(
+    () => buildBoard(rooms, availabilityById),
+    [rooms, availabilityById],
+  )
+  const stay = useMemo(
+    () => ({ checkIn, checkOut, nights, guests }),
+    [checkIn, checkOut, nights, guests],
+  )
+  const recoveries = useMemo(
+    () => recoveriesFor(board.blocked, stay),
+    [board.blocked, stay],
+  )
+
   const propertyById = useMemo(
     () => new Map((offer?.properties ?? []).map((row) => [row.id, row])),
     [offer],
   )
 
-  const roomById = useMemo(
-    () => new Map(rooms.map((room) => [room.id, room])),
-    [rooms],
-  )
+  const selected = cart.accommodations[0]
+  const asksSomething =
+    !!selected &&
+    stayAsksAnything(selected, {
+      requireGuestNames: config.requireGuestNames,
+      identity: buyerIdentity,
+    })
 
-  const selectedByRoom = useMemo(
-    () =>
-      new Map(cart.accommodations.map((item) => [item.accommodationId, item])),
-    [cart.accommodations],
-  )
+  /**
+   * Drop a room the stay has just made unbookable.
+   *
+   * Raising the party size past a room's capacity, or moving onto a night it
+   * is taken, leaves the cart holding a stay the purchase would refuse. The
+   * buyer is told which room went and why, because a room disappearing from
+   * the summary on its own is indistinguishable from a bug.
+   */
+  useEffect(() => {
+    if (!selected) return
+    const blocked = board.blocked.find(
+      (entry) => entry.room.id === selected.accommodationId,
+    )
+    if (!blocked?.reason) return
+    setDropped({ name: blocked.room.name, reason: blocked.reason })
+    removeAccommodation(
+      selected.accommodationId,
+      selected.checkIn,
+      selected.checkOut,
+    )
+  }, [board.blocked, selected, removeAccommodation])
 
-  // Moving the stay invalidates every quote in the cart, so the rooms booked
-  // for the old nights go with it rather than being silently re-priced.
+  // The party size lives on the stay now, so the booked room follows it
+  // rather than carrying a count of its own.
+  useEffect(() => {
+    if (!selected || selected.guestCount === guests) return
+    setAccommodationGuestCount(
+      selected.accommodationId,
+      selected.checkIn,
+      selected.checkOut,
+      guests,
+    )
+  }, [guests, selected, setAccommodationGuestCount])
+
+  // Moving the stay invalidates every quote in the cart, so the room booked
+  // for the old nights goes with it rather than being silently re-priced.
   const applyStay = (nextIn: string, nextOut: string) => {
+    setDropped(null)
     setCheckIn(nextIn)
     setCheckOut(nextOut)
     clearAccommodationsOutsideStay(nextIn, nextOut)
   }
 
+  /** Lengthen the stay to the minimum a removed room asks for. */
+  const extendStay = (toNights: number) => {
+    const nextOut = addDays(checkIn, toNights)
+    applyStay(checkIn, bounds.to && nextOut > bounds.to ? bounds.to : nextOut)
+  }
+
+  /** Move the same-length stay onto the day a removed room opens. */
+  const moveStay = (nextIn: string) => {
+    const nextOut = addDays(nextIn, Math.max(1, nights))
+    applyStay(nextIn, bounds.to && nextOut > bounds.to ? bounds.to : nextOut)
+  }
+
   const grouped = useMemo(() => {
-    const byProperty = new Map<string, PublicAccommodation[]>()
-    for (const room of rooms) {
-      const list = byProperty.get(room.property_id) ?? []
-      list.push(room)
-      byProperty.set(room.property_id, list)
+    const byProperty = new Map<string, typeof board.bookable>()
+    for (const entry of board.bookable) {
+      const list = byProperty.get(entry.room.property_id) ?? []
+      list.push(entry)
+      byProperty.set(entry.room.property_id, list)
     }
-    return [...byProperty.entries()].map(([propertyId, list]) => ({
+    return [...byProperty.entries()].map(([propertyId, entries]) => ({
       property: propertyById.get(propertyId),
-      rooms: list,
+      entries,
     }))
-  }, [rooms, propertyById])
+  }, [board.bookable, propertyById])
 
   const handleSelect = (room: PublicAccommodation) => {
     const row = availabilityById.get(room.id)
     if (!row?.quote || !room.product_id) return
     const property = propertyById.get(room.property_id)
-    addAccommodation({
+    setDropped(null)
+    const item: SelectedAccommodationItem = {
       accommodationId: room.id,
       productId: room.product_id,
       name: room.name,
@@ -561,13 +423,22 @@ export default function VariantAccommodationBooking({
       checkIn,
       checkOut,
       nights,
-      guestCount: 1,
-      guests: [""],
+      guestCount: guests,
+      guests: Array.from({ length: guests }, () => ({
+        name: "",
+        answers: {},
+      })),
+      bookerAnswers: {},
+      // Captured now rather than looked up later: the cart then carries what
+      // it needs to be validated from screens where this step is not mounted.
+      guestForm: config.guestForm,
       subtotal: Number(row.quote.subtotal),
       tax: Number(row.quote.tax),
       totalPrice: Number(row.quote.total),
       imageUrl: room.images?.[0]?.url ?? null,
-    })
+    }
+    justBookedRef.current = true
+    addAccommodation(item)
   }
 
   if (offerLoading) {
@@ -591,122 +462,229 @@ export default function VariantAccommodationBooking({
     )
   }
 
-  return (
-    <div className="flex flex-col gap-6">
-      <div className="rounded-2xl border bg-card p-4">
-        <div className="grid gap-3 sm:grid-cols-2">
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor="stay-check-in">
-              {t("checkout.accommodation.check_in")}
-            </Label>
-            <DatePicker
-              id="stay-check-in"
-              value={checkIn}
-              onChange={(value) =>
-                applyStay(
-                  value,
-                  checkOut && checkOut > value ? checkOut : addDays(value, 1),
-                )
+  const settling = availabilityFetching || board.unanswered.length > 0
+  // The room whose own screen is open, looked up on the board rather than
+  // remembered: a room the stay has just made unbookable leaves the board,
+  // and its dialog goes with it instead of describing an offer that is gone.
+  const detailsEntry =
+    board.bookable.find((entry) => entry.room.id === detailsRoomId) ?? null
+  // The chosen room is described by the cart, which is why it can be shown
+  // before the board is priced. Its board entry is needed only to open its
+  // own screen, so that link is absent until there is one.
+  const selectedEntry = selected
+    ? (board.bookable.find(
+        (entry) => entry.room.id === selected.accommodationId,
+      ) ?? null)
+    : null
+
+  const renderEntries = (entries: typeof board.bookable) => {
+    if (config.layout === "sheet") {
+      return (
+        <div className="overflow-hidden rounded-2xl border bg-card">
+          {entries.map((entry) => (
+            <RoomSheetRow
+              key={entry.room.id}
+              entry={entry}
+              currency={currency}
+              nights={nights}
+              selected={selected?.accommodationId === entry.room.id}
+              onSelect={() => handleSelect(entry.room)}
+              onRemove={() =>
+                removeAccommodation(entry.room.id, checkIn, checkOut)
               }
-              disabledDays={(day) => {
-                const key = toDateInput(day)
-                return (
-                  (!!bounds.from && key < bounds.from) ||
-                  (!!bounds.to && key >= bounds.to)
-                )
-              }}
-              defaultMonth={bounds.from ? new Date(bounds.from) : undefined}
-            />
-          </div>
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor="stay-check-out">
-              {t("checkout.accommodation.check_out")}
-            </Label>
-            <DatePicker
-              id="stay-check-out"
-              value={checkOut}
-              onChange={(value) => applyStay(checkIn, value)}
-              disabledDays={(day) => {
-                const key = toDateInput(day)
-                return (
-                  (!!checkIn && key <= checkIn) ||
-                  (!!bounds.to && key > bounds.to)
-                )
-              }}
-              defaultMonth={checkIn ? new Date(checkIn) : undefined}
-            />
-          </div>
-        </div>
-
-        {datesReady && (
-          <p className="mt-3 text-sm text-muted-foreground">
-            {t("checkout.accommodation.nights", { count: nights })} ·{" "}
-            {formatCheckoutDate(checkIn)} → {formatCheckoutDate(checkOut)}
-            {availabilityFetching && (
-              <Loader2 className="ml-2 inline h-3 w-3 animate-spin align-middle" />
-            )}
-          </p>
-        )}
-      </div>
-
-      {grouped.map(({ property, rooms: propertyRooms }) => (
-        <div key={property?.id ?? "unknown"} className="flex flex-col gap-3">
-          {config.showPropertyHeaders && property && (
-            <div>
-              <h3 className="font-semibold">{property.name}</h3>
-              {property.address && (
-                <p className="text-xs text-muted-foreground">
-                  {property.address}
-                </p>
-              )}
-            </div>
-          )}
-
-          <div
-            className={cn(
-              "grid gap-4",
-              config.layout === "grid"
-                ? "sm:grid-cols-2 lg:grid-cols-3"
-                : "grid-cols-1",
-            )}
-          >
-            {propertyRooms.map((room) => (
-              <RoomCard
-                key={room.id}
-                room={room}
-                availability={availabilityById.get(room.id)}
-                currency={currency}
-                selected={selectedByRoom.get(room.id)}
-                nights={nights}
-                isPending={availabilityFetching}
-                onSelect={() => handleSelect(room)}
-                onRemove={() => removeAccommodation(room.id, checkIn, checkOut)}
-              />
-            ))}
-          </div>
-        </div>
-      ))}
-
-      {cart.accommodations.length > 0 && (
-        <div className="flex flex-col gap-3">
-          <h3 className="font-semibold">
-            {t("checkout.accommodation.who_is_staying")}
-          </h3>
-          {cart.accommodations.map((item) => (
-            <GuestBlock
-              key={`${item.accommodationId}-${item.checkIn}`}
-              item={item}
-              room={roomById.get(item.accommodationId)}
-              requireGuestNames={config.requireGuestNames}
+              onOpenDetails={() => setDetailsRoomId(entry.room.id)}
             />
           ))}
         </div>
+      )
+    }
+
+    const View = config.layout === "cards" ? RoomCard : RoomRow
+    return (
+      <div
+        className={cn(
+          "grid gap-4",
+          config.layout === "cards" ? "sm:grid-cols-2" : "grid-cols-1",
+        )}
+      >
+        {entries.map((entry) => (
+          <View
+            key={entry.room.id}
+            entry={entry}
+            currency={currency}
+            nights={nights}
+            selected={selected?.accommodationId === entry.room.id}
+            onSelect={() => handleSelect(entry.room)}
+            onRemove={() =>
+              removeAccommodation(entry.room.id, checkIn, checkOut)
+            }
+            onOpenDetails={() => setDetailsRoomId(entry.room.id)}
+          />
+        ))}
+      </div>
+    )
+  }
+
+  return (
+    <div className="flex flex-col gap-6">
+      <StayBar
+        checkIn={checkIn}
+        checkOut={checkOut}
+        guests={guests}
+        maxGuests={maxGuests}
+        bounds={bounds}
+        roomCount={board.bookable.length}
+        loading={settling}
+        onStayChange={applyStay}
+        onGuestsChange={(next) => {
+          setDropped(null)
+          setGuests(next)
+        }}
+      />
+
+      {dropped && (
+        <p className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">
+          {t("checkout.accommodation.dropped", {
+            room: dropped.name,
+            reason: t(`checkout.accommodation.unavailable.${dropped.reason}`, {
+              defaultValue: t("checkout.accommodation.unavailable.default"),
+            }),
+          })}
+        </p>
       )}
 
-      <div className="flex items-start gap-2 rounded-xl bg-muted/50 p-3 text-xs text-muted-foreground">
+      {/* Board or booking, never both. `mode="wait"` is what makes it read
+          as one thing folding into the other: the rooms collapse their own
+          height away first, and the chosen room unfolds into the gap they
+          leave, instead of the two crossing over and shoving the page
+          around while they do. */}
+      <div ref={swapRef}>
+        <AnimatePresence mode="wait" initial={false}>
+          {selected ? (
+            <Fold key="chosen" onSettled={revealBooking}>
+              <div className="flex flex-col gap-6">
+                <SelectedRoomSummary
+                  item={selected}
+                  currency={currency}
+                  onOpenDetails={
+                    selectedEntry
+                      ? () => setDetailsRoomId(selected.accommodationId)
+                      : undefined
+                  }
+                  onRelease={() =>
+                    removeAccommodation(
+                      selected.accommodationId,
+                      selected.checkIn,
+                      selected.checkOut,
+                    )
+                  }
+                />
+
+                {/* Nothing at all in the common case: the buyer's own
+                    details come from the buyer step or their account, so a
+                    party of one with no configured questions leaves this
+                    whole block off the screen. It rides inside the same
+                    fold as the room above it so the two arrive as one
+                    block, which is the point of collapsing the board: the
+                    form is already on screen, not a scroll away. */}
+                {asksSomething && (
+                  <div className="flex flex-col gap-3">
+                    <h3 className="font-semibold">
+                      {t("checkout.accommodation.who_is_staying")}
+                    </h3>
+                    <GuestDetailsPanel
+                      key={`${selected.accommodationId}-${selected.checkIn}`}
+                      item={selected}
+                      requireGuestNames={config.requireGuestNames}
+                    />
+                  </div>
+                )}
+              </div>
+            </Fold>
+          ) : (
+            <Fold key="board">
+              <div className="flex flex-col gap-6">
+                {board.bookable.length === 0 && !settling ? (
+                  <div className="flex flex-col gap-2 rounded-2xl border bg-card p-6">
+                    <p className="font-medium">
+                      {t("checkout.accommodation.empty.title", {
+                        from: formatCheckoutDate(checkIn),
+                        to: formatCheckoutDate(checkOut),
+                      })}
+                    </p>
+                    <p className="text-sm text-muted-foreground">
+                      {t("checkout.accommodation.empty.body")}
+                    </p>
+                  </div>
+                ) : (
+                  // One group, however many property headings it is broken
+                  // up by: the cart holds a single room, so choosing one
+                  // anywhere on this board un-chooses whatever was chosen
+                  // anywhere else on it.
+                  <div
+                    role="radiogroup"
+                    aria-label={t("checkout.accommodation.choose_room")}
+                    className="flex flex-col gap-6"
+                  >
+                    {grouped.map(({ property, entries }) => (
+                      <div
+                        key={property?.id ?? "unknown"}
+                        className="flex flex-col gap-3"
+                      >
+                        {config.showPropertyHeaders && property && (
+                          <div>
+                            <h3 className="font-semibold">{property.name}</h3>
+                            {property.address && (
+                              <p className="text-muted-foreground text-xs">
+                                {property.address}
+                              </p>
+                            )}
+                          </div>
+                        )}
+                        {renderEntries(entries)}
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Ways to get a removed room back, which is only worth
+                    saying while the buyer is still choosing one. */}
+                <RecoveryNotes
+                  recoveries={recoveries}
+                  guests={guests}
+                  onExtendStay={extendStay}
+                  onMoveStay={moveStay}
+                />
+              </div>
+            </Fold>
+          )}
+        </AnimatePresence>
+      </div>
+
+      <div className="flex items-start gap-2 rounded-xl bg-muted/50 p-3 text-muted-foreground text-xs">
         <Info className="mt-0.5 h-4 w-4 shrink-0" />
         <span>{config.noticeText}</span>
       </div>
+
+      <RoomDetailsDialog
+        entry={detailsEntry}
+        property={
+          detailsEntry
+            ? propertyById.get(detailsEntry.room.property_id)
+            : undefined
+        }
+        currency={currency}
+        nights={nights}
+        selected={
+          !!detailsEntry && selected?.accommodationId === detailsEntry.room.id
+        }
+        onClose={() => setDetailsRoomId(null)}
+        onSelect={() => detailsEntry && handleSelect(detailsEntry.room)}
+        onRemove={() => {
+          if (!detailsEntry) return
+          removeAccommodation(detailsEntry.room.id, checkIn, checkOut)
+        }}
+      />
     </div>
   )
 }

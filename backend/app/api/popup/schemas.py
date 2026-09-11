@@ -119,6 +119,21 @@ def validate_reminder_config(
         )
 
 
+# Keep inline home documents bounded in both admin and portal responses.
+CUSTOM_HOME_HTML_MAX_LENGTH = 200_000
+
+
+class CustomHomeInput(SQLModel):
+    custom_home_html: str | None = Field(
+        default=None, max_length=CUSTOM_HOME_HTML_MAX_LENGTH
+    )
+
+    @field_validator("custom_home_html")
+    @classmethod
+    def normalize_custom_home_html(cls, value: str | None) -> str | None:
+        return value if value and value.strip() else None
+
+
 ALLOWED_CURRENCIES = ("USD", "ARS", "EUR")
 
 
@@ -226,6 +241,14 @@ class PopupBase(SQLModel):
     application_fee_amount: Decimal | None = Field(
         default=None,
         sa_column=Column(Numeric(10, 2), nullable=True),
+    )
+    custom_home_enabled: bool = Field(
+        default=False,
+        sa_column=Column(Boolean, nullable=False, server_default="false"),
+    )
+    custom_home_html: str | None = Field(
+        default=None,
+        sa_column=Column(Text(), nullable=True),
     )
     theme_config: dict | None = Field(
         default=None,
@@ -342,7 +365,8 @@ class PopupBase(SQLModel):
         return validate_currency_value(value) or "USD"
 
 
-class PopupCreate(SQLModel):
+class PopupCreate(CustomHomeInput):
+    custom_home_enabled: bool = False
     tenant_id: uuid.UUID | None = None
     name: str = Field(max_length=255)
     tagline: str | None = None
@@ -466,7 +490,16 @@ class PopupCreate(SQLModel):
         return self
 
 
-class PopupUpdate(SQLModel):
+class PopupUpdate(CustomHomeInput):
+    custom_home_enabled: bool | None = None
+
+    @field_validator("custom_home_enabled")
+    @classmethod
+    def validate_custom_home_enabled(cls, value: bool | None) -> bool:
+        if value is None:
+            raise ValueError("custom_home_enabled cannot be null")
+        return value
+
     # Reject unknown fields so deprecated ones (e.g., the removed
     # tier_progression_enabled) are surfaced as 422 instead of silently ignored.
     model_config = ConfigDict(extra="forbid")
@@ -627,6 +660,16 @@ class PopupUpdate(SQLModel):
 
 class PopupPublic(SQLModel):
     """Public popup schema — excludes sensitive/internal fields."""
+
+    custom_home_enabled: bool = False
+    custom_home_html: str | None = None
+
+    @model_validator(mode="after")
+    def hide_disabled_custom_home(self) -> Self:
+        # Saved-but-disabled HTML is admin-only, not published content.
+        if not self.custom_home_enabled:
+            self.custom_home_html = None
+        return self
 
     id: uuid.UUID
     name: str
