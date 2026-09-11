@@ -2,9 +2,15 @@ import uuid
 from datetime import datetime
 from decimal import Decimal
 from enum import StrEnum
-from typing import Any
+from typing import Any, Literal, TypedDict
 
-from pydantic import BaseModel, ConfigDict, field_validator, model_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    TypeAdapter,
+    field_validator,
+    model_validator,
+)
 from sqlalchemy import Boolean, Column, Integer, Numeric
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlmodel import Field, SQLModel, String
@@ -385,6 +391,57 @@ class SalesFlowPriceSummary(BaseModel):
     kind: SalesFlowPriceKind
 
 
+class SalesFlowPortalThemeColors(TypedDict, total=False):
+    """Theme color tokens safe for a buyer-facing checkout."""
+
+    mode: Literal["light", "dark"]
+    primary_color: str
+    primary_foreground_color: str
+    secondary_color: str
+    accent_color: str
+    checkout_navbar_bg: str
+    checkout_subtitle_color: str
+    checkout_bottom_bar_bg_color: str
+    checkout_bottom_bar_text_color: str
+    checkout_watermark_color: str
+    checkout_nav_text_color: str
+    checkout_nav_monochrome_emoji: bool | str
+    card_background_color: str
+    card_foreground_color: str
+    border_color: str
+    input_color: str
+
+
+class SalesFlowPortalThemeTypography(TypedDict, total=False):
+    """Theme typography tokens safe for a buyer-facing checkout."""
+
+    font_base_size: str
+    font_heading_scale: float
+    font_family: str
+    font_heading_family: str
+
+
+class SalesFlowPortalThemeConfig(TypedDict, total=False):
+    """Narrow selected-flow theme consumed by the Portal ThemeProvider."""
+
+    colors: SalesFlowPortalThemeColors
+    typography: SalesFlowPortalThemeTypography
+    radius: str
+    border_radius: str
+
+
+_PORTAL_THEME_CONFIG_ADAPTER = TypeAdapter(SalesFlowPortalThemeConfig)
+
+
+def parse_portal_theme_config(
+    value: dict[str, Any] | None,
+) -> SalesFlowPortalThemeConfig | None:
+    """Validate and narrow persisted JSON before exposing it to the Portal."""
+    if value is None:
+        return None
+    return _PORTAL_THEME_CONFIG_ADAPTER.validate_python(value)
+
+
 class SalesFlowPortalPublic(BaseModel):
     """What a buyer is told about a way in.
 
@@ -411,6 +468,9 @@ class SalesFlowPortalPublic(BaseModel):
     # The listing deliberately receives a display fact rather than products or
     # flow configuration. `None` means the server cannot state a price honestly.
     price_summary: SalesFlowPriceSummary | None = None
+    # Presentation data is projected through a nested allowlist so arbitrary
+    # persisted JSON and internal flow configuration never reach a buyer.
+    theme_config: SalesFlowPortalThemeConfig | None = None
 
     model_config = ConfigDict(from_attributes=True)
 

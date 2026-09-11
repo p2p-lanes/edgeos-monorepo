@@ -3831,11 +3831,14 @@ export type OpenTicketingPurchaseCreate = {
     fbc?: (string | null);
     fbp?: (string | null);
     locale?: (string | null);
+    return_context?: 'direct' | 'portal';
     attribution?: (Attribution | null);
     cid?: (string | null);
     sig?: (string | null);
     quote_token?: (string | null);
 };
+
+export type return_context = 'direct' | 'portal';
 
 /**
  * Response schema for POST /checkout/{slug}/{flow_slug}/purchase.
@@ -4992,6 +4995,51 @@ export type SalesFlowPortalPublic = {
     order: number;
     type: SalesFlowType;
     price_summary?: (SalesFlowPriceSummary | null);
+    theme_config?: (SalesFlowPortalThemeConfig | null);
+};
+
+/**
+ * Theme color tokens safe for a buyer-facing checkout.
+ */
+export type SalesFlowPortalThemeColors = {
+    mode?: 'light' | 'dark';
+    primary_color?: string;
+    primary_foreground_color?: string;
+    secondary_color?: string;
+    accent_color?: string;
+    checkout_navbar_bg?: string;
+    checkout_subtitle_color?: string;
+    checkout_bottom_bar_bg_color?: string;
+    checkout_bottom_bar_text_color?: string;
+    checkout_watermark_color?: string;
+    checkout_nav_text_color?: string;
+    checkout_nav_monochrome_emoji?: (boolean | string);
+    card_background_color?: string;
+    card_foreground_color?: string;
+    border_color?: string;
+    input_color?: string;
+};
+
+export type mode = 'light' | 'dark';
+
+/**
+ * Narrow selected-flow theme consumed by the Portal ThemeProvider.
+ */
+export type SalesFlowPortalThemeConfig = {
+    colors?: SalesFlowPortalThemeColors;
+    typography?: SalesFlowPortalThemeTypography;
+    radius?: string;
+    border_radius?: string;
+};
+
+/**
+ * Theme typography tokens safe for a buyer-facing checkout.
+ */
+export type SalesFlowPortalThemeTypography = {
+    font_base_size?: string;
+    font_heading_scale?: number;
+    font_family?: string;
+    font_heading_family?: string;
 };
 
 export type SalesFlowPriceKind = 'fixed' | 'from';

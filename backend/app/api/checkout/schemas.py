@@ -211,6 +211,9 @@ class OpenTicketingPurchaseCreate(BaseModel):
     # Active checkout language (from the entry URL ?lang=), used to build the
     # locale-aware success redirect. Falls back to the popup default when absent.
     locale: str | None = Field(default=None, max_length=8)
+    # Explicitly identifies where this request was initiated. Direct checkout
+    # remains the backwards-compatible default for existing clients.
+    return_context: Literal["direct", "portal"] = "direct"
     attribution: Attribution | None = None
     # Cart continuity proof: signed cart identifier from the abandoned-cart
     # restore link (GET /checkout/{slug}/{flow_slug}/cart?cid=&sig=).  When both are

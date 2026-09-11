@@ -12,6 +12,7 @@ Tasks covered:
 import uuid
 from decimal import Decimal
 from unittest.mock import MagicMock, patch
+from urllib.parse import parse_qs, urlparse
 
 import pytest
 from fastapi import HTTPException
@@ -422,6 +423,39 @@ class TestSupersedeLocatedPendingCore:
         assert "example.com/thank-you" in redirect_url
         # Signed URL carries base64 payload + sig — must not contain the raw payment UUID
         assert str(prior.id) not in redirect_url
+
+    def test_already_approved_portal_request_gets_safe_internal_redirect(
+        self,
+        db: Session,
+        tenant_a: Tenants,
+    ) -> None:
+        popup = _make_popup(db, tenant_a, slug_prefix="portal-completed")
+        db.add(popup)
+        db.flush()
+        prior = _make_pending_payment(db, tenant_a, popup)
+
+        with patch("app.services.simplefi.get_simplefi_client") as mock_factory:
+            mock_client = MagicMock()
+            mock_client.cancel_payment_request.return_value = (
+                CancelOutcome.ALREADY_APPROVED
+            )
+            mock_factory.return_value = mock_client
+            with patch.object(payments_crud, "_reconcile_approved"):
+                with pytest.raises(HTTPException) as exc_info:
+                    payments_crud._supersede_located_pending(
+                        db,
+                        prior,
+                        anonymous=True,
+                        locale="es",
+                        return_context="portal",
+                    )
+
+        detail = exc_info.value.detail
+        assert detail["code"] == "previous_payment_completed"
+        parsed = urlparse(detail["redirect_url"])
+        assert parsed.path.endswith(f"/portal/{popup.slug}/thank-you")
+        assert parse_qs(parsed.query) == {"lang": ["es"], "flow": ["checkout"]}
+        assert str(prior.id) not in detail["redirect_url"]
 
 
 # ---------------------------------------------------------------------------
