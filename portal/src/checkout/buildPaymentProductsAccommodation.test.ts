@@ -43,7 +43,12 @@ function booking(
     checkOut: "2026-06-08",
     nights: 7,
     guestCount: 2,
-    guests: ["Ada", "Grace"],
+    guests: [
+      { name: "Ada", answers: {} },
+      { name: "Grace", answers: {} },
+    ],
+    bookerAnswers: {},
+    guestForm: null,
     subtotal: 840,
     tax: 84,
     totalPrice: 924,
@@ -107,7 +112,10 @@ describe("buildPaymentProducts: accommodations", () => {
     const { products } = build([booking()])
     const metadata = products[0].purchase_metadata as Record<string, unknown>
 
-    expect(metadata.guests).toEqual([{ name: "Ada" }, { name: "Grace" }])
+    expect(metadata.guests).toEqual([
+      { name: "Ada", answers: {} },
+      { name: "Grace", answers: {} },
+    ])
   })
 
   it("drops blank guest slots rather than sending empty names", () => {
@@ -115,11 +123,18 @@ describe("buildPaymentProducts: accommodations", () => {
     // "". The backend rejects the purchase when required names are missing,
     // which is the honest failure.
     const { products } = build([
-      booking({ guestCount: 3, guests: ["Ada", "  ", ""] }),
+      booking({
+        guestCount: 3,
+        guests: [
+          { name: "Ada", answers: {} },
+          { name: "  ", answers: {} },
+          { name: "", answers: {} },
+        ],
+      }),
     ])
     const metadata = products[0].purchase_metadata as Record<string, unknown>
 
-    expect(metadata.guests).toEqual([{ name: "Ada" }])
+    expect(metadata.guests).toEqual([{ name: "Ada", answers: {} }])
     expect(metadata.guest_count).toBe(3)
   })
 

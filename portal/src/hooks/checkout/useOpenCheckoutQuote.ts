@@ -6,6 +6,7 @@ import {
   type CheckoutPreviewRequest,
   CheckoutService,
 } from "@/client"
+import { guestsForWire } from "@/lib/accommodationForm"
 import { useCheckout } from "@/providers/checkoutProvider"
 import type { CheckoutCartState } from "@/types/checkout"
 
@@ -43,10 +44,9 @@ export function buildOpenCheckoutPreviewRequest(
       check_in: item.checkIn,
       check_out: item.checkOut,
       guest_count: item.guestCount,
-      guests: item.guests
-        .map((name) => name.trim())
-        .filter(Boolean)
-        .map((name) => ({ name })),
+      guests: guestsForWire(item.guests).map((guest) => ({
+        name: guest.name,
+      })),
     },
   }))
 

@@ -16,6 +16,7 @@ import {
 import { withCheckoutLocale } from "@/helpers/checkout"
 import { getAttribution } from "@/lib/attribution"
 import { navigateBrowser } from "@/lib/browser-navigation"
+import type { BuyerIdentity } from "@/lib/buyerIdentity"
 import { trackGAPurchase } from "@/lib/google-analytics"
 import { getMetaAttribution, trackMetaPurchase } from "@/lib/meta-pixel"
 import { trackPortalTelemetry } from "@/lib/portal-telemetry"
@@ -31,7 +32,10 @@ import type {
   SelectedPassItem,
   SelectedPatronItem,
 } from "@/types/checkout"
-import { buildPaymentProducts } from "./buildPaymentProducts"
+import {
+  buildPaymentProducts,
+  MissingTicketBuyerError,
+} from "./buildPaymentProducts"
 import {
   dispatchPaymentError,
   extractCartMeta,
@@ -49,6 +53,10 @@ interface UsePaymentSubmitParams {
   selectedPasses: SelectedPassItem[]
   housing: SelectedHousingItem | null
   accommodations: SelectedAccommodationItem[]
+  /** What the checkout knows about the buyer. Folded into each booking's
+   *  answers on the way out, so a contact the step stopped asking for still
+   *  reaches the property. */
+  buyerIdentity: BuyerIdentity
   merch: SelectedMerchItem[]
   patron: SelectedPatronItem | null
   selectedMealPlans: SelectedMealPlanItem[]
@@ -153,6 +161,7 @@ export function usePaymentSubmit({
   selectedPasses,
   housing,
   accommodations,
+  buyerIdentity,
   merch,
   patron,
   selectedMealPlans,
@@ -267,6 +276,7 @@ export function usePaymentSubmit({
         selectedPasses,
         housing,
         accommodations,
+        buyerIdentity,
         merch,
         patron,
         selectedMealPlans,
@@ -276,6 +286,7 @@ export function usePaymentSubmit({
         checkoutMode,
         editPassesEnabled,
         submitMode,
+        openTicketBuyer: buyerData,
       })
 
       const result =
@@ -431,6 +442,13 @@ export function usePaymentSubmit({
       setIsSubmitting(false)
       return { success: true }
     } catch (err: unknown) {
+      if (err instanceof MissingTicketBuyerError) {
+        const message = t("checkout.toast_buyer_incomplete_pay")
+        setCurrentStep("buyer")
+        toast.error(message)
+        setIsSubmitting(false)
+        return { success: false, error: message }
+      }
       console.error("Payment failed:", err)
       trackPortalTelemetry("checkout_failed")
 
@@ -497,6 +515,7 @@ export function usePaymentSubmit({
   }, [
     applicationId,
     buyerData,
+    buyerIdentity,
     appCredit,
     checkoutMode,
     selectedPasses,

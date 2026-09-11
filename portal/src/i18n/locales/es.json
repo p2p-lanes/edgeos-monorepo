@@ -116,6 +116,16 @@
       "unknown": "Estado de pago desconocido"
     }
   },
+  "people": {
+    "title": "Tú y tu grupo",
+    "description": "Tus datos como asistente y los de los acompañantes que gestionas para este evento.",
+    "primary": "Asistente principal",
+    "dependent": "Dependiente",
+    "can_manage": "Administrado por ti",
+    "empty_title": "Aún no hay asistentes vinculados",
+    "empty_description": "Cuando se confirmen tus entradas, tú y los acompañantes que gestionas aparecerán aquí.",
+    "browse_tickets": "Ver entradas"
+  },
   "tickets_access": {
     "title": "Entradas",
     "description": "Tus entradas activas y artículos con check-in para este evento.",
@@ -390,6 +400,69 @@
         "over_capacity": "Capacidad insuficiente para el grupo",
         "inactive": "No disponible",
         "default": "No disponible para estas fechas"
+      },
+      "stay": {
+        "fewer_guests": "Un huésped menos",
+        "more_guests": "Un huésped más",
+        "checking": "Buscando disponibilidad…",
+        "results_one": "{{count}} habitación para estas noches",
+        "results_other": "{{count}} habitaciones para estas noches"
+      },
+      "removed": {
+        "extend_stay_one": "Se libera {{count}} habitación más con {{nights}} noches.",
+        "extend_stay_other": "Se liberan {{count}} habitaciones más con {{nights}} noches.",
+        "extend_stay_cta_one": "Quedarse {{count}} noche",
+        "extend_stay_cta_other": "Quedarse {{count}} noches",
+        "opens_later_one": "{{count}} habitación más abre el {{date}}.",
+        "opens_later_other": "{{count}} habitaciones más abren el {{date}}.",
+        "move_stay_cta": "Mover al {{date}}",
+        "closed_earlier_one": "{{count}} habitación se podía reservar hasta el {{date}}.",
+        "closed_earlier_other": "{{count}} habitaciones se podían reservar hasta el {{date}}.",
+        "party_too_big_one": "{{count}} habitación es para menos de {{guests}} personas. La más grande es para {{largest}}.",
+        "party_too_big_other": "{{count}} habitaciones son para menos de {{guests}} personas. La más grande es para {{largest}}.",
+        "taken_one": "{{count}} habitación ya está reservada para estas noches.",
+        "taken_other": "{{count}} habitaciones ya están reservadas para estas noches."
+      },
+      "empty": {
+        "title": "No hay habitaciones del {{from}} al {{to}}",
+        "body": "Todas están reservadas, no entran tantas personas o piden una estadía más larga."
+      },
+      "dropped": "{{room}} salió de tu reserva: {{reason}}.",
+      "form": {
+        "lead_guest": "Huésped principal",
+        "guest_number": "Huésped {{number}}",
+        "name": "Nombre completo",
+        "not_filled_in": "Sin completar",
+        "complete": "Completo",
+        "missing_count_one": "Falta {{count}}",
+        "missing_count_other": "Faltan {{count}}",
+        "same_as_lead": "Igual que el huésped principal",
+        "progress": "{{complete}} de {{total}} huéspedes completos",
+        "booking_contact": "Contacto de la reserva",
+        "booking_contact_hint": "A quién contacta la propiedad por esta habitación"
+      },
+      "view_details": "Ver detalles",
+      "choose": "Elegir esta habitación",
+      "choose_room": "Elegí una habitación",
+      "your_room": "Tu habitación",
+      "change_room": "Cambiar habitación",
+      "beds_label": "Camas",
+      "min_stay_label": "Estadía mínima",
+      "about_property": "Sobre {{name}}",
+      "kinds": {
+        "room": "Habitación",
+        "apartment": "Departamento",
+        "studio": "Monoambiente",
+        "tent": "Carpa",
+        "cabin": "Cabaña",
+        "other": "Alojamiento"
+      },
+      "gallery": {
+        "previous": "Foto anterior",
+        "next": "Foto siguiente",
+        "position": "{{current}} de {{total}}",
+        "go_to": "Foto {{number}}",
+        "no_photos": "Todavía no hay fotos de esta habitación"
       }
     },
     "contribution": {
@@ -469,7 +542,8 @@
       "catalog_add_aria": "Agregar {{product}}",
       "catalog_add_one_aria": "Agregar uno más de {{product}}",
       "catalog_remove_one_aria": "Quitar uno de {{product}}"
-    }
+    },
+    "toast_guest_details_incomplete": "Faltan datos de los huéspedes para completar la reserva."
   },
   "openCheckout": {
     "loading": "Cargando checkout...",
@@ -651,6 +725,9 @@
     "community": "Comunidad",
     "tickets": "Entradas",
     "orders": "Pagos",
+    "shop": "Tienda",
+    "people": "Tus datos",
+    "tickets_access": "Entradas y acceso",
     "passes": "Pases",
     "attendee_directory": "Directorio",
     "companion": "Acompañante",

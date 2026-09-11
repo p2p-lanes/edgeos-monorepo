@@ -39,6 +39,7 @@ from app.api.accommodation.schemas import (
     AccommodationAvailability,
     AccommodationBlockRange,
     AccommodationBookingCreate,
+    AccommodationBookingDetail,
     AccommodationBookingPublic,
     AccommodationBookingUpdate,
     AccommodationBulkPrice,
@@ -60,6 +61,7 @@ from app.api.accommodation.schemas import (
     AccommodationUnitUpdate,
     AccommodationUpdate,
     BlockRangeResult,
+    BookingUnitOption,
     BulkResult,
 )
 from app.api.shared.enums import UserRole
@@ -338,6 +340,43 @@ async def list_bookings(
     return ListModel[AccommodationBookingPublic](
         results=[AccommodationBookingPublic.model_validate(row) for row in rows],
         paging=Paging(offset=0, limit=len(rows), total=len(rows)),
+    )
+
+
+@router.get("/bookings/{booking_id}", response_model=AccommodationBookingDetail)
+async def get_booking(
+    booking_id: uuid.UUID,
+    db: AdminOrApiKeySession_AccommodationsRead,
+    _: AdminOrApiKey_AccommodationsRead,
+) -> AccommodationBookingDetail:
+    """One booking, with the room, the building and the sibling units.
+
+    Everything the detail page shows in a single call. The alternative was
+    four requests whose failures would each leave a different part of the
+    page empty.
+    """
+    booking = db.get(AccommodationBookings, booking_id)
+    if booking is None:
+        raise _not_found("Booking")
+
+    accommodation = _get_accommodation(db, booking.accommodation_id)
+    property_row = _get_property(db, accommodation.property_id)
+    units = db.exec(
+        select(AccommodationUnits)
+        .where(AccommodationUnits.accommodation_id == accommodation.id)
+        .order_by(col(AccommodationUnits.sort_order), col(AccommodationUnits.label))
+    ).all()
+
+    return AccommodationBookingDetail(
+        **AccommodationBookingPublic.model_validate(booking).model_dump(),
+        property_id=property_row.id,
+        property_name=property_row.name,
+        property_address=property_row.address,
+        accommodation_name=accommodation.name,
+        unit_label=next(
+            (unit.label for unit in units if unit.id == booking.unit_id), None
+        ),
+        units=[BookingUnitOption.model_validate(unit) for unit in units],
     )
 
 

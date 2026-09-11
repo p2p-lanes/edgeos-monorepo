@@ -192,6 +192,7 @@ class TestPortalUpsaleListing:
                     "currency": "USD",
                     "kind": "fixed",
                 },
+                "theme_config": None,
             }
         ]
 

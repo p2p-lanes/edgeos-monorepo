@@ -32,3 +32,5 @@ openapi.json
 /blob-report/
 /playwright/.cache/
 /playwright/.auth/
+# TanStack Router dev-server scratch
+.tanstack

@@ -1,4 +1,5 @@
 import { useQuery } from "@tanstack/react-query"
+import { useNavigate } from "@tanstack/react-router"
 import type { ColumnDef } from "@tanstack/react-table"
 import { CalendarPlus, Download } from "lucide-react"
 import { useMemo, useState } from "react"
@@ -24,11 +25,6 @@ import {
 import { Skeleton } from "@/components/ui/skeleton"
 import useCustomToast from "@/hooks/useCustomToast"
 import { cn } from "@/lib/utils"
-import {
-  type BookingDetail,
-  BookingDetailDialog,
-  detailFromRow,
-} from "./BookingDetailDialog"
 import { NewBookingDialog } from "./BookingDialog"
 import { bookingAppearance } from "./bookingAppearance"
 import { addDays, monthWindow, todayKey } from "./calendarLayout"
@@ -53,13 +49,13 @@ const STATUS_OPTIONS: { value: BookingStatus; label: string }[] = [
 
 export function BookingsTab({ popupId }: { popupId: string }) {
   const { showErrorToast } = useCustomToast()
+  const navigate = useNavigate()
 
   const [dateFrom, setDateFrom] = useState(() => monthWindow(todayKey()).from)
   const [dateTo, setDateTo] = useState(() => addDays(todayKey(), 180))
   const [propertyId, setPropertyId] = useState(ALL)
   const [status, setStatus] = useState<BookingStatus | typeof ALL>(ALL)
   const [search, setSearch] = useState("")
-  const [detail, setDetail] = useState<BookingDetail | null>(null)
   const [creating, setCreating] = useState(false)
 
   const statuses = status === ALL ? null : [status]
@@ -102,16 +98,12 @@ export function BookingsTab({ popupId }: { popupId: string }) {
     enabled: !!popupId && !rangeInvalid,
   })
 
-  // Room types carry their units, which the detail dialog needs to offer a
-  // reassignment without a second round-trip per row.
+  // Room types name the room and unit in the table's Room column. The
+  // booking page fetches its own, so nothing here is loaded on its behalf.
   const roomsById = useMemo(
     () => new Map((rooms?.results ?? []).map((room) => [room.id, room])),
     [rooms],
   )
-
-  const selectedRoom = detail
-    ? roomsById.get(detail.accommodationId)
-    : undefined
 
   const exportCsv = async () => {
     try {
@@ -298,7 +290,12 @@ export function BookingsTab({ popupId }: { popupId: string }) {
           searchValue={search}
           onSearchChange={setSearch}
           hiddenOnMobile={["guest_count", "nights", "total"]}
-          onRowClick={(booking) => setDetail(detailFromRow(booking))}
+          onRowClick={(booking) =>
+            navigate({
+              to: "/accommodations/bookings/$id",
+              params: { id: booking.id },
+            })
+          }
           emptyState={
             <EmptyState
               icon={CalendarPlus}
@@ -308,17 +305,6 @@ export function BookingsTab({ popupId }: { popupId: string }) {
           }
         />
       )}
-
-      <BookingDetailDialog
-        booking={detail}
-        roomName={selectedRoom?.name ?? ""}
-        units={(selectedRoom?.units ?? []).map((unit) => ({
-          id: unit.id,
-          label: unit.label,
-        }))}
-        open={!!detail}
-        onOpenChange={(open) => !open && setDetail(null)}
-      />
 
       {creating && (
         <NewBookingDialog

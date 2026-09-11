@@ -289,6 +289,7 @@ export function OpenCheckoutRuntime({
                 openCartPopupSlug={previewMode ? null : popupSlug}
                 openCartCid={cartCid}
                 openCartSig={cartSig}
+                initialPromoCode={searchParams.get("coupon")}
                 validatePromoCodeOverride={async (code) => {
                   const result = await CouponsService.validateCouponPublic({
                     requestBody: {
