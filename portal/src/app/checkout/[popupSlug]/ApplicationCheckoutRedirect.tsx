@@ -11,23 +11,9 @@ interface ApplicationCheckoutRedirectProps {
 }
 
 /**
- * Sends an application flow's buyer to the page that can actually charge
- * them.
- *
- * `/checkout/{popup}/{flow}` used to refuse application flows outright, by
- * type. That asked the wrong question — what separates an anonymous
- * purchase from an application-backed one is who is buying — so the
- * backend now serves them to the people they accepted. The link works.
- *
- * The purchase does not happen here, though. This page submits an
- * anonymous purchase, and an accepted applicant pays through their
- * application: their attendees, their credit, their existing details.
- * Submitting the anonymous one would create a second payment linked to
- * nothing. So the URL resolves and hands over to the portal page that
- * already does this correctly.
- *
- * The selected flow UUID travels in the query so the portal checkout keeps
- * its application, quote, and purchase context without resolving a default.
+ * Sends an accepted applicant from the public checkout to the authenticated
+ * Shop checkout that preserves their attendees, credit, and application.
+ * Shop accepts the flow UUID here and canonicalizes it to the readable slug.
  */
 export function ApplicationCheckoutRedirect({
   popupSlug,
@@ -36,8 +22,7 @@ export function ApplicationCheckoutRedirect({
   const router = useRouter()
 
   useEffect(() => {
-    const target = `/portal/${popupSlug}/passes/buy`
-    router.replace(`${target}?flow=${flowId}`)
+    router.replace(`/portal/${popupSlug}/shop/${flowId}`)
   }, [popupSlug, flowId, router])
 
   return (

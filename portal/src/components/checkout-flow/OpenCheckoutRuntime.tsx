@@ -47,6 +47,7 @@ interface OpenCheckoutRuntimeProps {
     lastName?: string
   }
   showQuoteStatus?: boolean
+  returnContext?: "direct" | "portal"
   /** Renders for the backoffice live preview instead of a real buyer: no
    *  payment, no analytics, no attribution, no favicon takeover. */
   previewMode?: boolean
@@ -151,6 +152,7 @@ export function OpenCheckoutRuntime({
   flowSlug,
   prefilledBuyer,
   showQuoteStatus = false,
+  returnContext = "direct",
   previewMode = false,
   previewToken = null,
 }: OpenCheckoutRuntimeProps) {
@@ -300,6 +302,7 @@ export function OpenCheckoutRuntime({
                 }}
                 submitMode="open-ticketing"
                 submitPopupSlug={popupSlug}
+                returnContext={returnContext}
                 previewMode={previewMode}
                 previewToken={previewToken}
               >
