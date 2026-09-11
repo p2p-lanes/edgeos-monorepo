@@ -10,7 +10,16 @@ import { usePortalDirectSalesFlows } from "@/hooks/usePortalDirectSalesFlows"
 import { usePortalSalesFlows } from "@/hooks/usePortalSalesFlows"
 import { usePortalUpsaleFlows } from "@/hooks/usePortalUpsaleFlows"
 import { useApplication } from "@/providers/applicationProvider"
-import { resolveShopFlowSlug } from "../components/ShopContent"
+
+function resolveShopFlowSlug(
+  identifier: string,
+  flows: Array<{ id: string; slug: string }>,
+) {
+  return (
+    flows.find((flow) => flow.id === identifier || flow.slug === identifier)
+      ?.slug ?? null
+  )
+}
 
 interface ShopCheckoutContentProps {
   popupId: string | undefined
