@@ -298,10 +298,10 @@ def test_invalid_existing_attendee_is_rejected_before_provider_creation(
     assert attendee.managed_by_human_id == other_manager.id
 
 
-def test_recipient_category_owned_by_another_flow_is_rejected_before_provider(
+def test_new_recipient_category_owned_by_another_flow_is_rejected_before_provider(
     db: Session, tenant_a: Tenants
 ) -> None:
-    popup, _, _, _, application, _ = _payment_context(db, tenant_a)
+    popup, _, _, _, application, product = _payment_context(db, tenant_a)
     other_flow = SalesFlows(
         tenant_id=tenant_a.id,
         popup_id=popup.id,
@@ -313,29 +313,200 @@ def test_recipient_category_owned_by_another_flow_is_rejected_before_provider(
     db.flush()
     from app.api.attendee_category.crud import attendee_categories_crud
 
-    attendee_categories_crud.seed_main_for_flow(db, other_flow)
-    companion = AttendeeCategories(
-        tenant_id=tenant_a.id,
-        popup_id=popup.id,
-        sales_flow_id=other_flow.id,
-        key=f"guest-{uuid.uuid4().hex[:6]}",
-    )
-    product = Products(
-        tenant_id=tenant_a.id,
-        popup_id=popup.id,
-        name="Guest pass",
-        slug=f"guest-pass-{uuid.uuid4().hex[:8]}",
-        price=Decimal("25"),
-        category="ticket",
-        attendee_category_id=companion.id,
-        is_active=True,
-    )
-    db.add_all([companion, product])
+    other_main = attendee_categories_crud.seed_main_for_flow(db, other_flow)
     db.commit()
 
     with patch("app.services.simplefi.get_simplefi_client") as get_client:
         with pytest.raises(HTTPException) as error:
-            payments_crud.create_payment(db, _request(application, product, companion))
+            payments_crud.create_payment(db, _request(application, product, other_main))
+
+    assert error.value.status_code == 422
+    assert error.value.detail == "Recipient is not valid for this payment"
+    get_client.assert_not_called()
+
+
+def test_existing_human_with_equivalent_cross_flow_category_can_pay_and_fulfill(
+    db: Session, tenant_a: Tenants
+) -> None:
+    popup, _, buyer, current_main, application, product = _payment_context(db, tenant_a)
+    other_flow = SalesFlows(
+        tenant_id=tenant_a.id,
+        popup_id=popup.id,
+        slug=f"other-main-{uuid.uuid4().hex[:6]}",
+        name="Other main flow",
+        type=SaleType.application.value,
+    )
+    db.add(other_flow)
+    db.flush()
+    from app.api.attendee_category.crud import attendee_categories_crud
+
+    other_main = attendee_categories_crud.seed_main_for_flow(db, other_flow)
+    db.flush()
+    existing = Attendees(
+        tenant_id=tenant_a.id,
+        popup_id=popup.id,
+        human_id=buyer.id,
+        name="Existing buyer attendee",
+        category_id=other_main.id,
+    )
+    db.add(existing)
+    db.commit()
+
+    with patch("app.services.simplefi.get_simplefi_client") as get_client:
+        get_client.return_value.create_payment.return_value = SimpleNamespace(
+            id=f"cross-flow-human-{uuid.uuid4().hex}",
+            status="pending",
+            checkout_url="https://pay.test/cross-flow-human",
+            is_installment_plan=False,
+        )
+        payment, _ = payments_crud.create_payment(
+            db,
+            _request(
+                application,
+                product,
+                other_main,
+                human_id=buyer.id,
+                recipient_name="Existing buyer attendee",
+            ),
+        )
+
+    payments_crud.approve_payment(db, payment.id)
+
+    recipient = db.exec(
+        select(PaymentRecipients).where(PaymentRecipients.payment_id == payment.id)
+    ).one()
+    line = db.exec(
+        select(PaymentProducts).where(PaymentProducts.payment_id == payment.id)
+    ).one()
+    assert current_main.id != other_main.id
+    assert current_main.key == other_main.key == "main"
+    assert recipient.category_id == other_main.id
+    assert recipient.attendee_id == existing.id
+    assert line.attendee_id == existing.id
+
+
+def test_existing_accountless_companion_reuses_equivalent_cross_flow_category(
+    db: Session, tenant_a: Tenants
+) -> None:
+    popup, current_flow, buyer, _, application, product = _payment_context(db, tenant_a)
+    current_spouse = AttendeeCategories(
+        tenant_id=tenant_a.id,
+        popup_id=popup.id,
+        sales_flow_id=current_flow.id,
+        key="spouse",
+    )
+    other_flow = SalesFlows(
+        tenant_id=tenant_a.id,
+        popup_id=popup.id,
+        slug=f"other-spouse-{uuid.uuid4().hex[:6]}",
+        name="Other spouse flow",
+        type=SaleType.application.value,
+    )
+    db.add_all([current_spouse, other_flow])
+    db.flush()
+    other_spouse = AttendeeCategories(
+        tenant_id=tenant_a.id,
+        popup_id=popup.id,
+        sales_flow_id=other_flow.id,
+        key="spouse",
+    )
+    old_application = Applications(
+        tenant_id=tenant_a.id,
+        popup_id=popup.id,
+        human_id=buyer.id,
+        sales_flow_id=other_flow.id,
+        status=ApplicationStatus.ACCEPTED.value,
+    )
+    db.add_all([other_spouse, old_application])
+    db.flush()
+    existing = Attendees(
+        tenant_id=tenant_a.id,
+        popup_id=popup.id,
+        application_id=old_application.id,
+        name="Existing spouse",
+        category_id=other_spouse.id,
+    )
+    product.attendee_category_id = current_spouse.id
+    db.add_all([existing, product])
+    db.commit()
+
+    with patch("app.services.simplefi.get_simplefi_client") as get_client:
+        get_client.return_value.create_payment.return_value = SimpleNamespace(
+            id=f"cross-flow-companion-{uuid.uuid4().hex}",
+            status="pending",
+            checkout_url="https://pay.test/cross-flow-companion",
+            is_installment_plan=False,
+        )
+        payment, _ = payments_crud.create_payment(
+            db,
+            _request(
+                application,
+                product,
+                other_spouse,
+                existing_attendee_id=existing.id,
+                recipient_name=existing.name,
+            ),
+        )
+
+    payments_crud.approve_payment(db, payment.id)
+
+    recipient = db.exec(
+        select(PaymentRecipients).where(PaymentRecipients.payment_id == payment.id)
+    ).one()
+    assert current_spouse.id != other_spouse.id
+    assert recipient.attendee_id == existing.id
+    assert (
+        len(db.exec(select(Attendees).where(Attendees.popup_id == popup.id)).all()) == 1
+    )
+
+
+def test_existing_person_with_different_category_key_is_rejected_before_provider(
+    db: Session, tenant_a: Tenants
+) -> None:
+    popup, current_flow, buyer, _, application, product = _payment_context(db, tenant_a)
+    current_spouse = AttendeeCategories(
+        tenant_id=tenant_a.id,
+        popup_id=popup.id,
+        sales_flow_id=current_flow.id,
+        key="spouse",
+    )
+    other_flow = SalesFlows(
+        tenant_id=tenant_a.id,
+        popup_id=popup.id,
+        slug=f"other-role-{uuid.uuid4().hex[:6]}",
+        name="Other role flow",
+        type=SaleType.application.value,
+    )
+    db.add_all([current_spouse, other_flow])
+    db.flush()
+    other_spouse = AttendeeCategories(
+        tenant_id=tenant_a.id,
+        popup_id=popup.id,
+        sales_flow_id=other_flow.id,
+        key="spouse",
+    )
+    existing = Attendees(
+        tenant_id=tenant_a.id,
+        popup_id=popup.id,
+        human_id=buyer.id,
+        name="Existing spouse role",
+        category_id=other_spouse.id,
+    )
+    db.add_all([other_spouse, existing])
+    db.commit()
+
+    with patch("app.services.simplefi.get_simplefi_client") as get_client:
+        with pytest.raises(HTTPException) as error:
+            payments_crud.create_payment(
+                db,
+                _request(
+                    application,
+                    product,
+                    other_spouse,
+                    human_id=buyer.id,
+                    recipient_name=existing.name,
+                ),
+            )
 
     assert error.value.status_code == 422
     assert error.value.detail == "Recipient is not valid for this payment"

@@ -14,6 +14,7 @@ import type { ProductsPass } from "@/types/Products"
 import useResolvedAttendees from "./useResolvedAttendees"
 
 const mockUseHumanAttendeesQuery = vi.fn()
+const mockUseAttendeeCategories = vi.fn()
 
 let mockCity: {
   id: string
@@ -52,7 +53,10 @@ vi.mock("@/hooks/useGetPassesData", () => ({ default: vi.fn() }))
 vi.mock("@/hooks/useGetPurchases", () => ({ usePurchasesQuery: vi.fn() }))
 
 vi.mock("@/hooks/useAttendeeCategories", () => ({
-  useAttendeeCategories: () => ({ categories: mockCategories }),
+  useAttendeeCategories: (popupId: string, salesFlowId?: string | null) => {
+    mockUseAttendeeCategories(popupId, salesFlowId)
+    return { categories: mockCategories }
+  },
 }))
 
 vi.mock("@/providers/applicationProvider", () => ({
@@ -140,6 +144,7 @@ describe("useResolvedAttendees", () => {
     mockApplications = []
     mockCategories = [primaryCategory]
     mockUseHumanAttendeesQuery.mockReset()
+    mockUseAttendeeCategories.mockReset()
   })
 
   it("returns persisted direct-sale attendees with ticket entries", () => {
@@ -291,6 +296,47 @@ describe("useResolvedAttendees", () => {
     const { result } = renderHook(() => useResolvedAttendees("flow-partner"))
 
     expect(result.current[0]?.application_id).toBe("application-partner")
+    expect(mockUseAttendeeCategories).toHaveBeenCalledWith(
+      "popup-1",
+      "flow-partner",
+    )
+  })
+
+  it("uses the application's flow when synthesizing its recipient category", () => {
+    mockCity = {
+      id: "popup-1",
+      sale_type: "application",
+      checkout_mode: "pass_system",
+      takes_applications: true,
+    }
+    mockApplications = [
+      {
+        id: "application-1",
+        tenant_id: "tenant-1",
+        popup_id: "popup-1",
+        human_id: "human-1",
+        sales_flow_id: "flow-application",
+        status: "accepted",
+      },
+    ] as ApplicationPublic[]
+    mockCategories = [
+      {
+        ...primaryCategory,
+        id: "category-application-main",
+        sales_flow_id: "flow-application",
+      },
+    ]
+    mockUseHumanAttendeesQuery.mockReturnValue({ data: [] })
+
+    const { result } = renderHook(() => useResolvedAttendees())
+
+    expect(mockUseAttendeeCategories).toHaveBeenCalledWith(
+      "popup-1",
+      "flow-application",
+    )
+    expect(result.current[0]?.recipient?.category_id).toBe(
+      "category-application-main",
+    )
   })
 
   it.each([

@@ -76,10 +76,14 @@ export function useResolvedAttendees(
   // The hook disables the query when popupId is null/falsy or no human is logged in.
   const popupId = city ? String(city.id) : null
   const { data: humanAttendees } = useHumanAttendeesQuery(popupId)
-  const { categories } = useAttendeeCategories(popupId ?? "")
   const application = nobodyApplies
     ? null
     : getRelevantApplication(salesFlowId ?? undefined)
+  const effectiveSalesFlowId = salesFlowId ?? application?.sales_flow_id
+  const { categories } = useAttendeeCategories(
+    popupId ?? "",
+    effectiveSalesFlowId,
+  )
 
   if (!humanAttendees) return []
 

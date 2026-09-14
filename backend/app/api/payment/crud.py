@@ -2173,6 +2173,34 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
             detail="Recipient is not valid for this payment",
         )
 
+    @staticmethod
+    def _attendee_categories_match(
+        session: Session,
+        first_id: uuid.UUID | None,
+        second_id: uuid.UUID | None,
+        *,
+        tenant_id: uuid.UUID,
+        popup_id: uuid.UUID,
+    ) -> bool:
+        """Compare popup-scoped attendee roles across flow-owned category rows."""
+        if first_id is None or second_id is None:
+            return first_id == second_id
+        categories = session.exec(
+            select(AttendeeCategories).where(
+                AttendeeCategories.id.in_(  # ty: ignore[unresolved-attribute]
+                    {first_id, second_id}
+                ),
+                AttendeeCategories.tenant_id == tenant_id,
+                AttendeeCategories.popup_id == popup_id,
+            )
+        ).all()
+        keys_by_id = {category.id: category.key for category in categories}
+        return (
+            first_id in keys_by_id
+            and second_id in keys_by_id
+            and keys_by_id[first_id] == keys_by_id[second_id]
+        )
+
     def _validate_recipient_requests(
         self,
         session: Session,
@@ -2257,26 +2285,35 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
             for recipient in validated
             if recipient.category_id is not None
         }
+        categories_by_id = {
+            category.id: category
+            for category in session.exec(
+                select(AttendeeCategories).where(
+                    AttendeeCategories.id.in_(  # ty: ignore[unresolved-attribute]
+                        category_ids
+                    ),
+                    AttendeeCategories.tenant_id == tenant_id,
+                    AttendeeCategories.popup_id == popup_id,
+                )
+            ).all()
+        }
         if sales_flow_id is not None:
             from app.api.attendee_category.crud import (  # noqa: PLC0415
                 attendee_categories_crud,
             )
 
-            valid_category_ids = (
-                attendee_categories_crud.allowed_ids_for_flow(session, sales_flow_id)
-                & category_ids
+            flow_categories = attendee_categories_crud.list_by_flow(
+                session, sales_flow_id
             )
+            allowed_category_ids = {category.id for category in flow_categories}
+            allowed_category_keys = {category.key for category in flow_categories}
         else:
-            valid_category_ids = set(
-                session.exec(
-                    select(AttendeeCategories.id).where(
-                        AttendeeCategories.id.in_(category_ids),  # type: ignore[attr-defined]
-                        AttendeeCategories.tenant_id == tenant_id,
-                        AttendeeCategories.popup_id == popup_id,
-                        AttendeeCategories.deleted_at.is_(None),  # type: ignore[union-attr]
-                    )
-                ).all()
-            )
+            allowed_category_ids = {
+                category.id
+                for category in categories_by_id.values()
+                if category.deleted_at is None
+            }
+            allowed_category_keys: set[str] = set()
         attendee_ids = {
             recipient.existing_attendee_id
             for recipient in validated
@@ -2306,21 +2343,11 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
         for recipient in validated:
             if recipient.human_id and recipient.human_id not in valid_human_ids:
                 raise self._recipient_error()
-            if (
-                recipient.category_id is not None
-                and recipient.category_id not in valid_category_ids
-            ):
-                raise self._recipient_error()
             linked_attendee = (
                 linked_attendees_by_human_id.get(recipient.human_id)
                 if recipient.human_id
                 else None
             )
-            if (
-                linked_attendee is not None
-                and linked_attendee.category_id != recipient.category_id
-            ):
-                raise self._recipient_error()
             if recipient.human_id and recipient.existing_attendee_id:
                 raise self._recipient_error()
             existing = attendees_by_id.get(recipient.existing_attendee_id)
@@ -2328,8 +2355,34 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
                 existing is None
                 or existing.tenant_id != tenant_id
                 or existing.popup_id != popup_id
-                or existing.category_id != recipient.category_id
             ):
+                raise self._recipient_error()
+            identity_attendee = linked_attendee or existing
+            category = categories_by_id.get(recipient.category_id)
+            if recipient.category_id is not None and category is None:
+                raise self._recipient_error()
+            if identity_attendee is not None:
+                if not self._attendee_categories_match(
+                    session,
+                    identity_attendee.category_id,
+                    recipient.category_id,
+                    tenant_id=tenant_id,
+                    popup_id=popup_id,
+                ):
+                    raise self._recipient_error()
+                if (
+                    sales_flow_id is not None
+                    and category is not None
+                    and category.key not in allowed_category_keys
+                ):
+                    raise self._recipient_error()
+            elif (
+                recipient.category_id is not None
+                and recipient.category_id not in allowed_category_ids
+            ):
+                # New people start from the active flow's category definition.
+                # Existing people may retain an equivalent category UUID from
+                # another flow, but creation must not inherit stale flow config.
                 raise self._recipient_error()
             for line in lines:
                 if line.recipient_key != recipient.recipient_key:
@@ -2337,7 +2390,13 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
                 product = products_by_id[line.product_id]
                 if (
                     product.attendee_category_id is not None
-                    and product.attendee_category_id != recipient.category_id
+                    and not self._attendee_categories_match(
+                        session,
+                        product.attendee_category_id,
+                        recipient.category_id,
+                        tenant_id=tenant_id,
+                        popup_id=popup_id,
+                    )
                 ):
                     raise self._recipient_error()
         return [
@@ -2462,7 +2521,13 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
             or attendee.popup_id != payment.popup_id
             or (
                 product.attendee_category_id is not None
-                and attendee.category_id != product.attendee_category_id
+                and not self._attendee_categories_match(
+                    session,
+                    attendee.category_id,
+                    product.attendee_category_id,
+                    tenant_id=payment.tenant_id,
+                    popup_id=payment.popup_id,
+                )
             )
         ):
             raise self._recipient_error()
@@ -2480,16 +2545,16 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
             raise self._recipient_error()
         if attendee.human_id == buyer_human_id:
             return attendee
-        if payment.application_id is not None:
+        if attendee.application_id is not None:
             application = session.exec(
                 select(Applications.id).where(
-                    Applications.id == payment.application_id,
+                    Applications.id == attendee.application_id,
                     Applications.tenant_id == payment.tenant_id,
                     Applications.popup_id == payment.popup_id,
                     Applications.human_id == buyer_human_id,
                 )
             ).first()
-            if application is not None and attendee.application_id == application:
+            if application is not None:
                 return attendee
         prior_recipient = session.exec(
             select(PaymentRecipients.id)
@@ -3879,13 +3944,25 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
                 attendee.tenant_id != payment.tenant_id
                 or attendee.popup_id != payment.popup_id
                 or attendee.human_id != recipient.human_id
-                or attendee.category_id != recipient.category_id
+                or not self._attendee_categories_match(
+                    session,
+                    attendee.category_id,
+                    recipient.category_id,
+                    tenant_id=payment.tenant_id,
+                    popup_id=payment.popup_id,
+                )
             ):
                 raise self._fulfillment_error()
         elif attendee is not None and (
             attendee.tenant_id != payment.tenant_id
             or attendee.popup_id != payment.popup_id
-            or attendee.category_id != recipient.category_id
+            or not self._attendee_categories_match(
+                session,
+                attendee.category_id,
+                recipient.category_id,
+                tenant_id=payment.tenant_id,
+                popup_id=payment.popup_id,
+            )
         ):
             raise self._fulfillment_error()
 
@@ -4022,7 +4099,13 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
                     raise self._fulfillment_error()
             if (
                 product.attendee_category_id is not None
-                and attendee.category_id != product.attendee_category_id
+                and not self._attendee_categories_match(
+                    session,
+                    attendee.category_id,
+                    product.attendee_category_id,
+                    tenant_id=payment.tenant_id,
+                    popup_id=payment.popup_id,
+                )
             ):
                 raise self._fulfillment_error()
             attendees_by_line[line.id] = attendee
