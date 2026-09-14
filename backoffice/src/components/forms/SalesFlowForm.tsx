@@ -18,6 +18,7 @@ import {
   SalesFlowsService,
   type SalesFlowUpdate,
 } from "@/client"
+import { AttendeeCategoriesEditor } from "@/components/attendee-categories/AttendeeCategoriesEditor"
 import { DangerZone } from "@/components/Common/DangerZone"
 import { FieldError } from "@/components/Common/FieldError"
 import {
@@ -462,6 +463,17 @@ export function SalesFlowForm({
             )}
           </form.Field>
         </InlineSection>
+
+        {isEdit && defaultValues && (
+          <>
+            <Separator />
+            <AttendeeCategoriesEditor
+              popupId={popupId}
+              flowId={defaultValues.id}
+              readOnly={readOnly}
+            />
+          </>
+        )}
 
         <Separator />
 

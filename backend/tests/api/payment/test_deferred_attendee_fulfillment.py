@@ -38,16 +38,19 @@ def _human(db: Session, tenant: Tenants, label: str) -> Humans:
 
 
 def _category(db: Session, popup: Popups) -> AttendeeCategories:
+    flow_id = application_flow_id(db, popup.id)
     category = db.exec(
         select(AttendeeCategories).where(
-            AttendeeCategories.popup_id == popup.id,
+            AttendeeCategories.sales_flow_id == flow_id,
             AttendeeCategories.is_primary.is_(True),
+            AttendeeCategories.deleted_at.is_(None),  # type: ignore[union-attr]
         )
     ).first()
     if category is None:
         category = AttendeeCategories(
             tenant_id=popup.tenant_id,
             popup_id=popup.id,
+            sales_flow_id=flow_id,
             key="main",
             is_primary=True,
         )
@@ -221,6 +224,7 @@ def test_same_access_product_keeps_recipient_price_category_and_qr_lines_separat
     child_category = AttendeeCategories(
         tenant_id=tenant_a.id,
         popup_id=popup_tenant_a.id,
+        sales_flow_id=application_flow_id(db, popup_tenant_a.id),
         key=f"discount-child-{uuid.uuid4().hex[:6]}",
     )
     db.add(child_category)
@@ -378,6 +382,7 @@ def test_explicit_reuse_rejects_invalid_scope_without_transferring_ownership(
     wrong_category = AttendeeCategories(
         tenant_id=tenant_a.id,
         popup_id=popup_tenant_a.id,
+        sales_flow_id=application_flow_id(db, popup_tenant_a.id),
         key=f"wrong-{uuid.uuid4().hex[:6]}",
     )
     db.add(wrong_category)
@@ -838,6 +843,7 @@ def test_recipient_category_mismatch_rejects_and_rolls_back_materialization(
     other = AttendeeCategories(
         tenant_id=tenant_a.id,
         popup_id=popup_tenant_a.id,
+        sales_flow_id=application_flow_id(db, popup_tenant_a.id),
         key=f"other-{uuid.uuid4().hex[:6]}",
     )
     db.add(other)

@@ -39,23 +39,23 @@ from tests._flow_helpers import application_flow_id
 
 
 def _ensure_primary_category(db: Session, popup: Popups) -> AttendeeCategories:
-    """Create the popup's primary attendee category (main) if missing."""
+    """Create the default flow's primary attendee category if missing."""
+    from app.api.attendee_category.crud import attendee_categories_crud
+
+    flow_id = application_flow_id(db, popup.id)
     cat = db.exec(
         select(AttendeeCategories).where(
-            AttendeeCategories.popup_id == popup.id,
+            AttendeeCategories.sales_flow_id == flow_id,
             AttendeeCategories.is_primary == True,  # noqa: E712
+            AttendeeCategories.deleted_at.is_(None),  # type: ignore[union-attr]
         )
     ).first()
     if cat is None:
-        cat = AttendeeCategories(
-            tenant_id=popup.tenant_id,
-            popup_id=popup.id,
-            key="main",
-            label="Main",
-            is_primary=True,
-            enabled_in_passes_flow=True,
-        )
-        db.add(cat)
+        from app.api.sales_flow.models import SalesFlows
+
+        flow = db.get(SalesFlows, flow_id)
+        assert flow is not None
+        cat = attendee_categories_crud.seed_main_for_flow(db, flow)
         db.commit()
         db.refresh(cat)
     return cat

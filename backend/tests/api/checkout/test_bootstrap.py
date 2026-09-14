@@ -227,24 +227,16 @@ def test_runtime_includes_attendee_categories(
     from app.api.attendee_category.models import AttendeeCategories
 
     popup = _make_direct_popup(db, tenant_a)
-    db.add(
-        AttendeeCategories(
-            tenant_id=tenant_a.id,
-            popup_id=popup.id,
-            key="main",
-            is_primary=True,
-            sort_order=0,
-        )
+    flow_id = default_flow_id(db, popup.id)
+    spouse = AttendeeCategories(
+        tenant_id=tenant_a.id,
+        popup_id=popup.id,
+        sales_flow_id=flow_id,
+        key="spouse",
+        sort_order=1,
+        display_meta={"label": "Spouse"},
     )
-    db.add(
-        AttendeeCategories(
-            tenant_id=tenant_a.id,
-            popup_id=popup.id,
-            key="spouse",
-            sort_order=1,
-            display_meta={"label": "Spouse"},
-        )
-    )
+    db.add(spouse)
     db.commit()
 
     response = client.get(

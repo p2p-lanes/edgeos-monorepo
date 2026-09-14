@@ -70,7 +70,8 @@ export const queryKeys = {
       ["checkout", "coupon", slug, code] as const,
   },
   attendeeCategories: {
-    byPopup: (popupId: string) => ["attendee-categories", popupId] as const,
+    byPopup: (popupId: string, salesFlowId?: string | null) =>
+      ["attendee-categories", popupId, salesFlowId ?? null] as const,
   },
   salesFlows: {
     portal: (popupId: string) => ["sales-flows", "portal", popupId] as const,

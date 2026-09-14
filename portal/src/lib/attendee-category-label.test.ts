@@ -11,7 +11,6 @@ function makeCategory(
     key,
     is_primary: key === "main",
     sort_order: 0,
-    enabled_in_passes_flow: true,
     display_meta: label != null ? { label } : {},
     required_fields: [],
     popup_id: "popup-1",

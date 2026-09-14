@@ -1,7 +1,7 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
 import { render, screen, waitFor } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
-import { describe, expect, it, vi } from "vitest"
+import { beforeEach, describe, expect, it, vi } from "vitest"
 
 import type { AttendeeCategoryPublic } from "@/client"
 import { AttendeeCategoriesEditor } from "./AttendeeCategoriesEditor"
@@ -10,7 +10,8 @@ import { AttendeeCategoriesEditor } from "./AttendeeCategoriesEditor"
 vi.mock("@/client", () => ({
   AttendeeCategoriesService: {
     listAttendeeCategories: vi.fn(),
-    createAttendeeCategory: vi.fn(),
+    listSalesFlowAttendeeCategories: vi.fn(),
+    createSalesFlowAttendeeCategory: vi.fn(),
     updateAttendeeCategory: vi.fn(),
     deleteAttendeeCategory: vi.fn(),
   },
@@ -29,11 +30,18 @@ import { AttendeeCategoriesService } from "@/client"
 const mockList = AttendeeCategoriesService.listAttendeeCategories as ReturnType<
   typeof vi.fn
 >
+const mockFlowList =
+  AttendeeCategoriesService.listSalesFlowAttendeeCategories as ReturnType<
+    typeof vi.fn
+  >
 const mockCreate =
-  AttendeeCategoriesService.createAttendeeCategory as ReturnType<typeof vi.fn>
+  AttendeeCategoriesService.createSalesFlowAttendeeCategory as ReturnType<
+    typeof vi.fn
+  >
+const mockUpdate =
+  AttendeeCategoriesService.updateAttendeeCategory as ReturnType<typeof vi.fn>
 const mockDelete =
   AttendeeCategoriesService.deleteAttendeeCategory as ReturnType<typeof vi.fn>
-
 function makeCategory(
   overrides: Partial<AttendeeCategoryPublic> = {},
 ): AttendeeCategoryPublic {
@@ -41,10 +49,10 @@ function makeCategory(
     id: "cat-1",
     tenant_id: "tenant-1",
     popup_id: "popup-1",
+    sales_flow_id: "flow-1",
     key: "spouse",
     is_primary: false,
     sort_order: 1,
-    enabled_in_passes_flow: true,
     display_meta: { label: "Spouse" },
     required_fields: [],
     ...overrides,
@@ -62,8 +70,13 @@ function wrapper() {
 }
 
 describe("AttendeeCategoriesEditor", () => {
-  it("renders a list of category rows from API", async () => {
-    const categories = [
+  beforeEach(() => {
+    vi.clearAllMocks()
+    mockFlowList.mockResolvedValue({ results: [] })
+  })
+
+  it("renders only category rows returned for the current flow", async () => {
+    const flowCategories = [
       makeCategory({
         id: "cat-1",
         key: "spouse",
@@ -76,9 +89,18 @@ describe("AttendeeCategoriesEditor", () => {
         sort_order: 2,
       }),
     ]
-    mockList.mockResolvedValue({ results: categories })
+    mockList.mockResolvedValue({
+      results: [
+        makeCategory({
+          id: "popup-only",
+          key: "popup-only",
+          display_meta: { label: "Popup only" },
+        }),
+      ],
+    })
+    mockFlowList.mockResolvedValue({ results: flowCategories })
 
-    render(<AttendeeCategoriesEditor popupId="popup-1" />, {
+    render(<AttendeeCategoriesEditor popupId="popup-1" flowId="flow-1" />, {
       wrapper: wrapper(),
     })
 
@@ -86,12 +108,15 @@ describe("AttendeeCategoriesEditor", () => {
       expect(screen.getByText("Spouse")).toBeInTheDocument()
       expect(screen.getByText("Kid")).toBeInTheDocument()
     })
+    expect(screen.queryByText("Popup only")).not.toBeInTheDocument()
+    expect(mockList).not.toHaveBeenCalled()
+    expect(mockFlowList).toHaveBeenCalledWith({ flowId: "flow-1" })
   })
 
   it("shows empty state when no categories", async () => {
-    mockList.mockResolvedValue({ results: [] })
+    mockFlowList.mockResolvedValue({ results: [] })
 
-    render(<AttendeeCategoriesEditor popupId="popup-1" />, {
+    render(<AttendeeCategoriesEditor popupId="popup-1" flowId="flow-1" />, {
       wrapper: wrapper(),
     })
 
@@ -101,7 +126,7 @@ describe("AttendeeCategoriesEditor", () => {
   })
 
   it("create mutation fires when form is submitted with a new key", async () => {
-    mockList.mockResolvedValue({ results: [] })
+    mockFlowList.mockResolvedValue({ results: [] })
     mockCreate.mockResolvedValue(
       makeCategory({
         id: "cat-new",
@@ -111,7 +136,7 @@ describe("AttendeeCategoriesEditor", () => {
     )
 
     const user = userEvent.setup()
-    render(<AttendeeCategoriesEditor popupId="popup-1" />, {
+    render(<AttendeeCategoriesEditor popupId="popup-1" flowId="flow-1" />, {
       wrapper: wrapper(),
     })
 
@@ -129,6 +154,7 @@ describe("AttendeeCategoriesEditor", () => {
     await waitFor(() => {
       expect(mockCreate).toHaveBeenCalledWith(
         expect.objectContaining({
+          flowId: "flow-1",
           requestBody: expect.objectContaining({
             popup_id: "popup-1",
             key: "teen",
@@ -138,46 +164,100 @@ describe("AttendeeCategoriesEditor", () => {
     })
   })
 
-  it("delete button is disabled for is_primary categories", async () => {
+  it("keeps the main category delete disabled", async () => {
     const primary = makeCategory({
       id: "cat-main",
       key: "main",
       is_primary: true,
       display_meta: { label: "Main" },
     })
-    mockList.mockResolvedValue({ results: [primary] })
+    mockFlowList.mockResolvedValue({ results: [primary] })
 
-    render(<AttendeeCategoriesEditor popupId="popup-1" />, {
+    render(<AttendeeCategoriesEditor popupId="popup-1" flowId="flow-1" />, {
       wrapper: wrapper(),
     })
 
     await waitFor(() => screen.getByText("Main"))
 
-    const deleteBtn = screen.getByRole("button", { name: /delete main/i })
+    const deleteBtn = screen.getByRole("button", {
+      name: /delete main/i,
+    })
     expect(deleteBtn).toBeDisabled()
   })
 
-  it("delete mutation fires for non-primary category", async () => {
-    const category = makeCategory({
+  it("does not render availability switches or not allowed badges", async () => {
+    const main = makeCategory({
+      id: "cat-main",
+      key: "main",
+      is_primary: true,
+      display_meta: { label: "Main" },
+    })
+    const spouse = makeCategory({ id: "cat-spouse" })
+    mockFlowList.mockResolvedValue({ results: [main, spouse] })
+
+    render(<AttendeeCategoriesEditor popupId="popup-1" flowId="flow-1" />, {
+      wrapper: wrapper(),
+    })
+
+    await screen.findByText("Spouse")
+
+    expect(screen.queryByRole("switch")).not.toBeInTheDocument()
+    expect(screen.queryByText("Not allowed")).not.toBeInTheDocument()
+  })
+
+  it("deletes a category and refetches the current flow rows", async () => {
+    const main = makeCategory({
+      id: "cat-main",
+      key: "main",
+      is_primary: true,
+      display_meta: { label: "Main" },
+    })
+    const spouse = makeCategory({
       id: "cat-spouse",
       key: "spouse",
       display_meta: { label: "Spouse" },
     })
-    mockList.mockResolvedValue({ results: [category] })
+    mockFlowList
+      .mockResolvedValueOnce({ results: [main, spouse] })
+      .mockResolvedValue({ results: [main] })
     mockDelete.mockResolvedValue(undefined)
 
     const user = userEvent.setup()
-    render(<AttendeeCategoriesEditor popupId="popup-1" />, {
+    render(<AttendeeCategoriesEditor popupId="popup-1" flowId="flow-1" />, {
       wrapper: wrapper(),
     })
 
     await waitFor(() => screen.getByText("Spouse"))
 
-    const deleteBtn = screen.getByRole("button", { name: /delete spouse/i })
+    const deleteBtn = screen.getByRole("button", {
+      name: /delete spouse/i,
+    })
     await user.click(deleteBtn)
 
     await waitFor(() => {
-      expect(mockDelete).toHaveBeenCalledWith(
+      expect(mockDelete).toHaveBeenCalledWith({ categoryId: "cat-spouse" })
+      expect(mockFlowList).toHaveBeenCalledTimes(2)
+      expect(screen.queryByText("Spouse")).not.toBeInTheDocument()
+    })
+  })
+
+  it("updates an edited category by category ID", async () => {
+    const category = makeCategory({ id: "cat-spouse" })
+    mockFlowList.mockResolvedValue({ results: [category] })
+    mockUpdate.mockResolvedValue(category)
+
+    const user = userEvent.setup()
+    render(<AttendeeCategoriesEditor popupId="popup-1" flowId="flow-1" />, {
+      wrapper: wrapper(),
+    })
+
+    await user.click(
+      await screen.findByRole("button", { name: /edit spouse/i }),
+    )
+    await user.click(screen.getByRole("button", { name: /^save$/i }))
+
+    await waitFor(() => {
+      expect(mockUpdate).toHaveBeenCalledWith(
         expect.objectContaining({ categoryId: "cat-spouse" }),
       )
     })
@@ -190,10 +270,10 @@ describe("AttendeeCategoriesEditor", () => {
       sort_order: 3,
       display_meta: { label: "Spouse" },
     })
-    mockList.mockResolvedValue({ results: [category] })
+    mockFlowList.mockResolvedValue({ results: [category] })
 
     const user = userEvent.setup()
-    render(<AttendeeCategoriesEditor popupId="popup-1" />, {
+    render(<AttendeeCategoriesEditor popupId="popup-1" flowId="flow-1" />, {
       wrapper: wrapper(),
     })
 

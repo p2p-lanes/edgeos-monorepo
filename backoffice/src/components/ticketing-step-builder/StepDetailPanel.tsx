@@ -328,6 +328,7 @@ function StepDetailContent({
           ) : step.step_type === "buyer" ? null : (
             <StepContentSection
               popupId={step.popup_id}
+              salesFlowId={step.sales_flow_id}
               template={template}
               onTemplateChange={(key) => {
                 setTemplate(key)

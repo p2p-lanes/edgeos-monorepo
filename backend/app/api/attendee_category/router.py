@@ -47,14 +47,48 @@ async def list_attendee_categories_portal(
     popup_id: uuid.UUID,
     db: HumanTenantSession,
     _: CurrentHuman,
+    sales_flow_id: uuid.UUID | None = None,
 ) -> ListModel[AttendeeCategoryPublic]:
     """Portal counterpart of list_attendee_categories — accepts Human tokens.
 
-    Used by the passes flow to render `+ Add {category}` buttons. Returns the
-    same shape as the admin endpoint; the portal filters out is_primary and
-    enabled_in_passes_flow=false client-side.
+    When sales_flow_id is supplied, returns categories owned by that flow.
+    Popup-only callers receive all active flow-owned rows for compatibility.
     """
-    categories = attendee_categories_crud.list_by_popup(db, popup_id)
+    if sales_flow_id is not None:
+        from app.api.sales_flow.crud import sales_flows_crud
+
+        flow = sales_flows_crud.get(db, sales_flow_id)
+        if flow is None or flow.popup_id != popup_id:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Sales flow not found for this popup",
+            )
+        categories = attendee_categories_crud.list_by_flow(db, flow.id)
+    else:
+        categories = attendee_categories_crud.list_by_popup(db, popup_id)
+    results = [AttendeeCategoryPublic.model_validate(c) for c in categories]
+    return ListModel[AttendeeCategoryPublic](
+        results=results,
+        paging=Paging(offset=0, limit=len(results), total=len(results)),
+    )
+
+
+@router.get(
+    "/sales-flows/{flow_id}/attendee-categories",
+    response_model=ListModel[AttendeeCategoryPublic],
+)
+async def list_sales_flow_attendee_categories(
+    flow_id: uuid.UUID,
+    db: TenantSession,
+    _: CurrentUser,
+) -> ListModel[AttendeeCategoryPublic]:
+    """List the active attendee categories owned by one sales flow."""
+    from app.api.sales_flow.crud import sales_flows_crud
+
+    flow = sales_flows_crud.get(db, flow_id)
+    if flow is None:
+        raise HTTPException(status_code=404, detail="Sales flow not found")
+    categories = attendee_categories_crud.list_by_flow(db, flow.id)
     results = [AttendeeCategoryPublic.model_validate(c) for c in categories]
     return ListModel[AttendeeCategoryPublic](
         results=results,
@@ -63,37 +97,23 @@ async def list_attendee_categories_portal(
 
 
 @router.post(
-    "/attendee-categories",
+    "/sales-flows/{flow_id}/attendee-categories",
     response_model=AttendeeCategoryPublic,
     status_code=status.HTTP_201_CREATED,
 )
-async def create_attendee_category(
+async def create_sales_flow_attendee_category(
+    flow_id: uuid.UUID,
     data: AttendeeCategoryCreate,
     db: TenantSession,
-    current_user: CurrentWriter,
+    _: CurrentWriter,
 ) -> AttendeeCategoryPublic:
-    """Create a new attendee category (ADMIN only)."""
-    from app.api.shared.enums import UserRole
+    """Create or restore a category owned by this flow."""
+    from app.api.sales_flow.crud import sales_flows_crud
 
-    if current_user.role == UserRole.SUPERADMIN:
-        from app.api.popup.models import Popups
-
-        popup = db.get(Popups, data.popup_id)
-        if not popup:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Popup not found",
-            )
-        tenant_id = popup.tenant_id
-    else:
-        if current_user.tenant_id is None:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="User has no tenant assigned",
-            )
-        tenant_id = current_user.tenant_id
-
-    category = attendee_categories_crud.create_for_popup(db, data, tenant_id)
+    flow = sales_flows_crud.get(db, flow_id)
+    if flow is None:
+        raise HTTPException(status_code=404, detail="Sales flow not found")
+    category = attendee_categories_crud.create_for_flow(db, data, flow)
     return AttendeeCategoryPublic.model_validate(category)
 
 
@@ -128,8 +148,8 @@ async def update_attendee_category(
 ) -> AttendeeCategoryPublic:
     """Update an attendee category (ADMIN only).
 
-    For primary categories, only display_meta, required_fields, sort_order,
-    and enabled_in_passes_flow may be updated.
+    For primary categories, only display_meta, required_fields, and sort_order
+    may be updated.
     key and is_primary cannot be changed.
     """
     category = attendee_categories_crud.get(db, category_id)

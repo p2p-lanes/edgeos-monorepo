@@ -31,7 +31,7 @@ describe("useAttendeeCategories", () => {
 
     expect(mockUseQuery).toHaveBeenCalledWith(
       expect.objectContaining({
-        queryKey: ["attendee-categories", "popup-abc"],
+        queryKey: ["attendee-categories", "popup-abc", null],
         staleTime: 5 * 60 * 1000,
       }),
     )
@@ -46,7 +46,6 @@ describe("useAttendeeCategories", () => {
         key: "main",
         is_primary: true,
         sort_order: 0,
-        enabled_in_passes_flow: true,
         display_meta: {},
         required_fields: [],
         popup_id: "popup-1",
@@ -57,7 +56,6 @@ describe("useAttendeeCategories", () => {
         key: "kid",
         is_primary: false,
         sort_order: 2,
-        enabled_in_passes_flow: true,
         display_meta: {},
         required_fields: [],
         popup_id: "popup-1",

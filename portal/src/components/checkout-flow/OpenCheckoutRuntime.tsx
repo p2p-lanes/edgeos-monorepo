@@ -187,7 +187,7 @@ export function OpenCheckoutRuntime({
   const categoriesSeededRef = useRef(false)
   if (!categoriesSeededRef.current) {
     queryClient.setQueryData(
-      queryKeys.attendeeCategories.byPopup(popup.id),
+      queryKeys.attendeeCategories.byPopup(popup.id, runtime.selected_flow.id),
       runtime.attendee_categories ?? [],
     )
     categoriesSeededRef.current = true

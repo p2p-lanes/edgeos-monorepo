@@ -51,13 +51,11 @@ def _payment_context(db: Session, tenant: Tenants):
         email=f"recipient-buyer-{uuid.uuid4().hex[:8]}@test.com",
         first_name="Buyer",
     )
-    category = AttendeeCategories(
-        tenant_id=tenant.id,
-        popup_id=popup.id,
-        key=f"main-{uuid.uuid4().hex[:6]}",
-        is_primary=True,
-    )
-    db.add_all([buyer, category])
+    from app.api.attendee_category.crud import attendee_categories_crud
+
+    category = attendee_categories_crud.get_primary_for_flow(db, flow.id)
+    assert category is not None
+    db.add(buyer)
     db.flush()
     application = Applications(
         tenant_id=tenant.id,
@@ -133,6 +131,16 @@ def test_application_payment_redirects_preserve_the_application_flow(
         )
         db.add(flow)
         db.flush()
+        from app.api.attendee_category.crud import attendee_categories_crud
+
+        attendee_categories_crud.seed_for_flow(
+            db, flow, source_flow_id=application.sales_flow_id
+        )
+        db.flush()
+        category = attendee_categories_crud.get_primary_for_flow(db, flow.id)
+        assert category is not None
+        product.attendee_category_id = category.id
+        db.add(product)
         seed_ticketing_steps_for_popup(
             db,
             popup_id=popup.id,
@@ -165,10 +173,13 @@ def test_application_payment_redirects_preserve_the_application_flow(
             is_installment_plan=False,
         )
         if payment_kind == "application_fee":
-            payments_crud.create_fee_payment(db, application, popup)
+            payment = payments_crud.create_fee_payment(db, application, popup)
         else:
-            payments_crud.create_payment(db, _request(application, product, category))
+            payment, _ = payments_crud.create_payment(
+                db, _request(application, product, category)
+            )
 
+    assert payment.sales_flow_id == application.sales_flow_id
     path = "application" if payment_kind == "application_fee" else "passes/buy"
     expected_cancel = (
         f"{get_portal_url(tenant_a)}/portal/{popup.slug}/{path}?flow={flow.id}"
@@ -287,6 +298,50 @@ def test_invalid_existing_attendee_is_rejected_before_provider_creation(
     assert attendee.managed_by_human_id == other_manager.id
 
 
+def test_recipient_category_owned_by_another_flow_is_rejected_before_provider(
+    db: Session, tenant_a: Tenants
+) -> None:
+    popup, _, _, _, application, _ = _payment_context(db, tenant_a)
+    other_flow = SalesFlows(
+        tenant_id=tenant_a.id,
+        popup_id=popup.id,
+        slug=f"other-{uuid.uuid4().hex[:6]}",
+        name="Other flow",
+        type=SaleType.application.value,
+    )
+    db.add(other_flow)
+    db.flush()
+    from app.api.attendee_category.crud import attendee_categories_crud
+
+    attendee_categories_crud.seed_main_for_flow(db, other_flow)
+    companion = AttendeeCategories(
+        tenant_id=tenant_a.id,
+        popup_id=popup.id,
+        sales_flow_id=other_flow.id,
+        key=f"guest-{uuid.uuid4().hex[:6]}",
+    )
+    product = Products(
+        tenant_id=tenant_a.id,
+        popup_id=popup.id,
+        name="Guest pass",
+        slug=f"guest-pass-{uuid.uuid4().hex[:8]}",
+        price=Decimal("25"),
+        category="ticket",
+        attendee_category_id=companion.id,
+        is_active=True,
+    )
+    db.add_all([companion, product])
+    db.commit()
+
+    with patch("app.services.simplefi.get_simplefi_client") as get_client:
+        with pytest.raises(HTTPException) as error:
+            payments_crud.create_payment(db, _request(application, product, companion))
+
+    assert error.value.status_code == 422
+    assert error.value.detail == "Recipient is not valid for this payment"
+    get_client.assert_not_called()
+
+
 def test_payment_line_rejects_both_legacy_and_recipient_identity() -> None:
     with pytest.raises(ValidationError):
         PaymentProductRequest(
@@ -363,6 +418,7 @@ def test_linked_human_category_conflict_is_rejected_before_provider_creation(
     other_category = AttendeeCategories(
         tenant_id=tenant_a.id,
         popup_id=popup.id,
+        sales_flow_id=application.sales_flow_id,
         key=f"other-{uuid.uuid4().hex[:6]}",
     )
     db.add_all([linked_human, other_category])

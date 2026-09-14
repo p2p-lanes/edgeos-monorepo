@@ -1,7 +1,16 @@
-import type { AttendeeProductPublic, AttendeePublic } from "@/client"
+import type {
+  AttendeeCategoryPublic,
+  AttendeeProductPublic,
+  AttendeePublic,
+} from "@/client"
 import type { ProductsPass } from "./Products"
 
 export type AttendeeCategory = "main" | "spouse" | "kid" | "baby" | "teen"
+
+export type AttendeeCategoryForm = Pick<
+  AttendeeCategoryPublic,
+  "id" | "key" | "display_meta" | "required_fields"
+>
 
 /**
  * A single ticket entry as returned by the API's AttendeeProductPublic.

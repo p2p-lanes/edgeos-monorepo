@@ -1872,6 +1872,7 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
             application_id=application.id,
             popup_id=application.popup_id,
             buyer_human_id=application.human_id,
+            sales_flow_id=application.sales_flow_id,
             status=simplefi_response.status,
             amount=fee_amount,
             currency=popup.currency,
@@ -2256,15 +2257,26 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
             for recipient in validated
             if recipient.category_id is not None
         }
-        valid_category_ids = set(
-            session.exec(
-                select(AttendeeCategories.id).where(
-                    AttendeeCategories.id.in_(category_ids),  # type: ignore[attr-defined]
-                    AttendeeCategories.tenant_id == tenant_id,
-                    AttendeeCategories.popup_id == popup_id,
-                )
-            ).all()
-        )
+        if sales_flow_id is not None:
+            from app.api.attendee_category.crud import (  # noqa: PLC0415
+                attendee_categories_crud,
+            )
+
+            valid_category_ids = (
+                attendee_categories_crud.allowed_ids_for_flow(session, sales_flow_id)
+                & category_ids
+            )
+        else:
+            valid_category_ids = set(
+                session.exec(
+                    select(AttendeeCategories.id).where(
+                        AttendeeCategories.id.in_(category_ids),  # type: ignore[attr-defined]
+                        AttendeeCategories.tenant_id == tenant_id,
+                        AttendeeCategories.popup_id == popup_id,
+                        AttendeeCategories.deleted_at.is_(None),  # type: ignore[union-attr]
+                    )
+                ).all()
+            )
         attendee_ids = {
             recipient.existing_attendee_id
             for recipient in validated

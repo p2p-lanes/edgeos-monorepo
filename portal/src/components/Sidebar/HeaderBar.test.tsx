@@ -20,7 +20,7 @@ vi.mock("react-i18next", () => ({
     t: (key: string) =>
       ({
         "sidebar.commerce": "Commerce",
-        "breadcrumbs.passes": "Passes",
+        "breadcrumbs.passes": "Purchases",
         "breadcrumbs.buy": "Buy",
       })[key] ?? key,
   }),
@@ -72,7 +72,7 @@ describe("HeaderBar breadcrumbs", () => {
     render(<HeaderBar />)
 
     expect(
-      screen.getByRole("link", { name: "Passes" }).getAttribute("href"),
+      screen.getByRole("link", { name: "Purchases" }).getAttribute("href"),
     ).toBe("/portal/summit/passes")
   })
 })

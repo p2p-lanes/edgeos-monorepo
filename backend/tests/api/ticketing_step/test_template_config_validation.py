@@ -252,25 +252,23 @@ class TestTemplateConfigAttendeeCategories:
         default_flow_tenant_a,
     ) -> None:
         """POST section with valid attendee_categories (UUIDs) → 201, GET returns exact list."""
-        # Fetch the main category UUID for this popup
+        # Fetch a category UUID owned by this exact flow.
         cats_resp = client.get(
-            f"/api/v1/popups/{popup_tenant_a.id}/attendee-categories",
+            f"/api/v1/sales-flows/{default_flow_tenant_a.id}/attendee-categories",
             headers=_admin_headers(admin_token_tenant_a),
         )
         assert cats_resp.status_code == 200, cats_resp.text
         categories = cats_resp.json().get("results", cats_resp.json())
-        # popup_tenant_a may not have categories seeded (created via db.add, not API).
-        # Create a non-primary category to use in the test.
+        # Legacy fixtures may not have seeded categories. Create one if needed.
         if not categories:
             create_resp = client.post(
-                "/api/v1/attendee-categories",
+                f"/api/v1/sales-flows/{default_flow_tenant_a.id}/attendee-categories",
                 headers=_admin_headers(admin_token_tenant_a),
                 json={
                     "popup_id": str(popup_tenant_a.id),
                     "sales_flow_id": str(default_flow_tenant_a.id),
                     "key": "vip",
                     "sort_order": 1,
-                    "enabled_in_passes_flow": True,
                 },
             )
             assert create_resp.status_code == 201, create_resp.text

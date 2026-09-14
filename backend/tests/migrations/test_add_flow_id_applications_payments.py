@@ -55,6 +55,23 @@ def _load_migration_module():
     return module
 
 
+def _load_application_fee_backfill_module():
+    migration_path = (
+        Path(__file__).resolve().parents[2] / "app" / "alembic" / "versions"
+    )
+    matches = list(
+        migration_path.glob("9c7a4e2f1b8d_backfill_application_fee_sales_flows.py")
+    )
+    assert matches, "application-fee sales-flow backfill migration file not found"
+
+    module_path = matches[0]
+    spec = importlib.util.spec_from_file_location(module_path.stem, module_path)
+    assert spec and spec.loader
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
 def _insert_popup(db: Session, tenant_id: uuid.UUID) -> uuid.UUID:
     popup_id = uuid.uuid4()
     db.exec(
@@ -84,6 +101,28 @@ def _insert_default_flow(
             "VALUES (:id, :tid, :pid, 'application', 'attendee', 'Attendee', "
             "'portal_listed', true, 0, 'inherit', 'portal_auth')"
         ).bindparams(id=flow_id, tid=tenant_id, pid=popup_id)
+    )
+    db.commit()
+    return flow_id
+
+
+def _insert_secondary_flow(
+    db: Session, tenant_id: uuid.UUID, popup_id: uuid.UUID
+) -> uuid.UUID:
+    flow_id = uuid.uuid4()
+    db.exec(
+        text(
+            "INSERT INTO sales_flows "
+            "(id, tenant_id, popup_id, type, slug, name, visibility, "
+            'is_default, "order", reviewers_mode, identity_mode) '
+            "VALUES (:id, :tid, :pid, 'application', :slug, 'Partners', "
+            "'portal_listed', false, 1, 'inherit', 'portal_auth')"
+        ).bindparams(
+            id=flow_id,
+            tid=tenant_id,
+            pid=popup_id,
+            slug=f"partners-{flow_id.hex[:8]}",
+        )
     )
     db.commit()
     return flow_id
@@ -119,14 +158,27 @@ def _insert_application(
 
 
 def _insert_payment(
-    db: Session, tenant_id: uuid.UUID, popup_id: uuid.UUID
+    db: Session,
+    tenant_id: uuid.UUID,
+    popup_id: uuid.UUID,
+    *,
+    payment_type: str = "pass_purchase",
+    sales_flow_id: uuid.UUID | None = None,
 ) -> uuid.UUID:
     payment_id = uuid.uuid4()
     db.exec(
         text(
-            "INSERT INTO payments (id, tenant_id, popup_id, amount) "
-            "VALUES (:id, :tid, :pid, :amount)"
-        ).bindparams(id=payment_id, tid=tenant_id, pid=popup_id, amount=Decimal("0"))
+            "INSERT INTO payments "
+            "(id, tenant_id, popup_id, amount, payment_type, sales_flow_id) "
+            "VALUES (:id, :tid, :pid, :amount, :payment_type, :sales_flow_id)"
+        ).bindparams(
+            id=payment_id,
+            tid=tenant_id,
+            pid=popup_id,
+            amount=Decimal("0"),
+            payment_type=payment_type,
+            sales_flow_id=sales_flow_id,
+        )
     )
     db.commit()
     return payment_id
@@ -206,6 +258,71 @@ class TestAddFlowIdBackfillDML:
             assert resolved == flow_id
         finally:
             _cleanup(db, popup_id, human_id)
+
+
+class TestApplicationFeeSalesFlowBackfill:
+    def test_backfill_targets_only_unassigned_application_fees_in_same_tenant(
+        self, db: Session, tenant_a: Tenants, tenant_b: Tenants
+    ) -> None:
+        popup_id = _insert_popup(db, tenant_a.id)
+        human_id = _insert_human(db, tenant_a.id)
+        isolated_popup_id = _insert_popup(db, tenant_a.id)
+        isolated_human_id = _insert_human(db, tenant_a.id)
+        try:
+            default_flow_id = _insert_default_flow(db, tenant_a.id, popup_id)
+            secondary_flow_id = _insert_secondary_flow(db, tenant_a.id, popup_id)
+            unassigned_fee_id = _insert_payment(
+                db,
+                tenant_a.id,
+                popup_id,
+                payment_type="application_fee",
+            )
+            assigned_fee_id = _insert_payment(
+                db,
+                tenant_a.id,
+                popup_id,
+                payment_type="application_fee",
+                sales_flow_id=secondary_flow_id,
+            )
+            pass_purchase_id = _insert_payment(db, tenant_a.id, popup_id)
+
+            _insert_default_flow(db, tenant_b.id, isolated_popup_id)
+            cross_tenant_fee_id = _insert_payment(
+                db,
+                tenant_a.id,
+                isolated_popup_id,
+                payment_type="application_fee",
+            )
+
+            module = _load_application_fee_backfill_module()
+            with patch.object(module, "op") as mock_op:
+                mock_op.get_bind.return_value = db.connection()
+                module.upgrade()
+                module.upgrade()
+            db.commit()
+
+            payment_ids = (
+                unassigned_fee_id,
+                assigned_fee_id,
+                pass_purchase_id,
+                cross_tenant_fee_id,
+            )
+            resolved = {
+                payment_id: db.exec(
+                    text(
+                        "SELECT sales_flow_id FROM payments WHERE id = :payment_id"
+                    ).bindparams(payment_id=payment_id)
+                ).scalar()
+                for payment_id in payment_ids
+            }
+
+            assert resolved[unassigned_fee_id] == default_flow_id
+            assert resolved[assigned_fee_id] == secondary_flow_id
+            assert resolved[pass_purchase_id] is None
+            assert resolved[cross_tenant_fee_id] is None
+        finally:
+            _cleanup(db, popup_id, human_id)
+            _cleanup(db, isolated_popup_id, isolated_human_id)
 
 
 # ---------------------------------------------------------------------------

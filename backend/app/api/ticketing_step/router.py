@@ -210,9 +210,10 @@ def _validate_template_config_fk(
     template: str | None,
     template_config: dict | None,
     popup_id: uuid.UUID,
+    sales_flow_id: uuid.UUID,
     db,
 ) -> None:
-    """Validate that attendee_categories UUIDs in template_config sections exist in the popup.
+    """Validate attendee category UUIDs against the step's sales flow.
 
     Pattern B (locked decision #1268): Pydantic validates UUID structure,
     router validates FK existence. This keeps schemas pure.
@@ -241,15 +242,15 @@ def _validate_template_config_fk(
                 elif isinstance(cat, uuid.UUID):
                     all_uuids.append(cat)
 
-    if all_uuids and not attendee_categories_crud.exists_in_popup(
-        db, all_uuids, popup_id
+    if all_uuids and set(all_uuids) - attendee_categories_crud.allowed_ids_for_flow(
+        db, sales_flow_id
     ):
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail=[
                 {
                     "code": "invalid_attendee_category",
-                    "message": "One or more attendee_categories UUIDs do not belong to this popup",
+                    "message": "One or more attendee_categories UUIDs do not belong to this sales flow",
                 }
             ],
         )
@@ -317,7 +318,11 @@ async def create_ticketing_step(
 
     # FK existence check for attendee_categories in template_config (Pattern B, ADR-5)
     _validate_template_config_fk(
-        step_in.template, step_in.template_config, step_in.popup_id, db
+        step_in.template,
+        step_in.template_config,
+        step_in.popup_id,
+        step_in.sales_flow_id,
+        db,
     )
     _validate_meal_product_references(
         step_in.template, step_in.template_config, step_in.popup_id, db
@@ -395,7 +400,11 @@ async def update_ticketing_step(
             step_in.template_config = effective_config
     if effective_config is not None:
         _validate_template_config_fk(
-            effective_template, effective_config, step.popup_id, db
+            effective_template,
+            effective_config,
+            step.popup_id,
+            step.sales_flow_id,
+            db,
         )
         _validate_meal_product_references(
             effective_template, effective_config, step.popup_id, db

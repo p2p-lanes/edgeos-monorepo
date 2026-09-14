@@ -268,9 +268,9 @@ def test_portal_companion_create_endpoint_is_gone(
     category = AttendeeCategories(
         tenant_id=tenant_a.id,
         popup_id=popup.id,
+        sales_flow_id=application.sales_flow_id,
         key=f"companion-{uuid.uuid4().hex[:6]}",
         label="Companion",
-        enabled_in_passes_flow=True,
     )
     db.add_all([application, category])
     db.commit()

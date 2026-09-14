@@ -3,13 +3,17 @@ import type { AttendeeCategoryPublic } from "@/client"
 import { AttendeeCategoriesService } from "@/client"
 import { queryKeys } from "@/lib/query-keys"
 
-export function useAttendeeCategories(popupId: string) {
+export function useAttendeeCategories(
+  popupId: string,
+  salesFlowId?: string | null,
+) {
   const query = useQuery({
-    queryKey: queryKeys.attendeeCategories.byPopup(popupId),
+    queryKey: queryKeys.attendeeCategories.byPopup(popupId, salesFlowId),
     queryFn: async (): Promise<AttendeeCategoryPublic[]> => {
       const result =
         await AttendeeCategoriesService.listAttendeeCategoriesPortal({
           popupId,
+          salesFlowId: salesFlowId ?? undefined,
         })
       return [...(result.results ?? [])].sort(
         (a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0),

@@ -112,17 +112,19 @@ def test_attendee_categories_table_has_expected_columns(db: Session) -> None:
         "id",
         "tenant_id",
         "popup_id",
+        "sales_flow_id",
         "key",
         "is_primary",
         "sort_order",
-        "enabled_in_passes_flow",
         "max_per_application",
         "required_fields",
         "display_meta",
         "created_at",
         "updated_at",
+        "deleted_at",
     }
     assert required.issubset(columns), f"Missing columns: {required - columns}"
+    assert "enabled_in_passes_flow" not in columns
 
 
 # ---------------------------------------------------------------------------
@@ -167,30 +169,32 @@ def test_products_attendee_category_id_column_exists_nullable(db: Session) -> No
 
 
 # ---------------------------------------------------------------------------
-# Scenario: unique constraint enforced (popup_id, key)
+# Scenario: unique constraint enforced (sales_flow_id, key)
 # ---------------------------------------------------------------------------
 
 
-def test_unique_popup_key_constraint_enforced(
+def test_unique_sales_flow_key_constraint_enforced(
     db: Session,
     popup_tenant_a: Popups,
     tenant_a: Tenants,
 ) -> None:
-    """Inserting two categories with same (popup_id, key) raises IntegrityError."""
+    """Inserting two categories with the same flow key raises IntegrityError."""
     from sqlalchemy.exc import IntegrityError
 
     from app.api.attendee_category.models import AttendeeCategories
+    from tests._flow_helpers import default_flow_id
 
     unique = uuid.uuid4().hex[:8]
     key = f"unique_test_{unique}"
+    flow_id = default_flow_id(db, popup_tenant_a.id)
 
     cat1 = AttendeeCategories(
         tenant_id=tenant_a.id,
         popup_id=popup_tenant_a.id,
+        sales_flow_id=flow_id,
         key=key,
         is_primary=False,
         sort_order=0,
-        enabled_in_passes_flow=True,
         required_fields=[],
         display_meta={},
     )
@@ -200,10 +204,10 @@ def test_unique_popup_key_constraint_enforced(
     cat2 = AttendeeCategories(
         tenant_id=tenant_a.id,
         popup_id=popup_tenant_a.id,
+        sales_flow_id=flow_id,
         key=key,
         is_primary=False,
         sort_order=0,
-        enabled_in_passes_flow=True,
         required_fields=[],
         display_meta={},
     )

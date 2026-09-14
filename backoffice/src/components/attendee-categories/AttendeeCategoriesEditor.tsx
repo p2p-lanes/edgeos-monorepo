@@ -25,6 +25,7 @@ import { createErrorHandler } from "@/utils"
 
 interface AttendeeCategoriesEditorProps {
   popupId: string
+  flowId: string
   readOnly?: boolean
 }
 
@@ -34,7 +35,6 @@ interface DialogState {
   key: string
   label: string
   sortOrder: string
-  enabledInPassesFlow: boolean
   /** Empty string = unlimited (null on the server). */
   maxPerApplication: string
   // High-level form fields the admin toggles. We serialize/deserialize these
@@ -51,7 +51,6 @@ const EMPTY_DIALOG: DialogState = {
   key: "",
   label: "",
   sortOrder: "",
-  enabledInPassesFlow: true,
   maxPerApplication: "",
   requireEmail: true,
   requireGender: false,
@@ -148,24 +147,26 @@ function resolveCategoryLabel(category: AttendeeCategoryPublic): string {
 
 export function AttendeeCategoriesEditor({
   popupId,
+  flowId,
   readOnly = false,
 }: AttendeeCategoriesEditorProps) {
   const queryClient = useQueryClient()
   const { showErrorToast, showSuccessToast } = useCustomToast()
   const [state, setState] = useState<DialogState>(EMPTY_DIALOG)
 
-  const queryKey = ["attendee-categories", popupId]
+  const flowQueryKey = ["sales-flow-attendee-categories", flowId]
 
   const { data } = useQuery({
-    queryKey,
+    queryKey: flowQueryKey,
     queryFn: async () => {
-      const result = await AttendeeCategoriesService.listAttendeeCategories({
-        popupId,
-      })
+      const result =
+        await AttendeeCategoriesService.listSalesFlowAttendeeCategories({
+          flowId,
+        })
       const list = Array.isArray(result?.results) ? result.results : []
       return [...list].sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0))
     },
-    enabled: !!popupId,
+    enabled: !!flowId,
     staleTime: 0,
     refetchOnMount: "always",
   })
@@ -173,18 +174,19 @@ export function AttendeeCategoriesEditor({
   // a non-array `data`; treat anything that isn't an array as empty.
   const categories: AttendeeCategoryPublic[] = Array.isArray(data) ? data : []
 
-  const invalidate = () => queryClient.invalidateQueries({ queryKey })
+  const invalidate = () =>
+    queryClient.invalidateQueries({ queryKey: flowQueryKey })
 
   const createMutation = useMutation({
     mutationFn: () => {
       const fields = serializeRequiredFields(state)
-      return AttendeeCategoriesService.createAttendeeCategory({
+      return AttendeeCategoriesService.createSalesFlowAttendeeCategory({
+        flowId,
         requestBody: {
           popup_id: popupId,
           key: state.key.trim(),
           sort_order:
             state.sortOrder !== "" ? Number(state.sortOrder) : undefined,
-          enabled_in_passes_flow: state.enabledInPassesFlow,
           max_per_application:
             state.maxPerApplication !== ""
               ? Number(state.maxPerApplication)
@@ -214,7 +216,6 @@ export function AttendeeCategoriesEditor({
         categoryId: state.editing!.id,
         requestBody: {
           sort_order: state.sortOrder !== "" ? Number(state.sortOrder) : null,
-          enabled_in_passes_flow: state.enabledInPassesFlow,
           max_per_application:
             state.maxPerApplication !== ""
               ? Number(state.maxPerApplication)
@@ -238,7 +239,7 @@ export function AttendeeCategoriesEditor({
     mutationFn: (categoryId: string) =>
       AttendeeCategoriesService.deleteAttendeeCategory({ categoryId }),
     onSuccess: () => {
-      showSuccessToast("Category removed")
+      showSuccessToast("Category deleted")
       invalidate()
     },
     onError: createErrorHandler(showErrorToast),
@@ -255,7 +256,6 @@ export function AttendeeCategoriesEditor({
       key: cat.key,
       label: (meta?.label as string) ?? "",
       sortOrder: cat.sort_order != null ? String(cat.sort_order) : "",
-      enabledInPassesFlow: cat.enabled_in_passes_flow ?? true,
       maxPerApplication:
         cat.max_per_application != null ? String(cat.max_per_application) : "",
       ...fieldsState,
@@ -285,8 +285,12 @@ export function AttendeeCategoriesEditor({
   const saving = createMutation.isPending || updateMutation.isPending
 
   return (
-    <InlineSection title="Companion types">
+    <InlineSection title="Companions">
       <div className="space-y-2 py-3">
+        <p className="text-xs text-muted-foreground">
+          Choose which attendee types can be added through this sales flow. Main
+          is always required.
+        </p>
         {categories.length === 0 ? (
           <p className="text-sm text-muted-foreground">
             No companion types configured. Add one to allow attendees to bring
@@ -308,9 +312,6 @@ export function AttendeeCategoriesEditor({
                         {cat.is_primary && (
                           <Badge variant="secondary">Primary</Badge>
                         )}
-                        {!cat.enabled_in_passes_flow && (
-                          <Badge variant="outline">Hidden</Badge>
-                        )}
                       </div>
                       <div className="text-xs text-muted-foreground">
                         key: {cat.key}
@@ -319,7 +320,7 @@ export function AttendeeCategoriesEditor({
                       </div>
                     </div>
                   </div>
-                  <div className="flex gap-1">
+                  <div className="flex items-center gap-1">
                     <Button
                       type="button"
                       variant="ghost"
@@ -412,20 +413,6 @@ export function AttendeeCategoriesEditor({
                 placeholder="0"
                 onChange={(e) =>
                   setState((prev) => ({ ...prev, sortOrder: e.target.value }))
-                }
-              />
-            </div>
-
-            <div className="flex items-center justify-between">
-              <Label htmlFor="cat-enabled">Visible in passes flow</Label>
-              <Switch
-                id="cat-enabled"
-                checked={state.enabledInPassesFlow}
-                onCheckedChange={(checked) =>
-                  setState((prev) => ({
-                    ...prev,
-                    enabledInPassesFlow: checked,
-                  }))
                 }
               />
             </div>

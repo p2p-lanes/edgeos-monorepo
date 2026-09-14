@@ -98,7 +98,7 @@ class CheckoutRuntimeResponse(BaseModel):
     products: list[CheckoutRuntimeProduct]
     buyer_form: list[CheckoutBuyerSection]
     ticketing_steps: list[TicketingStepPublic]
-    # Per-popup attendee categories (benign config: keys, labels, sort order).
+    # Categories enabled for this flow (benign config: keys, labels, sort order).
     # Shipped in the public bootstrap so anonymous checkout never has to call
     # the human-gated /portal/popups/{id}/attendee-categories endpoint.
     attendee_categories: list[AttendeeCategoryPublic] = []

@@ -1,9 +1,9 @@
-"""Tests for attendee_category CRUD, RLS, and invariants.
+"""Tests for flow-owned attendee category CRUD, RLS, and invariants.
 
 Spec scenarios covered:
 - create-category-happy-path
 - duplicate-key-rejected
-- key-uniqueness-is-per-popup
+- key-uniqueness-is-per-flow
 - viewer-can-read-categories
 - viewer-cannot-write-categories
 - cross-tenant-isolation
@@ -14,12 +14,20 @@ Spec scenarios covered:
 """
 
 import uuid
+from decimal import Decimal
 
 from fastapi.testclient import TestClient
 from sqlmodel import Session
 
+from app.api.attendee.models import Attendees
+from app.api.attendee_category.models import AttendeeCategories
+from app.api.payment.models import PaymentRecipients, Payments
 from app.api.popup.models import Popups
+from app.api.product.models import Products
+from app.api.sales_flow.models import SalesFlows
 from app.api.tenant.models import Tenants
+from app.api.ticketing_step.models import TicketingSteps
+from tests._flow_helpers import default_flow_id
 
 
 def _admin_headers(token: str) -> dict[str, str]:
@@ -52,6 +60,29 @@ def _create_popup(client: TestClient, admin_token: str, tenant_id: uuid.UUID) ->
     return resp.json()
 
 
+def _create_category(
+    client: TestClient,
+    admin_token: str,
+    popup_id: uuid.UUID | str,
+    flow_id: uuid.UUID | str,
+    key: str,
+    **values,
+) -> dict:
+    response = client.post(
+        f"/api/v1/sales-flows/{flow_id}/attendee-categories",
+        headers=_admin_headers(admin_token),
+        json={
+            "popup_id": str(popup_id),
+            "key": key,
+            "required_fields": [],
+            "display_meta": {},
+            **values,
+        },
+    )
+    assert response.status_code == 201, response.text
+    return response.json()
+
+
 # ---------------------------------------------------------------------------
 # T1.1a — Scenario: create-category-happy-path
 # ---------------------------------------------------------------------------
@@ -61,23 +92,21 @@ def test_create_category_happy_path(
     client: TestClient,
     admin_token_tenant_a: str,
     popup_tenant_a: Popups,
+    default_flow_tenant_a: SalesFlows,
 ) -> None:
-    """POST /attendee-categories creates a new category and returns 201."""
+    """POST on a sales flow creates a category owned by that flow."""
     unique = uuid.uuid4().hex[:8]
-    resp = client.post(
-        "/api/v1/attendee-categories",
-        headers=_admin_headers(admin_token_tenant_a),
-        json={
-            "popup_id": str(popup_tenant_a.id),
-            "key": f"sponsor_{unique}",
-            "display_meta": {"label": "Sponsor"},
-            "required_fields": [],
-        },
+    data = _create_category(
+        client,
+        admin_token_tenant_a,
+        popup_tenant_a.id,
+        default_flow_tenant_a.id,
+        f"sponsor_{unique}",
+        display_meta={"label": "Sponsor"},
     )
-    assert resp.status_code == 201, resp.text
-    data = resp.json()
     assert data["key"] == f"sponsor_{unique}"
     assert data["popup_id"] == str(popup_tenant_a.id)
+    assert data["sales_flow_id"] == str(default_flow_tenant_a.id)
     assert data["id"] is not None
 
 
@@ -106,27 +135,25 @@ def test_get_category_exposes_its_popup_scope(
     client: TestClient,
     admin_token_tenant_a: str,
     popup_tenant_a: Popups,
+    default_flow_tenant_a: SalesFlows,
 ) -> None:
-    """GET /attendee-categories/{id} identifies the owning popup."""
-    created = client.post(
-        "/api/v1/attendee-categories",
-        headers=_admin_headers(admin_token_tenant_a),
-        json={
-            "popup_id": str(popup_tenant_a.id),
-            "key": f"scope_{uuid.uuid4().hex[:8]}",
-            "display_meta": {},
-            "required_fields": [],
-        },
+    """GET /attendee-categories/{id} identifies both compatibility scopes."""
+    created = _create_category(
+        client,
+        admin_token_tenant_a,
+        popup_tenant_a.id,
+        default_flow_tenant_a.id,
+        f"scope_{uuid.uuid4().hex[:8]}",
     )
-    assert created.status_code == 201, created.text
 
     response = client.get(
-        f"/api/v1/attendee-categories/{created.json()['id']}",
+        f"/api/v1/attendee-categories/{created['id']}",
         headers=_admin_headers(admin_token_tenant_a),
     )
 
     assert response.status_code == 200, response.text
     assert response.json()["popup_id"] == str(popup_tenant_a.id)
+    assert response.json()["sales_flow_id"] == str(default_flow_tenant_a.id)
 
 
 # ---------------------------------------------------------------------------
@@ -134,16 +161,18 @@ def test_get_category_exposes_its_popup_scope(
 # ---------------------------------------------------------------------------
 
 
-def test_duplicate_key_per_popup_rejected(
+def test_duplicate_key_per_flow_rejected(
     client: TestClient,
     admin_token_tenant_a: str,
     popup_tenant_a: Popups,
+    default_flow_tenant_a: SalesFlows,
 ) -> None:
-    """Creating two categories with the same key in the same popup returns 409."""
+    """Creating two active categories with the same flow key returns 409."""
     unique = uuid.uuid4().hex[:8]
     key = f"dup_{unique}"
+    path = f"/api/v1/sales-flows/{default_flow_tenant_a.id}/attendee-categories"
     resp1 = client.post(
-        "/api/v1/attendee-categories",
+        path,
         headers=_admin_headers(admin_token_tenant_a),
         json={
             "popup_id": str(popup_tenant_a.id),
@@ -155,7 +184,7 @@ def test_duplicate_key_per_popup_rejected(
     assert resp1.status_code == 201, resp1.text
 
     resp2 = client.post(
-        "/api/v1/attendee-categories",
+        path,
         headers=_admin_headers(admin_token_tenant_a),
         json={
             "popup_id": str(popup_tenant_a.id),
@@ -168,54 +197,82 @@ def test_duplicate_key_per_popup_rejected(
 
 
 # ---------------------------------------------------------------------------
-# T1.1a — Scenario: key-uniqueness-is-per-popup (same key different popup = ok)
+# Regression: the same key in two flows creates independent definitions
 # ---------------------------------------------------------------------------
 
 
-def test_same_key_different_popup_allowed(
+def test_same_key_in_two_flows_has_distinct_ids_and_configuration(
     client: TestClient,
     admin_token_tenant_a: str,
     popup_tenant_a: Popups,
     db: Session,
     tenant_a: Tenants,
+    default_flow_tenant_a: SalesFlows,
 ) -> None:
-    """Same key on a different popup (same tenant) is allowed."""
+    """A key is unique only inside one flow, never across a popup."""
     unique = uuid.uuid4().hex[:8]
     key = f"cross_{unique}"
 
-    # Create a second popup for tenant_a
-    popup2 = Popups(
-        name=f"Second Popup {unique}",
-        slug=f"second-popup-{unique}",
+    second_flow = SalesFlows(
         tenant_id=tenant_a.id,
+        popup_id=popup_tenant_a.id,
+        name=f"Second Flow {unique}",
+        slug=f"second-flow-{unique}",
+        type="application",
     )
-    db.add(popup2)
+    db.add(second_flow)
+    db.flush()
+    from app.api.attendee_category.crud import attendee_categories_crud
+
+    attendee_categories_crud.seed_main_for_flow(db, second_flow)
     db.commit()
-    db.refresh(popup2)
+    db.refresh(second_flow)
 
-    resp1 = client.post(
-        "/api/v1/attendee-categories",
-        headers=_admin_headers(admin_token_tenant_a),
-        json={
-            "popup_id": str(popup_tenant_a.id),
-            "key": key,
-            "display_meta": {},
-            "required_fields": [],
-        },
+    first = _create_category(
+        client,
+        admin_token_tenant_a,
+        popup_tenant_a.id,
+        default_flow_tenant_a.id,
+        key,
+        display_meta={"label": "First"},
     )
-    assert resp1.status_code == 201, resp1.text
+    second = _create_category(
+        client,
+        admin_token_tenant_a,
+        popup_tenant_a.id,
+        second_flow.id,
+        key,
+        display_meta={"label": "Second"},
+    )
 
-    resp2 = client.post(
-        "/api/v1/attendee-categories",
+    assert first["id"] != second["id"]
+    assert first["display_meta"] == {"label": "First"}
+    assert second["display_meta"] == {"label": "Second"}
+
+    updated = client.patch(
+        f"/api/v1/attendee-categories/{first['id']}",
         headers=_admin_headers(admin_token_tenant_a),
-        json={
-            "popup_id": str(popup2.id),
-            "key": key,
-            "display_meta": {},
-            "required_fields": [],
-        },
+        json={"display_meta": {"label": "Updated first"}},
     )
-    assert resp2.status_code == 201, resp2.text
+    assert updated.status_code == 200, updated.text
+    second_after_edit = client.get(
+        f"/api/v1/attendee-categories/{second['id']}",
+        headers=_admin_headers(admin_token_tenant_a),
+    )
+    assert second_after_edit.json()["display_meta"] == {"label": "Second"}
+
+    deleted = client.delete(
+        f"/api/v1/attendee-categories/{first['id']}",
+        headers=_admin_headers(admin_token_tenant_a),
+    )
+    assert deleted.status_code == 204, deleted.text
+    assert [
+        category["id"]
+        for category in _flow_categories(
+            client, admin_token_tenant_a, str(second_flow.id)
+        )
+        if category["key"] == key
+    ] == [second["id"]]
 
 
 # ---------------------------------------------------------------------------
@@ -245,10 +302,11 @@ def test_viewer_cannot_create_category(
     client: TestClient,
     viewer_token_tenant_a: str,
     popup_tenant_a: Popups,
+    default_flow_tenant_a: SalesFlows,
 ) -> None:
     """VIEWER role cannot create categories (POST returns 403)."""
     resp = client.post(
-        "/api/v1/attendee-categories",
+        f"/api/v1/sales-flows/{default_flow_tenant_a.id}/attendee-categories",
         headers=_viewer_headers(viewer_token_tenant_a),
         json={
             "popup_id": str(popup_tenant_a.id),
@@ -303,6 +361,91 @@ def _create_popup_via_api(client: TestClient, admin_token: str) -> str:
     )
     assert resp.status_code == 201, resp.text
     return resp.json()["id"]
+
+
+def _flow_categories(client: TestClient, admin_token: str, flow_id: str) -> list[dict]:
+    response = client.get(
+        f"/api/v1/sales-flows/{flow_id}/attendee-categories",
+        headers=_admin_headers(admin_token),
+    )
+    assert response.status_code == 200, response.text
+    return response.json()["results"]
+
+
+def test_fresh_flow_gets_its_own_main_and_copy_clones_active_definitions(
+    client: TestClient,
+    admin_token_tenant_a: str,
+) -> None:
+    popup_id = _create_popup_via_api(client, admin_token_tenant_a)
+    flows_response = client.get(
+        "/api/v1/sales-flows",
+        params={"popup_id": popup_id},
+        headers=_admin_headers(admin_token_tenant_a),
+    )
+    assert flows_response.status_code == 200, flows_response.text
+    default_flow = flows_response.json()["results"][0]
+
+    created_category = _create_category(
+        client,
+        admin_token_tenant_a,
+        popup_id,
+        default_flow["id"],
+        f"spouse_{uuid.uuid4().hex[:8]}",
+        display_meta={"label": "Spouse"},
+    )
+    assert [
+        category["is_primary"]
+        for category in _flow_categories(
+            client, admin_token_tenant_a, default_flow["id"]
+        )
+    ] == [True, False]
+
+    fresh_flow = client.post(
+        "/api/v1/sales-flows",
+        headers=_admin_headers(admin_token_tenant_a),
+        json={
+            "popup_id": popup_id,
+            "name": "Volunteers",
+            "slug": "volunteers",
+            "type": "application",
+            "start_from": "fresh",
+        },
+    )
+    assert fresh_flow.status_code == 201, fresh_flow.text
+    fresh_categories = _flow_categories(
+        client, admin_token_tenant_a, fresh_flow.json()["id"]
+    )
+    assert [category["key"] for category in fresh_categories] == ["main"]
+    assert (
+        fresh_categories[0]["id"]
+        != _flow_categories(client, admin_token_tenant_a, default_flow["id"])[0]["id"]
+    )
+
+    copied_flow = client.post(
+        "/api/v1/sales-flows",
+        headers=_admin_headers(admin_token_tenant_a),
+        json={
+            "popup_id": popup_id,
+            "name": "Attendee copy",
+            "slug": "attendee-copy",
+            "type": "application",
+            "start_from": default_flow["id"],
+        },
+    )
+    assert copied_flow.status_code == 201, copied_flow.text
+    source_categories = _flow_categories(
+        client, admin_token_tenant_a, default_flow["id"]
+    )
+    copied_categories = _flow_categories(
+        client, admin_token_tenant_a, copied_flow.json()["id"]
+    )
+    assert [category["key"] for category in copied_categories] == [
+        category["key"] for category in source_categories
+    ]
+    assert {category["id"] for category in copied_categories}.isdisjoint(
+        category["id"] for category in source_categories
+    )
+    assert copied_categories[1]["display_meta"] == created_category["display_meta"]
 
 
 # ---------------------------------------------------------------------------
@@ -403,22 +546,20 @@ def test_update_non_primary_category(
     client: TestClient,
     admin_token_tenant_a: str,
     popup_tenant_a: Popups,
+    default_flow_tenant_a: SalesFlows,
 ) -> None:
     """PATCH on non-primary category updates successfully."""
     unique = uuid.uuid4().hex[:8]
     # Create a category to update
-    create_resp = client.post(
-        "/api/v1/attendee-categories",
-        headers=_admin_headers(admin_token_tenant_a),
-        json={
-            "popup_id": str(popup_tenant_a.id),
-            "key": f"updateable_{unique}",
-            "display_meta": {"label": "Old Label"},
-            "required_fields": [],
-        },
+    created = _create_category(
+        client,
+        admin_token_tenant_a,
+        popup_tenant_a.id,
+        default_flow_tenant_a.id,
+        f"updateable_{unique}",
+        display_meta={"label": "Old Label"},
     )
-    assert create_resp.status_code == 201, create_resp.text
-    cat_id = create_resp.json()["id"]
+    cat_id = created["id"]
 
     patch_resp = client.patch(
         f"/api/v1/attendee-categories/{cat_id}",
@@ -440,27 +581,96 @@ def test_delete_non_primary_category(
     client: TestClient,
     admin_token_tenant_a: str,
     popup_tenant_a: Popups,
+    default_flow_tenant_a: SalesFlows,
+    db: Session,
 ) -> None:
-    """DELETE on non-primary category returns 204."""
+    """DELETE soft-deletes a referenced category and hides it from its flow."""
     unique = uuid.uuid4().hex[:8]
-    create_resp = client.post(
-        "/api/v1/attendee-categories",
-        headers=_admin_headers(admin_token_tenant_a),
-        json={
-            "popup_id": str(popup_tenant_a.id),
-            "key": f"deletable_{unique}",
-            "display_meta": {},
-            "required_fields": [],
+    created = _create_category(
+        client,
+        admin_token_tenant_a,
+        popup_tenant_a.id,
+        default_flow_tenant_a.id,
+        f"deletable_{unique}",
+    )
+    cat_id = uuid.UUID(created["id"])
+    attendee = Attendees(
+        tenant_id=popup_tenant_a.tenant_id,
+        popup_id=popup_tenant_a.id,
+        category_id=cat_id,
+        name="Historical companion",
+    )
+    product = Products(
+        tenant_id=popup_tenant_a.tenant_id,
+        popup_id=popup_tenant_a.id,
+        name="Historical companion product",
+        slug=f"historical-companion-{unique}",
+        price=Decimal("10"),
+        category="ticket",
+        attendee_category_id=cat_id,
+    )
+    payment = Payments(
+        tenant_id=popup_tenant_a.tenant_id,
+        popup_id=popup_tenant_a.id,
+        sales_flow_id=default_flow_tenant_a.id,
+        amount=Decimal("10"),
+    )
+    db.add(payment)
+    db.flush()
+    recipient = PaymentRecipients(
+        tenant_id=popup_tenant_a.tenant_id,
+        payment_id=payment.id,
+        recipient_key="historical-companion",
+        name="Historical companion",
+        category_id=cat_id,
+    )
+    step = TicketingSteps(
+        tenant_id=popup_tenant_a.tenant_id,
+        popup_id=popup_tenant_a.id,
+        sales_flow_id=default_flow_tenant_a.id,
+        step_type="tickets",
+        title="Category cleanup regression",
+        template="ticket-select",
+        template_config={
+            "sections": [{"attendee_categories": [str(cat_id)], "product_ids": []}]
         },
     )
-    assert create_resp.status_code == 201, create_resp.text
-    cat_id = create_resp.json()["id"]
+    db.add_all([attendee, product, recipient, step])
+    db.commit()
 
     del_resp = client.delete(
         f"/api/v1/attendee-categories/{cat_id}",
         headers=_admin_headers(admin_token_tenant_a),
     )
     assert del_resp.status_code == 204, del_resp.text
+
+    stored = db.get(AttendeeCategories, cat_id)
+    assert stored is not None
+    assert stored.deleted_at is not None
+    assert db.get(Attendees, attendee.id).category_id == cat_id
+    assert db.get(Products, product.id).attendee_category_id == cat_id
+    assert db.get(PaymentRecipients, recipient.id).category_id == cat_id
+    db.refresh(step)
+    assert step.template_config["sections"][0]["attendee_categories"] == []
+    assert cat_id not in {
+        uuid.UUID(category["id"])
+        for category in _flow_categories(
+            client, admin_token_tenant_a, str(default_flow_tenant_a.id)
+        )
+    }
+
+    restored = _create_category(
+        client,
+        admin_token_tenant_a,
+        popup_tenant_a.id,
+        default_flow_tenant_a.id,
+        created["key"],
+        display_meta={"label": "Restored"},
+    )
+    assert restored["id"] == str(cat_id)
+    assert restored["display_meta"] == {"label": "Restored"}
+    db.refresh(stored)
+    assert stored.deleted_at is None
 
 
 # ---------------------------------------------------------------------------
@@ -471,8 +681,9 @@ def test_delete_non_primary_category(
 def test_main_category_created_on_popup_create(
     client: TestClient,
     admin_token_tenant_a: str,
+    db: Session,
 ) -> None:
-    """Creating a Popup auto-creates the main category in the same transaction."""
+    """Creating a popup provisions one main owned by its default flow."""
     unique = uuid.uuid4().hex[:8]
     popup_resp = client.post(
         "/api/v1/popups",
@@ -492,3 +703,6 @@ def test_main_category_created_on_popup_create(
         c for c in categories if c.get("is_primary") and c.get("key") == "main"
     ]
     assert len(main_cats) == 1, f"Expected 1 main category, got {categories}"
+    assert main_cats[0]["sales_flow_id"] == str(
+        default_flow_id(db, uuid.UUID(popup_id))
+    )
