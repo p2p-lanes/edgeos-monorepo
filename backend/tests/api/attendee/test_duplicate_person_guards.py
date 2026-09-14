@@ -77,10 +77,10 @@ def _make_companion_category(
     category = AttendeeCategories(
         tenant_id=tenant.id,
         popup_id=popup.id,
+        sales_flow_id=application_flow_id(db, popup.id),
         key="companion",
         label="Companion",
         is_primary=False,
-        enabled_in_passes_flow=True,
     )
     db.add(category)
     db.flush()

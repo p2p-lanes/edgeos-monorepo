@@ -39,7 +39,10 @@ def test_portal_simple_quantity_contract_reaches_provider_and_fulfills_each_unit
     category_id = None
     if categorized:
         category = AttendeeCategories(
-            tenant_id=tenant_a.id, popup_id=popup.id, key="guest"
+            tenant_id=tenant_a.id,
+            popup_id=popup.id,
+            sales_flow_id=flow.id,
+            key="guest",
         )
         db.add(category)
         db.flush()

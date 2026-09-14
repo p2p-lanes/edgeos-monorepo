@@ -49,7 +49,7 @@ from app.api.approval_strategy.schemas import (
 from app.api.attendee.models import AttendeeProducts, Attendees
 from app.api.attendee.schemas import AttendeeCreate, AttendeePublic, AttendeeUpdate
 
-# Attendee category (declarative per-popup categories replacing hardcoded enum)
+# Attendee category (declarative per-flow categories replacing hardcoded enum)
 from app.api.attendee_category.models import AttendeeCategories
 from app.api.attendee_category.schemas import (
     AttendeeCategoryCreate,

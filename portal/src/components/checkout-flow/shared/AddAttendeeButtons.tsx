@@ -16,6 +16,7 @@ interface AddAttendeeButtonsProps {
   className?: string
   allowedCategoryIds?: string[] | null
   mode?: "checkout" | "management"
+  salesFlowId?: string | null
 }
 
 function resolveLabel(cat: AttendeeCategoryPublic): string {
@@ -32,11 +33,12 @@ export default function AddAttendeeButtons({
   className,
   allowedCategoryIds,
   mode = "checkout",
+  salesFlowId,
 }: AddAttendeeButtonsProps) {
   const { getCity } = useCityProvider()
   const city = getCity()
   const popupId = city?.id ? String(city.id) : ""
-  const { categories } = useAttendeeCategories(popupId)
+  const { categories } = useAttendeeCategories(popupId, salesFlowId)
   const { attendeePasses: attendees, addRecipientDraft } = usePassesProvider()
   const { addAttendee, loading } = useAttendee()
 
@@ -57,7 +59,6 @@ export default function AddAttendeeButtons({
 
   const available = categories.filter((c) => {
     if (c.is_primary) return false
-    if (c.enabled_in_passes_flow === false) return false
     if (allowedCategoryIds && !allowedCategoryIds.includes(c.id)) return false
     const max = c.max_per_application
     if (max == null) return true

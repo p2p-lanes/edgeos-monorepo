@@ -368,16 +368,6 @@ async def create_my_attendee_for_popup(
                     }
                 ],
             )
-        if not category_row.enabled_in_passes_flow:
-            raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                detail=[
-                    {
-                        "code": "category_disabled",
-                        "message": "This attendee type is not currently accepted",
-                    }
-                ],
-            )
         if category_row.max_per_application is not None:
             count = crud.attendees_crud.count_party_by_category(
                 db,

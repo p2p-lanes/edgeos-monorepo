@@ -74,9 +74,10 @@ function expectPortalBoundary(getByTestId: (id: string) => HTMLElement) {
   expect(getByTestId("portal-sidebar").classList).toContain("portal-chrome")
   expect(getByTestId("portal-inset").classList).toContain("portal-chrome")
   expect(getByTestId("portal-inset").classList).toContain("text-foreground")
-  expect(document.querySelector("#portal-scroll")?.classList).toContain(
-    "portal-chrome",
-  )
+  const portalScroll = document.querySelector("#portal-scroll")
+  expect(portalScroll?.classList).toContain("portal-chrome")
+  expect(portalScroll?.classList).toContain("bg-background")
+  expect(portalScroll?.className).not.toContain("bg-gradient")
 }
 
 describe("PortalShell", () => {

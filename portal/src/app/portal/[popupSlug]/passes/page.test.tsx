@@ -1,7 +1,5 @@
 import { fireEvent, render, screen } from "@testing-library/react"
-import { useState } from "react"
 import { beforeEach, describe, expect, it, vi } from "vitest"
-import { OTHER_PASSES_VIEW } from "@/lib/portal-sales-flows"
 import HomePasses from "./page"
 
 const mocks = vi.hoisted(() => ({
@@ -43,6 +41,23 @@ const mocks = vi.hoisted(() => ({
     id: string
     application_id: string | null
     sales_flow_id: string | null
+    status?: string
+    products_snapshot?: Array<{
+      product_id: string
+      attendee_id: string | null
+      product_name: string
+      product_price: string
+      product_category: string
+      product_currency: string
+      quantity: number
+      created_at: string
+      units?: Array<{
+        id: string
+        check_in_code: string
+        active: boolean
+        requires_check_in: boolean
+      }>
+    }>
   }>,
   paymentsLoading: false,
   products: [] as Array<{ id: string }>,
@@ -131,6 +146,7 @@ vi.mock("./Tabs/YourPasses", () => {
     attendees,
     onSwitchToBuy,
     salesFlowId,
+    sectionTitle,
   }: {
     attendees: Array<{
       id: string
@@ -139,16 +155,12 @@ vi.mock("./Tabs/YourPasses", () => {
     }>
     onSwitchToBuy?: (attendee?: { application_id: string | null }) => void
     salesFlowId: string | null
+    sectionTitle?: string
   }) {
-    const [localStateOpen, setLocalStateOpen] = useState(false)
     return (
       <div>
-        <span>your-passes</span>
+        {sectionTitle && <h2>{sectionTitle}</h2>}
         <span data-testid="selected-sales-flow">{salesFlowId ?? "other"}</span>
-        <button type="button" onClick={() => setLocalStateOpen(true)}>
-          Open local state
-        </button>
-        {localStateOpen && <span>local-state-open</span>}
         {attendees.map((attendee) => (
           <div key={attendee.id}>
             <span>{attendee.id}</span>
@@ -159,7 +171,11 @@ vi.mock("./Tabs/YourPasses", () => {
         ))}
         {onSwitchToBuy && (
           <>
-            <button type="button" onClick={() => onSwitchToBuy()}>
+            <button
+              type="button"
+              onClick={() => onSwitchToBuy()}
+              aria-label={`Buy passes ${sectionTitle ?? salesFlowId}`}
+            >
               Buy passes
             </button>
             <button
@@ -233,22 +249,20 @@ describe("Passes page", () => {
   it("renders the canonical production Passes experience", () => {
     render(<HomePasses />)
 
-    expect(screen.getByText("your-passes")).toBeTruthy()
+    expect(screen.getByText("passes.your_purchases")).toBeTruthy()
     expect(screen.getByText("attendee-1")).toBeTruthy()
     expect(screen.queryByRole("heading", { name: "Attendee" })).toBeNull()
     expect(replace).not.toHaveBeenCalled()
   })
 
-  it("canonicalizes a legacy ID for a sole flow", () => {
+  it("keeps legacy flow URLs on the unified passes screen", () => {
     mocks.searchParams = new URLSearchParams({ flow: attendeeFlow.id })
     render(<HomePasses />)
 
     expect(screen.getByTestId("selected-sales-flow").textContent).toBe(
       attendeeFlow.id,
     )
-    expect(replace).toHaveBeenCalledWith(
-      "/portal/festival/passes?flow=attendee",
-    )
+    expect(replace).not.toHaveBeenCalled()
   })
 
   it("maps an attendee application to its eligible Shop flow", () => {
@@ -269,12 +283,14 @@ describe("Passes page", () => {
     mocks.searchParams = new URLSearchParams({ flow: volunteerFlow.id })
     render(<HomePasses />)
 
-    fireEvent.click(screen.getByRole("button", { name: "Buy passes" }))
+    fireEvent.click(
+      screen.getByRole("button", { name: "Buy passes flow-attendee" }),
+    )
 
     expect(push).toHaveBeenCalledWith("/portal/festival/shop/attendee")
   })
 
-  it("shows only the flow selector when several projections are available", () => {
+  it("renders every flow on one screen with a scoped purchase action", () => {
     mocks.applications.push({
       id: "application-2",
       sales_flow_id: volunteerFlow.id,
@@ -288,18 +304,20 @@ describe("Passes page", () => {
     })
     render(<HomePasses />)
 
-    expect(screen.getByRole("button", { name: /Attendee/ })).toBeTruthy()
-    expect(screen.getByRole("button", { name: /Volunteer/ })).toBeTruthy()
-    expect(screen.queryByText("your-passes")).toBeNull()
-    expect(screen.queryByText("attendee-1")).toBeNull()
-    expect(screen.queryByText("attendee-2")).toBeNull()
+    expect(screen.getByRole("heading", { name: "Attendee" })).toBeTruthy()
+    expect(screen.getByRole("heading", { name: "Volunteer" })).toBeTruthy()
+    expect(screen.getByText("passes.your_purchases")).toBeTruthy()
+    expect(screen.getByText("attendee-1")).toBeTruthy()
+    expect(screen.getByText("attendee-2")).toBeTruthy()
 
-    fireEvent.click(screen.getByRole("button", { name: /Volunteer/ }))
+    fireEvent.click(
+      screen.getByRole("button", { name: "Buy passes Volunteer" }),
+    )
 
-    expect(push).toHaveBeenCalledWith("/portal/festival/passes?flow=volunteer")
+    expect(push).toHaveBeenCalledWith("/portal/festival/shop/volunteer")
   })
 
-  it("does not choose the first projection for an invalid flow query", () => {
+  it("shows every projection when an obsolete flow query is invalid", () => {
     mocks.applications.push({
       id: "application-2",
       sales_flow_id: volunteerFlow.id,
@@ -314,13 +332,13 @@ describe("Passes page", () => {
     mocks.searchParams = new URLSearchParams({ flow: "unknown" })
     render(<HomePasses />)
 
-    expect(screen.getByRole("button", { name: /Attendee/ })).toBeTruthy()
-    expect(screen.getByRole("button", { name: /Volunteer/ })).toBeTruthy()
-    expect(screen.queryByText("your-passes")).toBeNull()
-    expect(screen.queryByText("attendee-1")).toBeNull()
+    expect(screen.getByRole("heading", { name: "Attendee" })).toBeTruthy()
+    expect(screen.getByRole("heading", { name: "Volunteer" })).toBeTruthy()
+    expect(screen.getByText("attendee-1")).toBeTruthy()
+    expect(screen.getByText("attendee-2")).toBeTruthy()
   })
 
-  it("renders only the selected direct-sale flow and keeps its Shop action canonical", () => {
+  it("renders all direct and upsale passes with canonical Shop actions", () => {
     mocks.applications = []
     mocks.applicationFlows = []
     mocks.directFlows = [directFlow]
@@ -370,69 +388,16 @@ describe("Passes page", () => {
     render(<HomePasses />)
 
     expect(screen.getByText("Weekend ticket")).toBeTruthy()
-    expect(screen.queryByText("Volunteer ticket")).toBeNull()
-    expect(screen.getByTestId("selected-sales-flow").textContent).toBe(
-      directFlow.id,
+    expect(screen.getByText("Volunteer ticket")).toBeTruthy()
+    expect(screen.getAllByTestId("selected-sales-flow")).toHaveLength(2)
+    fireEvent.click(
+      screen.getByRole("button", { name: "Buy passes Weekend Pass" }),
     )
-    fireEvent.click(screen.getByRole("button", { name: "Buy passes" }))
     expect(push).toHaveBeenCalledWith("/portal/festival/shop/weekend-pass")
-  })
-
-  it("remounts flow-local state when the selected flow changes", () => {
-    mocks.applications = []
-    mocks.applicationFlows = []
-    mocks.directFlows = [directFlow]
-    mocks.upsaleFlows = [volunteerFlow]
-    mocks.attendeePasses = [
-      {
-        id: "shared-attendee",
-        application_id: null,
-        products: [{ id: "shared-product", purchased: true }],
-        ticket_entries: [
-          {
-            id: "ticket-direct",
-            attendee_id: "shared-attendee",
-            product_id: "shared-product",
-            payment_id: "payment-direct",
-            check_in_code: "direct-code",
-            product_name: "Direct ticket",
-          },
-          {
-            id: "ticket-volunteer",
-            attendee_id: "shared-attendee",
-            product_id: "shared-product",
-            payment_id: "payment-volunteer",
-            check_in_code: "volunteer-code",
-            product_name: "Volunteer ticket",
-          },
-        ],
-      },
-    ]
-    mocks.payments = [
-      {
-        id: "payment-direct",
-        application_id: null,
-        sales_flow_id: directFlow.id,
-      },
-      {
-        id: "payment-volunteer",
-        application_id: null,
-        sales_flow_id: volunteerFlow.id,
-      },
-    ]
-    mocks.searchParams = new URLSearchParams({ flow: directFlow.slug })
-    const { rerender } = render(<HomePasses />)
-
-    fireEvent.click(screen.getByRole("button", { name: "Open local state" }))
-    expect(screen.getByText("local-state-open")).toBeTruthy()
-
-    mocks.searchParams = new URLSearchParams({ flow: volunteerFlow.slug })
-    rerender(<HomePasses />)
-
-    expect(screen.getByTestId("selected-sales-flow").textContent).toBe(
-      volunteerFlow.id,
+    fireEvent.click(
+      screen.getByRole("button", { name: "Buy passes Volunteer" }),
     )
-    expect(screen.queryByText("local-state-open")).toBeNull()
+    expect(push).toHaveBeenCalledWith("/portal/festival/shop/volunteer")
   })
 
   it("renders unassigned-only passes directly without a purchase action", () => {
@@ -459,10 +424,10 @@ describe("Passes page", () => {
     render(<HomePasses />)
 
     expect(screen.getByText("Historical ticket")).toBeTruthy()
-    expect(screen.queryByRole("button", { name: "Buy passes" })).toBeNull()
+    expect(screen.queryByRole("button", { name: /Buy passes/ })).toBeNull()
   })
 
-  it("offers Other passes as a separate choice without rendering pass cards", () => {
+  it("renders Other passes as a separate section without a purchase action", () => {
     mocks.directFlows = [directFlow]
     mocks.attendeePasses.push({
       id: "attendee-direct",
@@ -481,44 +446,71 @@ describe("Passes page", () => {
     })
     render(<HomePasses />)
 
-    expect(screen.getByRole("button", { name: /Attendee/ })).toBeTruthy()
-    fireEvent.click(screen.getByRole("button", { name: /passes.other_passes/ }))
-    expect(screen.queryByText("attendee-1")).toBeNull()
-    expect(screen.queryByText("Unassigned ticket")).toBeNull()
-    expect(push).toHaveBeenCalledWith(
-      `/portal/festival/passes?view=${OTHER_PASSES_VIEW}`,
-    )
-  })
-
-  it("renders a selected Other passes projection without a purchase action", () => {
-    mocks.directFlows = [directFlow]
-    mocks.attendeePasses.push({
-      id: "attendee-direct",
-      application_id: null,
-      products: [],
-      ticket_entries: [
-        {
-          id: "ticket-unassigned",
-          attendee_id: "attendee-direct",
-          product_id: "product-unassigned",
-          payment_id: null,
-          check_in_code: "unassigned-code",
-          product_name: "Unassigned ticket",
-        },
-      ],
-    })
-    mocks.searchParams = new URLSearchParams({
-      view: OTHER_PASSES_VIEW,
-    })
-    render(<HomePasses />)
-
+    expect(screen.getByRole("heading", { name: "Attendee" })).toBeTruthy()
+    expect(
+      screen.getByRole("heading", { name: "passes.other_passes" }),
+    ).toBeTruthy()
+    expect(screen.getByText("attendee-1")).toBeTruthy()
     expect(screen.getByText("Unassigned ticket")).toBeTruthy()
-    expect(screen.getByTestId("selected-sales-flow").textContent).toBe("other")
-    expect(screen.queryByText("attendee-1")).toBeNull()
-    expect(screen.queryByRole("button", { name: "Buy passes" })).toBeNull()
+    expect(screen.getAllByTestId("selected-sales-flow")[1].textContent).toBe(
+      "other",
+    )
+    expect(
+      screen.queryByRole("button", { name: "Buy passes passes.other_passes" }),
+    ).toBeNull()
   })
 
-  it("accepts a legacy flow ID and replaces it with the canonical slug", () => {
+  it("shows approved ownerless products below passes and links to Payments", () => {
+    mocks.access = { state: "denied" }
+    mocks.applications = []
+    mocks.applicationFlows = []
+    mocks.attendeePasses = []
+    mocks.attendeesQuery.data = []
+    mocks.city.takes_applications = false
+    mocks.directFlows = [directFlow]
+    mocks.products = []
+    mocks.payments = [
+      {
+        id: "payment-merch",
+        application_id: null,
+        sales_flow_id: directFlow.id,
+        status: "approved",
+        products_snapshot: [
+          {
+            product_id: "event-shirt",
+            attendee_id: null,
+            product_name: "Event shirt",
+            product_price: "25",
+            product_category: "merch",
+            product_currency: "USD",
+            quantity: 1,
+            created_at: "2026-09-11T12:00:00Z",
+            units: [
+              {
+                id: "shirt-unit",
+                check_in_code: "shirt-code",
+                active: true,
+                requires_check_in: false,
+              },
+            ],
+          },
+        ],
+      },
+    ]
+
+    render(<HomePasses />)
+
+    expect(screen.getByText("passes.your_purchases")).toBeTruthy()
+    expect(screen.getByText("passes.other_products")).toBeTruthy()
+    expect(screen.getByText("Event shirt")).toBeTruthy()
+    expect(
+      screen
+        .getByRole("link", { name: /passes.view_payment_details/ })
+        .getAttribute("href"),
+    ).toBe("/portal/festival/orders")
+  })
+
+  it("does not let a legacy flow ID hide other pass groups", () => {
     mocks.applications.push({
       id: "application-2",
       sales_flow_id: volunteerFlow.id,
@@ -533,11 +525,9 @@ describe("Passes page", () => {
     mocks.searchParams = new URLSearchParams({ flow: volunteerFlow.id })
     render(<HomePasses />)
 
+    expect(screen.getByText("attendee-1")).toBeTruthy()
     expect(screen.getByText("attendee-2")).toBeTruthy()
-    expect(screen.queryByText("attendee-1")).toBeNull()
-    expect(replace).toHaveBeenCalledWith(
-      "/portal/festival/passes?flow=volunteer",
-    )
+    expect(replace).not.toHaveBeenCalled()
   })
 
   it("routes a direct-sale empty-state action through its one eligible Shop flow", () => {
@@ -559,7 +549,7 @@ describe("Passes page", () => {
     mocks.attendeesQuery.isError = true
     render(<HomePasses />)
 
-    expect(screen.getByText("your-passes")).toBeTruthy()
+    expect(screen.getByText("passes.your_purchases")).toBeTruthy()
     expect(screen.queryByText("passes.error_title")).toBeNull()
   })
 })

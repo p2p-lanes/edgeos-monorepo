@@ -1,25 +1,30 @@
 import uuid
 from datetime import UTC, datetime
-from typing import TYPE_CHECKING
 
-from sqlalchemy import Index, UniqueConstraint
+from sqlalchemy import Index, UniqueConstraint, text
 from sqlalchemy.dialects.postgresql import UUID
 from sqlmodel import Column, DateTime, Field, func
 
 from app.api.attendee_category.schemas import AttendeeCategoryBase
 
-if TYPE_CHECKING:
-    pass
-
 
 class AttendeeCategories(AttendeeCategoryBase, table=True):
-    """Per-popup attendee category — replaces the hardcoded main|spouse|kid enum."""
+    """Attendee category configuration owned by one sales flow."""
 
     __tablename__ = "attendee_categories"
     __table_args__ = (
-        UniqueConstraint("popup_id", "key", name="uq_attendee_categories_popup_key"),
+        UniqueConstraint(
+            "sales_flow_id", "key", name="uq_attendee_categories_sales_flow_key"
+        ),
+        Index(
+            "uq_attendee_categories_sales_flow_primary",
+            "sales_flow_id",
+            unique=True,
+            postgresql_where=text("is_primary = true"),
+        ),
         Index("ix_attendee_categories_tenant_id", "tenant_id"),
         Index("ix_attendee_categories_popup_id", "popup_id"),
+        Index("ix_attendee_categories_sales_flow_id", "sales_flow_id"),
     )
 
     id: uuid.UUID = Field(
@@ -44,4 +49,8 @@ class AttendeeCategories(AttendeeCategoryBase, table=True):
             onupdate=func.now(),
             nullable=False,
         ),
+    )
+    deleted_at: datetime | None = Field(
+        default=None,
+        sa_column=Column(DateTime(timezone=True), nullable=True),
     )

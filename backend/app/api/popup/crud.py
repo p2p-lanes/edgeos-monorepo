@@ -19,10 +19,9 @@ class PopupsCRUD(BaseCRUD[Popups, PopupCreate, PopupUpdate]):
         return self.get_by_field(session, "slug", slug)
 
     def create(self, session: Session, obj_in: PopupCreate) -> Popups:
-        """Create a popup and seed the main attendee category in the same transaction."""
+        """Create a popup and its default sales flow in one transaction."""
         from app.api.approval_strategy.crud import approval_strategies_crud
         from app.api.approval_strategy.schemas import ApprovalStrategyCreate
-        from app.api.attendee_category.crud import attendee_categories_crud
         from app.api.sales_flow.crud import sales_flows_crud
 
         popup = self.model(**obj_in.model_dump())
@@ -36,9 +35,6 @@ class PopupsCRUD(BaseCRUD[Popups, PopupCreate, PopupUpdate]):
 
         session.add(popup)
         session.flush()  # Get the popup id without committing
-
-        # Seed main category in same transaction
-        attendee_categories_crud.seed_main_for_popup(session, popup.id, popup.tenant_id)
 
         # sdd/sales-flows task 5.0: new popups receive a compatibility default
         # sales flow. Mirrors the slice-2 backfill behavior for pre-existing

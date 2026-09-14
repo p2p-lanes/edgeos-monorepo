@@ -30,7 +30,7 @@ vi.mock("@/client", async (importOriginal) => {
       listProducts: vi.fn(),
     },
     AttendeeCategoriesService: {
-      listAttendeeCategories: vi.fn(),
+      listSalesFlowAttendeeCategories: vi.fn(),
     },
     FormFieldsService: {
       listFormFields: vi.fn(),
@@ -106,7 +106,7 @@ describe("StepDetailPanel", () => {
       paging: { limit: 200, offset: 0, total: products.length },
     })
     vi.mocked(
-      AttendeeCategoriesService.listAttendeeCategories,
+      AttendeeCategoriesService.listSalesFlowAttendeeCategories,
     ).mockResolvedValue({
       results: [],
       paging: { limit: 100, offset: 0, total: 0 },
@@ -185,6 +185,24 @@ describe("StepDetailPanel", () => {
           }),
         }),
       ),
+    )
+  })
+
+  it("loads ticket-select attendee categories from the current sales flow", async () => {
+    const step: TicketingStepPublic = {
+      ...baseStep,
+      step_type: "cart",
+      template: "ticket-select",
+      template_config: { sections: [] },
+    }
+    vi.mocked(TicketingStepsService.getTicketingStep).mockResolvedValue(step)
+
+    renderPanel(step)
+
+    await waitFor(() =>
+      expect(
+        AttendeeCategoriesService.listSalesFlowAttendeeCategories,
+      ).toHaveBeenCalledWith({ flowId: "flow-1" }),
     )
   })
 })

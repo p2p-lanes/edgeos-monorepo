@@ -984,7 +984,6 @@ export type AttendeeCategoryCreate = {
     popup_id: string;
     key: string;
     sort_order?: number;
-    enabled_in_passes_flow?: boolean;
     max_per_application?: (number | null);
     required_fields?: Array<{
         [key: string]: unknown;
@@ -1001,10 +1000,10 @@ export type AttendeeCategoryPublic = {
     id: string;
     tenant_id: string;
     popup_id: string;
+    sales_flow_id: string;
     key: string;
     is_primary?: boolean;
     sort_order?: number;
-    enabled_in_passes_flow?: boolean;
     max_per_application?: (number | null);
     required_fields?: Array<{
         [key: string]: unknown;
@@ -1014,6 +1013,7 @@ export type AttendeeCategoryPublic = {
     };
     created_at?: (string | null);
     updated_at?: (string | null);
+    deleted_at?: (string | null);
 };
 
 /**
@@ -1024,7 +1024,6 @@ export type AttendeeCategoryPublic = {
  */
 export type AttendeeCategoryUpdate = {
     sort_order?: (number | null);
-    enabled_in_passes_flow?: (boolean | null);
     max_per_application?: (number | null);
     required_fields?: (Array<{
     [key: string]: unknown;
@@ -6919,16 +6918,25 @@ export type AttendeeCategoriesListAttendeeCategoriesResponse = (ListModel_Attend
 
 export type AttendeeCategoriesListAttendeeCategoriesPortalData = {
     popupId: string;
+    salesFlowId?: (string | null);
 };
 
 export type AttendeeCategoriesListAttendeeCategoriesPortalResponse = (ListModel_AttendeeCategoryPublic_);
 
-export type AttendeeCategoriesCreateAttendeeCategoryData = {
+export type AttendeeCategoriesListSalesFlowAttendeeCategoriesData = {
+    flowId: string;
+    xTenantId?: (string | null);
+};
+
+export type AttendeeCategoriesListSalesFlowAttendeeCategoriesResponse = (ListModel_AttendeeCategoryPublic_);
+
+export type AttendeeCategoriesCreateSalesFlowAttendeeCategoryData = {
+    flowId: string;
     requestBody: AttendeeCategoryCreate;
     xTenantId?: (string | null);
 };
 
-export type AttendeeCategoriesCreateAttendeeCategoryResponse = (AttendeeCategoryPublic);
+export type AttendeeCategoriesCreateSalesFlowAttendeeCategoryResponse = (AttendeeCategoryPublic);
 
 export type AttendeeCategoriesGetAttendeeCategoryData = {
     categoryId: string;

@@ -69,22 +69,21 @@ def _make_fee_popup(
 
 
 def _ensure_primary_category(db: Session, popup: Popups) -> AttendeeCategories:
+    from app.api.attendee_category.crud import attendee_categories_crud
+    from app.api.sales_flow.models import SalesFlows
+
+    flow_id = application_flow_id(db, popup.id)
     cat = db.exec(
         select(AttendeeCategories).where(
-            AttendeeCategories.popup_id == popup.id,
+            AttendeeCategories.sales_flow_id == flow_id,
             AttendeeCategories.is_primary == True,  # noqa: E712
+            AttendeeCategories.deleted_at.is_(None),  # type: ignore[union-attr]
         )
     ).first()
     if cat is None:
-        cat = AttendeeCategories(
-            tenant_id=popup.tenant_id,
-            popup_id=popup.id,
-            key="main",
-            label="Main",
-            is_primary=True,
-            enabled_in_passes_flow=True,
-        )
-        db.add(cat)
+        flow = db.get(SalesFlows, flow_id)
+        assert flow is not None
+        cat = attendee_categories_crud.seed_main_for_flow(db, flow)
         db.flush()
     return cat
 

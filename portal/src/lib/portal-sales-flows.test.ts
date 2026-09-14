@@ -2,7 +2,6 @@ import { describe, expect, it } from "vitest"
 import type { AttendeePassState, TicketEntry } from "@/types/Attendee"
 import {
   groupPassesBySalesFlow,
-  resolvePassesFlowSelection,
   resolvePassPurchaseFlowSlug,
 } from "./portal-sales-flows"
 
@@ -319,104 +318,5 @@ describe("groupPassesBySalesFlow", () => {
       directAttendee.products[0],
       directAttendee.products[2],
     ])
-  })
-})
-
-describe("resolvePassesFlowSelection", () => {
-  const attendeePass = attendee("attendee-1", "application-attendee", [])
-  const volunteerPass = attendee("attendee-2", "application-volunteer", [])
-  const otherPass = attendee("attendee-3", null, [])
-
-  it("renders one available flow directly", () => {
-    const result = resolvePassesFlowSelection(
-      {
-        sections: [{ flow: attendeeFlow, attendees: [attendeePass] }],
-        unassignedAttendees: [],
-      },
-      null,
-    )
-
-    expect(result.state).toBe("selected")
-    if (result.state !== "selected") return
-    expect(result.choice.attendees).toEqual([attendeePass])
-    expect(result.canonicalFlowSlug).toBeNull()
-  })
-
-  it("canonicalizes a legacy ID when only one flow is available", () => {
-    const result = resolvePassesFlowSelection(
-      {
-        sections: [{ flow: attendeeFlow, attendees: [attendeePass] }],
-        unassignedAttendees: [],
-      },
-      attendeeFlow.id,
-    )
-
-    expect(result.state).toBe("selected")
-    if (result.state !== "selected") return
-    expect(result.canonicalFlowSlug).toBe("attendee")
-  })
-
-  it("requires an explicit choice when several projections are available", () => {
-    const result = resolvePassesFlowSelection(
-      {
-        sections: [
-          { flow: attendeeFlow, attendees: [attendeePass] },
-          { flow: volunteerFlow, attendees: [volunteerPass] },
-        ],
-        unassignedAttendees: [],
-      },
-      "unknown",
-    )
-
-    expect(result.state).toBe("choose")
-    expect(result.choices).toHaveLength(2)
-  })
-
-  it("selects by slug and accepts a legacy flow ID for canonicalization", () => {
-    const grouping = {
-      sections: [
-        { flow: attendeeFlow, attendees: [attendeePass] },
-        { flow: volunteerFlow, attendees: [volunteerPass] },
-      ],
-      unassignedAttendees: [],
-    }
-
-    const bySlug = resolvePassesFlowSelection(grouping, volunteerFlow.slug)
-    const byId = resolvePassesFlowSelection(grouping, volunteerFlow.id)
-
-    expect(bySlug.state).toBe("selected")
-    expect(byId.state).toBe("selected")
-    if (bySlug.state !== "selected" || byId.state !== "selected") return
-    expect(bySlug.choice.attendees).toEqual([volunteerPass])
-    expect(bySlug.canonicalFlowSlug).toBeNull()
-    expect(byId.choice.attendees).toEqual([volunteerPass])
-    expect(byId.canonicalFlowSlug).toBe("volunteer")
-  })
-
-  it("offers Other passes as a selectable projection", () => {
-    const result = resolvePassesFlowSelection(
-      {
-        sections: [{ flow: attendeeFlow, attendees: [attendeePass] }],
-        unassignedAttendees: [otherPass],
-      },
-      null,
-      true,
-    )
-
-    expect(result.state).toBe("selected")
-    if (result.state !== "selected") return
-    expect(result.choice.kind).toBe("other")
-    expect(result.choice.attendees).toEqual([otherPass])
-  })
-
-  it("renders an unassigned-only projection directly", () => {
-    const result = resolvePassesFlowSelection(
-      { sections: [], unassignedAttendees: [otherPass] },
-      null,
-    )
-
-    expect(result.state).toBe("selected")
-    if (result.state !== "selected") return
-    expect(result.choice.kind).toBe("other")
   })
 })

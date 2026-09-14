@@ -258,7 +258,7 @@ def runtime_for_slug(
         else ticketing_steps_crud.find_portal_by_flow(session, flow.id)
     )
 
-    attendee_categories = attendee_categories_crud.list_by_popup(session, popup.id)
+    attendee_categories = attendee_categories_crud.list_by_flow(session, flow.id)
 
     # Translation overlays. Every branch is a no-op when lang is None or when no
     # rows match the requested language, so the untranslated source is returned.

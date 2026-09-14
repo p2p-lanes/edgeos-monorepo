@@ -3,7 +3,7 @@
 New popups receive a compatibility fallback for legacy requests that omit a
 flow. The slice-2 backfill added the same fallback to popups that existed
 before it ran. This mirrors `PopupsCRUD.create`'s existing
-`AttendeeCategoriesCRUD.seed_main_for_popup` auto-provisioning pattern:
+`AttendeeCategoriesCRUD.seed_main_for_flow` auto-provisioning pattern:
 same transaction, no commit inside the seed helper, caller owns the
 transaction boundary.
 
@@ -16,6 +16,7 @@ import uuid
 from fastapi.testclient import TestClient
 from sqlmodel import Session, select
 
+from app.api.attendee_category.models import AttendeeCategories
 from app.api.sales_flow.models import SalesFlows
 
 
@@ -45,6 +46,16 @@ class TestPopupCreateProvisionsDefaultFlow:
         assert flow.name == "Checkout"
         assert flow.visibility == "direct_url_only"
         assert flow.reviewers_mode == "inherit"
+
+        main = db.exec(
+            select(AttendeeCategories).where(
+                AttendeeCategories.sales_flow_id == flow.id,
+                AttendeeCategories.is_primary == True,  # noqa: E712
+                AttendeeCategories.deleted_at.is_(None),  # type: ignore[union-attr]
+            )
+        ).one()
+        assert main.key == "main"
+        assert main.popup_id == popup_id
 
         # The flow takes its own copy of the popup's channel configuration
         # (slice 7), so it starts offering exactly what the popup offered and

@@ -140,7 +140,8 @@ export default function PassSelectionSection() {
   const { t } = useTranslation()
   const { attendeePasses, toggleProduct, isEditing, toggleEditing } =
     usePassesProvider()
-  const { editCredit, editPassesEnabled, checkoutMode } = useCheckout()
+  const { editCredit, editPassesEnabled, checkoutMode, salesFlowId } =
+    useCheckout()
   const { getRelevantApplication } = useApplication()
   const [focusedAttendeeId, setFocusedAttendeeId] = useState<string | null>(
     null,
@@ -238,7 +239,10 @@ export default function PassSelectionSection() {
       {/* Toolbar: Add Family Members */}
       {canManageAttendees && (
         <div className="flex flex-wrap items-center gap-3 text-sm">
-          <AddAttendeeButtons onAttendeeAdded={setFocusedAttendeeId} />
+          <AddAttendeeButtons
+            onAttendeeAdded={setFocusedAttendeeId}
+            salesFlowId={salesFlowId}
+          />
         </div>
       )}
 

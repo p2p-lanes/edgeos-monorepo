@@ -38,10 +38,6 @@ vi.mock("react-i18next", () => ({
   useTranslation: () => ({ t: (key: string) => key }),
 }))
 
-vi.mock("@/components/checkout-flow/shared/AddAttendeeButtons", () => ({
-  default: () => <span>add-attendee-actions</span>,
-}))
-
 vi.mock("@/hooks/useAttendee", () => ({
   default: () => ({
     addAttendee: vi.fn(),
@@ -110,7 +106,6 @@ describe("YourPasses selected projection", () => {
 
     render(
       <YourPasses
-        access={{ state: "allowed", source: "attendee" }}
         attendees={[attendee("attendee-pass", "Attendee ticket")]}
         onSwitchToBuy={buyPasses}
         salesFlowId="flow-attendee"
@@ -134,7 +129,6 @@ describe("YourPasses selected projection", () => {
 
     render(
       <YourPasses
-        access={{ state: "allowed", source: "attendee" }}
         attendees={[attendee("attendee-pass", "Attendee ticket")]}
         salesFlowId="flow-attendee"
       />,
@@ -222,7 +216,6 @@ describe("YourPasses selected projection", () => {
 
     render(
       <YourPasses
-        access={{ state: "allowed", source: "attendee" }}
         attendees={[
           attendee("other-pass", "Historical ticket"),
           historicalAccommodation,
@@ -314,7 +307,6 @@ describe("YourPasses selected projection", () => {
 
     const { rerender } = render(
       <YourPasses
-        access={{ state: "allowed", source: "attendee" }}
         attendees={grouping.sections[0].attendees}
         salesFlowId="flow-attendee"
       />,
@@ -327,7 +319,6 @@ describe("YourPasses selected projection", () => {
 
     rerender(
       <YourPasses
-        access={{ state: "allowed", source: "attendee" }}
         attendees={grouping.sections[1].attendees}
         salesFlowId="flow-volunteer"
       />,

@@ -114,6 +114,7 @@ const primaryCategory: AttendeeCategoryPublic = {
   id: "category-main",
   tenant_id: "tenant-1",
   popup_id: "popup-1",
+  sales_flow_id: "flow-1",
   key: "main",
   is_primary: true,
 }

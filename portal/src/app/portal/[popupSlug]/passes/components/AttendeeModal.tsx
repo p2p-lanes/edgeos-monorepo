@@ -1,7 +1,6 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import type { AttendeeCategoryPublic } from "@/client"
 import { Button, ButtonAnimated } from "@/components/ui/button"
 import { DialogFooter } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
@@ -14,7 +13,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import type { AttendeePassState } from "@/types/Attendee"
+import type { AttendeeCategoryForm, AttendeePassState } from "@/types/Attendee"
 
 interface AttendeeModalProps {
   open: boolean
@@ -22,7 +21,7 @@ interface AttendeeModalProps {
   onSubmit: (
     data: AttendeePassState & { category_id?: string },
   ) => Promise<void>
-  category: AttendeeCategoryPublic
+  category: AttendeeCategoryForm
   editingAttendee: AttendeePassState | null
   isDelete?: boolean
 }
