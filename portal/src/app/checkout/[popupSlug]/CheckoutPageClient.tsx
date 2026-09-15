@@ -137,6 +137,7 @@ export default function CheckoutPageClient({
       <ApplicationCheckoutRedirect
         popupSlug={popupSlug}
         flowId={runtime.selected_flow.id}
+        returnContext={returnContext}
       />
     )
   }

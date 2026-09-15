@@ -17,12 +17,14 @@ interface ShopCheckoutContentProps {
   popupId: string | undefined
   popupSlug: string
   flowSlug: string
+  returnContext?: "direct" | "portal"
 }
 
 export function ShopCheckoutContent({
   popupId,
   popupSlug,
   flowSlug,
+  returnContext = "portal",
 }: ShopCheckoutContentProps) {
   const { t } = useTranslation()
   const router = useRouter()
@@ -47,10 +49,17 @@ export function ShopCheckoutContent({
     if (collectionsLoading || canonicalSlug === flowSlug) return
     router.replace(
       canonicalSlug
-        ? `/portal/${popupSlug}/shop/${canonicalSlug}`
+        ? `/portal/${popupSlug}/shop/${canonicalSlug}${returnContext === "direct" ? "?return_context=direct" : ""}`
         : `/portal/${popupSlug}`,
     )
-  }, [canonicalSlug, collectionsLoading, flowSlug, popupSlug, router])
+  }, [
+    canonicalSlug,
+    collectionsLoading,
+    flowSlug,
+    popupSlug,
+    returnContext,
+    router,
+  ])
 
   if (!canonicalSlug || (collectionsLoading && canonicalSlug !== flowSlug)) {
     return <Loader />
@@ -82,6 +91,7 @@ export function ShopCheckoutContent({
         flowSlug={applicationFlow.slug}
         popupSlug={popupSlug}
         themeConfig={applicationFlow.theme_config}
+        returnContext={returnContext}
       />
     )
   }

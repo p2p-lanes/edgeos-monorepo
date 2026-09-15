@@ -17,8 +17,14 @@ describe("ApplicationCheckoutRedirect", () => {
   beforeEach(() => replace.mockReset())
 
   it.each([
-    ["attendee-flow-id", "/portal/spring-fest/shop/attendee-flow-id"],
-    ["volunteer-flow-id", "/portal/spring-fest/shop/volunteer-flow-id"],
+    [
+      "attendee-flow-id",
+      "/portal/spring-fest/shop/attendee-flow-id?return_context=direct",
+    ],
+    [
+      "volunteer-flow-id",
+      "/portal/spring-fest/shop/volunteer-flow-id?return_context=direct",
+    ],
   ])("hands authenticated flow %s to its resolvable Shop route", (flowId, target) => {
     render(
       <ApplicationCheckoutRedirect popupSlug="spring-fest" flowId={flowId} />,
