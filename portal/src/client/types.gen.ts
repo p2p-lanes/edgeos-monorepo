@@ -4271,7 +4271,6 @@ export type PopupAdmin = {
     requires_application_fee?: boolean;
     application_fee_amount?: (string | null);
     custom_home_enabled?: boolean;
-    custom_home_html?: (string | null);
     theme_config?: ({
     [key: string]: unknown;
 } | null);
@@ -4315,8 +4314,6 @@ export type PopupAdmin = {
 };
 
 export type PopupCreate = {
-    custom_home_html?: (string | null);
-    custom_home_enabled?: boolean;
     tenant_id?: (string | null);
     name: string;
     tagline?: (string | null);
@@ -4383,12 +4380,30 @@ export type PopupCreate = {
     abandoned_application_max_count?: (number | null);
 };
 
+export type PopupHomeAdmin = {
+    enabled: boolean;
+    html?: (string | null);
+    version: number;
+    updated_at?: (string | null);
+};
+
+export type PopupHomePublic = {
+    html: string;
+    version: number;
+    updated_at: string;
+};
+
+export type PopupHomeUpdate = {
+    enabled: boolean;
+    html?: (string | null);
+    version: number;
+};
+
 /**
  * Public popup schema — excludes sensitive/internal fields.
  */
 export type PopupPublic = {
     custom_home_enabled?: boolean;
-    custom_home_html?: (string | null);
     id: string;
     name: string;
     tagline?: (string | null);
@@ -4485,8 +4500,6 @@ export type PopupReviewerUpdate = {
 export type PopupStatus = 'draft' | 'active' | 'archived' | 'ended';
 
 export type PopupUpdate = {
-    custom_home_html?: (string | null);
-    custom_home_enabled?: (boolean | null);
     name?: (string | null);
     tagline?: (string | null);
     location?: (string | null);
@@ -8931,6 +8944,21 @@ export type PopupsDeletePopupData = {
 
 export type PopupsDeletePopupResponse = (void);
 
+export type PopupsGetPopupHomeData = {
+    popupId: string;
+    xTenantId?: (string | null);
+};
+
+export type PopupsGetPopupHomeResponse = (PopupHomeAdmin);
+
+export type PopupsUpdatePopupHomeData = {
+    popupId: string;
+    requestBody: PopupHomeUpdate;
+    xTenantId?: (string | null);
+};
+
+export type PopupsUpdatePopupHomeResponse = (PopupHomeAdmin);
+
 export type PopupsCreateCheckoutPreviewTokenData = {
     popupId: string;
     xTenantId?: (string | null);
@@ -8943,6 +8971,13 @@ export type PopupsListPortalPopupsData = {
 };
 
 export type PopupsListPortalPopupsResponse = (Array<PopupPublic>);
+
+export type PopupsGetPortalPopupHomeData = {
+    ifNoneMatch?: (string | null);
+    slug: string;
+};
+
+export type PopupsGetPortalPopupHomeResponse = (PopupHomePublic);
 
 export type PopupsGetPortalPopupData = {
     acceptLanguage?: (string | null);

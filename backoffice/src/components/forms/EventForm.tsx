@@ -996,7 +996,12 @@ export function EventForm({
     })()
     if (dateInvalid && firstOpenDayKey) {
       const hhmm = startTimeValue?.slice(11, 16) || "09:00"
-      form.setFieldValue("start_time", `${firstOpenDayKey}T${hhmm}`)
+      // A seeded default is not a user edit: without dontUpdateMeta the
+      // field turns dirty on mount and Cancel on an untouched create form
+      // prompts "Unsaved changes".
+      form.setFieldValue("start_time", `${firstOpenDayKey}T${hhmm}`, {
+        dontUpdateMeta: true,
+      })
     }
   }, [
     isEdit,

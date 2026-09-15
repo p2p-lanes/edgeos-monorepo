@@ -147,34 +147,41 @@ class EventsCRUD(BaseCRUD[Events, EventCreate, EventUpdate]):
         if search:
             statement = statement.where(col(Events.title).ilike(f"%{search}%"))
 
-        count_statement = select(func.count()).select_from(statement.subquery())
-        total = session.exec(count_statement).one()
-
         # Order by start_time with ``id`` as a unique tiebreaker so the row
         # order is deterministic across requests. Without the tiebreaker,
         # events sharing a start_time order arbitrarily, which makes any
         # offset/limit paging unstable (the same boundary row can repeat or
         # vanish between pages).
         statement = statement.order_by(asc(Events.start_time), asc(Events.id))
-        # ``limit=None`` returns the full filtered set in one query (no paging
-        # boundaries). The portal events list uses this so recurring expansion
-        # runs once over the complete window instead of per page.
-        if limit is not None:
-            statement = statement.offset(skip).limit(limit)
-        results = list(session.exec(statement).all())
 
         want_expansion = bool(expand_occurrences) or (
             start_after is not None or start_before is not None
         )
         if want_expansion:
-            results = _expand_rows_in_window(
+            # Expand first, then page the expanded list. Paging DB rows and
+            # expanding afterwards made ``total`` count rows instead of
+            # occurrences, returned pages larger than ``limit``, and put a
+            # series' occurrences on whichever page held its master row. The
+            # SQL window keeps the load bounded: rows inside it plus
+            # recurring masters.
+            expanded = _expand_rows_in_window(
                 session,
-                results,
+                list(session.exec(statement).all()),
                 window_start=start_after,
                 window_end=start_before,
             )
+            expanded.sort(key=lambda e: (e.start_time, str(e.id)))
+            total = len(expanded)
+            # ``limit=None`` returns the full window (the portal events list).
+            if limit is not None:
+                expanded = expanded[skip : skip + limit]
+            return expanded, total
 
-        return results, total
+        count_statement = select(func.count()).select_from(statement.subquery())
+        total = session.exec(count_statement).one()
+        if limit is not None:
+            statement = statement.offset(skip).limit(limit)
+        return list(session.exec(statement).all()), total
 
     def find_in_range_expanded(
         self,

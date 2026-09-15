@@ -1,6 +1,5 @@
 import {
   buildPopupHomeDocument,
-  hasCustomHome,
   interpolatePopupHome,
   PopupHomeFrame,
   unknownPopupHomeVariables,
@@ -26,25 +25,6 @@ function documentFor(html: string, details = popup) {
 }
 
 describe("custom home template", () => {
-  it.each([
-    {},
-    { custom_home_html: "<h1>Saved, not enabled</h1>" },
-    { custom_home_enabled: false, custom_home_html: "<h1>Disabled</h1>" },
-    { custom_home_enabled: true },
-    { custom_home_enabled: true, custom_home_html: " \n " },
-  ])("keeps the existing home for %j", (settings) => {
-    expect(hasCustomHome(settings)).toBe(false)
-  })
-
-  it("requires both an explicit switch and content", () => {
-    expect(
-      hasCustomHome({
-        custom_home_enabled: true,
-        custom_home_html: "<h1>Hello</h1>",
-      }),
-    ).toBe(true)
-  })
-
   it("substitutes the allowlisted popup values and escapes text and attributes", () => {
     const doc = documentFor(
       '<h1 title="{{popup.name}}">{{ popup.name }}</h1><p>{{ popup.location }}</p><img src="{{ popup.image_url }}">',

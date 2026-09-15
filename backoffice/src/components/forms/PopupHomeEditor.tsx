@@ -1,8 +1,9 @@
 import {
-  CUSTOM_HOME_HTML_MAX_LENGTH,
+  CUSTOM_HOME_HTML_MAX_BYTES,
   POPUP_HOME_VARIABLES,
   type PopupHomeDetails,
   PopupHomeFrame,
+  popupHomeHtmlByteLength,
   unknownPopupHomeVariables,
 } from "@edgeos/shared-form-ui/popup-home"
 import CodeEditor from "@monaco-editor/react"
@@ -62,7 +63,8 @@ export function PopupHomeEditor({
   const [previewWidth, setPreviewWidth] = useState<"desktop" | "mobile">(
     "desktop",
   )
-  const tooLong = html.length > CUSTOM_HOME_HTML_MAX_LENGTH
+  const htmlBytes = popupHomeHtmlByteLength(html)
+  const tooLong = htmlBytes > CUSTOM_HOME_HTML_MAX_BYTES
   // Keep typing responsive and never parse an oversized paste in the preview.
   // Preserve the source so the author can fix it without losing their work.
   const previewHtml = useDeferredValue(tooLong ? "" : html)
@@ -171,8 +173,8 @@ export function PopupHomeEditor({
             <span
               className={`tabular-nums ${tooLong ? "text-destructive" : ""}`}
             >
-              {html.length.toLocaleString()} /{" "}
-              {CUSTOM_HOME_HTML_MAX_LENGTH.toLocaleString()}
+              {htmlBytes.toLocaleString()} /{" "}
+              {CUSTOM_HOME_HTML_MAX_BYTES.toLocaleString()} bytes
             </span>
           </div>
         </section>
@@ -296,8 +298,8 @@ export function PopupHomeEditor({
 
       {tooLong && (
         <p role="alert" className="text-sm text-destructive">
-          HTML exceeds the {CUSTOM_HOME_HTML_MAX_LENGTH.toLocaleString()}
-          -character limit. Shorten it before saving. Your code has not been
+          HTML exceeds the {CUSTOM_HOME_HTML_MAX_BYTES.toLocaleString()}-byte
+          UTF-8 limit. Shorten it before saving. Your code has not been
           truncated.
         </p>
       )}

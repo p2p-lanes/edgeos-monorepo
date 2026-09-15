@@ -8,9 +8,15 @@ const SidebarComponents = await vi.importActual<
 
 const resources = [
   {
-    name: "Application",
+    name: "Home",
     status: "active" as const,
     path: "/portal/summit",
+    group: "commerce" as const,
+  },
+  {
+    name: "Application",
+    status: "active" as const,
+    path: "/portal/summit/overview",
     group: "commerce" as const,
   },
   {
@@ -169,12 +175,18 @@ describe("ResourcesMenu", () => {
       within(commerce)
         .getAllByRole("link")
         .map((link) => link.textContent),
-    ).toEqual(["Application", "Passes", "Payments"])
+    ).toEqual(["Home", "Application", "Passes", "Payments"])
     expect(
       within(checkouts)
         .getAllByRole("link")
         .map((link) => link.textContent),
     ).toEqual(["Attendee", "Volunteer", "Merch Store"])
+    expect(
+      screen.getByRole("link", { name: "Home" }).getAttribute("href"),
+    ).toBe("/portal/summit")
+    expect(
+      screen.getByRole("link", { name: "Application" }).getAttribute("href"),
+    ).toBe("/portal/summit/overview")
     expect(
       screen.getByRole("link", { name: "Passes" }).getAttribute("href"),
     ).toBe("/portal/summit/passes")

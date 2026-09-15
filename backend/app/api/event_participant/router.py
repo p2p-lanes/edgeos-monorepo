@@ -202,13 +202,18 @@ async def delete_participant(
 
 
 def _resolve_occurrence_start(
-    event, occurrence_start: datetime | None
+    event, occurrence_start: datetime | None, *, require_scheduled: bool = False
 ) -> datetime | None:
     """Validate the (event, occurrence_start) pair for portal RSVP endpoints.
 
     Recurring events require ``occurrence_start`` so each registration
     targets a single instance. One-off events ignore it (and reject it,
     to avoid fragmented data).
+
+    ``require_scheduled`` also rejects instants the series never produces:
+    made-up times, or dates removed via EXDATE. Registration sets it; cancel
+    and check-in leave it off so an RSVP taken before an occurrence was
+    removed can still be withdrawn.
     """
     is_recurring = bool(event.rrule)
     if is_recurring and occurrence_start is None:
@@ -221,7 +226,43 @@ def _resolve_occurrence_start(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="occurrence_start is not allowed for non-recurring events",
         )
+    if (
+        require_scheduled
+        and occurrence_start is not None
+        and not _is_scheduled_occurrence(event, occurrence_start)
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="occurrence_start does not match a scheduled occurrence",
+        )
     return occurrence_start
+
+
+def _is_scheduled_occurrence(event, occurrence_start: datetime) -> bool:
+    from app.api.event.recurrence import expand, parse_rrule
+
+    try:
+        rule = parse_rrule(event.rrule)
+    except ValueError:
+        return False
+    if rule is None:
+        return False
+    occ = (
+        occurrence_start
+        if occurrence_start.tzinfo is not None
+        else occurrence_start.replace(tzinfo=UTC)
+    )
+    return bool(
+        expand(
+            dtstart=event.start_time,
+            rule=rule,
+            window_start=occ,
+            window_end=occ,
+            exdates=list(event.recurrence_exdates or []),
+            max_occurrences=1,
+            timezone=event.timezone,
+        )
+    )
 
 
 @router.get("/portal/participants", response_model=ListModel[EventParticipantPublic])
@@ -386,7 +427,7 @@ async def register_for_event(
         )
 
     occ_start = _resolve_occurrence_start(
-        event, body.occurrence_start if body else None
+        event, body.occurrence_start if body else None, require_scheduled=True
     )
 
     existing = crud.event_participants_crud.get_by_event_and_profile(
