@@ -1,36 +1,30 @@
 "use client"
 
 import { CalendarDays } from "lucide-react"
-import { useSearchParams } from "next/navigation"
 import type * as React from "react"
 import { useTranslation } from "react-i18next"
+import { hasAcceptedPopupParticipation } from "@/lib/popup-participation"
 import { useApplication } from "@/providers/applicationProvider"
 import { useCityProvider } from "@/providers/cityProvider"
 
 // Mirrors the sidebar's exposure rule for Agentic Access in
-// useResources.ts: shown on application-based flows (applicant or
-// companion) once the application is accepted and the events module is
-// enabled at the popup level. Direct-sale flows never expose this
-// subsection, so navigating to /portal/agentic-access by URL must fall
-// through to the unavailable state instead of rendering the page.
+// useResources.ts: shown once the human has any accepted popup participation
+// (application or companion) and the events module is enabled. Direct-sale
+// popups never expose this subsection, so navigating to
+// /portal/agentic-access by URL must fall through to the unavailable state.
 export function useEventsApiAccess(): { allowed: boolean } {
   const { getCity } = useCityProvider()
-  const { getRelevantApplication, participation } = useApplication()
+  const { getApplicationsForPopup, participation } = useApplication()
   const city = getCity()
-  // The door this screen is about. Without it, someone holding two
-  // applications was answered with whichever came last
-  // (sdd/sales-flows-rediseno).
-  const flowId = useSearchParams().get("flow")
-  const application = getRelevantApplication(flowId)
 
   // Agentic access hangs off an accepted application, so it is gated on
   // whether anybody applies here rather than on how the popup sells.
   const nobodyApplies = city?.takes_applications === false
-  const isCompanion = participation?.type === "companion"
   const eventsEnabled = city?.events_enabled ?? true
-  const applicationAccepted = isCompanion
-    ? participation?.application_status === "accepted"
-    : application?.status === "accepted"
+  const applicationAccepted = hasAcceptedPopupParticipation(
+    getApplicationsForPopup(),
+    participation,
+  )
 
   return {
     allowed: !nobodyApplies && eventsEnabled && applicationAccepted,

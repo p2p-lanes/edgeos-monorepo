@@ -40,6 +40,7 @@ import { cn } from "@/lib/utils"
 import { CoverImage } from "./CoverImage"
 import type { EventsScrollSnapshot } from "./eventsViewState"
 import { fetchAllPortalEvents } from "./fetchAllPortalEvents"
+import { buildPortalEventHref } from "./portalEventHref"
 import { summarizeRrule } from "./summarizeRrule"
 import { useEventRsvp } from "./useEventRsvp"
 import { useEventTimezone } from "./useEventTimezone"
@@ -47,6 +48,8 @@ import { useEventTimezone } from "./useEventTimezone"
 interface CalendarBodyProps {
   popupId: string | undefined
   slug: string | undefined
+  /** Selected application flow, retained as navigation context. */
+  flowId?: string | null
   search: string
   rsvpedOnly: boolean
   /** "My events": owner/host/collaborator. Includes the manager's drafts. */
@@ -114,6 +117,7 @@ interface CalendarBodyProps {
 export function CalendarBody({
   popupId,
   slug,
+  flowId,
   search,
   rsvpedOnly,
   mineOnly,
@@ -314,17 +318,15 @@ export function CalendarBody({
 
   // `from` rebuilds the events-page URL state (view + selected day) so
   // the detail page's "Back to events" link returns the user here.
-  const fromParam = selectedDayKey
-    ? encodeURIComponent(`view=calendar&date=${selectedDayKey}`)
-    : null
-  const eventHref = (event: EventPublic) => {
-    const base = fromParam
-      ? `/portal/${slug}/events/${event.id}?from=${fromParam}`
-      : `/portal/${slug}/events/${event.id}`
-    return event.occurrence_id
-      ? `${base}${fromParam ? "&" : "?"}occ=${encodeURIComponent(event.start_time)}`
-      : base
-  }
+  const from = selectedDayKey ? `view=calendar&date=${selectedDayKey}` : null
+  const eventHref = (event: EventPublic) =>
+    buildPortalEventHref({
+      slug,
+      eventId: event.id,
+      flowId,
+      from,
+      occurrenceStart: event.occurrence_id ? event.start_time : null,
+    })
   const handleEventClick = (
     event: EventPublic,
     e: React.MouseEvent<HTMLAnchorElement>,

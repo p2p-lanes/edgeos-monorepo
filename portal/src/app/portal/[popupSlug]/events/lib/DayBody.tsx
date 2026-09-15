@@ -38,6 +38,7 @@ import {
 import { cn } from "@/lib/utils"
 import type { EventsScrollSnapshot } from "./eventsViewState"
 import { fetchAllPortalEvents } from "./fetchAllPortalEvents"
+import { buildPortalEventHref } from "./portalEventHref"
 import { summarizeRrule } from "./summarizeRrule"
 import { useEventRsvp } from "./useEventRsvp"
 import { useEventTimezone } from "./useEventTimezone"
@@ -45,6 +46,8 @@ import { useEventTimezone } from "./useEventTimezone"
 interface DayBodyProps {
   popupId: string | undefined
   slug: string | undefined
+  /** Selected application flow, retained as navigation context. */
+  flowId?: string | null
   search: string
   rsvpedOnly: boolean
   /** "My events": owner/host/collaborator. Includes the manager's drafts. */
@@ -155,6 +158,7 @@ interface PositionedEvent {
 export function DayBody({
   popupId,
   slug,
+  flowId,
   search,
   rsvpedOnly,
   mineOnly,
@@ -416,16 +420,15 @@ export function DayBody({
   // "Back to events" link. `occ` carries the specific occurrence's start
   // time so the detail page renders the clicked instance (not the series'
   // first occurrence) for recurring events.
-  const fromParam = useMemo(
-    () => encodeURIComponent(`view=day&date=${dayKey}`),
-    [dayKey],
-  )
-  const eventHref = (event: EventPublic) => {
-    const base = `/portal/${slug}/events/${event.id}?from=${fromParam}`
-    return event.occurrence_id
-      ? `${base}&occ=${encodeURIComponent(event.start_time)}`
-      : base
-  }
+  const from = useMemo(() => `view=day&date=${dayKey}`, [dayKey])
+  const eventHref = (event: EventPublic) =>
+    buildPortalEventHref({
+      slug,
+      eventId: event.id,
+      flowId,
+      from,
+      occurrenceStart: event.occurrence_id ? event.start_time : null,
+    })
   const handleEventClick = (
     event: EventPublic,
     e: React.MouseEvent<HTMLAnchorElement>,
