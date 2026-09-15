@@ -15,10 +15,10 @@ interface FeePaymentBannerProps {
   isReturnFromCheckout: boolean
 }
 
-export function FeePaymentBanner({
-  application,
-  isReturnFromCheckout,
-}: FeePaymentBannerProps) {
+export function useFeePaymentConfirmation(
+  application: ApplicationPublic,
+  isReturnFromCheckout: boolean,
+) {
   const { t } = useTranslation()
   const queryClient = useQueryClient()
   const [isPolling, setIsPolling] = useState(isReturnFromCheckout)
@@ -55,6 +55,19 @@ export function FeePaymentBanner({
       toast.error(t("application.fee.confirmation_error"))
     }
   }, [polledApps, isPolling, application.id, queryClient, t])
+
+  return { isPolling, paymentConfirmed }
+}
+
+export function FeePaymentBanner({
+  application,
+  isReturnFromCheckout,
+}: FeePaymentBannerProps) {
+  const { t } = useTranslation()
+  const { isPolling, paymentConfirmed } = useFeePaymentConfirmation(
+    application,
+    isReturnFromCheckout,
+  )
 
   // Polling view — returning from checkout, waiting for confirmation
   if (isReturnFromCheckout && isPolling) {

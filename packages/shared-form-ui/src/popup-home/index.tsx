@@ -3,7 +3,11 @@
 import DOMPurify from "dompurify"
 import { useEffect, useState } from "react"
 
-export const CUSTOM_HOME_HTML_MAX_LENGTH = 200_000
+export const CUSTOM_HOME_HTML_MAX_BYTES = 200_000
+
+export function popupHomeHtmlByteLength(html: string): number {
+  return new TextEncoder().encode(html).byteLength
+}
 
 export const POPUP_HOME_VARIABLES = {
   name: "Gathering name",
@@ -19,13 +23,6 @@ export interface PopupHomeDetails {
   start_date?: string | null
   end_date?: string | null
   image_url?: string | null
-}
-
-export function hasCustomHome(popup: {
-  custom_home_enabled?: boolean
-  custom_home_html?: string | null
-}): boolean {
-  return popup.custom_home_enabled === true && !!popup.custom_home_html?.trim()
 }
 
 function escapeHtml(value: string): string {

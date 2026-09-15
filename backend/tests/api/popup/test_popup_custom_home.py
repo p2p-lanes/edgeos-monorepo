@@ -1,4 +1,4 @@
-"""Optional custom home settings: defaults, PATCH semantics, and tenant boundaries."""
+"""Dedicated popup-home resource contracts and tenant boundaries."""
 
 import uuid
 
@@ -9,8 +9,9 @@ from sqlmodel import Session
 
 from app.api.human.models import Humans
 from app.api.popup.schemas import (
-    CUSTOM_HOME_HTML_MAX_LENGTH,
+    CUSTOM_HOME_HTML_MAX_BYTES,
     PopupCreate,
+    PopupHomeUpdate,
     PopupUpdate,
 )
 from app.api.shared.enums import UserRole
@@ -20,30 +21,25 @@ from app.core.security import create_access_token
 from app.core.tenant_db import ensure_tenant_credentials
 
 
-def test_custom_home_defaults_and_partial_updates():
-    popup = PopupCreate(name="An unchanged gathering")
-    assert popup.custom_home_enabled is False
-    assert popup.custom_home_html is None
-    assert "custom_home_html" not in PopupUpdate(name="Renamed").model_dump(
-        exclude_unset=True
-    )
-    assert PopupUpdate(custom_home_html=" \n ").custom_home_html is None
-    assert PopupUpdate(custom_home_html=None).model_dump(exclude_unset=True) == {
-        "custom_home_html": None
-    }
+def test_home_is_not_part_of_popup_write_schemas():
+    assert "custom_home_html" not in PopupCreate.model_json_schema()["properties"]
+    assert "custom_home_enabled" not in PopupCreate.model_json_schema()["properties"]
+    assert "custom_home_html" not in PopupUpdate.model_json_schema()["properties"]
+    assert "custom_home_enabled" not in PopupUpdate.model_json_schema()["properties"]
+
+
+def test_home_html_is_bounded_by_utf8_bytes():
+    # One emoji is one Python code point / two JS UTF-16 units / four UTF-8 bytes.
+    exact = "😀" * (CUSTOM_HOME_HTML_MAX_BYTES // 4)
+    assert PopupHomeUpdate(enabled=True, html=exact, version=0).html == exact
     with pytest.raises(ValidationError):
-        PopupUpdate(custom_home_enabled=None)
+        PopupHomeUpdate(enabled=True, html=f"{exact}😀", version=0)
+    assert PopupHomeUpdate(enabled=True, html=" \n ", version=0).html is None
 
 
-@pytest.mark.parametrize("schema", [PopupCreate, PopupUpdate])
-def test_custom_home_html_is_bounded(schema):
-    with pytest.raises(ValidationError):
-        schema(name="Home", custom_home_html="x" * (CUSTOM_HOME_HTML_MAX_LENGTH + 1))
-
-
-def test_custom_home_round_trip_and_opt_out(client: TestClient, db: Session):
-    # Public lists are capped; isolate this tenant from the hundreds of popups
-    # accumulated by other tests in the session-scoped database.
+def test_custom_home_round_trip_opt_out_and_conflict(client: TestClient, db: Session):
+    # Public lists are capped; isolate this tenant from popups accumulated by
+    # other tests in the session-scoped database.
     suffix = uuid.uuid4().hex
     tenant = Tenants(name="Home tenant", slug=f"home-{suffix}")
     db.add(tenant)
@@ -54,69 +50,118 @@ def test_custom_home_round_trip_and_opt_out(client: TestClient, db: Session):
     )
     db.add(admin)
     db.commit()
-    headers = {
+    admin_headers = {
         "Authorization": f"Bearer {create_access_token(subject=admin.id, token_type='user')}"
     }
     response = client.post(
         "/api/v1/popups",
-        headers=headers,
+        headers=admin_headers,
         json={"name": f"Home {uuid.uuid4().hex[:8]}", "status": "active"},
     )
     assert response.status_code == 201, response.text
     popup_id = response.json()["id"]
     slug = response.json()["slug"]
+    assert response.json()["custom_home_enabled"] is False
+    assert "custom_home_html" not in response.json()
+
     human = Humans(tenant_id=tenant.id, email=f"home-{suffix}@test.com")
     db.add(human)
     db.commit()
     human_headers = {
-        "Authorization": f"Bearer {create_access_token(subject=human.id, token_type='human')}",
-        "Accept-Language": "es",
+        "Authorization": f"Bearer {create_access_token(subject=human.id, token_type='human')}"
     }
-    assert response.json()["custom_home_enabled"] is False
-    assert response.json()["custom_home_html"] is None
-    url = f"/api/v1/popups/{popup_id}"
+    admin_url = f"/api/v1/popups/{popup_id}/home"
+    portal_url = f"/api/v1/popups/portal/{slug}/home"
+
+    response = client.get(admin_url, headers=admin_headers)
+    assert response.status_code == 200, response.text
+    assert response.json() == {
+        "enabled": False,
+        "html": None,
+        "version": 0,
+        "updated_at": None,
+    }
+    assert client.get(portal_url, headers=human_headers).status_code == 404
+
     html = "<style>h1 { color: navy; }</style><h1>{{ popup.name }}</h1>"
-
-    def public_home():
-        response = client.get(
-            "/api/v1/popups/public/list", headers={"X-Tenant-Id": str(tenant.id)}
-        )
-        assert response.status_code == 200, response.text
-        public = next(p for p in response.json() if p["id"] == popup_id)
-        # Both authenticated endpoints (including the translation overlay) must
-        # carry the same published fields as the public list.
-        detail = client.get(f"/api/v1/popups/portal/{slug}", headers=human_headers)
-        listing = client.get("/api/v1/popups/portal/list", headers=human_headers)
-        assert detail.status_code == listing.status_code == 200
-        portal = next(p for p in listing.json() if p["id"] == popup_id)
-        for key in ("custom_home_enabled", "custom_home_html"):
-            assert detail.json()[key] == portal[key] == public[key]
-        return public
-
-    # Saving without enabling must not publish it or change any default.
-    response = client.patch(url, headers=headers, json={"custom_home_html": html})
+    response = client.patch(
+        admin_url,
+        headers=admin_headers,
+        json={"enabled": True, "html": html, "version": 0},
+    )
     assert response.status_code == 200, response.text
-    assert response.json()["custom_home_html"] == html
-    assert public_home()["custom_home_html"] is None
+    assert response.json()["enabled"] is True
+    assert response.json()["html"] == html
+    assert response.json()["version"] == 1
+    assert response.json()["updated_at"] is not None
 
-    response = client.patch(url, headers=headers, json={"custom_home_enabled": True})
+    response = client.get(portal_url, headers=human_headers)
     assert response.status_code == 200, response.text
-    assert public_home()["custom_home_html"] == html
-    # An unrelated edit preserves both fields.
-    response = client.patch(url, headers=headers, json={"location": "Patagonia"})
-    assert response.json()["custom_home_enabled"] is True
-    assert response.json()["custom_home_html"] == html
+    assert response.json()["html"] == html
+    assert response.json()["version"] == 1
+    assert response.headers["etag"] == '"1"'
+    not_modified = client.get(
+        portal_url,
+        headers={**human_headers, "If-None-Match": response.headers["etag"]},
+    )
+    assert not_modified.status_code == 304
+    assert not_modified.content == b""
 
-    response = client.patch(url, headers=headers, json={"custom_home_enabled": False})
-    assert response.status_code == 200, response.text
-    assert response.json()["custom_home_html"] == html
-    assert public_home()["custom_home_enabled"] is False
-    assert public_home()["custom_home_html"] is None
-    assert client.get(url, headers=headers).json()["custom_home_html"] == html
+    # Popup collection and detail contracts expose only the small signal.
+    public = client.get(
+        "/api/v1/popups/public/list", headers={"X-Tenant-Id": str(tenant.id)}
+    )
+    portal = client.get("/api/v1/popups/portal/list", headers=human_headers)
+    portal_detail = client.get(f"/api/v1/popups/portal/{slug}", headers=human_headers)
+    detail = client.get(f"/api/v1/popups/{popup_id}", headers=admin_headers)
+    assert (
+        public.status_code
+        == portal.status_code
+        == portal_detail.status_code
+        == detail.status_code
+        == 200
+    )
+    for payload in (
+        *public.json(),
+        *portal.json(),
+        portal_detail.json(),
+        detail.json(),
+    ):
+        assert "custom_home_html" not in payload
+    selected = next(item for item in portal.json() if item["id"] == popup_id)
+    assert selected["custom_home_enabled"] is True
 
-    response = client.patch(url, headers=headers, json={"custom_home_html": None})
+    # Stale editors cannot overwrite the current document.
+    conflict = client.patch(
+        admin_url,
+        headers=admin_headers,
+        json={"enabled": False, "html": "stale", "version": 0},
+    )
+    assert conflict.status_code == 409, conflict.text
+    assert "updated elsewhere" in conflict.json()["detail"]
+
+    # Disabling retains the draft for administrators but unpublishes it.
+    response = client.patch(
+        admin_url,
+        headers=admin_headers,
+        json={"enabled": False, "html": html, "version": 1},
+    )
     assert response.status_code == 200, response.text
-    assert response.json()["custom_home_html"] is None
+    assert response.json()["html"] == html
+    assert response.json()["version"] == 2
+    assert client.get(portal_url, headers=human_headers).status_code == 404
+    assert client.get(admin_url, headers=admin_headers).json()["html"] == html
+
+    # An unrelated popup PATCH does not own or mutate home state.
+    response = client.patch(
+        f"/api/v1/popups/{popup_id}",
+        headers=admin_headers,
+        json={"location": "Patagonia"},
+    )
+    assert response.status_code == 200, response.text
+    assert response.json()["custom_home_enabled"] is False
+    assert "custom_home_html" not in response.json()
+    assert client.get(admin_url, headers=admin_headers).json()["version"] == 2
 
 
 def test_custom_home_requires_operator_in_same_tenant(
@@ -131,8 +176,8 @@ def test_custom_home_requires_operator_in_same_tenant(
         json={"name": f"Private Home {uuid.uuid4().hex[:8]}"},
     )
     assert response.status_code == 201, response.text
-    url = f"/api/v1/popups/{response.json()['id']}"
-    payload = {"custom_home_enabled": True, "custom_home_html": "<h1>Changed</h1>"}
+    url = f"/api/v1/popups/{response.json()['id']}/home"
+    payload = {"enabled": True, "html": "<h1>Changed</h1>", "version": 0}
     for token, expected in [(admin_token_tenant_b, 404), (viewer_token_tenant_a, 403)]:
         response = client.patch(
             url, headers={"Authorization": f"Bearer {token}"}, json=payload
