@@ -247,6 +247,120 @@ describe("buildPaymentProducts recipient payloads", () => {
     }
   }
 
+  it.each([
+    0, 1, 3,
+  ])("does not resubmit owned passes with quantity %i when spending account credit", (quantity) => {
+    const selected = recipientPass("new-ticket", "attendee-1", linkedRecipient)
+    const owned = createProduct({
+      id: "owned-ticket",
+      purchased: true,
+      quantity,
+      max_per_order: 5,
+    })
+    const attendee = {
+      ...selected.attendee,
+      products: [owned, selected.product],
+    }
+
+    const result = buildProducts({
+      attendeePasses: [attendee],
+      selectedPasses: [selected],
+      appCredit: "100",
+      submitMode: "application",
+    })
+
+    expect(result).toEqual({
+      products: [
+        {
+          product_id: "new-ticket",
+          recipient_key: linkedRecipient.recipient_key,
+          quantity: 1,
+        },
+      ],
+      recipients: [linkedRecipient],
+      isMonthUpgrade: false,
+    })
+  })
+
+  it("sends only the selected day-pass delta when spending account credit", () => {
+    const selected = recipientPass(
+      "day-ticket",
+      "attendee-1",
+      linkedRecipient,
+      {
+        duration_type: "day",
+        purchased: true,
+        selected: true,
+        original_quantity: 2,
+        quantity: 3,
+      },
+    )
+
+    const result = buildProducts({
+      attendeePasses: [selected.attendee],
+      selectedPasses: [selected],
+      appCredit: 100,
+    })
+
+    expect(result.products).toEqual([
+      {
+        product_id: "day-ticket",
+        recipient_key: linkedRecipient.recipient_key,
+        quantity: 1,
+      },
+    ])
+    expect(result.recipients).toEqual([linkedRecipient])
+  })
+
+  it.each([
+    "edit",
+    "month-upgrade",
+  ])("still includes kept purchases during %s replacement", (mode) => {
+    const kept = recipientPass("kept-week", "attendee-2", managedRecipient, {
+      purchased: true,
+      quantity: 1,
+    })
+    const selected = recipientPass("new-month", "attendee-1", linkedRecipient, {
+      duration_type: "month",
+      selected: true,
+      quantity: 1,
+    })
+    const replaced = createProduct({
+      id: "replaced-week",
+      duration_type: "week",
+      purchased: true,
+      quantity: 1,
+    })
+
+    const result = buildProducts({
+      attendeePasses: [
+        kept.attendee,
+        mode === "edit"
+          ? selected.attendee
+          : { ...selected.attendee, products: [replaced, selected.product] },
+      ],
+      selectedPasses: [selected],
+      isEditing: mode === "edit",
+      editPassesEnabled: true,
+      appCredit: 100,
+    })
+
+    expect(result.products).toEqual([
+      {
+        product_id: "kept-week",
+        recipient_key: managedRecipient.recipient_key,
+        quantity: 1,
+      },
+      {
+        product_id: "new-month",
+        recipient_key: linkedRecipient.recipient_key,
+        quantity: 1,
+      },
+    ])
+    expect(result.recipients).toEqual([managedRecipient, linkedRecipient])
+    expect(result.isMonthUpgrade).toBe(mode === "month-upgrade")
+  })
+
   it("emits linked and managed pass lines with recipient identity only", () => {
     const linkedPass = recipientPass(
       "linked-ticket",

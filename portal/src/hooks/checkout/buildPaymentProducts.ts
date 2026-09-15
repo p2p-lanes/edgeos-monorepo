@@ -110,7 +110,6 @@ export function buildPaymentProducts({
   selectedMealPlans = [],
   dynamicItems,
   isEditing,
-  appCredit,
   checkoutMode = CHECKOUT_MODE.PASS_SYSTEM,
   editPassesEnabled = false,
   submitMode = "application",
@@ -207,11 +206,9 @@ export function buildPaymentProducts({
       }
     }
   } else {
-    const hasAccountCredit = appCredit ? Number(appCredit) > 0 : false
-
-    // When there's account credit or month upgrade, include purchased products
-    // so the backend can recalculate totals with credits applied
-    if (hasAccountCredit || isMonthUpgrade) {
+    // Only replacement upgrades need kept purchases. Stored account credit is
+    // applied server-side; normal purchases must contain only new units.
+    if (isMonthUpgrade) {
       for (const attendee of attendeePasses) {
         const hasFullOrMonth = attendee.products.some(
           (p) =>

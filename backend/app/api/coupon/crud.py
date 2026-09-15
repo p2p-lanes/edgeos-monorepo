@@ -240,7 +240,9 @@ class CouponsCRUD(BaseCRUD[Coupons, CouponCreate, CouponUpdate]):
 
         return coupon
 
-    def use_coupon(self, session: Session, coupon_id: uuid.UUID) -> Coupons:
+    def use_coupon(
+        self, session: Session, coupon_id: uuid.UUID, *, commit: bool = True
+    ) -> Coupons:
         """Atomically redeem a coupon, enforcing ``max_uses`` under concurrency.
 
         Increments ``current_uses`` in a single conditional ``UPDATE`` guarded
@@ -250,13 +252,16 @@ class CouponsCRUD(BaseCRUD[Coupons, CouponCreate, CouponUpdate]):
         conditional update, the row lock serialises the two writers and the
         second one matches zero rows once the cap is reached.
 
-        Commits on success, mirroring the original behaviour: this releases the
-        coupon row lock immediately rather than holding it across the SimpleFI
+        Commits on success by default, mirroring the original behaviour: this
+        releases the coupon row lock rather than holding it across the SimpleFI
         network call that follows in some checkout flows (e.g. open-ticketing),
         which would otherwise serialise every concurrent redemption of the same
         code behind a multi-second provider request. On the exhausted/missing
         path it raises WITHOUT committing, so any half-built payment flushed by
         the caller is discarded on transaction teardown rather than persisted.
+
+        Pass commit=False when redemption must remain in the caller's transaction
+        until local fulfillment succeeds. The caller then owns commit or rollback.
 
         Raises 400 when the coupon is already exhausted, 404 when it is gone.
         """
@@ -286,7 +291,10 @@ class CouponsCRUD(BaseCRUD[Coupons, CouponCreate, CouponUpdate]):
                 detail="Coupon code has reached maximum uses",
             )
 
-        session.commit()
+        if commit:
+            session.commit()
+        else:
+            session.flush()
         coupon = self.get(session, coupon_id)
         if coupon is not None:
             # The increment was a Core UPDATE; sync the ORM instance so callers
