@@ -12,7 +12,6 @@ import {
   Check,
   CheckCircle,
   Clock,
-  Globe,
   Home,
   Layers,
   Lock,
@@ -62,7 +61,6 @@ import { Textarea } from "@/components/ui/textarea"
 import {
   Tooltip,
   TooltipContent,
-  TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip"
 import { cn } from "@/lib/utils"
@@ -714,27 +712,7 @@ export default function EventDetailPage() {
       {/* Details card */}
       <div className="relative rounded-xl border bg-card p-4 space-y-3">
         {event.status === "published" && (
-          <div className="absolute top-3 right-3 flex items-start gap-2">
-            <TooltipProvider>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button asChild variant="outline">
-                    <a
-                      href={`https://ee26.geobrowser.io/events/${event.id}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      aria-label={t("events.detail.join_on_geo")}
-                    >
-                      <Globe className="mr-2 h-4 w-4" />
-                      {t("events.detail.join_on_geo")}
-                    </a>
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>
-                  <p>{t("events.detail.join_on_geo_tooltip")}</p>
-                </TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
+          <div className="absolute top-3 right-3">
             <div className="flex flex-col items-end gap-1.5">
               {isRsvped ? (
                 <>
