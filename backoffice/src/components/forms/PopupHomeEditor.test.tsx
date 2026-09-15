@@ -1,4 +1,4 @@
-import { CUSTOM_HOME_HTML_MAX_LENGTH } from "@edgeos/shared-form-ui/popup-home"
+import { CUSTOM_HOME_HTML_MAX_BYTES } from "@edgeos/shared-form-ui/popup-home"
 import {
   cleanup,
   fireEvent,
@@ -205,11 +205,11 @@ describe("popup home editor", () => {
   })
 
   it("shows oversized source intact with a warning and pauses the preview", () => {
-    const html = "x".repeat(CUSTOM_HOME_HTML_MAX_LENGTH + 1)
+    const html = "😀".repeat(CUSTOM_HOME_HTML_MAX_BYTES / 4 + 1)
     render(<Editor initialHtml={html} />)
     expect(screen.getByLabelText("Home page HTML")).toHaveValue(html)
     expect(screen.getByRole("alert")).toHaveTextContent(
-      "Shorten it before saving",
+      "UTF-8 limit. Shorten it before saving",
     )
     expect(screen.queryByTitle("Custom home preview")).toBeNull()
     expect(

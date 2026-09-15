@@ -19774,17 +19774,6 @@ export const PopupAdminSchema = {
             title: 'Custom Home Enabled',
             default: false
         },
-        custom_home_html: {
-            anyOf: [
-                {
-                    type: 'string'
-                },
-                {
-                    type: 'null'
-                }
-            ],
-            title: 'Custom Home Html'
-        },
         theme_config: {
             anyOf: [
                 {
@@ -20105,23 +20094,6 @@ export const PopupAdminSchema = {
 
 export const PopupCreateSchema = {
     properties: {
-        custom_home_html: {
-            anyOf: [
-                {
-                    type: 'string',
-                    maxLength: 200000
-                },
-                {
-                    type: 'null'
-                }
-            ],
-            title: 'Custom Home Html'
-        },
-        custom_home_enabled: {
-            type: 'boolean',
-            title: 'Custom Home Enabled',
-            default: false
-        },
         tenant_id: {
             anyOf: [
                 {
@@ -20708,14 +20680,13 @@ export const PopupCreateSchema = {
     title: 'PopupCreate'
 } as const;
 
-export const PopupPublicSchema = {
+export const PopupHomeAdminSchema = {
     properties: {
-        custom_home_enabled: {
+        enabled: {
             type: 'boolean',
-            title: 'Custom Home Enabled',
-            default: false
+            title: 'Enabled'
         },
-        custom_home_html: {
+        html: {
             anyOf: [
                 {
                     type: 'string'
@@ -20724,7 +20695,88 @@ export const PopupPublicSchema = {
                     type: 'null'
                 }
             ],
-            title: 'Custom Home Html'
+            title: 'Html'
+        },
+        version: {
+            type: 'integer',
+            minimum: 0,
+            title: 'Version'
+        },
+        updated_at: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Updated At'
+        }
+    },
+    type: 'object',
+    required: ['enabled', 'version'],
+    title: 'PopupHomeAdmin'
+} as const;
+
+export const PopupHomePublicSchema = {
+    properties: {
+        html: {
+            type: 'string',
+            title: 'Html'
+        },
+        version: {
+            type: 'integer',
+            minimum: 1,
+            title: 'Version'
+        },
+        updated_at: {
+            type: 'string',
+            format: 'date-time',
+            title: 'Updated At'
+        }
+    },
+    type: 'object',
+    required: ['html', 'version', 'updated_at'],
+    title: 'PopupHomePublic'
+} as const;
+
+export const PopupHomeUpdateSchema = {
+    properties: {
+        enabled: {
+            type: 'boolean',
+            title: 'Enabled'
+        },
+        html: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Html'
+        },
+        version: {
+            type: 'integer',
+            minimum: 0,
+            title: 'Version'
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    required: ['enabled', 'version'],
+    title: 'PopupHomeUpdate'
+} as const;
+
+export const PopupPublicSchema = {
+    properties: {
+        custom_home_enabled: {
+            type: 'boolean',
+            title: 'Custom Home Enabled',
+            default: false
         },
         id: {
             type: 'string',
@@ -21304,29 +21356,6 @@ export const PopupStatusSchema = {
 
 export const PopupUpdateSchema = {
     properties: {
-        custom_home_html: {
-            anyOf: [
-                {
-                    type: 'string',
-                    maxLength: 200000
-                },
-                {
-                    type: 'null'
-                }
-            ],
-            title: 'Custom Home Html'
-        },
-        custom_home_enabled: {
-            anyOf: [
-                {
-                    type: 'boolean'
-                },
-                {
-                    type: 'null'
-                }
-            ],
-            title: 'Custom Home Enabled'
-        },
         name: {
             anyOf: [
                 {
