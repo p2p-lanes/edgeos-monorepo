@@ -1,11 +1,12 @@
 "use client"
 
-import { useParams, useRouter, useSearchParams } from "next/navigation"
+import { useParams, useRouter } from "next/navigation"
 import { useEffect } from "react"
 import { Loader } from "@/components/ui/Loader"
 import { useApplicationsQuery } from "@/hooks/useGetApplications"
 import { useHumanPopupAccess } from "@/hooks/useHumanPopupAccess"
 import { useParticipationQuery } from "@/hooks/useParticipationQuery"
+import { hasAcceptedPopupParticipation } from "@/lib/popup-participation"
 import { useApplication } from "@/providers/applicationProvider"
 import { useCityProvider } from "@/providers/cityProvider"
 
@@ -17,7 +18,7 @@ export default function EventsLayout({
   const params = useParams()
   const router = useRouter()
   const { getCity } = useCityProvider()
-  const { getRelevantApplication, participation } = useApplication()
+  const { getApplicationsForPopup, participation } = useApplication()
   const city = getCity()
   const popupId = city?.id ? String(city.id) : null
   const isEnded = city?.status === "ended"
@@ -34,25 +35,14 @@ export default function EventsLayout({
   const participationQuery = useParticipationQuery(popupId)
 
   const nobodyApplies = city?.takes_applications === false
-  const isCompanion = participation?.type === "companion"
-  // The door this screen is about. Without it, someone holding two
-  // applications was answered with whichever came last
-  // (sdd/sales-flows-rediseno).
-  const flowId = useSearchParams().get("flow")
-  const application = getRelevantApplication(flowId)
-
-  // Only an accepted application (or an accepted companion) may view events,
-  // mirroring the sidebar gate. A draft/pending_fee/in-review application owns
-  // an attendee row but is not approved, so it is bounced here just as the nav
-  // hides the link. Direct-sale popups don't run the application flow, so their
-  // events access is left untouched. For an ended popup, eligibility instead
-  // comes from `endedAccess` (useHumanPopupAccess, the backend access ladder),
-  // since there's no live application/companion status to check.
+  // Events are popup-wide, not owned by one application flow. Any accepted
+  // application for this popup (or accepted companion participation) grants
+  // access, even when a shared/direct URL has no `flow` query parameter.
+  // Direct-sale popups don't run the application flow, so their events access
+  // is left untouched. Ended-popup eligibility comes from the backend ladder.
   const isEligible = isEnded
     ? endedAccess.state === "allowed"
-    : isCompanion
-      ? participation?.application_status === "accepted"
-      : application?.status === "accepted"
+    : hasAcceptedPopupParticipation(getApplicationsForPopup(), participation)
 
   const stillLoading =
     !city ||

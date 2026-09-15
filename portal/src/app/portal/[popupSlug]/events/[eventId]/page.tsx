@@ -165,15 +165,18 @@ export default function EventDetailPage() {
   // start_time (and shift end_time by the same offset) so the user sees the
   // specific instance they clicked, not the series' first occurrence.
   const occParam = searchParams.get("occ")
+  const flowId = searchParams.get("flow")
+  // Rebuild the originating list state and retain the selected gathering door.
+  // Access is popup-wide, but keeping `flow` avoids changing the user's sidebar
+  // context when they return from a detail page.
+  const backParams = new URLSearchParams(fromSearch)
+  if (flowId) backParams.set("flow", flowId)
+  backParams.set("focus", params.eventId)
   // Stamp focusOcc alongside focus so the list can scroll to the *specific*
   // occurrence card on return — without it, all occurrences of a recurring
   // series share the same event id and the list lands on the first one.
-  const focusQs = occParam
-    ? `focus=${encodeURIComponent(params.eventId)}&focusOcc=${encodeURIComponent(occParam)}`
-    : `focus=${encodeURIComponent(params.eventId)}`
-  const backHref = fromSearch
-    ? `/portal/${city?.slug}/events?${fromSearch}&${focusQs}`
-    : `/portal/${city?.slug}/events?${focusQs}`
+  if (occParam) backParams.set("focusOcc", occParam)
+  const backHref = `/portal/${city?.slug}/events?${backParams.toString()}`
   const queryClient = useQueryClient()
   const {
     timezone,
@@ -835,6 +838,7 @@ export default function EventDetailPage() {
             // Preserve the current event URL (incl. occ + originating
             // events-list `from`) so the venue page can return here.
             const eventDetailQs = new URLSearchParams()
+            if (flowId) eventDetailQs.set("flow", flowId)
             if (occParam) eventDetailQs.set("occ", occParam)
             if (fromSearch) eventDetailQs.set("from", fromSearch)
             const eventDetailQsStr = eventDetailQs.toString()
