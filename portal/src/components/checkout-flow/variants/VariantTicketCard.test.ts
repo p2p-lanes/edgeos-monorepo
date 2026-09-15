@@ -25,7 +25,21 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock("@/hooks/checkout/useTicketsStep", () => ({ useTicketsStep }))
 vi.mock("@/app/portal/[popupSlug]/passes/components/AttendeeModal", () => ({
-  AttendeeModal: ({ onSubmit, category, editingAttendee }) =>
+  AttendeeModal: ({
+    onSubmit,
+    category,
+    editingAttendee,
+  }: {
+    onSubmit: (data: {
+      name: string
+      email: string
+      gender: string
+      category_id: string
+      additional_data: Record<string, unknown>
+    }) => Promise<void>
+    category: { id: string }
+    editingAttendee: { name?: string | null } | null
+  }) =>
     createElement(
       "button",
       {

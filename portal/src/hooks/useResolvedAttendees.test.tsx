@@ -320,6 +320,7 @@ describe("useResolvedAttendees", () => {
         popup_id: "popup-1",
         human_id: "human-1",
         sales_flow_id: "flow-current",
+        status: "accepted",
         custom_fields: {
           first_name: "Stale application name",
           role: "Builder",

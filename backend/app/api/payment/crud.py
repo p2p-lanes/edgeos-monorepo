@@ -2197,11 +2197,34 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
             raise self._recipient_error()
         referenced: set[str] = set()
         snapshot_keys: set[str] = set()
+        ticket_recipient_keys = {
+            line.recipient_key
+            for line in lines
+            if line.recipient_key is not None
+            and line.product_id in products_by_id
+            and (products_by_id[line.product_id].category or "").lower() == "ticket"
+        }
         product_role_eligibility = (
             flow_product_recipient_category_ids(session, sales_flow_id, popup_id)
             if sales_flow_id is not None
             else {}
         )
+        if sales_flow_id is not None:
+            from app.api.ticketing_step.models import TicketingSteps
+
+            has_ticket_recipient_config = (
+                session.exec(
+                    select(TicketingSteps.id).where(
+                        TicketingSteps.sales_flow_id == sales_flow_id,
+                        TicketingSteps.popup_id == popup_id,
+                        TicketingSteps.is_enabled == True,  # noqa: E712
+                        TicketingSteps.template == "ticket-select",
+                    )
+                ).first()
+                is not None
+            )
+        else:
+            has_ticket_recipient_config = False
         payment_context = Payments(
             tenant_id=tenant_id,
             popup_id=popup_id,
@@ -2328,6 +2351,8 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
             legacy_self = recipient.existing_attendee_id in legacy_self_attendee_ids
             direct_self = (
                 application_id is None
+                and recipient.recipient_key in ticket_recipient_keys
+                and primary_category_id is not None
                 and recipient.human_id is None
                 and recipient.existing_attendee_id is None
                 and recipient.category_id in (None, primary_category_id)
@@ -2367,9 +2392,8 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
 
         for recipient in validated:
             category = categories_by_id.get(recipient.category_id)
-            if (
-                recipient.category_id is None
-                or category is None
+            if recipient.category_id is not None and (
+                category is None
                 or (
                     sales_flow_id is not None
                     and category.sales_flow_id != sales_flow_id
@@ -2382,7 +2406,8 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
             ):
                 raise self._recipient_error()
             if (
-                recipient.recipient_key not in primary_role_recipient_keys
+                category is not None
+                and recipient.recipient_key not in primary_role_recipient_keys
                 and category.is_primary
             ):
                 raise self._recipient_error()
@@ -2400,14 +2425,15 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
                 if existing.human_id == buyer_human_id:
                     raise self._recipient_error()
 
-            validate_required_fields(
-                category.required_fields or [],
-                {
-                    **recipient.profile_snapshot,
-                    "name": recipient.name,
-                    "email": str(recipient.email) if recipient.email else None,
-                },
-            )
+            if category is not None:
+                validate_required_fields(
+                    category.required_fields or [],
+                    {
+                        **recipient.profile_snapshot,
+                        "name": recipient.name,
+                        "email": str(recipient.email) if recipient.email else None,
+                    },
+                )
             for line in lines:
                 if line.recipient_key != recipient.recipient_key:
                     continue
@@ -2416,11 +2442,15 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
                     sales_flow_id is not None
                     and (product.category or "").lower() == "ticket"
                 ):
-                    if product.id not in product_role_eligibility:
-                        raise self._recipient_error()
-                    allowed_roles = product_role_eligibility[product.id]
+                    allowed_roles = product_role_eligibility.get(product.id)
                     if (
-                        allowed_roles is not None
+                        has_ticket_recipient_config
+                        and product.id not in product_role_eligibility
+                    ):
+                        raise self._recipient_error()
+                    if (
+                        product.id in product_role_eligibility
+                        and allowed_roles is not None
                         and recipient.category_id not in allowed_roles
                     ):
                         raise self._recipient_error()
