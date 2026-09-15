@@ -140,8 +140,16 @@ from app.api.invite.models import Invites
 # Payment models
 from app.api.payment.models import PaymentProducts, PaymentRecipients, Payments
 from app.api.payment.schemas import PaymentCreate, PaymentPublic, PaymentUpdate
-from app.api.popup.models import Popups
-from app.api.popup.schemas import PopupAdmin, PopupCreate, PopupPublic, PopupUpdate
+from app.api.popup.models import PopupHomePages, Popups
+from app.api.popup.schemas import (
+    PopupAdmin,
+    PopupCreate,
+    PopupHomeAdmin,
+    PopupHomePublic,
+    PopupHomeUpdate,
+    PopupPublic,
+    PopupUpdate,
+)
 from app.api.popup_reviewer.models import PopupReviewers
 from app.api.popup_reviewer.schemas import (
     PopupReviewerCreate,
@@ -228,6 +236,10 @@ __all__ = [
     "Popups",
     "PopupAdmin",
     "PopupCreate",
+    "PopupHomePages",
+    "PopupHomeAdmin",
+    "PopupHomePublic",
+    "PopupHomeUpdate",
     "PopupPublic",
     "PopupUpdate",
     "TenantCredentials",

@@ -50,14 +50,15 @@ INTENTIONAL_DERIVATIONS: dict[str, dict[str, set[str]]] = {
     "app.api.product.schemas.ProductUpdate": {"category": {"discountable"}},
 }
 
-# Schemas whose every field is a nested model we cannot synthesize a value for.
-# Both hold a single field, so "send one field" is the whole payload anyway and
-# there is no other field left for a validator to leak onto. Listed explicitly
+# Schemas with no valid single-field payload. The first two contain only a
+# nested model we cannot synthesize; PopupHomeUpdate is an atomic, versioned
+# resource write whose fields are deliberately all required. Listed explicitly
 # rather than skipped silently, so a schema that stops being sampleable for some
 # other reason shows up as a failure instead of quietly dropping out.
 NO_SAMPLEABLE_FIELDS = {
     "app.api.cart.schemas.CartUpdate",  # items: CartState
     "app.api.event.schemas.RecurrenceUpdate",  # recurrence: RecurrenceRule | None
+    "app.api.popup.schemas.PopupHomeUpdate",  # enabled + html + version atomically
 }
 
 

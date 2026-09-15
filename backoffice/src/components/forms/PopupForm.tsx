@@ -1,4 +1,7 @@
-import { CUSTOM_HOME_HTML_MAX_LENGTH } from "@edgeos/shared-form-ui/popup-home"
+import {
+  CUSTOM_HOME_HTML_MAX_BYTES,
+  popupHomeHtmlByteLength,
+} from "@edgeos/shared-form-ui/popup-home"
 import { useForm } from "@tanstack/react-form"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { useNavigate } from "@tanstack/react-router"
@@ -28,6 +31,8 @@ import {
   type CheckoutMode,
   type PopupAdmin,
   type PopupCreate,
+  type PopupHomeAdmin,
+  type PopupHomeUpdate,
   PopupsService,
   type PopupUpdate,
   type SaleType,
@@ -75,6 +80,7 @@ import { createErrorHandler } from "@/utils"
 
 interface PopupFormProps {
   defaultValues?: PopupAdmin
+  defaultHome?: PopupHomeAdmin
   onSuccess: () => void
 }
 
@@ -130,7 +136,11 @@ function deriveCheckoutMode(saleType: SaleType): CheckoutMode {
   return saleType === "direct" ? "simple_quantity" : "pass_system"
 }
 
-export function PopupForm({ defaultValues, onSuccess }: PopupFormProps) {
+export function PopupForm({
+  defaultValues,
+  defaultHome,
+  onSuccess,
+}: PopupFormProps) {
   const [activeTab, setActiveTab] = useState("general")
   const navigate = useNavigate()
   const queryClient = useQueryClient()
@@ -165,14 +175,32 @@ export function PopupForm({ defaultValues, onSuccess }: PopupFormProps) {
   })
 
   const updateMutation = useMutation({
-    mutationFn: (data: PopupUpdate) =>
-      PopupsService.updatePopup({
+    mutationFn: async ({
+      popup,
+      home,
+    }: {
+      popup: PopupUpdate
+      home?: PopupHomeUpdate
+    }) => {
+      // Save the versioned home first so a stale editor cannot silently save
+      // the rest of the form while believing its home was also accepted.
+      if (home) {
+        await PopupsService.updatePopupHome({
+          popupId: defaultValues!.id,
+          requestBody: home,
+        })
+      }
+      return PopupsService.updatePopup({
         popupId: defaultValues!.id,
-        requestBody: data,
-      }),
+        requestBody: popup,
+      })
+    },
     onSuccess: () => {
       showSuccessToast("Gathering updated successfully")
       queryClient.invalidateQueries({ queryKey: ["popups"] })
+      queryClient.invalidateQueries({
+        queryKey: ["popup-home", defaultValues!.id],
+      })
       queryClient.invalidateQueries({ queryKey: ["form-fields"] })
       queryClient.invalidateQueries({ queryKey: ["form-sections"] })
       form.reset()
@@ -231,8 +259,8 @@ export function PopupForm({ defaultValues, onSuccess }: PopupFormProps) {
       invoice_company_email: defaultValues?.invoice_company_email ?? "",
       default_language: defaultValues?.default_language ?? "en",
       supported_languages: defaultValues?.supported_languages ?? ["en"],
-      custom_home_enabled: defaultValues?.custom_home_enabled ?? false,
-      custom_home_html: defaultValues?.custom_home_html ?? "",
+      custom_home_enabled: defaultHome?.enabled ?? false,
+      custom_home_html: defaultHome?.html ?? "",
       events_enabled: defaultValues?.events_enabled ?? true,
       edit_passes_enabled: defaultValues?.edit_passes_enabled ?? false,
       self_check_in_enabled: defaultValues?.self_check_in_enabled ?? false,
@@ -242,10 +270,14 @@ export function PopupForm({ defaultValues, onSuccess }: PopupFormProps) {
     },
     onSubmit: ({ value }) => {
       if (readOnly) return
-      if (value.custom_home_html.length > CUSTOM_HOME_HTML_MAX_LENGTH) {
+      if (
+        isEdit &&
+        popupHomeHtmlByteLength(value.custom_home_html) >
+          CUSTOM_HOME_HTML_MAX_BYTES
+      ) {
         setActiveTab("home")
         showErrorToast(
-          `Home page HTML must be ${CUSTOM_HOME_HTML_MAX_LENGTH.toLocaleString()} characters or fewer.`,
+          `Home page HTML must be ${CUSTOM_HOME_HTML_MAX_BYTES.toLocaleString()} UTF-8 bytes or fewer.`,
         )
         return
       }
@@ -280,10 +312,6 @@ export function PopupForm({ defaultValues, onSuccess }: PopupFormProps) {
         // existing event the door owns its own type, and sending this would
         // retype it from a screen that never asked.
         ...(isEdit ? {} : { sale_type: value.sale_type }),
-        custom_home_enabled: value.custom_home_enabled,
-        custom_home_html: value.custom_home_html.trim()
-          ? value.custom_home_html
-          : null,
         events_enabled: value.events_enabled,
         edit_passes_enabled: value.edit_passes_enabled,
         self_check_in_enabled: value.self_check_in_enabled,
@@ -309,7 +337,22 @@ export function PopupForm({ defaultValues, onSuccess }: PopupFormProps) {
         }
       }
       if (isEdit) {
-        updateMutation.mutate(payload)
+        const html = value.custom_home_html.trim()
+          ? value.custom_home_html
+          : null
+        const homeChanged =
+          value.custom_home_enabled !== defaultHome?.enabled ||
+          html !== (defaultHome?.html ?? null)
+        updateMutation.mutate({
+          popup: payload,
+          home: homeChanged
+            ? {
+                enabled: value.custom_home_enabled,
+                html,
+                version: defaultHome?.version ?? 0,
+              }
+            : undefined,
+        })
       } else {
         createMutation.mutate(payload)
       }
@@ -361,7 +404,7 @@ export function PopupForm({ defaultValues, onSuccess }: PopupFormProps) {
               Features
             </TabsTrigger>
             <TabsTrigger value="branding">Branding</TabsTrigger>
-            <TabsTrigger value="home">Home page</TabsTrigger>
+            {isEdit && <TabsTrigger value="home">Home page</TabsTrigger>}
             <TabsTrigger value="languages">Languages</TabsTrigger>
           </TabsList>
 
@@ -1183,25 +1226,27 @@ export function PopupForm({ defaultValues, onSuccess }: PopupFormProps) {
             </InlineSection>
           </TabsContent>
 
-          <TabsContent value="home" className="space-y-6">
-            <form.Subscribe selector={(state) => state.values}>
-              {(values) => (
-                <PopupHomeEditor
-                  html={values.custom_home_html}
-                  enabled={values.custom_home_enabled}
-                  onHtmlChange={(html) =>
-                    form.setFieldValue("custom_home_html", html)
-                  }
-                  onEnabledChange={(enabled) =>
-                    form.setFieldValue("custom_home_enabled", enabled)
-                  }
-                  popup={values}
-                  locale={values.default_language}
-                  readOnly={readOnly}
-                />
-              )}
-            </form.Subscribe>
-          </TabsContent>
+          {isEdit && (
+            <TabsContent value="home" className="space-y-6">
+              <form.Subscribe selector={(state) => state.values}>
+                {(values) => (
+                  <PopupHomeEditor
+                    html={values.custom_home_html}
+                    enabled={values.custom_home_enabled}
+                    onHtmlChange={(html) =>
+                      form.setFieldValue("custom_home_html", html)
+                    }
+                    onEnabledChange={(enabled) =>
+                      form.setFieldValue("custom_home_enabled", enabled)
+                    }
+                    popup={values}
+                    locale={values.default_language}
+                    readOnly={readOnly}
+                  />
+                )}
+              </form.Subscribe>
+            </TabsContent>
+          )}
 
           {/* ─── Languages & Translations ───────────────────────────── */}
           <TabsContent value="languages" className="space-y-6">
