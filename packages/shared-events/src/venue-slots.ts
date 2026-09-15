@@ -233,14 +233,56 @@ export function dayBoundsInTz(
   dateStr: string,
   timeZone: string,
 ): { start: Date; end: Date } {
-  // 'YYYY-MM-DDT00:00:00' interpreted as-if in timeZone:
   const [y, m, d] = dateStr.split("-").map(Number)
-  // Build a UTC guess, then adjust by the offset of that moment in tz.
-  const guess = Date.UTC(y, (m ?? 1) - 1, d ?? 1, 0, 0, 0)
-  const offsetMinutes = tzOffsetMinutes(guess, timeZone)
-  const start = new Date(guess - offsetMinutes * 60 * 1000)
-  const end = new Date(start.getTime() + 24 * 60 * 60 * 1000)
+  // End at the next local midnight rather than start + 24h: DST days are
+  // 23h or 25h long. Date.UTC normalises day overflow across months/years.
+  const next = new Date(Date.UTC(y, (m ?? 1) - 1, (d ?? 1) + 1))
+  const start = new Date(
+    wallClockInTzToUtcMs(y, (m ?? 1) - 1, d ?? 1, 0, 0, 0, timeZone),
+  )
+  const end = new Date(
+    wallClockInTzToUtcMs(
+      next.getUTCFullYear(),
+      next.getUTCMonth(),
+      next.getUTCDate(),
+      0,
+      0,
+      0,
+      timeZone,
+    ),
+  )
   return { start, end }
+}
+
+/**
+ * UTC ms for a wall-clock time in `timeZone` (month is 0-based).
+ *
+ * The offset has to be the one in force at the resulting instant, which is
+ * unknown up front, so both offsets around the wall-clock time (a day before
+ * and a day after) are tried and the one that is self-consistent wins:
+ * - one match: the normal case.
+ * - two matches (fall-back overlap): the earlier instant.
+ * - no match (spring-forward gap): the pre-transition offset, which lands
+ *   the time shifted forward by the gap, as consumer calendars do.
+ */
+function wallClockInTzToUtcMs(
+  y: number,
+  monthIndex: number,
+  d: number,
+  hh: number,
+  mm: number,
+  ss: number,
+  timeZone: string,
+): number {
+  const wall = Date.UTC(y, monthIndex, d, hh, mm, ss)
+  const dayMs = 24 * 60 * 60 * 1000
+  const before = tzOffsetMinutes(wall - dayMs, timeZone)
+  const after = tzOffsetMinutes(wall + dayMs, timeZone)
+  const valid = [before, after]
+    .map((offset) => wall - offset * 60 * 1000)
+    .filter((ms) => wall - tzOffsetMinutes(ms, timeZone) * 60 * 1000 === ms)
+  if (valid.length > 0) return Math.min(...valid)
+  return wall - before * 60 * 1000
 }
 
 /**
@@ -286,9 +328,9 @@ export function localTzNaiveToUtc(naive: string, timeZone: string): Date {
   const [datePart, timePart = "00:00"] = naive.split("T")
   const [y, m, d] = datePart.split("-").map(Number)
   const [hh = 0, mm = 0, ss = 0] = timePart.split(":").map(Number)
-  const guess = Date.UTC(y, (m ?? 1) - 1, d ?? 1, hh, mm, ss)
-  const offsetMinutes = tzOffsetMinutes(guess, timeZone)
-  return new Date(guess - offsetMinutes * 60 * 1000)
+  return new Date(
+    wallClockInTzToUtcMs(y, (m ?? 1) - 1, d ?? 1, hh, mm, ss, timeZone),
+  )
 }
 
 /**
