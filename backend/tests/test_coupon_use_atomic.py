@@ -7,17 +7,18 @@ and lost-update the counter.
 
 The fix performs a single conditional UPDATE guarded by
 `current_uses < max_uses`, so the row lock serialises concurrent writers and
-the second one matches zero rows once the cap is reached. It also no longer
-commits internally, so the redemption rolls back with the caller's payment if
-checkout later fails.
+the second one matches zero rows once the cap is reached. By default it commits
+on success; callers can opt out to roll redemption back with local fulfillment.
 """
 
 import uuid
 from types import SimpleNamespace
+from typing import cast
 
 import pytest
 from fastapi import HTTPException
 from sqlalchemy.dialects import postgresql
+from sqlmodel import Session
 
 from app.api.coupon.crud import coupons_crud
 
@@ -34,6 +35,7 @@ class _FakeSession:
         self.statements = []
         self.refreshed = False
         self.committed = False
+        self.flushed = False
 
     def exec(self, statement):
         self.statements.append(statement)
@@ -47,6 +49,9 @@ class _FakeSession:
 
     def commit(self):
         self.committed = True
+
+    def flush(self):
+        self.flushed = True
 
 
 def _sql(stmt) -> str:
@@ -68,6 +73,19 @@ def test_use_coupon_issues_conditional_update_and_commits_on_success() -> None:
     assert "UPDATE coupons" in sql
     assert "current_uses < coupons.max_uses" in sql
     assert "max_uses IS NULL" in sql
+
+
+def test_use_coupon_can_leave_commit_to_caller() -> None:
+    coupon = SimpleNamespace(id=uuid.uuid4(), current_uses=0, max_uses=1)
+    session = _FakeSession(rowcount=1, coupon=coupon)
+
+    assert (
+        coupons_crud.use_coupon(cast(Session, session), coupon.id, commit=False)
+        is coupon
+    )
+    assert session.flushed is True
+    assert session.refreshed is True
+    assert session.committed is False
 
 
 def test_use_coupon_exhausted_raises_400_without_committing() -> None:

@@ -3330,6 +3330,14 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
 
         application_id = _require_application_id(obj.application_id)
 
+        # Removed passes are omitted from edit requests, not sent with zero units.
+        # Reject invalid lines before preview or superseding an existing payment.
+        if any(product.quantity <= 0 for product in obj.products):
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="Each product quantity must be at least 1.",
+            )
+
         # sdd/sales-flows slice 12 (design D5/D6, call-site table): the
         # restriction gate must run before the SUPERSEDE_PENDING_ENABLED
         # block AND before the FOR UPDATE application lock below — a
@@ -3669,9 +3677,9 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
                     session, payment_id=payment.id, bookings=stay_bookings
                 )
 
-            # Increment coupon usage if used
+            # Redeem in the same transaction as credit settlement and fulfillment.
             if preview.coupon_id:
-                coupons_crud.use_coupon(session, preview.coupon_id)
+                coupons_crud.use_coupon(session, preview.coupon_id, commit=False)
 
             # Clear cart after successful purchase
             from app.api.cart.crud import carts_crud
