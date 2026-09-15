@@ -28,13 +28,34 @@ describe("dayBoundsInTz", () => {
   })
 
   it("US/Pacific spring-forward 2026-03-08 day bound still anchors to wall-clock midnight", () => {
-    // 2026-03-08 02:00 local jumps to 03:00; the day before is UTC-8, the
-    // day itself is UTC-7. Midnight wall-clock on 03-08 is still
-    // 08:00Z (one UTC-8 hour after the bound at midnight before the DST gap).
+    // 2026-03-08 02:00 local jumps to 03:00; midnight is still UTC-8.
     const { start, end } = dayBoundsInTz("2026-03-08", "America/Los_Angeles")
     expect(start.toISOString()).toBe("2026-03-08T08:00:00.000Z")
-    // 23h day across spring-forward.
-    expect(end.getTime() - start.getTime()).toBe(24 * 60 * 60 * 1000)
+    // 23h day across spring-forward: ends at 03-09 00:00 PDT.
+    expect(end.toISOString()).toBe("2026-03-09T07:00:00.000Z")
+    expect(end.getTime() - start.getTime()).toBe(23 * 60 * 60 * 1000)
+  })
+
+  it("US/Pacific fall-back 2026-11-01 is a 25h day ending at next local midnight", () => {
+    const { start, end } = dayBoundsInTz("2026-11-01", "America/Los_Angeles")
+    expect(start.toISOString()).toBe("2026-11-01T07:00:00.000Z")
+    expect(end.toISOString()).toBe("2026-11-02T08:00:00.000Z")
+    expect(end.getTime() - start.getTime()).toBe(25 * 60 * 60 * 1000)
+  })
+
+  it("Santiago 2026-09-06 starts at 01:00 local because 00:00 does not exist", () => {
+    // Clocks jump 00:00 -> 01:00 (UTC-4 -> UTC-3).
+    const { start, end } = dayBoundsInTz("2026-09-06", "America/Santiago")
+    expect(start.toISOString()).toBe("2026-09-06T04:00:00.000Z")
+    expect(end.toISOString()).toBe("2026-09-07T03:00:00.000Z")
+    expect(utcToLocalTzNaive(start.toISOString(), "America/Santiago")).toBe(
+      "2026-09-06T01:00",
+    )
+  })
+
+  it("wraps month and year for the next-day end bound", () => {
+    const { end } = dayBoundsInTz("2026-12-31", "America/Los_Angeles")
+    expect(end.toISOString()).toBe("2027-01-01T08:00:00.000Z")
   })
 
   it("range is exactly 24h for a non-DST day", () => {
@@ -102,6 +123,42 @@ describe("localTzNaiveToUtc", () => {
     const tz = "America/Los_Angeles"
     const utc = localTzNaiveToUtc(naive, tz).toISOString()
     expect(utcToLocalTzNaive(utc, tz)).toBe(naive)
+  })
+
+  // Times on a DST-change day that sit between local midnight and the UTC
+  // instant of the switch used to pick up the offset of the wrong side.
+  it.each([
+    ["America/Santiago", "2026-09-06T01:30", "2026-09-06T04:30:00.000Z"],
+    ["America/Santiago", "2026-09-06T02:00", "2026-09-06T05:00:00.000Z"],
+    ["America/Santiago", "2026-09-06T03:30", "2026-09-06T06:30:00.000Z"],
+    ["America/Los_Angeles", "2026-11-01T03:00", "2026-11-01T11:00:00.000Z"],
+    ["America/Los_Angeles", "2026-11-01T08:00", "2026-11-01T16:00:00.000Z"],
+    ["America/Los_Angeles", "2026-03-08T03:00", "2026-03-08T10:00:00.000Z"],
+    ["America/Los_Angeles", "2026-03-08T08:00", "2026-03-08T15:00:00.000Z"],
+    ["Europe/Madrid", "2026-10-25T01:00", "2026-10-24T23:00:00.000Z"],
+  ])("DST day: %s %s -> %s and round-trips", (tz, naive, expected) => {
+    const utc = localTzNaiveToUtc(naive, tz).toISOString()
+    expect(utc).toBe(expected)
+    expect(utcToLocalTzNaive(utc, tz)).toBe(naive)
+  })
+
+  it("ambiguous fall-back time resolves to the earlier instant", () => {
+    // 01:30 happens twice in LA on 2026-11-01: PDT (08:30Z), then PST (09:30Z).
+    expect(
+      localTzNaiveToUtc("2026-11-01T01:30", "America/Los_Angeles").toISOString(),
+    ).toBe("2026-11-01T08:30:00.000Z")
+  })
+
+  it("nonexistent spring-forward time shifts forward by the gap", () => {
+    // 02:30 does not exist in LA on 2026-03-08; it lands on 03:30 PDT.
+    const utc = localTzNaiveToUtc(
+      "2026-03-08T02:30",
+      "America/Los_Angeles",
+    ).toISOString()
+    expect(utc).toBe("2026-03-08T10:30:00.000Z")
+    expect(utcToLocalTzNaive(utc, "America/Los_Angeles")).toBe(
+      "2026-03-08T03:30",
+    )
   })
 })
 

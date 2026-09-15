@@ -170,7 +170,13 @@ def build_event_ics(
         lines.append(f"RRULE:{event.rrule}")
         exdates = getattr(event, "recurrence_exdates", None) or []
         if exdates:
-            lines.append(f"EXDATE:{','.join(_fmt_utc(d) for d in exdates)}")
+            # recurrence_exdates is a JSONB array, so values arrive as ISO
+            # strings. Formatting them unparsed raised, and the iTIP sender
+            # swallowed it and mailed the update without its calendar part.
+            parsed = [
+                datetime.fromisoformat(d) if isinstance(d, str) else d for d in exdates
+            ]
+            lines.append(f"EXDATE:{','.join(_fmt_utc(d) for d in parsed)}")
     if description:
         lines.append(f"DESCRIPTION:{description}")
     if location:
