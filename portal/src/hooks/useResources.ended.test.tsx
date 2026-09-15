@@ -7,11 +7,13 @@ const mocks = vi.hoisted(() => ({
     slug: "summit",
     status: "ended",
     takes_applications: false,
+    custom_home_enabled: false,
   } as {
     id: string
     slug: string
     status: string
     takes_applications: boolean
+    custom_home_enabled: boolean
   } | null,
   directFlows: [] as Array<{ id: string; slug: string; name: string }>,
 }))
@@ -71,6 +73,7 @@ describe("useResources", () => {
       slug: "summit",
       status: "ended",
       takes_applications: false,
+      custom_home_enabled: false,
     }
     mocks.directFlows = []
   })
@@ -81,6 +84,17 @@ describe("useResources", () => {
     const { result } = renderHook(() => useResources())
 
     expect(result.current.resources).toEqual([])
+  })
+
+  it("separates Home from the ended application overview", () => {
+    if (mocks.city) mocks.city.custom_home_enabled = true
+
+    const { result } = renderHook(() => useResources())
+
+    expect(result.current.resources.slice(0, 2)).toMatchObject([
+      { name: "sidebar.home", path: "/portal/summit" },
+      { name: "sidebar.application", path: "/portal/summit/overview" },
+    ])
   })
 
   it("removes flow links from an ended direct-sale popup while retaining Payments", () => {

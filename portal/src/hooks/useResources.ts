@@ -1,6 +1,7 @@
 import {
   CalendarDays,
   FileText,
+  House,
   Layers,
   Link2,
   MapPin,
@@ -88,6 +89,16 @@ const useResources = () => {
   // gathering can take applications through one door and sell through
   // another, so the popup's `sale_type` can no longer answer it.
   const nobodyApplies = city.takes_applications === false
+  const hasCustomHome = city.custom_home_enabled === true
+  const popupRoot = `/portal/${city.slug}`
+  const overviewPath = hasCustomHome ? `${popupRoot}/overview` : popupRoot
+  const homeResource: Resource = {
+    name: t("sidebar.home"),
+    icon: House,
+    status: "active",
+    path: popupRoot,
+    group: "commerce",
+  }
 
   if (city?.status === "ended") {
     const resources = buildEndedResources({
@@ -95,6 +106,8 @@ const useResources = () => {
       city,
       participated: endedAccess.state === "allowed",
     })
+    resources[0].path = overviewPath
+    if (hasCustomHome) resources.unshift(homeResource)
     return { resources, doorName: null }
   }
 
@@ -143,6 +156,7 @@ const useResources = () => {
   // (and its API Keys/Docs subsections) is not exposed in this flow.
   if (nobodyApplies && user) {
     const resources: Resource[] = [
+      ...(hasCustomHome ? [homeResource] : []),
       {
         name: t("sidebar.passes"),
         icon: Ticket,
@@ -154,7 +168,7 @@ const useResources = () => {
         name: t("sidebar.overview", { defaultValue: "Overview" }),
         icon: FileText,
         status: "active",
-        path: `/portal/${city.slug}${flowQuery}`,
+        path: `${overviewPath}${flowQuery}`,
         group: "commerce",
       },
       {
@@ -173,6 +187,7 @@ const useResources = () => {
   if (isCompanion) {
     const companionEventsVisible = companionApplicationAccepted && eventsEnabled
     const resources: Resource[] = [
+      ...(hasCustomHome ? [homeResource] : []),
       {
         name: t("sidebar.passes"),
         icon: Ticket,
@@ -184,7 +199,7 @@ const useResources = () => {
         name: t("sidebar.companion"),
         icon: Users,
         status: "active",
-        path: `/portal/${city.slug}${flowQuery}`,
+        path: `${overviewPath}${flowQuery}`,
         group: "commerce",
         children: [
           {
@@ -243,11 +258,12 @@ const useResources = () => {
   }
 
   const resources: Resource[] = [
+    ...(hasCustomHome ? [homeResource] : []),
     {
       name: t("sidebar.application"),
       icon: FileText,
       status: "active",
-      path: `/portal/${city.slug}${flowQuery}`,
+      path: `${overviewPath}${flowQuery}`,
       group: "commerce",
     },
     {

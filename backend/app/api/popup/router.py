@@ -1,8 +1,9 @@
 import uuid
 from typing import Annotated
 
-from fastapi import APIRouter, Header, HTTPException, status
+from fastapi import APIRouter, Header, HTTPException, Response, status
 from sqlalchemy.exc import IntegrityError
+from sqlmodel import select
 
 from app.api.payment.crud import payments_crud
 from app.api.payment.schemas import PaymentStatus
@@ -12,10 +13,14 @@ from app.api.popup.guards import (
     ensure_api_key_popup,
     is_popup_scoped_api_key,
 )
+from app.api.popup.models import PopupHomePages
 from app.api.popup.schemas import (
     CheckoutPreviewTokenPublic,
     PopupAdmin,
     PopupCreate,
+    PopupHomeAdmin,
+    PopupHomePublic,
+    PopupHomeUpdate,
     PopupPublic,
     PopupStatus,
     PopupUpdate,
@@ -128,6 +133,102 @@ async def get_popup(
         )
 
     return _with_flow_kinds(db, [popup], [PopupAdmin.model_validate(popup)])[0]
+
+
+@router.get("/{popup_id}/home", response_model=PopupHomeAdmin)
+async def get_popup_home(
+    popup_id: uuid.UUID,
+    db: TenantSession,
+    _: CurrentCheckInOperator,
+) -> PopupHomeAdmin:
+    popup = crud.get(db, popup_id)
+    if not popup:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Popup not found",
+        )
+
+    home = db.get(PopupHomePages, popup.id)
+    if home is None:
+        return PopupHomeAdmin(
+            enabled=popup.custom_home_enabled,
+            html=None,
+            version=0,
+            updated_at=None,
+        )
+    return PopupHomeAdmin(
+        enabled=popup.custom_home_enabled,
+        html=home.html,
+        version=home.version,
+        updated_at=home.updated_at,
+    )
+
+
+@router.patch("/{popup_id}/home", response_model=PopupHomeAdmin)
+async def update_popup_home(
+    popup_id: uuid.UUID,
+    popup_in: PopupHomeUpdate,
+    db: TenantSession,
+    _current_user: CurrentOperator,
+) -> PopupHomeAdmin:
+    popup = crud.get(db, popup_id)
+    if not popup:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Popup not found",
+        )
+
+    # Serialize writers before comparing versions. Under PostgreSQL's default
+    # READ COMMITTED isolation, a waiter sees the version committed by the
+    # previous editor after acquiring this lock.
+    home = db.exec(
+        select(PopupHomePages)
+        .where(PopupHomePages.popup_id == popup.id)
+        .with_for_update()
+    ).one_or_none()
+    current_version = home.version if home is not None else 0
+    if popup_in.version != current_version:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=(
+                "Home page was updated elsewhere. Reload before saving your changes."
+            ),
+        )
+
+    if home is None:
+        home = PopupHomePages(
+            popup_id=popup.id,
+            tenant_id=popup.tenant_id,
+            html=popup_in.html,
+            version=1,
+        )
+    else:
+        home.html = popup_in.html
+        home.version += 1
+
+    popup.custom_home_enabled = popup_in.enabled
+    db.add(home)
+    db.add(popup)
+    try:
+        db.commit()
+    except IntegrityError as exc:
+        # Two first writes can both observe the absent row. The primary key
+        # resolves the race; report the same optimistic-concurrency contract.
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=(
+                "Home page was updated elsewhere. Reload before saving your changes."
+            ),
+        ) from exc
+    db.refresh(home)
+
+    return PopupHomeAdmin(
+        enabled=popup.custom_home_enabled,
+        html=home.html,
+        version=home.version,
+        updated_at=home.updated_at,
+    )
 
 
 @router.post(
@@ -424,6 +525,66 @@ async def list_portal_popups(
         )
         results.append(PopupPublic.model_validate(data))
     return _with_flow_kinds(db, popups, results)
+
+
+@router.get(
+    "/portal/{slug}/home",
+    response_model=PopupHomePublic,
+    responses={status.HTTP_304_NOT_MODIFIED: {"description": "Not modified"}},
+)
+async def get_portal_popup_home(
+    slug: str,
+    response: Response,
+    db: HumanTenantSession,
+    current_human: CurrentHuman,
+    token_payload: CallerToken,
+    if_none_match: Annotated[str | None, Header(alias="If-None-Match")] = None,
+) -> PopupHomePublic | Response:
+    """Return only a published home document, never an admin draft."""
+    from app.api.application.crud import applications_crud  # noqa: PLC0415
+
+    popup = crud.get_by_slug(db, slug)
+    if not popup or popup.status not in (PopupStatus.active, PopupStatus.ended):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Home page not found",
+        )
+    ensure_api_key_popup(token_payload, popup.id)
+
+    if popup.status == PopupStatus.ended:
+        access = applications_crud.resolve_popup_access(db, current_human.id, popup.id)
+        if not access.allowed:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Home page not found",
+            )
+
+    home = db.get(PopupHomePages, popup.id)
+    if (
+        not popup.custom_home_enabled
+        or home is None
+        or home.html is None
+        or not home.html.strip()
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Home page not found",
+        )
+
+    etag = f'"{home.version}"'
+    cache_control = "private, max-age=0, must-revalidate"
+    if if_none_match == etag:
+        return Response(
+            status_code=status.HTTP_304_NOT_MODIFIED,
+            headers={"ETag": etag, "Cache-Control": cache_control},
+        )
+    response.headers["ETag"] = etag
+    response.headers["Cache-Control"] = cache_control
+    return PopupHomePublic(
+        html=home.html,
+        version=home.version,
+        updated_at=home.updated_at,
+    )
 
 
 @router.get("/portal/{slug}", response_model=PopupPublic)

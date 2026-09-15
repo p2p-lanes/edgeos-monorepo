@@ -2,8 +2,10 @@
 
 ## Behavior
 
-In **Gatherings → Edit → Home page**, operators can edit HTML/CSS in Monaco
-(syntax colors, line numbers, autocomplete, folding, and formatting). The editor
+After creating a gathering, operators can edit HTML/CSS in Monaco under
+**Gatherings → Edit → Home page** (syntax colors, line numbers, autocomplete,
+folding, and formatting). The tab is intentionally absent during creation
+because the home is a separate, versioned popup resource. The editor
 stays on the left with a live preview on the right; smaller screens stack them.
 Desktop/mobile controls change only the preview width, never hide the editor.
 **Fullscreen preview** opens the current unsaved HTML in a viewport-sized modal,
@@ -16,14 +18,21 @@ correction, but pause preview and block saving until within the limit.
 
 - Existing popups start with the switch off and no HTML.
 - Disabled or empty HTML keeps the existing portal home, including application,
-  multi-flow, and companion views. Other portal screens and chrome never change.
-- Disabling keeps the saved HTML for later. Disabled HTML is returned as `null`
-  from public/portal responses, but remains available to authorized admins.
+  multi-flow, and companion views.
+- Disabling keeps the saved HTML for later. Popup responses expose only the
+  lightweight `custom_home_enabled` signal. The dedicated portal-home endpoint
+  returns 404 for disabled/empty homes, while authorized admins can still read
+  the draft from the administrative home endpoint.
 - Saving while enabled updates the live home. V1 has no separate draft/publish
   workflow or version history. Preview alone never saves or enables anything.
-- The custom home replaces the current home cards; v1 does not relocate or embed
-  the application/status UI or add navigation/user-data placeholders.
-- Changes appear on the portal's next popup-data fetch (reload to test immediately).
+- When enabled, the custom home remains the gathering's root page and a **Home**
+  item appears in the portal sidebar. The existing application/status cards move
+  to `/portal/{slug}/overview` and remain available from the **Application**,
+  **Overview**, or **Companion** item, depending on the gathering and participant.
+  V1 does not embed that UI or add user-data placeholders to custom HTML.
+- Changes appear on the portal's next home-resource fetch (reload to test immediately).
+- Saves use an optimistic version. A stale editor receives HTTP 409 instead of
+  overwriting a newer home.
 
 ## Template contract
 
@@ -45,7 +54,7 @@ Unknown expressions remain literal and trigger an editor warning. There are no
 loops, conditionals, JavaScript evaluation, or recursive interpolation.
 
 Both full documents and fragments (including `<style>` blocks) work. The maximum
-source length is 200,000 characters. Prefer HTTPS for image, font, and stylesheet
+source size is 200,000 UTF-8 bytes. Prefer HTTPS for image, font, and stylesheet
 URLs; inline styles and CSS media queries work. Ordinary links navigate the top
 page on a user click; fragment links stay inside the frame. Preview blocks links
 that would leave the frame.
@@ -65,16 +74,25 @@ Long pages scroll inside the frame: v1 intentionally avoids a scripted resize
 bridge. External images/styles/fonts can make network requests; do not include
 sensitive information in custom HTML or external URLs.
 
-The backend stores the source, not a rendered document. Treat the API field as
-untrusted HTML in any future consumer; always use the shared renderer.
+The backend stores the source, not a rendered document, in the tenant-scoped
+`popup_home_pages` table. Treat the dedicated API response as untrusted HTML in
+any future consumer; always use the shared renderer.
 
 ## Rollout
 
-Apply Alembic revision `d9e4c2a7b6f1` before deploying the updated API. It adds a
-non-null `custom_home_enabled` flag with a server default of `false`, plus nullable
-`custom_home_html` text. No existing popup is opted in. Both generated frontend
-OpenAPI clients include the new fields. API writes use the existing tenant-scoped
-operator permissions; unrelated PATCH requests preserve the home settings.
+Apply Alembic revision `e2c6a91b7d4f` before deploying the updated API. It
+moves existing source—including disabled drafts—from `popups.custom_home_html`
+into the RLS-protected `popup_home_pages` table and removes the wide popup
+column. The small `custom_home_enabled` flag remains on `popups`. Both generated
+frontend OpenAPI clients expose the dedicated administrative and portal home
+endpoints. Home writes use existing tenant-scoped operator permissions and
+update the flag, source, and version in one transaction.
+
+- `GET /api/v1/popups/{popup_id}/home` returns the admin draft or an empty
+  version-0 resource.
+- `PATCH /api/v1/popups/{popup_id}/home` performs a version-checked upsert.
+- `GET /api/v1/popups/portal/{slug}/home` returns published source only.
+- Popup list/detail payloads never include the source document.
 
 ## Focused checks
 
@@ -84,7 +102,9 @@ From the repository root, with the normal local dependencies configured:
 pnpm --filter backoffice exec vitest run src/components/forms/PopupHomeEditor.test.tsx
 pnpm --filter portal test 'src/app/portal/[popupSlug]/page.test.tsx' \
   'src/app/portal/[popupSlug]/custom-home.test.tsx' \
-  src/components/Portal/PopupHomeFrame.test.tsx src/providers/discountProvider.test.tsx
+  src/components/Portal/PopupHomeFrame.test.tsx \
+  src/components/Sidebar/ResourcesMenu.test.tsx \
+  src/hooks/useResources.commerce.test.tsx src/providers/discountProvider.test.tsx
 pnpm --filter backoffice exec tsc -p tsconfig.build.json --noEmit
 pnpm --filter portal exec tsc --noEmit
 (cd backend && uv run pytest -q tests/api/popup)

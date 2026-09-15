@@ -14,6 +14,7 @@ const mocks = vi.hoisted(() => ({
   },
   takesApplications: true,
   directoryEnabled: false,
+  customHomeEnabled: false,
 }))
 
 type Flow = {
@@ -75,6 +76,7 @@ vi.mock("@/providers/cityProvider", () => ({
       status: "active",
       takes_applications: mocks.takesApplications,
       show_attendee_directory: mocks.directoryEnabled,
+      custom_home_enabled: mocks.customHomeEnabled,
     }),
   }),
 }))
@@ -132,6 +134,28 @@ describe("useResources Commerce navigation", () => {
     mocks.participation = null
     mocks.takesApplications = true
     mocks.directoryEnabled = false
+    mocks.customHomeEnabled = false
+  })
+
+  it("adds Home and keeps Application on its own overview when a custom home is enabled", () => {
+    mocks.customHomeEnabled = true
+
+    const { result } = renderHook(() => useResources())
+    const commerce = visibleCommerce(result.current.resources)
+
+    expect(commerce.map((resource) => resource.name)).toEqual([
+      "sidebar.home",
+      "sidebar.application",
+      "sidebar.orders",
+    ])
+    expect(commerce[0]).toMatchObject({
+      path: "/portal/summit",
+      status: "active",
+    })
+    expect(commerce[1]).toMatchObject({
+      path: "/portal/summit/overview",
+      status: "active",
+    })
   })
 
   it("lists only application flows with a matching approved application", () => {

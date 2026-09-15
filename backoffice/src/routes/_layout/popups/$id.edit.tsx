@@ -1,4 +1,4 @@
-import { useSuspenseQuery } from "@tanstack/react-query"
+import { useSuspenseQueries } from "@tanstack/react-query"
 import { createFileRoute } from "@tanstack/react-router"
 import { Suspense } from "react"
 
@@ -16,18 +16,24 @@ export const Route = createFileRoute("/_layout/popups/$id/edit")({
   }),
 })
 
-function getPopupQueryOptions(popupId: string) {
-  return {
-    queryKey: ["popups", popupId],
-    queryFn: () => PopupsService.getPopup({ popupId }),
-  }
-}
-
 function EditPopupContent({ popupId }: { popupId: string }) {
   const goBack = useGoBack({ to: "/popups" })
-  const { data: popup } = useSuspenseQuery(getPopupQueryOptions(popupId))
+  const [{ data: popup }, { data: home }] = useSuspenseQueries({
+    queries: [
+      {
+        queryKey: ["popups", popupId],
+        queryFn: () => PopupsService.getPopup({ popupId }),
+      },
+      {
+        queryKey: ["popup-home", popupId],
+        queryFn: () => PopupsService.getPopupHome({ popupId }),
+      },
+    ],
+  })
 
-  return <PopupForm defaultValues={popup} onSuccess={goBack} />
+  return (
+    <PopupForm defaultValues={popup} defaultHome={home} onSuccess={goBack} />
+  )
 }
 
 function EditPopupPage() {
