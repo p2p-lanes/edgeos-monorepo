@@ -447,6 +447,26 @@ def _enforce_group_id_rules(
             )
 
 
+def _validate_event_timezone(value: str | None) -> str | None:
+    """Reject an IANA name this server cannot resolve (same rule as settings).
+
+    An unknown zone silently degrades to UTC on read, shifting every displayed
+    time and every recurrence step.
+    """
+    if value is None:
+        return value
+    from app.api.event_settings.schemas import _validate_timezone
+
+    return _validate_timezone(value)
+
+
+def _enforce_end_not_before_start(
+    start_time: datetime | None, end_time: datetime | None
+) -> None:
+    if start_time is not None and end_time is not None and end_time < start_time:
+        raise ValueError("end_time must not be before start_time")
+
+
 class EventCreate(BaseModel):
     """Event schema for creation."""
 
@@ -482,6 +502,12 @@ class EventCreate(BaseModel):
     model_config = ConfigDict(str_strip_whitespace=True)
 
     _normalize_datetimes = field_validator("start_time", "end_time")(_require_utc_aware)
+    _check_timezone = field_validator("timezone")(_validate_event_timezone)
+
+    @model_validator(mode="after")
+    def _validate_time_order(self) -> "EventCreate":
+        _enforce_end_not_before_start(self.start_time, self.end_time)
+        return self
 
     @model_validator(mode="after")
     def _validate_custom_location(self) -> "EventCreate":
@@ -530,6 +556,14 @@ class EventUpdate(BaseModel):
     group_id: uuid.UUID | None = None
 
     _normalize_datetimes = field_validator("start_time", "end_time")(_require_utc_aware)
+    _check_timezone = field_validator("timezone")(_validate_event_timezone)
+
+    @model_validator(mode="after")
+    def _validate_time_order(self) -> "EventUpdate":
+        # Only when both are patched; a one-sided patch is checked against the
+        # stored value in the router.
+        _enforce_end_not_before_start(self.start_time, self.end_time)
+        return self
 
     @model_validator(mode="after")
     def _validate_custom_location(self) -> "EventUpdate":
