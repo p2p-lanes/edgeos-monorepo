@@ -177,7 +177,7 @@ def _attendee_count(db: Session, popup: Popups) -> int:
     )
 
 
-def test_approval_materializes_unmanaged_attendee_and_repairs_missing_lineage(
+def test_approval_materializes_buyer_managed_attendee_and_repairs_missing_lineage(
     db: Session, tenant_a: Tenants, popup_tenant_a: Popups
 ) -> None:
     buyer = _human(db, tenant_a, "Buyer")
@@ -192,7 +192,8 @@ def test_approval_materializes_unmanaged_attendee_and_repairs_missing_lineage(
 
     assert attendee is not None
     assert attendee.human_id is None
-    assert attendee.managed_by_human_id is None
+    assert attendee.managed_by_human_id == buyer.id
+    assert attendee.category_id is None
     assert attendee.additional_data == {"dietary_restriction": "vegan"}
     assert line.attendee_id == attendee.id
     assert [ticket.unit_index for ticket in tickets] == [0, 1]
@@ -286,14 +287,14 @@ def test_same_access_product_keeps_recipient_price_category_and_qr_lines_separat
         (
             "discount-adult",
             adult_category.id,
-            adult_category.id,
+            None,
             Decimal("25.00"),
             adult_line.id,
         ),
         (
             "discount-child",
             child_category.id,
-            child_category.id,
+            None,
             Decimal("15.00"),
             child_line.id,
         ),
@@ -368,7 +369,7 @@ def test_approval_materializes_only_referenced_recipients_without_application_li
     assert _resolve_payment_buyer(payment, db) == buyer
 
 
-@pytest.mark.parametrize("invalid_field", ["tenant", "popup", "category"])
+@pytest.mark.parametrize("invalid_field", ["tenant", "popup"])
 def test_explicit_reuse_rejects_invalid_scope_without_transferring_ownership(
     db: Session,
     tenant_a: Tenants,
@@ -379,23 +380,11 @@ def test_explicit_reuse_rejects_invalid_scope_without_transferring_ownership(
 ) -> None:
     buyer = _human(db, tenant_a, "ReuseBuyer")
     product = _product(db, popup_tenant_a)
-    wrong_category = AttendeeCategories(
-        tenant_id=tenant_a.id,
-        popup_id=popup_tenant_a.id,
-        sales_flow_id=application_flow_id(db, popup_tenant_a.id),
-        key=f"wrong-{uuid.uuid4().hex[:6]}",
-    )
-    db.add(wrong_category)
-    db.flush()
     attendee = Attendees(
         tenant_id=tenant_b.id if invalid_field == "tenant" else tenant_a.id,
         popup_id=popup_tenant_b.id if invalid_field == "popup" else popup_tenant_a.id,
         name="Managed guest",
-        category_id=(
-            wrong_category.id
-            if invalid_field == "category"
-            else _category(db, popup_tenant_a).id
-        ),
+        category_id=_category(db, popup_tenant_a).id,
         managed_by_human_id=buyer.id,
     )
     db.add(attendee)
@@ -417,7 +406,7 @@ def test_explicit_reuse_rejects_invalid_scope_without_transferring_ownership(
     assert line.attendee_id is None
 
 
-def test_explicit_recipient_reuse_ignores_existing_manager_metadata(
+def test_historical_payment_does_not_override_existing_manager(
     db: Session, tenant_a: Tenants, popup_tenant_a: Popups
 ) -> None:
     buyer = _human(db, tenant_a, "ExplicitBuyer")
@@ -456,15 +445,17 @@ def test_explicit_recipient_reuse_ignores_existing_manager_metadata(
         db, popup_tenant_a, buyer, product, existing_attendee=attendee
     )
 
-    payments_crud.approve_payment(db, payment.id)
+    with pytest.raises(HTTPException) as error:
+        payments_crud.approve_payment(db, payment.id)
     db.refresh(attendee)
     db.refresh(recipient)
     db.refresh(line)
 
+    assert error.value.status_code == 422
     assert attendee.managed_by_human_id == existing_manager.id
-    assert recipient.attendee_id == attendee.id
-    assert line.attendee_id == attendee.id
-    assert [unit.attendee_id for unit in _tickets(db, payment.id)] == [attendee.id]
+    assert recipient.attendee_id is None
+    assert line.attendee_id is None
+    assert _tickets(db, payment.id) == []
 
 
 def test_concurrent_approval_and_legacy_or_fee_compatibility(
@@ -665,7 +656,7 @@ def test_side_only_merch_approval_creates_no_attendee_or_unit(
 
 
 @pytest.mark.parametrize("grant", ["application", "ticket", "unresolved"])
-def test_application_or_existing_unit_authority(
+def test_application_or_manager_authority_ignores_existing_unit_metadata(
     db: Session,
     tenant_a: Tenants,
     popup_tenant_a: Popups,
@@ -714,16 +705,10 @@ def test_application_or_existing_unit_authority(
         )
     db.commit()
 
-    if grant == "application":
-        payments_crud.approve_payment(db, payment.id)
-        assert [
-            ticket.product_category_snapshot for ticket in _tickets(db, payment.id)
-        ] == ["ticket"]
-    else:
-        with pytest.raises(HTTPException) as error:
-            payments_crud.approve_payment(db, payment.id)
-        assert error.value.status_code == 422
-        assert _tickets(db, payment.id) == []
+    payments_crud.approve_payment(db, payment.id)
+    assert [
+        ticket.product_category_snapshot for ticket in _tickets(db, payment.id)
+    ] == ["ticket"]
 
 
 def test_payment_application_allocates_accountless_ticket_unit(
@@ -837,7 +822,7 @@ def test_self_attendee_allocates_ticket_when_prior_product_is_inactive(
     ] == ["ticket"]
 
 
-def test_recipient_category_mismatch_rejects_and_rolls_back_materialization(
+def test_recipient_role_snapshot_is_independent_of_product_legacy_category(
     db: Session, tenant_a: Tenants, popup_tenant_a: Popups
 ) -> None:
     other = AttendeeCategories(
@@ -858,23 +843,16 @@ def test_recipient_category_mismatch_rejects_and_rolls_back_materialization(
     attendee_count = _attendee_count(db, popup_tenant_a)
     payment, recipient, line = _payment(db, popup_tenant_a, buyer, product)
 
-    with pytest.raises(HTTPException) as error:
-        payments_crud.approve_payment(db, payment.id)
+    payments_crud.approve_payment(db, payment.id)
 
-    assert (error.value.status_code, error.value.detail) == (
-        422,
-        "Recipient could not be fulfilled",
-    )
     db.refresh(payment)
     db.refresh(recipient)
     db.refresh(line)
-    assert (payment.status, recipient.attendee_id, line.attendee_id) == (
-        PaymentStatus.PENDING.value,
-        None,
-        None,
-    )
-    assert _tickets(db, payment.id) == []
-    assert _attendee_count(db, popup_tenant_a) == attendee_count
+    assert payment.status == PaymentStatus.APPROVED.value
+    assert recipient.attendee_id is not None
+    assert line.attendee_id == recipient.attendee_id
+    assert len(_tickets(db, payment.id)) == 1
+    assert _attendee_count(db, popup_tenant_a) == attendee_count + 1
 
 
 @pytest.mark.parametrize(

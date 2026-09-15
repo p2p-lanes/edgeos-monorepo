@@ -2,6 +2,7 @@
 
 import { Plus } from "lucide-react"
 import { useState } from "react"
+import { useTranslation } from "react-i18next"
 import { AttendeeModal } from "@/app/portal/[popupSlug]/passes/components/AttendeeModal"
 import type { AttendeeCategoryPublic } from "@/client"
 import useAttendee from "@/hooks/useAttendee"
@@ -10,6 +11,7 @@ import { cn } from "@/lib/utils"
 import { useCityProvider } from "@/providers/cityProvider"
 import { usePassesProvider } from "@/providers/passesProvider"
 import type { AttendeePassState } from "@/types/Attendee"
+import { resolveRecipientRoleLabel } from "./recipientAssignmentLabels"
 
 interface AddAttendeeButtonsProps {
   onAttendeeAdded?: (attendeeId: string) => void
@@ -19,15 +21,6 @@ interface AddAttendeeButtonsProps {
   salesFlowId?: string | null
 }
 
-function resolveLabel(cat: AttendeeCategoryPublic): string {
-  const meta = cat.display_meta as Record<string, unknown> | undefined
-  const metaLabel = meta?.label
-  if (metaLabel && typeof metaLabel === "string" && metaLabel.trim() !== "") {
-    return metaLabel
-  }
-  return cat.key.charAt(0).toUpperCase() + cat.key.slice(1)
-}
-
 export default function AddAttendeeButtons({
   onAttendeeAdded,
   className,
@@ -35,6 +28,7 @@ export default function AddAttendeeButtons({
   mode = "checkout",
   salesFlowId,
 }: AddAttendeeButtonsProps) {
+  const { t } = useTranslation()
   const { getCity } = useCityProvider()
   const city = getCity()
   const popupId = city?.id ? String(city.id) : ""
@@ -57,15 +51,18 @@ export default function AddAttendeeButtons({
     countByCategoryId.set(id, (countByCategoryId.get(id) ?? 0) + 1)
   }
 
-  const available = categories.filter((c) => {
-    if (c.is_primary) return false
-    if (allowedCategoryIds && !allowedCategoryIds.includes(c.id)) return false
-    const max = c.max_per_application
+  const categoryIsAvailable = (category: AttendeeCategoryPublic) => {
+    if (category.is_primary) return false
+    if (allowedCategoryIds && !allowedCategoryIds.includes(category.id))
+      return false
+    const max = category.max_per_application
     if (max == null) return true
-    const current = countByCategoryId.get(c.id) ?? 0
+    const current = countByCategoryId.get(category.id) ?? 0
     return current < max
+  }
+  const available = categories.filter((c) => {
+    return categoryIsAvailable(c)
   })
-
   if (available.length === 0) return null
 
   const handleSubmit = async (
@@ -116,7 +113,11 @@ export default function AddAttendeeButtons({
           )}
         >
           <Plus className="w-3.5 h-3.5" />
-          <span>Add {resolveLabel(cat)}</span>
+          <span>
+            {t("checkout.recipient_assignment.add_role", {
+              role: resolveRecipientRoleLabel(cat, t),
+            })}
+          </span>
         </button>
       ))}
 

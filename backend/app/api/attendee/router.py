@@ -25,6 +25,7 @@ from app.api.attendee.schemas import (
     TicketPublic,
     parse_attendee_filters,
 )
+from app.api.attendee.validation import validate_required_fields
 from app.api.audit_log.actor import actor_from_user
 from app.api.check_in.crud import (
     get_check_in_summary,
@@ -59,55 +60,6 @@ class StaffTicketPublic(TicketPublic):
 _AttendeeLimit = Annotated[
     int, Query(ge=1, le=100, description="Max attendees to return")
 ]
-
-
-def _validate_required_fields(
-    required_fields: list[dict],
-    additional_data: dict,
-) -> None:
-    """Validate declarative required_fields against submitted additional_data.
-
-    For each field marked ``required``, ensure a non-empty value is present. For
-    fields typed ``"date"``, also ensure the value parses as an ISO date when
-    present. Extra keys in additional_data are permitted (unknown keys are kept,
-    not rejected) so partial/extra answers do not break the flow. Raises 422 with
-    the offending field name on the first failure.
-    """
-    from datetime import date as _date
-
-    data = additional_data or {}
-    for field in required_fields or []:
-        name = field.get("name")
-        if not name:
-            continue
-        value = data.get(name)
-        if field.get("required") and (value is None or value == ""):
-            raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                detail=[
-                    {
-                        "code": "required_field_missing",
-                        "field": name,
-                        "message": f"Missing required field '{name}'",
-                    }
-                ],
-            )
-        if field.get("type") == "date" and value not in (None, ""):
-            try:
-                _date.fromisoformat(str(value))
-            except (ValueError, TypeError):
-                raise HTTPException(
-                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                    detail=[
-                        {
-                            "code": "invalid_date",
-                            "field": name,
-                            "message": (
-                                f"Field '{name}' must be an ISO date (YYYY-MM-DD)"
-                            ),
-                        }
-                    ],
-                ) from None
 
 
 def _build_attendee_with_origin(
@@ -388,7 +340,7 @@ async def create_my_attendee_for_popup(
                 )
         # Validate declarative required_fields (e.g. a kid's date_of_birth) are
         # present in the submitted additional_data. Permissive toward extra keys.
-        _validate_required_fields(
+        validate_required_fields(
             category_row.required_fields or [],
             attendee_in.additional_data or {},
         )

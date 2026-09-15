@@ -361,7 +361,7 @@ describe("recipient draft restoration", () => {
     )
 
     expect(rebuilt).toHaveLength(1)
-    expect(rebuilt[0].recipient).toBe(companionDraft)
+    expect(rebuilt[0].recipient).toEqual(companionDraft)
     expect(rebuilt[0].products).toEqual(
       expect.arrayContaining([
         expect.objectContaining({ id: "spouse-pass", selected: true }),
@@ -445,6 +445,48 @@ describe("recipient draft restoration", () => {
         expect.objectContaining({ id: "legacy-ticket", selected: true }),
       ]),
     )
+  })
+
+  it("restores a saved flow role onto an existing companion identity", () => {
+    const companion = {
+      id: "linked-companion",
+      tenant_id: "tenant-1",
+      popup_id: "popup-1",
+      human_id: "linked-human",
+      name: "Linked Companion",
+      category_id: null,
+      category: null,
+      products: [],
+      recipient: {
+        recipient_key: "attendee:linked-companion",
+        existing_attendee_id: "linked-companion",
+        name: "Linked Companion",
+        category_id: null,
+      },
+    } as CheckoutRecipientPassState
+    const saved = {
+      recipient_key: "attendee:linked-companion",
+      existing_attendee_id: "linked-companion",
+      human_id: "stale-inferred-human",
+      name: "Saved Companion",
+      category_id: "category-spouse",
+      profile_snapshot: { category: "spouse", residence: "Lisbon" },
+    }
+
+    const restored = restoreRecipientDrafts([companion], [saved], "popup-1")[0]
+
+    expect(restored).toMatchObject({
+      id: "linked-companion",
+      name: "Saved Companion",
+      category_id: "category-spouse",
+      category: "spouse",
+      additional_data: { category: "spouse", residence: "Lisbon" },
+      recipient: {
+        existing_attendee_id: "linked-companion",
+        category_id: "category-spouse",
+      },
+    })
+    expect(restored.recipient).not.toHaveProperty("human_id")
   })
 })
 

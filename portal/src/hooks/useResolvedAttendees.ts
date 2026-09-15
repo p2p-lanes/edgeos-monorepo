@@ -35,6 +35,44 @@ function buildHumanProfileSnapshot(
   }
 }
 
+function withoutFlowRole(
+  profile: Record<string, unknown> | null | undefined,
+): Record<string, unknown> {
+  const {
+    category: _category,
+    category_id: _categoryId,
+    ...rest
+  } = profile ?? {}
+  return rest
+}
+
+function isLegacyBuyerAttendee(
+  attendee: AttendeeWithOriginPublic,
+  application: ApplicationPublic | null,
+  ownsApplication: boolean,
+): boolean {
+  if (!ownsApplication || !application) return false
+  if (attendee.application_id !== application.id || attendee.human_id)
+    return false
+
+  // The portal endpoint exposes only self-, manager-, or legacy-owned rows.
+  // Current application ownership therefore rules out a row transferred to a
+  // different manager without requiring manager metadata in this response.
+  // Primary categories are seeded with the stable `main` key. Historical
+  // category IDs are intentionally absent from an exact current-flow fetch.
+  return attendee.category_id == null || attendee.category === "main"
+}
+
+function persistedPassState(
+  attendee: AttendeeWithOriginPublic,
+): AttendeePassState {
+  return {
+    ...(attendee as unknown as AttendeePassState),
+    products: [],
+    ticket_entries: dedupTicketEntries(attendee.products ?? []),
+  }
+}
+
 /**
  * Resolves the attendees list the PassesProvider should drive off.
  *
@@ -76,27 +114,109 @@ export function useResolvedAttendees(
   // The hook disables the query when popupId is null/falsy or no human is logged in.
   const popupId = city ? String(city.id) : null
   const { data: humanAttendees } = useHumanAttendeesQuery(popupId)
-  const { categories } = useAttendeeCategories(popupId ?? "")
   const application = nobodyApplies
     ? null
     : getRelevantApplication(salesFlowId ?? undefined)
+  const effectiveSalesFlowId = salesFlowId ?? application?.sales_flow_id
+  const { categories } = useAttendeeCategories(
+    popupId ?? "",
+    effectiveSalesFlowId,
+  )
 
   if (!humanAttendees) return []
 
-  if (humanAttendees.length > 0) {
-    const withTicketEntries = humanAttendees.map(
-      (attendee: AttendeeWithOriginPublic): AttendeePassState => ({
-        ...(attendee as unknown as AttendeePassState),
-        products: [],
-        ticket_entries: dedupTicketEntries(attendee.products ?? []),
-      }),
-    )
-    return sortAttendees(withTicketEntries)
+  // Outside checkout, preserve the popup-scoped attendee representation used
+  // by the passes history page. Flow-local role projection only applies when a
+  // concrete sales flow is being purchased.
+  if (salesFlowId == null) {
+    if (humanAttendees.length > 0) {
+      return sortAttendees(humanAttendees.map(persistedPassState))
+    }
   }
 
   const primaryCategory = categories?.find((category) => category.is_primary)
   const hasUnambiguousApplication =
     application?.popup_id === city?.id && application?.human_id === user?.id
+
+  if (salesFlowId != null && city && user && primaryCategory) {
+    const modernBuyer = humanAttendees.find(
+      (attendee) => attendee.human_id === user.id,
+    )
+    const legacyBuyer = modernBuyer
+      ? undefined
+      : humanAttendees.find((attendee) =>
+          isLegacyBuyerAttendee(
+            attendee,
+            application,
+            hasUnambiguousApplication,
+          ),
+        )
+    const buyerSource = modernBuyer ?? legacyBuyer
+    const firstName = user.first_name?.trim() ?? ""
+    const lastName = user.last_name?.trim() ?? ""
+    const fullName = [firstName, lastName].filter(Boolean).join(" ").trim()
+    const displayName = fullName || user.email
+    const profileSnapshot = {
+      ...buildHumanProfileSnapshot(user, application),
+      category: primaryCategory.key,
+    }
+    const buyer: CheckoutRecipientPassState = {
+      ...(buyerSource ? persistedPassState(buyerSource) : {}),
+      id: buyerSource?.id ?? user.id,
+      tenant_id: user.tenant_id,
+      popup_id: city.id,
+      human_id: legacyBuyer ? null : user.id,
+      application_id: application?.id ?? buyerSource?.application_id ?? null,
+      name: displayName,
+      category_id: primaryCategory.id,
+      category: primaryCategory.key,
+      email: user.email,
+      gender: user.gender ?? null,
+      poap_url: buyerSource?.poap_url ?? null,
+      additional_data: profileSnapshot,
+      created_at: buyerSource?.created_at ?? null,
+      updated_at: buyerSource?.updated_at ?? null,
+      products: [],
+      recipient: legacyBuyer
+        ? {
+            recipient_key: `attendee:${legacyBuyer.id}`,
+            existing_attendee_id: legacyBuyer.id,
+            name: displayName,
+            email: user.email,
+            category_id: primaryCategory.id,
+            profile_snapshot: profileSnapshot,
+          }
+        : {
+            recipient_key: `human:${user.id}`,
+            human_id: user.id,
+            name: displayName,
+            email: user.email,
+            category_id: primaryCategory.id,
+            profile_snapshot: profileSnapshot,
+          },
+    }
+    const companions = humanAttendees
+      .filter((attendee) => attendee.id !== buyerSource?.id)
+      .map((attendee): CheckoutRecipientPassState => {
+        const profileSnapshot = withoutFlowRole(attendee.additional_data)
+        return {
+          ...persistedPassState(attendee),
+          category_id: null,
+          category: null,
+          additional_data: profileSnapshot,
+          recipient: {
+            recipient_key: `attendee:${attendee.id}`,
+            existing_attendee_id: attendee.id,
+            name: attendee.name,
+            ...(attendee.email != null ? { email: attendee.email } : {}),
+            category_id: null,
+            profile_snapshot: profileSnapshot,
+          },
+        }
+      })
+
+    return sortAttendees([buyer, ...companions])
+  }
 
   if (
     city &&

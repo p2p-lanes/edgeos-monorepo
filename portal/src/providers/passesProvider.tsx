@@ -26,6 +26,7 @@ import {
   buildCheckoutRecipientDraft,
   type CheckoutRecipientDraft,
   type CheckoutRecipientPassState,
+  canSelectRecipientProducts,
 } from "@/types/checkout"
 import type { ProductsPass } from "@/types/Products"
 import { useCityProvider } from "./cityProvider"
@@ -271,29 +272,99 @@ export function restoreRecipientDrafts(
     )
     if (!recipient) return attendee
     remaining.delete(recipient.recipient_key)
-    return { ...attendee, recipient }
+    const currentRecipient = attendee.recipient
+    const currentRoleIsAuthoritative = Boolean(
+      currentRecipient?.human_id ||
+        (currentRecipient?.existing_attendee_id &&
+          currentRecipient.category_id != null),
+    )
+    const mergedRecipient: CheckoutRecipientDraft = currentRoleIsAuthoritative
+      ? {
+          ...recipient,
+          ...currentRecipient,
+          profile_snapshot: currentRecipient?.profile_snapshot ?? {},
+        }
+      : {
+          ...currentRecipient,
+          ...recipient,
+          profile_snapshot: {
+            ...(currentRecipient?.profile_snapshot ?? {}),
+            ...(recipient.profile_snapshot ?? {}),
+          },
+        }
+    if (currentRecipient?.human_id) {
+      delete mergedRecipient.existing_attendee_id
+    } else if (currentRecipient?.existing_attendee_id) {
+      mergedRecipient.existing_attendee_id =
+        currentRecipient.existing_attendee_id
+      delete mergedRecipient.human_id
+    }
+    return applyRecipientDraftToAttendee(attendee, mergedRecipient)
   })
 
   for (const recipient of remaining.values()) {
-    const profile = recipient.profile_snapshot ?? {}
+    const normalizedRecipient: CheckoutRecipientDraft = { ...recipient }
+    if (normalizedRecipient.existing_attendee_id) {
+      delete normalizedRecipient.human_id
+    }
+    const profile = normalizedRecipient.profile_snapshot ?? {}
     restored.push({
-      id: `recipient:${recipient.recipient_key}`,
+      id: `recipient:${normalizedRecipient.recipient_key}`,
       tenant_id: "",
       popup_id: popupId,
       application_id: null,
-      human_id: recipient.human_id ?? null,
-      name: recipient.name,
-      category_id: recipient.category_id ?? null,
+      human_id: normalizedRecipient.human_id ?? null,
+      name: normalizedRecipient.name,
+      category_id: normalizedRecipient.category_id ?? null,
       category: typeof profile.category === "string" ? profile.category : null,
-      email: recipient.email ?? null,
+      email: normalizedRecipient.email ?? null,
       gender: typeof profile.gender === "string" ? profile.gender : null,
       additional_data: profile,
       products: [],
-      recipient,
+      recipient: normalizedRecipient,
     })
   }
 
   return restored
+}
+
+function applyRecipientDraftToAttendee(
+  attendee: CheckoutRecipientPassState,
+  recipient: CheckoutRecipientDraft,
+): CheckoutRecipientPassState {
+  const profile = recipient.profile_snapshot ?? {}
+  return {
+    ...attendee,
+    name: recipient.name,
+    email: recipient.email ?? null,
+    category_id: recipient.category_id ?? null,
+    category: typeof profile.category === "string" ? profile.category : null,
+    gender:
+      typeof profile.gender === "string" ? profile.gender : attendee.gender,
+    additional_data: profile,
+    recipient,
+  }
+}
+
+function resetProductSelection(product: ProductsPass): ProductsPass {
+  if (product.purchased) {
+    return { ...product, selected: false, edit: false, disabled: false }
+  }
+  const isMultiUnit =
+    product.duration_type !== "day" && isPassQuantityBased(product)
+  const quantity =
+    product.duration_type === "day"
+      ? (product.original_quantity ?? 0)
+      : isMultiUnit
+        ? 0
+        : 1
+  return {
+    ...product,
+    selected: false,
+    edit: false,
+    disabled: false,
+    quantity,
+  }
 }
 
 function recipientMatchesAttendee(
@@ -337,8 +408,22 @@ export function rebuildRecipientPasses(
   checkoutMode: CheckoutMode,
   existing: CheckoutRecipientPassState[] = [],
 ) {
+  const mergedRecipients = new Map(
+    recipients.map((recipient) => [recipient.recipient_key, recipient]),
+  )
+  for (const attendee of existing) {
+    const recipient = attendee.recipient
+    if (!recipient) continue
+    const isAssignedExistingAttendee = Boolean(
+      recipient.existing_attendee_id && recipient.category_id != null,
+    )
+    const isLocalOrBuyerRecipient = !recipient.existing_attendee_id
+    if (isAssignedExistingAttendee || isLocalOrBuyerRecipient) {
+      mergedRecipients.set(recipient.recipient_key, recipient)
+    }
+  }
   const recipientAttendees = preserveLocalRecipientDrafts(
-    restoreRecipientDrafts(attendees, recipients, popupId),
+    restoreRecipientDrafts(attendees, [...mergedRecipients.values()], popupId),
     existing,
   )
   const rebuilt = buildBaseAttendeePasses(
@@ -492,14 +577,19 @@ const PassesProvider = ({
         checkoutPolicy.checkoutMode,
       )
       setAttendeePasses((current) =>
-        strategy.handleSelection(
-          current,
-          attendeeId,
-          product,
-          discountRef.current,
-          exclusivityScopeIds,
-          attendeeVisibleProductIds,
-        ),
+        current.some(
+          (attendee) =>
+            attendee.id === attendeeId && !canSelectRecipientProducts(attendee),
+        )
+          ? current
+          : strategy.handleSelection(
+              current,
+              attendeeId,
+              product,
+              discountRef.current,
+              exclusivityScopeIds,
+              attendeeVisibleProductIds,
+            ),
       )
     },
     [checkoutPolicy.checkoutMode],
@@ -700,21 +790,7 @@ const PassesProvider = ({
           if (p.purchased) {
             return { ...p, selected: false, edit: false, disabled: false }
           }
-          const isMultiUnit =
-            p.duration_type !== "day" && isPassQuantityBased(p)
-          const initialQuantity =
-            p.duration_type === "day"
-              ? (p.original_quantity ?? 0)
-              : isMultiUnit
-                ? 0
-                : 1
-          return {
-            ...p,
-            selected: false,
-            edit: false,
-            disabled: false,
-            quantity: initialQuantity,
-          }
+          return resetProductSelection(p)
         }),
       })),
     )

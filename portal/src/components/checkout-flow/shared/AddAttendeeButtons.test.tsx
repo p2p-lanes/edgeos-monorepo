@@ -1,5 +1,6 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react"
 import { beforeEach, describe, expect, it, vi } from "vitest"
+import "@/i18n/config"
 import { CHECKOUT_MODE } from "@/checkout/popupCheckoutPolicy"
 import {
   buildPersistedPassSelections,
@@ -13,24 +14,34 @@ import AddAttendeeButtons from "./AddAttendeeButtons"
 const mocks = vi.hoisted(() => ({
   addAttendee: vi.fn(),
   addRecipientDraft: vi.fn(),
-  attendeePasses: [] as Array<{ id: string; category_id: string }>,
+  useAttendeeCategories: vi.fn(),
+  attendeePasses: [] as Array<{
+    id: string
+    name: string
+    category_id: string | null
+    recipient?: CheckoutRecipientDraft
+  }>,
   email: " sam@example.com ",
 }))
 
 vi.mock("@/app/portal/[popupSlug]/passes/components/AttendeeModal", () => ({
   AttendeeModal: ({
     onSubmit,
+    category,
+    editingAttendee,
   }: {
     onSubmit: (data: unknown) => Promise<void>
+    category: { id: string }
+    editingAttendee: { name?: string } | null
   }) => (
     <button
       type="button"
       onClick={() =>
         void onSubmit({
-          name: "Sam Companion",
+          name: editingAttendee?.name ?? "Sam Companion",
           email: mocks.email,
           gender: "nonbinary",
-          category_id: "spouse",
+          category_id: category.id,
           additional_data: { residence: "Lisbon" },
         })
       }
@@ -45,18 +56,24 @@ vi.mock("@/hooks/useAttendee", () => ({
 }))
 
 vi.mock("@/hooks/useAttendeeCategories", () => ({
-  useAttendeeCategories: () => ({
-    categories: [
-      { id: "main", key: "main", is_primary: true },
-      {
-        id: "spouse",
-        key: "spouse",
-        is_primary: false,
-        max_per_application: 2,
-      },
-      { id: "kid", key: "kid", is_primary: false },
-    ],
-  }),
+  useAttendeeCategories: (popupId: string, salesFlowId?: string | null) => {
+    mocks.useAttendeeCategories(popupId, salesFlowId)
+    return {
+      categories: [
+        { id: "main", key: "main", is_primary: true },
+        {
+          id: "spouse",
+          key: "spouse",
+          is_primary: false,
+          max_per_application: 2,
+          required_fields: [
+            { name: "residence", type: "text", required: true },
+          ],
+        },
+        { id: "kid", key: "kid", is_primary: false },
+      ],
+    }
+  },
 }))
 
 vi.mock("@/providers/cityProvider", () => ({
@@ -74,6 +91,7 @@ describe("AddAttendeeButtons", () => {
   beforeEach(() => {
     mocks.addAttendee.mockReset()
     mocks.addRecipientDraft.mockReset()
+    mocks.useAttendeeCategories.mockReset()
     mocks.addRecipientDraft.mockReturnValue(
       "recipient:draft:11111111-1111-4111-8111-111111111111",
     )
@@ -92,10 +110,19 @@ describe("AddAttendeeButtons", () => {
   })
 
   it("shows only companions supported by the current step", () => {
-    render(<AddAttendeeButtons allowedCategoryIds={["spouse"]} />)
+    render(
+      <AddAttendeeButtons
+        allowedCategoryIds={["spouse"]}
+        salesFlowId="flow-current"
+      />,
+    )
 
     expect(screen.getByRole("button", { name: "Add Spouse" })).toBeTruthy()
     expect(screen.queryByRole("button", { name: "Add Kid" })).toBeNull()
+    expect(mocks.useAttendeeCategories).toHaveBeenCalledWith(
+      "popup-1",
+      "flow-current",
+    )
   })
 
   it("submits one stable local recipient draft without an attendee mutation", async () => {
@@ -230,8 +257,16 @@ describe("AddAttendeeButtons", () => {
 
   it("counts persisted and local companion drafts against the category cap", () => {
     mocks.attendeePasses = [
-      { id: "persisted-spouse", category_id: "spouse" },
-      { id: "recipient:draft:one", category_id: "spouse" },
+      {
+        id: "persisted-spouse",
+        name: "Persisted Spouse",
+        category_id: "spouse",
+      },
+      {
+        id: "recipient:draft:one",
+        name: "Draft Spouse",
+        category_id: "spouse",
+      },
     ]
 
     render(<AddAttendeeButtons allowedCategoryIds={["spouse"]} />)

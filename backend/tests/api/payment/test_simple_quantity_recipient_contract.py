@@ -13,7 +13,7 @@ from app.api.attendee.models import AttendeeProducts, Attendees
 from app.api.attendee_category.models import AttendeeCategories
 from app.api.human.models import Humans
 from app.api.payment.crud import payments_crud
-from app.api.payment.models import PaymentProducts, PaymentRecipients
+from app.api.payment.models import PaymentProducts, PaymentRecipients, Payments
 from app.api.product.models import Products
 from app.core.security import create_access_token
 from tests.api.payment.test_typed_payment_writes import _open_context
@@ -25,7 +25,7 @@ FIXTURE = (
 
 @pytest.mark.parametrize("signed_in", [False, True])
 @pytest.mark.parametrize("categorized", [False, True])
-def test_portal_simple_quantity_contract_reaches_provider_and_fulfills_each_unit(
+def test_portal_simple_quantity_contract_requires_roles_and_fulfills_each_unit(
     client, db, tenant_a, signed_in, categorized
 ):
     popup, flow = _open_context(db, tenant_a)
@@ -97,10 +97,18 @@ def test_portal_simple_quantity_contract_reaches_provider_and_fulfills_each_unit
             headers=headers,
             json=body,
         )
+    if not categorized:
+        assert response.status_code == 422
+        assert response.json()["detail"] == "Recipient is not valid for this payment"
+        provider.assert_not_called()
+        return
+
     assert response.status_code == 200, response.text
     assert response.json()["checkout_url"] == "https://pay.test/simple-quantity"
     provider.return_value.create_payment.assert_called_once()
     payment_id = uuid.UUID(response.json()["payment_id"])
+    payment = db.get(Payments, payment_id)
+    assert payment is not None
     recipients = db.exec(
         select(PaymentRecipients).where(PaymentRecipients.payment_id == payment_id)
     ).all()
@@ -111,6 +119,7 @@ def test_portal_simple_quantity_contract_reaches_provider_and_fulfills_each_unit
     assert all(
         r.human_id is None and r.existing_attendee_id is None for r in recipients
     )
+    assert all(r.category_id == category_id for r in recipients)
     assert (
         len({p.payment_recipient_id for p in lines if p.product_id == ticket_id}) == 2
     )
@@ -122,7 +131,8 @@ def test_portal_simple_quantity_contract_reaches_provider_and_fulfills_each_unit
     payments_crud.approve_payment(db, payment_id)
     attendees = db.exec(select(Attendees).where(Attendees.popup_id == popup.id)).all()
     assert len(attendees) == 2
-    assert all(a.category_id == category_id for a in attendees)
+    assert all(a.category_id is None for a in attendees)
+    assert all(a.managed_by_human_id == payment.buyer_human_id for a in attendees)
     tickets = db.exec(
         select(AttendeeProducts).where(AttendeeProducts.product_id == ticket_id)
     ).all()

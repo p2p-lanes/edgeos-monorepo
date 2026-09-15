@@ -7,6 +7,10 @@
  */
 
 import type { AttendeePassState } from "@/types/Attendee"
+import {
+  type CheckoutRecipientPassState,
+  canSelectRecipientProducts,
+} from "@/types/checkout"
 import type { ProductsPass } from "@/types/Products"
 
 // ---------------------------------------------------------------------------
@@ -92,6 +96,9 @@ export function buildSectionGroups(
   attendee: AttendeePassState,
   sections: TemplateSection[],
 ): { section: TemplateSection; products: ProductsPass[] }[] {
+  if (!canSelectRecipientProducts(attendee as CheckoutRecipientPassState)) {
+    return []
+  }
   if (sections.length === 0) {
     return buildDurationGroups(attendee)
   }

@@ -14,6 +14,7 @@ import type { ProductsPass } from "@/types/Products"
 import useResolvedAttendees from "./useResolvedAttendees"
 
 const mockUseHumanAttendeesQuery = vi.fn()
+const mockUseAttendeeCategories = vi.fn()
 
 let mockCity: {
   id: string
@@ -52,7 +53,10 @@ vi.mock("@/hooks/useGetPassesData", () => ({ default: vi.fn() }))
 vi.mock("@/hooks/useGetPurchases", () => ({ usePurchasesQuery: vi.fn() }))
 
 vi.mock("@/hooks/useAttendeeCategories", () => ({
-  useAttendeeCategories: () => ({ categories: mockCategories }),
+  useAttendeeCategories: (popupId: string, salesFlowId?: string | null) => {
+    mockUseAttendeeCategories(popupId, salesFlowId)
+    return { categories: mockCategories }
+  },
 }))
 
 vi.mock("@/providers/applicationProvider", () => ({
@@ -140,6 +144,7 @@ describe("useResolvedAttendees", () => {
     mockApplications = []
     mockCategories = [primaryCategory]
     mockUseHumanAttendeesQuery.mockReset()
+    mockUseAttendeeCategories.mockReset()
   })
 
   it("returns persisted direct-sale attendees with ticket entries", () => {
@@ -263,6 +268,10 @@ describe("useResolvedAttendees", () => {
         },
       },
     })
+    expect(mockUseAttendeeCategories).toHaveBeenCalledWith(
+      "popup-1",
+      "flow-general",
+    )
   })
 
   it("uses the selected flow when a virtual attendee needs application identity", () => {
@@ -291,6 +300,275 @@ describe("useResolvedAttendees", () => {
     const { result } = renderHook(() => useResolvedAttendees("flow-partner"))
 
     expect(result.current[0]?.application_id).toBe("application-partner")
+    expect(mockUseAttendeeCategories).toHaveBeenCalledWith(
+      "popup-1",
+      "flow-partner",
+    )
+  })
+
+  it("projects the buyer from fresh Human and Application data in the current flow", () => {
+    mockCity = {
+      id: "popup-1",
+      sale_type: "application",
+      checkout_mode: "pass_system",
+      takes_applications: true,
+    }
+    mockApplications = [
+      {
+        id: "application-current",
+        tenant_id: "tenant-1",
+        popup_id: "popup-1",
+        human_id: "human-1",
+        sales_flow_id: "flow-current",
+        status: "accepted",
+        custom_fields: {
+          first_name: "Stale application name",
+          role: "Builder",
+        },
+      },
+    ] as ApplicationPublic[]
+    mockUseHumanAttendeesQuery.mockReturnValue({
+      data: [
+        makeAttendee({
+          id: "buyer-attendee",
+          name: "Stale attendee name",
+          human_id: "human-1",
+          application_id: "application-old",
+          category_id: "category-old",
+          category: "old-role",
+          additional_data: { residence: "Old residence" },
+        }),
+      ],
+    })
+
+    const { result } = renderHook(() => useResolvedAttendees("flow-current"))
+
+    expect(result.current).toHaveLength(1)
+    expect(result.current[0]).toMatchObject({
+      id: "buyer-attendee",
+      human_id: "human-1",
+      name: "Direct Buyer",
+      email: "buyer@example.com",
+      category_id: "category-main",
+      category: "main",
+      recipient: {
+        recipient_key: "human:human-1",
+        human_id: "human-1",
+        category_id: "category-main",
+        profile_snapshot: {
+          first_name: "Direct",
+          last_name: "Buyer",
+          residence: "Lisbon",
+          role: "Builder",
+          category: "main",
+        },
+      },
+    })
+    expect(result.current[0]?.recipient).not.toHaveProperty(
+      "existing_attendee_id",
+    )
+  })
+
+  it("recognizes only the current application's historical primary attendee as legacy self", () => {
+    mockCity = {
+      id: "popup-1",
+      sale_type: "application",
+      checkout_mode: "pass_system",
+      takes_applications: true,
+    }
+    mockApplications = [
+      {
+        id: "application-current",
+        tenant_id: "tenant-1",
+        popup_id: "popup-1",
+        human_id: "human-1",
+        sales_flow_id: "flow-current",
+      },
+    ] as ApplicationPublic[]
+    mockUseHumanAttendeesQuery.mockReturnValue({
+      data: [
+        makeAttendee({
+          id: "legacy-self",
+          name: "Legacy name",
+          application_id: "application-current",
+          category_id: "historical-primary",
+          category: "main",
+        }),
+      ],
+    })
+
+    const { result } = renderHook(() => useResolvedAttendees("flow-current"))
+
+    expect(result.current).toHaveLength(1)
+    expect(result.current[0]).toMatchObject({
+      id: "legacy-self",
+      human_id: null,
+      name: "Direct Buyer",
+      category_id: "category-main",
+      recipient: {
+        recipient_key: "attendee:legacy-self",
+        existing_attendee_id: "legacy-self",
+        category_id: "category-main",
+      },
+    })
+    expect(result.current[0]?.recipient).not.toHaveProperty("human_id")
+  })
+
+  it("treats a transferred accountless attendee from another application as a companion", () => {
+    mockCity = {
+      id: "popup-1",
+      sale_type: "application",
+      checkout_mode: "pass_system",
+      takes_applications: true,
+    }
+    mockApplications = [
+      {
+        id: "application-current",
+        tenant_id: "tenant-1",
+        popup_id: "popup-1",
+        human_id: "human-1",
+        sales_flow_id: "flow-current",
+      },
+    ] as ApplicationPublic[]
+    mockUseHumanAttendeesQuery.mockReturnValue({
+      data: [
+        makeAttendee({
+          id: "transferred-attendee",
+          name: "Managed elsewhere",
+          application_id: "application-previous-owner",
+          category_id: "historical-primary",
+          category: "main",
+        }),
+      ],
+    })
+
+    const { result } = renderHook(() => useResolvedAttendees("flow-current"))
+
+    expect(result.current).toHaveLength(2)
+    expect(
+      result.current.find((attendee) => attendee.id === "transferred-attendee"),
+    ).toMatchObject({
+      human_id: null,
+      category_id: null,
+      category: null,
+      recipient: {
+        recipient_key: "attendee:transferred-attendee",
+        existing_attendee_id: "transferred-attendee",
+        category_id: null,
+      },
+    })
+  })
+
+  it("keeps Human-linked companions attendee-owned and strips stale roles", () => {
+    mockUseHumanAttendeesQuery.mockReturnValue({
+      data: [
+        persistedAttendee,
+        makeAttendee({
+          id: "linked-companion",
+          name: "Linked Companion",
+          human_id: "human-2",
+          category_id: "category-other-flow",
+          category: "spouse",
+          additional_data: {
+            category: "spouse",
+            category_id: "category-other-flow",
+            residence: "Porto",
+          },
+        }),
+      ],
+    })
+
+    const { result } = renderHook(() => useResolvedAttendees("flow-current"))
+    const companion = result.current.find(
+      (attendee) => attendee.id === "linked-companion",
+    )
+
+    expect(companion).toMatchObject({
+      human_id: "human-2",
+      category_id: null,
+      category: null,
+      additional_data: { residence: "Porto" },
+      recipient: {
+        recipient_key: "attendee:linked-companion",
+        existing_attendee_id: "linked-companion",
+        category_id: null,
+        profile_snapshot: { residence: "Porto" },
+      },
+    })
+    expect(companion?.recipient).not.toHaveProperty("human_id")
+  })
+
+  it("never infers buyer-self from an accountless direct-sale attendee", () => {
+    mockUseHumanAttendeesQuery.mockReturnValue({
+      data: [
+        makeAttendee({
+          id: "fulfilled-guest",
+          name: "Fulfilled Guest",
+          origin: "direct_sale",
+          category_id: null,
+          category: null,
+        }),
+      ],
+    })
+
+    const { result } = renderHook(() => useResolvedAttendees("flow-current"))
+
+    expect(result.current).toHaveLength(2)
+    expect(
+      result.current.find((attendee) => attendee.id === "fulfilled-guest")
+        ?.recipient,
+    ).toMatchObject({
+      existing_attendee_id: "fulfilled-guest",
+      category_id: null,
+    })
+    expect(
+      result.current.find((attendee) => attendee.id === "human-1")?.recipient,
+    ).toMatchObject({ human_id: "human-1", category_id: "category-main" })
+  })
+
+  it("keeps fresh buyer fields when restoring a stale cart recipient", () => {
+    mockUseHumanAttendeesQuery.mockReturnValue({ data: [] })
+    const { result } = renderHook(() => useResolvedAttendees("flow-current"))
+
+    const restored = restoreRecipientDrafts(
+      result.current,
+      [
+        {
+          recipient_key: "human:human-1",
+          human_id: "human-1",
+          existing_attendee_id: "stale-attendee-id",
+          name: "Stale Cart Name",
+          email: "stale@example.com",
+          category_id: "category-stale",
+          profile_snapshot: {
+            category: "stale-role",
+            residence: "Stale residence",
+            saved_only: true,
+          },
+        },
+      ],
+      "popup-1",
+    )
+
+    expect(restored[0]).toMatchObject({
+      name: "Direct Buyer",
+      email: "buyer@example.com",
+      category_id: "category-main",
+      category: "main",
+      recipient: {
+        name: "Direct Buyer",
+        email: "buyer@example.com",
+        category_id: "category-main",
+        profile_snapshot: {
+          residence: "Lisbon",
+          category: "main",
+        },
+      },
+    })
+    expect(restored[0]?.recipient?.profile_snapshot).not.toHaveProperty(
+      "saved_only",
+    )
+    expect(restored[0]?.recipient).not.toHaveProperty("existing_attendee_id")
   })
 
   it.each([
@@ -373,6 +651,7 @@ describe("useResolvedAttendees", () => {
         id: "application-1",
         popup_id: "popup-1",
         human_id: "human-1",
+        sales_flow_id: "flow-general",
       },
     ] as ApplicationPublic[]
     mockUseHumanAttendeesQuery.mockReturnValue({ data: [persistedAttendee] })
@@ -384,7 +663,7 @@ describe("useResolvedAttendees", () => {
     expect(result.current[0]?.recipient).toBeUndefined()
   })
 
-  it("reconciles a restored recipient into the synthetic base projection without duplication", () => {
+  it("reconciles a restored recipient without replacing the fresh synthetic profile", () => {
     mockCity = {
       id: "popup-1",
       sale_type: "application",
@@ -440,7 +719,7 @@ describe("useResolvedAttendees", () => {
     expect(projected).toHaveLength(1)
     expect(projected[0]).toMatchObject({
       id: "human-1",
-      recipient: restoredRecipient,
+      recipient: result.current[0]?.recipient,
       products: [{ id: "access-pass", attendee_id: "human-1" }],
     })
   })

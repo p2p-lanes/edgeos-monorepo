@@ -1,21 +1,122 @@
 import { fireEvent, render, screen } from "@testing-library/react"
 import { createElement } from "react"
-import { describe, expect, it, vi } from "vitest"
+import { beforeEach, describe, expect, it, vi } from "vitest"
 import type { ProductsPass } from "@/types/Products"
 
 const useTicketsStep = vi.hoisted(() => vi.fn())
+const mocks = vi.hoisted(() => ({
+  addAttendee: vi.fn(),
+  getRelevantApplication: vi.fn(),
+  useAttendeeCategories: vi.fn(),
+  attendeePasses: [
+    {
+      id: "existing-companion",
+      name: "Existing Companion",
+      category_id: null,
+      recipient: {
+        recipient_key: "attendee:existing-companion",
+        existing_attendee_id: "existing-companion",
+        name: "Existing Companion",
+        category_id: null,
+      },
+    },
+  ],
+}))
 
 vi.mock("@/hooks/checkout/useTicketsStep", () => ({ useTicketsStep }))
+vi.mock("@/app/portal/[popupSlug]/passes/components/AttendeeModal", () => ({
+  AttendeeModal: ({
+    onSubmit,
+    category,
+    editingAttendee,
+  }: {
+    onSubmit: (data: {
+      name: string
+      email: string
+      gender: string
+      category_id: string
+      additional_data: Record<string, unknown>
+    }) => Promise<void>
+    category: { id: string }
+    editingAttendee: { name?: string | null } | null
+  }) =>
+    createElement(
+      "button",
+      {
+        type: "button",
+        onClick: () =>
+          void onSubmit({
+            name: editingAttendee?.name ?? "Companion",
+            email: "companion@example.com",
+            gender: "",
+            category_id: category.id,
+            additional_data: {},
+          }),
+      },
+      "Submit recipient",
+    ),
+}))
+vi.mock("@/hooks/useAttendee", () => ({
+  default: () => ({ addAttendee: mocks.addAttendee, loading: false }),
+}))
+vi.mock("@/hooks/useAttendeeCategories", () => ({
+  useAttendeeCategories: (popupId: string, salesFlowId?: string | null) => {
+    mocks.useAttendeeCategories(popupId, salesFlowId)
+    return {
+      categories: [
+        { id: "main", key: "main", is_primary: true },
+        { id: "spouse", key: "spouse", is_primary: false },
+        { id: "kid", key: "kid", is_primary: false },
+      ],
+    }
+  },
+}))
+vi.mock("@/providers/applicationProvider", () => ({
+  useApplication: () => ({
+    getRelevantApplication: mocks.getRelevantApplication,
+  }),
+}))
+vi.mock("@/providers/checkoutProvider", () => ({
+  useCheckout: () => ({ salesFlowId: "flow-current" }),
+}))
+vi.mock("@/providers/cityProvider", () => ({
+  useCityProvider: () => ({ getCity: () => ({ id: "popup-1" }) }),
+}))
+vi.mock("@/providers/passesProvider", () => ({
+  usePassesProvider: () => ({
+    attendeePasses: mocks.attendeePasses,
+    addRecipientDraft: vi.fn(),
+  }),
+}))
 vi.mock("react-i18next", () => ({
   useTranslation: () => ({
-    t: (_key: string, options?: { defaultValue?: string }) =>
-      options?.defaultValue ?? _key,
+    t: (
+      key: string,
+      options?: { defaultValue?: string; name?: string; role?: string },
+    ) => {
+      if (key === "checkout.recipient_assignment.roles.spouse") return "Spouse"
+      if (key === "checkout.recipient_assignment.roles.kid") return "Kid"
+      if (key === "checkout.recipient_assignment.add_role")
+        return `Add ${options?.role}`
+      return options?.defaultValue ?? key
+    },
   }),
 }))
 
 import VariantTicketCard from "./VariantTicketCard"
 
 describe("VariantTicketCard section layout", () => {
+  beforeEach(() => {
+    mocks.addAttendee.mockReset()
+    mocks.getRelevantApplication.mockReset()
+    mocks.useAttendeeCategories.mockReset()
+    mocks.getRelevantApplication.mockImplementation((salesFlowId?: string) =>
+      salesFlowId === "flow-current"
+        ? { id: "application-current", custom_fields: {} }
+        : null,
+    )
+  })
+
   it("keeps the compact desktop width and uses a subtle semantic border", () => {
     const product = {
       id: "weekend-pass",

@@ -85,6 +85,14 @@ export type CheckoutRecipientPassState = AttendeePassState & {
   recipient?: CheckoutRecipientDraft
 }
 
+export function canSelectRecipientProducts(
+  attendee: CheckoutRecipientPassState,
+): boolean {
+  return !(
+    attendee.recipient?.existing_attendee_id && attendee.category_id == null
+  )
+}
+
 interface RecipientDraftOverrides {
   name?: string
   email?: string | null
@@ -100,14 +108,20 @@ export function buildCheckoutRecipientDraft(
   overrides: RecipientDraftOverrides = {},
 ): CheckoutRecipientDraft {
   const embedded = attendee.recipient
-  const humanId = embedded?.human_id ?? attendee.human_id ?? undefined
+  // A persisted attendee selected as a companion must stay attendee-owned even
+  // when that row happens to be linked to a Human. Re-inferring human_id here
+  // would turn the companion into the buyer during cart restoration/payment.
+  const embeddedAttendeeId = embedded?.existing_attendee_id ?? undefined
+  const humanId = embeddedAttendeeId
+    ? undefined
+    : (embedded?.human_id ?? attendee.human_id ?? undefined)
   const isPersistedAccountlessAttendee =
     !humanId &&
     Boolean(
       attendee.created_at || attendee.updated_at || attendee.application_id,
     )
   const existingAttendeeId =
-    embedded?.existing_attendee_id ??
+    embeddedAttendeeId ??
     (isPersistedAccountlessAttendee ? attendee.id : undefined)
   const profileSnapshot = {
     ...(attendee.additional_data ?? {}),

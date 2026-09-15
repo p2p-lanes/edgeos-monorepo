@@ -30,8 +30,9 @@ if TYPE_CHECKING:
 from app.api.accommodation import payments as accommodation_payments
 from app.api.accommodation.constants import PRODUCT_MANAGED_BY_ACCOMMODATION
 from app.api.application.schemas import ApplicationStatus, ScholarshipStatus
-from app.api.attendee.crud import generate_check_in_code
+from app.api.attendee.crud import attendees_crud, generate_check_in_code
 from app.api.attendee.models import AttendeeProducts, Attendees
+from app.api.attendee.validation import validate_required_fields
 from app.api.attendee_category.models import AttendeeCategories
 from app.api.coupon.crud import coupons_crud
 from app.api.form_section.models import FormSections
@@ -53,6 +54,7 @@ from app.api.product.models import Products
 from app.api.product.product_state import ProductSaleState, derive_product_state
 from app.api.shared.crud import BaseCRUD
 from app.core.filters import build_filter_expression
+from app.services.restrictions.offering import flow_product_recipient_category_ids
 from app.utils.checkout_signing import (
     append_query_params,
     build_signed_redirect_url,
@@ -2191,8 +2193,38 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
         recipients_by_key = {
             recipient.recipient_key: recipient for recipient in recipients
         }
+        if len(recipients_by_key) != len(recipients):
+            raise self._recipient_error()
         referenced: set[str] = set()
         snapshot_keys: set[str] = set()
+        ticket_recipient_keys = {
+            line.recipient_key
+            for line in lines
+            if line.recipient_key is not None
+            and line.product_id in products_by_id
+            and (products_by_id[line.product_id].category or "").lower() == "ticket"
+        }
+        product_role_eligibility = (
+            flow_product_recipient_category_ids(session, sales_flow_id, popup_id)
+            if sales_flow_id is not None
+            else {}
+        )
+        if sales_flow_id is not None:
+            from app.api.ticketing_step.models import TicketingSteps
+
+            has_ticket_recipient_config = (
+                session.exec(
+                    select(TicketingSteps.id).where(
+                        TicketingSteps.sales_flow_id == sales_flow_id,
+                        TicketingSteps.popup_id == popup_id,
+                        TicketingSteps.is_enabled == True,  # noqa: E712
+                        TicketingSteps.template == "ticket-select",
+                    )
+                ).first()
+                is not None
+            )
+        else:
+            has_ticket_recipient_config = False
         payment_context = Payments(
             tenant_id=tenant_id,
             popup_id=popup_id,
@@ -2241,110 +2273,330 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
         ):
             raise self._recipient_error()
 
-        human_ids = {
-            recipient.human_id for recipient in validated if recipient.human_id
+        attendee_ids = {
+            recipient.existing_attendee_id
+            for recipient in validated
+            if recipient.existing_attendee_id is not None
         }
-        valid_human_ids = set(
+        attendees_by_id = {
+            attendee.id: attendee
+            for attendee in session.exec(
+                select(Attendees).where(
+                    Attendees.id.in_(attendee_ids),  # type: ignore[attr-defined]
+                    Attendees.tenant_id == tenant_id,
+                    Attendees.popup_id == popup_id,
+                )
+            ).all()
+        }
+        historical_category_ids = {
+            attendee.category_id
+            for attendee in attendees_by_id.values()
+            if attendee.category_id is not None
+        }
+        historical_primary_category_ids = set(
             session.exec(
-                select(Humans.id).where(
-                    Humans.id.in_(human_ids),  # type: ignore[attr-defined]
-                    Humans.tenant_id == tenant_id,
+                select(AttendeeCategories.id).where(
+                    AttendeeCategories.id.in_(historical_category_ids),  # type: ignore[attr-defined]
+                    AttendeeCategories.tenant_id == tenant_id,
+                    AttendeeCategories.popup_id == popup_id,
+                    AttendeeCategories.is_primary.is_(True),  # type: ignore[union-attr]
                 )
             ).all()
         )
+        application_is_owned_by_buyer = (
+            application_id is not None
+            and session.exec(
+                select(Applications.id).where(
+                    Applications.id == application_id,
+                    Applications.human_id == buyer_human_id,
+                    Applications.tenant_id == tenant_id,
+                    Applications.popup_id == popup_id,
+                )
+            ).first()
+            is not None
+        )
+        legacy_self_attendee_ids = {
+            attendee.id
+            for attendee in attendees_by_id.values()
+            if application_is_owned_by_buyer
+            and attendee.application_id == application_id
+            and attendee.human_id is None
+            and attendee.managed_by_human_id in (None, buyer_human_id)
+            and (
+                attendee.category_id is None
+                or attendee.category_id in historical_primary_category_ids
+            )
+        }
+        primary_category = (
+            session.exec(
+                select(AttendeeCategories).where(
+                    AttendeeCategories.sales_flow_id == sales_flow_id,
+                    AttendeeCategories.tenant_id == tenant_id,
+                    AttendeeCategories.popup_id == popup_id,
+                    AttendeeCategories.is_primary.is_(True),  # type: ignore[union-attr]
+                    AttendeeCategories.deleted_at.is_(None),  # type: ignore[union-attr]
+                )
+            ).first()
+            if sales_flow_id is not None
+            else None
+        )
+        primary_category_id = primary_category.id if primary_category else None
+        primary_role_recipient_keys: set[str] = set()
+
+        for recipient in validated:
+            if recipient.human_id is not None and recipient.human_id != buyer_human_id:
+                raise self._recipient_error()
+            if recipient.human_id is not None and recipient.existing_attendee_id:
+                raise self._recipient_error()
+            legacy_self = recipient.existing_attendee_id in legacy_self_attendee_ids
+            direct_self = (
+                application_id is None
+                and recipient.recipient_key in ticket_recipient_keys
+                and primary_category_id is not None
+                and recipient.human_id is None
+                and recipient.existing_attendee_id is None
+                and recipient.category_id in (None, primary_category_id)
+            )
+            uses_primary_role = (
+                recipient.human_id == buyer_human_id or legacy_self or direct_self
+            )
+            if direct_self:
+                recipient.human_id = buyer_human_id
+            if uses_primary_role:
+                primary_role_recipient_keys.add(recipient.recipient_key)
+                if recipient.category_id is None:
+                    recipient.category_id = primary_category_id
+
+        recipient_identities = [
+            self._recipient_person_identity(recipient) for recipient in validated
+        ]
+        if len(recipient_identities) != len(set(recipient_identities)):
+            raise self._recipient_error()
+
         category_ids = {
             recipient.category_id
             for recipient in validated
             if recipient.category_id is not None
         }
-        if sales_flow_id is not None:
-            from app.api.attendee_category.crud import (  # noqa: PLC0415
-                attendee_categories_crud,
-            )
-
-            valid_category_ids = (
-                attendee_categories_crud.allowed_ids_for_flow(session, sales_flow_id)
-                & category_ids
-            )
-        else:
-            valid_category_ids = set(
-                session.exec(
-                    select(AttendeeCategories.id).where(
-                        AttendeeCategories.id.in_(category_ids),  # type: ignore[attr-defined]
-                        AttendeeCategories.tenant_id == tenant_id,
-                        AttendeeCategories.popup_id == popup_id,
-                        AttendeeCategories.deleted_at.is_(None),  # type: ignore[union-attr]
-                    )
-                ).all()
-            )
-        attendee_ids = {
-            recipient.existing_attendee_id
-            for recipient in validated
-            if recipient.existing_attendee_id
-        }
-        attendees_by_id = {
-            attendee.id: attendee
-            for attendee in session.exec(
-                select(Attendees).where(Attendees.id.in_(attendee_ids))  # type: ignore[attr-defined]
-            ).all()
-        }
-        linked_attendees_by_human_id: dict[uuid.UUID, Attendees] = {}
-        if human_ids:
-            linked_attendees = session.exec(
-                select(Attendees)
-                .where(
-                    Attendees.tenant_id == tenant_id,
-                    Attendees.popup_id == popup_id,
-                    Attendees.human_id.in_(human_ids),  # type: ignore[attr-defined]
+        categories_by_id = {
+            category.id: category
+            for category in session.exec(
+                select(AttendeeCategories).where(
+                    AttendeeCategories.id.in_(category_ids),  # type: ignore[attr-defined]
+                    AttendeeCategories.tenant_id == tenant_id,
+                    AttendeeCategories.popup_id == popup_id,
+                    AttendeeCategories.deleted_at.is_(None),  # type: ignore[union-attr]
                 )
-                .order_by(Attendees.created_at, Attendees.id)
             ).all()
-            for attendee in linked_attendees:
-                if attendee.human_id is not None:
-                    linked_attendees_by_human_id.setdefault(attendee.human_id, attendee)
+        }
 
         for recipient in validated:
-            if recipient.human_id and recipient.human_id not in valid_human_ids:
-                raise self._recipient_error()
-            if (
-                recipient.category_id is not None
-                and recipient.category_id not in valid_category_ids
+            category = categories_by_id.get(recipient.category_id)
+            if recipient.category_id is not None and (
+                category is None
+                or (
+                    sales_flow_id is not None
+                    and category.sales_flow_id != sales_flow_id
+                )
             ):
                 raise self._recipient_error()
-            linked_attendee = (
-                linked_attendees_by_human_id.get(recipient.human_id)
-                if recipient.human_id
-                else None
-            )
             if (
-                linked_attendee is not None
-                and linked_attendee.category_id != recipient.category_id
+                recipient.recipient_key in primary_role_recipient_keys
+                and recipient.category_id != primary_category_id
             ):
                 raise self._recipient_error()
-            if recipient.human_id and recipient.existing_attendee_id:
+            if (
+                category is not None
+                and recipient.recipient_key not in primary_role_recipient_keys
+                and category.is_primary
+            ):
                 raise self._recipient_error()
             existing = attendees_by_id.get(recipient.existing_attendee_id)
-            if recipient.existing_attendee_id and (
-                existing is None
-                or existing.tenant_id != tenant_id
-                or existing.popup_id != popup_id
-                or existing.category_id != recipient.category_id
-            ):
-                raise self._recipient_error()
+            if recipient.existing_attendee_id is not None:
+                accessible = attendees_crud.get_for_human_popup(
+                    session,
+                    attendee_id=recipient.existing_attendee_id,
+                    human_id=buyer_human_id,
+                    popup_id=popup_id,
+                    tenant_id=tenant_id,
+                )
+                if existing is None or accessible is None:
+                    raise self._recipient_error()
+                if existing.human_id == buyer_human_id:
+                    raise self._recipient_error()
+
+            if category is not None:
+                validate_required_fields(
+                    category.required_fields or [],
+                    {
+                        **recipient.profile_snapshot,
+                        "name": recipient.name,
+                        "email": str(recipient.email) if recipient.email else None,
+                    },
+                )
             for line in lines:
                 if line.recipient_key != recipient.recipient_key:
                     continue
                 product = products_by_id[line.product_id]
                 if (
-                    product.attendee_category_id is not None
-                    and product.attendee_category_id != recipient.category_id
+                    sales_flow_id is not None
+                    and (product.category or "").lower() == "ticket"
                 ):
-                    raise self._recipient_error()
-        return [
+                    allowed_roles = product_role_eligibility.get(product.id)
+                    if (
+                        has_ticket_recipient_config
+                        and product.id not in product_role_eligibility
+                    ):
+                        raise self._recipient_error()
+                    if (
+                        product.id in product_role_eligibility
+                        and allowed_roles is not None
+                        and recipient.category_id not in allowed_roles
+                    ):
+                        raise self._recipient_error()
+        selected = [
             recipient
             for recipient in validated
             if recipient.recipient_key in snapshot_keys
         ]
+        if application_id is not None and sales_flow_id is not None:
+            self._enforce_recipient_category_limits(
+                session,
+                application_id=application_id,
+                sales_flow_id=sales_flow_id,
+                current_recipients=selected,
+                categories_by_id=categories_by_id,
+            )
+        return selected
+
+    @staticmethod
+    def _recipient_person_identity(
+        recipient: PaymentRecipientRequest | PaymentRecipients,
+    ) -> tuple[str, str]:
+        if recipient.human_id is not None:
+            return ("human", str(recipient.human_id))
+        attendee_id = getattr(recipient, "attendee_id", None)
+        if attendee_id is not None or recipient.existing_attendee_id is not None:
+            return ("attendee", str(attendee_id or recipient.existing_attendee_id))
+        return ("draft", recipient.recipient_key)
+
+    def _enforce_recipient_category_limits(
+        self,
+        session: Session,
+        *,
+        application_id: uuid.UUID,
+        sales_flow_id: uuid.UUID,
+        current_recipients: list[PaymentRecipientRequest | PaymentRecipients],
+        categories_by_id: dict[uuid.UUID, AttendeeCategories],
+    ) -> None:
+        capped_categories = {
+            category_id: category
+            for category_id, category in categories_by_id.items()
+            if category.max_per_application is not None
+        }
+        if not capped_categories:
+            return
+
+        approved_recipients = list(
+            session.exec(
+                select(PaymentRecipients)
+                .join(Payments, Payments.id == PaymentRecipients.payment_id)
+                .join(
+                    PaymentProducts,
+                    PaymentProducts.payment_recipient_id == PaymentRecipients.id,
+                )
+                .where(
+                    Payments.application_id == application_id,
+                    Payments.sales_flow_id == sales_flow_id,
+                    Payments.status == PaymentStatus.APPROVED.value,
+                    PaymentProducts.payment_id == Payments.id,
+                    PaymentRecipients.category_id.in_(  # type: ignore[attr-defined]
+                        capped_categories
+                    ),
+                )
+                .distinct()
+            ).all()
+        )
+        identities_by_category: dict[uuid.UUID, set[tuple[str, str]]] = {
+            category_id: set() for category_id in capped_categories
+        }
+        for recipient in approved_recipients:
+            if recipient.category_id in identities_by_category:
+                identities_by_category[recipient.category_id].add(
+                    self._recipient_person_identity(recipient)
+                )
+        for recipient in current_recipients:
+            if recipient.category_id in identities_by_category:
+                identities_by_category[recipient.category_id].add(
+                    self._recipient_person_identity(recipient)
+                )
+
+        for category_id, category in capped_categories.items():
+            identities = identities_by_category[category_id]
+            if len(identities) > category.max_per_application:
+                raise self._recipient_error()
+
+    def _enforce_payment_recipient_limits_for_approval(
+        self, session: Session, payment: Payments
+    ) -> None:
+        """Recheck cumulative recipient limits at the approval boundary."""
+        if payment.application_id is None or payment.sales_flow_id is None:
+            return
+
+        application_id = session.exec(
+            select(Applications.id)
+            .where(
+                Applications.id == payment.application_id,
+                Applications.tenant_id == payment.tenant_id,
+                Applications.popup_id == payment.popup_id,
+                Applications.sales_flow_id == payment.sales_flow_id,
+            )
+            .with_for_update()
+        ).first()
+        if application_id is None:
+            raise self._fulfillment_error()
+
+        current_recipients = list(
+            session.exec(
+                select(PaymentRecipients)
+                .join(
+                    PaymentProducts,
+                    PaymentProducts.payment_recipient_id == PaymentRecipients.id,
+                )
+                .where(
+                    PaymentRecipients.payment_id == payment.id,
+                    PaymentProducts.payment_id == payment.id,
+                )
+                .distinct()
+            ).all()
+        )
+        category_ids = {
+            recipient.category_id
+            for recipient in current_recipients
+            if recipient.category_id is not None
+        }
+        if not category_ids:
+            return
+
+        categories_by_id = {
+            category.id: category
+            for category in session.exec(
+                select(AttendeeCategories).where(
+                    AttendeeCategories.id.in_(category_ids),  # type: ignore[attr-defined]
+                    AttendeeCategories.tenant_id == payment.tenant_id,
+                    AttendeeCategories.popup_id == payment.popup_id,
+                    AttendeeCategories.sales_flow_id == payment.sales_flow_id,
+                    AttendeeCategories.deleted_at.is_(None),  # type: ignore[union-attr]
+                )
+            ).all()
+        }
+        self._enforce_recipient_category_limits(
+            session,
+            application_id=payment.application_id,
+            sales_flow_id=payment.sales_flow_id,
+            current_recipients=current_recipients,
+            categories_by_id=categories_by_id,
+        )
 
     def _validate_open_attendee_lines(
         self,
@@ -2426,19 +2678,24 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
         product: Products,
         recipient: PaymentRecipientRequest | PaymentRecipients | None = None,
     ) -> Attendees | None:
-        """Resolve recipient authority without manager relationships."""
+        """Resolve self or centrally authorized existing-attendee identity."""
         selected_id = line.attendee_id or (
             recipient.existing_attendee_id if recipient is not None else None
         )
         has_recipient = selected_id is not None or recipient is not None
-        if not self._product_accepts_recipient(
+        is_validated_snapshot = isinstance(recipient, PaymentRecipients)
+        if not is_validated_snapshot and not self._product_accepts_recipient(
             session, product, sales_flow_id=payment.sales_flow_id
         ):
             if has_recipient:
                 raise self._recipient_error()
             return None
         if recipient is not None and recipient.human_id is not None:
-            if selected_id is not None:
+            if (
+                selected_id is not None
+                or payment.buyer_human_id is None
+                or recipient.human_id != payment.buyer_human_id
+            ):
                 raise self._recipient_error()
             attendee = session.exec(
                 select(Attendees)
@@ -2460,10 +2717,6 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
             attendee is None
             or attendee.tenant_id != payment.tenant_id
             or attendee.popup_id != payment.popup_id
-            or (
-                product.attendee_category_id is not None
-                and attendee.category_id != product.attendee_category_id
-            )
         ):
             raise self._recipient_error()
         buyer_human_id = payment.buyer_human_id
@@ -2480,51 +2733,16 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
             raise self._recipient_error()
         if attendee.human_id == buyer_human_id:
             return attendee
-        if payment.application_id is not None:
-            application = session.exec(
-                select(Applications.id).where(
-                    Applications.id == payment.application_id,
-                    Applications.tenant_id == payment.tenant_id,
-                    Applications.popup_id == payment.popup_id,
-                    Applications.human_id == buyer_human_id,
-                )
-            ).first()
-            if application is not None and attendee.application_id == application:
-                return attendee
-        prior_recipient = session.exec(
-            select(PaymentRecipients.id)
-            .join(Payments, Payments.id == PaymentRecipients.payment_id)
-            .where(
-                PaymentRecipients.attendee_id == attendee.id,
-                PaymentRecipients.tenant_id == payment.tenant_id,
-                Payments.tenant_id == payment.tenant_id,
-                Payments.popup_id == payment.popup_id,
-                Payments.buyer_human_id == buyer_human_id,
-            )
-        ).first()
-        if prior_recipient is not None:
-            return attendee
-        prior_unit = session.exec(
-            select(AttendeeProducts.id)
-            .join(
-                PaymentProducts,
-                PaymentProducts.id == AttendeeProducts.payment_product_id,
-            )
-            .join(Payments, Payments.id == PaymentProducts.payment_id)
-            .where(
-                AttendeeProducts.attendee_id == attendee.id,
-                AttendeeProducts.tenant_id == payment.tenant_id,
-                AttendeeProducts.payment_id == Payments.id,
-                AttendeeProducts.product_id == PaymentProducts.product_id,
-                PaymentProducts.tenant_id == payment.tenant_id,
-                Payments.tenant_id == payment.tenant_id,
-                Payments.popup_id == payment.popup_id,
-                Payments.buyer_human_id == buyer_human_id,
-            )
-        ).first()
-        if prior_unit is not None:
-            return attendee
-        raise self._recipient_error()
+        authorized = attendees_crud.get_for_human_popup(
+            session,
+            attendee_id=attendee.id,
+            human_id=buyer_human_id,
+            popup_id=payment.popup_id,
+            tenant_id=payment.tenant_id,
+        )
+        if authorized is None:
+            raise self._recipient_error()
+        return attendee
 
     @staticmethod
     def _snapshot_recipients(
@@ -3714,6 +3932,8 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
             ):
                 raise self._invalid_transition(payment.status, PaymentStatus.APPROVED)
             was_approved = payment.status == PaymentStatus.APPROVED.value
+            if not was_approved:
+                self._enforce_payment_recipient_limits_for_approval(session, payment)
             # Set payment fields directly (no intermediate commit)
             payment.status = PaymentStatus.APPROVED.value
             if not payment.currency:
@@ -3827,14 +4047,18 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
         ):
             raise self._fulfillment_error()
         if recipient.category_id is not None:
-            category_exists = session.exec(
-                select(AttendeeCategories.id).where(
+            category = session.exec(
+                select(AttendeeCategories).where(
                     AttendeeCategories.id == recipient.category_id,
                     AttendeeCategories.tenant_id == payment.tenant_id,
                     AttendeeCategories.popup_id == payment.popup_id,
+                    AttendeeCategories.deleted_at.is_(None),  # type: ignore[union-attr]
                 )
             ).first()
-            if category_exists is None:
+            if category is None or (
+                payment.sales_flow_id is not None
+                and category.sales_flow_id != payment.sales_flow_id
+            ):
                 raise self._fulfillment_error()
 
         if (
@@ -3853,6 +4077,11 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
             raise self._fulfillment_error()
 
         if recipient.human_id is not None:
+            if (
+                recipient.existing_attendee_id is not None
+                or recipient.human_id != buyer_human_id
+            ):
+                raise self._fulfillment_error()
             human = session.exec(
                 select(Humans)
                 .where(
@@ -3879,15 +4108,18 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
                 attendee.tenant_id != payment.tenant_id
                 or attendee.popup_id != payment.popup_id
                 or attendee.human_id != recipient.human_id
-                or attendee.category_id != recipient.category_id
             ):
                 raise self._fulfillment_error()
-        elif attendee is not None and (
-            attendee.tenant_id != payment.tenant_id
-            or attendee.popup_id != payment.popup_id
-            or attendee.category_id != recipient.category_id
-        ):
-            raise self._fulfillment_error()
+        elif attendee is not None:
+            authorized = attendees_crud.get_for_human_popup(
+                session,
+                attendee_id=attendee.id,
+                human_id=buyer_human_id,
+                popup_id=payment.popup_id,
+                tenant_id=payment.tenant_id,
+            )
+            if authorized is None:
+                raise self._fulfillment_error()
 
         if attendee is None:
             from app.services.trial_limits import enforce_trial_attendee_cap
@@ -3898,9 +4130,12 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
                 application_id=None,
                 popup_id=payment.popup_id,
                 human_id=recipient.human_id,
+                managed_by_human_id=(
+                    None if recipient.human_id is not None else buyer_human_id
+                ),
                 name=recipient.name,
                 email=recipient.email,
-                category_id=recipient.category_id,
+                category_id=None,
                 additional_data=recipient.profile_snapshot,
             )
             session.add(attendee)
@@ -4000,7 +4235,6 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
 
         attendees_by_line: dict[uuid.UUID, Attendees] = {}
         for line in personal_lines:
-            product = products_by_id[line.product_id]
             if line.payment_recipient_id:
                 recipient = recipients_by_id.get(line.payment_recipient_id)
                 attendee = resolved_recipients.get(line.payment_recipient_id)
@@ -4020,11 +4254,6 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
                     or attendee.popup_id != payment.popup_id
                 ):
                     raise self._fulfillment_error()
-            if (
-                product.attendee_category_id is not None
-                and attendee.category_id != product.attendee_category_id
-            ):
-                raise self._fulfillment_error()
             attendees_by_line[line.id] = attendee
 
         line_ids = [line.id for line in personal_lines + ownerless_lines]
@@ -5022,6 +5251,12 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
                         actor=actor_from_system(),
                         payment=payment,
                     )
+
+        if (
+            new_status == PaymentStatus.APPROVED
+            and old_status != PaymentStatus.APPROVED.value
+        ):
+            self._enforce_payment_recipient_limits_for_approval(session, payment)
 
         payment.status = new_status.value
 

@@ -4,6 +4,10 @@ import { Check, CreditCard, Plus, ShoppingBag } from "lucide-react"
 import Image from "next/image"
 import type { CSSProperties } from "react"
 import { useTranslation } from "react-i18next"
+import {
+  TicketRecipientControls,
+  useTicketRecipientContext,
+} from "@/components/checkout-flow/shared/TicketRecipientControls"
 import ExpandableDescription from "@/components/ui/ExpandableDescription"
 import QuantitySelector, {
   resolveBlockedStepperProps,
@@ -1024,6 +1028,7 @@ export default function VariantTicketCard({
 }: VariantProps) {
   // Business logic via contract — routes to passesProvider or dynamicItems
   const view = useTicketsStep({ stepType, templateConfig, products })
+  const recipientContext = useTicketRecipientContext(templateConfig)
 
   const configSections = parseSections(templateConfig)
   const variant = parseVariant(templateConfig)
@@ -1044,13 +1049,18 @@ export default function VariantTicketCard({
 
   if (isEmpty) {
     return (
-      <div className="flex flex-col items-center justify-center py-12 text-center">
-        <ShoppingBag className="w-12 h-12 text-muted-foreground mb-4" />
-        <p className="text-muted-foreground">
-          {t("checkout.tickets_empty", {
-            defaultValue: "No tickets available yet.",
-          })}
-        </p>
+      <div className="space-y-4">
+        {view.mode === "pass_system" && (
+          <TicketRecipientControls context={recipientContext} />
+        )}
+        <div className="flex flex-col items-center justify-center py-12 text-center">
+          <ShoppingBag className="w-12 h-12 text-muted-foreground mb-4" />
+          <p className="text-muted-foreground">
+            {t("checkout.tickets_empty", {
+              defaultValue: "No tickets available yet.",
+            })}
+          </p>
+        </div>
       </div>
     )
   }
@@ -1071,13 +1081,20 @@ export default function VariantTicketCard({
       variant,
     }
 
-    if (variant === "compact") {
-      return <PassSystemCompactLayout {...layoutProps} />
-    }
-    if (variant === "tabs") {
-      return <PassSystemTabsLayout {...layoutProps} />
-    }
-    return <PassSystemStackedLayout {...layoutProps} />
+    const layout =
+      variant === "compact" ? (
+        <PassSystemCompactLayout {...layoutProps} />
+      ) : variant === "tabs" ? (
+        <PassSystemTabsLayout {...layoutProps} />
+      ) : (
+        <PassSystemStackedLayout {...layoutProps} />
+      )
+    return (
+      <div className="space-y-4">
+        <TicketRecipientControls context={recipientContext} />
+        {layout}
+      </div>
+    )
   }
 
   // ---------------------------------------------------------------------------

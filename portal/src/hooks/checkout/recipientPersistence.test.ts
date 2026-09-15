@@ -157,6 +157,28 @@ describe("recipient draft persistence", () => {
     expect(buildCheckoutRecipientDraft(attendee)).toEqual(recipient)
   })
 
+  it("does not infer human identity when an embedded existing attendee wins", () => {
+    const attendee = {
+      id: "linked-companion",
+      tenant_id: "tenant-1",
+      popup_id: "popup-1",
+      human_id: "linked-human",
+      name: "Linked Companion",
+      products: [],
+      recipient: {
+        recipient_key: "attendee:linked-companion",
+        existing_attendee_id: "linked-companion",
+        name: "Linked Companion",
+        category_id: "category-spouse",
+      },
+    } as CheckoutRecipientPassState
+
+    const recipient = buildCheckoutRecipientDraft(attendee)
+
+    expect(recipient.existing_attendee_id).toBe("linked-companion")
+    expect(recipient).not.toHaveProperty("human_id")
+  })
+
   it("saves authenticated recipient lines and keeps legacy attendee lines", () => {
     const spouse = {
       recipient_key: "managed-spouse",

@@ -65,6 +65,59 @@ def _curated_product_ids(template_config: Any) -> set[uuid.UUID]:
     return ids
 
 
+def _section_recipient_category_ids(section: Any) -> set[uuid.UUID] | None:
+    """Return one section's role constraint; ``None`` means unrestricted."""
+    if not isinstance(section, dict):
+        return None
+    raw_ids = section.get("attendee_categories")
+    if raw_ids is None or not isinstance(raw_ids, list):
+        return None
+    category_ids: set[uuid.UUID] = set()
+    for raw in raw_ids:
+        try:
+            category_ids.add(uuid.UUID(str(raw)))
+        except (ValueError, AttributeError, TypeError):
+            continue
+    return category_ids
+
+
+def _merge_recipient_categories(
+    result: dict[uuid.UUID, set[uuid.UUID] | None],
+    product_id: uuid.UUID,
+    category_ids: set[uuid.UUID] | None,
+) -> None:
+    """Merge matching sections; any unrestricted match makes the product open."""
+    if product_id not in result:
+        result[product_id] = category_ids
+    elif result[product_id] is None or category_ids is None:
+        result[product_id] = None
+    else:
+        result[product_id] |= category_ids
+
+
+def _active_product_ids_for_categories(
+    session: Session, popup_id: uuid.UUID, categories: set[str]
+) -> set[uuid.UUID]:
+    """Return active popup products whose category is in ``categories``."""
+    if not categories:
+        return set()
+
+    from app.api.product.models import Products
+
+    rows = session.exec(
+        select(Products.id, Products.category).where(
+            Products.popup_id == popup_id,
+            Products.is_active == True,  # noqa: E712
+            Products.deleted_at.is_(None),  # type: ignore[attr-defined]
+        )
+    ).all()
+    return {
+        product_id
+        for product_id, category in rows
+        if category and category.lower() in categories
+    }
+
+
 def _accommodation_product_ids(
     session: Session, flow_id: uuid.UUID, popup_id: uuid.UUID
 ) -> set[uuid.UUID]:
@@ -109,7 +162,6 @@ def flow_offered_product_ids(
 ) -> set[uuid.UUID]:
     """Every product id this flow's enabled steps offer."""
     from app.api.accommodation.constants import ACCOMMODATION_STEP_TEMPLATE
-    from app.api.product.models import Products
     from app.api.ticketing_step.models import TicketingSteps
 
     steps = list(
@@ -133,19 +185,59 @@ def flow_offered_product_ids(
         else:
             open_categories.add(step.product_category.lower())
 
-    if open_categories:
-        rows = session.exec(
-            select(Products.id, Products.category).where(
-                Products.popup_id == popup_id,
-                Products.is_active == True,  # noqa: E712
-                Products.deleted_at.is_(None),  # type: ignore[attr-defined]
-            )
-        ).all()
-        for product_id, category in rows:
-            if category and category.lower() in open_categories:
-                offered.add(product_id)
+    offered |= _active_product_ids_for_categories(session, popup_id, open_categories)
 
     if any(step.template == ACCOMMODATION_STEP_TEMPLATE for step in steps):
         offered |= _accommodation_product_ids(session, flow_id, popup_id)
 
     return offered
+
+
+def flow_product_recipient_category_ids(
+    session: Session, flow_id: uuid.UUID, popup_id: uuid.UUID
+) -> dict[uuid.UUID, set[uuid.UUID] | None]:
+    """Map ticket products to exact flow-role constraints from ticket sections.
+
+    ``None`` means unrestricted. Explicit lists constrain, including an empty
+    list which permits no recipient role. An uncurated enabled ``ticket-select``
+    retains its product-category fallback and leaves those products unrestricted.
+    """
+    from app.api.ticketing_step.models import TicketingSteps
+
+    steps = list(
+        session.exec(
+            select(TicketingSteps).where(
+                TicketingSteps.sales_flow_id == flow_id,
+                TicketingSteps.popup_id == popup_id,
+                TicketingSteps.is_enabled == True,  # noqa: E712
+                TicketingSteps.template == "ticket-select",
+            )
+        ).all()
+    )
+    result: dict[uuid.UUID, set[uuid.UUID] | None] = {}
+    open_categories: set[str] = set()
+
+    for step in steps:
+        curated = _curated_product_ids(step.template_config)
+        if curated:
+            sections = (
+                step.template_config.get("sections")
+                if isinstance(step.template_config, dict)
+                else []
+            )
+            for section in sections or []:
+                if not isinstance(section, dict):
+                    continue
+                section_product_ids = _curated_product_ids({"sections": [section]})
+                category_ids = _section_recipient_category_ids(section)
+                for product_id in section_product_ids:
+                    _merge_recipient_categories(result, product_id, category_ids)
+        elif step.product_category:
+            open_categories.add(step.product_category.lower())
+
+    for product_id in _active_product_ids_for_categories(
+        session, popup_id, open_categories
+    ):
+        _merge_recipient_categories(result, product_id, None)
+
+    return result
