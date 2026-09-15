@@ -328,6 +328,8 @@ export function usePaymentSubmit({
           : await PaymentsService.createMyPayment({
               requestBody: {
                 application_id: applicationId,
+                locale: i18n.language,
+                return_context: returnContext,
                 products: productsToSend,
                 recipients: recipientsToSend,
                 coupon_code: promoCodeValid ? promoCode : undefined,
@@ -420,11 +422,12 @@ export function usePaymentSubmit({
           // email was sent, matching the open-ticketing zero-amount path.
           if (isEditing) {
             router.replace(`/portal/${popupSlug}/passes`)
-          } else if (submitMode === "open-ticketing" && data.redirect_url) {
-            // Zero-amount open checkout where the popup configured a custom
-            // success URL: SimpleFI was bypassed, so we perform the redirect
-            // the provider would have done on a paid purchase. The backend
-            // returns the configured URL in redirect_url for this case.
+          } else if (
+            (submitMode === "open-ticketing" || submitMode === "application") &&
+            data.redirect_url
+          ) {
+            // SimpleFI was bypassed, so follow the same backend-resolved
+            // destination the provider would have used for a paid purchase.
             navigateBrowser(data.redirect_url)
           } else {
             const qs = paymentId ? `?payment_id=${paymentId}` : ""

@@ -8,6 +8,7 @@ import { Loader } from "@/components/ui/Loader"
 interface ApplicationCheckoutRedirectProps {
   popupSlug: string
   flowId: string
+  returnContext?: "direct" | "portal"
 }
 
 /**
@@ -18,12 +19,14 @@ interface ApplicationCheckoutRedirectProps {
 export function ApplicationCheckoutRedirect({
   popupSlug,
   flowId,
+  returnContext = "direct",
 }: ApplicationCheckoutRedirectProps) {
   const router = useRouter()
 
   useEffect(() => {
-    router.replace(`/portal/${popupSlug}/shop/${flowId}`)
-  }, [popupSlug, flowId, router])
+    const query = returnContext === "direct" ? "?return_context=direct" : ""
+    router.replace(`/portal/${popupSlug}/shop/${flowId}${query}`)
+  }, [popupSlug, flowId, returnContext, router])
 
   return (
     <div className="flex min-h-screen items-center justify-center">

@@ -956,7 +956,16 @@ async def create_my_payment(
     if payment.status == PaymentStatus.APPROVED.value:
         await _send_payment_confirmed_email_best_effort(payment, db_session=db)
 
-    return PaymentPublic.model_validate(payment)
+    response = PaymentPublic.model_validate(payment)
+    if payment.status == PaymentStatus.APPROVED.value and not payment.edit_passes:
+        response.redirect_url = payments_crud.resolve_application_payment_success_url(
+            db,
+            payment,
+            application,
+            locale=payment_in.locale,
+            return_context=payment_in.return_context,
+        )
+    return response
 
 
 @router.post("/direct", include_in_schema=False)

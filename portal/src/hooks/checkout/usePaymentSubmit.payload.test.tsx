@@ -300,6 +300,29 @@ describe("usePaymentSubmit public purchase payload", () => {
     )
   })
 
+  it("sends application context and follows the backend destination", async () => {
+    const redirectUrl = "https://brand.example/thanks?lang=en&sig=signature"
+    createMyPayment.mockResolvedValueOnce({
+      status: "approved",
+      id: "payment-1",
+      redirect_url: redirectUrl,
+    })
+    const { result } = renderPaymentSubmit("application-store", {
+      submitMode: "application",
+      returnContext: "portal",
+    })
+
+    await act(async () => {
+      await result.current.submitPayment()
+    })
+
+    expect(createMyPayment.mock.calls[0]?.[0].requestBody).toMatchObject({
+      locale: "en",
+      return_context: "portal",
+    })
+    expect(navigateBrowser).toHaveBeenCalledWith(redirectUrl)
+  })
+
   it("follows the backend-resolved portal redirect for a zero-price purchase", async () => {
     const redirectUrl =
       "https://portal.test/portal/festival-2026/thank-you?lang=en"

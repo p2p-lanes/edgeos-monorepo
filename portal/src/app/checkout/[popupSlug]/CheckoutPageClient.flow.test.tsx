@@ -34,8 +34,16 @@ vi.mock("@/components/checkout-flow/OpenCheckoutRuntime", () => ({
 }))
 
 vi.mock("./ApplicationCheckoutRedirect", () => ({
-  ApplicationCheckoutRedirect: ({ flowId }: { flowId?: string }) => (
-    <div>application-checkout:{flowId ?? "missing"}</div>
+  ApplicationCheckoutRedirect: ({
+    flowId,
+    returnContext,
+  }: {
+    flowId?: string
+    returnContext?: string
+  }) => (
+    <div>
+      application-checkout:{flowId ?? "missing"}:{returnContext ?? "missing"}
+    </div>
   ),
 }))
 
@@ -106,7 +114,7 @@ describe("CheckoutPageClient flow propagation", () => {
     )
 
     expect(
-      screen.getByText("application-checkout:application-flow-id"),
+      screen.getByText("application-checkout:application-flow-id:direct"),
     ).toBeTruthy()
   })
 })

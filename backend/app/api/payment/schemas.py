@@ -2,7 +2,7 @@ import uuid
 from datetime import datetime
 from decimal import Decimal
 from enum import Enum
-from typing import ClassVar
+from typing import ClassVar, Literal
 
 from pydantic import BaseModel, ConfigDict, EmailStr, field_validator, model_validator
 from pydantic import Field as PydanticField
@@ -358,6 +358,8 @@ class PaymentCreate(BaseModel):
     coupon_code: str | None = None
     edit_passes: bool = False
     insurance: bool = False
+    locale: str | None = PydanticField(default=None, max_length=8)
+    return_context: Literal["direct", "portal"] = "direct"
 
     model_config = ConfigDict(extra="forbid")
 
@@ -424,6 +426,7 @@ class PaymentPublic(PaymentBase):
     recipients: list[PaymentRecipientResponse] = PydanticField(default_factory=list)
     buyer_email: str | None = None
     buyer_name: str | None = None
+    redirect_url: str | None = None
     created_at: datetime | None = None
     updated_at: datetime | None = None
 

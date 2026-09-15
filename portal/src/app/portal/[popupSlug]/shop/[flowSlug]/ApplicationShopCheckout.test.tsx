@@ -50,7 +50,13 @@ vi.mock("@/providers/passesProvider", () => ({
   usePassesProvider: () => useContext(PassesContext),
 }))
 vi.mock("@/providers/checkoutProvider", () => ({
-  CheckoutProvider: ({ children }: { children: ReactNode }) => children,
+  CheckoutProvider: ({
+    children,
+    returnContext,
+  }: {
+    children: ReactNode
+    returnContext?: string
+  }) => <div data-return-context={returnContext}>{children}</div>,
 }))
 vi.mock("@/providers/cityProvider", () => ({
   CityContext: createContext(null),
@@ -117,6 +123,7 @@ describe("ApplicationShopCheckout", () => {
         flowId={flowId}
         flowSlug={flowSlug}
         popupSlug="festival-2026"
+        returnContext="direct"
         themeConfig={{
           colors: {
             mode: "light",
@@ -139,6 +146,12 @@ describe("ApplicationShopCheckout", () => {
       }),
     )
     expect(screen.getByText("checkout")).toBeTruthy()
+    expect(
+      screen
+        .getByText("checkout")
+        .closest("[data-return-context]")
+        ?.getAttribute("data-return-context"),
+    ).toBe("direct")
     const themeScope = screen
       .getByText("checkout")
       .closest<HTMLElement>(".text-foreground")

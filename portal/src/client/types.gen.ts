@@ -3970,6 +3970,8 @@ export type PaymentCreate = {
     coupon_code?: (string | null);
     edit_passes?: boolean;
     insurance?: boolean;
+    locale?: (string | null);
+    return_context?: 'direct' | 'portal';
 };
 
 /**
@@ -4091,6 +4093,7 @@ export type PaymentPublic = {
     recipients?: Array<PaymentRecipientResponse>;
     buyer_email?: (string | null);
     buyer_name?: (string | null);
+    redirect_url?: (string | null);
     created_at?: (string | null);
     updated_at?: (string | null);
 };

@@ -19,6 +19,7 @@ interface ApplicationShopCheckoutProps {
   flowSlug: string
   popupSlug: string
   themeConfig?: SalesFlowPortalThemeConfig | null
+  returnContext?: "direct" | "portal"
 }
 
 type CheckoutControlBoundaryStyle = CSSProperties & {
@@ -83,6 +84,7 @@ function FlowScopedCheckout({
   flowSlug,
   popupSlug,
   themeConfig,
+  returnContext = "portal",
 }: ApplicationShopCheckoutProps) {
   const router = useRouter()
   const { attendeePasses, products } = usePassesProvider()
@@ -98,6 +100,7 @@ function FlowScopedCheckout({
       salesFlowId={flowId}
       salesFlowSlug={flowSlug}
       flowType="application"
+      returnContext={returnContext}
     >
       {background.type === "image" && (
         <CheckoutBackgroundImage url={background.url} />
@@ -125,6 +128,7 @@ export function ApplicationShopCheckout({
   flowSlug,
   popupSlug,
   themeConfig,
+  returnContext = "portal",
 }: ApplicationShopCheckoutProps) {
   const attendees = useResolvedAttendees(flowId)
   const providerThemeConfig = toProviderThemeConfig(themeConfig)
@@ -144,6 +148,7 @@ export function ApplicationShopCheckout({
           flowSlug={flowSlug}
           popupSlug={popupSlug}
           themeConfig={themeConfig}
+          returnContext={returnContext}
         />
       </PassesProvider>
     </ThemeProvider>

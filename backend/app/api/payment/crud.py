@@ -259,7 +259,7 @@ def _internal_open_checkout_thank_you_url(
     portal_base: str,
     landing_is_checkout: bool,
     popup: "Popups",
-    payment: Payments,
+    payment: Payments | uuid.UUID,
     *,
     flow_slug: str | None = None,
     return_context: str = "direct",
@@ -271,10 +271,55 @@ def _internal_open_checkout_thank_you_url(
         base = f"{portal_base}/thank-you"
     else:
         base = f"{portal_base}/checkout/{popup.slug}/thank-you"
-    query = [("payment_id", str(payment.id))]
+    payment_id = payment if isinstance(payment, uuid.UUID) else payment.id
+    query = [("payment_id", str(payment_id))]
     if flow_slug is not None:
         query.append(("flow", flow_slug))
     return append_query_params(base, query)
+
+
+def _resolve_application_payment_success_url(
+    flow: "SalesFlows",
+    application: Applications,
+    payment_id: uuid.UUID,
+    *,
+    items: list[dict],
+    amount: Decimal,
+    currency: str,
+    locale: str | None,
+    return_context: str,
+) -> str:
+    from app.api.shared.enums import LandingMode  # noqa: PLC0415
+    from app.api.tenant.utils import get_portal_url  # noqa: PLC0415
+
+    popup = application.popup
+    lang = locale or popup.default_language or "en"
+    now = datetime.now(UTC)
+    human = application.human
+    payload = build_thank_you_payload(
+        order_id=str(payment_id),
+        first_name=human.first_name if human and human.first_name else "",
+        email=human.email if human else "",
+        items=items,
+        amount_total=float(amount),
+        currency=currency,
+        issued_at=now.isoformat(),
+        exp=int(now.timestamp()) + 30 * 60,
+    )
+    portal_base = get_portal_url(popup.tenant)
+    return _resolve_open_checkout_success_url(
+        flow,
+        _internal_open_checkout_thank_you_url(
+            portal_base,
+            popup.tenant.landing_mode == LandingMode.checkout,
+            popup,
+            payment_id,
+            flow_slug=flow.slug,
+            return_context=return_context,
+        ),
+        payload,
+        locale=lang,
+    )
 
 
 def resolve_patron_template_config(
@@ -3217,6 +3262,47 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
     # this window is treated as a legitimate new purchase intent.
     _DUPLICATE_WINDOW_SECONDS = 300
 
+    def resolve_application_payment_success_url(
+        self,
+        session: Session,
+        payment: Payments,
+        application: Applications,
+        *,
+        locale: str | None,
+        return_context: str,
+    ) -> str:
+        """Resolve the approved application payment destination for the API."""
+        from app.api.sales_flow.models import SalesFlows  # noqa: PLC0415
+
+        flow = session.get(SalesFlows, application.sales_flow_id)
+        if flow is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Sales flow not found",
+            )
+
+        return _resolve_application_payment_success_url(
+            flow,
+            application,
+            payment.id,
+            items=[
+                {
+                    "title": line.product_name,
+                    "qty": line.quantity,
+                    "price": float(
+                        line.effective_unit_price
+                        if line.effective_unit_price is not None
+                        else line.product_price
+                    ),
+                }
+                for line in payment.products_snapshot
+            ],
+            amount=payment.amount,
+            currency=payment.currency,
+            locale=locale,
+            return_context=return_context,
+        )
+
     def create_payment(
         self,
         session: Session,
@@ -3370,6 +3456,15 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Application not found",
+            )
+
+        from app.api.sales_flow.models import SalesFlows  # noqa: PLC0415
+
+        target_flow = session.get(SalesFlows, application.sales_flow_id)
+        if target_flow is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Sales flow not found",
             )
 
         # Same resolution the preview just ran, repeated on purpose: it
@@ -3686,7 +3781,30 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
                 f"{portal_base}/portal/{application.popup.slug}/passes/buy"
                 f"?flow={application.sales_flow_id}"
             )
-            success_path = f"{cancel_path}&checkout=success"
+            payment_id = uuid.uuid4()
+            success_path = _resolve_application_payment_success_url(
+                target_flow,
+                application,
+                payment_id,
+                items=[
+                    {
+                        "title": products_map[line.product_id].name,
+                        "qty": line.quantity,
+                        "price": float(
+                            line.unit_price_override
+                            if line.unit_price_override is not None
+                            else stay_prices.get(
+                                index, products_map[line.product_id].price
+                            )
+                        ),
+                    }
+                    for index, line in enumerate(obj.products)
+                ],
+                amount=preview.amount,
+                currency=preview.currency,
+                locale=obj.locale,
+                return_context=obj.return_context,
+            )
 
             logger.info(
                 "Creating SimpleFI pass payment: application_id={} popup_id={} tenant_id={} amount={} currency={} product_count={} coupon_code={} edit_passes={} insurance={} max_installments={}",
@@ -3738,6 +3856,7 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
         # payment_request_id) and installments_total stays NULL until the
         # `installment_plan_activated` webhook delivers the buyer's pick.
         payment = Payments(
+            id=payment_id,
             tenant_id=application.tenant_id,
             application_id=obj.application_id,
             popup_id=application.popup_id,

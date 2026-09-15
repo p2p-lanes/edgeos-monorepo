@@ -18202,6 +18202,24 @@ export const PaymentCreateSchema = {
             type: 'boolean',
             title: 'Insurance',
             default: false
+        },
+        locale: {
+            anyOf: [
+                {
+                    type: 'string',
+                    maxLength: 8
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Locale'
+        },
+        return_context: {
+            type: 'string',
+            enum: ['direct', 'portal'],
+            title: 'Return Context',
+            default: 'direct'
         }
     },
     additionalProperties: false,
@@ -18963,6 +18981,17 @@ export const PaymentPublicSchema = {
                 }
             ],
             title: 'Buyer Name'
+        },
+        redirect_url: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Redirect Url'
         },
         created_at: {
             anyOf: [

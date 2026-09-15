@@ -57,12 +57,14 @@ vi.mock("./ApplicationShopCheckout", () => ({
     flowId,
     flowSlug,
     themeConfig,
+    returnContext,
   }: {
     flowId: string
     flowSlug: string
     themeConfig?: SalesFlowPortalThemeConfig | null
+    returnContext?: "direct" | "portal"
   }) => {
-    applicationCheckoutProps({ flowId, flowSlug, themeConfig })
+    applicationCheckoutProps({ flowId, flowSlug, themeConfig, returnContext })
     return <div>{`application-checkout:${flowId}:${flowSlug}`}</div>
   },
 }))
@@ -140,15 +142,19 @@ describe("ShopCheckoutContent", () => {
         popupId="popup-1"
         popupSlug="summer-camp"
         flowSlug="application-1"
+        returnContext="direct"
       />,
     )
 
-    expect(replace).toHaveBeenCalledWith("/portal/summer-camp/shop/attendee")
+    expect(replace).toHaveBeenCalledWith(
+      "/portal/summer-camp/shop/attendee?return_context=direct",
+    )
     expect(
       screen.getByText("application-checkout:application-1:attendee"),
     ).toBeTruthy()
     expect(applicationCheckoutProps).toHaveBeenLastCalledWith(
       expect.objectContaining({
+        returnContext: "direct",
         themeConfig: {
           colors: {
             mode: "light",

@@ -235,12 +235,15 @@ def test_application_payment_redirects_preserve_the_application_flow(
     provider.create_payment.assert_called_once()
     sent = provider.create_payment.call_args.kwargs
     assert sent["cancel_path"] == expected_cancel
-    expected_success = (
-        f"{get_portal_url(tenant_a)}/portal/{popup.slug}?flow={flow.id}&checkout=success"
-        if payment_kind == "application_fee"
-        else f"{expected_cancel}&checkout=success"
-    )
-    assert sent["success_path"] == expected_success
+    if payment_kind == "application_fee":
+        assert sent["success_path"] == (
+            f"{get_portal_url(tenant_a)}/portal/{popup.slug}"
+            f"?flow={flow.id}&checkout=success"
+        )
+    else:
+        assert f"/checkout/{popup.slug}/thank-you?" in sent["success_path"]
+        assert f"payment_id={payment.id}" in sent["success_path"]
+        assert f"flow={flow.slug}" in sent["success_path"]
 
 
 def test_payment_attempts_write_distinct_immutable_recipient_snapshots(
