@@ -65,6 +65,7 @@ export default function EventsPage() {
   const router = useRouter()
   const pathname = usePathname()
   const searchParams = useSearchParams()
+  const flowId = searchParams.get("flow")
 
   // One-shot restore of UI state from sessionStorage when the user comes
   // back from an event detail page. The detail page's "Back to events"
@@ -800,6 +801,7 @@ export default function EventsPage() {
           <CalendarBody
             popupId={city?.id}
             slug={city?.slug}
+            flowId={flowId}
             search={search}
             rsvpedOnly={rsvpedOnly}
             mineOnly={mineOnly}
@@ -818,6 +820,7 @@ export default function EventsPage() {
             <DayBody
               popupId={city?.id}
               slug={city?.slug}
+              flowId={flowId}
               search={search}
               rsvpedOnly={rsvpedOnly}
               mineOnly={mineOnly}
@@ -839,6 +842,7 @@ export default function EventsPage() {
           <ListBody
             events={events}
             slug={city?.slug}
+            flowId={flowId}
             isLoading={isLoading || tzLoading}
             formatTime={formatTime}
             formatDateShort={formatDateShort}
@@ -897,6 +901,7 @@ export default function EventsPage() {
             <DayBody
               popupId={city?.id}
               slug={city?.slug}
+              flowId={flowId}
               search={search}
               rsvpedOnly={rsvpedOnly}
               mineOnly={mineOnly}

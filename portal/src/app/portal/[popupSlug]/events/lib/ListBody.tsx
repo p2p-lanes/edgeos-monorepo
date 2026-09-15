@@ -31,6 +31,7 @@ import { cn } from "@/lib/utils"
 import { CoverImage } from "./CoverImage"
 import { canManageEvent } from "./eventPermissions"
 import type { EventsScrollSnapshot } from "./eventsViewState"
+import { buildPortalEventHref } from "./portalEventHref"
 import { summarizeRrule } from "./summarizeRrule"
 
 const statusColors: Record<string, string> = {
@@ -82,6 +83,8 @@ export function nextOpenDayTarget(
 interface ListBodyProps {
   events: EventPublic[]
   slug: string | undefined
+  /** Selected application flow, retained as navigation context. */
+  flowId?: string | null
   isLoading?: boolean
   formatTime: (d: string) => string
   formatDateShort: (d: string) => string
@@ -152,6 +155,7 @@ interface ListBodyProps {
 export function ListBody({
   events,
   slug,
+  flowId,
   isLoading,
   formatTime,
   formatDateShort,
@@ -376,9 +380,14 @@ export function ListBody({
                     : isHighlighted
                       ? "relative rounded-xl border-2 border-amber-400 bg-amber-50 dark:bg-amber-950/30 hover:shadow-md transition-shadow"
                       : "relative rounded-xl border bg-card hover:shadow-md transition-shadow"
-                  const href = event.occurrence_id
-                    ? `/portal/${slug}/events/${event.id}?occ=${encodeURIComponent(event.start_time)}`
-                    : `/portal/${slug}/events/${event.id}`
+                  const href = buildPortalEventHref({
+                    slug,
+                    eventId: event.id,
+                    flowId,
+                    occurrenceStart: event.occurrence_id
+                      ? event.start_time
+                      : null,
+                  })
                   const handleClick = (
                     e: React.MouseEvent<HTMLAnchorElement>,
                   ) => {
@@ -593,7 +602,12 @@ export function ListBody({
                             </button>
                             {canManage && (
                               <Link
-                                href={`/portal/${slug}/events/${event.id}/edit`}
+                                href={buildPortalEventHref({
+                                  slug,
+                                  eventId: event.id,
+                                  flowId,
+                                  suffix: "/edit",
+                                })}
                                 onClick={(e) => e.stopPropagation()}
                                 aria-label={t("events.list.edit_event_aria", {
                                   title: event.title,

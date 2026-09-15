@@ -19,6 +19,7 @@ import { useHumanPopupAccess } from "@/hooks/useHumanPopupAccess"
 import { usePortalDirectSalesFlows } from "@/hooks/usePortalDirectSalesFlows"
 import { usePortalSalesFlows } from "@/hooks/usePortalSalesFlows"
 import { usePortalUpsaleFlows } from "@/hooks/usePortalUpsaleFlows"
+import { hasAcceptedPopupParticipation } from "@/lib/popup-participation"
 import { getEligiblePortalFlows } from "@/lib/portal-sales-flows"
 import { useApplication } from "@/providers/applicationProvider"
 import { useCityProvider } from "@/providers/cityProvider"
@@ -113,8 +114,10 @@ const useResources = () => {
   const acceptedApplications = getApplicationsForPopup().filter(
     (item) => item.status === "accepted",
   )
-  const hasAcceptedPopupParticipation =
-    acceptedApplications.length > 0 || companionApplicationAccepted
+  const popupParticipationAccepted = hasAcceptedPopupParticipation(
+    acceptedApplications,
+    participation,
+  )
   const approvedApplicationFlowIds = new Set<string>(
     acceptedApplications.flatMap((item) =>
       item.sales_flow_id ? [item.sales_flow_id] : [],
@@ -231,7 +234,7 @@ const useResources = () => {
       buildDirectoryResource({
         t,
         slug: city.slug,
-        hasAcceptedParticipation: hasAcceptedPopupParticipation,
+        hasAcceptedParticipation: popupParticipationAccepted,
         attendeeDirectoryEnabled,
       }),
     ]
@@ -250,7 +253,7 @@ const useResources = () => {
     {
       name: t("sidebar.passes"),
       icon: Ticket,
-      status: hasAcceptedPopupParticipation ? "active" : "hidden",
+      status: popupParticipationAccepted ? "active" : "hidden",
       path: `/portal/${city.slug}/passes`,
       group: "commerce",
     },
@@ -265,14 +268,13 @@ const useResources = () => {
     buildDirectoryResource({
       t,
       slug: city?.slug,
-      hasAcceptedParticipation: hasAcceptedPopupParticipation,
+      hasAcceptedParticipation: popupParticipationAccepted,
       attendeeDirectoryEnabled,
     }),
     {
       name: t("sidebar.events"),
       icon: CalendarDays,
-      status:
-        selectedApplicationAccepted && eventsEnabled ? "active" : "hidden",
+      status: popupParticipationAccepted && eventsEnabled ? "active" : "hidden",
       path: `/portal/${city?.slug}/events${flowQuery}`,
       group: "community",
       children: [
@@ -280,21 +282,21 @@ const useResources = () => {
           name: t("sidebar.tracks", { defaultValue: "Tracks" }),
           icon: Layers,
           status:
-            selectedApplicationAccepted && eventsEnabled ? "active" : "hidden",
+            popupParticipationAccepted && eventsEnabled ? "active" : "hidden",
           path: `/portal/${city?.slug}/events/tracks${flowQuery}`,
         },
         {
           name: t("sidebar.venues"),
           icon: MapPin,
           status:
-            selectedApplicationAccepted && eventsEnabled ? "active" : "hidden",
+            popupParticipationAccepted && eventsEnabled ? "active" : "hidden",
           path: `/portal/${city?.slug}/events/venues${flowQuery}`,
         },
         {
           name: t("sidebar.agentic_access", { defaultValue: "Agentic access" }),
           icon: OpenClaw,
           status:
-            selectedApplicationAccepted && eventsEnabled ? "active" : "hidden",
+            popupParticipationAccepted && eventsEnabled ? "active" : "hidden",
           path: "/portal/agentic-access",
         },
       ],

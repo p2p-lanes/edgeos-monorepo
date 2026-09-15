@@ -205,6 +205,11 @@ describe("useResources Commerce navigation", () => {
         (resource) => resource.path === "/portal/summit/shop/attendee",
       ),
     ).toBe(false)
+    expect(
+      result.current.resources.find(
+        (resource) => resource.name === "sidebar.events",
+      )?.status,
+    ).toBe("hidden")
   })
 
   it("deduplicates returned flows by ID or slug", () => {
@@ -260,7 +265,7 @@ describe("useResources Commerce navigation", () => {
     ).toBe(false)
   })
 
-  it("keeps popup-wide Passes and Directory when no application flow is selected", () => {
+  it("keeps popup-wide Passes, Directory, and Events when no application flow is selected", () => {
     mocks.applicationStatus = null
     mocks.applications = [
       { sales_flow_id: attendeeFlow.id, status: "accepted" },
@@ -287,8 +292,11 @@ describe("useResources Commerce navigation", () => {
     expect(
       result.current.resources.find(
         (resource) => resource.name === "sidebar.events",
-      )?.status,
-    ).toBe("hidden")
+      ),
+    ).toMatchObject({
+      status: "active",
+      path: "/portal/summit/events",
+    })
   })
 
   it("shows popup-wide Passes and Directory for an accepted companion", () => {
