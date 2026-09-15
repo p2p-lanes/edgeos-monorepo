@@ -53,7 +53,10 @@ vi.mock("@/client", () => ({
 vi.mock("@tanstack/react-router", () => ({
   Link: ({ children }: { children: ReactNode }) => <>{children}</>,
   useNavigate: () => vi.fn(),
-  useBlocker: (options: { shouldBlockFn: () => boolean; disabled: boolean }) => {
+  useBlocker: (options: {
+    shouldBlockFn: () => boolean
+    disabled: boolean
+  }) => {
     mocks.blockerOptions = options
     return { status: "unblocked" }
   },
