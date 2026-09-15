@@ -271,7 +271,7 @@ def _internal_open_checkout_thank_you_url(
         base = f"{portal_base}/thank-you"
     else:
         base = f"{portal_base}/checkout/{popup.slug}/thank-you"
-    payment_id = payment.id if isinstance(payment, Payments) else payment
+    payment_id = payment if isinstance(payment, uuid.UUID) else payment.id
     query = [("payment_id", str(payment_id))]
     if flow_slug is not None:
         query.append(("flow", flow_slug))
