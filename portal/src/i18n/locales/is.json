@@ -400,6 +400,37 @@
       "not_eligible_caption": "Ekki gjaldgengt fyrir afslátt",
       "promo_discount_eligible_label": "Afsláttur (gjaldgengar vörur)"
     },
+    "recipient_assignment": {
+      "add_role": "Bæta við {{role}}",
+      "add_title": "Bæta við {{role}}",
+      "edit_title": "Breyta {{name}}",
+      "description": "Sláðu inn upplýsingar fyrir {{role}} og vistaðu þegar því er lokið.",
+      "delete_title": "Eyða {{name}}",
+      "delete_description": "Ertu viss um að þú viljir eyða {{role}}?",
+      "deleting": "Eyði...",
+      "delete": "Eyða",
+      "full_name": "Fullt nafn",
+      "select_field": "Veldu {{field}}",
+      "update": "Uppfæra",
+      "save": "Vista",
+      "roles": {
+        "main": "Aðalgestur",
+        "spouse": "Maki",
+        "kid": "Barn",
+        "baby": "Ungbarn",
+        "teen": "Unglingur"
+      },
+      "fields": {
+        "email": "Netfang",
+        "gender": "Kyn",
+        "age": "Aldur",
+        "residence": "Búseta",
+        "telegram": "Telegram",
+        "phone": "Sími",
+        "date_of_birth": "Fæðingardagur",
+        "age_group": "Aldurshópur"
+      }
+    },
     "coupon_no_longer_valid": "This coupon is no longer available. Your total has been updated. Please review and try again.",
     "payment_error": "Something went wrong with your payment. Please try again.",
     "no_products": "Engar vörur í boði fyrir þetta skref.",

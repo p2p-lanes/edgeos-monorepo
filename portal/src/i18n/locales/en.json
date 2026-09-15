@@ -475,6 +475,37 @@
       "not_eligible_caption": "Not eligible for discount",
       "promo_discount_eligible_label": "Promo Discount (eligible items)"
     },
+    "recipient_assignment": {
+      "add_role": "Add {{role}}",
+      "add_title": "Add {{role}}",
+      "edit_title": "Edit {{name}}",
+      "description": "Enter the details for {{role}}. Save when you are done.",
+      "delete_title": "Delete {{name}}",
+      "delete_description": "Are you sure you want to delete this {{role}}?",
+      "deleting": "Deleting...",
+      "delete": "Delete",
+      "full_name": "Full name",
+      "select_field": "Select {{field}}",
+      "update": "Update",
+      "save": "Save",
+      "roles": {
+        "main": "Primary attendee",
+        "spouse": "Spouse",
+        "kid": "Kid",
+        "baby": "Baby",
+        "teen": "Teen"
+      },
+      "fields": {
+        "email": "Email",
+        "gender": "Gender",
+        "age": "Age",
+        "residence": "Residence",
+        "telegram": "Telegram",
+        "phone": "Phone",
+        "date_of_birth": "Date of birth",
+        "age_group": "Age group"
+      }
+    },
     "coupon_no_longer_valid": "This coupon is no longer available. Your total has been updated. Please review and try again.",
     "payment_error": "Something went wrong with your payment. Please try again.",
     "popup_ended_error": "This popup has ended. Purchases are no longer available.",

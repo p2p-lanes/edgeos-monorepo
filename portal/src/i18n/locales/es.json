@@ -475,6 +475,37 @@
       "not_eligible_caption": "No aplica descuento",
       "promo_discount_eligible_label": "Descuento (items elegibles)"
     },
+    "recipient_assignment": {
+      "add_role": "Agregar {{role}}",
+      "add_title": "Agregar {{role}}",
+      "edit_title": "Editar a {{name}}",
+      "description": "Ingrese los datos de {{role}}. Guarde los cambios al finalizar.",
+      "delete_title": "Eliminar a {{name}}",
+      "delete_description": "¿Confirma que desea eliminar a {{role}}?",
+      "deleting": "Eliminando...",
+      "delete": "Eliminar",
+      "full_name": "Nombre completo",
+      "select_field": "Seleccione {{field}}",
+      "update": "Actualizar",
+      "save": "Guardar",
+      "roles": {
+        "main": "Asistente principal",
+        "spouse": "Cónyuge",
+        "kid": "Menor",
+        "baby": "Bebé",
+        "teen": "Adolescente"
+      },
+      "fields": {
+        "email": "Correo electrónico",
+        "gender": "Género",
+        "age": "Edad",
+        "residence": "Lugar de residencia",
+        "telegram": "Telegram",
+        "phone": "Teléfono",
+        "date_of_birth": "Fecha de nacimiento",
+        "age_group": "Grupo de edad"
+      }
+    },
     "coupon_no_longer_valid": "This coupon is no longer available. Your total has been updated. Please review and try again.",
     "payment_error": "Something went wrong with your payment. Please try again.",
     "popup_ended_error": "Este popup ha finalizado. Las compras ya no están disponibles.",

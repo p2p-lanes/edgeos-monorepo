@@ -306,7 +306,7 @@ export function buildPaymentProducts({
           recipient_key: key,
           name,
           email,
-          category_id: item.product.attendee_category_id ?? null,
+          category_id: null,
         })
         products.push({
           product_id: item.productId,

@@ -3,7 +3,10 @@
 import { Check, ChevronDown, Ticket } from "lucide-react"
 import { useEffect, useLayoutEffect, useRef, useState } from "react"
 import { useTranslation } from "react-i18next"
-import AddAttendeeButtons from "@/components/checkout-flow/shared/AddAttendeeButtons"
+import {
+  TicketRecipientControls,
+  useTicketRecipientContext,
+} from "@/components/checkout-flow/shared/TicketRecipientControls"
 import ExpandableDescription from "@/components/ui/ExpandableDescription"
 import QuantitySelector, {
   resolveBlockedStepperProps,
@@ -12,10 +15,7 @@ import QuantitySelector, {
 import type { TemplateSection } from "@/hooks/checkout/ticketSections"
 import {
   buildSectionGroups,
-  getStepAttendeeCategoryIds,
   hasRenderableSectionProducts,
-  isSectionVisibleForApp,
-  parseSections,
 } from "@/hooks/checkout/ticketSections"
 import {
   type TicketRowVM,
@@ -25,7 +25,6 @@ import {
 import { useAttendeeCategories } from "@/hooks/useAttendeeCategories"
 import { deriveProductState } from "@/lib/product-state"
 import { cn } from "@/lib/utils"
-import { useApplication } from "@/providers/applicationProvider"
 import { useCheckout } from "@/providers/checkoutProvider"
 import { useCityProvider } from "@/providers/cityProvider"
 import { usePassesProvider } from "@/providers/passesProvider"
@@ -164,12 +163,8 @@ export default function VariantTicketSelect({
   // Apply per-application visibility (visible_if) once: it depends on the
   // application's form answers, not on individual attendees. Layouts and
   // helpers downstream consume the already-filtered list.
-  const { getRelevantApplication } = useApplication()
-  const customFields = getRelevantApplication()?.custom_fields ?? null
-  const sections = parseSections(templateConfig).filter((s) =>
-    isSectionVisibleForApp(s, customFields),
-  )
-  const allowedCategoryIds = getStepAttendeeCategoryIds(sections)
+  const recipientContext = useTicketRecipientContext(templateConfig)
+  const { sections } = recipientContext
 
   // Build category_id -> sort_order map for attendee ordering.
   const { getCity } = useCityProvider()
@@ -230,13 +225,10 @@ export default function VariantTicketSelect({
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-center gap-3 text-sm">
-        <AddAttendeeButtons
-          allowedCategoryIds={allowedCategoryIds}
-          onAttendeeAdded={handleAttendeeAdded}
-          salesFlowId={salesFlowId}
-        />
-      </div>
+      <TicketRecipientControls
+        context={recipientContext}
+        onAttendeeAdded={handleAttendeeAdded}
+      />
       {passesVariant === "stacked" && <StackedLayout {...sharedProps} />}
       {passesVariant === "tabs" && <TabsLayout {...sharedProps} />}
       {passesVariant === "compact" && <CompactLayout {...sharedProps} />}
@@ -272,8 +264,7 @@ function scrollToAttendeeCard(attendeeId: string) {
 // ---------------------------------------------------------------------------
 // Template config helpers
 // ---------------------------------------------------------------------------
-// parseSections, buildSectionGroups, and isSectionVisibleForApp are imported
-// from @/hooks/checkout/ticketSections (the shared module).
+// buildSectionGroups is imported from the shared ticket-section module.
 
 // ---------------------------------------------------------------------------
 // Attendee card header

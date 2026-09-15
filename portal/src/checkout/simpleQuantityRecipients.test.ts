@@ -88,7 +88,7 @@ describe("simple-quantity ticket recipient normalization", () => {
     ).toBe(true)
   })
 
-  it("uses the current buyer form and product category rather than stale cart contact data", () => {
+  it("uses the current buyer form without inventing a role from the product", () => {
     const categorized = { ...ticket, attendee_category_id: "guest-category" }
     const result = buildPaymentProducts({
       ...base,
@@ -102,7 +102,7 @@ describe("simple-quantity ticket recipient normalization", () => {
     expect(result.recipients[0]).toMatchObject({
       name: "New Buyer",
       email: "new@example.com",
-      category_id: "guest-category",
+      category_id: null,
     })
   })
 

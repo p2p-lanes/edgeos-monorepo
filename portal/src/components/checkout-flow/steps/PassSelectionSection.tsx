@@ -32,7 +32,12 @@ import { useApplication } from "@/providers/applicationProvider"
 import { useCheckout } from "@/providers/checkoutProvider"
 import { usePassesProvider } from "@/providers/passesProvider"
 import type { AttendeeCategory, AttendeePassState } from "@/types/Attendee"
-import { formatCurrency, formatPrice } from "@/types/checkout"
+import {
+  type CheckoutRecipientPassState,
+  canSelectRecipientProducts,
+  formatCurrency,
+  formatPrice,
+} from "@/types/checkout"
 import type { ProductsPass } from "@/types/Products"
 
 /** Smooth-scroll to an attendee card. Defers one frame so layout settles first. */
@@ -146,16 +151,20 @@ export default function PassSelectionSection() {
   const [focusedAttendeeId, setFocusedAttendeeId] = useState<string | null>(
     null,
   )
-  const canManageAttendees = !isEditing && !!getRelevantApplication()
+  const canManageAttendees =
+    !isEditing && !!getRelevantApplication(salesFlowId ?? undefined)
   // Editing modifies already-purchased passes, so only offer it when the
   // attendee actually owns something. Mirrors the legacy in-flow toggle.
   const somePurchased = attendeePasses.some((a) =>
     a.products.some((p) => p.purchased),
   )
+  const selectableAttendeePasses = attendeePasses.filter((attendee) =>
+    canSelectRecipientProducts(attendee as CheckoutRecipientPassState),
+  )
 
   const groupedByCategory = useMemo(() => {
     const map = new Map<string, AttendeePassState[]>()
-    for (const a of attendeePasses) {
+    for (const a of selectableAttendeePasses) {
       const cat = a.category ?? ""
       if (!map.has(cat)) map.set(cat, [])
       map.get(cat)!.push(a)
@@ -167,7 +176,7 @@ export default function PassSelectionSection() {
       if (aIsMain !== bIsMain) return aIsMain - bIsMain
       return a.localeCompare(b)
     })
-  }, [attendeePasses])
+  }, [selectableAttendeePasses])
 
   return (
     <motion.div
@@ -248,7 +257,7 @@ export default function PassSelectionSection() {
 
       {getPassSelectionLayout(checkoutMode) === "flat" ? (
         <SimpleQuantityVariant
-          attendees={attendeePasses}
+          attendees={selectableAttendeePasses}
           toggleProduct={toggleProduct}
           isEditing={isEditing}
           focusedAttendeeId={focusedAttendeeId}
@@ -256,7 +265,7 @@ export default function PassSelectionSection() {
       ) : (
         <StackedVariant
           groupedByCategory={groupedByCategory}
-          allAttendees={attendeePasses}
+          allAttendees={selectableAttendeePasses}
           toggleProduct={toggleProduct}
           isEditing={isEditing}
           focusedAttendeeId={focusedAttendeeId}
