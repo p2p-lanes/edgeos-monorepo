@@ -38,6 +38,23 @@ describe("combineDateTimeInTz", () => {
     expect(combineDateTimeInTz("not-a-date", "13:00", "UTC")).toBeNaN()
     expect(combineDateTimeInTz("2026-06-04", "xx:yy", "UTC")).toBeNaN()
   })
+
+  // On DST-change days the offset must be the one in force at the event's
+  // instant, not at the naive UTC guess.
+  it.each([
+    ["America/Santiago", "2026-09-06", "01:30", "2026-09-06T04:30:00.000Z"],
+    ["America/Santiago", "2026-09-06", "02:00", "2026-09-06T05:00:00.000Z"],
+    ["America/Santiago", "2026-09-06", "03:30", "2026-09-06T06:30:00.000Z"],
+    ["America/Los_Angeles", "2026-11-01", "03:00", "2026-11-01T11:00:00.000Z"],
+    ["America/Los_Angeles", "2026-11-01", "08:00", "2026-11-01T16:00:00.000Z"],
+    ["America/Los_Angeles", "2026-03-08", "03:00", "2026-03-08T10:00:00.000Z"],
+    ["America/Los_Angeles", "2026-03-08", "08:00", "2026-03-08T15:00:00.000Z"],
+    ["Europe/Madrid", "2026-10-25", "01:00", "2026-10-24T23:00:00.000Z"],
+  ])("DST day: %s %s %s -> %s", (tz, date, time, expected) => {
+    const ms = combineDateTimeInTz(date, time, tz)
+    expect(new Date(ms).toISOString()).toBe(expected)
+    expect(formatHhmmInTz(new Date(ms), tz)).toBe(time)
+  })
 })
 
 describe("todayInTz", () => {

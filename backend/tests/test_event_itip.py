@@ -755,7 +755,8 @@ class TestPatchBumpsSequenceAndDispatches:
                 f"/api/v1/events/{event.id}",
                 headers=_auth(admin_token_tenant_a),
                 json={
-                    "start_time": (event.start_time + timedelta(hours=2)).isoformat()
+                    "start_time": (event.start_time + timedelta(hours=2)).isoformat(),
+                    "end_time": (event.end_time + timedelta(hours=2)).isoformat(),
                 },
             )
 
