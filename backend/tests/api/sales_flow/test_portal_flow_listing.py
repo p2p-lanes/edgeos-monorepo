@@ -101,11 +101,14 @@ def _make_product(
     return product
 
 
-def _add_primary_category(db: Session, popup: Popups) -> AttendeeCategories:
+def _add_primary_category(
+    db: Session, popup: Popups, flow: SalesFlows
+) -> AttendeeCategories:
     category = AttendeeCategories(
         tenant_id=popup.tenant_id,
         popup_id=popup.id,
-        key=f"primary-{uuid.uuid4().hex[:8]}",
+        sales_flow_id=flow.id,
+        key="main",
         is_primary=True,
     )
     db.add(category)
@@ -113,10 +116,11 @@ def _add_primary_category(db: Session, popup: Popups) -> AttendeeCategories:
     return category
 
 
-def _add_category(db: Session, popup: Popups) -> AttendeeCategories:
+def _add_category(db: Session, popup: Popups, flow: SalesFlows) -> AttendeeCategories:
     category = AttendeeCategories(
         tenant_id=popup.tenant_id,
         popup_id=popup.id,
+        sales_flow_id=flow.id,
         key=f"companion-{uuid.uuid4().hex[:8]}",
     )
     db.add(category)
@@ -167,7 +171,7 @@ class TestPortalFlowListing:
     ) -> None:
         popup = _make_popup(db, tenant_a)
         flow = _make_flow(db, popup, slug="priced")
-        _add_primary_category(db, popup)
+        _add_primary_category(db, popup, flow)
         _offer_products(db, flow, [_make_product(db, popup, price=Decimal("50"))])
         db.commit()
 
@@ -192,8 +196,8 @@ class TestPortalFlowListing:
     ) -> None:
         popup = _make_popup(db, tenant_a)
         flow = _make_flow(db, popup, slug="primary-fixed")
-        primary = _add_primary_category(db, popup)
-        companion = _add_category(db, popup)
+        primary = _add_primary_category(db, popup, flow)
+        companion = _add_category(db, popup, flow)
         primary_ticket = _make_product(db, popup, price=Decimal("50"))
         companion_ticket = _make_product(db, popup, price=Decimal("5"))
         free_ticket = _make_product(db, popup, price=Decimal("0"))
@@ -252,8 +256,8 @@ class TestPortalFlowListing:
     ) -> None:
         popup = _make_popup(db, tenant_a)
         flow = _make_flow(db, popup, slug="primary-variable")
-        primary = _add_primary_category(db, popup)
-        companion = _add_category(db, popup)
+        primary = _add_primary_category(db, popup, flow)
+        companion = _add_category(db, popup, flow)
         low_ticket = _make_product(db, popup, price=Decimal("40"))
         high_ticket = _make_product(db, popup, price=Decimal("90"))
         companion_ticket = _make_product(db, popup, price=Decimal("5"))
@@ -298,8 +302,8 @@ class TestPortalFlowListing:
     ) -> None:
         popup = _make_popup(db, tenant_a)
         flow = _make_flow(db, popup, slug="no-primary-ticket")
-        primary = _add_primary_category(db, popup)
-        companion = _add_category(db, popup)
+        primary = _add_primary_category(db, popup, flow)
+        companion = _add_category(db, popup, flow)
         companion_ticket = _make_product(db, popup, price=Decimal("75"))
         disabled_ticket = _make_product(db, popup, price=Decimal("20"))
         unlisted_ticket = _make_product(db, popup, price=Decimal("30"))

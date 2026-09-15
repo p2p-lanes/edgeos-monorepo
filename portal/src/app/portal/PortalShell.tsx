@@ -35,7 +35,7 @@ export default function PortalShell({
               writes are no-ops. Keep this id stable. */}
           <main
             id="portal-scroll"
-            className="portal-chrome flex-1 overflow-y-auto bg-gradient-to-b from-background via-background to-muted/30"
+            className="portal-chrome flex-1 overflow-y-auto bg-background"
           >
             {children}
           </main>

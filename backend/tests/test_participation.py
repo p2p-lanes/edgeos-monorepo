@@ -91,10 +91,10 @@ def _make_category(
     cat = AttendeeCategories(
         tenant_id=tenant.id,
         popup_id=popup.id,
+        sales_flow_id=application_flow_id(db, popup.id),
         key=key,
         label=key.capitalize(),
         is_primary=(key == "main"),
-        enabled_in_passes_flow=True,
     )
     db.add(cat)
     db.commit()
@@ -124,8 +124,9 @@ def _make_attendee(
     # Find or create the category for this popup
     cat = db.exec(
         select(AttendeeCategories).where(
-            AttendeeCategories.popup_id == application.popup_id,
+            AttendeeCategories.sales_flow_id == application.sales_flow_id,
             AttendeeCategories.key == category,
+            AttendeeCategories.deleted_at.is_(None),  # type: ignore[union-attr]
         )
     ).first()
     if cat is None:

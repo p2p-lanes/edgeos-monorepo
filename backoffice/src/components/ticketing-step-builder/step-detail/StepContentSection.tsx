@@ -5,6 +5,7 @@ import { CollapsibleSection } from "./CollapsibleSection"
 
 interface StepContentSectionProps {
   popupId: string
+  salesFlowId: string
   template: string
   onTemplateChange: (key: string) => void
   templateConfig: Record<string, unknown> | null
@@ -14,6 +15,7 @@ interface StepContentSectionProps {
 
 export function StepContentSection({
   popupId,
+  salesFlowId,
   template,
   onTemplateChange,
   templateConfig,
@@ -54,6 +56,7 @@ export function StepContentSection({
             config={templateConfig}
             onChange={onTemplateConfigChange}
             popupId={popupId}
+            salesFlowId={salesFlowId}
             productCategory={productCategory || null}
           />
         </CollapsibleSection>

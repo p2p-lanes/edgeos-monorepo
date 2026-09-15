@@ -1,10 +1,10 @@
 import { useState } from "react"
 import type { AttendeeCategoryPublic } from "@/client"
-import type { AttendeePassState } from "@/types/Attendee"
+import type { AttendeeCategoryForm, AttendeePassState } from "@/types/Attendee"
 
 type ModalType = {
   isOpen: boolean
-  category: AttendeeCategoryPublic | null
+  category: AttendeeCategoryForm | null
   editingAttendee: AttendeePassState | null
   isDelete?: boolean
 }
@@ -37,19 +37,14 @@ const useModal = () => {
     attendee: AttendeePassState,
     category?: AttendeeCategoryPublic,
   ) => {
-    const resolvedCategory: AttendeeCategoryPublic | null =
+    const resolvedCategory: AttendeeCategoryForm | null =
       category ??
       (attendee.category_id
         ? {
             id: attendee.category_id,
             key: attendee.category ?? "",
-            is_primary: attendee.category === "main",
-            sort_order: 0,
-            enabled_in_passes_flow: true,
             display_meta: {},
             required_fields: [],
-            popup_id: attendee.popup_id,
-            tenant_id: attendee.tenant_id,
           }
         : null)
     setModal({
@@ -64,19 +59,14 @@ const useModal = () => {
     attendee: AttendeePassState,
     category?: AttendeeCategoryPublic,
   ) => {
-    const resolvedCategory: AttendeeCategoryPublic | null =
+    const resolvedCategory: AttendeeCategoryForm | null =
       category ??
       (attendee.category_id
         ? {
             id: attendee.category_id,
             key: attendee.category ?? "",
-            is_primary: attendee.category === "main",
-            sort_order: 0,
-            enabled_in_passes_flow: true,
             display_meta: {},
             required_fields: [],
-            popup_id: attendee.popup_id,
-            tenant_id: attendee.tenant_id,
           }
         : null)
     setModal({

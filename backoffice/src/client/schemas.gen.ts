@@ -4911,11 +4911,6 @@ export const AttendeeCategoryCreateSchema = {
             title: 'Sort Order',
             default: 0
         },
-        enabled_in_passes_flow: {
-            type: 'boolean',
-            title: 'Enabled In Passes Flow',
-            default: true
-        },
         max_per_application: {
             anyOf: [
                 {
@@ -4966,6 +4961,11 @@ export const AttendeeCategoryPublicSchema = {
             format: 'uuid',
             title: 'Popup Id'
         },
+        sales_flow_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Sales Flow Id'
+        },
         key: {
             type: 'string',
             title: 'Key'
@@ -4979,11 +4979,6 @@ export const AttendeeCategoryPublicSchema = {
             type: 'integer',
             title: 'Sort Order',
             default: 0
-        },
-        enabled_in_passes_flow: {
-            type: 'boolean',
-            title: 'Enabled In Passes Flow',
-            default: true
         },
         max_per_application: {
             anyOf: [
@@ -5034,10 +5029,22 @@ export const AttendeeCategoryPublicSchema = {
                 }
             ],
             title: 'Updated At'
+        },
+        deleted_at: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Deleted At'
         }
     },
     type: 'object',
-    required: ['id', 'tenant_id', 'popup_id', 'key'],
+    required: ['id', 'tenant_id', 'popup_id', 'sales_flow_id', 'key'],
     title: 'AttendeeCategoryPublic',
     description: 'Public read model for attendee categories.'
 } as const;
@@ -5054,17 +5061,6 @@ export const AttendeeCategoryUpdateSchema = {
                 }
             ],
             title: 'Sort Order'
-        },
-        enabled_in_passes_flow: {
-            anyOf: [
-                {
-                    type: 'boolean'
-                },
-                {
-                    type: 'null'
-                }
-            ],
-            title: 'Enabled In Passes Flow'
         },
         max_per_application: {
             anyOf: [

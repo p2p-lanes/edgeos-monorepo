@@ -33,7 +33,6 @@ import {
   type SaleType,
   type SimpleFiSuccessBehavior,
 } from "@/client"
-import { AttendeeCategoriesEditor } from "@/components/attendee-categories/AttendeeCategoriesEditor"
 import { DangerZone } from "@/components/Common/DangerZone"
 import { FieldError } from "@/components/Common/FieldError"
 import { FormErrorSummary } from "@/components/Common/FormErrorSummary"
@@ -987,18 +986,6 @@ export function PopupForm({ defaultValues, onSuccess }: PopupFormProps) {
                 )}
               </form.Field>
             </InlineSection>
-
-            {/* Companion Types — only available when editing an existing popup */}
-            {isEdit && defaultValues && (
-              <>
-                <Separator />
-
-                <AttendeeCategoriesEditor
-                  popupId={defaultValues.id}
-                  readOnly={readOnly}
-                />
-              </>
-            )}
           </TabsContent>
 
           {/* ─── Branding ────────────────────────────────────────────── */}

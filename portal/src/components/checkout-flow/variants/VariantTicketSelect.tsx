@@ -26,6 +26,7 @@ import { useAttendeeCategories } from "@/hooks/useAttendeeCategories"
 import { deriveProductState } from "@/lib/product-state"
 import { cn } from "@/lib/utils"
 import { useApplication } from "@/providers/applicationProvider"
+import { useCheckout } from "@/providers/checkoutProvider"
 import { useCityProvider } from "@/providers/cityProvider"
 import { usePassesProvider } from "@/providers/passesProvider"
 import { isPassQuantityBased } from "@/strategies/passQuantityHelper"
@@ -154,6 +155,7 @@ export default function VariantTicketSelect({
   // filtering logic (visibleAttendees/sortedAttendees) which operates on
   // AttendeePassState until Slice 2 migrates layouts to TicketAttendeeVM.
   const { attendeePasses } = usePassesProvider()
+  const { salesFlowId } = useCheckout()
 
   const [focusedAttendeeId, setFocusedAttendeeId] = useState<string | null>(
     null,
@@ -173,8 +175,10 @@ export default function VariantTicketSelect({
   const { getCity } = useCityProvider()
   const cityForSort = getCity()
   const popupIdForSort = cityForSort?.id ? String(cityForSort.id) : ""
-  const { categories: categoriesForSort } =
-    useAttendeeCategories(popupIdForSort)
+  const { categories: categoriesForSort } = useAttendeeCategories(
+    popupIdForSort,
+    salesFlowId,
+  )
   const categorySortOrderById = new Map<string, number>()
   for (const c of categoriesForSort ?? []) {
     categorySortOrderById.set(c.id, c.sort_order ?? 0)
@@ -230,6 +234,7 @@ export default function VariantTicketSelect({
         <AddAttendeeButtons
           allowedCategoryIds={allowedCategoryIds}
           onAttendeeAdded={handleAttendeeAdded}
+          salesFlowId={salesFlowId}
         />
       </div>
       {passesVariant === "stacked" && <StackedLayout {...sharedProps} />}

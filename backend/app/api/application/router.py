@@ -642,8 +642,8 @@ async def grant_tickets_admin(
             if grant_attendee is None:
                 from app.api.attendee_category.crud import attendee_categories_crud
 
-                main_cat = attendee_categories_crud.get_primary_for_popup(
-                    db, payload.popup_id
+                main_cat = attendee_categories_crud.get_primary_for_flow(
+                    db, application.sales_flow_id
                 )
                 grant_attendee = attendees_crud.create_internal(
                     db,
@@ -1826,6 +1826,25 @@ async def add_my_attendee(
     from app.api.popup.guards import ensure_popup_writable
 
     ensure_popup_writable(popups_crud.get(db, popup_id))
+
+    if attendee_in.category_id is None:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="An attendee category is required",
+        )
+    from app.api.attendee_category.crud import attendee_categories_crud
+
+    if (
+        application.sales_flow_id is None
+        or attendee_in.category_id
+        not in attendee_categories_crud.allowed_ids_for_flow(
+            db, application.sales_flow_id
+        )
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="This attendee category is not enabled for the sales flow",
+        )
 
     crud.applications_crud.create_attendee(
         db,

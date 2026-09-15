@@ -301,7 +301,7 @@ function PassSystemProductRow({
                 onDecrement={() =>
                   handleQuantityChange(Math.max(0, quantity - 1))
                 }
-                onAdd={() => handleToggle()}
+                onAdd={() => handleQuantityChange(1)}
               />
             ) : (
               <button

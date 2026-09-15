@@ -1,25 +1,18 @@
 import { useQuery } from "@tanstack/react-query"
-import { ArrowRight, FileText, Sparkles, Ticket } from "lucide-react"
+import { ArrowRight, Sparkles } from "lucide-react"
 import { useSearchParams } from "next/navigation"
-import { useState } from "react"
 import { useTranslation } from "react-i18next"
 import { TICKET_CATEGORY } from "@/checkout/popupCheckoutPolicy"
 import { TicketingStepsService } from "@/client"
-import AddAttendeeButtons from "@/components/checkout-flow/shared/AddAttendeeButtons"
 import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
-import useAttendee from "@/hooks/useAttendee"
 import { useAttendeeCategories } from "@/hooks/useAttendeeCategories"
-import type { HumanPopupAccess } from "@/hooks/useHumanPopupAccess"
 import { useProductsQuery } from "@/hooks/useProductsQuery"
 import { useCityProvider } from "@/providers/cityProvider"
 import { usePassesProvider } from "@/providers/passesProvider"
 import type { AttendeePassState } from "@/types/Attendee"
 import { formatCurrency } from "@/types/checkout"
-import { AttendeeModal } from "../components/AttendeeModal"
 import AttendeeTicket from "../components/common/AttendeeTicket"
-import InvoiceModal from "../components/common/InvoiceModal"
-import useModal from "../hooks/useModal"
 
 interface TicketSelectSectionConfig {
   product_ids?: string[]
@@ -27,19 +20,21 @@ interface TicketSelectSectionConfig {
 }
 
 interface YourPassesProps {
-  access: Extract<HumanPopupAccess, { state: "allowed" }>
   attendees?: AttendeePassState[]
+  inlineCta?: boolean
   onSwitchToBuy?: (attendee?: AttendeePassState) => void
   readOnly?: boolean
   salesFlowId: string | null
+  sectionTitle?: string
 }
 
 const YourPasses = ({
-  access: _access,
   attendees: attendeeSubset,
+  inlineCta = false,
   onSwitchToBuy,
   readOnly = false,
   salesFlowId,
+  sectionTitle,
 }: YourPassesProps) => {
   const { t } = useTranslation()
   const { attendeePasses: providerAttendees } = usePassesProvider()
@@ -51,9 +46,6 @@ const YourPasses = ({
   const city = getCity()
   const { categories } = useAttendeeCategories(city?.id ? String(city.id) : "")
   const primaryCategoryId = categories?.find((c) => c.is_primary)?.id ?? null
-  const { handleCloseModal, modal } = useModal()
-  const { addAttendee } = useAttendee()
-  const [isInvoiceModalOpen, setIsInvoiceModalOpen] = useState(false)
 
   const hasPurchasedPasses = attendees.some(
     (attendee) =>
@@ -119,47 +111,23 @@ const YourPasses = ({
     : []
   const minPrice =
     mainTickets.length > 0 ? Math.min(...mainTickets.map((p) => p.price)) : null
-
-  const handleSubmit = async (data: AttendeePassState) => {
-    if (modal.category) {
-      await addAttendee({
-        name: data.name ?? "",
-        email: data.email ?? "",
-        category_id: modal.category.id,
-        gender: data.gender ?? "",
-        additional_data: data.additional_data,
-      })
-    }
-    handleCloseModal()
-  }
+  const sectionHeadingId = sectionTitle
+    ? `passes-flow-${salesFlowId ?? "other"}`
+    : undefined
 
   return (
-    <div className="space-y-6 pb-24 lg:pb-0">
-      {/* Heading with Ticket Icon */}
-      <div className="flex flex-col gap-2 max-w-3xl">
-        <div className="flex items-center gap-3">
-          <Ticket className="w-6 h-6 text-pass-text" />
-          <h1 className="text-3xl font-bold tracking-tight text-pass-title">
-            {t("passes.your_passes")}
-          </h1>
-        </div>
-        <p className="text-pass-text">{t("passes.your_passes_description")}</p>
-
-        {/* Inline Text Links */}
-        <div className="flex flex-wrap items-center gap-3 text-sm mt-2">
-          {!readOnly && <AddAttendeeButtons mode="management" />}
-          {city?.invoice_company_name && (
-            <button
-              type="button"
-              className="flex items-center gap-1.5 text-pass-text hover:text-pass-title transition-colors whitespace-nowrap"
-              onClick={() => setIsInvoiceModalOpen(true)}
-            >
-              <FileText className="w-3.5 h-3.5" />
-              <span>{t("passes.view_invoices")}</span>
-            </button>
-          )}
-        </div>
-      </div>
+    <section
+      aria-labelledby={sectionHeadingId}
+      className={`space-y-6 ${inlineCta ? "" : "pb-24 lg:pb-0"}`}
+    >
+      {sectionTitle && (
+        <h2
+          id={sectionHeadingId}
+          className="text-lg font-semibold text-pass-title"
+        >
+          {sectionTitle}
+        </h2>
+      )}
 
       <div className="flex flex-col gap-4">
         {attendees.length === 0 ? (
@@ -185,8 +153,8 @@ const YourPasses = ({
 
       {/* Desktop CTA Card */}
       {!readOnly && flowPurchase && (
-        <div className="hidden lg:block mt-6">
-          {!hasPurchasedPasses ? (
+        <div className={inlineCta ? "mt-4" : "hidden lg:block mt-6"}>
+          {!hasPurchasedPasses && !inlineCta ? (
             <div
               className="rounded-3xl overflow-hidden shadow-xl relative"
               style={{
@@ -246,14 +214,22 @@ const YourPasses = ({
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-pass-title font-medium">
-                    {t("passes.need_more_passes")}
+                    {t(
+                      hasPurchasedPasses
+                        ? "passes.need_more_passes"
+                        : "passes.adventure_awaits",
+                    )}
                   </p>
                 </div>
                 <Button
                   onClick={() => flowPurchase()}
                   className="flex items-center gap-2 bg-foreground hover:bg-foreground text-background px-5 py-2.5 rounded-lg text-sm font-semibold transition-all whitespace-nowrap active:scale-95"
                 >
-                  {t("passes.buy_passes")}
+                  {t(
+                    hasPurchasedPasses
+                      ? "passes.buy_passes"
+                      : "passes.get_your_pass",
+                  )}
                   <ArrowRight className="w-4 h-4" />
                 </Button>
               </div>
@@ -265,7 +241,7 @@ const YourPasses = ({
       {/* Mobile Sticky Footer — same fixed-dark treatment as the desktop
           hero above: the footer stays dark regardless of theme, so its
           text and the pill button use literal white/neutral. */}
-      {!readOnly && flowPurchase && (
+      {!readOnly && flowPurchase && !inlineCta && (
         <div className="fixed bottom-0 left-0 right-0 z-30 lg:hidden">
           {!hasPurchasedPasses ? (
             <div className="bg-gray-900 border-t border-gray-800 px-4 py-3">
@@ -310,24 +286,7 @@ const YourPasses = ({
           )}
         </div>
       )}
-
-      {/* Modals */}
-      {modal.isOpen && modal.category && (
-        <AttendeeModal
-          open={modal.isOpen}
-          onClose={handleCloseModal}
-          onSubmit={handleSubmit}
-          category={modal.category}
-          editingAttendee={modal.editingAttendee}
-        />
-      )}
-      {city?.invoice_company_name && (
-        <InvoiceModal
-          isOpen={isInvoiceModalOpen}
-          onClose={() => setIsInvoiceModalOpen(false)}
-        />
-      )}
-    </div>
+    </section>
   )
 }
 export default YourPasses

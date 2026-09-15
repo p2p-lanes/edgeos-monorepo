@@ -34,11 +34,12 @@ def test_group_application_defers_main_attendee(
     db.flush()
     seed_default_steps(db, popup)
 
-    main_cat = attendee_categories_crud.seed_main_for_popup(db, popup.id, tenant_a.id)
+    flow_id = group_flow_id(db, popup.id)
+    main_cat = attendee_categories_crud.get_primary_for_flow(db, flow_id)
     assert main_cat is not None
 
     group = Groups(
-        sales_flow_id=group_flow_id(db, popup.id),
+        sales_flow_id=flow_id,
         tenant_id=tenant_a.id,
         popup_id=popup.id,
         name="Group T",

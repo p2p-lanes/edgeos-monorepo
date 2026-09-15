@@ -22,6 +22,7 @@ from app.api.attendee_category.models import AttendeeCategories
 from app.api.popup.models import Popups
 from app.api.product.models import Products
 from app.api.tenant.models import Tenants
+from tests._flow_helpers import application_flow_id
 from tests.api.application_review.test_pending_reviews import (
     _auth,
     _make_admin,
@@ -37,7 +38,11 @@ def _make_category(
     db: Session, tenant: Tenants, popup: Popups, key: str
 ) -> AttendeeCategories:
     cat = AttendeeCategories(
-        id=uuid.uuid4(), tenant_id=tenant.id, popup_id=popup.id, key=key
+        id=uuid.uuid4(),
+        tenant_id=tenant.id,
+        popup_id=popup.id,
+        sales_flow_id=application_flow_id(db, popup.id),
+        key=key,
     )
     db.add(cat)
     db.commit()

@@ -1868,7 +1868,7 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
         session.add(application)
         session.flush()
 
-        main_cat = attendee_categories_crud.get_primary_for_popup(session, popup_id)
+        main_cat = attendee_categories_crud.get_primary_for_flow(session, flow_id)
         name = (
             f"{human.first_name or ''} {human.last_name or ''}".strip() or human.email
         )
@@ -1928,7 +1928,7 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
 
         category_id (UUID FK) is required for any attendee beyond the primary.
         The legacy category string is no longer accepted — callers must resolve
-        a category_id against the popup's attendee_categories table.
+        a category_id against the application's sales flow.
         """
 
         # Check for duplicate emails

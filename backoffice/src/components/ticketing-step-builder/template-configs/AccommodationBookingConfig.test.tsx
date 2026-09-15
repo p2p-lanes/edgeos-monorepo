@@ -48,6 +48,7 @@ function renderConfig(config: Record<string, unknown> | null = null) {
         config={config}
         onChange={onChange}
         popupId="popup-1"
+        salesFlowId="flow-1"
         productCategory={null}
       />
     </QueryClientProvider>,

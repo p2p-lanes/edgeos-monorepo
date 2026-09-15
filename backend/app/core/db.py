@@ -250,7 +250,7 @@ def _seed_approval_strategies(session: Session, popup_map: dict, tenant_id) -> N
 def _seed_attendee_categories(
     session: Session, seed_data: dict, popup_map: dict, tenant_id
 ) -> dict[str, dict[str, uuid.UUID]]:
-    """Seed per-popup attendee categories before products/attendees that reference them.
+    """Seed default-flow categories before products and attendees reference them.
 
     For each popup, always creates `main` (primary) and additionally creates any
     category key referenced by the popup's products or attendees in seed_data.
@@ -258,6 +258,7 @@ def _seed_attendee_categories(
     Returns {popup_key: {cat_key: category_id}}.
     """
     from app.api.attendee_category.models import AttendeeCategories
+    from app.api.sales_flow.crud import sales_flows_crud
 
     REQUIRED_FIELDS_BY_KEY: dict[str, list[dict]] = {
         "spouse": [{"name": "email", "type": "email", "required": True}],
@@ -291,8 +292,14 @@ def _seed_attendee_categories(
 
     result: dict[str, dict[str, uuid.UUID]] = {}
     for popup_key, popup in popup_map.items():
+        flow = sales_flows_crud.get_default_flow(session, popup.id)
+        if flow is None:
+            raise RuntimeError(f"seeded popup {popup.slug} has no default sales flow")
         existing = session.exec(
-            select(AttendeeCategories).where(AttendeeCategories.popup_id == popup.id)
+            select(AttendeeCategories).where(
+                AttendeeCategories.sales_flow_id == flow.id,
+                AttendeeCategories.deleted_at.is_(None),  # type: ignore[union-attr]
+            )
         ).all()
         result[popup_key] = {cat.key: cat.id for cat in existing}
 
@@ -302,10 +309,10 @@ def _seed_attendee_categories(
             category = AttendeeCategories(
                 tenant_id=tenant_id,
                 popup_id=popup.id,
+                sales_flow_id=flow.id,
                 key=cat_key,
                 is_primary=(cat_key == "main"),
                 sort_order=SORT_ORDER_BY_KEY.get(cat_key, 99),
-                enabled_in_passes_flow=True,
                 max_per_application=MAX_PER_APPLICATION_BY_KEY.get(cat_key),
                 required_fields=REQUIRED_FIELDS_BY_KEY.get(cat_key, []),
                 display_meta={},
@@ -782,12 +789,15 @@ def _seed_applications(
         attendees_data = app_data.get("attendees", [])
         created_attendees: list[Attendees] = []
 
-        # Build a key→category_id map for this popup so we can set category_id
-        # on each attendee. The attendees.category string column was dropped in PR 2.
+        # Build the key-to-id map for this application's flow. The attendees
+        # category string column was dropped in PR 2.
         from app.api.attendee_category.models import AttendeeCategories  # noqa: PLC0415
 
         popup_categories = session.exec(
-            select(AttendeeCategories).where(AttendeeCategories.popup_id == popup.id)
+            select(AttendeeCategories).where(
+                AttendeeCategories.sales_flow_id == application.sales_flow_id,
+                AttendeeCategories.deleted_at.is_(None),  # type: ignore[union-attr]
+            )
         ).all()
         category_key_to_id = {cat.key: cat.id for cat in popup_categories}
 

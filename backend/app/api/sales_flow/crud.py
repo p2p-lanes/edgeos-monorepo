@@ -156,8 +156,9 @@ def _application_price_product_ids(
     primary_category_id = session.exec(
         select(AttendeeCategories.id)
         .where(
-            AttendeeCategories.popup_id == flow.popup_id,
+            AttendeeCategories.sales_flow_id == flow.id,
             AttendeeCategories.is_primary == True,  # noqa: E712
+            AttendeeCategories.deleted_at.is_(None),  # type: ignore[union-attr]
         )
         .limit(1)
     ).first()
@@ -443,6 +444,15 @@ class SalesFlowsCRUD(BaseCRUD[SalesFlows, SalesFlowCreate, SalesFlowUpdate]):
         flow = SalesFlows(**data)
         self.seed_config(session, flow, flow.popup_id, start_from=start_from)
         session.add(flow)
+        session.flush()
+        from app.api.attendee_category.crud import (  # noqa: PLC0415
+            attendee_categories_crud,
+        )
+
+        source_flow_id = uuid.UUID(start_from) if start_from != START_FRESH else None
+        attendee_categories_crud.seed_for_flow(
+            session, flow, source_flow_id=source_flow_id
+        )
         if commit:
             session.commit()
             session.refresh(flow)
@@ -461,8 +471,8 @@ class SalesFlowsCRUD(BaseCRUD[SalesFlows, SalesFlowCreate, SalesFlowUpdate]):
         """Seed the default sales_flow for a newly created popup (task 5.0).
 
         Called inside the same transaction as popup creation — mirrors
-        `AttendeeCategoriesCRUD.seed_main_for_popup`. No commit here, the
-        caller controls the transaction. Idempotent: returns the existing
+        `AttendeeCategoriesCRUD.seed_main_for_flow`. No commit here, the caller
+        controls the transaction. Idempotent: returns the existing
         default flow instead of creating a second one (defensive, mirrors
         the slice-2 backfill's own `WHERE NOT EXISTS` idempotency).
 
@@ -473,6 +483,11 @@ class SalesFlowsCRUD(BaseCRUD[SalesFlows, SalesFlowCreate, SalesFlowUpdate]):
         """
         existing = self.get_default_flow(session, popup_id)
         if existing:
+            from app.api.attendee_category.crud import (  # noqa: PLC0415
+                attendee_categories_crud,
+            )
+
+            attendee_categories_crud.seed_main_for_flow(session, existing)
             return existing
 
         flow = SalesFlows(
@@ -489,6 +504,12 @@ class SalesFlowsCRUD(BaseCRUD[SalesFlows, SalesFlowCreate, SalesFlowUpdate]):
         )
         self.seed_config(session, flow, popup_id, bootstrap_from_popup=True)
         session.add(flow)
+        session.flush()
+        from app.api.attendee_category.crud import (  # noqa: PLC0415
+            attendee_categories_crud,
+        )
+
+        attendee_categories_crud.seed_for_flow(session, flow)
         return flow
 
     def resolve_start(

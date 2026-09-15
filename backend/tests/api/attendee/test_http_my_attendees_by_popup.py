@@ -418,7 +418,7 @@ class TestCreateMyAttendeeForPopupHttp:
 
         popup = _make_popup(db, tenant_a, suffix="c-post-ok", sale_type="application")
         human = _make_human(db, tenant_a, suffix="c-post-ok")
-        _make_application(
+        application = _make_application(
             db, tenant_a, popup, human, status=ApplicationStatus.ACCEPTED.value
         )
 
@@ -428,10 +428,10 @@ class TestCreateMyAttendeeForPopupHttp:
         companion_cat = AttendeeCategories(
             tenant_id=tenant_a.id,
             popup_id=popup.id,
+            sales_flow_id=application.sales_flow_id,
             key="companion",
             label="Companion",
             is_primary=False,
-            enabled_in_passes_flow=True,
         )
         db.add(companion_cat)
         db.commit()

@@ -61,6 +61,7 @@ function renderConfig(productIds: string[] = [], onChange = vi.fn()) {
         config={mealConfig(productIds)}
         onChange={onChange}
         popupId="popup-1"
+        salesFlowId="flow-1"
         productCategory="meal_plan"
       />
     </QueryClientProvider>,
