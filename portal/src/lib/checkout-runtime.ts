@@ -19,6 +19,8 @@ const API_BASE = process.env.NEXT_PUBLIC_API_URL
 export async function fetchCheckoutRuntime(
   slug: string,
   tenantId: string,
+  /** Canonical sales flow slug in `/checkout/{popupSlug}/{flowSlug}`. */
+  flowSlug: string,
   lang?: string,
 ): Promise<CheckoutRuntimeResponse | null> {
   const controller = new AbortController()
@@ -35,14 +37,12 @@ export async function fetchCheckoutRuntime(
     if (lang) {
       headers["Accept-Language"] = lang
     }
-    const res = await fetch(
-      `${API_BASE}/api/v1/checkout/${encodeURIComponent(slug)}/runtime`,
-      {
-        cache: "no-store",
-        headers,
-        signal: controller.signal,
-      },
-    )
+    const path = `/api/v1/checkout/${encodeURIComponent(slug)}/${encodeURIComponent(flowSlug)}/runtime`
+    const res = await fetch(`${API_BASE}${path}`, {
+      cache: "no-store",
+      headers,
+      signal: controller.signal,
+    })
 
     if (!res.ok) {
       console.error("Checkout runtime SSR fetch degraded", {

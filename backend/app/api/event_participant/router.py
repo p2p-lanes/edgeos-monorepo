@@ -40,16 +40,21 @@ def _participants_with_names(db, participants: list) -> list[EventParticipantPub
     """
     from sqlmodel import select
 
+    from app.api.event.models import Events
     from app.api.human.models import Humans
 
     if not participants:
         return []
     profile_ids = {p.profile_id for p in participants}
+    event_ids = {p.event_id for p in participants}
     rows = db.exec(select(Humans).where(Humans.id.in_(profile_ids))).all()
+    events = db.exec(select(Events).where(Events.id.in_(event_ids))).all()
     names = {h.id: (h.first_name, h.last_name) for h in rows}
+    popup_ids = {event.id: event.popup_id for event in events}
     out: list[EventParticipantPublic] = []
     for p in participants:
         public = EventParticipantPublic.model_validate(p)
+        public.popup_id = popup_ids.get(p.event_id)
         first, last = names.get(p.profile_id, (None, None))
         public.first_name = first
         public.last_name = last
@@ -87,6 +92,22 @@ async def list_participants(
         results=_participants_with_names(db, participants),
         paging=Paging(offset=skip, limit=limit, total=total),
     )
+
+
+@router.get("/{participant_id}", response_model=EventParticipantPublic)
+async def get_participant(
+    participant_id: uuid.UUID,
+    db: AdminOrApiKeySession_EventsRead,
+    _: AdminOrApiKey_EventsRead,
+) -> EventParticipantPublic:
+    """Get one event participant with its resolved gathering."""
+    participant = crud.event_participants_crud.get(db, participant_id)
+    if not participant:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Participant not found",
+        )
+    return _participants_with_names(db, [participant])[0]
 
 
 @router.post(
@@ -181,13 +202,18 @@ async def delete_participant(
 
 
 def _resolve_occurrence_start(
-    event, occurrence_start: datetime | None
+    event, occurrence_start: datetime | None, *, require_scheduled: bool = False
 ) -> datetime | None:
     """Validate the (event, occurrence_start) pair for portal RSVP endpoints.
 
     Recurring events require ``occurrence_start`` so each registration
     targets a single instance. One-off events ignore it (and reject it,
     to avoid fragmented data).
+
+    ``require_scheduled`` also rejects instants the series never produces:
+    made-up times, or dates removed via EXDATE. Registration sets it; cancel
+    and check-in leave it off so an RSVP taken before an occurrence was
+    removed can still be withdrawn.
     """
     is_recurring = bool(event.rrule)
     if is_recurring and occurrence_start is None:
@@ -200,7 +226,43 @@ def _resolve_occurrence_start(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="occurrence_start is not allowed for non-recurring events",
         )
+    if (
+        require_scheduled
+        and occurrence_start is not None
+        and not _is_scheduled_occurrence(event, occurrence_start)
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="occurrence_start does not match a scheduled occurrence",
+        )
     return occurrence_start
+
+
+def _is_scheduled_occurrence(event, occurrence_start: datetime) -> bool:
+    from app.api.event.recurrence import expand, parse_rrule
+
+    try:
+        rule = parse_rrule(event.rrule)
+    except ValueError:
+        return False
+    if rule is None:
+        return False
+    occ = (
+        occurrence_start
+        if occurrence_start.tzinfo is not None
+        else occurrence_start.replace(tzinfo=UTC)
+    )
+    return bool(
+        expand(
+            dtstart=event.start_time,
+            rule=rule,
+            window_start=occ,
+            window_end=occ,
+            exdates=list(event.recurrence_exdates or []),
+            max_occurrences=1,
+            timezone=event.timezone,
+        )
+    )
 
 
 @router.get("/portal/participants", response_model=ListModel[EventParticipantPublic])
@@ -333,8 +395,6 @@ async def register_for_event(
 ) -> EventParticipantPublic:
     """Register current human for an event (portal)."""
     from app.api.application.crud import applications_crud
-    from app.api.application.schemas import ApplicationStatus
-    from app.api.attendee.crud import attendees_crud
     from app.api.event.crud import events_crud
     from app.api.event.schemas import EventStatus
     from app.api.event_participant.models import EventParticipants
@@ -352,36 +412,22 @@ async def register_for_event(
             status_code=status.HTTP_400_BAD_REQUEST, detail="Event is not published"
         )
 
-    # Eligibility gate: a human may only RSVP to a popup's events if they have a
-    # purchased ticket for that popup AND their application (if any) was not
-    # rejected. Mirrors the portal UI gate; enforced here so the rule can't be
-    # bypassed via the API directly.
-    application = applications_crud.get_by_human_popup(
+    access = applications_crud.resolve_popup_access(
         db, current_human.id, event.popup_id
     )
-    if application and application.status == ApplicationStatus.REJECTED.value:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Your application was not accepted, so you can't RSVP to events.",
+    if not access.allowed:
+        detail = (
+            "Your application was not accepted, so you can't RSVP to events."
+            if access.reason == "application_rejected"
+            else "You need a purchased ticket for this popup to RSVP."
         )
-
-    # Same ticket source as `list_my_tickets` (find_by_human) so "has a ticket"
-    # matches exactly what the portal shows, including companion/spouse tickets.
-    owned_attendees, _ = attendees_crud.find_by_human(
-        db, human_id=current_human.id, limit=1000
-    )
-    has_ticket = any(
-        a.popup_id == event.popup_id and len(a.attendee_products) > 0
-        for a in owned_attendees
-    )
-    if not has_ticket:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="You need a purchased ticket for this popup to RSVP.",
+            detail=detail,
         )
 
     occ_start = _resolve_occurrence_start(
-        event, body.occurrence_start if body else None
+        event, body.occurrence_start if body else None, require_scheduled=True
     )
 
     existing = crud.event_participants_crud.get_by_event_and_profile(

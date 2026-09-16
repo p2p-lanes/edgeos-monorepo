@@ -237,6 +237,68 @@ describe("dispatchPaymentError — pending_payment_exists", () => {
 })
 
 // ---------------------------------------------------------------------------
+// dispatchPaymentError — flow_restriction_violated / product_not_in_flow
+// (sdd/sales-flows slice 12/14: backend/app/services/restrictions/
+// enforcement.py's 403 machine codes, design D6)
+// ---------------------------------------------------------------------------
+
+describe("dispatchPaymentError — flow_restriction_violated", () => {
+  it("open-ticketing → openCheckout prefix, blocks resubmit, persistent banner, no nav", () => {
+    const result = dispatchPaymentError(
+      { code: "flow_restriction_violated" },
+      "open-ticketing",
+      "slug",
+    )
+    expect(result).not.toBeNull()
+    expect(result!.messageKey).toBe("openCheckout.flow_restriction_violated")
+    expect(result!.blockResubmit).toBe(true)
+    expect(result!.setPersistentError).toBe(true)
+    expect(result!.navigate).toBeNull()
+  })
+
+  it("application → checkout prefix, blocks resubmit, persistent banner, no nav", () => {
+    const result = dispatchPaymentError(
+      { code: "flow_restriction_violated" },
+      "application",
+      "slug",
+    )
+    expect(result).not.toBeNull()
+    expect(result!.messageKey).toBe("checkout.flow_restriction_violated")
+    expect(result!.blockResubmit).toBe(true)
+    expect(result!.setPersistentError).toBe(true)
+    expect(result!.navigate).toBeNull()
+  })
+})
+
+describe("dispatchPaymentError — product_not_in_flow", () => {
+  it("open-ticketing → openCheckout prefix, blocks resubmit, persistent banner, no nav", () => {
+    const result = dispatchPaymentError(
+      { code: "product_not_in_flow" },
+      "open-ticketing",
+      "slug",
+    )
+    expect(result).not.toBeNull()
+    expect(result!.messageKey).toBe("openCheckout.product_not_in_flow")
+    expect(result!.blockResubmit).toBe(true)
+    expect(result!.setPersistentError).toBe(true)
+    expect(result!.navigate).toBeNull()
+  })
+
+  it("application → checkout prefix, blocks resubmit, persistent banner, no nav", () => {
+    const result = dispatchPaymentError(
+      { code: "product_not_in_flow" },
+      "application",
+      "slug",
+    )
+    expect(result).not.toBeNull()
+    expect(result!.messageKey).toBe("checkout.product_not_in_flow")
+    expect(result!.blockResubmit).toBe(true)
+    expect(result!.setPersistentError).toBe(true)
+    expect(result!.navigate).toBeNull()
+  })
+})
+
+// ---------------------------------------------------------------------------
 // dispatchPaymentError — unrecognised / null codes
 // ---------------------------------------------------------------------------
 

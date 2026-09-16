@@ -49,7 +49,6 @@ class Products(ProductBase, table=True):
             primary_key=True,
         ),
     )
-
     # Soft-delete marker. When set, the row is hidden from all user-facing queries
     # and its slug is released by the partial unique index above.
     deleted_at: datetime | None = Field(

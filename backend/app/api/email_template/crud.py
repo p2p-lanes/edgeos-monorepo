@@ -16,8 +16,23 @@ class EmailTemplateCRUD(
     def get_by_popup_and_type(
         self, session: Session, popup_id: uuid.UUID, template_type: str
     ) -> EmailTemplates | None:
+        """Popup-shared tier only (`sales_flow_id IS NULL`) — a flow-scoped
+        row of the same type lives in a disjoint tier (sdd/sales-flows
+        slice 10) and must never be mistaken for a popup-tier duplicate."""
         statement = select(EmailTemplates).where(
             EmailTemplates.popup_id == popup_id,
+            EmailTemplates.sales_flow_id == None,  # noqa: E711
+            EmailTemplates.template_type == template_type,
+        )
+        return session.exec(statement).first()
+
+    def get_by_flow_and_type(
+        self, session: Session, sales_flow_id: uuid.UUID, template_type: str
+    ) -> EmailTemplates | None:
+        """Flow tier — mirrors `get_by_popup_and_type` for the flow-scoped
+        duplicate check (sdd/sales-flows slice 10)."""
+        statement = select(EmailTemplates).where(
+            EmailTemplates.sales_flow_id == sales_flow_id,
             EmailTemplates.template_type == template_type,
         )
         return session.exec(statement).first()
@@ -69,11 +84,38 @@ class EmailTemplateCRUD(
 
         return results, total
 
+    def get_active_flow_template(
+        self, session: Session, sales_flow_id: uuid.UUID, template_type: str
+    ) -> EmailTemplates | None:
+        """This flow's template, or None.
+
+        An inactive row is deliberately NOT returned: the caller falls
+        through to the shipped file template rather than failing, and since
+        slice 6 there is no popup tier in between.
+        """
+        statement = select(EmailTemplates).where(
+            EmailTemplates.sales_flow_id == sales_flow_id,
+            EmailTemplates.template_type == template_type,
+            EmailTemplates.is_active == True,  # noqa: E712
+        )
+        return session.exec(statement).first()
+
     def get_active_popup_template(
         self, session: Session, popup_id: uuid.UUID, template_type: str
     ) -> EmailTemplates | None:
+        """This popup's template, or None.
+
+        Owns the mails a gathering sends regardless of how anyone bought —
+        event invitations, schedule changes, the check-in pass. Those have
+        no sales flow at send time, which is why slice 6 deleting this tier
+        stopped them resolving anything (sdd/sales-flows-rediseno).
+
+        Scoped to `sales_flow_id IS NULL` so a flow-tier row of the same
+        type can never answer for the popup tier.
+        """
         statement = select(EmailTemplates).where(
             EmailTemplates.popup_id == popup_id,
+            EmailTemplates.sales_flow_id == None,  # noqa: E711
             EmailTemplates.template_type == template_type,
             EmailTemplates.is_active == True,  # noqa: E712
         )

@@ -14,9 +14,13 @@ import PassesProvider from "@/providers/passesProvider"
 import ThemeProvider from "@/providers/themeProvider"
 
 /**
- * Bridges `useResolvedAttendees` (which branches on sale_type) into the
+ * Bridges `useResolvedAttendees` (which branches on whether anybody applies) into the
  * `PassesProvider` `attendees` prop. Must live inside ApplicationProvider
  * and CityProvider so the hook can read both.
+ *
+ * The door the screen is about (`?flow=`) selects configuration, never
+ * people: a person and their party are one set at a popup regardless of how
+ * many ways in they hold (sdd/sales-flows-rediseno).
  */
 const PassesBridge = ({ children }: { children: ReactNode }) => {
   const attendees = useResolvedAttendees()

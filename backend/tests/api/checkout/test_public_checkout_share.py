@@ -1,4 +1,4 @@
-"""Tests for GET /checkout/{slug}/share.
+"""Tests for GET /checkout/{slug}/{flow_slug}/share.
 
 Unauthenticated OpenGraph share-preview endpoint. Social crawlers send no JWT,
 so the route is public — but it must only ever expose active direct-sale popups
@@ -21,6 +21,7 @@ from sqlmodel import Session
 from app.api.popup.models import Popups
 from app.api.shared.enums import SaleType
 from app.api.tenant.models import Tenants
+from tests._flow_helpers import provision_default_flow
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -53,11 +54,15 @@ def _make_popup(
     db.add(popup)
     db.commit()
     db.refresh(popup)
+    # A popup created through the API gets a default flow of its own type, and
+    # whether a checkout link exists is a question about doors now.
+    provision_default_flow(db, popup, sale_type=sale_type.value)
+    db.commit()
     return popup
 
 
-def _share_url(slug: str) -> str:
-    return f"/api/v1/checkout/{slug}/share"
+def _share_url(slug: str, flow_slug: str) -> str:
+    return f"/api/v1/checkout/{slug}/{flow_slug}/share"
 
 
 def _tenant_headers(tenant: Tenants) -> dict[str, str]:
@@ -75,7 +80,10 @@ def test_active_direct_popup_returns_share_meta(
     tenant_a: Tenants,
 ) -> None:
     popup = _make_popup(db, tenant_a)
-    res = client.get(_share_url(popup.slug), headers=_tenant_headers(tenant_a))
+    flow = provision_default_flow(db, popup, sale_type=SaleType.direct.value)
+    res = client.get(
+        _share_url(popup.slug, flow.slug), headers=_tenant_headers(tenant_a)
+    )
     assert res.status_code == 200
     body = res.json()
     assert body["id"] == str(popup.id)
@@ -90,7 +98,7 @@ def test_unknown_slug_returns_opaque_404(
     tenant_a: Tenants,
 ) -> None:
     res = client.get(
-        _share_url("does-not-exist"),
+        _share_url("does-not-exist", "checkout"),
         headers=_tenant_headers(tenant_a),
     )
     assert res.status_code == 404
@@ -103,7 +111,10 @@ def test_application_popup_returns_opaque_404(
     tenant_a: Tenants,
 ) -> None:
     popup = _make_popup(db, tenant_a, sale_type=SaleType.application)
-    res = client.get(_share_url(popup.slug), headers=_tenant_headers(tenant_a))
+    flow = provision_default_flow(db, popup, sale_type=SaleType.application.value)
+    res = client.get(
+        _share_url(popup.slug, flow.slug), headers=_tenant_headers(tenant_a)
+    )
     assert res.status_code == 404
     assert res.json()["detail"] == "Not found"
 
@@ -114,6 +125,9 @@ def test_inactive_direct_popup_returns_opaque_404(
     tenant_a: Tenants,
 ) -> None:
     popup = _make_popup(db, tenant_a, status="draft")
-    res = client.get(_share_url(popup.slug), headers=_tenant_headers(tenant_a))
+    flow = provision_default_flow(db, popup, sale_type=SaleType.direct.value)
+    res = client.get(
+        _share_url(popup.slug, flow.slug), headers=_tenant_headers(tenant_a)
+    )
     assert res.status_code == 404
     assert res.json()["detail"] == "Not found"

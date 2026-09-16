@@ -16,6 +16,7 @@ import {
   useState,
 } from "react"
 import type { PopupPublic } from "@/client"
+import { visiblePortalFallback } from "@/hooks/portalPopupList"
 import { usePopupsQuery, usePublicPopupsQuery } from "@/hooks/useGetPopups"
 import { setActiveCurrency } from "@/types/checkout"
 
@@ -56,6 +57,7 @@ const CityProvider = ({
   }, [popups, currentSlug])
 
   const cityFromUrl = getValidCity()
+  const fallbackCity = visiblePortalFallback(popups, lastValidCity)
 
   useEffect(() => {
     if (cityFromUrl) {
@@ -67,8 +69,11 @@ const CityProvider = ({
     if (!popupsLoaded) return
     if (!currentSlug) return
     if (cityFromUrl) return
-    const fallback = lastValidCity ?? popups[0]
-    if (!fallback?.slug) return
+    const fallback = visiblePortalFallback(popups, lastValidCity)
+    if (!fallback?.slug) {
+      router.replace("/portal")
+      return
+    }
     const segments = pathname.split("/")
     const slugIndex = segments.indexOf(currentSlug)
     if (slugIndex === -1) return
@@ -86,7 +91,7 @@ const CityProvider = ({
     searchParams,
   ])
 
-  const activePopup = cityFromUrl ?? lastValidCity ?? popups[0] ?? null
+  const activePopup = cityFromUrl ?? fallbackCity
   setActiveCurrency(activePopup?.currency ?? "USD")
 
   const getCity = useCallback((): PopupPublic | null => {
@@ -95,7 +100,7 @@ const CityProvider = ({
       const selectedCity = popups.find((popup) => popup.id === cityPreselected)
       if (selectedCity) return selectedCity
     } else if (!city) {
-      return lastValidCity ?? popups[0] ?? null
+      return visiblePortalFallback(popups, lastValidCity)
     }
     return city ?? null
   }, [getValidCity, cityPreselected, popups, lastValidCity])

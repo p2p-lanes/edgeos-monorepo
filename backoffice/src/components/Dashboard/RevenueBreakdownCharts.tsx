@@ -67,7 +67,7 @@ export function RevenueBreakdownCharts({
 }: RevenueBreakdownChartsProps) {
   if (isLoading || !data) {
     return (
-      <div className="grid gap-4 md:grid-cols-2">
+      <div className="grid gap-4 @2xl/dashboard:grid-cols-2">
         <Card>
           <CardHeader>
             <Skeleton className="h-5 w-40" />
@@ -128,7 +128,7 @@ export function RevenueBreakdownCharts({
   }
 
   return (
-    <div className="grid gap-4 md:grid-cols-2">
+    <div className="grid gap-4 @2xl/dashboard:grid-cols-2">
       {/* Revenue by Category — Donut */}
       <Card>
         <CardHeader>

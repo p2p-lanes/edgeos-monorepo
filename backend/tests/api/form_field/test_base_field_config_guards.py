@@ -13,6 +13,7 @@ from sqlmodel import Session
 from app.api.base_field_config.models import BaseFieldConfigs
 from app.api.popup.models import Popups
 from app.api.tenant.models import Tenants
+from tests._flow_helpers import default_flow_id, provision_default_flow
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -29,6 +30,7 @@ def _make_popup(db: Session, tenant: Tenants) -> Popups:
     db.add(popup)
     db.commit()
     db.refresh(popup)
+    provision_default_flow(db, popup)
     return popup
 
 
@@ -42,6 +44,7 @@ def _make_config(
     config = BaseFieldConfigs(
         tenant_id=popup.tenant_id,
         popup_id=popup.id,
+        sales_flow_id=default_flow_id(db, popup.id),
         field_name=field_name,
         required=required,
         label=field_name.replace("_", " ").title(),

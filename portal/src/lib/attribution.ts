@@ -11,6 +11,7 @@
  */
 
 const STORAGE_KEY = "edgeos_attribution_v1"
+const FBCLID_CAPTURE_KEY = "edgeos_fbclid_capture_v1"
 
 const ATTRIBUTION_KEYS = [
   "utm_source",
@@ -37,6 +38,10 @@ export function captureAttribution(params: ReadableParams): void {
   if (typeof window === "undefined") return
 
   const stored = getAttribution()
+  const incomingFbclid = params.get("fbclid")
+  const storedFbclidCapture = getFbclidCapture()
+  const shouldCaptureFbclid =
+    !!incomingFbclid && storedFbclidCapture?.fbclid !== incomingFbclid
   let changed = false
   for (const key of ATTRIBUTION_KEYS) {
     const value = params.get(key)
@@ -46,12 +51,47 @@ export function captureAttribution(params: ReadableParams): void {
     }
   }
 
-  if (changed) {
+  if (changed || shouldCaptureFbclid) {
     try {
-      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(stored))
+      if (changed) {
+        window.localStorage.setItem(STORAGE_KEY, JSON.stringify(stored))
+      }
+      if (shouldCaptureFbclid) {
+        window.localStorage.setItem(
+          FBCLID_CAPTURE_KEY,
+          JSON.stringify({ fbclid: incomingFbclid, capturedAt: Date.now() }),
+        )
+      }
     } catch {
       // localStorage unavailable (private mode / SSR) — attribution is best-effort.
     }
+  }
+}
+
+/**
+ * Return the fbclid and the time it was first observed together. This metadata
+ * stays outside the public attribution blob because that blob is sent to an
+ * API with a strict schema containing only the original URL parameters.
+ */
+export function getFbclidCapture():
+  | { fbclid: string; capturedAt: number }
+  | undefined {
+  if (typeof window === "undefined") return undefined
+  try {
+    const raw = window.localStorage.getItem(FBCLID_CAPTURE_KEY)
+    if (!raw) return undefined
+    const value = JSON.parse(raw) as Record<string, unknown>
+    if (
+      typeof value.fbclid !== "string" ||
+      !value.fbclid ||
+      !Number.isSafeInteger(value.capturedAt) ||
+      Number(value.capturedAt) <= 0
+    ) {
+      return undefined
+    }
+    return { fbclid: value.fbclid, capturedAt: Number(value.capturedAt) }
+  } catch {
+    return undefined
   }
 }
 

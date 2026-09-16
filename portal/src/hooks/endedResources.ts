@@ -3,6 +3,7 @@ import {
   FileText,
   Layers,
   MapPin,
+  ReceiptText,
   Ticket,
   Users,
 } from "lucide-react"
@@ -14,9 +15,9 @@ type Translator = (key: string, opts?: Record<string, unknown>) => string
 
 /**
  * Sidebar resources for an ended popup. Application points at the home card
- * (root) and stays active; Passes is locked (`disabled`). Events and the
- * attendee directory are open to anyone who participated, honoring the
- * popup's events/directory feature flags.
+ * (root) and stays active; authorized participants retain read-only attendee
+ * passes and payment history. Events and the attendee directory honor the popup's
+ * events/directory feature flags.
  */
 export function buildEndedResources({
   t,
@@ -29,7 +30,8 @@ export function buildEndedResources({
 }): Resource[] {
   const eventsEnabled = city?.events_enabled ?? true
   const directoryEnabled =
-    city?.sale_type !== "direct" && (city?.show_attendee_directory ?? false)
+    city?.takes_applications !== false &&
+    (city?.show_attendee_directory ?? false)
   const eventsVisible = participated && eventsEnabled
   const directoryVisible = participated && directoryEnabled
   const eventsStatus = eventsVisible ? "active" : "hidden"
@@ -40,24 +42,35 @@ export function buildEndedResources({
       icon: FileText,
       status: "active",
       path: `/portal/${city?.slug}`,
+      group: "commerce",
     },
     {
       name: t("sidebar.passes"),
       icon: Ticket,
-      status: "disabled",
+      status: participated ? "active" : "hidden",
       path: `/portal/${city?.slug}/passes`,
+      group: "commerce",
+    },
+    {
+      name: t("sidebar.orders"),
+      icon: ReceiptText,
+      status: "active",
+      path: `/portal/${city?.slug}/orders`,
+      group: "commerce",
     },
     {
       name: t("sidebar.attendee_directory"),
       icon: Users,
       status: directoryVisible ? "active" : "hidden",
       path: `/portal/${city?.slug}/attendees`,
+      group: "community",
     },
     {
       name: t("sidebar.events"),
       icon: CalendarDays,
       status: eventsStatus,
       path: `/portal/${city?.slug}/events`,
+      group: "community",
       children: [
         {
           name: t("sidebar.tracks", { defaultValue: "Tracks" }),

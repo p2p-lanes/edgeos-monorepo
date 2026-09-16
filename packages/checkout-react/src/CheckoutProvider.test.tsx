@@ -44,8 +44,9 @@ function fakeTransport(): Transport {
 
 function wrapper(extra?: Partial<React.ComponentProps<typeof CheckoutProvider>>) {
   return ({ children }: { children: ReactNode }) => (
-    <CheckoutProvider
-      slug="demo"
+      <CheckoutProvider
+        slug="demo"
+        flowSlug="checkout"
       baseUrl="https://api/api/v1"
       transport={fakeTransport()}
       initialRuntime={runtime()}
@@ -107,7 +108,7 @@ describe("CheckoutProvider + hooks", () => {
     }
     render(
       <StrictMode>
-        <CheckoutProvider slug="demo" transport={fakeTransport()} initialRuntime={runtime()}>
+        <CheckoutProvider slug="demo" flowSlug="checkout" transport={fakeTransport()} initialRuntime={runtime()}>
           <Probe />
         </CheckoutProvider>
       </StrictMode>,
@@ -131,7 +132,7 @@ describe("CheckoutProvider + hooks", () => {
 
   it("renders children", () => {
     render(
-      <CheckoutProvider slug="demo" transport={fakeTransport()} initialRuntime={runtime()} autoLoad={false}>
+      <CheckoutProvider slug="demo" flowSlug="checkout" transport={fakeTransport()} initialRuntime={runtime()} autoLoad={false}>
         <span>hello</span>
       </CheckoutProvider>,
     )

@@ -32,6 +32,12 @@ from app.api.popup.models import Popups
 from app.api.shared.enums import HumanRating, SaleType
 from app.api.tenant.models import Tenants
 from app.core.security import create_access_token
+from tests._flow_helpers import (
+    application_flow_id,
+    default_flow_id,
+    group_flow_id,
+    provision_default_flow,
+)
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -58,26 +64,26 @@ def _make_fee_popup(
     )
     db.add(popup)
     db.flush()
+    provision_default_flow(db, popup)
     return popup
 
 
 def _ensure_primary_category(db: Session, popup: Popups) -> AttendeeCategories:
+    from app.api.attendee_category.crud import attendee_categories_crud
+    from app.api.sales_flow.models import SalesFlows
+
+    flow_id = application_flow_id(db, popup.id)
     cat = db.exec(
         select(AttendeeCategories).where(
-            AttendeeCategories.popup_id == popup.id,
+            AttendeeCategories.sales_flow_id == flow_id,
             AttendeeCategories.is_primary == True,  # noqa: E712
+            AttendeeCategories.deleted_at.is_(None),  # type: ignore[union-attr]
         )
     ).first()
     if cat is None:
-        cat = AttendeeCategories(
-            tenant_id=popup.tenant_id,
-            popup_id=popup.id,
-            key="main",
-            label="Main",
-            is_primary=True,
-            enabled_in_passes_flow=True,
-        )
-        db.add(cat)
+        flow = db.get(SalesFlows, flow_id)
+        assert flow is not None
+        cat = attendee_categories_crud.seed_main_for_flow(db, flow)
         db.flush()
     return cat
 
@@ -104,6 +110,7 @@ def _make_application(
     status: str = ApplicationStatus.IN_REVIEW.value,
 ) -> Applications:
     application = Applications(
+        sales_flow_id=application_flow_id(db, popup.id),
         tenant_id=tenant.id,
         popup_id=popup.id,
         human_id=human.id,
@@ -285,6 +292,7 @@ class TestFeeCreditPaths:
         strategy = ApprovalStrategies(
             tenant_id=tenant_a.id,
             popup_id=popup.id,
+            sales_flow_id=default_flow_id(db, popup.id),
             strategy_type=ApprovalStrategyType.AUTO_ACCEPT,
         )
         db.add(strategy)
@@ -322,6 +330,7 @@ class TestFeeCreditPaths:
 
         # Create an open group for this popup
         group = Groups(
+            sales_flow_id=group_flow_id(db, popup.id),
             tenant_id=tenant_a.id,
             popup_id=popup.id,
             name=f"FeeGroup {uuid.uuid4().hex[:6]}",
@@ -337,6 +346,7 @@ class TestFeeCreditPaths:
         response = client.patch(
             f"/api/v1/applications/my/{popup.id}",
             json={"group_id": str(group.id)},
+            params={"sales_flow_id": str(application.sales_flow_id)},
             headers={
                 "Authorization": f"Bearer {human_token}",
                 "X-Tenant-Id": str(tenant_a.id),
@@ -363,6 +373,7 @@ class TestFeeCreditPaths:
         group = Groups(
             tenant_id=tenant_a.id,
             popup_id=popup.id,
+            sales_flow_id=application.sales_flow_id,
             name=f"ManualGroup {uuid.uuid4().hex[:6]}",
             slug=f"manualgroup-{uuid.uuid4().hex[:6]}",
             auto_approve_applications=False,
@@ -374,6 +385,7 @@ class TestFeeCreditPaths:
         response = client.patch(
             f"/api/v1/applications/my/{popup.id}",
             json={"group_id": str(group.id)},
+            params={"sales_flow_id": str(application.sales_flow_id)},
             headers={
                 "Authorization": f"Bearer {human_token}",
                 "X-Tenant-Id": str(tenant_a.id),

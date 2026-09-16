@@ -249,7 +249,7 @@ export function ProductForm({ defaultValues, onSuccess }: ProductFormProps) {
         : null
 
       if (isEdit) {
-        updateMutation.mutate({
+        const update: ProductUpdate = {
           name: value.name,
           price: effectivePrice,
           compare_price: effectiveComparePrice,
@@ -267,7 +267,8 @@ export function ProductForm({ defaultValues, onSuccess }: ProductFormProps) {
           max_per_order: maxPerOrder,
           insurance_eligible: value.insurance_eligible,
           discountable: value.discountable,
-        })
+        }
+        updateMutation.mutate(update)
       } else {
         if (!selectedPopupId) {
           showErrorToast("Please select a gathering first")

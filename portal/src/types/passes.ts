@@ -14,7 +14,7 @@ export interface AttendeePassesProps {
 
 export interface ProductsSnapshotProps {
   product_id: string
-  attendee_id: string
+  attendee_id: string | null
   quantity: number
   product_name: string
   product_description: string | null

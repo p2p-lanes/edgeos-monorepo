@@ -1,39 +1,114 @@
 import {
   CalendarDays,
   FileText,
+  House,
   Layers,
   Link2,
   MapPin,
+  ReceiptText,
+  ShoppingBag,
   Ticket,
   Users,
 } from "lucide-react"
+import { useSearchParams } from "next/navigation"
 import { useTranslation } from "react-i18next"
 import { OpenClaw } from "@/components/Icons/OpenClaw"
 import { buildEndedResources } from "@/hooks/endedResources"
 import useAuth from "@/hooks/useAuth"
+import { useGatheringDoors } from "@/hooks/useGatheringDoors"
 import { useHumanPopupAccess } from "@/hooks/useHumanPopupAccess"
+import { usePortalDirectSalesFlows } from "@/hooks/usePortalDirectSalesFlows"
+import { usePortalSalesFlows } from "@/hooks/usePortalSalesFlows"
+import { usePortalUpsaleFlows } from "@/hooks/usePortalUpsaleFlows"
+import { hasAcceptedPopupParticipation } from "@/lib/popup-participation"
+import { getEligiblePortalFlows } from "@/lib/portal-sales-flows"
 import { useApplication } from "@/providers/applicationProvider"
 import { useCityProvider } from "@/providers/cityProvider"
 import type { Resource } from "@/types/resources"
 
+export function buildDirectoryResource({
+  t,
+  slug,
+  hasAcceptedParticipation,
+  attendeeDirectoryEnabled,
+}: {
+  t: (key: string) => string
+  slug: string | undefined
+  hasAcceptedParticipation: boolean
+  attendeeDirectoryEnabled: boolean
+}): Resource {
+  return {
+    name: t("sidebar.attendee_directory"),
+    icon: Users,
+    status:
+      hasAcceptedParticipation && attendeeDirectoryEnabled
+        ? "active"
+        : "hidden",
+    path: `/portal/${slug}/attendees`,
+    group: "community",
+  }
+}
+
 const useResources = () => {
   const { t } = useTranslation()
   const { getCity } = useCityProvider()
-  const { getRelevantApplication, participation } = useApplication()
+  const { getApplicationsForPopup, getRelevantApplication, participation } =
+    useApplication()
+  // Which door into the gathering the sidebar is describing. It is
+  // always on screen, so with two applications and no door named it
+  // would have to speak for both at once with one status
+  // (sdd/sales-flows-rediseno). Absent means a single application,
+  // which is almost everyone.
+  const flowId = useSearchParams().get("flow")
+  // Flow-specific application details keep the door. Popup-scoped Passes and
+  // Directory intentionally do not.
+  const flowQuery = flowId ? `?flow=${flowId}` : ""
   const { user } = useAuth()
-  const application = getRelevantApplication()
+  const application = getRelevantApplication(flowId)
   const city = getCity()
+  const popupId = city?.id ? String(city.id) : undefined
+  const applicationFlows = usePortalSalesFlows(popupId).data ?? []
+  const directFlows = usePortalDirectSalesFlows(popupId).data ?? []
+  const upsaleFlows = usePortalUpsaleFlows(popupId).data ?? []
+  const { doors } = useGatheringDoors(city?.id ? String(city.id) : null)
+  // Named only when there is more than one way in. With a single door the
+  // sidebar has nothing to disambiguate and saying its name would be noise.
+  const doorName =
+    doors.length > 1
+      ? (doors.find((door) => door.flowId === flowId)?.name ?? null)
+      : null
   const endedAccess = useHumanPopupAccess(
     city?.status === "ended" && city?.id ? String(city.id) : null,
   )
 
-  if (city?.status === "ended" && city?.sale_type !== "direct") {
+  if (!city) {
+    return { resources: [], doorName: null }
+  }
+
+  // What the sidebar actually branches on: whether anybody applies here. A
+  // gathering can take applications through one door and sell through
+  // another, so the popup's `sale_type` can no longer answer it.
+  const nobodyApplies = city.takes_applications === false
+  const hasCustomHome = city.custom_home_enabled === true
+  const popupRoot = `/portal/${city.slug}`
+  const overviewPath = hasCustomHome ? `${popupRoot}/overview` : popupRoot
+  const homeResource: Resource = {
+    name: t("sidebar.home"),
+    icon: House,
+    status: "active",
+    path: popupRoot,
+    group: "commerce",
+  }
+
+  if (city?.status === "ended") {
     const resources = buildEndedResources({
       t,
       city,
       participated: endedAccess.state === "allowed",
     })
-    return { resources }
+    resources[0].path = overviewPath
+    if (hasCustomHome) resources.unshift(homeResource)
+    return { resources, doorName: null }
   }
 
   // Popup-level feature flag: hides the entire events module when off.
@@ -41,47 +116,91 @@ const useResources = () => {
   // inside the events page itself (event_settings.event_enabled).
   const eventsEnabled = city?.events_enabled ?? true
   const attendeeDirectoryEnabled =
-    city?.sale_type !== "direct" && (city?.show_attendee_directory ?? false)
+    !nobodyApplies && (city?.show_attendee_directory ?? false)
   const referralsEnabled = city?.referrals_enabled === true
 
   const isCompanion = participation?.type === "companion"
-  const canSeeAttendees = application?.status === "accepted"
-  const companionCanSeePasses = isCompanion
+  const selectedApplicationAccepted = application?.status === "accepted"
   const companionApplicationAccepted =
     participation?.type === "companion" &&
     participation?.application_status === "accepted"
+  const acceptedApplications = getApplicationsForPopup().filter(
+    (item) => item.status === "accepted",
+  )
+  const popupParticipationAccepted = hasAcceptedPopupParticipation(
+    acceptedApplications,
+    participation,
+  )
+  const approvedApplicationFlowIds = new Set<string>(
+    acceptedApplications.flatMap((item) =>
+      item.sales_flow_id ? [item.sales_flow_id] : [],
+    ),
+  )
+  const eligibleFlows = getEligiblePortalFlows({
+    application: applicationFlows,
+    direct: directFlows,
+    upsale: upsaleFlows,
+    approvedApplicationFlowIds,
+  })
+  const flowResources: Resource[] = eligibleFlows.map((flow) => ({
+    name: flow.name,
+    icon: ShoppingBag,
+    status: "active",
+    path: `/portal/${city.slug}/shop/${flow.slug}`,
+    group: "checkouts",
+  }))
 
-  // Direct-sale popups have no application and no reviewer-controlled
-  // attendees — just an event overview that links to checkout, plus a
+  // Where nobody applies there is no application and no reviewer-controlled
+  // attendee list, just an event overview that links to checkout plus a
   // passes view for managing existing purchases. The events module
   // (and its API Keys/Docs subsections) is not exposed in this flow.
-  if (city?.sale_type === "direct" && user) {
+  if (nobodyApplies && user) {
     const resources: Resource[] = [
-      {
-        name: t("sidebar.overview", { defaultValue: "Overview" }),
-        icon: Ticket,
-        status: "active",
-        path: `/portal/${city?.slug}`,
-      },
+      ...(hasCustomHome ? [homeResource] : []),
       {
         name: t("sidebar.passes"),
         icon: Ticket,
         status: "active",
-        path: `/portal/${city?.slug}/passes`,
+        path: `/portal/${city.slug}/passes`,
+        group: "commerce",
       },
+      {
+        name: t("sidebar.overview", { defaultValue: "Overview" }),
+        icon: FileText,
+        status: "active",
+        path: `${overviewPath}${flowQuery}`,
+        group: "commerce",
+      },
+      {
+        name: t("sidebar.orders"),
+        icon: ReceiptText,
+        status: "active",
+        path: `/portal/${city.slug}/orders`,
+        group: "commerce",
+      },
+      ...flowResources,
     ]
 
-    return { resources }
+    return { resources, doorName: null }
   }
 
   if (isCompanion) {
     const companionEventsVisible = companionApplicationAccepted && eventsEnabled
     const resources: Resource[] = [
+      ...(hasCustomHome ? [homeResource] : []),
+      {
+        name: t("sidebar.passes"),
+        icon: Ticket,
+        status: "active",
+        path: `/portal/${city.slug}/passes`,
+        group: "commerce",
+      },
       {
         name: t("sidebar.companion"),
         icon: Users,
         status: "active",
-        path: `/portal/${city?.slug}`,
+        path: `${overviewPath}${flowQuery}`,
+        group: "commerce",
         children: [
           {
             name: t("sidebar.status"),
@@ -91,28 +210,31 @@ const useResources = () => {
         ],
       },
       {
-        name: t("sidebar.passes"),
-        icon: Ticket,
-        status: companionCanSeePasses ? "active" : "hidden",
-        path: `/portal/${city?.slug}/passes`,
+        name: t("sidebar.orders"),
+        icon: ReceiptText,
+        status: "active",
+        path: `/portal/${city?.slug}/orders`,
+        group: "commerce",
       },
+      ...flowResources,
       {
         name: t("sidebar.events"),
         icon: CalendarDays,
         status: companionEventsVisible ? "active" : "hidden",
-        path: `/portal/${city?.slug}/events`,
+        path: `/portal/${city?.slug}/events${flowQuery}`,
+        group: "community",
         children: [
           {
             name: t("sidebar.tracks", { defaultValue: "Tracks" }),
             icon: Layers,
             status: companionEventsVisible ? "active" : "hidden",
-            path: `/portal/${city?.slug}/events/tracks`,
+            path: `/portal/${city?.slug}/events/tracks${flowQuery}`,
           },
           {
             name: t("sidebar.venues"),
             icon: MapPin,
             status: companionEventsVisible ? "active" : "hidden",
-            path: `/portal/${city?.slug}/events/venues`,
+            path: `/portal/${city?.slug}/events/venues${flowQuery}`,
           },
           {
             name: t("sidebar.agentic_access", {
@@ -124,59 +246,73 @@ const useResources = () => {
           },
         ],
       },
+      buildDirectoryResource({
+        t,
+        slug: city.slug,
+        hasAcceptedParticipation: popupParticipationAccepted,
+        attendeeDirectoryEnabled,
+      }),
     ]
 
-    return { resources }
+    return { resources, doorName: null }
   }
 
   const resources: Resource[] = [
+    ...(hasCustomHome ? [homeResource] : []),
     {
       name: t("sidebar.application"),
       icon: FileText,
       status: "active",
-      path: `/portal/${city?.slug}`,
-      children: [
-        {
-          name: t("sidebar.status"),
-          status: "inactive",
-          value: application?.status ?? "not started",
-        },
-      ],
+      path: `${overviewPath}${flowQuery}`,
+      group: "commerce",
     },
     {
       name: t("sidebar.passes"),
       icon: Ticket,
-      status: canSeeAttendees ? "active" : "hidden",
-      path: `/portal/${city?.slug}/passes`,
+      status: popupParticipationAccepted ? "active" : "hidden",
+      path: `/portal/${city.slug}/passes`,
+      group: "commerce",
     },
     {
-      name: t("sidebar.attendee_directory"),
-      icon: Users,
-      status: canSeeAttendees && attendeeDirectoryEnabled ? "active" : "hidden",
-      path: `/portal/${city?.slug}/attendees`,
+      name: t("sidebar.orders"),
+      icon: ReceiptText,
+      status: "active",
+      path: `/portal/${city?.slug}/orders`,
+      group: "commerce",
     },
+    ...flowResources,
+    buildDirectoryResource({
+      t,
+      slug: city?.slug,
+      hasAcceptedParticipation: popupParticipationAccepted,
+      attendeeDirectoryEnabled,
+    }),
     {
       name: t("sidebar.events"),
       icon: CalendarDays,
-      status: canSeeAttendees && eventsEnabled ? "active" : "hidden",
-      path: `/portal/${city?.slug}/events`,
+      status: popupParticipationAccepted && eventsEnabled ? "active" : "hidden",
+      path: `/portal/${city?.slug}/events${flowQuery}`,
+      group: "community",
       children: [
         {
           name: t("sidebar.tracks", { defaultValue: "Tracks" }),
           icon: Layers,
-          status: canSeeAttendees && eventsEnabled ? "active" : "hidden",
-          path: `/portal/${city?.slug}/events/tracks`,
+          status:
+            popupParticipationAccepted && eventsEnabled ? "active" : "hidden",
+          path: `/portal/${city?.slug}/events/tracks${flowQuery}`,
         },
         {
           name: t("sidebar.venues"),
           icon: MapPin,
-          status: canSeeAttendees && eventsEnabled ? "active" : "hidden",
-          path: `/portal/${city?.slug}/events/venues`,
+          status:
+            popupParticipationAccepted && eventsEnabled ? "active" : "hidden",
+          path: `/portal/${city?.slug}/events/venues${flowQuery}`,
         },
         {
           name: t("sidebar.agentic_access", { defaultValue: "Agentic access" }),
           icon: OpenClaw,
-          status: canSeeAttendees && eventsEnabled ? "active" : "hidden",
+          status:
+            popupParticipationAccepted && eventsEnabled ? "active" : "hidden",
           path: "/portal/agentic-access",
         },
       ],
@@ -184,11 +320,13 @@ const useResources = () => {
     {
       name: t("sidebar.referrals"),
       icon: Link2,
-      status: canSeeAttendees && referralsEnabled ? "active" : "hidden",
-      path: `/portal/${city?.slug}/referrals`,
+      status:
+        selectedApplicationAccepted && referralsEnabled ? "active" : "hidden",
+      path: `/portal/${city?.slug}/referrals${flowQuery}`,
+      group: "community",
     },
   ]
 
-  return { resources }
+  return { resources, doorName }
 }
 export default useResources

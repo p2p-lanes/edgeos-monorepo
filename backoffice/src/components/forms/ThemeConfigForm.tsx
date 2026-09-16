@@ -2,7 +2,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query"
 import { ChevronDown, Info, PartyPopper, RotateCcw, Type } from "lucide-react"
 import { useCallback, useMemo, useState } from "react"
 import { RgbaColorPicker } from "react-colorful"
-import { PopupsService, type PopupUpdate } from "@/client"
+import { PopupsService, type PopupUpdate, SalesFlowsService } from "@/client"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
 import { InlineSection } from "@/components/ui/inline-form"
@@ -122,6 +122,14 @@ interface ThemeConfigFormProps {
   themeConfig: ThemeConfig | null | undefined
   readOnly?: boolean
   previewEvent?: PreviewEvent
+  /**
+   * Save to this flow instead of the gathering.
+   *
+   * A flow chooses how its checkout looks (sdd/sales-flows-rediseno). The
+   * gathering's own theme still dresses its portal pages, where no flow is
+   * in scope, so both remain editable and neither reads the other.
+   */
+  salesFlowId?: string
 }
 
 const EMPTY_PREVIEW_EVENT: PreviewEvent = {
@@ -139,6 +147,7 @@ export function ThemeConfigForm({
   themeConfig,
   readOnly,
   previewEvent,
+  salesFlowId,
 }: ThemeConfigFormProps) {
   const queryClient = useQueryClient()
   const { showSuccessToast, showErrorToast } = useCustomToast()
@@ -184,11 +193,22 @@ export function ThemeConfigForm({
   )
 
   const updateMutation = useMutation({
-    mutationFn: (data: PopupUpdate) =>
-      PopupsService.updatePopup({ popupId, requestBody: data }),
+    // Both endpoints take `theme_config` and both answers are discarded, so
+    // the payload type is the only thing that has to line up.
+    mutationFn: async (data: PopupUpdate): Promise<void> => {
+      if (salesFlowId) {
+        await SalesFlowsService.updateSalesFlow({
+          flowId: salesFlowId,
+          requestBody: { theme_config: data.theme_config },
+        })
+        return
+      }
+      await PopupsService.updatePopup({ popupId, requestBody: data })
+    },
     onSuccess: () => {
       showSuccessToast("Theme updated successfully")
       queryClient.invalidateQueries({ queryKey: ["popups"] })
+      queryClient.invalidateQueries({ queryKey: ["sales-flows"] })
     },
     onError: createErrorHandler(showErrorToast),
   })

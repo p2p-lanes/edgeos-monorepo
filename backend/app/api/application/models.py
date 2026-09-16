@@ -61,7 +61,10 @@ class Applications(ApplicationBase, table=True):
     """
 
     __table_args__ = (
-        UniqueConstraint("human_id", "popup_id", name="uq_application_human_popup"),
+        # Re-keyed from (human_id, popup_id) to (human_id, sales_flow_id) in
+        # sdd/sales-flows slice 5 (G2, confirmed 2026-08-04): one application
+        # per person PER FLOW, not per popup. See migration e31496bde92c.
+        UniqueConstraint("human_id", "sales_flow_id", name="uq_application_human_flow"),
         Index("ix_applications_popup_status", "popup_id", "status"),
         Index(
             "ix_applications_active_status",

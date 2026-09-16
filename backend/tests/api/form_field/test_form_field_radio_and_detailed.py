@@ -8,6 +8,7 @@ from app.api.form_field.crud import form_fields_crud
 from app.api.form_field.models import FormFields
 from app.api.popup.models import Popups
 from app.api.tenant.models import Tenants
+from tests._flow_helpers import default_flow_id, provision_default_flow
 
 
 def _make_popup_with_field(
@@ -25,10 +26,12 @@ def _make_popup_with_field(
     )
     db.add(popup)
     db.flush()
+    provision_default_flow(db, popup)
 
     field = FormFields(
         tenant_id=tenant.id,
         popup_id=popup.id,
+        sales_flow_id=default_flow_id(db, popup.id),
         name=f"f_{uuid.uuid4().hex[:6]}",
         label="My Field",
         field_type=field_type,

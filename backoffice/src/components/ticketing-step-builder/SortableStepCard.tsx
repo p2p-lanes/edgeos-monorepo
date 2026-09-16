@@ -179,6 +179,12 @@ export function SortableStepCard({
         {templateDef && (
           <p className="text-xs text-muted-foreground/70">
             {templateDef.label}
+            {/* Named in the list, not only inside the step, so an operator
+                can see which of their steps are on a retired template
+                without opening each one. */}
+            {templateDef.deprecatedBy && (
+              <span className="ml-1.5 text-amber-600">· retired</span>
+            )}
           </p>
         )}
       </div>

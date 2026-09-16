@@ -2,9 +2,8 @@ import { render, screen, waitFor } from "@testing-library/react"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 
 // ---------------------------------------------------------------------------
-// The ended-popup gate lives in this layout rather than in each page so it
-// covers /passes AND every nested route (notably /passes/buy). These tests
-// pin that contract — the guard regressed once by living only in page.tsx.
+// Passes remains available as popup-scoped participation history. The layout
+// must not replace the canonical page with another route.
 // ---------------------------------------------------------------------------
 
 const mockReplace = vi.fn()
@@ -37,12 +36,12 @@ vi.mock("@/components/ui/Loader", () => ({
 
 import Layout from "./layout"
 
-describe("passes layout ended guard", () => {
+describe("Passes layout", () => {
   beforeEach(() => {
     mockReplace.mockClear()
   })
 
-  it("redirects to the popup home and hides children when the popup has ended", async () => {
+  it("keeps Passes history available when the popup has ended", async () => {
     mockCity = { id: "city-1", slug: "festival", status: "ended" }
 
     render(
@@ -51,10 +50,8 @@ describe("passes layout ended guard", () => {
       </Layout>,
     )
 
-    await waitFor(() => {
-      expect(mockReplace).toHaveBeenCalledWith("/portal/festival")
-    })
-    expect(screen.queryByTestId("child")).toBeNull()
+    expect(screen.getByTestId("child")).toBeTruthy()
+    await waitFor(() => expect(mockReplace).not.toHaveBeenCalled())
   })
 
   it("renders children for an active popup", async () => {

@@ -2,7 +2,6 @@
 
 import { motion } from "framer-motion"
 import { Check } from "lucide-react"
-import Image from "next/image"
 import {
   type ReactNode,
   useEffect,
@@ -11,7 +10,6 @@ import {
   useState,
 } from "react"
 import { getRegistryIcon, resolveStepIcon } from "@/lib/checkoutStepIcons"
-import { imageOptimization } from "@/lib/image-optimization"
 import { cn } from "@/lib/utils"
 import { useCheckout } from "@/providers/checkoutProvider"
 import type { CheckoutStep } from "@/types/checkout"
@@ -47,10 +45,8 @@ interface ScrollySectionNavProps {
   activeSection: string
   onSectionClick: (sectionId: string) => void
   extraContent?: ReactNode
-  /** Tenant logo (popup icon_url with tenant fallback) shown on the left
-   *  of the nav. Skipped when null. */
+  /** Accepted for shared checkout-flow compatibility; the portal nav does not render logos. */
   brandLogoUrl?: string | null
-  /** Display name used as alt text on the logo. */
   brandLabel?: string
 }
 
@@ -59,8 +55,6 @@ export default function ScrollySectionNav({
   activeSection,
   onSectionClick,
   extraContent,
-  brandLogoUrl,
-  brandLabel,
 }: ScrollySectionNavProps) {
   const {
     isStepComplete,
@@ -166,17 +160,6 @@ export default function ScrollySectionNav({
     <div data-snap-nav className="sticky top-0 z-20">
       <div className="bg-checkout-navbar-bg/85 px-2.5 py-1.5 backdrop-blur-xl">
         <div className="flex items-center gap-1.5">
-          {brandLogoUrl ? (
-            <Image
-              src={brandLogoUrl}
-              alt={brandLabel ?? "Tenant logo"}
-              width={28}
-              height={28}
-              priority
-              className="size-7 shrink-0 rounded-md object-contain"
-              {...imageOptimization(brandLogoUrl)}
-            />
-          ) : null}
           <div
             ref={shellRef}
             className={cn("flex min-w-0 flex-1", !compact && "justify-center")}

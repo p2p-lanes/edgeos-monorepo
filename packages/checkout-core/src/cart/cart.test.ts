@@ -10,7 +10,9 @@ import type { CartState, OpenCartPublic } from "../types/api"
 import { createCartDriver } from "./driver"
 import { cartStateToSelection, selectionToCartState } from "./mapping"
 
-function openCart(over: Partial<OpenCartPublic> & { items: CartState }): OpenCartPublic {
+function openCart(
+  over: Partial<OpenCartPublic> & { items: CartState },
+): OpenCartPublic {
   return {
     id: over.id ?? "cart-1",
     popup_id: "p",
@@ -21,7 +23,7 @@ function openCart(over: Partial<OpenCartPublic> & { items: CartState }): OpenCar
 }
 
 describe("selectionToCartState", () => {
-  it("maps quantities to merch and housing to dates", () => {
+  it("maps quantities and housing to canonical lines", () => {
     let s = setQuantity(emptySelection(), "p1", 2)
     s = setCoupon(setInsurance(s, true), "SAVE")
     s = selectHousing(s, {
@@ -30,11 +32,23 @@ describe("selectionToCartState", () => {
       checkOut: "2026-08-04",
     })
     expect(selectionToCartState(s, { currentStep: "buyer" })).toEqual({
-      passes: [],
-      housing: { product_id: "h1", check_in: "2026-08-01", check_out: "2026-08-04" },
-      merch: [{ product_id: "p1", quantity: 2 }],
-      patron: null,
-      meal_plans: [],
+      lines: [
+        {
+          kind: "product",
+          assignment: { kind: "unassigned" },
+          product_id: "p1",
+          quantity: 2,
+        },
+        {
+          kind: "date_range",
+          assignment: { kind: "unassigned" },
+          step_type: "housing",
+          product_id: "h1",
+          check_in: "2026-08-01",
+          check_out: "2026-08-04",
+          quantity: 1,
+        },
+      ],
       promo_code: "SAVE",
       insurance: true,
       current_step: "buyer",
@@ -43,12 +57,35 @@ describe("selectionToCartState", () => {
 })
 
 describe("cartStateToSelection", () => {
-  it("merges merch/passes/patron into quantities and restores housing", () => {
+  it("merges product/custom amount lines and restores a date range", () => {
     const cart: CartState = {
-      merch: [{ product_id: "p1", quantity: 2 }],
-      passes: [{ attendee_id: "a", product_id: "p1", quantity: 1 }],
-      patron: { product_id: "pat", amount: 50, is_custom_amount: true },
-      housing: { product_id: "h1", check_in: "2026-08-01", check_out: "2026-08-03" },
+      lines: [
+        {
+          kind: "product",
+          assignment: { kind: "unassigned" },
+          product_id: "p1",
+          quantity: 2,
+        },
+        {
+          kind: "product",
+          assignment: { kind: "attendee", attendee_id: "a" },
+          product_id: "p1",
+          quantity: 1,
+        },
+        {
+          kind: "custom_amount",
+          assignment: { kind: "unassigned" },
+          product_id: "pat",
+          amount: 50,
+        },
+        {
+          kind: "date_range",
+          assignment: { kind: "unassigned" },
+          product_id: "h1",
+          check_in: "2026-08-01",
+          check_out: "2026-08-03",
+        },
+      ],
       promo_code: "SAVE",
       insurance: true,
     }
@@ -81,7 +118,9 @@ describe("createCartDriver", () => {
   afterEach(() => vi.useRealTimers())
 
   it("debounces save into one upsert and updates meta", async () => {
-    const upsertCart = vi.fn().mockResolvedValue(openCart({ id: "cart-9", items: {} }))
+    const upsertCart = vi
+      .fn()
+      .mockResolvedValue(openCart({ id: "cart-9", items: {} }))
     const client = { upsertCart, restoreCart: vi.fn() }
     const driver = createCartDriver({ client, debounceMs: 800 })
 
@@ -94,7 +133,9 @@ describe("createCartDriver", () => {
     expect(upsertCart).toHaveBeenCalledTimes(1)
     expect(upsertCart).toHaveBeenCalledWith({
       email: "a@b.co",
-      items: expect.objectContaining({ merch: [{ product_id: "p1", quantity: 3 }] }),
+      items: expect.objectContaining({
+        lines: [expect.objectContaining({ product_id: "p1", quantity: 3 })],
+      }),
     })
     expect(driver.getMeta()).toEqual({ cartId: "cart-9", restoreToken: "tok" })
   })
@@ -111,11 +152,16 @@ describe("createCartDriver", () => {
   })
 
   it("flush upserts immediately and returns meta", async () => {
-    const upsertCart = vi.fn().mockResolvedValue(openCart({ id: "c-flush", items: {} }))
+    const upsertCart = vi
+      .fn()
+      .mockResolvedValue(openCart({ id: "c-flush", items: {} }))
     const client = { upsertCart, restoreCart: vi.fn() }
     const driver = createCartDriver({ client, debounceMs: 10_000 })
 
-    const meta = await driver.flush("a@b.co", setQuantity(emptySelection(), "p1", 1))
+    const meta = await driver.flush(
+      "a@b.co",
+      setQuantity(emptySelection(), "p1", 1),
+    )
 
     expect(upsertCart).toHaveBeenCalledTimes(1)
     expect(meta).toEqual({ cartId: "c-flush", restoreToken: "tok" })
@@ -126,7 +172,17 @@ describe("createCartDriver", () => {
       openCart({
         id: "c-restore",
         restore_token: "sig-tok",
-        items: { merch: [{ product_id: "p1", quantity: 2 }], insurance: true },
+        items: {
+          lines: [
+            {
+              kind: "product",
+              assignment: { kind: "unassigned" },
+              product_id: "p1",
+              quantity: 2,
+            },
+          ],
+          insurance: true,
+        },
       }),
     )
     const client = { upsertCart: vi.fn(), restoreCart }

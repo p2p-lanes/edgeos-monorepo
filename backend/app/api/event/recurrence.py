@@ -215,10 +215,11 @@ def expand(
     tzinfo on ``dtstart`` untouched — EXDATE matching normalizes to UTC for
     comparison only).
 
-    ``timezone`` is the event's IANA tz; it only affects WEEKLY+BYDAY
-    anchoring (the BYDAY weekday is resolved against the event's local
-    wall-clock, not against ``dtstart``'s UTC weekday). For naive
-    ``dtstart`` or ``timezone="UTC"`` it is a no-op.
+    ``timezone`` is the event's IANA tz. Periods are stepped in that zone's
+    local wall-clock, so an 18:00 series stays at 18:00 across DST changes,
+    and the BYDAY weekday is resolved against the local date rather than
+    ``dtstart``'s UTC weekday. For naive ``dtstart`` or ``timezone="UTC"`` it
+    is a no-op.
 
     Safety: the loop is hard-capped at ``HARD_MAX_OCCURRENCES`` regardless of
     arguments. Caller may lower the cap via ``max_occurrences``.
@@ -232,16 +233,27 @@ def expand(
         if norm is not None:
             exdate_set.add(norm)
 
-    # Local zone for BYDAY anchoring. Only used when both dtstart is
-    # tz-aware and the requested zone differs from UTC; otherwise BYDAY
-    # math runs against dtstart directly (preserves prior naive-datetime
-    # behaviour).
+    # Local zone for wall-clock stepping and BYDAY anchoring. Only used when
+    # both dtstart is tz-aware and the requested zone differs from UTC;
+    # otherwise the math runs against dtstart directly (preserves prior
+    # naive-datetime behaviour).
     local_tz: ZoneInfo | None = None
     if timezone and timezone != "UTC" and dtstart.tzinfo is not None:
         try:
             local_tz = ZoneInfo(timezone)
         except ZoneInfoNotFoundError:
             local_tz = None
+    dtstart_local = (
+        dtstart.astimezone(local_tz).replace(tzinfo=None)
+        if local_tz is not None
+        else dtstart
+    )
+
+    def _local_to_instant(naive_local: datetime) -> datetime:
+        # A wall-clock time inside a spring-forward gap takes the
+        # pre-transition offset (fold=0), landing just after the gap; an
+        # ambiguous fall-back time resolves to its first occurrence.
+        return naive_local.replace(tzinfo=local_tz).astimezone(dtstart.tzinfo)
 
     # WEEKLY + BYDAY: iterate weeks, emit each matching weekday within the
     # same week block (week starts on the weekday of dtstart).
@@ -267,22 +279,30 @@ def expand(
     while len(results) < cap:
         if n > max_iters:
             return results
-        base = _increment(dtstart, rule, n)
+        # With an event timezone, step the naive local wall-clock and resolve
+        # each value with that date's own offset. Stepping the UTC instant
+        # kept the pre-DST offset, so an 18:00 series drifted to 19:00 (or
+        # 17:00) after a clock change.
+        base_local = _increment(dtstart_local, rule, n)
+        base = (
+            _local_to_instant(base_local)
+            if local_tz is not None
+            else _increment(dtstart, rule, n)
+        )
 
         candidates: list[datetime] = []
         if target_weekdays is not None:
             # Expand each weekday in the current week block. When the event
-            # has an IANA timezone, anchor the weekday in local wall-clock —
+            # has an IANA timezone, anchor the weekday in local wall-clock,
             # otherwise a 20:00 PDT event whose UTC instant lands on the
             # next calendar day would have BYDAY=TU resolve against Wed.
             if local_tz is not None:
-                dtstart_local = dtstart.astimezone(local_tz)
-                base_local = base.astimezone(local_tz)
                 base_weekday = dtstart_local.weekday()
                 for wd in target_weekdays:
                     delta_days = (wd - base_weekday) % 7
-                    cand_local = base_local + timedelta(days=delta_days)
-                    candidates.append(cand_local.astimezone(dtstart.tzinfo))
+                    candidates.append(
+                        _local_to_instant(base_local + timedelta(days=delta_days))
+                    )
             else:
                 base_weekday = dtstart.weekday()
                 for wd in target_weekdays:

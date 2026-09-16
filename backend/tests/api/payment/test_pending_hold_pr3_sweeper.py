@@ -29,6 +29,7 @@ from app.services.pending_payment_sweeper import (  # NOT YET CREATED — RED
     SWEEP_ADVISORY_LOCK_KEY,
     sweep_pending_payments,
 )
+from tests._flow_helpers import coupon_flow_id
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -79,6 +80,7 @@ def _make_coupon(
     max_uses: int = 5,
 ) -> Coupons:
     coupon = Coupons(
+        sales_flow_id=coupon_flow_id(db, popup.id),
         id=uuid.uuid4(),
         tenant_id=popup.tenant_id,
         popup_id=popup.id,

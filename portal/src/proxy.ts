@@ -75,7 +75,7 @@ export async function proxy(request: NextRequest): Promise<NextResponse> {
         // ?lang here strips the language before SSR or the client can read it
         // and the checkout falls back to the popup default_language.
         const rewriteUrl = new URL(
-          `/checkout/${slug}${request.nextUrl.search}`,
+          `/checkout/${slug}/checkout${request.nextUrl.search}`,
           request.url,
         )
         return NextResponse.rewrite(rewriteUrl, {

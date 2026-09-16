@@ -1,7 +1,12 @@
 "use client"
 
+import type { TFunction } from "i18next"
 import { useEffect, useState } from "react"
-import type { AttendeeCategoryPublic } from "@/client"
+import { useTranslation } from "react-i18next"
+import {
+  resolveRecipientFieldLabel,
+  resolveRecipientRoleLabel,
+} from "@/components/checkout-flow/shared/recipientAssignmentLabels"
 import { Button, ButtonAnimated } from "@/components/ui/button"
 import { DialogFooter } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
@@ -14,7 +19,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import type { AttendeePassState } from "@/types/Attendee"
+import type { AttendeeCategoryForm, AttendeePassState } from "@/types/Attendee"
 
 interface AttendeeModalProps {
   open: boolean
@@ -22,7 +27,7 @@ interface AttendeeModalProps {
   onSubmit: (
     data: AttendeePassState & { category_id?: string },
   ) => Promise<void>
-  category: AttendeeCategoryPublic
+  category: AttendeeCategoryForm
   editingAttendee: AttendeePassState | null
   isDelete?: boolean
 }
@@ -65,6 +70,7 @@ export function AttendeeModal({
   editingAttendee,
   isDelete,
 }: AttendeeModalProps) {
+  const { t } = useTranslation()
   const [loading, setLoading] = useState(false)
   const [formData, setFormData] = useState<FormDataState>(defaultFormData)
   const [errors, setErrors] = useState<{ [key: string]: boolean }>({})
@@ -82,6 +88,14 @@ export function AttendeeModal({
       }
       // Populate dynamic fields from additional_data if available
       for (const field of fields) {
+        if (field.name === "email") {
+          initial.email = editingAttendee.email ?? ""
+          continue
+        }
+        if (field.name === "gender") {
+          initial.gender = editingAttendee.gender ?? ""
+          continue
+        }
         const existing = (editingAttendee as Record<string, unknown>)
           .additional_data
         if (
@@ -151,22 +165,28 @@ export function AttendeeModal({
     }
   }
 
-  const categoryLabel =
-    (category.display_meta as Record<string, unknown>)?.label ??
-    category.key.charAt(0).toUpperCase() + category.key.slice(1)
+  const categoryLabel = resolveRecipientRoleLabel(category, t)
 
   const title = editingAttendee
-    ? `Edit ${editingAttendee.name}`
-    : `Add ${categoryLabel}`
-  const description = `Enter the details of your ${categoryLabel} here. Click save when you're done.`
+    ? t("checkout.recipient_assignment.edit_title", {
+        name: editingAttendee.name,
+      })
+    : t("checkout.recipient_assignment.add_title", { role: categoryLabel })
+  const description = t("checkout.recipient_assignment.description", {
+    role: categoryLabel,
+  })
 
   if (isDelete) {
     return (
       <Modal
         open={open}
         onClose={onClose}
-        title={`Delete ${editingAttendee?.name}`}
-        description={`Are you sure you want to delete this ${categoryLabel}?`}
+        title={t("checkout.recipient_assignment.delete_title", {
+          name: editingAttendee?.name,
+        })}
+        description={t("checkout.recipient_assignment.delete_description", {
+          role: categoryLabel,
+        })}
       >
         <DialogFooter>
           <Button
@@ -174,7 +194,9 @@ export function AttendeeModal({
             disabled={loading}
             onClick={handleSubmit}
           >
-            {loading ? "Deleting..." : "Delete"}
+            {loading
+              ? t("checkout.recipient_assignment.deleting")
+              : t("checkout.recipient_assignment.delete")}
           </Button>
         </DialogFooter>
       </Modal>
@@ -193,7 +215,8 @@ export function AttendeeModal({
           {/* Name — always required */}
           <div className="grid grid-cols-4 items-center gap-4">
             <Label htmlFor="name" className="text-right">
-              Full Name <span className="text-destructive">*</span>
+              {t("checkout.recipient_assignment.full_name")}{" "}
+              <span className="text-destructive">*</span>
             </Label>
             <Input
               id="name"
@@ -213,6 +236,7 @@ export function AttendeeModal({
               field={field}
               value={formData[field.name] ?? ""}
               hasError={!!errors[field.name]}
+              t={t}
               onChange={(val) =>
                 setFormData((prev) => ({ ...prev, [field.name]: val }))
               }
@@ -221,7 +245,9 @@ export function AttendeeModal({
         </div>
         <DialogFooter>
           <ButtonAnimated loading={loading} type="submit">
-            {editingAttendee ? "Update" : "Save"}
+            {editingAttendee
+              ? t("checkout.recipient_assignment.update")
+              : t("checkout.recipient_assignment.save")}
           </ButtonAnimated>
         </DialogFooter>
       </form>
@@ -234,16 +260,15 @@ function DynamicField({
   value,
   hasError,
   onChange,
+  t,
 }: {
   field: RequiredField
   value: string
   hasError: boolean
   onChange: (val: string) => void
+  t: TFunction
 }) {
-  const labelText =
-    field.label && field.label.trim() !== ""
-      ? field.label
-      : field.name.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase())
+  const labelText = resolveRecipientFieldLabel(field.name, field.label, t)
   const errorClass = hasError ? "border-destructive" : ""
 
   if (field.type === "select" && field.options) {
@@ -260,7 +285,11 @@ function DynamicField({
           required={field.required}
         >
           <SelectTrigger className={`col-span-3 ${errorClass}`}>
-            <SelectValue placeholder={`Select ${labelText.toLowerCase()}`} />
+            <SelectValue
+              placeholder={t("checkout.recipient_assignment.select_field", {
+                field: labelText,
+              })}
+            />
           </SelectTrigger>
           <SelectContent>
             {options.map((opt) => (

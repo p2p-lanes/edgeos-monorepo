@@ -1,79 +1,78 @@
 "use client"
 
-import { useRouter } from "next/navigation"
-import type { CompanionParticipation } from "@/client"
-import { EventCard } from "@/components/Card/EventCard"
-import type { EventStatus } from "@/components/Card/EventProgressBar"
-import { CompanionView } from "@/components/CompanionView"
-import { ScholarshipStatusBadge } from "@/components/ScholarshipStatusBadge"
+import { PopupHomeFrame } from "@edgeos/shared-form-ui/popup-home"
+import { useQuery } from "@tanstack/react-query"
+import { useRouter, useSearchParams } from "next/navigation"
+import { useEffect } from "react"
+import { useTranslation } from "react-i18next"
+import type { ApplicationPublic, PopupPublic } from "@/client"
+import { ApiError, PopupsService } from "@/client"
+import DefaultPopupHome from "@/components/Portal/DefaultPopupHome"
+import { Loader } from "@/components/ui/Loader"
 import { useApplication } from "@/providers/applicationProvider"
 import { useCityProvider } from "@/providers/cityProvider"
+import { useFeePaymentConfirmation } from "./application/components/fee-payment-banner"
 
-export default function Home() {
-  const { getCity } = useCityProvider()
-  const { getRelevantApplication, participation } = useApplication()
-  const router = useRouter()
-  const city = getCity()
-  const relevantApplication = getRelevantApplication()
+function FeePaymentConfirmationEffects({
+  application,
+}: {
+  application: ApplicationPublic
+}) {
+  useFeePaymentConfirmation(application, true)
+  return null
+}
 
-  if (!city) return null
+function CustomPopupHome({ city }: { city: PopupPublic }) {
+  const { i18n } = useTranslation()
+  const searchParams = useSearchParams()
+  const { getRelevantApplication } = useApplication()
+  const feeFlowId = searchParams.has("checkout", "success")
+    ? searchParams.get("flow")
+    : null
+  const feeApplication = feeFlowId ? getRelevantApplication(feeFlowId) : null
+  const { data: home, isPending } = useQuery({
+    queryKey: ["popup-home", city.id],
+    queryFn: () => PopupsService.getPortalPopupHome({ slug: city.slug }),
+    retry: (failureCount, error) =>
+      !(error instanceof ApiError && error.status === 404) && failureCount < 1,
+    staleTime: 60_000,
+  })
 
-  const isDirectSale = city.sale_type === "direct"
-
-  if (!isDirectSale && participation?.type === "companion") {
-    return (
-      <section className="container mx-auto">
-        <div className="space-y-6 max-w-5xl p-6 mx-auto">
-          <CompanionView
-            participation={participation as CompanionParticipation}
-          />
-        </div>
-      </section>
-    )
-  }
-
-  const status: EventStatus = isDirectSale
-    ? "not_started"
-    : ((relevantApplication?.status as EventStatus) ?? "not_started")
-
-  const onClickApply = () => {
-    if (isDirectSale) {
-      router.push(`/checkout/${city.slug}`)
-      return
-    }
-    if (status === "accepted") {
-      router.push(`/portal/${city.slug}/passes`)
-      return
-    }
-    router.push(`/portal/${city.slug}/application`)
-  }
+  if (isPending) return <Loader />
+  // The list signal and resource can briefly disagree while caches refresh.
+  // A missing/failed document must never leave the gathering without a home.
+  if (!home?.html.trim()) return <DefaultPopupHome />
 
   return (
-    <section className="container mx-auto">
-      <div className="space-y-6 max-w-5xl p-6 mx-auto">
-        <EventCard popup={city} status={status}>
-          <EventCard.Image />
-          <EventCard.Content>
-            <EventCard.Title />
-            <EventCard.Tagline />
-            <EventCard.Location />
-            <EventCard.DateRange />
-            {!isDirectSale && <EventCard.Progress />}
-            {!isDirectSale && relevantApplication && (
-              <ScholarshipStatusBadge
-                application={relevantApplication}
-                popup={city}
-              />
-            )}
-            {city.status !== "ended" && (
-              <EventCard.ApplyButton
-                onClick={onClickApply}
-                labelKey={isDirectSale ? "cta.buy_tickets" : undefined}
-              />
-            )}
-          </EventCard.Content>
-        </EventCard>
-      </div>
-    </section>
+    <>
+      {feeApplication && (
+        <FeePaymentConfirmationEffects
+          key={feeApplication.id}
+          application={feeApplication}
+        />
+      )}
+      <PopupHomeFrame
+        key={city.id}
+        html={home.html}
+        popup={city}
+        locale={i18n.resolvedLanguage ?? city.default_language ?? "en"}
+        title={city.name}
+        className="block h-full min-h-[480px] w-full border-0 bg-white"
+      />
+    </>
   )
+}
+
+export default function Home() {
+  const { getCity, popupsLoaded } = useCityProvider()
+  const city = getCity()
+  const router = useRouter()
+
+  useEffect(() => {
+    if (popupsLoaded && !city) router.replace("/portal")
+  }, [city, popupsLoaded, router])
+
+  if (!city) return popupsLoaded ? null : <Loader />
+  if (!city.custom_home_enabled) return <DefaultPopupHome />
+  return <CustomPopupHome key={city.id} city={city} />
 }

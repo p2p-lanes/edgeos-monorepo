@@ -24,6 +24,7 @@ import { Route as LayoutAbandonedCartsRouteImport } from './routes/_layout/aband
 import { Route as LayoutTicketingStepsIndexRouteImport } from './routes/_layout/ticketing-steps/index'
 import { Route as LayoutThemeIndexRouteImport } from './routes/_layout/theme/index'
 import { Route as LayoutTasksIndexRouteImport } from './routes/_layout/tasks/index'
+import { Route as LayoutSalesFlowsIndexRouteImport } from './routes/_layout/sales-flows/index'
 import { Route as LayoutReferralsIndexRouteImport } from './routes/_layout/referrals/index'
 import { Route as LayoutProductsIndexRouteImport } from './routes/_layout/products/index'
 import { Route as LayoutPopupsIndexRouteImport } from './routes/_layout/popups/index'
@@ -38,12 +39,13 @@ import { Route as LayoutCouponsIndexRouteImport } from './routes/_layout/coupons
 import { Route as LayoutAttendeesIndexRouteImport } from './routes/_layout/attendees/index'
 import { Route as LayoutApplicationsIndexRouteImport } from './routes/_layout/applications/index'
 import { Route as LayoutAdminIndexRouteImport } from './routes/_layout/admin/index'
+import { Route as LayoutAccommodationsIndexRouteImport } from './routes/_layout/accommodations/index'
 import { Route as LayoutTicketingStepsStepIdRouteImport } from './routes/_layout/ticketing-steps/$stepId'
+import { Route as LayoutSalesFlowsNewRouteImport } from './routes/_layout/sales-flows/new'
 import { Route as LayoutProductsNewRouteImport } from './routes/_layout/products/new'
 import { Route as LayoutPopupsNewRouteImport } from './routes/_layout/popups/new'
 import { Route as LayoutOrganizationsNewRouteImport } from './routes/_layout/organizations/new'
 import { Route as LayoutInvitesNewRouteImport } from './routes/_layout/invites/new'
-import { Route as LayoutHumansNewRouteImport } from './routes/_layout/humans/new'
 import { Route as LayoutHumansIdRouteImport } from './routes/_layout/humans/$id'
 import { Route as LayoutGroupsNewRouteImport } from './routes/_layout/groups/new'
 import { Route as LayoutFormBuilderNewRouteImport } from './routes/_layout/form-builder/new'
@@ -55,12 +57,11 @@ import { Route as LayoutEventsEventIdRouteImport } from './routes/_layout/events
 import { Route as LayoutCouponsNewRouteImport } from './routes/_layout/coupons/new'
 import { Route as LayoutAttendeesAttendeeIdRouteImport } from './routes/_layout/attendees/$attendeeId'
 import { Route as LayoutApplicationsReviewQueueRouteImport } from './routes/_layout/applications/review-queue'
-import { Route as LayoutApplicationsNewRouteImport } from './routes/_layout/applications/new'
 import { Route as LayoutApplicationsIdRouteImport } from './routes/_layout/applications/$id'
 import { Route as LayoutAdminNewRouteImport } from './routes/_layout/admin/new'
 import { Route as LayoutEventsVenuesIndexRouteImport } from './routes/_layout/events/venues/index'
 import { Route as LayoutEventsTracksIndexRouteImport } from './routes/_layout/events/tracks/index'
-import { Route as LayoutReferralsReferralIdEditRouteImport } from './routes/_layout/referrals/$referralId/edit'
+import { Route as LayoutSalesFlowsIdEditRouteImport } from './routes/_layout/sales-flows/$id.edit'
 import { Route as LayoutProductsIdEditRouteImport } from './routes/_layout/products/$id.edit'
 import { Route as LayoutPopupsIdEditRouteImport } from './routes/_layout/popups/$id.edit'
 import { Route as LayoutPopupsIdBulkGrantRouteImport } from './routes/_layout/popups/$id.bulk-grant'
@@ -75,10 +76,15 @@ import { Route as LayoutEventsEventIdEditRouteImport } from './routes/_layout/ev
 import { Route as LayoutEmailTemplatesTypeEditRouteImport } from './routes/_layout/email-templates/$type.edit'
 import { Route as LayoutCouponsIdEditRouteImport } from './routes/_layout/coupons/$id.edit'
 import { Route as LayoutAdminIdEditRouteImport } from './routes/_layout/admin/$id.edit'
+import { Route as LayoutAccommodationsRoomsNewRouteImport } from './routes/_layout/accommodations/rooms/new'
+import { Route as LayoutAccommodationsPropertiesNewRouteImport } from './routes/_layout/accommodations/properties/new'
+import { Route as LayoutAccommodationsBookingsIdRouteImport } from './routes/_layout/accommodations/bookings/$id'
 import { Route as LayoutFormBuilderSectionsIdEditRouteImport } from './routes/_layout/form-builder/sections/$id.edit'
 import { Route as LayoutEventsVenuesVenueIdScheduleRouteImport } from './routes/_layout/events/venues/$venueId.schedule'
 import { Route as LayoutEventsVenuesVenueIdEditRouteImport } from './routes/_layout/events/venues/$venueId.edit'
 import { Route as LayoutEventsTracksTrackIdEditRouteImport } from './routes/_layout/events/tracks/$trackId.edit'
+import { Route as LayoutAccommodationsRoomsIdEditRouteImport } from './routes/_layout/accommodations/rooms/$id.edit'
+import { Route as LayoutAccommodationsPropertiesIdEditRouteImport } from './routes/_layout/accommodations/properties/$id.edit'
 
 const LoginRoute = LoginRouteImport.update({
   id: '/login',
@@ -155,6 +161,11 @@ const LayoutTasksIndexRoute = LayoutTasksIndexRouteImport.update({
   path: '/tasks/',
   getParentRoute: () => LayoutRoute,
 } as any)
+const LayoutSalesFlowsIndexRoute = LayoutSalesFlowsIndexRouteImport.update({
+  id: '/sales-flows/',
+  path: '/sales-flows/',
+  getParentRoute: () => LayoutRoute,
+} as any)
 const LayoutReferralsIndexRoute = LayoutReferralsIndexRouteImport.update({
   id: '/referrals/',
   path: '/referrals/',
@@ -227,12 +238,23 @@ const LayoutAdminIndexRoute = LayoutAdminIndexRouteImport.update({
   path: '/admin/',
   getParentRoute: () => LayoutRoute,
 } as any)
+const LayoutAccommodationsIndexRoute =
+  LayoutAccommodationsIndexRouteImport.update({
+    id: '/accommodations/',
+    path: '/accommodations/',
+    getParentRoute: () => LayoutRoute,
+  } as any)
 const LayoutTicketingStepsStepIdRoute =
   LayoutTicketingStepsStepIdRouteImport.update({
     id: '/ticketing-steps/$stepId',
     path: '/ticketing-steps/$stepId',
     getParentRoute: () => LayoutRoute,
   } as any)
+const LayoutSalesFlowsNewRoute = LayoutSalesFlowsNewRouteImport.update({
+  id: '/sales-flows/new',
+  path: '/sales-flows/new',
+  getParentRoute: () => LayoutRoute,
+} as any)
 const LayoutProductsNewRoute = LayoutProductsNewRouteImport.update({
   id: '/products/new',
   path: '/products/new',
@@ -251,11 +273,6 @@ const LayoutOrganizationsNewRoute = LayoutOrganizationsNewRouteImport.update({
 const LayoutInvitesNewRoute = LayoutInvitesNewRouteImport.update({
   id: '/invites/new',
   path: '/invites/new',
-  getParentRoute: () => LayoutRoute,
-} as any)
-const LayoutHumansNewRoute = LayoutHumansNewRouteImport.update({
-  id: '/humans/new',
-  path: '/humans/new',
   getParentRoute: () => LayoutRoute,
 } as any)
 const LayoutHumansIdRoute = LayoutHumansIdRouteImport.update({
@@ -315,11 +332,6 @@ const LayoutApplicationsReviewQueueRoute =
     path: '/applications/review-queue',
     getParentRoute: () => LayoutRoute,
   } as any)
-const LayoutApplicationsNewRoute = LayoutApplicationsNewRouteImport.update({
-  id: '/applications/new',
-  path: '/applications/new',
-  getParentRoute: () => LayoutRoute,
-} as any)
 const LayoutApplicationsIdRoute = LayoutApplicationsIdRouteImport.update({
   id: '/applications/$id',
   path: '/applications/$id',
@@ -340,12 +352,11 @@ const LayoutEventsTracksIndexRoute = LayoutEventsTracksIndexRouteImport.update({
   path: '/events/tracks/',
   getParentRoute: () => LayoutRoute,
 } as any)
-const LayoutReferralsReferralIdEditRoute =
-  LayoutReferralsReferralIdEditRouteImport.update({
-    id: '/referrals/$referralId/edit',
-    path: '/referrals/$referralId/edit',
-    getParentRoute: () => LayoutRoute,
-  } as any)
+const LayoutSalesFlowsIdEditRoute = LayoutSalesFlowsIdEditRouteImport.update({
+  id: '/sales-flows/$id/edit',
+  path: '/sales-flows/$id/edit',
+  getParentRoute: () => LayoutRoute,
+} as any)
 const LayoutProductsIdEditRoute = LayoutProductsIdEditRouteImport.update({
   id: '/products/$id/edit',
   path: '/products/$id/edit',
@@ -420,6 +431,24 @@ const LayoutAdminIdEditRoute = LayoutAdminIdEditRouteImport.update({
   path: '/admin/$id/edit',
   getParentRoute: () => LayoutRoute,
 } as any)
+const LayoutAccommodationsRoomsNewRoute =
+  LayoutAccommodationsRoomsNewRouteImport.update({
+    id: '/accommodations/rooms/new',
+    path: '/accommodations/rooms/new',
+    getParentRoute: () => LayoutRoute,
+  } as any)
+const LayoutAccommodationsPropertiesNewRoute =
+  LayoutAccommodationsPropertiesNewRouteImport.update({
+    id: '/accommodations/properties/new',
+    path: '/accommodations/properties/new',
+    getParentRoute: () => LayoutRoute,
+  } as any)
+const LayoutAccommodationsBookingsIdRoute =
+  LayoutAccommodationsBookingsIdRouteImport.update({
+    id: '/accommodations/bookings/$id',
+    path: '/accommodations/bookings/$id',
+    getParentRoute: () => LayoutRoute,
+  } as any)
 const LayoutFormBuilderSectionsIdEditRoute =
   LayoutFormBuilderSectionsIdEditRouteImport.update({
     id: '/form-builder/sections/$id/edit',
@@ -444,6 +473,18 @@ const LayoutEventsTracksTrackIdEditRoute =
     path: '/events/tracks/$trackId/edit',
     getParentRoute: () => LayoutRoute,
   } as any)
+const LayoutAccommodationsRoomsIdEditRoute =
+  LayoutAccommodationsRoomsIdEditRouteImport.update({
+    id: '/accommodations/rooms/$id/edit',
+    path: '/accommodations/rooms/$id/edit',
+    getParentRoute: () => LayoutRoute,
+  } as any)
+const LayoutAccommodationsPropertiesIdEditRoute =
+  LayoutAccommodationsPropertiesIdEditRouteImport.update({
+    id: '/accommodations/properties/$id/edit',
+    path: '/accommodations/properties/$id/edit',
+    getParentRoute: () => LayoutRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof LayoutIndexRoute
@@ -459,7 +500,6 @@ export interface FileRoutesByFullPath {
   '/third-party-apps': typeof LayoutThirdPartyAppsRoute
   '/admin/new': typeof LayoutAdminNewRoute
   '/applications/$id': typeof LayoutApplicationsIdRoute
-  '/applications/new': typeof LayoutApplicationsNewRoute
   '/applications/review-queue': typeof LayoutApplicationsReviewQueueRoute
   '/attendees/$attendeeId': typeof LayoutAttendeesAttendeeIdRoute
   '/coupons/new': typeof LayoutCouponsNewRoute
@@ -471,12 +511,13 @@ export interface FileRoutesByFullPath {
   '/form-builder/new': typeof LayoutFormBuilderNewRoute
   '/groups/new': typeof LayoutGroupsNewRoute
   '/humans/$id': typeof LayoutHumansIdRoute
-  '/humans/new': typeof LayoutHumansNewRoute
   '/invites/new': typeof LayoutInvitesNewRoute
   '/organizations/new': typeof LayoutOrganizationsNewRoute
   '/popups/new': typeof LayoutPopupsNewRoute
   '/products/new': typeof LayoutProductsNewRoute
+  '/sales-flows/new': typeof LayoutSalesFlowsNewRoute
   '/ticketing-steps/$stepId': typeof LayoutTicketingStepsStepIdRoute
+  '/accommodations/': typeof LayoutAccommodationsIndexRoute
   '/admin/': typeof LayoutAdminIndexRoute
   '/applications/': typeof LayoutApplicationsIndexRoute
   '/attendees/': typeof LayoutAttendeesIndexRoute
@@ -491,9 +532,13 @@ export interface FileRoutesByFullPath {
   '/popups/': typeof LayoutPopupsIndexRoute
   '/products/': typeof LayoutProductsIndexRoute
   '/referrals/': typeof LayoutReferralsIndexRoute
+  '/sales-flows/': typeof LayoutSalesFlowsIndexRoute
   '/tasks/': typeof LayoutTasksIndexRoute
   '/theme/': typeof LayoutThemeIndexRoute
   '/ticketing-steps/': typeof LayoutTicketingStepsIndexRoute
+  '/accommodations/bookings/$id': typeof LayoutAccommodationsBookingsIdRoute
+  '/accommodations/properties/new': typeof LayoutAccommodationsPropertiesNewRoute
+  '/accommodations/rooms/new': typeof LayoutAccommodationsRoomsNewRoute
   '/admin/$id/edit': typeof LayoutAdminIdEditRoute
   '/coupons/$id/edit': typeof LayoutCouponsIdEditRoute
   '/email-templates/$type/edit': typeof LayoutEmailTemplatesTypeEditRoute
@@ -508,9 +553,11 @@ export interface FileRoutesByFullPath {
   '/popups/$id/bulk-grant': typeof LayoutPopupsIdBulkGrantRoute
   '/popups/$id/edit': typeof LayoutPopupsIdEditRoute
   '/products/$id/edit': typeof LayoutProductsIdEditRoute
-  '/referrals/$referralId/edit': typeof LayoutReferralsReferralIdEditRoute
+  '/sales-flows/$id/edit': typeof LayoutSalesFlowsIdEditRoute
   '/events/tracks/': typeof LayoutEventsTracksIndexRoute
   '/events/venues/': typeof LayoutEventsVenuesIndexRoute
+  '/accommodations/properties/$id/edit': typeof LayoutAccommodationsPropertiesIdEditRoute
+  '/accommodations/rooms/$id/edit': typeof LayoutAccommodationsRoomsIdEditRoute
   '/events/tracks/$trackId/edit': typeof LayoutEventsTracksTrackIdEditRoute
   '/events/venues/$venueId/edit': typeof LayoutEventsVenuesVenueIdEditRoute
   '/events/venues/$venueId/schedule': typeof LayoutEventsVenuesVenueIdScheduleRoute
@@ -530,7 +577,6 @@ export interface FileRoutesByTo {
   '/': typeof LayoutIndexRoute
   '/admin/new': typeof LayoutAdminNewRoute
   '/applications/$id': typeof LayoutApplicationsIdRoute
-  '/applications/new': typeof LayoutApplicationsNewRoute
   '/applications/review-queue': typeof LayoutApplicationsReviewQueueRoute
   '/attendees/$attendeeId': typeof LayoutAttendeesAttendeeIdRoute
   '/coupons/new': typeof LayoutCouponsNewRoute
@@ -542,12 +588,13 @@ export interface FileRoutesByTo {
   '/form-builder/new': typeof LayoutFormBuilderNewRoute
   '/groups/new': typeof LayoutGroupsNewRoute
   '/humans/$id': typeof LayoutHumansIdRoute
-  '/humans/new': typeof LayoutHumansNewRoute
   '/invites/new': typeof LayoutInvitesNewRoute
   '/organizations/new': typeof LayoutOrganizationsNewRoute
   '/popups/new': typeof LayoutPopupsNewRoute
   '/products/new': typeof LayoutProductsNewRoute
+  '/sales-flows/new': typeof LayoutSalesFlowsNewRoute
   '/ticketing-steps/$stepId': typeof LayoutTicketingStepsStepIdRoute
+  '/accommodations': typeof LayoutAccommodationsIndexRoute
   '/admin': typeof LayoutAdminIndexRoute
   '/applications': typeof LayoutApplicationsIndexRoute
   '/attendees': typeof LayoutAttendeesIndexRoute
@@ -562,9 +609,13 @@ export interface FileRoutesByTo {
   '/popups': typeof LayoutPopupsIndexRoute
   '/products': typeof LayoutProductsIndexRoute
   '/referrals': typeof LayoutReferralsIndexRoute
+  '/sales-flows': typeof LayoutSalesFlowsIndexRoute
   '/tasks': typeof LayoutTasksIndexRoute
   '/theme': typeof LayoutThemeIndexRoute
   '/ticketing-steps': typeof LayoutTicketingStepsIndexRoute
+  '/accommodations/bookings/$id': typeof LayoutAccommodationsBookingsIdRoute
+  '/accommodations/properties/new': typeof LayoutAccommodationsPropertiesNewRoute
+  '/accommodations/rooms/new': typeof LayoutAccommodationsRoomsNewRoute
   '/admin/$id/edit': typeof LayoutAdminIdEditRoute
   '/coupons/$id/edit': typeof LayoutCouponsIdEditRoute
   '/email-templates/$type/edit': typeof LayoutEmailTemplatesTypeEditRoute
@@ -579,9 +630,11 @@ export interface FileRoutesByTo {
   '/popups/$id/bulk-grant': typeof LayoutPopupsIdBulkGrantRoute
   '/popups/$id/edit': typeof LayoutPopupsIdEditRoute
   '/products/$id/edit': typeof LayoutProductsIdEditRoute
-  '/referrals/$referralId/edit': typeof LayoutReferralsReferralIdEditRoute
+  '/sales-flows/$id/edit': typeof LayoutSalesFlowsIdEditRoute
   '/events/tracks': typeof LayoutEventsTracksIndexRoute
   '/events/venues': typeof LayoutEventsVenuesIndexRoute
+  '/accommodations/properties/$id/edit': typeof LayoutAccommodationsPropertiesIdEditRoute
+  '/accommodations/rooms/$id/edit': typeof LayoutAccommodationsRoomsIdEditRoute
   '/events/tracks/$trackId/edit': typeof LayoutEventsTracksTrackIdEditRoute
   '/events/venues/$venueId/edit': typeof LayoutEventsVenuesVenueIdEditRoute
   '/events/venues/$venueId/schedule': typeof LayoutEventsVenuesVenueIdScheduleRoute
@@ -603,7 +656,6 @@ export interface FileRoutesById {
   '/_layout/': typeof LayoutIndexRoute
   '/_layout/admin/new': typeof LayoutAdminNewRoute
   '/_layout/applications/$id': typeof LayoutApplicationsIdRoute
-  '/_layout/applications/new': typeof LayoutApplicationsNewRoute
   '/_layout/applications/review-queue': typeof LayoutApplicationsReviewQueueRoute
   '/_layout/attendees/$attendeeId': typeof LayoutAttendeesAttendeeIdRoute
   '/_layout/coupons/new': typeof LayoutCouponsNewRoute
@@ -615,12 +667,13 @@ export interface FileRoutesById {
   '/_layout/form-builder/new': typeof LayoutFormBuilderNewRoute
   '/_layout/groups/new': typeof LayoutGroupsNewRoute
   '/_layout/humans/$id': typeof LayoutHumansIdRoute
-  '/_layout/humans/new': typeof LayoutHumansNewRoute
   '/_layout/invites/new': typeof LayoutInvitesNewRoute
   '/_layout/organizations/new': typeof LayoutOrganizationsNewRoute
   '/_layout/popups/new': typeof LayoutPopupsNewRoute
   '/_layout/products/new': typeof LayoutProductsNewRoute
+  '/_layout/sales-flows/new': typeof LayoutSalesFlowsNewRoute
   '/_layout/ticketing-steps/$stepId': typeof LayoutTicketingStepsStepIdRoute
+  '/_layout/accommodations/': typeof LayoutAccommodationsIndexRoute
   '/_layout/admin/': typeof LayoutAdminIndexRoute
   '/_layout/applications/': typeof LayoutApplicationsIndexRoute
   '/_layout/attendees/': typeof LayoutAttendeesIndexRoute
@@ -635,9 +688,13 @@ export interface FileRoutesById {
   '/_layout/popups/': typeof LayoutPopupsIndexRoute
   '/_layout/products/': typeof LayoutProductsIndexRoute
   '/_layout/referrals/': typeof LayoutReferralsIndexRoute
+  '/_layout/sales-flows/': typeof LayoutSalesFlowsIndexRoute
   '/_layout/tasks/': typeof LayoutTasksIndexRoute
   '/_layout/theme/': typeof LayoutThemeIndexRoute
   '/_layout/ticketing-steps/': typeof LayoutTicketingStepsIndexRoute
+  '/_layout/accommodations/bookings/$id': typeof LayoutAccommodationsBookingsIdRoute
+  '/_layout/accommodations/properties/new': typeof LayoutAccommodationsPropertiesNewRoute
+  '/_layout/accommodations/rooms/new': typeof LayoutAccommodationsRoomsNewRoute
   '/_layout/admin/$id/edit': typeof LayoutAdminIdEditRoute
   '/_layout/coupons/$id/edit': typeof LayoutCouponsIdEditRoute
   '/_layout/email-templates/$type/edit': typeof LayoutEmailTemplatesTypeEditRoute
@@ -652,9 +709,11 @@ export interface FileRoutesById {
   '/_layout/popups/$id/bulk-grant': typeof LayoutPopupsIdBulkGrantRoute
   '/_layout/popups/$id/edit': typeof LayoutPopupsIdEditRoute
   '/_layout/products/$id/edit': typeof LayoutProductsIdEditRoute
-  '/_layout/referrals/$referralId/edit': typeof LayoutReferralsReferralIdEditRoute
+  '/_layout/sales-flows/$id/edit': typeof LayoutSalesFlowsIdEditRoute
   '/_layout/events/tracks/': typeof LayoutEventsTracksIndexRoute
   '/_layout/events/venues/': typeof LayoutEventsVenuesIndexRoute
+  '/_layout/accommodations/properties/$id/edit': typeof LayoutAccommodationsPropertiesIdEditRoute
+  '/_layout/accommodations/rooms/$id/edit': typeof LayoutAccommodationsRoomsIdEditRoute
   '/_layout/events/tracks/$trackId/edit': typeof LayoutEventsTracksTrackIdEditRoute
   '/_layout/events/venues/$venueId/edit': typeof LayoutEventsVenuesVenueIdEditRoute
   '/_layout/events/venues/$venueId/schedule': typeof LayoutEventsVenuesVenueIdScheduleRoute
@@ -676,7 +735,6 @@ export interface FileRouteTypes {
     | '/third-party-apps'
     | '/admin/new'
     | '/applications/$id'
-    | '/applications/new'
     | '/applications/review-queue'
     | '/attendees/$attendeeId'
     | '/coupons/new'
@@ -688,12 +746,13 @@ export interface FileRouteTypes {
     | '/form-builder/new'
     | '/groups/new'
     | '/humans/$id'
-    | '/humans/new'
     | '/invites/new'
     | '/organizations/new'
     | '/popups/new'
     | '/products/new'
+    | '/sales-flows/new'
     | '/ticketing-steps/$stepId'
+    | '/accommodations/'
     | '/admin/'
     | '/applications/'
     | '/attendees/'
@@ -708,9 +767,13 @@ export interface FileRouteTypes {
     | '/popups/'
     | '/products/'
     | '/referrals/'
+    | '/sales-flows/'
     | '/tasks/'
     | '/theme/'
     | '/ticketing-steps/'
+    | '/accommodations/bookings/$id'
+    | '/accommodations/properties/new'
+    | '/accommodations/rooms/new'
     | '/admin/$id/edit'
     | '/coupons/$id/edit'
     | '/email-templates/$type/edit'
@@ -725,9 +788,11 @@ export interface FileRouteTypes {
     | '/popups/$id/bulk-grant'
     | '/popups/$id/edit'
     | '/products/$id/edit'
-    | '/referrals/$referralId/edit'
+    | '/sales-flows/$id/edit'
     | '/events/tracks/'
     | '/events/venues/'
+    | '/accommodations/properties/$id/edit'
+    | '/accommodations/rooms/$id/edit'
     | '/events/tracks/$trackId/edit'
     | '/events/venues/$venueId/edit'
     | '/events/venues/$venueId/schedule'
@@ -747,7 +812,6 @@ export interface FileRouteTypes {
     | '/'
     | '/admin/new'
     | '/applications/$id'
-    | '/applications/new'
     | '/applications/review-queue'
     | '/attendees/$attendeeId'
     | '/coupons/new'
@@ -759,12 +823,13 @@ export interface FileRouteTypes {
     | '/form-builder/new'
     | '/groups/new'
     | '/humans/$id'
-    | '/humans/new'
     | '/invites/new'
     | '/organizations/new'
     | '/popups/new'
     | '/products/new'
+    | '/sales-flows/new'
     | '/ticketing-steps/$stepId'
+    | '/accommodations'
     | '/admin'
     | '/applications'
     | '/attendees'
@@ -779,9 +844,13 @@ export interface FileRouteTypes {
     | '/popups'
     | '/products'
     | '/referrals'
+    | '/sales-flows'
     | '/tasks'
     | '/theme'
     | '/ticketing-steps'
+    | '/accommodations/bookings/$id'
+    | '/accommodations/properties/new'
+    | '/accommodations/rooms/new'
     | '/admin/$id/edit'
     | '/coupons/$id/edit'
     | '/email-templates/$type/edit'
@@ -796,9 +865,11 @@ export interface FileRouteTypes {
     | '/popups/$id/bulk-grant'
     | '/popups/$id/edit'
     | '/products/$id/edit'
-    | '/referrals/$referralId/edit'
+    | '/sales-flows/$id/edit'
     | '/events/tracks'
     | '/events/venues'
+    | '/accommodations/properties/$id/edit'
+    | '/accommodations/rooms/$id/edit'
     | '/events/tracks/$trackId/edit'
     | '/events/venues/$venueId/edit'
     | '/events/venues/$venueId/schedule'
@@ -819,7 +890,6 @@ export interface FileRouteTypes {
     | '/_layout/'
     | '/_layout/admin/new'
     | '/_layout/applications/$id'
-    | '/_layout/applications/new'
     | '/_layout/applications/review-queue'
     | '/_layout/attendees/$attendeeId'
     | '/_layout/coupons/new'
@@ -831,12 +901,13 @@ export interface FileRouteTypes {
     | '/_layout/form-builder/new'
     | '/_layout/groups/new'
     | '/_layout/humans/$id'
-    | '/_layout/humans/new'
     | '/_layout/invites/new'
     | '/_layout/organizations/new'
     | '/_layout/popups/new'
     | '/_layout/products/new'
+    | '/_layout/sales-flows/new'
     | '/_layout/ticketing-steps/$stepId'
+    | '/_layout/accommodations/'
     | '/_layout/admin/'
     | '/_layout/applications/'
     | '/_layout/attendees/'
@@ -851,9 +922,13 @@ export interface FileRouteTypes {
     | '/_layout/popups/'
     | '/_layout/products/'
     | '/_layout/referrals/'
+    | '/_layout/sales-flows/'
     | '/_layout/tasks/'
     | '/_layout/theme/'
     | '/_layout/ticketing-steps/'
+    | '/_layout/accommodations/bookings/$id'
+    | '/_layout/accommodations/properties/new'
+    | '/_layout/accommodations/rooms/new'
     | '/_layout/admin/$id/edit'
     | '/_layout/coupons/$id/edit'
     | '/_layout/email-templates/$type/edit'
@@ -868,9 +943,11 @@ export interface FileRouteTypes {
     | '/_layout/popups/$id/bulk-grant'
     | '/_layout/popups/$id/edit'
     | '/_layout/products/$id/edit'
-    | '/_layout/referrals/$referralId/edit'
+    | '/_layout/sales-flows/$id/edit'
     | '/_layout/events/tracks/'
     | '/_layout/events/venues/'
+    | '/_layout/accommodations/properties/$id/edit'
+    | '/_layout/accommodations/rooms/$id/edit'
     | '/_layout/events/tracks/$trackId/edit'
     | '/_layout/events/venues/$venueId/edit'
     | '/_layout/events/venues/$venueId/schedule'
@@ -989,6 +1066,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof LayoutTasksIndexRouteImport
       parentRoute: typeof LayoutRoute
     }
+    '/_layout/sales-flows/': {
+      id: '/_layout/sales-flows/'
+      path: '/sales-flows'
+      fullPath: '/sales-flows/'
+      preLoaderRoute: typeof LayoutSalesFlowsIndexRouteImport
+      parentRoute: typeof LayoutRoute
+    }
     '/_layout/referrals/': {
       id: '/_layout/referrals/'
       path: '/referrals'
@@ -1087,11 +1171,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof LayoutAdminIndexRouteImport
       parentRoute: typeof LayoutRoute
     }
+    '/_layout/accommodations/': {
+      id: '/_layout/accommodations/'
+      path: '/accommodations'
+      fullPath: '/accommodations/'
+      preLoaderRoute: typeof LayoutAccommodationsIndexRouteImport
+      parentRoute: typeof LayoutRoute
+    }
     '/_layout/ticketing-steps/$stepId': {
       id: '/_layout/ticketing-steps/$stepId'
       path: '/ticketing-steps/$stepId'
       fullPath: '/ticketing-steps/$stepId'
       preLoaderRoute: typeof LayoutTicketingStepsStepIdRouteImport
+      parentRoute: typeof LayoutRoute
+    }
+    '/_layout/sales-flows/new': {
+      id: '/_layout/sales-flows/new'
+      path: '/sales-flows/new'
+      fullPath: '/sales-flows/new'
+      preLoaderRoute: typeof LayoutSalesFlowsNewRouteImport
       parentRoute: typeof LayoutRoute
     }
     '/_layout/products/new': {
@@ -1120,13 +1218,6 @@ declare module '@tanstack/react-router' {
       path: '/invites/new'
       fullPath: '/invites/new'
       preLoaderRoute: typeof LayoutInvitesNewRouteImport
-      parentRoute: typeof LayoutRoute
-    }
-    '/_layout/humans/new': {
-      id: '/_layout/humans/new'
-      path: '/humans/new'
-      fullPath: '/humans/new'
-      preLoaderRoute: typeof LayoutHumansNewRouteImport
       parentRoute: typeof LayoutRoute
     }
     '/_layout/humans/$id': {
@@ -1206,13 +1297,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof LayoutApplicationsReviewQueueRouteImport
       parentRoute: typeof LayoutRoute
     }
-    '/_layout/applications/new': {
-      id: '/_layout/applications/new'
-      path: '/applications/new'
-      fullPath: '/applications/new'
-      preLoaderRoute: typeof LayoutApplicationsNewRouteImport
-      parentRoute: typeof LayoutRoute
-    }
     '/_layout/applications/$id': {
       id: '/_layout/applications/$id'
       path: '/applications/$id'
@@ -1241,11 +1325,11 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof LayoutEventsTracksIndexRouteImport
       parentRoute: typeof LayoutRoute
     }
-    '/_layout/referrals/$referralId/edit': {
-      id: '/_layout/referrals/$referralId/edit'
-      path: '/referrals/$referralId/edit'
-      fullPath: '/referrals/$referralId/edit'
-      preLoaderRoute: typeof LayoutReferralsReferralIdEditRouteImport
+    '/_layout/sales-flows/$id/edit': {
+      id: '/_layout/sales-flows/$id/edit'
+      path: '/sales-flows/$id/edit'
+      fullPath: '/sales-flows/$id/edit'
+      preLoaderRoute: typeof LayoutSalesFlowsIdEditRouteImport
       parentRoute: typeof LayoutRoute
     }
     '/_layout/products/$id/edit': {
@@ -1346,6 +1430,27 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof LayoutAdminIdEditRouteImport
       parentRoute: typeof LayoutRoute
     }
+    '/_layout/accommodations/rooms/new': {
+      id: '/_layout/accommodations/rooms/new'
+      path: '/accommodations/rooms/new'
+      fullPath: '/accommodations/rooms/new'
+      preLoaderRoute: typeof LayoutAccommodationsRoomsNewRouteImport
+      parentRoute: typeof LayoutRoute
+    }
+    '/_layout/accommodations/properties/new': {
+      id: '/_layout/accommodations/properties/new'
+      path: '/accommodations/properties/new'
+      fullPath: '/accommodations/properties/new'
+      preLoaderRoute: typeof LayoutAccommodationsPropertiesNewRouteImport
+      parentRoute: typeof LayoutRoute
+    }
+    '/_layout/accommodations/bookings/$id': {
+      id: '/_layout/accommodations/bookings/$id'
+      path: '/accommodations/bookings/$id'
+      fullPath: '/accommodations/bookings/$id'
+      preLoaderRoute: typeof LayoutAccommodationsBookingsIdRouteImport
+      parentRoute: typeof LayoutRoute
+    }
     '/_layout/form-builder/sections/$id/edit': {
       id: '/_layout/form-builder/sections/$id/edit'
       path: '/form-builder/sections/$id/edit'
@@ -1374,6 +1479,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof LayoutEventsTracksTrackIdEditRouteImport
       parentRoute: typeof LayoutRoute
     }
+    '/_layout/accommodations/rooms/$id/edit': {
+      id: '/_layout/accommodations/rooms/$id/edit'
+      path: '/accommodations/rooms/$id/edit'
+      fullPath: '/accommodations/rooms/$id/edit'
+      preLoaderRoute: typeof LayoutAccommodationsRoomsIdEditRouteImport
+      parentRoute: typeof LayoutRoute
+    }
+    '/_layout/accommodations/properties/$id/edit': {
+      id: '/_layout/accommodations/properties/$id/edit'
+      path: '/accommodations/properties/$id/edit'
+      fullPath: '/accommodations/properties/$id/edit'
+      preLoaderRoute: typeof LayoutAccommodationsPropertiesIdEditRouteImport
+      parentRoute: typeof LayoutRoute
+    }
   }
 }
 
@@ -1390,7 +1509,6 @@ interface LayoutRouteChildren {
   LayoutIndexRoute: typeof LayoutIndexRoute
   LayoutAdminNewRoute: typeof LayoutAdminNewRoute
   LayoutApplicationsIdRoute: typeof LayoutApplicationsIdRoute
-  LayoutApplicationsNewRoute: typeof LayoutApplicationsNewRoute
   LayoutApplicationsReviewQueueRoute: typeof LayoutApplicationsReviewQueueRoute
   LayoutAttendeesAttendeeIdRoute: typeof LayoutAttendeesAttendeeIdRoute
   LayoutCouponsNewRoute: typeof LayoutCouponsNewRoute
@@ -1402,12 +1520,13 @@ interface LayoutRouteChildren {
   LayoutFormBuilderNewRoute: typeof LayoutFormBuilderNewRoute
   LayoutGroupsNewRoute: typeof LayoutGroupsNewRoute
   LayoutHumansIdRoute: typeof LayoutHumansIdRoute
-  LayoutHumansNewRoute: typeof LayoutHumansNewRoute
   LayoutInvitesNewRoute: typeof LayoutInvitesNewRoute
   LayoutOrganizationsNewRoute: typeof LayoutOrganizationsNewRoute
   LayoutPopupsNewRoute: typeof LayoutPopupsNewRoute
   LayoutProductsNewRoute: typeof LayoutProductsNewRoute
+  LayoutSalesFlowsNewRoute: typeof LayoutSalesFlowsNewRoute
   LayoutTicketingStepsStepIdRoute: typeof LayoutTicketingStepsStepIdRoute
+  LayoutAccommodationsIndexRoute: typeof LayoutAccommodationsIndexRoute
   LayoutAdminIndexRoute: typeof LayoutAdminIndexRoute
   LayoutApplicationsIndexRoute: typeof LayoutApplicationsIndexRoute
   LayoutAttendeesIndexRoute: typeof LayoutAttendeesIndexRoute
@@ -1422,9 +1541,13 @@ interface LayoutRouteChildren {
   LayoutPopupsIndexRoute: typeof LayoutPopupsIndexRoute
   LayoutProductsIndexRoute: typeof LayoutProductsIndexRoute
   LayoutReferralsIndexRoute: typeof LayoutReferralsIndexRoute
+  LayoutSalesFlowsIndexRoute: typeof LayoutSalesFlowsIndexRoute
   LayoutTasksIndexRoute: typeof LayoutTasksIndexRoute
   LayoutThemeIndexRoute: typeof LayoutThemeIndexRoute
   LayoutTicketingStepsIndexRoute: typeof LayoutTicketingStepsIndexRoute
+  LayoutAccommodationsBookingsIdRoute: typeof LayoutAccommodationsBookingsIdRoute
+  LayoutAccommodationsPropertiesNewRoute: typeof LayoutAccommodationsPropertiesNewRoute
+  LayoutAccommodationsRoomsNewRoute: typeof LayoutAccommodationsRoomsNewRoute
   LayoutAdminIdEditRoute: typeof LayoutAdminIdEditRoute
   LayoutCouponsIdEditRoute: typeof LayoutCouponsIdEditRoute
   LayoutEmailTemplatesTypeEditRoute: typeof LayoutEmailTemplatesTypeEditRoute
@@ -1439,9 +1562,11 @@ interface LayoutRouteChildren {
   LayoutPopupsIdBulkGrantRoute: typeof LayoutPopupsIdBulkGrantRoute
   LayoutPopupsIdEditRoute: typeof LayoutPopupsIdEditRoute
   LayoutProductsIdEditRoute: typeof LayoutProductsIdEditRoute
-  LayoutReferralsReferralIdEditRoute: typeof LayoutReferralsReferralIdEditRoute
+  LayoutSalesFlowsIdEditRoute: typeof LayoutSalesFlowsIdEditRoute
   LayoutEventsTracksIndexRoute: typeof LayoutEventsTracksIndexRoute
   LayoutEventsVenuesIndexRoute: typeof LayoutEventsVenuesIndexRoute
+  LayoutAccommodationsPropertiesIdEditRoute: typeof LayoutAccommodationsPropertiesIdEditRoute
+  LayoutAccommodationsRoomsIdEditRoute: typeof LayoutAccommodationsRoomsIdEditRoute
   LayoutEventsTracksTrackIdEditRoute: typeof LayoutEventsTracksTrackIdEditRoute
   LayoutEventsVenuesVenueIdEditRoute: typeof LayoutEventsVenuesVenueIdEditRoute
   LayoutEventsVenuesVenueIdScheduleRoute: typeof LayoutEventsVenuesVenueIdScheduleRoute
@@ -1461,7 +1586,6 @@ const LayoutRouteChildren: LayoutRouteChildren = {
   LayoutIndexRoute: LayoutIndexRoute,
   LayoutAdminNewRoute: LayoutAdminNewRoute,
   LayoutApplicationsIdRoute: LayoutApplicationsIdRoute,
-  LayoutApplicationsNewRoute: LayoutApplicationsNewRoute,
   LayoutApplicationsReviewQueueRoute: LayoutApplicationsReviewQueueRoute,
   LayoutAttendeesAttendeeIdRoute: LayoutAttendeesAttendeeIdRoute,
   LayoutCouponsNewRoute: LayoutCouponsNewRoute,
@@ -1473,12 +1597,13 @@ const LayoutRouteChildren: LayoutRouteChildren = {
   LayoutFormBuilderNewRoute: LayoutFormBuilderNewRoute,
   LayoutGroupsNewRoute: LayoutGroupsNewRoute,
   LayoutHumansIdRoute: LayoutHumansIdRoute,
-  LayoutHumansNewRoute: LayoutHumansNewRoute,
   LayoutInvitesNewRoute: LayoutInvitesNewRoute,
   LayoutOrganizationsNewRoute: LayoutOrganizationsNewRoute,
   LayoutPopupsNewRoute: LayoutPopupsNewRoute,
   LayoutProductsNewRoute: LayoutProductsNewRoute,
+  LayoutSalesFlowsNewRoute: LayoutSalesFlowsNewRoute,
   LayoutTicketingStepsStepIdRoute: LayoutTicketingStepsStepIdRoute,
+  LayoutAccommodationsIndexRoute: LayoutAccommodationsIndexRoute,
   LayoutAdminIndexRoute: LayoutAdminIndexRoute,
   LayoutApplicationsIndexRoute: LayoutApplicationsIndexRoute,
   LayoutAttendeesIndexRoute: LayoutAttendeesIndexRoute,
@@ -1493,9 +1618,14 @@ const LayoutRouteChildren: LayoutRouteChildren = {
   LayoutPopupsIndexRoute: LayoutPopupsIndexRoute,
   LayoutProductsIndexRoute: LayoutProductsIndexRoute,
   LayoutReferralsIndexRoute: LayoutReferralsIndexRoute,
+  LayoutSalesFlowsIndexRoute: LayoutSalesFlowsIndexRoute,
   LayoutTasksIndexRoute: LayoutTasksIndexRoute,
   LayoutThemeIndexRoute: LayoutThemeIndexRoute,
   LayoutTicketingStepsIndexRoute: LayoutTicketingStepsIndexRoute,
+  LayoutAccommodationsBookingsIdRoute: LayoutAccommodationsBookingsIdRoute,
+  LayoutAccommodationsPropertiesNewRoute:
+    LayoutAccommodationsPropertiesNewRoute,
+  LayoutAccommodationsRoomsNewRoute: LayoutAccommodationsRoomsNewRoute,
   LayoutAdminIdEditRoute: LayoutAdminIdEditRoute,
   LayoutCouponsIdEditRoute: LayoutCouponsIdEditRoute,
   LayoutEmailTemplatesTypeEditRoute: LayoutEmailTemplatesTypeEditRoute,
@@ -1510,9 +1640,12 @@ const LayoutRouteChildren: LayoutRouteChildren = {
   LayoutPopupsIdBulkGrantRoute: LayoutPopupsIdBulkGrantRoute,
   LayoutPopupsIdEditRoute: LayoutPopupsIdEditRoute,
   LayoutProductsIdEditRoute: LayoutProductsIdEditRoute,
-  LayoutReferralsReferralIdEditRoute: LayoutReferralsReferralIdEditRoute,
+  LayoutSalesFlowsIdEditRoute: LayoutSalesFlowsIdEditRoute,
   LayoutEventsTracksIndexRoute: LayoutEventsTracksIndexRoute,
   LayoutEventsVenuesIndexRoute: LayoutEventsVenuesIndexRoute,
+  LayoutAccommodationsPropertiesIdEditRoute:
+    LayoutAccommodationsPropertiesIdEditRoute,
+  LayoutAccommodationsRoomsIdEditRoute: LayoutAccommodationsRoomsIdEditRoute,
   LayoutEventsTracksTrackIdEditRoute: LayoutEventsTracksTrackIdEditRoute,
   LayoutEventsVenuesVenueIdEditRoute: LayoutEventsVenuesVenueIdEditRoute,
   LayoutEventsVenuesVenueIdScheduleRoute:

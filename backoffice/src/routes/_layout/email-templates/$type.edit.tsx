@@ -14,12 +14,24 @@ import useAuth from "@/hooks/useAuth"
 
 export const Route = createFileRoute("/_layout/email-templates/$type/edit")({
   component: EditEmailTemplate,
+  // Which flow's copy is being edited. Mails a sale produces belong to the
+  // flow that made the sale, so the URL has to say which one — otherwise a
+  // link to this page means something different depending on who opens it.
+  validateSearch: (search: Record<string, unknown>) => ({
+    flow: typeof search.flow === "string" ? search.flow : undefined,
+  }),
   head: () => ({
     meta: [{ title: "Edit Email Template - EdgeOS" }],
   }),
 })
 
-export function EditorContent({ templateType }: { templateType: string }) {
+export function EditorContent({
+  templateType,
+  flowId,
+}: {
+  templateType: string
+  flowId?: string
+}) {
   const { selectedPopupId, effectiveTenantId } = useWorkspace()
   const navigate = useNavigate()
 
@@ -29,7 +41,8 @@ export function EditorContent({ templateType }: { templateType: string }) {
   })
 
   const typeInfo = types?.find((t) => t.type === templateType)
-  const requiresPopup = typeInfo?.scope === "popup"
+  const isFlowScoped = typeInfo?.scope === "flow"
+  const requiresPopup = isFlowScoped || typeInfo?.scope === "popup"
 
   const { data: customTemplates } = useQuery({
     queryKey: requiresPopup
@@ -44,14 +57,26 @@ export function EditorContent({ templateType }: { templateType: string }) {
     enabled: !!typeInfo && (!requiresPopup || !!selectedPopupId),
   })
 
+  // Match the tier as well as the type. A flow's copy and the gathering's
+  // copy are different rows, and picking the wrong one would edit somebody
+  // else's mail.
   const existingTemplate = customTemplates?.results?.find(
-    (t) => t.template_type === templateType,
+    (t) =>
+      t.template_type === templateType &&
+      (isFlowScoped ? t.sales_flow_id === flowId : !t.sales_flow_id),
   )
 
   if (!types) return <Skeleton className="h-96 w-full" />
   if (!typeInfo) return <div>Unknown template type: {templateType}</div>
   if (requiresPopup && !selectedPopupId) {
     return <WorkspaceAlert resource="email templates" action="create" />
+  }
+  if (isFlowScoped && !flowId) {
+    return (
+      <p className="text-muted-foreground text-sm">
+        Open this email from the list to choose which sales flow it is for.
+      </p>
+    )
   }
   if (!customTemplates) return <Skeleton className="h-96 w-full" />
 
@@ -74,6 +99,7 @@ export function EditorContent({ templateType }: { templateType: string }) {
       <EmailTemplateEditor
         templateType={templateType as EmailTemplateType}
         popupId={requiresPopup ? selectedPopupId! : undefined}
+        salesFlowId={isFlowScoped ? flowId : undefined}
         existingTemplate={existingTemplate}
         typeInfo={typeInfo}
         onSave={() => navigate({ to: "/email-templates" })}
@@ -84,6 +110,7 @@ export function EditorContent({ templateType }: { templateType: string }) {
 
 function EditEmailTemplate() {
   const { type } = Route.useParams()
+  const { flow } = Route.useSearch()
   const { needsTenantSelection } = useWorkspace()
   const { isOperatorOrAbove, isUserLoading } = useAuth()
   const navigate = useNavigate()
@@ -109,7 +136,7 @@ function EditEmailTemplate() {
   return (
     <QueryErrorBoundary>
       <Suspense fallback={<Skeleton className="h-96 w-full" />}>
-        <EditorContent templateType={type} />
+        <EditorContent templateType={type} flowId={flow} />
       </Suspense>
     </QueryErrorBoundary>
   )

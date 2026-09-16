@@ -68,23 +68,33 @@ class TestPatronProductRulesMigration:
         assert row[0] is True, "uq_product_patreon_per_popup must be a unique index"
 
     def test_patron_step_unique_index_exists(self, db: Session) -> None:
-        """uq_ticketing_step_patron_per_popup partial unique index must exist on ticketingsteps."""
+        """`uq_ticketing_step_patron_per_popup` (this migration, fb7da98c8d72)
+        was re-keyed to a two-tier shape by sdd/sales-flows slice 8
+        (`96ca481168da_add_flow_id_to_ticketing_steps.py`):
+        `uq_ticketing_step_patron_popup_shared` on `(popup_id) WHERE
+        sales_flow_id IS NULL` is the direct successor for the popup-shared
+        tier — identical enforcement for every row that stays flow-less,
+        which is every row this migration's own popups/products fixtures
+        exercise. `uq_ticketing_step_patron_flow` is the sibling flow tier.
+        """
         conn = db.connection()
         row = conn.exec_driver_sql(
             """
             SELECT indexname
             FROM pg_indexes
             WHERE tablename = 'ticketingsteps'
-              AND indexname = 'uq_ticketing_step_patron_per_popup'
+              AND indexname = 'uq_ticketing_step_patron_flow'
             """
         ).fetchone()
         assert row is not None, (
-            "Index 'uq_ticketing_step_patron_per_popup' not found on ticketingsteps. "
-            "Run migration fb7da98c8d72."
+            "Index 'uq_ticketing_step_patron_flow' not found on "
+            "ticketingsteps. Run migration 96ca481168da."
         )
 
     def test_patron_step_unique_index_is_unique(self, db: Session) -> None:
-        """uq_ticketing_step_patron_per_popup must be a UNIQUE index."""
+        """`uq_ticketing_step_patron_popup_shared` must be a UNIQUE index
+        (sdd/sales-flows slice 8 two-tier re-key — see
+        `test_patron_step_unique_index_exists` docstring)."""
         conn = db.connection()
         row = conn.exec_driver_sql(
             """
@@ -93,12 +103,10 @@ class TestPatronProductRulesMigration:
             JOIN pg_class c ON c.relname = pi.indexname
             JOIN pg_index ix ON ix.indexrelid = c.oid
             WHERE pi.tablename = 'ticketingsteps'
-              AND pi.indexname = 'uq_ticketing_step_patron_per_popup'
+              AND pi.indexname = 'uq_ticketing_step_patron_flow'
             """
         ).fetchone()
-        assert row is not None, (
-            "uq_ticketing_step_patron_per_popup not found in pg_index"
-        )
+        assert row is not None, "uq_ticketing_step_patron_flow not found in pg_index"
         assert row[0] is True, (
-            "uq_ticketing_step_patron_per_popup must be a unique index"
+            "uq_ticketing_step_patron_popup_shared must be a unique index"
         )

@@ -6,15 +6,25 @@ import { type MutableRefObject, useCallback, useEffect, useState } from "react"
 import { useTranslation } from "react-i18next"
 import { toast } from "sonner"
 import type { CheckoutMode } from "@/checkout/popupCheckoutPolicy"
-import { ApiError, CheckoutService, PaymentsService } from "@/client"
+import {
+  ApiError,
+  CheckoutService,
+  type PaymentProductRequest_Input as PaymentProductRequest,
+  PaymentsService,
+  type ProductLine,
+} from "@/client"
 import { withCheckoutLocale } from "@/helpers/checkout"
 import { getAttribution } from "@/lib/attribution"
+import { navigateBrowser } from "@/lib/browser-navigation"
+import type { BuyerIdentity } from "@/lib/buyerIdentity"
 import { trackGAPurchase } from "@/lib/google-analytics"
 import { getMetaAttribution, trackMetaPurchase } from "@/lib/meta-pixel"
+import { trackPortalTelemetry } from "@/lib/portal-telemetry"
 import { queryKeys } from "@/lib/query-keys"
 import type { AttendeePassState } from "@/types/Attendee"
 import type {
   CheckoutStep,
+  SelectedAccommodationItem,
   SelectedDynamicItem,
   SelectedHousingItem,
   SelectedMealPlanItem,
@@ -22,7 +32,10 @@ import type {
   SelectedPassItem,
   SelectedPatronItem,
 } from "@/types/checkout"
-import { buildPaymentProducts } from "./buildPaymentProducts"
+import {
+  buildPaymentProducts,
+  MissingTicketBuyerError,
+} from "./buildPaymentProducts"
 import {
   dispatchPaymentError,
   extractCartMeta,
@@ -33,11 +46,17 @@ interface UsePaymentSubmitParams {
   applicationId: string | undefined
   popupId: string | null
   popupSlug: string | null
+  salesFlowSlug?: string | null
   appCredit: string | number | null | undefined
   checkoutMode: CheckoutMode
   attendeePasses: AttendeePassState[]
   selectedPasses: SelectedPassItem[]
   housing: SelectedHousingItem | null
+  accommodations: SelectedAccommodationItem[]
+  /** What the checkout knows about the buyer. Folded into each booking's
+   *  answers on the way out, so a contact the step stopped asking for still
+   *  reaches the property. */
+  buyerIdentity: BuyerIdentity
   merch: SelectedMerchItem[]
   patron: SelectedPatronItem | null
   selectedMealPlans: SelectedMealPlanItem[]
@@ -53,6 +72,7 @@ interface UsePaymentSubmitParams {
   clearPromoCode: () => void
   paymentCompleteRef: React.MutableRefObject<boolean>
   submitMode: "application" | "open-ticketing"
+  returnContext?: "direct" | "portal"
   buyerData: {
     email: string
     firstName: string
@@ -82,15 +102,66 @@ interface PaymentSubmitResult {
   error?: string
 }
 
+export function buildOpenTicketingProductLines(
+  products: PaymentProductRequest[],
+): ProductLine[] {
+  const lines: ProductLine[] = []
+  const mergeableLineIndexes = new Map<string, number>()
+
+  for (const product of products) {
+    const identity = product.recipient_key
+      ? { recipient_key: product.recipient_key }
+      : product.attendee_id
+        ? { attendee_id: product.attendee_id }
+        : {}
+    const identityKey = product.recipient_key
+      ? ["recipient", product.recipient_key]
+      : product.attendee_id
+        ? ["attendee", product.attendee_id]
+        : ["ownerless"]
+    const key = JSON.stringify([product.product_id, ...identityKey])
+    const quantity = product.quantity ?? 1
+    const purchaseMetadata = product.purchase_metadata ?? undefined
+    const existingIndex = mergeableLineIndexes.get(key)
+
+    // Metadata describes one concrete purchase unit. Even byte-identical
+    // accommodation blobs stay separate because every room line gets its own
+    // unit; different dates must never collapse behind the same product id.
+    if (purchaseMetadata !== undefined) {
+      lines.push({
+        product_id: product.product_id,
+        ...identity,
+        quantity,
+        purchase_metadata: purchaseMetadata,
+      })
+    } else if (existingIndex !== undefined) {
+      const existing = lines[existingIndex]
+      existing.quantity = (existing.quantity ?? 1) + quantity
+    } else {
+      mergeableLineIndexes.set(key, lines.length)
+      lines.push({
+        product_id: product.product_id,
+        ...identity,
+        quantity,
+      })
+    }
+  }
+
+  return lines
+}
+
 export function usePaymentSubmit({
   applicationId,
   popupId,
   popupSlug,
+  salesFlowSlug = null,
   appCredit,
   checkoutMode,
   attendeePasses,
   selectedPasses,
   housing,
+  accommodations,
+  buyerIdentity,
   merch,
   patron,
   selectedMealPlans,
@@ -106,6 +177,7 @@ export function usePaymentSubmit({
   clearPromoCode,
   paymentCompleteRef,
   submitMode,
+  returnContext = "direct",
   buyerData,
   editPassesEnabled,
   popupName,
@@ -164,6 +236,7 @@ export function usePaymentSubmit({
     const hasAnyCartSelection =
       selectedPasses.length > 0 ||
       !!housing ||
+      accommodations.length > 0 ||
       merch.length > 0 ||
       !!patron ||
       selectedMealPlans.length > 0 ||
@@ -181,6 +254,12 @@ export function usePaymentSubmit({
     setIsSubmitting(true)
     setPromoError(null)
 
+    const openFlowSlug = salesFlowSlug
+    if (submitMode === "open-ticketing" && !openFlowSlug) {
+      setIsSubmitting(false)
+      return { success: false, error: "Checkout flow is unavailable" }
+    }
+
     // Flush any pending debounced save BEFORE building the purchase body so
     // cartMetaRef has fresh cid/restore_token (ADR-R8).
     if (submitMode === "open-ticketing" && flushOpenCartSave) {
@@ -188,49 +267,42 @@ export function usePaymentSubmit({
     }
 
     try {
-      const { products: productsToSend, isMonthUpgrade } = buildPaymentProducts(
-        {
-          attendeePasses,
-          selectedPasses,
-          housing,
-          merch,
-          patron,
-          selectedMealPlans,
-          dynamicItems,
-          isEditing,
-          appCredit,
-          checkoutMode,
-          editPassesEnabled,
-        },
-      )
+      const {
+        products: productsToSend,
+        recipients: recipientsToSend,
+        isMonthUpgrade,
+      } = buildPaymentProducts({
+        attendeePasses,
+        selectedPasses,
+        housing,
+        accommodations,
+        buyerIdentity,
+        merch,
+        patron,
+        selectedMealPlans,
+        dynamicItems,
+        isEditing,
+        appCredit,
+        checkoutMode,
+        editPassesEnabled,
+        submitMode,
+        openTicketBuyer: buyerData,
+      })
 
       const result =
         submitMode === "open-ticketing"
           ? await CheckoutService.purchaseOpenTicketing({
               slug: popupSlug!,
+              flowSlug: openFlowSlug!,
               requestBody: {
                 ...getMetaAttribution(),
                 locale: i18n.language,
+                return_context: returnContext,
                 ...(Object.keys(getAttribution()).length
                   ? { attribution: getAttribution() }
                   : {}),
-                products: Object.values(
-                  productsToSend.reduce<
-                    Record<string, { product_id: string; quantity: number }>
-                  >((acc, product) => {
-                    const quantity = product.quantity ?? 1
-                    const existing = acc[product.product_id]
-                    if (existing) {
-                      existing.quantity += quantity
-                    } else {
-                      acc[product.product_id] = {
-                        product_id: product.product_id,
-                        quantity,
-                      }
-                    }
-                    return acc
-                  }, {}),
-                ),
+                products: buildOpenTicketingProductLines(productsToSend),
+                recipients: recipientsToSend,
                 buyer: {
                   email: buyerData!.email,
                   first_name: buyerData!.firstName,
@@ -256,7 +328,10 @@ export function usePaymentSubmit({
           : await PaymentsService.createMyPayment({
               requestBody: {
                 application_id: applicationId,
+                locale: i18n.language,
+                return_context: returnContext,
                 products: productsToSend,
+                recipients: recipientsToSend,
                 coupon_code: promoCodeValid ? promoCode : undefined,
                 edit_passes: isEditing || isMonthUpgrade ? true : undefined,
                 insurance: insurance || undefined,
@@ -274,10 +349,7 @@ export function usePaymentSubmit({
       }
 
       if (data.status === "pending" && data.checkout_url) {
-        window.location.href = withCheckoutLocale(
-          data.checkout_url,
-          i18n.language,
-        )
+        navigateBrowser(withCheckoutLocale(data.checkout_url, i18n.language))
         return { success: true }
       }
 
@@ -302,6 +374,7 @@ export function usePaymentSubmit({
           }
           trackMetaPurchase(purchasePayload)
           trackGAPurchase(purchasePayload)
+          trackPortalTelemetry("checkout_completed")
         }
         toast.success(
           isEditing
@@ -334,6 +407,11 @@ export function usePaymentSubmit({
                 queryKey: queryKeys.attendees.byHumanPopup(popupId),
               })
             : Promise.resolve(),
+          popupId
+            ? queryClient.invalidateQueries({
+                queryKey: queryKeys.salesFlows.portalUpsale(popupId),
+              })
+            : Promise.resolve(),
         ])
         if (popupSlug) {
           // Approved-on-create only happens when the cart was zero-amount and
@@ -344,12 +422,13 @@ export function usePaymentSubmit({
           // email was sent, matching the open-ticketing zero-amount path.
           if (isEditing) {
             router.replace(`/portal/${popupSlug}/passes`)
-          } else if (submitMode === "open-ticketing" && data.redirect_url) {
-            // Zero-amount open checkout where the popup configured a custom
-            // success URL: SimpleFI was bypassed, so we perform the redirect
-            // the provider would have done on a paid purchase. The backend
-            // returns the configured URL in redirect_url for this case.
-            window.location.href = data.redirect_url
+          } else if (
+            (submitMode === "open-ticketing" || submitMode === "application") &&
+            data.redirect_url
+          ) {
+            // SimpleFI was bypassed, so follow the same backend-resolved
+            // destination the provider would have used for a paid purchase.
+            navigateBrowser(data.redirect_url)
           } else {
             const qs = paymentId ? `?payment_id=${paymentId}` : ""
             router.replace(`/checkout/${popupSlug}/thank-you${qs}`)
@@ -366,7 +445,15 @@ export function usePaymentSubmit({
       setIsSubmitting(false)
       return { success: true }
     } catch (err: unknown) {
+      if (err instanceof MissingTicketBuyerError) {
+        const message = t("checkout.toast_buyer_incomplete_pay")
+        setCurrentStep("buyer")
+        toast.error(message)
+        setIsSubmitting(false)
+        return { success: false, error: message }
+      }
       console.error("Payment failed:", err)
+      trackPortalTelemetry("checkout_failed")
 
       const apiBody =
         err instanceof ApiError
@@ -392,7 +479,7 @@ export function usePaymentSubmit({
           if (dispatch.blockResubmit) paymentCompleteRef.current = true
           if (dispatch.setPersistentError) setPromoError(msg)
           if (dispatch.navigate?.type === "href") {
-            window.location.href = dispatch.navigate.url
+            navigateBrowser(dispatch.navigate.url)
           } else if (dispatch.navigate?.type === "router-push") {
             router.push(dispatch.navigate.path)
           }
@@ -431,11 +518,13 @@ export function usePaymentSubmit({
   }, [
     applicationId,
     buyerData,
+    buyerIdentity,
     appCredit,
     checkoutMode,
     selectedPasses,
     merch,
     housing,
+    accommodations,
     patron,
     selectedMealPlans,
     dynamicItems,
@@ -453,7 +542,9 @@ export function usePaymentSubmit({
     paymentCompleteRef,
     popupId,
     popupSlug,
+    salesFlowSlug,
     submitMode,
+    returnContext,
     popupName,
     router,
     editPassesEnabled,

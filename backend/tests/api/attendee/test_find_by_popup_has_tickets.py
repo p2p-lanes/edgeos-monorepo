@@ -65,15 +65,14 @@ def _make_product(db: Session, tenant: Tenants, popup: Popups) -> Products:
     return product
 
 
-def _give_ticket(
-    db: Session, tenant: Tenants, attendee: Attendees, product: Products
-) -> AttendeeProducts:
+def _give_ticket(db, tenant, attendee, product, category_snapshot="ticket"):
     ticket = AttendeeProducts(
         id=uuid.uuid4(),
         tenant_id=tenant.id,
         attendee_id=attendee.id,
         product_id=product.id,
         check_in_code=f"HT{uuid.uuid4().hex[:6].upper()}",
+        product_category_snapshot=category_snapshot,
     )
     db.add(ticket)
     db.commit()
@@ -143,3 +142,30 @@ class TestFindByPopupHasTickets:
 
         assert total == 1
         assert [r.id for r in results] == [without.id]
+
+    def test_ticket_snapshot_excludes_non_ticket_and_unresolved_units(
+        self, db: Session, tenant_a: Tenants
+    ) -> None:
+        popup = _make_popup(db, tenant_a)
+        product = _make_product(db, tenant_a, popup)
+        typed_access = _make_attendee(db, tenant_a, popup, name="Access")
+        participant = _make_attendee(db, tenant_a, popup, name="Participant")
+        legacy_ticket = _make_attendee(db, tenant_a, popup, name="Legacy")
+        _give_ticket(db, tenant_a, typed_access, product, "ticket")
+        _give_ticket(db, tenant_a, participant, product, "meal_plan")
+        _give_ticket(db, tenant_a, legacy_ticket, product, None)
+
+        with_access, access_total = attendees_crud.find_by_popup(
+            db, popup_id=popup.id, has_tickets=True
+        )
+        without_access, no_access_total = attendees_crud.find_by_popup(
+            db, popup_id=popup.id, has_tickets=False
+        )
+
+        assert access_total == 1
+        assert [row.id for row in with_access] == [typed_access.id]
+        assert no_access_total == 2
+        assert {row.id for row in without_access} == {
+            participant.id,
+            legacy_ticket.id,
+        }

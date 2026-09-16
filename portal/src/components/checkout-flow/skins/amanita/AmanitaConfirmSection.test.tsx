@@ -120,6 +120,36 @@ describe("AmanitaConfirmSection", () => {
     expect(screen.getAllByText(/\$100/).length).toBeGreaterThan(0)
   })
 
+  it("lists a booked room, which reaches the cart by its own path", () => {
+    // It was counted in the total and missing from the list, so the buyer
+    // was asked to pay for something this screen did not mention.
+    cart = {
+      ...createInitialCartState(),
+      accommodations: [
+        {
+          accommodationId: "room-1",
+          productId: "room-product",
+          name: "Garden Studio",
+          propertyName: "Casa del Lago",
+          checkIn: "2026-09-14",
+          checkOut: "2026-09-18",
+          nights: 4,
+          guestCount: 2,
+          guests: [],
+          bookerAnswers: {},
+          guestForm: null,
+          subtotal: 400,
+          tax: 40,
+          totalPrice: 440,
+        },
+      ],
+    }
+    render(<AmanitaConfirmSection />)
+
+    expect(screen.getByText("Garden Studio")).toBeTruthy()
+    expect(screen.queryByText(/empty/i)).toBeNull()
+  })
+
   it("renders dynamic items from cart.dynamicItems", () => {
     cart = {
       ...cart,

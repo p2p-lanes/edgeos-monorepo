@@ -3,7 +3,10 @@
 import { Check, ChevronDown, Ticket } from "lucide-react"
 import { useEffect, useLayoutEffect, useRef, useState } from "react"
 import { useTranslation } from "react-i18next"
-import AddAttendeeButtons from "@/components/checkout-flow/shared/AddAttendeeButtons"
+import {
+  TicketRecipientControls,
+  useTicketRecipientContext,
+} from "@/components/checkout-flow/shared/TicketRecipientControls"
 import ExpandableDescription from "@/components/ui/ExpandableDescription"
 import QuantitySelector, {
   resolveBlockedStepperProps,
@@ -12,8 +15,7 @@ import QuantitySelector, {
 import type { TemplateSection } from "@/hooks/checkout/ticketSections"
 import {
   buildSectionGroups,
-  isSectionVisibleForApp,
-  parseSections,
+  hasRenderableSectionProducts,
 } from "@/hooks/checkout/ticketSections"
 import {
   type TicketRowVM,
@@ -23,7 +25,7 @@ import {
 import { useAttendeeCategories } from "@/hooks/useAttendeeCategories"
 import { deriveProductState } from "@/lib/product-state"
 import { cn } from "@/lib/utils"
-import { useApplication } from "@/providers/applicationProvider"
+import { useCheckout } from "@/providers/checkoutProvider"
 import { useCityProvider } from "@/providers/cityProvider"
 import { usePassesProvider } from "@/providers/passesProvider"
 import { isPassQuantityBased } from "@/strategies/passQuantityHelper"
@@ -133,22 +135,6 @@ function countSelected(attendee: AttendeePassState): number {
 }
 
 // ---------------------------------------------------------------------------
-// Empty-attendee suppression helper
-// ---------------------------------------------------------------------------
-
-/** True when an attendee has at least one renderable product:
- *  either purchased (must show Owned row in editing mode), or
- *  present in at least one section group (configurable product). */
-function attendeeHasRenderableContent(
-  attendee: AttendeePassState,
-  sections: TemplateSection[],
-): boolean {
-  // Always show attendees who have purchased products.
-  if (attendee.products.some((p) => p.purchased)) return true
-  return buildSectionGroups(attendee, sections).length > 0
-}
-
-// ---------------------------------------------------------------------------
 // Main component
 // ---------------------------------------------------------------------------
 
@@ -168,6 +154,7 @@ export default function VariantTicketSelect({
   // filtering logic (visibleAttendees/sortedAttendees) which operates on
   // AttendeePassState until Slice 2 migrates layouts to TicketAttendeeVM.
   const { attendeePasses } = usePassesProvider()
+  const { salesFlowId } = useCheckout()
 
   const [focusedAttendeeId, setFocusedAttendeeId] = useState<string | null>(
     null,
@@ -176,18 +163,17 @@ export default function VariantTicketSelect({
   // Apply per-application visibility (visible_if) once: it depends on the
   // application's form answers, not on individual attendees. Layouts and
   // helpers downstream consume the already-filtered list.
-  const { getRelevantApplication } = useApplication()
-  const customFields = getRelevantApplication()?.custom_fields ?? null
-  const sections = parseSections(templateConfig).filter((s) =>
-    isSectionVisibleForApp(s, customFields),
-  )
+  const recipientContext = useTicketRecipientContext(templateConfig)
+  const { sections } = recipientContext
 
   // Build category_id -> sort_order map for attendee ordering.
   const { getCity } = useCityProvider()
   const cityForSort = getCity()
   const popupIdForSort = cityForSort?.id ? String(cityForSort.id) : ""
-  const { categories: categoriesForSort } =
-    useAttendeeCategories(popupIdForSort)
+  const { categories: categoriesForSort } = useAttendeeCategories(
+    popupIdForSort,
+    salesFlowId,
+  )
   const categorySortOrderById = new Map<string, number>()
   for (const c of categoriesForSort ?? []) {
     categorySortOrderById.set(c.id, c.sort_order ?? 0)
@@ -209,7 +195,7 @@ export default function VariantTicketSelect({
   const visibleAttendees = sortedAttendees(
     attendeePasses,
     categorySortOrderById,
-  ).filter((a) => attendeeHasRenderableContent(a, sections))
+  ).filter((attendee) => hasRenderableSectionProducts(attendee, sections))
 
   // Route toggle actions through the contract. The contract resolves
   // exclusivity scope, attendee-visible product ids, and strategies
@@ -239,9 +225,10 @@ export default function VariantTicketSelect({
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-center gap-3 text-sm">
-        <AddAttendeeButtons onAttendeeAdded={handleAttendeeAdded} />
-      </div>
+      <TicketRecipientControls
+        context={recipientContext}
+        onAttendeeAdded={handleAttendeeAdded}
+      />
       {passesVariant === "stacked" && <StackedLayout {...sharedProps} />}
       {passesVariant === "tabs" && <TabsLayout {...sharedProps} />}
       {passesVariant === "compact" && <CompactLayout {...sharedProps} />}
@@ -277,8 +264,7 @@ function scrollToAttendeeCard(attendeeId: string) {
 // ---------------------------------------------------------------------------
 // Template config helpers
 // ---------------------------------------------------------------------------
-// parseSections, buildSectionGroups, and isSectionVisibleForApp are imported
-// from @/hooks/checkout/ticketSections (the shared module).
+// buildSectionGroups is imported from the shared ticket-section module.
 
 // ---------------------------------------------------------------------------
 // Attendee card header

@@ -20,6 +20,10 @@ class AuditAction:
     # A human's rating (red/orange/green flag, star, …) was changed by a user.
     HUMAN_RATING_CHANGED = "human.rating_changed"
 
+    # Coupon lifecycle changes made from the backoffice or AI copilot.
+    COUPON_CREATED = "coupon.created"
+    COUPON_UPDATED = "coupon.updated"
+
     # Credit movements on an application (grant, debit, restore).
     CREDIT_GRANTED = "credit.granted"
     CREDIT_APPLIED = "credit.applied"
@@ -33,6 +37,7 @@ class AuditEntityType:
     """Type of the primary entity an event is grouped under."""
 
     ATTENDEE = "attendee"
+    COUPON = "coupon"
     EVENT = "event"
     HUMAN = "human"
     PRODUCT = "product"

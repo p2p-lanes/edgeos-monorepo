@@ -11,11 +11,13 @@ export type { CheckoutShareMeta }
  */
 export async function fetchCheckoutShareMeta(
   popupSlug: string,
+  flowSlug: string,
   tenantId: string,
 ): Promise<CheckoutShareMeta | null> {
   try {
     return await CheckoutService.getCheckoutShareMeta({
       slug: popupSlug,
+      flowSlug,
       xTenantId: tenantId,
     })
   } catch {

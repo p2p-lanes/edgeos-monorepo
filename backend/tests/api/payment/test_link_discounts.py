@@ -26,6 +26,11 @@ from app.api.product.models import Products
 from app.api.shared.enums import SaleType
 from app.api.tenant.models import Tenants
 from app.api.user.models import Users
+from tests._flow_helpers import (
+    application_flow_id,
+    group_flow_id,
+    invite_flow_id,
+)
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -71,6 +76,7 @@ def _make_invite(
     discount_percentage: Decimal,
 ) -> Invites:
     invite = Invites(
+        sales_flow_id=invite_flow_id(db, popup.id),
         tenant_id=tenant.id,
         popup_id=popup.id,
         token=f"tok-{uuid.uuid4().hex[:10]}",
@@ -93,6 +99,7 @@ def _make_referral(
 ) -> Invites:
     """A referral is an Invite carrying a referrer_human_id."""
     referral = Invites(
+        sales_flow_id=invite_flow_id(db, popup.id),
         tenant_id=tenant.id,
         popup_id=popup.id,
         referrer_human_id=referrer.id,
@@ -116,6 +123,7 @@ def _make_group(
 ) -> Groups:
     suffix = uuid.uuid4().hex[:6]
     group = Groups(
+        sales_flow_id=group_flow_id(db, popup.id),
         tenant_id=tenant.id,
         popup_id=popup.id,
         name=f"Disc Group {suffix}",
@@ -138,6 +146,7 @@ def _make_application(
     group_id: uuid.UUID | None = None,
 ) -> Applications:
     application = Applications(
+        sales_flow_id=application_flow_id(db, popup.id),
         tenant_id=tenant.id,
         popup_id=popup.id,
         human_id=human.id,

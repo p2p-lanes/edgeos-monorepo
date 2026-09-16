@@ -19,6 +19,7 @@ from app.api.popup.models import Popups
 from app.api.product.models import Products
 from app.api.tenant.models import Tenants
 from app.core.security import create_access_token
+from tests._flow_helpers import group_flow_id
 
 
 def _auth(token: str) -> dict[str, str]:
@@ -40,6 +41,7 @@ def _make_popup(db: Session, tenant: Tenants) -> Popups:
 def _make_member_with_purchase(
     db: Session, tenant: Tenants, popup: Popups
 ) -> tuple[Groups, Humans, Applications, Payments, AttendeeProducts]:
+    flow_id = group_flow_id(db, popup.id)
     human = Humans(
         tenant_id=tenant.id,
         email=f"group-lifecycle-{uuid.uuid4().hex[:8]}@test.com",
@@ -49,6 +51,7 @@ def _make_member_with_purchase(
     group = Groups(
         tenant_id=tenant.id,
         popup_id=popup.id,
+        sales_flow_id=flow_id,
         name=f"Group {uuid.uuid4().hex[:6]}",
         slug=f"group-{uuid.uuid4().hex[:8]}",
     )
@@ -58,6 +61,7 @@ def _make_member_with_purchase(
     application = Applications(
         tenant_id=tenant.id,
         popup_id=popup.id,
+        sales_flow_id=flow_id,
         human_id=human.id,
         group_id=group.id,
         status=ApplicationStatus.ACCEPTED.value,
@@ -94,6 +98,8 @@ def _make_member_with_purchase(
         product_id=product.id,
         payment_id=payment.id,
         check_in_code=f"group-{uuid.uuid4().hex[:12]}",
+        product_category_snapshot="ticket",
+        requires_check_in_snapshot=product.requires_check_in,
     )
     membership = GroupMembers(
         tenant_id=tenant.id,

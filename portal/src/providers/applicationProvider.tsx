@@ -21,8 +21,18 @@ import { useCityProvider } from "./cityProvider"
 interface ApplicationContextProps {
   applications: ApplicationPublic[] | null
   participation: ApplicationsGetMyParticipationResponse | null
-  getRelevantApplication: () => ApplicationPublic | null
-  getAttendees: () => AttendeePassState[]
+  /**
+   * The application on screen.
+   *
+   * `flowId` names which door into the gathering is being looked at. A
+   * person can hold more than one — accepted as a volunteer and applying
+   * for general entry are two applications with two sets of attendees and
+   * two balances (sdd/sales-flows-rediseno). Omitting it is only correct
+   * when the gathering has a single door.
+   */
+  getRelevantApplication: (flowId?: string | null) => ApplicationPublic | null
+  getApplicationsForPopup: () => ApplicationPublic[]
+  getAttendees: (flowId?: string | null) => AttendeePassState[]
   updateApplication: (application: ApplicationPublic) => void
 }
 
@@ -54,31 +64,54 @@ const ApplicationProvider = ({ children }: { children: ReactNode }) => {
     [queryClient],
   )
 
-  const getRelevantApplication = useCallback((): ApplicationPublic | null => {
+  const getApplicationsForPopup = useCallback((): ApplicationPublic[] => {
     const city = getCity()
-    if (!applications) return null
-
-    return (
-      applications
-        ?.filter((app: ApplicationPublic) => app.popup_id === city?.id)
-        ?.slice(-1)[0] ?? null
+    if (!applications || !city?.id) return []
+    return applications.filter(
+      (app: ApplicationPublic) => app.popup_id === city.id,
     )
   }, [applications, getCity])
 
-  const getAttendees = useCallback((): AttendeePassState[] => {
-    const application = getRelevantApplication()
-    if (!application) return []
-    return (application.attendees ?? []).map((att) => ({
-      ...att,
-      products: [],
-    }))
-  }, [getRelevantApplication])
+  const getRelevantApplication = useCallback(
+    (flowId?: string | null): ApplicationPublic | null => {
+      const mine = getApplicationsForPopup()
+      if (mine.length === 0) return null
+
+      // Named door wins. Returning null when it does not match is the
+      // point: the caller asked about one door, and answering with another
+      // one's application is how the wrong attendees, the wrong balance and
+      // the wrong payment used to reach the screen.
+      if (flowId) {
+        return mine.find((app) => app.sales_flow_id === flowId) ?? null
+      }
+
+      // No door named. Only one relationship makes that unambiguous; more
+      // than one and there is nothing here that can choose. This used to
+      // take `.slice(-1)[0]` — the OLDEST, since the API orders by
+      // created_at descending — and every screen below trusted it.
+      return mine.length === 1 ? mine[0] : null
+    },
+    [getApplicationsForPopup],
+  )
+
+  const getAttendees = useCallback(
+    (flowId?: string | null): AttendeePassState[] => {
+      const application = getRelevantApplication(flowId)
+      if (!application) return []
+      return (application.attendees ?? []).map((att) => ({
+        ...att,
+        products: [],
+      }))
+    },
+    [getRelevantApplication],
+  )
 
   const contextValue = useMemo(
     () => ({
       applications,
       participation,
       getRelevantApplication,
+      getApplicationsForPopup,
       getAttendees,
       updateApplication,
     }),
@@ -86,6 +119,7 @@ const ApplicationProvider = ({ children }: { children: ReactNode }) => {
       applications,
       participation,
       getRelevantApplication,
+      getApplicationsForPopup,
       getAttendees,
       updateApplication,
     ],

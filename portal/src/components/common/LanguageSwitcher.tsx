@@ -1,6 +1,7 @@
 "use client"
 
 import { Globe } from "lucide-react"
+import type { CSSProperties } from "react"
 import {
   Select,
   SelectContent,
@@ -17,9 +18,17 @@ interface LanguageSwitcherProps {
    *  Used in the checkout header where the switcher is a secondary
    *  affordance and shouldn't compete with the step nav. */
   compact?: boolean
+  /** Class applied to the portaled language menu content. */
+  portalContentClassName?: string
+  /** Inline theme variables applied to the portaled language menu content. */
+  portalContentStyle?: CSSProperties
 }
 
-export function LanguageSwitcher({ compact = false }: LanguageSwitcherProps) {
+export function LanguageSwitcher({
+  compact = false,
+  portalContentClassName,
+  portalContentStyle,
+}: LanguageSwitcherProps) {
   const { currentLanguage, supportedLanguages, setLanguage } = useLanguage()
 
   if (supportedLanguages.length <= 1) return null
@@ -41,7 +50,10 @@ export function LanguageSwitcher({ compact = false }: LanguageSwitcherProps) {
             entirely in compact mode so the trigger reads as icon-only. */}
         {compact ? null : <SelectValue />}
       </SelectTrigger>
-      <SelectContent>
+      <SelectContent
+        className={portalContentClassName}
+        style={portalContentStyle}
+      >
         {supportedLanguages.map((code) => {
           const label =
             SUPPORTED_LANGUAGES[code as keyof typeof SUPPORTED_LANGUAGES]

@@ -297,6 +297,22 @@ describe("buildSectionGroups", () => {
     expect(keys).toContain("day")
   })
 
+  it("keeps an existing companion unreachable until a current-flow role is assigned", () => {
+    const unassignedCompanion = {
+      ...makeAttendee("existing-companion", [pWeek1]),
+      category_id: null,
+      recipient: {
+        recipient_key: "attendee:existing-companion",
+        existing_attendee_id: "existing-companion",
+        name: "Existing Companion",
+        category_id: null,
+      },
+    }
+
+    expect(buildSectionGroups(unassignedCompanion, [])).toEqual([])
+    expect(buildSectionGroups(unassignedCompanion, sections)).toEqual([])
+  })
+
   it("excludes patreon products regardless of section config", () => {
     const pPatreon = makeProduct("p-patreon", { category: "patreon" })
     const attendeeWithPatreon = makeAttendee("c", [pMonth, pPatreon])

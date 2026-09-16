@@ -2,14 +2,23 @@
 
 import Image from "next/image"
 import { imageOptimization } from "@/lib/image-optimization"
+import { cn } from "@/lib/utils"
 
-// Full-bleed image rendered behind the checkout, mirroring the fixed
-// positioning of CheckoutBackgroundVideo. The fixed wrapper reproduces the
-// old CSS `background-attachment: fixed` look while the photo itself loads
-// through next/image.
-export function CheckoutBackgroundImage({ url }: { url: string }) {
+export function CheckoutBackgroundImage({
+  url,
+  position = "fixed",
+}: {
+  url: string
+  position?: "absolute" | "fixed"
+}) {
   return (
-    <div aria-hidden className="fixed inset-0 -z-10">
+    <div
+      aria-hidden
+      className={cn(
+        position === "absolute" ? "absolute" : "fixed",
+        "pointer-events-none inset-0 -z-10",
+      )}
+    >
       <Image
         src={url}
         alt=""

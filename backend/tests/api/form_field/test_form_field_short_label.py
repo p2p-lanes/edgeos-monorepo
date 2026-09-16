@@ -15,11 +15,13 @@ def _create_field(
     client: TestClient,
     token: str,
     popup_id: str,
+    flow_id: str,
     *,
     short_label: str | None = None,
 ) -> dict:
     payload: dict = {
         "popup_id": popup_id,
+        "sales_flow_id": flow_id,
         "label": f"Long question label {uuid.uuid4().hex[:6]}",
         "field_type": "text",
     }
@@ -54,11 +56,13 @@ class TestShortLabel:
         client: TestClient,
         admin_token_tenant_a: str,
         popup_tenant_a: Popups,
+        default_flow_tenant_a,
     ) -> None:
         data = _create_field(
             client,
             admin_token_tenant_a,
             str(popup_tenant_a.id),
+            str(default_flow_tenant_a.id),
             short_label="Builder",
         )
         assert data["short_label"] == "Builder"
@@ -73,8 +77,14 @@ class TestShortLabel:
         client: TestClient,
         admin_token_tenant_a: str,
         popup_tenant_a: Popups,
+        default_flow_tenant_a,
     ) -> None:
-        data = _create_field(client, admin_token_tenant_a, str(popup_tenant_a.id))
+        data = _create_field(
+            client,
+            admin_token_tenant_a,
+            str(popup_tenant_a.id),
+            str(default_flow_tenant_a.id),
+        )
         assert data["short_label"] is None
 
         resp = client.patch(
@@ -90,11 +100,13 @@ class TestShortLabel:
         client: TestClient,
         admin_token_tenant_a: str,
         popup_tenant_a: Popups,
+        default_flow_tenant_a,
     ) -> None:
         data = _create_field(
             client,
             admin_token_tenant_a,
             str(popup_tenant_a.id),
+            str(default_flow_tenant_a.id),
             short_label="Column",
         )
 
@@ -111,11 +123,13 @@ class TestShortLabel:
         client: TestClient,
         admin_token_tenant_a: str,
         popup_tenant_a: Popups,
+        default_flow_tenant_a,
     ) -> None:
         data = _create_field(
             client,
             admin_token_tenant_a,
             str(popup_tenant_a.id),
+            str(default_flow_tenant_a.id),
             short_label="Column",
         )
 
@@ -132,8 +146,14 @@ class TestShortLabel:
         client: TestClient,
         admin_token_tenant_a: str,
         popup_tenant_a: Popups,
+        default_flow_tenant_a,
     ) -> None:
-        data = _create_field(client, admin_token_tenant_a, str(popup_tenant_a.id))
+        data = _create_field(
+            client,
+            admin_token_tenant_a,
+            str(popup_tenant_a.id),
+            str(default_flow_tenant_a.id),
+        )
 
         entry = _get_schema_entry(
             client, admin_token_tenant_a, str(popup_tenant_a.id), data["name"]

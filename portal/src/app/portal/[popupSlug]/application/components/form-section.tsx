@@ -46,7 +46,6 @@ export function FormSection({
                       value={values[name]}
                       error={errors[name]}
                       onChange={onChange}
-                      hideLabelAndSubtitle={name === "info_not_shared"}
                     />
                   </div>
                 </div>
@@ -63,7 +62,6 @@ export function FormSection({
                   value={values[name]}
                   error={errors[name]}
                   onChange={onChange}
-                  hideLabelAndSubtitle={name === "info_not_shared"}
                 />
               </div>
             )

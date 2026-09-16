@@ -18,6 +18,7 @@ from sqlmodel import Session
 from app.api.human.models import Humans
 from app.api.popup.models import Popups
 from app.api.tenant.models import Tenants
+from tests._flow_helpers import application_flow_id
 
 CREATE_URL = "/api/v1/api-keys"
 
@@ -52,6 +53,7 @@ def _member_popup(db: Session, *, tenant: Tenants, human: Humans) -> Popups:
     db.refresh(popup)
     db.add(
         Applications(
+            sales_flow_id=application_flow_id(db, popup.id),
             tenant_id=tenant.id,
             popup_id=popup.id,
             human_id=human.id,

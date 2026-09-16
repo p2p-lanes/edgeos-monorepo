@@ -14,6 +14,7 @@ from app.api.popup.crud import popups_crud
 from app.api.popup.models import Popups
 from app.api.popup.schemas import PopupStatus
 from app.api.tenant.models import Tenants
+from tests._flow_helpers import application_flow_id
 
 
 def _make_ended_popup(db: Session, tenant: Tenants) -> Popups:
@@ -45,6 +46,7 @@ def _make_human(db: Session, tenant: Tenants) -> Humans:
 def _accept_application(db: Session, human: Humans, popup: Popups) -> None:
     db.add(
         Applications(
+            sales_flow_id=application_flow_id(db, popup.id),
             tenant_id=popup.tenant_id,
             human_id=human.id,
             popup_id=popup.id,

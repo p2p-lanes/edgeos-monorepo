@@ -12,7 +12,7 @@ import {
 } from "lucide-react"
 import { Suspense, useState } from "react"
 
-import { type PopupAdmin, PopupsService, type SaleType } from "@/client"
+import { type PopupAdmin, PopupsService } from "@/client"
 import { DataTable, SortableHeader } from "@/components/Common/DataTable"
 import { EmptyState } from "@/components/Common/EmptyState"
 import { QueryErrorBoundary } from "@/components/Common/QueryErrorBoundary"
@@ -34,7 +34,7 @@ import {
   validateTableSearch,
 } from "@/hooks/useTableSearchParams"
 import {
-  getPopupCheckoutUrl,
+  getFlowCheckoutUrl,
   getPopupPortalUrl,
   getPortalBaseUrl,
 } from "@/lib/portal-urls"
@@ -102,7 +102,7 @@ function PopupActionsMenu({ popup }: { popup: PopupAdmin }) {
         </DropdownMenuItem>
         <DropdownMenuItem asChild>
           <a
-            href={getPopupCheckoutUrl(baseUrl, popup.slug)}
+            href={getFlowCheckoutUrl(baseUrl, popup.slug, "checkout")}
             target="_blank"
             rel="noopener noreferrer"
           >
@@ -124,19 +124,30 @@ function formatDate(dateStr: string | null | undefined): string {
   }
 }
 
-function SaleTypeBadge({ saleType }: { saleType: SaleType | undefined }) {
-  if (saleType === "direct") {
-    return (
-      <Badge
-        variant="outline"
-        className="border-warning/25 bg-warning-soft text-warning"
-      >
-        Direct
-      </Badge>
-    )
+function WaysInBadges({ popup }: { popup: PopupAdmin }) {
+  // Two badges rather than one, because an event can do both: review
+  // applicants through one door and sell through another. A single label had
+  // to pick one and was wrong for anything mixed.
+  const takesApplications = popup.takes_applications !== false
+  const sellsDirectly = popup.sells_directly === true
+
+  if (!takesApplications && !sellsDirectly) {
+    return <span className="text-muted-foreground">—</span>
   }
-  // Default: "application" or undefined (pre-existing popups default to application)
-  return <Badge variant="secondary">Application</Badge>
+
+  return (
+    <div className="flex flex-wrap gap-1">
+      {takesApplications && <Badge variant="secondary">Applications</Badge>}
+      {sellsDirectly && (
+        <Badge
+          variant="outline"
+          className="border-warning/25 bg-warning-soft text-warning"
+        >
+          Sells
+        </Badge>
+      )}
+    </div>
+  )
 }
 
 const columns: ColumnDef<PopupAdmin>[] = [
@@ -146,9 +157,9 @@ const columns: ColumnDef<PopupAdmin>[] = [
     cell: ({ row }) => <span className="font-medium">{row.original.name}</span>,
   },
   {
-    accessorKey: "sale_type",
-    header: () => <span>Sale Type</span>,
-    cell: ({ row }) => <SaleTypeBadge saleType={row.original.sale_type} />,
+    accessorKey: "takes_applications",
+    header: () => <span>Ways in</span>,
+    cell: ({ row }) => <WaysInBadges popup={row.original} />,
   },
   {
     accessorKey: "status",
@@ -210,7 +221,7 @@ function PopupsTableContent() {
       columns={columns}
       data={popups.results}
       searchPlaceholder="Search by name..."
-      hiddenOnMobile={["sale_type", "start_date", "end_date"]}
+      hiddenOnMobile={["takes_applications", "start_date", "end_date"]}
       searchValue={search}
       onSearchChange={setSearch}
       onRowClick={(popup) =>

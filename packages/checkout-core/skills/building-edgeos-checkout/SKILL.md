@@ -46,6 +46,7 @@ To integrate you need just **two** things:
 |---|---|---|---|
 | Publishable key | `pk_live_xxxxxxxx` | sent as the `X-EdgeOS-Publishable-Key` header | You generate it in the EdgeOS backoffice → your Organization → *Checkout SDK Keys* |
 | Popup slug | `amanita` | identifies your popup/event | Visible in the backoffice |
+| Sales flow slug | `checkout` | identifies the checkout flow | Visible in the backoffice |
 
 You do **not** need an API URL: the SDK targets the EdgeOS production API by
 default (`DEFAULT_BASE_URL`). There is an optional `baseUrl`, but you only set it
@@ -66,7 +67,7 @@ framework: **`example-vanilla.ts`**.
 ```ts
 import { createCheckoutClient, createCheckoutStore } from "@edgeos/checkout-core"
 
-const client = createCheckoutClient({ slug: "amanita", publishableKey: "pk_live_xxxxxxxx" })
+const client = createCheckoutClient({ slug: "amanita", flowSlug: "checkout", publishableKey: "pk_live_xxxxxxxx" })
 const store = createCheckoutStore({ client })
 
 // 1. Subscribe — your render function runs on every state change.
@@ -97,7 +98,7 @@ import { CheckoutProvider, useCheckout, useCart, usePreview } from "@edgeos/chec
 
 export function App() {
   return (
-    <CheckoutProvider slug="amanita" publishableKey="pk_live_xxxxxxxx">
+    <CheckoutProvider slug="amanita" flowSlug="checkout" publishableKey="pk_live_xxxxxxxx">
       <YourCheckout />
     </CheckoutProvider>
   )
@@ -113,7 +114,7 @@ function YourCheckout() {
 ```
 
 `<CheckoutProvider>` builds the store once and, by default (`autoLoad`), calls
-`GET /checkout/{slug}/runtime` on mount. The hooks are thin live subscriptions
+`GET /checkout/{slug}/{flowSlug}/runtime` on mount. The hooks are thin live subscriptions
 over that store — components re-render on relevant state changes.
 
 ### Pointing at a different environment
@@ -124,9 +125,9 @@ domain. It must be the API root **including `/api/v1`** and **excluding the slug
 
 ```ts
 // core:
-createCheckoutClient({ slug: "amanita", publishableKey: "pk_live_xxx", baseUrl: "http://localhost:8000/api/v1" })
+createCheckoutClient({ slug: "amanita", flowSlug: "checkout", publishableKey: "pk_live_xxx", baseUrl: "http://localhost:8000/api/v1" })
 // react:
-// <CheckoutProvider slug="amanita" publishableKey="pk_live_xxx" baseUrl="http://localhost:8000/api/v1">
+// <CheckoutProvider slug="amanita" flowSlug="checkout" publishableKey="pk_live_xxx" baseUrl="http://localhost:8000/api/v1">
 ```
 
 ## The store surface (both paths)

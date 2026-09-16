@@ -31,10 +31,16 @@ export default async function PopupRoutePage({ params }: PopupRoutePageProps) {
     notFound()
   }
 
-  const popup = (await response.json()) as { sale_type?: string; slug: string }
+  const popup = (await response.json()) as {
+    takes_applications?: boolean
+    slug: string
+  }
 
-  if (popup.sale_type === "direct") {
-    redirect(`/checkout/${popup.slug}`)
+  // Only a gathering nobody applies to lands straight on the checkout. One
+  // that takes applications belongs in the portal even when some of its doors
+  // also sell, which is why this cannot read `sale_type` any more.
+  if (popup.takes_applications === false) {
+    redirect(`/checkout/${popup.slug}/checkout`)
   }
 
   redirect(`/portal/${popup.slug}`)

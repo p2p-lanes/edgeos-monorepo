@@ -5,13 +5,448 @@
  */
 export type AbandonedCartPublic = {
     id: string;
-    items: CartState;
+    items: CartState_Output;
     created_at?: (string | null);
     updated_at?: (string | null);
     email?: (string | null);
     human?: (CartHumanInfo | null);
     popup: CartPopupInfo;
     payments?: Array<CartPaymentInfo>;
+};
+
+/**
+ * Per-accommodation answer to "can I book these dates, and for how much".
+ *
+ * ``available`` is a count, not a boolean: the checkout shows "3 left".
+ * ``unavailable_reason`` explains a zero so the UI can say *why* (too short
+ * a stay, outside the bookable window, sold out).
+ */
+export type AccommodationAvailability = {
+    accommodation_id: string;
+    available: number;
+    quote?: (AccommodationQuote | null);
+    unavailable_reason?: (string | null);
+};
+
+export type AccommodationAvailabilityRequest = {
+    check_in: string;
+    check_out: string;
+    guest_count?: (number | null);
+};
+
+/**
+ * Take a whole room type off the market for a range.
+ *
+ * One booking per unit, so the calendar shows the block on every row and
+ * the exclusion constraint keeps guests out.
+ */
+export type AccommodationBlockRange = {
+    popup_id: string;
+    accommodation_id: string;
+    check_in: string;
+    check_out: string;
+    kind?: BookingKind;
+    notes?: (string | null);
+};
+
+/**
+ * Staff-created booking (comp, block, maintenance).
+ *
+ * ``unit_id`` is optional: without it the backend picks a free unit of the
+ * accommodation with the same best-fit logic the checkout uses.
+ */
+export type AccommodationBookingCreate = {
+    popup_id: string;
+    accommodation_id: string;
+    unit_id?: (string | null);
+    kind?: BookingKind;
+    check_in: string;
+    check_out: string;
+    guest_count?: (number | null);
+    guests?: Array<BookingGuest>;
+    booker_answers?: {
+        [key: string]: unknown;
+    };
+    primary_guest_name?: (string | null);
+    primary_guest_email?: (string | null);
+    notes?: (string | null);
+    ignore_restrictions?: boolean;
+};
+
+/**
+ * One booking with everything its own page needs, in one request.
+ *
+ * The context is denormalised on purpose. A detail screen that had to fetch
+ * the room to learn its name, the property to learn its address and the
+ * room again to list its other units would render in four steps and show
+ * three of them half-built.
+ *
+ * ``units`` carries every unit of the same room type, the booking's own
+ * included, because the only thing an operator does to a booking from here
+ * besides releasing it is move it to a different bed.
+ */
+export type AccommodationBookingDetail = {
+    tenant_id: string;
+    popup_id: string;
+    accommodation_id: string;
+    unit_id: string;
+    kind?: BookingKind;
+    status?: BookingStatus;
+    check_in: string;
+    check_out: string;
+    guest_count?: (number | null);
+    guests?: Array<{
+        [key: string]: unknown;
+    }>;
+    booker_answers?: {
+        [key: string]: unknown;
+    };
+    form_snapshot?: ({
+    [key: string]: unknown;
+} | null);
+    primary_guest_name?: (string | null);
+    primary_guest_email?: (string | null);
+    attendee_id?: (string | null);
+    human_id?: (string | null);
+    payment_id?: (string | null);
+    payment_product_id?: (string | null);
+    price_snapshot?: ({
+    [key: string]: unknown;
+} | null);
+    hold_expires_at?: (string | null);
+    notes?: (string | null);
+    created_by_user_id?: (string | null);
+    created_at?: string;
+    updated_at?: string;
+    id: string;
+    nights?: number;
+    property_id: string;
+    property_name: string;
+    property_address?: (string | null);
+    accommodation_name: string;
+    unit_label?: (string | null);
+    units?: Array<BookingUnitOption>;
+};
+
+export type AccommodationBookingPublic = {
+    tenant_id: string;
+    popup_id: string;
+    accommodation_id: string;
+    unit_id: string;
+    kind?: BookingKind;
+    status?: BookingStatus;
+    check_in: string;
+    check_out: string;
+    guest_count?: (number | null);
+    guests?: Array<{
+        [key: string]: unknown;
+    }>;
+    booker_answers?: {
+        [key: string]: unknown;
+    };
+    form_snapshot?: ({
+    [key: string]: unknown;
+} | null);
+    primary_guest_name?: (string | null);
+    primary_guest_email?: (string | null);
+    attendee_id?: (string | null);
+    human_id?: (string | null);
+    payment_id?: (string | null);
+    payment_product_id?: (string | null);
+    price_snapshot?: ({
+    [key: string]: unknown;
+} | null);
+    hold_expires_at?: (string | null);
+    notes?: (string | null);
+    created_by_user_id?: (string | null);
+    created_at?: string;
+    updated_at?: string;
+    id: string;
+    nights?: number;
+};
+
+export type AccommodationBookingUpdate = {
+    unit_id?: (string | null);
+    status?: (BookingStatus | null);
+    guest_count?: (number | null);
+    guests?: (Array<BookingGuest> | null);
+    booker_answers?: ({
+    [key: string]: unknown;
+} | null);
+    primary_guest_name?: (string | null);
+    primary_guest_email?: (string | null);
+    notes?: (string | null);
+};
+
+/**
+ * Selects room types by attribute instead of by id.
+ *
+ * Exists so an operator (or an agent over MCP) can say "every room in this
+ * property" without first listing them.
+ */
+export type AccommodationBulkFilter = {
+    popup_id: string;
+    property_id?: (string | null);
+    kind?: (AccommodationKind | null);
+    is_active?: (boolean | null);
+};
+
+/**
+ * Re-price many room types at once.
+ *
+ * Without a date range this moves ``default_nightly_price``; with one it
+ * creates (or replaces) a date-range rule per room type, which is how a
+ * "high season +20%" is expressed.
+ */
+export type AccommodationBulkPrice = {
+    ids?: (Array<(string)> | null);
+    filter?: (AccommodationBulkFilter | null);
+    mode?: BulkPriceMode;
+    value: (number | string);
+    start_date?: (string | null);
+    end_date?: (string | null);
+    label?: (string | null);
+    priority?: number;
+};
+
+/**
+ * Apply one patch to many room types.
+ *
+ * Named ``...Request`` rather than ``...Update`` on purpose: this is the
+ * envelope of a bulk endpoint, not a PATCH body. The PATCH body it carries
+ * is ``patch``, and that one is a real ``*Update`` schema.
+ */
+export type AccommodationBulkUpdateRequest = {
+    ids?: (Array<(string)> | null);
+    filter?: (AccommodationBulkFilter | null);
+    patch: AccommodationUpdate;
+};
+
+export type AccommodationCalendar = {
+    date_from: string;
+    date_to: string;
+    properties?: Array<CalendarProperty>;
+};
+
+export type AccommodationCreate = {
+    popup_id: string;
+    property_id: string;
+    name: string;
+    kind?: AccommodationKind;
+    description?: (string | null);
+    guest_capacity?: number;
+    beds?: Array<BedSpec>;
+    default_nightly_price: (number | string);
+    long_stay_price?: (number | string | null);
+    min_stay_override?: (number | null);
+    bookable_from: string;
+    bookable_to: string;
+    visible_in_checkout?: boolean;
+    is_active?: boolean;
+    sort_order?: number;
+    units_count?: (number | null);
+    unit_label_prefix?: (string | null);
+    image_ids?: (Array<(string)> | null);
+};
+
+/**
+ * Copy a room type, optionally with its units and price rules.
+ */
+export type AccommodationDuplicate = {
+    name?: (string | null);
+    copy_units?: boolean;
+    units_count?: (number | null);
+    copy_price_rules?: boolean;
+    copy_images?: boolean;
+};
+
+export type AccommodationImageCreate = {
+    popup_id: string;
+    url: string;
+    filename?: (string | null);
+    width?: (number | null);
+    height?: (number | null);
+};
+
+export type AccommodationImagePublic = {
+    id: string;
+    url: string;
+    filename?: (string | null);
+    width?: (number | null);
+    height?: (number | null);
+};
+
+/**
+ * Physical shape of an accommodation type. Presentational only.
+ */
+export type AccommodationKind = 'room' | 'apartment' | 'studio' | 'tent' | 'cabin' | 'other';
+
+/**
+ * Everything the accommodation step needs to render before dates exist.
+ */
+export type AccommodationOffer = {
+    properties?: Array<PublicAccommodationProperty>;
+    accommodations?: Array<PublicAccommodation>;
+    currency?: (string | null);
+};
+
+export type AccommodationPriceRuleCreate = {
+    label?: (string | null);
+    start_date: string;
+    end_date: string;
+    nightly_price: (number | string);
+    priority?: number;
+};
+
+export type AccommodationPriceRulePublic = {
+    tenant_id: string;
+    popup_id: string;
+    accommodation_id: string;
+    label?: (string | null);
+    start_date: string;
+    end_date: string;
+    nightly_price: string;
+    priority?: number;
+    created_at?: string;
+    updated_at?: string;
+    id: string;
+};
+
+export type AccommodationPriceRuleUpdate = {
+    label?: (string | null);
+    start_date?: (string | null);
+    end_date?: (string | null);
+    nightly_price?: (number | string | null);
+    priority?: (number | null);
+};
+
+export type AccommodationPropertyCreate = {
+    popup_id: string;
+    name: string;
+    address?: (string | null);
+    description?: (string | null);
+    contact_email?: (string | null);
+    contact_name?: (string | null);
+    tax_percentage?: (number | string | null);
+    is_active?: boolean;
+    sort_order?: number;
+};
+
+export type AccommodationPropertyPublic = {
+    tenant_id: string;
+    popup_id: string;
+    name: string;
+    address?: (string | null);
+    description?: (string | null);
+    contact_email?: (string | null);
+    contact_name?: (string | null);
+    tax_percentage?: (string | null);
+    is_active?: boolean;
+    sort_order?: number;
+    created_at?: string;
+    updated_at?: string;
+    id: string;
+};
+
+export type AccommodationPropertyUpdate = {
+    name?: (string | null);
+    address?: (string | null);
+    description?: (string | null);
+    contact_email?: (string | null);
+    contact_name?: (string | null);
+    tax_percentage?: (number | string | null);
+    is_active?: (boolean | null);
+    sort_order?: (number | null);
+};
+
+export type AccommodationPublic = {
+    tenant_id: string;
+    popup_id: string;
+    property_id: string;
+    product_id?: (string | null);
+    name: string;
+    kind?: AccommodationKind;
+    description?: (string | null);
+    guest_capacity?: number;
+    beds?: Array<{
+        [key: string]: unknown;
+    }>;
+    default_nightly_price: string;
+    long_stay_price?: (string | null);
+    min_stay_override?: (number | null);
+    bookable_from: string;
+    bookable_to: string;
+    visible_in_checkout?: boolean;
+    is_active?: boolean;
+    sort_order?: number;
+    deleted_at?: (string | null);
+    created_at?: string;
+    updated_at?: string;
+    id: string;
+    units?: Array<AccommodationUnitPublic>;
+    images?: Array<AccommodationImagePublic>;
+};
+
+/**
+ * Server-computed price of a stay. The client never sends prices.
+ *
+ * Stored verbatim in ``accommodation_bookings.price_snapshot`` and in the
+ * payment line's ``purchase_metadata.quote`` so a booking can always be
+ * explained after the fact, even if the rules change afterwards.
+ */
+export type AccommodationQuote = {
+    nights: Array<QuoteNight>;
+    night_count: number;
+    subtotal: string;
+    tax_percentage?: (string | null);
+    tax?: string;
+    total: string;
+    applied_rule: string;
+    currency?: (string | null);
+};
+
+/**
+ * Either explicit labels, or ``prefix`` + ``count`` -> "Room 1..N".
+ */
+export type AccommodationUnitBulkCreate = {
+    labels?: (Array<(string)> | null);
+    prefix?: (string | null);
+    count?: (number | null);
+    start_at?: number;
+};
+
+export type AccommodationUnitPublic = {
+    id: string;
+    accommodation_id: string;
+    label: string;
+    notes?: (string | null);
+    is_active: boolean;
+    sort_order: number;
+};
+
+export type AccommodationUnitUpdate = {
+    label?: (string | null);
+    notes?: (string | null);
+    is_active?: (boolean | null);
+    sort_order?: (number | null);
+};
+
+export type AccommodationUpdate = {
+    property_id?: (string | null);
+    name?: (string | null);
+    kind?: (AccommodationKind | null);
+    description?: (string | null);
+    guest_capacity?: (number | null);
+    beds?: (Array<BedSpec> | null);
+    default_nightly_price?: (number | string | null);
+    long_stay_price?: (number | string | null);
+    min_stay_override?: (number | null);
+    bookable_from?: (string | null);
+    bookable_to?: (string | null);
+    visible_in_checkout?: (boolean | null);
+    is_active?: (boolean | null);
+    sort_order?: (number | null);
+    image_ids?: (Array<(string)> | null);
 };
 
 /**
@@ -41,7 +476,7 @@ export type status = 'added' | 'invited';
  */
 export type AdminApiKeyCreate = {
     name: string;
-    scopes: Array<('events:read' | 'events:write' | 'rsvp:write' | 'venues:read' | 'venues:write' | 'applications:read' | 'applications:write' | 'attendees:read' | 'attendees:write' | 'humans:read' | 'humans:write' | 'groups:read' | 'groups:write' | 'products:read' | 'products:write' | 'coupons:read' | 'coupons:write' | 'forms:read' | 'forms:write' | 'payments:read' | 'tracks:read' | 'tracks:write' | 'ticketing_steps:read' | 'ticketing_steps:write' | 'translations:read' | 'translations:write')>;
+    scopes: Array<('events:read' | 'events:write' | 'rsvp:write' | 'venues:read' | 'venues:write' | 'applications:read' | 'applications:write' | 'attendees:read' | 'attendees:write' | 'humans:read' | 'humans:write' | 'groups:read' | 'groups:write' | 'products:read' | 'products:write' | 'accommodations:read' | 'accommodations:write' | 'coupons:read' | 'coupons:write' | 'forms:read' | 'forms:write' | 'payments:read' | 'tracks:read' | 'tracks:write' | 'ticketing_steps:read' | 'ticketing_steps:write' | 'translations:read' | 'translations:write')>;
     expires_at?: (string | null);
 };
 
@@ -54,7 +489,7 @@ export type AdminApiKeyCreated = {
     id: string;
     name: string;
     prefix: string;
-    scopes: Array<('events:read' | 'events:write' | 'rsvp:write' | 'venues:read' | 'venues:write' | 'applications:read' | 'applications:write' | 'attendees:read' | 'attendees:write' | 'humans:read' | 'humans:write' | 'groups:read' | 'groups:write' | 'products:read' | 'products:write' | 'coupons:read' | 'coupons:write' | 'forms:read' | 'forms:write' | 'payments:read' | 'tracks:read' | 'tracks:write' | 'ticketing_steps:read' | 'ticketing_steps:write' | 'translations:read' | 'translations:write')>;
+    scopes: Array<('events:read' | 'events:write' | 'rsvp:write' | 'venues:read' | 'venues:write' | 'applications:read' | 'applications:write' | 'attendees:read' | 'attendees:write' | 'humans:read' | 'humans:write' | 'groups:read' | 'groups:write' | 'products:read' | 'products:write' | 'accommodations:read' | 'accommodations:write' | 'coupons:read' | 'coupons:write' | 'forms:read' | 'forms:write' | 'payments:read' | 'tracks:read' | 'tracks:write' | 'ticketing_steps:read' | 'ticketing_steps:write' | 'translations:read' | 'translations:write')>;
     created_at: string;
     last_used_at?: (string | null);
     expires_at?: (string | null);
@@ -69,7 +504,7 @@ export type AdminApiKeyPublic = {
     id: string;
     name: string;
     prefix: string;
-    scopes: Array<('events:read' | 'events:write' | 'rsvp:write' | 'venues:read' | 'venues:write' | 'applications:read' | 'applications:write' | 'attendees:read' | 'attendees:write' | 'humans:read' | 'humans:write' | 'groups:read' | 'groups:write' | 'products:read' | 'products:write' | 'coupons:read' | 'coupons:write' | 'forms:read' | 'forms:write' | 'payments:read' | 'tracks:read' | 'tracks:write' | 'ticketing_steps:read' | 'ticketing_steps:write' | 'translations:read' | 'translations:write')>;
+    scopes: Array<('events:read' | 'events:write' | 'rsvp:write' | 'venues:read' | 'venues:write' | 'applications:read' | 'applications:write' | 'attendees:read' | 'attendees:write' | 'humans:read' | 'humans:write' | 'groups:read' | 'groups:write' | 'products:read' | 'products:write' | 'accommodations:read' | 'accommodations:write' | 'coupons:read' | 'coupons:write' | 'forms:read' | 'forms:write' | 'payments:read' | 'tracks:read' | 'tracks:write' | 'ticketing_steps:read' | 'ticketing_steps:write' | 'translations:read' | 'translations:write')>;
     created_at: string;
     last_used_at?: (string | null);
     expires_at?: (string | null);
@@ -91,6 +526,52 @@ export type AdminGrantTicketsResponse = {
     granted: Array<GrantedPaymentInfo>;
 };
 
+export type AIConversationPublic = {
+    id: string;
+    title: string;
+    messages: Array<{
+        [key: string]: unknown;
+    }>;
+    schema_version: number;
+    revision: number;
+    created_at: string;
+    updated_at: string;
+    expires_at: string;
+    usage?: AIConversationUsageSummary;
+};
+
+export type AIConversationUpsert = {
+    messages: Array<{
+        [key: string]: unknown;
+    }>;
+};
+
+export type AIConversationUsageSummary = {
+    input_tokens?: number;
+    cached_input_tokens?: number;
+    output_tokens?: number;
+    reasoning_tokens?: number;
+    models?: Array<(string)>;
+    providers?: Array<(string)>;
+    response_count?: number;
+};
+
+export type AIExecutionClaimRequest = {
+    fingerprint: string;
+};
+
+export type AIExecutionClaimResponse = {
+    state: 'acquired' | 'pending' | 'completed';
+    result?: unknown;
+};
+
+export type state = 'acquired' | 'pending' | 'completed';
+
+export type AIExecutionCompleteRequest = {
+    fingerprint: string;
+    result: unknown;
+};
+
 export type AITranslateRequest = {
     entity_type: string;
     entity_id: string;
@@ -104,7 +585,7 @@ export type ApiKeyCreate = {
     name: string;
     popup_id: string;
     expires_at?: (string | null);
-    scopes?: Array<('events:read' | 'events:write' | 'rsvp:write' | 'venues:read' | 'venues:write' | 'applications:read' | 'applications:write' | 'attendees:read' | 'attendees:write' | 'humans:read' | 'humans:write' | 'groups:read' | 'groups:write' | 'products:read' | 'products:write' | 'coupons:read' | 'coupons:write' | 'forms:read' | 'forms:write' | 'payments:read' | 'tracks:read' | 'tracks:write' | 'ticketing_steps:read' | 'ticketing_steps:write' | 'translations:read' | 'translations:write')>;
+    scopes?: Array<('events:read' | 'events:write' | 'rsvp:write' | 'venues:read' | 'venues:write' | 'applications:read' | 'applications:write' | 'attendees:read' | 'attendees:write' | 'humans:read' | 'humans:write' | 'groups:read' | 'groups:write' | 'products:read' | 'products:write' | 'accommodations:read' | 'accommodations:write' | 'coupons:read' | 'coupons:write' | 'forms:read' | 'forms:write' | 'payments:read' | 'tracks:read' | 'tracks:write' | 'ticketing_steps:read' | 'ticketing_steps:write' | 'translations:read' | 'translations:write')>;
 };
 
 /**
@@ -116,7 +597,7 @@ export type ApiKeyCreated = {
     name: string;
     prefix: string;
     popup_id?: (string | null);
-    scopes: Array<('events:read' | 'events:write' | 'rsvp:write' | 'venues:read' | 'venues:write' | 'applications:read' | 'applications:write' | 'attendees:read' | 'attendees:write' | 'humans:read' | 'humans:write' | 'groups:read' | 'groups:write' | 'products:read' | 'products:write' | 'coupons:read' | 'coupons:write' | 'forms:read' | 'forms:write' | 'payments:read' | 'tracks:read' | 'tracks:write' | 'ticketing_steps:read' | 'ticketing_steps:write' | 'translations:read' | 'translations:write')>;
+    scopes: Array<('events:read' | 'events:write' | 'rsvp:write' | 'venues:read' | 'venues:write' | 'applications:read' | 'applications:write' | 'attendees:read' | 'attendees:write' | 'humans:read' | 'humans:write' | 'groups:read' | 'groups:write' | 'products:read' | 'products:write' | 'accommodations:read' | 'accommodations:write' | 'coupons:read' | 'coupons:write' | 'forms:read' | 'forms:write' | 'payments:read' | 'tracks:read' | 'tracks:write' | 'ticketing_steps:read' | 'ticketing_steps:write' | 'translations:read' | 'translations:write')>;
     created_at: string;
     last_used_at?: (string | null);
     expires_at?: (string | null);
@@ -132,7 +613,7 @@ export type ApiKeyPublic = {
     name: string;
     prefix: string;
     popup_id?: (string | null);
-    scopes: Array<('events:read' | 'events:write' | 'rsvp:write' | 'venues:read' | 'venues:write' | 'applications:read' | 'applications:write' | 'attendees:read' | 'attendees:write' | 'humans:read' | 'humans:write' | 'groups:read' | 'groups:write' | 'products:read' | 'products:write' | 'coupons:read' | 'coupons:write' | 'forms:read' | 'forms:write' | 'payments:read' | 'tracks:read' | 'tracks:write' | 'ticketing_steps:read' | 'ticketing_steps:write' | 'translations:read' | 'translations:write')>;
+    scopes: Array<('events:read' | 'events:write' | 'rsvp:write' | 'venues:read' | 'venues:write' | 'applications:read' | 'applications:write' | 'attendees:read' | 'attendees:write' | 'humans:read' | 'humans:write' | 'groups:read' | 'groups:write' | 'products:read' | 'products:write' | 'accommodations:read' | 'accommodations:write' | 'coupons:read' | 'coupons:write' | 'forms:read' | 'forms:write' | 'payments:read' | 'tracks:read' | 'tracks:write' | 'ticketing_steps:read' | 'ticketing_steps:write' | 'translations:read' | 'translations:write')>;
     created_at: string;
     last_used_at?: (string | null);
     expires_at?: (string | null);
@@ -182,6 +663,7 @@ export type ApplicationAdminCreate = {
 } | null);
     status?: ApplicationStatus;
     group_id?: (string | null);
+    sales_flow_id?: (string | null);
 };
 
 export type ApplicationCommentCreate = {
@@ -226,6 +708,7 @@ export type ApplicationCreate = {
     status?: (UserSettableStatus | null);
     human_id?: (string | null);
     group_id?: (string | null);
+    sales_flow_id?: (string | null);
     invite_id?: (string | null);
     referral_id?: (string | null);
     scholarship_request?: boolean;
@@ -279,6 +762,7 @@ export type ApplicationPublic = {
     popup_id: string;
     human_id: string;
     group_id?: (string | null);
+    sales_flow_id: string;
     referral?: (string | null);
     invite_id?: (string | null);
     referral_id?: (string | null);
@@ -441,6 +925,7 @@ export type ApprovalStrategyPublic = {
     id: string;
     popup_id: string;
     tenant_id: string;
+    sales_flow_id: (string | null);
     strategy_type: ApprovalStrategyType;
     required_approvals: number;
     accept_threshold: number;
@@ -499,7 +984,6 @@ export type AttendeeCategoryCreate = {
     popup_id: string;
     key: string;
     sort_order?: number;
-    enabled_in_passes_flow?: boolean;
     max_per_application?: (number | null);
     required_fields?: Array<{
         [key: string]: unknown;
@@ -516,10 +1000,10 @@ export type AttendeeCategoryPublic = {
     id: string;
     tenant_id: string;
     popup_id: string;
+    sales_flow_id: string;
     key: string;
     is_primary?: boolean;
     sort_order?: number;
-    enabled_in_passes_flow?: boolean;
     max_per_application?: (number | null);
     required_fields?: Array<{
         [key: string]: unknown;
@@ -529,6 +1013,7 @@ export type AttendeeCategoryPublic = {
     };
     created_at?: (string | null);
     updated_at?: (string | null);
+    deleted_at?: (string | null);
 };
 
 /**
@@ -539,7 +1024,6 @@ export type AttendeeCategoryPublic = {
  */
 export type AttendeeCategoryUpdate = {
     sort_order?: (number | null);
-    enabled_in_passes_flow?: (boolean | null);
     max_per_application?: (number | null);
     required_fields?: (Array<{
     [key: string]: unknown;
@@ -633,7 +1117,7 @@ export type AttendeeListItem = {
  */
 export type AttendeeProductPublic = {
     id: string;
-    attendee_id: string;
+    attendee_id: (string | null);
     product_id: string;
     check_in_code: string;
     payment_id?: (string | null);
@@ -645,6 +1129,9 @@ export type AttendeeProductPublic = {
     purchase_metadata?: ({
     [key: string]: unknown;
 } | null);
+    product_category_snapshot?: (string | null);
+    requires_check_in_snapshot?: (boolean | null);
+    revoked_at?: (string | null);
 };
 
 /**
@@ -908,6 +1395,7 @@ export type BaseFieldConfigPublic = {
     id: string;
     tenant_id: string;
     popup_id: string;
+    sales_flow_id: string;
     field_name: string;
     section_id?: (string | null);
     position?: number;
@@ -931,6 +1419,66 @@ export type BaseFieldConfigUpdate = {
 };
 
 /**
+ * One entry of ``accommodations.beds``: "2 single beds".
+ */
+export type BedSpec = {
+    type: BedType;
+    count: number;
+};
+
+/**
+ * Bed types listed in ``accommodations.beds``.
+ */
+export type BedType = 'king' | 'queen' | 'double' | 'single' | 'bunk' | 'sofa';
+
+export type BlockRangeResult = {
+    created: number;
+    skipped: number;
+    booking_ids: Array<(string)>;
+};
+
+/**
+ * One occupant.
+ *
+ * Names are collected in the checkout and exported to the property owner,
+ * who needs them for their own registry. ``answers`` holds whatever else the
+ * step's guest form asked, keyed by its field keys; it is empty when the
+ * step asks nothing, which is the default.
+ */
+export type BookingGuest = {
+    name: string;
+    answers?: {
+        [key: string]: unknown;
+    };
+};
+
+/**
+ * Why a unit is occupied.
+ *
+ * ``GUEST`` bookings come from the checkout (or are created manually by
+ * staff for comps); ``BLOCK`` / ``MAINTENANCE`` are internal and never
+ * carry a payment.
+ */
+export type BookingKind = 'guest' | 'block' | 'maintenance';
+
+/**
+ * Lifecycle of a booking.
+ *
+ * ``HOLD`` and ``CONFIRMED`` are the *blocking* states: they are the ones
+ * covered by the exclusion constraint, so only those two occupy a unit.
+ */
+export type BookingStatus = 'hold' | 'confirmed' | 'cancelled' | 'expired';
+
+/**
+ * A unit the booking could be moved to, or the one it is in.
+ */
+export type BookingUnitOption = {
+    id: string;
+    label: string;
+    is_active?: boolean;
+};
+
+/**
  * The 'report a bug' payload, open to every backoffice user.
  *
  * Produces a to-do task in the reporter's tenant scope. The reporter can
@@ -948,6 +1496,16 @@ export type BugReportCreate = {
     attachments?: Array<TaskAttachmentCreate>;
 };
 
+export type BulkPriceMode = 'set' | 'percent';
+
+/**
+ * How many rows a bulk call touched. Deliberately not the rows
+ * themselves: a bulk over a whole property would be a huge response.
+ */
+export type BulkResult = {
+    updated: number;
+};
+
 /**
  * Buyer identification and form data for open-ticketing purchase.
  */
@@ -956,6 +1514,120 @@ export type BuyerInfo = {
     first_name: string;
     last_name: string;
     form_data?: {
+        [key: string]: unknown;
+    };
+};
+
+export type CalendarAccommodation = {
+    id: string;
+    name: string;
+    kind: AccommodationKind;
+    guest_capacity: number;
+    units?: Array<CalendarUnit>;
+    availability_by_day?: {
+        [key: string]: (number);
+    };
+};
+
+/**
+ * One bar on the calendar.
+ */
+export type CalendarBooking = {
+    id: string;
+    unit_id: string;
+    accommodation_id: string;
+    kind: BookingKind;
+    status: BookingStatus;
+    check_in: string;
+    check_out: string;
+    nights: number;
+    guest_count?: (number | null);
+    primary_guest_name?: (string | null);
+    primary_guest_email?: (string | null);
+    payment_id?: (string | null);
+    total?: (string | null);
+    notes?: (string | null);
+};
+
+export type CalendarProperty = {
+    id: string;
+    name: string;
+    accommodations?: Array<CalendarAccommodation>;
+};
+
+/**
+ * One row of the calendar.
+ */
+export type CalendarUnit = {
+    id: string;
+    label: string;
+    is_active: boolean;
+    bookings?: Array<CalendarBooking>;
+};
+
+/**
+ * A room the buyer picked, as it survives a page reload.
+ *
+ * Keyed by ``accommodation_id`` rather than by the shadow ``product_id``:
+ * the product is an implementation detail of how the booking travels
+ * through payments, and resolving it at purchase time means a cart saved
+ * before a room was re-synced still points at the right room.
+ */
+export type CartAccommodationLine = {
+    assignment: (CartUnassigned | CartAttendeeAssignment | CartRecipientAssignment);
+    step_type?: (string | null);
+    kind: "accommodation";
+    accommodation_id: string;
+    check_in: string;
+    check_out: string;
+    guest_count?: (number | null);
+    guests?: Array<CartGuest>;
+    booker_answers?: {
+        [key: string]: unknown;
+    };
+};
+
+export type CartAttendeeAssignment = {
+    kind: "attendee";
+    attendee_id: string;
+};
+
+/**
+ * A product whose unit price is chosen during checkout.
+ */
+export type CartCustomAmountLine = {
+    assignment: (CartUnassigned | CartAttendeeAssignment | CartRecipientAssignment);
+    step_type?: (string | null);
+    kind: "custom_amount";
+    product_id: string;
+    amount: number;
+    is_custom_amount?: boolean;
+};
+
+/**
+ * A product selected for a date range, such as legacy housing.
+ */
+export type CartDateRangeLine = {
+    assignment: (CartUnassigned | CartAttendeeAssignment | CartRecipientAssignment);
+    step_type?: (string | null);
+    kind: "date_range";
+    product_id: string;
+    check_in: string;
+    check_out: string;
+    quantity?: number;
+};
+
+/**
+ * One occupant as the cart holds them.
+ *
+ * ``name`` may be empty: the checkout renders a slot per guest before any of
+ * them is filled in, and half a party typed in is exactly what a saved cart
+ * is for. ``answers`` holds whatever else the step's guest form asked, keyed
+ * by its field keys.
+ */
+export type CartGuest = {
+    name?: string;
+    answers?: {
         [key: string]: unknown;
     };
 };
@@ -971,15 +1643,6 @@ export type CartHumanInfo = {
 };
 
 /**
- * Housing selection in cart.
- */
-export type CartItemHousing = {
-    product_id: string;
-    check_in: string;
-    check_out: string;
-};
-
-/**
  * Meal-plan selection in cart (one row per attendee × weekly product).
  *
  * All metadata fields are nullable in cart because the buyer fills them
@@ -990,40 +1653,16 @@ export type CartItemHousing = {
  * `special_request` apply at the attendee level — the frontend / reducer
  * keeps them in sync across every meal_plans entry for that attendee.
  */
-export type CartItemMealPlan = {
-    attendee_id: string;
+export type CartMealPlanLine = {
+    assignment: (CartUnassigned | CartAttendeeAssignment | CartRecipientAssignment);
+    step_type?: (string | null);
+    kind: "meal_plan";
     product_id: string;
     daily_choices?: ({
     [key: string]: (string);
 } | null);
     dietary_restriction?: (string | null);
     special_request?: (string | null);
-};
-
-/**
- * Merch selection in cart.
- */
-export type CartItemMerch = {
-    product_id: string;
-    quantity?: number;
-};
-
-/**
- * Pass selection in cart.
- */
-export type CartItemPass = {
-    attendee_id: string;
-    product_id: string;
-    quantity?: number;
-};
-
-/**
- * Patron selection in cart.
- */
-export type CartItemPatron = {
-    product_id: string;
-    amount: number;
-    is_custom_amount?: boolean;
 };
 
 /**
@@ -1047,36 +1686,65 @@ export type CartPopupInfo = {
 };
 
 /**
+ * A fixed-price product selection, assigned or unassigned.
+ */
+export type CartProductLine = {
+    assignment: (CartUnassigned | CartAttendeeAssignment | CartRecipientAssignment);
+    step_type?: (string | null);
+    kind: "product";
+    product_id: string;
+    quantity?: number;
+    price?: (number | null);
+};
+
+/**
  * Cart schema for API responses.
  */
 export type CartPublic = {
     id: string;
     human_id: string;
     popup_id: string;
-    items: CartState;
+    items: CartState_Output;
     created_at?: (string | null);
     updated_at?: (string | null);
+};
+
+export type CartRecipientAssignment = {
+    kind: "recipient";
+    recipient_key: string;
 };
 
 /**
  * Full cart state stored as JSONB.
  */
-export type CartState = {
-    passes?: Array<CartItemPass>;
-    housing?: (CartItemHousing | null);
-    merch?: Array<CartItemMerch>;
-    patron?: (CartItemPatron | null);
-    meal_plans?: Array<CartItemMealPlan>;
+export type CartState_Input = {
+    lines?: Array<(CartProductLine | CartDateRangeLine | CartCustomAmountLine | CartMealPlanLine | CartAccommodationLine)>;
+    recipients?: Array<PaymentRecipientRequest>;
     promo_code?: (string | null);
     insurance?: boolean;
     current_step?: (string | null);
 };
 
 /**
+ * Full cart state stored as JSONB.
+ */
+export type CartState_Output = {
+    lines?: Array<(CartProductLine | CartDateRangeLine | CartCustomAmountLine | CartMealPlanLine | CartAccommodationLine)>;
+    recipients?: Array<PaymentRecipientRequest>;
+    promo_code?: (string | null);
+    insurance?: boolean;
+    current_step?: (string | null);
+};
+
+export type CartUnassigned = {
+    kind: "unassigned";
+};
+
+/**
  * Schema for updating cart items.
  */
 export type CartUpdate = {
-    items: CartState;
+    items: CartState_Input;
 };
 
 /**
@@ -1174,15 +1842,20 @@ export type CheckoutPreviewLine = {
     unit_price: string;
     line_total: string;
     discountable: boolean;
+    accommodation_quote?: ({
+    [key: string]: unknown;
+} | null);
 };
 
 /**
- * Request schema for POST /checkout/{slug}/preview.
+ * Request schema for POST /checkout/{slug}/{flow_slug}/preview.
  */
 export type CheckoutPreviewRequest = {
     products: Array<ProductLine>;
     coupon_code?: (string | null);
     insurance?: boolean;
+    buyer?: (BuyerInfo | null);
+    recipients?: Array<PaymentRecipientRequest>;
 };
 
 /**
@@ -1200,7 +1873,13 @@ export type CheckoutPreviewResponse = {
     contribution_amount?: string;
     total: string;
     currency: string;
+    selected_flow: SelectedSalesFlow;
+    kind: 'estimate' | 'definitive';
+    quote_token?: (string | null);
+    quote_expires_at?: (string | null);
 };
+
+export type kind2 = 'estimate' | 'definitive';
 
 /**
  * Short-lived token that unlocks the checkout runtime for a live preview.
@@ -1245,10 +1924,11 @@ export type CheckoutRuntimeProduct = {
 };
 
 /**
- * Full response for GET /checkout/{slug}/runtime.
+ * Full response for GET /checkout/{slug}/{flow_slug}/runtime.
  */
 export type CheckoutRuntimeResponse = {
     popup: PopupPublic;
+    selected_flow: SelectedSalesFlow;
     products: Array<CheckoutRuntimeProduct>;
     buyer_form: Array<CheckoutBuyerSection>;
     ticketing_steps: Array<TicketingStepPublic>;
@@ -1256,12 +1936,17 @@ export type CheckoutRuntimeResponse = {
     form_schema?: ({
     [key: string]: unknown;
 } | null);
+    empty_catalog_reason?: (string | null);
+    flow_type?: (string | null);
+    theme_config?: ({
+    [key: string]: unknown;
+} | null);
 };
 
 /**
  * Tiny, unauthenticated projection for social/OpenGraph share previews.
  *
- * Returned by the public ``/{slug}/share`` endpoint so social crawlers (which
+ * Returned by the public ``/{slug}/{flow_slug}/share`` endpoint so social crawlers (which
  * send no JWT) can render the popup name, tagline/location snippet and cover
  * image without loading the full checkout runtime payload.
  */
@@ -1284,10 +1969,37 @@ export type CompanionParticipation = {
 };
 
 /**
+ * sdd/sales-flows task 14.1: HTTP body for the copy-form-to-flow
+ * backoffice action. `source_flow_id` omitted copies the popup-shared
+ * tier; a specific flow id copies exactly that flow's own rows.
+ */
+export type CopyFormToFlowRequest = {
+    source_flow_id?: (string | null);
+};
+
+export type CopyFormToFlowResponse = {
+    sections: number;
+    base_fields: number;
+    fields: number;
+};
+
+/**
+ * Which flow to copy the checkout steps from.
+ */
+export type CopyStepsToFlowRequest = {
+    source_flow_id: string;
+};
+
+export type CopyStepsToFlowResponse = {
+    steps: number;
+};
+
+/**
  * Coupon schema for creation.
  */
 export type CouponCreate = {
     popup_id: string;
+    sales_flow_id?: (string | null);
     code: string;
     discount_value: number;
     max_uses?: (number | null);
@@ -1302,6 +2014,7 @@ export type CouponCreate = {
 export type CouponPublic = {
     tenant_id: string;
     popup_id: string;
+    sales_flow_id: string;
     code: string;
     discount_value?: number;
     max_uses?: (number | null);
@@ -1329,6 +2042,7 @@ export type CouponUpdate = {
  */
 export type CouponValidate = {
     popup_id: string;
+    sales_flow_id?: (string | null);
     code: string;
 };
 
@@ -1338,6 +2052,7 @@ export type CouponValidate = {
 export type CouponValidatePublicRequest = {
     popup_slug: string;
     code: string;
+    flow_slug?: (string | null);
 };
 
 /**
@@ -1364,6 +2079,15 @@ export type CredentialType = 'crud' | 'readonly';
 export type CumulativeTrends = {
     tickets?: Array<TimelinePoint>;
     revenue?: Array<RevenueTimelinePoint>;
+};
+
+export type CustomExportSpec = {
+    dataset: string;
+    popup_id?: (string | null);
+    columns: Array<ExportColumn>;
+    filters?: Array<ExportFilter>;
+    format?: ExportFormat;
+    filename?: (string | null);
 };
 
 /**
@@ -1446,6 +2170,7 @@ export type EmailLogPublic = {
 
 export type EmailTemplateCreate = {
     popup_id?: (string | null);
+    sales_flow_id?: (string | null);
     template_type: string;
     subject?: (string | null);
     html_content: string;
@@ -1456,6 +2181,7 @@ export type EmailTemplatePublic = {
     id: string;
     tenant_id: string;
     popup_id: (string | null);
+    sales_flow_id?: (string | null);
     template_type: string;
     scope: TemplateScope;
     subject?: (string | null);
@@ -1678,6 +2404,7 @@ export type EventParticipantPublic = {
     created_at?: string;
     updated_at?: string;
     id: string;
+    popup_id?: (string | null);
     first_name?: (string | null);
     last_name?: (string | null);
 };
@@ -1983,8 +2710,120 @@ export type EventVenueUpdate = {
 
 export type EventVisibility = 'public' | 'private' | 'unlisted';
 
+export type ExportCatalogPublic = {
+    datasets: Array<ExportDatasetPublic>;
+    formats: Array<ExportFormat>;
+    limits: {
+        [key: string]: (number);
+    };
+};
+
+export type ExportColumn = {
+    field: string;
+    label?: (string | null);
+};
+
+export type ExportDatasetPublic = {
+    dataset: string;
+    label: string;
+    description: string;
+    scope: 'organization' | 'gathering';
+    row_label: string;
+    fields: Array<ExportFieldPublic>;
+};
+
+export type scope = 'organization' | 'gathering';
+
+export type ExportDownloadRequest = {
+    spec: CustomExportSpec;
+    fingerprint: string;
+};
+
+export type ExportFieldPublic = {
+    field: string;
+    label: string;
+    type: string;
+    sensitivity: string;
+    filter_operators: Array<(string)>;
+};
+
+export type ExportFilter = {
+    field: string;
+    operator: 'eq' | 'neq' | 'contains' | 'not_contains' | 'in' | 'is_empty' | 'not_empty' | 'gt' | 'gte' | 'lt' | 'lte' | 'before' | 'after';
+    value?: unknown;
+};
+
+export type operator = 'eq' | 'neq' | 'contains' | 'not_contains' | 'in' | 'is_empty' | 'not_empty' | 'gt' | 'gte' | 'lt' | 'lte' | 'before' | 'after';
+
+export type ExportFormat = 'csv' | 'xlsx';
+
+export type ExportPreview = {
+    title: string;
+    dataset: string;
+    dataset_label: string;
+    scope: 'organization' | 'gathering';
+    row_label: string;
+    estimated_rows: number;
+    columns: Array<ExportPreviewColumn>;
+    filters: Array<ExportFilter>;
+    warnings: Array<(string)>;
+    format: ExportFormat;
+    filename: string;
+    spec: CustomExportSpec;
+    fingerprint: string;
+    generated_at: string;
+};
+
+export type ExportPreviewColumn = {
+    field: string;
+    label: string;
+    type: string;
+    sensitivity: string;
+};
+
+/**
+ * Which settings each kind of flow can use.
+ *
+ * What a kind of flow decides is not a set of preset values — it is which
+ * questions are worth asking at all. A flow nobody applies to has no
+ * application fee to charge and no half-finished draft to chase; one that
+ * never sells anonymously has nowhere to redirect a buyer and nothing to
+ * sign on the way.
+ *
+ * Served rather than duplicated in the backoffice. That knowledge already
+ * decides what gets seeded (`fields_for`) and what a copy carries across, so
+ * a second copy deciding what gets rendered would eventually disagree with
+ * it — and the screen would offer a setting the server would never keep.
+ */
+export type FlowSettingsByType = {
+    settings: {
+        [key: string]: Array<(string)>;
+    };
+};
+
+/**
+ * What a way in would begin with, before anyone commits to opening it.
+ *
+ * Computed by the same code that seeds the flow, so a screen cannot promise
+ * something creation will not deliver. Deriving this in the frontend would
+ * mean a second opinion about which settings a kind of door can read, and
+ * the two would eventually disagree — at which point the preview becomes the
+ * most confident wrong thing on screen.
+ */
+export type FlowStartPreview = {
+    flow_type: SalesFlowType;
+    source_kind: string;
+    source_name?: (string | null);
+    starts_with: {
+        [key: string]: unknown;
+    };
+    left_empty: Array<(string)>;
+    not_carried_over: Array<(string)>;
+};
+
 export type FormFieldCreate = {
     popup_id: string;
+    sales_flow_id: string;
     label: string;
     short_label?: (string | null);
     field_type?: string;
@@ -2006,6 +2845,7 @@ export type FormFieldPublic = {
     id: string;
     tenant_id: string;
     popup_id: string;
+    sales_flow_id: string;
     name: string;
     label: string;
     short_label?: (string | null);
@@ -2049,6 +2889,7 @@ export type FormFieldUpdate = {
 
 export type FormSectionCreate = {
     popup_id: string;
+    sales_flow_id: string;
     label: string;
     description?: (string | null);
     order?: number;
@@ -2061,6 +2902,7 @@ export type FormSectionPublic = {
     id: string;
     tenant_id: string;
     popup_id: string;
+    sales_flow_id: string;
     label: string;
     description?: (string | null);
     order?: number;
@@ -2127,7 +2969,7 @@ export type GrantCreditResponse = {
  */
 export type GrantedPaymentInfo = {
     payment_id: string;
-    application_id: string;
+    application_id: (string | null);
     human_id: string;
     email: string;
     tickets_created: number;
@@ -2162,6 +3004,7 @@ export type GroupAdminUpdate = {
  */
 export type GroupCreate = {
     popup_id: string;
+    sales_flow_id?: (string | null);
     name: string;
     slug?: (string | null);
     description?: (string | null);
@@ -2262,6 +3105,7 @@ export type GroupMemberUpdate = {
 export type GroupPublic = {
     tenant_id: string;
     popup_id: string;
+    sales_flow_id: string;
     name: string;
     slug: string;
     description?: (string | null);
@@ -2327,6 +3171,7 @@ export type GroupWhitelistedEmailPublic = {
 export type GroupWithMembers = {
     tenant_id: string;
     popup_id: string;
+    sales_flow_id: string;
     name: string;
     slug: string;
     description?: (string | null);
@@ -2595,6 +3440,7 @@ export type InstallmentInterval = 'day' | 'week' | 'month' | 'year';
  */
 export type InviteCreate = {
     popup_id: string;
+    sales_flow_id?: (string | null);
     token?: (string | null);
     recipient_email?: (string | null);
     discount_percentage?: (number | string);
@@ -2637,6 +3483,7 @@ export type InvitePortalUpdate = {
 export type InvitePublic = {
     id: string;
     popup_id: string;
+    sales_flow_id: string;
     token: string;
     recipient_email?: (string | null);
     discount_percentage: string;
@@ -2738,6 +3585,26 @@ export type ListModel = {
 
 export type ListModel_AbandonedCartPublic_ = {
     results: Array<AbandonedCartPublic>;
+    paging: Paging;
+};
+
+export type ListModel_AccommodationBookingPublic_ = {
+    results: Array<AccommodationBookingPublic>;
+    paging: Paging;
+};
+
+export type ListModel_AccommodationImagePublic_ = {
+    results: Array<AccommodationImagePublic>;
+    paging: Paging;
+};
+
+export type ListModel_AccommodationPropertyPublic_ = {
+    results: Array<AccommodationPropertyPublic>;
+    paging: Paging;
+};
+
+export type ListModel_AccommodationPublic_ = {
+    results: Array<AccommodationPublic>;
     paging: Paging;
 };
 
@@ -2886,6 +3753,16 @@ export type ListModel_ProductPublic_ = {
     paging: Paging;
 };
 
+export type ListModel_SalesFlowPortalPublic_ = {
+    results: Array<SalesFlowPortalPublic>;
+    paging: Paging;
+};
+
+export type ListModel_SalesFlowPublic_ = {
+    results: Array<SalesFlowPublic>;
+    paging: Paging;
+};
+
 export type ListModel_SavedViewPublic_ = {
     results: Array<SavedViewPublic>;
     paging: Paging;
@@ -2941,6 +3818,7 @@ export type MeAccess = {
 export type MyGroupPublic = {
     tenant_id: string;
     popup_id: string;
+    sales_flow_id: string;
     name: string;
     slug: string;
     description?: (string | null);
@@ -2964,6 +3842,7 @@ export type MyGroupPublic = {
 export type MyGroupWithMembers = {
     tenant_id: string;
     popup_id: string;
+    sales_flow_id: string;
     name: string;
     slug: string;
     description?: (string | null);
@@ -3012,7 +3891,7 @@ export type OccurrenceRef = {
  * Anonymous open-checkout cart response.
  *
  * `restore_token` is the HMAC for the signed restore link
- * (GET /checkout/{slug}/cart?cid=<id>&sig=<restore_token>). It is only
+ * (GET /checkout/{slug}/{flow_slug}/cart?cid=<id>&sig=<restore_token>). It is only
  * present when the popup configures an open_checkout_signing_secret; the
  * client stores it to rebuild the cart on a later visit.
  */
@@ -3020,7 +3899,7 @@ export type OpenCartPublic = {
     id: string;
     popup_id: string;
     email: string;
-    items: CartState;
+    items: CartState_Output;
     restore_token?: (string | null);
     created_at?: (string | null);
     updated_at?: (string | null);
@@ -3031,27 +3910,32 @@ export type OpenCartPublic = {
  */
 export type OpenCartUpsert = {
     email: string;
-    items: CartState;
+    items: CartState_Input;
 };
 
 /**
- * Request schema for POST /checkout/{slug}/purchase.
+ * Request schema for POST /checkout/{slug}/{flow_slug}/purchase.
  */
 export type OpenTicketingPurchaseCreate = {
     products: Array<ProductLine>;
+    recipients?: Array<PaymentRecipientRequest>;
     buyer: BuyerInfo;
     coupon_code?: (string | null);
     insurance?: boolean;
     fbc?: (string | null);
     fbp?: (string | null);
     locale?: (string | null);
+    return_context?: 'direct' | 'portal';
     attribution?: (Attribution | null);
     cid?: (string | null);
     sig?: (string | null);
+    quote_token?: (string | null);
 };
 
+export type return_context = 'direct' | 'portal';
+
 /**
- * Response schema for POST /checkout/{slug}/purchase.
+ * Response schema for POST /checkout/{slug}/{flow_slug}/purchase.
  */
 export type OpenTicketingPurchaseResponse = {
     payment_id: string;
@@ -3082,9 +3966,12 @@ export type PaymentCreate = {
     application_id?: (string | null);
     popup_id?: (string | null);
     products: Array<PaymentProductRequest_Input>;
+    recipients?: Array<PaymentRecipientRequest>;
     coupon_code?: (string | null);
     edit_passes?: boolean;
     insurance?: boolean;
+    locale?: (string | null);
+    return_context?: 'direct' | 'portal';
 };
 
 /**
@@ -3115,7 +4002,8 @@ export type PaymentPreview = {
  */
 export type PaymentProductRequest_Input = {
     product_id: string;
-    attendee_id: string;
+    attendee_id?: (string | null);
+    recipient_key?: (string | null);
     quantity?: number;
     unit_price_override?: (number | string | null);
     purchase_metadata?: ({
@@ -3128,7 +4016,8 @@ export type PaymentProductRequest_Input = {
  */
 export type PaymentProductRequest_Output = {
     product_id: string;
-    attendee_id: string;
+    attendee_id?: (string | null);
+    recipient_key?: (string | null);
     quantity?: number;
     unit_price_override?: (string | null);
     purchase_metadata?: ({
@@ -3141,16 +4030,28 @@ export type PaymentProductRequest_Output = {
  */
 export type PaymentProductResponse = {
     product_id: string;
-    attendee_id: string;
+    attendee_id: (string | null);
+    payment_recipient_id?: (string | null);
+    recipient_key?: (string | null);
     quantity: number;
     product_name: string;
     product_description?: (string | null);
     product_price: string;
     effective_unit_price?: (string | null);
     product_category: string;
+    requires_check_in_snapshot?: (boolean | null);
     product_currency: string;
     attendee_name?: (string | null);
+    units?: Array<PaymentProductUnitResponse>;
     created_at: string;
+};
+
+export type PaymentProductUnitResponse = {
+    id: string;
+    attendee_id?: (string | null);
+    check_in_code: string;
+    active: boolean;
+    requires_check_in: boolean;
 };
 
 /**
@@ -3160,6 +4061,8 @@ export type PaymentPublic = {
     tenant_id: string;
     application_id?: (string | null);
     popup_id: string;
+    buyer_human_id?: (string | null);
+    sales_flow_id?: (string | null);
     external_id?: (string | null);
     status?: string;
     amount?: string;
@@ -3187,10 +4090,42 @@ export type PaymentPublic = {
     credit_applied?: string;
     id: string;
     products_snapshot?: Array<PaymentProductResponse>;
+    recipients?: Array<PaymentRecipientResponse>;
     buyer_email?: (string | null);
     buyer_name?: (string | null);
+    redirect_url?: (string | null);
     created_at?: (string | null);
     updated_at?: (string | null);
+};
+
+/**
+ * Stable recipient identity and profile supplied for one payment attempt.
+ */
+export type PaymentRecipientRequest = {
+    recipient_key: string;
+    human_id?: (string | null);
+    existing_attendee_id?: (string | null);
+    name: string;
+    email?: (string | null);
+    category_id?: (string | null);
+    profile_snapshot?: {
+        [key: string]: unknown;
+    };
+};
+
+export type PaymentRecipientResponse = {
+    recipient_key: string;
+    human_id?: (string | null);
+    existing_attendee_id?: (string | null);
+    name: string;
+    email?: (string | null);
+    category_id?: (string | null);
+    profile_snapshot?: {
+        [key: string]: unknown;
+    };
+    id: string;
+    attendee_id?: (string | null);
+    created_at: string;
 };
 
 /**
@@ -3255,7 +4190,7 @@ export type PendingReleaseAuthRequest = {
 };
 
 /**
- * Request body for POST /checkout/{slug}/pending/release (anonymous surface).
+ * Request body for POST /checkout/{slug}/{flow_slug}/pending/release (anonymous surface).
  *
  * cid + sig constitute the cart continuity proof (HMAC). email is the buyer's
  * address used as the payment lookup key (must match the cart's stored email).
@@ -3338,6 +4273,7 @@ export type PopupAdmin = {
     currency?: string;
     requires_application_fee?: boolean;
     application_fee_amount?: (string | null);
+    custom_home_enabled?: boolean;
     theme_config?: ({
     [key: string]: unknown;
 } | null);
@@ -3354,6 +4290,7 @@ export type PopupAdmin = {
     events_enabled?: boolean;
     self_check_in_enabled?: boolean;
     checkin_pass_lead_days?: (number | null);
+    accommodation_min_stay?: number;
     show_attendee_directory?: boolean;
     edit_passes_enabled?: boolean;
     invites_enabled?: boolean;
@@ -3375,6 +4312,8 @@ export type PopupAdmin = {
     abandoned_application_repeat_days?: (number | null);
     abandoned_application_max_count?: (number | null);
     id: string;
+    takes_applications?: boolean;
+    sells_directly?: boolean;
 };
 
 export type PopupCreate = {
@@ -3432,6 +4371,7 @@ export type PopupCreate = {
     installments_interval?: InstallmentInterval;
     installments_interval_count?: number;
     checkin_pass_lead_days?: (number | null);
+    accommodation_min_stay?: number;
     abandoned_cart_delay_days?: (number | null);
     abandoned_cart_repeat_days?: (number | null);
     abandoned_cart_max_count?: (number | null);
@@ -3443,10 +4383,30 @@ export type PopupCreate = {
     abandoned_application_max_count?: (number | null);
 };
 
+export type PopupHomeAdmin = {
+    enabled: boolean;
+    html?: (string | null);
+    version: number;
+    updated_at?: (string | null);
+};
+
+export type PopupHomePublic = {
+    html: string;
+    version: number;
+    updated_at: string;
+};
+
+export type PopupHomeUpdate = {
+    enabled: boolean;
+    html?: (string | null);
+    version: number;
+};
+
 /**
  * Public popup schema — excludes sensitive/internal fields.
  */
 export type PopupPublic = {
+    custom_home_enabled?: boolean;
     id: string;
     name: string;
     tagline?: (string | null);
@@ -3455,6 +4415,8 @@ export type PopupPublic = {
     status?: PopupStatus;
     sale_type?: SaleType;
     checkout_mode?: CheckoutMode;
+    takes_applications?: boolean;
+    sells_directly?: boolean;
     start_date?: (string | null);
     end_date?: (string | null);
     image_url?: (string | null);
@@ -3468,6 +4430,8 @@ export type PopupPublic = {
     currency?: string;
     terms_and_conditions_url?: (string | null);
     invoice_company_name?: (string | null);
+    invoice_company_address?: (string | null);
+    invoice_company_email?: (string | null);
     requires_application_fee?: boolean;
     application_fee_amount?: (string | null);
     theme_config?: ({
@@ -3484,6 +4448,7 @@ export type PopupPublic = {
     contribution_description?: (string | null);
     application_layout?: ApplicationLayout;
     events_enabled?: boolean;
+    accommodation_min_stay?: number;
     show_attendee_directory?: boolean;
     edit_passes_enabled?: boolean;
     invites_enabled?: boolean;
@@ -3499,9 +4464,14 @@ export type PopupPublic = {
 
 /**
  * Schema for adding a reviewer to a popup.
+ *
+ * `sales_flow_id` omitted (None) adds a popup-shared reviewer; providing
+ * it adds a reviewer scoped exclusively to that flow (sdd/sales-flows D4)
+ * and switches the flow's `reviewers_mode` to 'override'.
  */
 export type PopupReviewerCreate = {
     user_id: string;
+    sales_flow_id?: (string | null);
     is_required?: boolean;
     weight_multiplier?: number;
 };
@@ -3514,6 +4484,7 @@ export type PopupReviewerPublic = {
     popup_id: string;
     user_id: string;
     tenant_id: string;
+    sales_flow_id?: (string | null);
     is_required: boolean;
     weight_multiplier: number;
     created_at?: (string | null);
@@ -3585,6 +4556,7 @@ export type PopupUpdate = {
     installments_interval?: (InstallmentInterval | null);
     installments_interval_count?: (number | null);
     checkin_pass_lead_days?: (number | null);
+    accommodation_min_stay?: (number | null);
     invites_enabled?: (boolean | null);
     referrals_enabled?: (boolean | null);
     group_private_events_enabled?: (boolean | null);
@@ -3737,6 +4709,7 @@ export type ProductBatchResult = {
     requires_check_in?: boolean;
     discountable?: boolean;
     sold_out_override?: boolean;
+    managed_by?: (string | null);
     id: string;
     success: boolean;
     err_msg?: (string | null);
@@ -3786,6 +4759,11 @@ export type ProductCreate = {
 export type ProductLine = {
     product_id: string;
     quantity?: number;
+    attendee_id?: (string | null);
+    recipient_key?: (string | null);
+    purchase_metadata?: ({
+    [key: string]: unknown;
+} | null);
 };
 
 /**
@@ -3819,6 +4797,7 @@ export type ProductPublic = {
     requires_check_in?: boolean;
     discountable?: boolean;
     sold_out_override?: boolean;
+    managed_by?: (string | null);
     id: string;
 };
 
@@ -3881,8 +4860,64 @@ export type ProductWithQuantity = {
     requires_check_in?: boolean;
     discountable?: boolean;
     sold_out_override?: boolean;
+    managed_by?: (string | null);
     id: string;
     quantity?: number;
+};
+
+/**
+ * A room type as the buyer sees it.
+ *
+ * No units: how many rooms exist, and which one a guest lands in, is the
+ * operator's business. What the checkout needs is whether *a* room is free,
+ * which is what the availability endpoint answers.
+ */
+export type PublicAccommodation = {
+    id: string;
+    property_id: string;
+    product_id?: (string | null);
+    name: string;
+    kind: AccommodationKind;
+    description?: (string | null);
+    guest_capacity: number;
+    beds?: Array<BedSpec>;
+    default_nightly_price: string;
+    long_stay_price?: (string | null);
+    min_stay: number;
+    bookable_from: string;
+    bookable_to: string;
+    images?: Array<AccommodationImagePublic>;
+};
+
+/**
+ * What a room type costs for these dates, and whether it can be had.
+ *
+ * The quote is server-computed and comes back with the availability so the
+ * checkout never multiplies a nightly price by a night count, because date-range
+ * rules and the long-stay price make that arithmetic wrong more often than
+ * it is right.
+ */
+export type PublicAccommodationAvailability = {
+    accommodation_id: string;
+    available: number;
+    unavailable_reason?: (string | null);
+    quote?: (AccommodationQuote | null);
+};
+
+/**
+ * A property as the buyer sees it.
+ *
+ * Deliberately narrower than ``AccommodationPropertyPublic``: the contact
+ * name and email belong to the operator's relationship with the owner, not
+ * to a checkout page. The tax percentage is exposed because it shows up as
+ * a line in the quote and the buyer is entitled to know why.
+ */
+export type PublicAccommodationProperty = {
+    id: string;
+    name: string;
+    address?: (string | null);
+    description?: (string | null);
+    tax_percentage?: (string | null);
 };
 
 export type PublishableKeyCreate = {
@@ -3917,6 +4952,15 @@ export type PublishableKeyPublic = {
 };
 
 export type PublishPermission = 'admin_only' | 'everyone';
+
+/**
+ * Price of a single night plus the rule that produced it.
+ */
+export type QuoteNight = {
+    date: string;
+    price: string;
+    rule: string;
+};
 
 /**
  * UI-friendly representation of the subset of RFC-5545 we support.
@@ -3988,6 +5032,306 @@ export type ReviewSummary = {
 };
 
 /**
+ * Sales flow creation payload (BO). tenant_id is derived server-side.
+ */
+export type SalesFlowCreate = {
+    popup_id: string;
+    start_from?: (string | null);
+    type?: SalesFlowType;
+    slug: string;
+    name: string;
+    visibility?: SalesFlowVisibility;
+    is_default?: boolean;
+    order?: number;
+    reviewers_mode?: SalesFlowReviewersMode;
+    identity_mode?: SalesFlowIdentityMode;
+    application_layout?: (ApplicationLayout | null);
+    requires_application_fee?: (boolean | null);
+    application_fee_amount?: (number | string | null);
+    allows_scholarship?: (boolean | null);
+    allows_incentive?: (boolean | null);
+    allows_coupons?: (boolean | null);
+    insurance_enabled?: (boolean | null);
+    insurance_percentage?: (number | string | null);
+    contribution_enabled?: (boolean | null);
+    contribution_percentage?: (number | string | null);
+    contribution_label?: (string | null);
+    contribution_description?: (string | null);
+    installments_enabled?: (boolean | null);
+    installments_deadline?: (string | null);
+    installments_max?: (number | null);
+    installments_interval?: (InstallmentInterval | null);
+    installments_interval_count?: (number | null);
+    invites_enabled?: (boolean | null);
+    referrals_enabled?: (boolean | null);
+    max_referrals_per_attendee?: (number | null);
+    checkin_pass_lead_days?: (number | null);
+    open_checkout_success_url?: (string | null);
+    open_checkout_cancel_url?: (string | null);
+    open_checkout_signing_secret?: (string | null);
+    abandoned_cart_delay_days?: (number | null);
+    abandoned_cart_repeat_days?: (number | null);
+    abandoned_cart_max_count?: (number | null);
+    purchase_reminder_delay_days?: (number | null);
+    purchase_reminder_repeat_days?: (number | null);
+    purchase_reminder_max_count?: (number | null);
+    abandoned_application_delay_days?: (number | null);
+    abandoned_application_repeat_days?: (number | null);
+    abandoned_application_max_count?: (number | null);
+    restriction_rule?: ({
+    [key: string]: unknown;
+} | null);
+    theme_config?: ({
+    [key: string]: unknown;
+} | null);
+};
+
+/**
+ * portal_auth is the only implemented mode in v1; anonymous is reserved
+ * for a future ticket-code lookup flow (spec: upsale-flow).
+ */
+export type SalesFlowIdentityMode = 'portal_auth' | 'anonymous';
+
+/**
+ * What a buyer is told about a way in.
+ *
+ * Deliberately NOT `SalesFlowPublic`. That one extends `SalesFlowBase`, so it
+ * carries every configuration column a flow owns — including
+ * `open_checkout_signing_secret`, the HMAC key that signs the order payload
+ * an external thank-you page verifies. The portal listing is readable by any
+ * authenticated human of the tenant, which handed each of them the key to
+ * forge a completed order against that page.
+ *
+ * The portal needs a door's name, its slug and the order to list them in.
+ * Anything a flow decides about selling is the organiser's business, so it is
+ * added here one field at a time, on purpose, or not at all.
+ */
+export type SalesFlowPortalPublic = {
+    id: string;
+    slug: string;
+    name: string;
+    order: number;
+    type: SalesFlowType;
+    price_summary?: (SalesFlowPriceSummary | null);
+    theme_config?: (SalesFlowPortalThemeConfig | null);
+};
+
+/**
+ * Theme color tokens safe for a buyer-facing checkout.
+ */
+export type SalesFlowPortalThemeColors = {
+    mode?: 'light' | 'dark';
+    primary_color?: string;
+    primary_foreground_color?: string;
+    secondary_color?: string;
+    accent_color?: string;
+    checkout_navbar_bg?: string;
+    checkout_subtitle_color?: string;
+    checkout_bottom_bar_bg_color?: string;
+    checkout_bottom_bar_text_color?: string;
+    checkout_watermark_color?: string;
+    checkout_nav_text_color?: string;
+    checkout_nav_monochrome_emoji?: (boolean | string);
+    card_background_color?: string;
+    card_foreground_color?: string;
+    border_color?: string;
+    input_color?: string;
+};
+
+export type mode = 'light' | 'dark';
+
+/**
+ * Narrow selected-flow theme consumed by the Portal ThemeProvider.
+ */
+export type SalesFlowPortalThemeConfig = {
+    colors?: SalesFlowPortalThemeColors;
+    typography?: SalesFlowPortalThemeTypography;
+    radius?: string;
+    border_radius?: string;
+};
+
+/**
+ * Theme typography tokens safe for a buyer-facing checkout.
+ */
+export type SalesFlowPortalThemeTypography = {
+    font_base_size?: string;
+    font_heading_scale?: number;
+    font_family?: string;
+    font_heading_family?: string;
+};
+
+export type SalesFlowPriceKind = 'fixed' | 'from';
+
+/**
+ * A price display fact that is safe to publish with a Portal flow.
+ */
+export type SalesFlowPriceSummary = {
+    amount: string;
+    currency: string;
+    kind: SalesFlowPriceKind;
+};
+
+/**
+ * Sales flow schema for API responses.
+ */
+export type SalesFlowPublic = {
+    tenant_id: string;
+    popup_id: string;
+    type?: SalesFlowType;
+    slug: string;
+    name: string;
+    visibility?: SalesFlowVisibility;
+    is_default?: boolean;
+    order?: number;
+    reviewers_mode?: SalesFlowReviewersMode;
+    identity_mode?: SalesFlowIdentityMode;
+    status?: (string | null);
+    restriction_rule?: ({
+    [key: string]: unknown;
+} | null);
+    theme_config?: ({
+    [key: string]: unknown;
+} | null);
+    application_layout?: (ApplicationLayout | null);
+    requires_application_fee?: (boolean | null);
+    application_fee_amount?: (string | null);
+    allows_scholarship?: (boolean | null);
+    allows_incentive?: (boolean | null);
+    allows_coupons?: (boolean | null);
+    insurance_enabled?: (boolean | null);
+    insurance_percentage?: (string | null);
+    contribution_enabled?: (boolean | null);
+    contribution_percentage?: (string | null);
+    contribution_label?: (string | null);
+    contribution_description?: (string | null);
+    installments_enabled?: (boolean | null);
+    installments_deadline?: (string | null);
+    installments_max?: (number | null);
+    installments_interval?: (InstallmentInterval | null);
+    installments_interval_count?: (number | null);
+    invites_enabled?: (boolean | null);
+    referrals_enabled?: (boolean | null);
+    max_referrals_per_attendee?: (number | null);
+    checkin_pass_lead_days?: (number | null);
+    open_checkout_success_url?: (string | null);
+    open_checkout_cancel_url?: (string | null);
+    open_checkout_signing_secret?: (string | null);
+    abandoned_cart_delay_days?: (number | null);
+    abandoned_cart_repeat_days?: (number | null);
+    abandoned_cart_max_count?: (number | null);
+    purchase_reminder_delay_days?: (number | null);
+    purchase_reminder_repeat_days?: (number | null);
+    purchase_reminder_max_count?: (number | null);
+    abandoned_application_delay_days?: (number | null);
+    abandoned_application_repeat_days?: (number | null);
+    abandoned_application_max_count?: (number | null);
+    id: string;
+    created_at?: (string | null);
+    updated_at?: (string | null);
+};
+
+/**
+ * What a flow is missing before it can sell
+ * (sdd/sales-flows-rediseno slice 8).
+ *
+ * `blockers` and `warnings` carry machine codes, not sentences. The
+ * backoffice owns the wording, and a code that nobody renders yet is
+ * still a code the API can add without breaking a client.
+ */
+export type SalesFlowReadiness = {
+    flow_id: string;
+    enabled_step_count: number;
+    offered_product_count: number;
+    form_field_count: number;
+    has_approval_strategy: boolean;
+    blockers: Array<(string)>;
+    warnings: Array<(string)>;
+};
+
+/**
+ * Whether a flow uses the popup-level reviewer list or its own (D4).
+ */
+export type SalesFlowReviewersMode = 'inherit' | 'override';
+
+/**
+ * A flow's own standing, when it differs from the gathering's.
+ *
+ * One value, and that is the point. `resolve_flow` reads
+ * `flow.status or popup.status`, so a flow that named itself active would
+ * keep selling into an event that had ended — the column can only ever be
+ * used to close something, never to hold it open.
+ *
+ * NULL is the normal state and means the flow follows the gathering. It is
+ * also how a closed flow is reopened.
+ */
+export type SalesFlowStatus = 'closed';
+
+/**
+ * Sale model of a flow. Mirrors PopupBase.sale_type plus 'upsale'.
+ */
+export type SalesFlowType = 'application' | 'direct' | 'upsale';
+
+/**
+ * Partial update payload (BO). Only provided fields are applied.
+ */
+export type SalesFlowUpdate = {
+    status?: (SalesFlowStatus | null);
+    type?: (SalesFlowType | null);
+    slug?: (string | null);
+    name?: (string | null);
+    visibility?: (SalesFlowVisibility | null);
+    is_default?: (boolean | null);
+    order?: (number | null);
+    reviewers_mode?: (SalesFlowReviewersMode | null);
+    identity_mode?: (SalesFlowIdentityMode | null);
+    application_layout?: (ApplicationLayout | null);
+    requires_application_fee?: (boolean | null);
+    application_fee_amount?: (number | string | null);
+    allows_scholarship?: (boolean | null);
+    allows_incentive?: (boolean | null);
+    allows_coupons?: (boolean | null);
+    insurance_enabled?: (boolean | null);
+    insurance_percentage?: (number | string | null);
+    contribution_enabled?: (boolean | null);
+    contribution_percentage?: (number | string | null);
+    contribution_label?: (string | null);
+    contribution_description?: (string | null);
+    installments_enabled?: (boolean | null);
+    installments_deadline?: (string | null);
+    installments_max?: (number | null);
+    installments_interval?: (InstallmentInterval | null);
+    installments_interval_count?: (number | null);
+    invites_enabled?: (boolean | null);
+    referrals_enabled?: (boolean | null);
+    max_referrals_per_attendee?: (number | null);
+    checkin_pass_lead_days?: (number | null);
+    open_checkout_success_url?: (string | null);
+    open_checkout_cancel_url?: (string | null);
+    open_checkout_signing_secret?: (string | null);
+    abandoned_cart_delay_days?: (number | null);
+    abandoned_cart_repeat_days?: (number | null);
+    abandoned_cart_max_count?: (number | null);
+    purchase_reminder_delay_days?: (number | null);
+    purchase_reminder_repeat_days?: (number | null);
+    purchase_reminder_max_count?: (number | null);
+    abandoned_application_delay_days?: (number | null);
+    abandoned_application_repeat_days?: (number | null);
+    abandoned_application_max_count?: (number | null);
+    restriction_rule?: ({
+    [key: string]: unknown;
+} | null);
+    theme_config?: ({
+    [key: string]: unknown;
+} | null);
+};
+
+/**
+ * Listing-only switch (Design D-URL): never affects access, only whether
+ * the flow appears in the portal's flow listing for its popup.
+ */
+export type SalesFlowVisibility = 'portal_listed' | 'direct_url_only';
+
+/**
  * Popup sale model.
  *
  * - application: traditional application-based flow (approval required).
@@ -4040,6 +5384,16 @@ export type ScholarshipDecisionRequest = {
  */
 export type ScholarshipDecisionStatus = 'approved' | 'rejected';
 
+/**
+ * Safe checkout identity for the flow selected by the server.
+ */
+export type SelectedSalesFlow = {
+    id: string;
+    slug: string;
+    name: string;
+    type: SalesFlowType;
+};
+
 export type SelfCheckInOptions = {
     popup: SelfCheckInPopup;
     tickets: Array<SelfCheckInTicket>;
@@ -4057,8 +5411,8 @@ export type SelfCheckInRequest = {
 
 export type SelfCheckInResult = {
     attendee_product_id: string;
-    attendee_name: string;
-    attendee_category: string;
+    attendee_name?: (string | null);
+    attendee_category?: (string | null);
     product_name: string;
     product_category?: (string | null);
     duration_type?: (string | null);
@@ -4068,8 +5422,8 @@ export type SelfCheckInResult = {
 
 export type SelfCheckInTicket = {
     attendee_product_id: string;
-    attendee_name: string;
-    attendee_category: string;
+    attendee_name?: (string | null);
+    attendee_category?: (string | null);
     product_name: string;
     product_category?: (string | null);
     duration_type?: (string | null);
@@ -4097,6 +5451,17 @@ export type SendTestRequest = {
  * - automatic: SimpleFi redirects the buyer immediately after approval.
  */
 export type SimpleFiSuccessBehavior = 'manual' | 'automatic';
+
+export type StaffTicketPublic = {
+    id: string;
+    check_in_code: string;
+    payment_id?: (string | null);
+    attendee?: (TicketAttendeeSnapshot | null);
+    product: TicketProductSnapshot;
+    total_scans?: number;
+    first_scan_at?: (string | null);
+    last_scan_at?: (string | null);
+};
 
 /**
  * Which surface a task relates to. Optional (NULL = unspecified).
@@ -4241,7 +5606,15 @@ export type TaskUpdate = {
 
 export type TaskVisibility = 'universal' | 'tenant' | 'internal';
 
-export type TemplateScope = 'tenant' | 'popup';
+/**
+ * Who owns a template, and therefore where the send path looks for it.
+ *
+ * Exactly one tier per type — a scope is not a chain
+ * (sdd/sales-flows-rediseno R1). FLOW covers the mails a sale produces,
+ * POPUP the ones a gathering produces regardless of how anyone bought,
+ * and TENANT the ones that belong to no gathering at all.
+ */
+export type TemplateScope = 'tenant' | 'popup' | 'flow';
 
 export type TemplateTypeInfo = {
     type: string;
@@ -4385,7 +5758,7 @@ export type TenantUpdate = {
 export type ThirdPartyAppCreate = {
     name: string;
     allowed_token_scopes?: Array<('portal:*' | 'portal:profile:read' | 'portal:profile:write' | 'portal:applications:read' | 'portal:applications:write' | 'portal:attendees:write' | 'portal:payments:read' | 'portal:directory:read' | 'portal:api_keys:manage')>;
-    allowed_api_key_scopes?: Array<('events:read' | 'events:write' | 'rsvp:write' | 'venues:read' | 'venues:write' | 'applications:read' | 'applications:write' | 'attendees:read' | 'attendees:write' | 'humans:read' | 'humans:write' | 'groups:read' | 'groups:write' | 'products:read' | 'products:write' | 'coupons:read' | 'coupons:write' | 'forms:read' | 'forms:write' | 'payments:read' | 'tracks:read' | 'tracks:write' | 'ticketing_steps:read' | 'ticketing_steps:write' | 'translations:read' | 'translations:write')>;
+    allowed_api_key_scopes?: Array<('events:read' | 'events:write' | 'rsvp:write' | 'venues:read' | 'venues:write' | 'applications:read' | 'applications:write' | 'attendees:read' | 'attendees:write' | 'humans:read' | 'humans:write' | 'groups:read' | 'groups:write' | 'products:read' | 'products:write' | 'accommodations:read' | 'accommodations:write' | 'coupons:read' | 'coupons:write' | 'forms:read' | 'forms:write' | 'payments:read' | 'tracks:read' | 'tracks:write' | 'ticketing_steps:read' | 'ticketing_steps:write' | 'translations:read' | 'translations:write')>;
 };
 
 /**
@@ -4436,7 +5809,7 @@ export type ThirdPartyAppPublic = {
 export type ThirdPartyAppUpdate = {
     name?: (string | null);
     allowed_token_scopes?: (Array<('portal:*' | 'portal:profile:read' | 'portal:profile:write' | 'portal:applications:read' | 'portal:applications:write' | 'portal:attendees:write' | 'portal:payments:read' | 'portal:directory:read' | 'portal:api_keys:manage')> | null);
-    allowed_api_key_scopes?: (Array<('events:read' | 'events:write' | 'rsvp:write' | 'venues:read' | 'venues:write' | 'applications:read' | 'applications:write' | 'attendees:read' | 'attendees:write' | 'humans:read' | 'humans:write' | 'groups:read' | 'groups:write' | 'products:read' | 'products:write' | 'coupons:read' | 'coupons:write' | 'forms:read' | 'forms:write' | 'payments:read' | 'tracks:read' | 'tracks:write' | 'ticketing_steps:read' | 'ticketing_steps:write' | 'translations:read' | 'translations:write')> | null);
+    allowed_api_key_scopes?: (Array<('events:read' | 'events:write' | 'rsvp:write' | 'venues:read' | 'venues:write' | 'applications:read' | 'applications:write' | 'attendees:read' | 'attendees:write' | 'humans:read' | 'humans:write' | 'groups:read' | 'groups:write' | 'products:read' | 'products:write' | 'accommodations:read' | 'accommodations:write' | 'coupons:read' | 'coupons:write' | 'forms:read' | 'forms:write' | 'payments:read' | 'tracks:read' | 'tracks:write' | 'ticketing_steps:read' | 'ticketing_steps:write' | 'translations:read' | 'translations:write')> | null);
 };
 
 /**
@@ -4477,6 +5850,7 @@ export type TicketDuration = 'day' | 'week' | 'month' | 'full';
 
 export type TicketingStepCreate = {
     popup_id: string;
+    sales_flow_id: string;
     step_type: string;
     title: string;
     description?: (string | null);
@@ -4498,6 +5872,7 @@ export type TicketingStepPublic = {
     id: string;
     tenant_id: string;
     popup_id: string;
+    sales_flow_id: string;
     step_type: string;
     title: string;
     description?: (string | null);
@@ -4554,25 +5929,6 @@ export type TicketProductSnapshot = {
     category?: (string | null);
     start_date?: (string | null);
     end_date?: (string | null);
-};
-
-/**
- * Full public representation of a single ticket (AttendeeProducts row).
- *
- * Returned by POST /attendees/check-in/{code}.
- * Embeds attendee + product snapshots for scanner UIs without extra round-trips.
- * Enriched with scan summary fields from ticket_events so frontend/staff can
- * apply check-in policy at runtime (single-scan, scan-every-time, etc.).
- */
-export type TicketPublic = {
-    id: string;
-    check_in_code: string;
-    payment_id?: (string | null);
-    attendee: TicketAttendeeSnapshot;
-    product: TicketProductSnapshot;
-    total_scans?: number;
-    first_scan_at?: (string | null);
-    last_scan_at?: (string | null);
 };
 
 /**
@@ -4894,6 +6250,276 @@ export type VenueWeeklyHoursUpdate = {
     hours: Array<VenueWeeklyHourInput>;
 };
 
+export type AccommodationsListPropertiesData = {
+    activeOnly?: boolean;
+    popupId: string;
+    search?: (string | null);
+    xTenantId?: (string | null);
+};
+
+export type AccommodationsListPropertiesResponse = (ListModel_AccommodationPropertyPublic_);
+
+export type AccommodationsCreatePropertyData = {
+    requestBody: AccommodationPropertyCreate;
+    xTenantId?: (string | null);
+};
+
+export type AccommodationsCreatePropertyResponse = (AccommodationPropertyPublic);
+
+export type AccommodationsGetPropertyData = {
+    propertyId: string;
+    xTenantId?: (string | null);
+};
+
+export type AccommodationsGetPropertyResponse = (AccommodationPropertyPublic);
+
+export type AccommodationsUpdatePropertyData = {
+    propertyId: string;
+    requestBody: AccommodationPropertyUpdate;
+    xTenantId?: (string | null);
+};
+
+export type AccommodationsUpdatePropertyResponse = (AccommodationPropertyPublic);
+
+export type AccommodationsDeletePropertyData = {
+    propertyId: string;
+    xTenantId?: (string | null);
+};
+
+export type AccommodationsDeletePropertyResponse = (void);
+
+export type AccommodationsGetCalendarData = {
+    dateFrom: string;
+    dateTo: string;
+    popupId: string;
+    propertyId?: (string | null);
+    xTenantId?: (string | null);
+};
+
+export type AccommodationsGetCalendarResponse = (AccommodationCalendar);
+
+export type AccommodationsGetAvailabilityData = {
+    checkIn: string;
+    checkOut: string;
+    popupId: string;
+    propertyId?: (string | null);
+    xTenantId?: (string | null);
+};
+
+export type AccommodationsGetAvailabilityResponse = (Array<AccommodationAvailability>);
+
+export type AccommodationsListBookingsData = {
+    accommodationId?: (string | null);
+    dateFrom: string;
+    dateTo: string;
+    popupId: string;
+    propertyId?: (string | null);
+    search?: (string | null);
+    statuses?: (Array<BookingStatus> | null);
+    xTenantId?: (string | null);
+};
+
+export type AccommodationsListBookingsResponse = (ListModel_AccommodationBookingPublic_);
+
+export type AccommodationsCreateManualBookingData = {
+    requestBody: AccommodationBookingCreate;
+    xTenantId?: (string | null);
+};
+
+export type AccommodationsCreateManualBookingResponse = (AccommodationBookingPublic);
+
+export type AccommodationsGetBookingData = {
+    bookingId: string;
+    xTenantId?: (string | null);
+};
+
+export type AccommodationsGetBookingResponse = (AccommodationBookingDetail);
+
+export type AccommodationsUpdateBookingData = {
+    bookingId: string;
+    requestBody: AccommodationBookingUpdate;
+    xTenantId?: (string | null);
+};
+
+export type AccommodationsUpdateBookingResponse = (AccommodationBookingPublic);
+
+export type AccommodationsBlockRangeData = {
+    requestBody: AccommodationBlockRange;
+    xTenantId?: (string | null);
+};
+
+export type AccommodationsBlockRangeResponse = (BlockRangeResult);
+
+export type AccommodationsExportBookingsData = {
+    accommodationId?: (string | null);
+    dateFrom: string;
+    dateTo: string;
+    popupId: string;
+    propertyId?: (string | null);
+    search?: (string | null);
+    statuses?: (Array<BookingStatus> | null);
+    xTenantId?: (string | null);
+};
+
+export type AccommodationsExportBookingsResponse = (unknown);
+
+export type AccommodationsListImagesData = {
+    popupId: string;
+    xTenantId?: (string | null);
+};
+
+export type AccommodationsListImagesResponse = (ListModel_AccommodationImagePublic_);
+
+export type AccommodationsCreateImageData = {
+    requestBody: AccommodationImageCreate;
+    xTenantId?: (string | null);
+};
+
+export type AccommodationsCreateImageResponse = (AccommodationImagePublic);
+
+export type AccommodationsDeleteImageData = {
+    imageId: string;
+    xTenantId?: (string | null);
+};
+
+export type AccommodationsDeleteImageResponse = (void);
+
+export type AccommodationsUpdateUnitData = {
+    requestBody: AccommodationUnitUpdate;
+    unitId: string;
+    xTenantId?: (string | null);
+};
+
+export type AccommodationsUpdateUnitResponse = (AccommodationUnitPublic);
+
+export type AccommodationsDeleteUnitData = {
+    unitId: string;
+    xTenantId?: (string | null);
+};
+
+export type AccommodationsDeleteUnitResponse = (void);
+
+export type AccommodationsUpdatePriceRuleData = {
+    requestBody: AccommodationPriceRuleUpdate;
+    ruleId: string;
+    xTenantId?: (string | null);
+};
+
+export type AccommodationsUpdatePriceRuleResponse = (AccommodationPriceRulePublic);
+
+export type AccommodationsDeletePriceRuleData = {
+    ruleId: string;
+    xTenantId?: (string | null);
+};
+
+export type AccommodationsDeletePriceRuleResponse = (void);
+
+export type AccommodationsBulkUpdateAccommodationsData = {
+    requestBody: AccommodationBulkUpdateRequest;
+    xTenantId?: (string | null);
+};
+
+export type AccommodationsBulkUpdateAccommodationsResponse = (BulkResult);
+
+export type AccommodationsBulkPriceAccommodationsData = {
+    requestBody: AccommodationBulkPrice;
+    xTenantId?: (string | null);
+};
+
+export type AccommodationsBulkPriceAccommodationsResponse = (BulkResult);
+
+export type AccommodationsListAccommodationsData = {
+    popupId: string;
+    propertyId?: (string | null);
+    search?: (string | null);
+    xTenantId?: (string | null);
+};
+
+export type AccommodationsListAccommodationsResponse = (ListModel_AccommodationPublic_);
+
+export type AccommodationsCreateAccommodationData = {
+    requestBody: AccommodationCreate;
+    xTenantId?: (string | null);
+};
+
+export type AccommodationsCreateAccommodationResponse = (AccommodationPublic);
+
+export type AccommodationsGetAccommodationData = {
+    accommodationId: string;
+    xTenantId?: (string | null);
+};
+
+export type AccommodationsGetAccommodationResponse = (AccommodationPublic);
+
+export type AccommodationsUpdateAccommodationData = {
+    accommodationId: string;
+    requestBody: AccommodationUpdate;
+    xTenantId?: (string | null);
+};
+
+export type AccommodationsUpdateAccommodationResponse = (AccommodationPublic);
+
+export type AccommodationsDeleteAccommodationData = {
+    accommodationId: string;
+    xTenantId?: (string | null);
+};
+
+export type AccommodationsDeleteAccommodationResponse = (void);
+
+export type AccommodationsDuplicateAccommodationData = {
+    accommodationId: string;
+    requestBody: AccommodationDuplicate;
+    xTenantId?: (string | null);
+};
+
+export type AccommodationsDuplicateAccommodationResponse = (AccommodationPublic);
+
+export type AccommodationsBulkCreateUnitsData = {
+    accommodationId: string;
+    requestBody: AccommodationUnitBulkCreate;
+    xTenantId?: (string | null);
+};
+
+export type AccommodationsBulkCreateUnitsResponse = (Array<AccommodationUnitPublic>);
+
+export type AccommodationsListPriceRulesData = {
+    accommodationId: string;
+    xTenantId?: (string | null);
+};
+
+export type AccommodationsListPriceRulesResponse = (Array<AccommodationPriceRulePublic>);
+
+export type AccommodationsCreatePriceRuleData = {
+    accommodationId: string;
+    requestBody: AccommodationPriceRuleCreate;
+    xTenantId?: (string | null);
+};
+
+export type AccommodationsCreatePriceRuleResponse = (AccommodationPriceRulePublic);
+
+export type AccommodationsSetAccommodationImagesData = {
+    accommodationId: string;
+    requestBody: Array<(string)>;
+    xTenantId?: (string | null);
+};
+
+export type AccommodationsSetAccommodationImagesResponse = (Array<AccommodationImagePublic>);
+
+export type AccommodationsListPortalAccommodationsData = {
+    popupId: string;
+    salesFlowId: string;
+};
+
+export type AccommodationsListPortalAccommodationsResponse = (AccommodationOffer);
+
+export type AccommodationsCheckPortalAccommodationAvailabilityData = {
+    popupId: string;
+    requestBody: AccommodationAvailabilityRequest;
+    salesFlowId: string;
+};
+
+export type AccommodationsCheckPortalAccommodationAvailabilityResponse = (Array<PublicAccommodationAvailability>);
+
 export type AdminApiKeysCreateAdminApiKeyData = {
     requestBody: AdminApiKeyCreate;
     xTenantId?: (string | null);
@@ -4920,6 +6546,50 @@ export type AdminApiKeysRevokeAdminApiKeyData = {
 };
 
 export type AdminApiKeysRevokeAdminApiKeyResponse = (void);
+
+export type AiConversationsListAiConversationsData = {
+    xTenantId?: (string | null);
+};
+
+export type AiConversationsListAiConversationsResponse = (Array<AIConversationPublic>);
+
+export type AiConversationsGetAiConversationData = {
+    conversationId: string;
+    xTenantId?: (string | null);
+};
+
+export type AiConversationsGetAiConversationResponse = (AIConversationPublic);
+
+export type AiConversationsUpsertAiConversationData = {
+    conversationId: string;
+    requestBody: AIConversationUpsert;
+    xTenantId?: (string | null);
+};
+
+export type AiConversationsUpsertAiConversationResponse = (AIConversationPublic);
+
+export type AiConversationsDeleteAiConversationData = {
+    conversationId: string;
+    xTenantId?: (string | null);
+};
+
+export type AiConversationsDeleteAiConversationResponse = (void);
+
+export type AiExecutionsClaimAiExecutionData = {
+    requestBody: AIExecutionClaimRequest;
+    toolCallId: string;
+    xTenantId?: (string | null);
+};
+
+export type AiExecutionsClaimAiExecutionResponse = (AIExecutionClaimResponse);
+
+export type AiExecutionsCompleteAiExecutionData = {
+    requestBody: AIExecutionCompleteRequest;
+    toolCallId: string;
+    xTenantId?: (string | null);
+};
+
+export type AiExecutionsCompleteAiExecutionResponse = (void);
 
 export type ApiKeysListApiKeysResponse = (Array<ApiKeyPublic>);
 
@@ -5124,6 +6794,7 @@ export type ApplicationsGetMyApplicationResponse = (ApplicationPublic);
 export type ApplicationsUpdateMyApplicationData = {
     popupId: string;
     requestBody: ApplicationUpdate;
+    salesFlowId: string;
 };
 
 export type ApplicationsUpdateMyApplicationResponse = (ApplicationPublic);
@@ -5160,7 +6831,7 @@ export type ApplicationsExportAttendeesDirectoryCsvData = {
     q?: (string | null);
 };
 
-export type ApplicationsExportAttendeesDirectoryCsvResponse = (unknown);
+export type ApplicationsExportAttendeesDirectoryCsvResponse = (string);
 
 export type ApplicationsAddMyAttendeeData = {
     popupId: string;
@@ -5263,16 +6934,32 @@ export type AttendeeCategoriesListAttendeeCategoriesResponse = (ListModel_Attend
 
 export type AttendeeCategoriesListAttendeeCategoriesPortalData = {
     popupId: string;
+    salesFlowId?: (string | null);
 };
 
 export type AttendeeCategoriesListAttendeeCategoriesPortalResponse = (ListModel_AttendeeCategoryPublic_);
 
-export type AttendeeCategoriesCreateAttendeeCategoryData = {
+export type AttendeeCategoriesListSalesFlowAttendeeCategoriesData = {
+    flowId: string;
+    xTenantId?: (string | null);
+};
+
+export type AttendeeCategoriesListSalesFlowAttendeeCategoriesResponse = (ListModel_AttendeeCategoryPublic_);
+
+export type AttendeeCategoriesCreateSalesFlowAttendeeCategoryData = {
+    flowId: string;
     requestBody: AttendeeCategoryCreate;
     xTenantId?: (string | null);
 };
 
-export type AttendeeCategoriesCreateAttendeeCategoryResponse = (AttendeeCategoryPublic);
+export type AttendeeCategoriesCreateSalesFlowAttendeeCategoryResponse = (AttendeeCategoryPublic);
+
+export type AttendeeCategoriesGetAttendeeCategoryData = {
+    categoryId: string;
+    xTenantId?: (string | null);
+};
+
+export type AttendeeCategoriesGetAttendeeCategoryResponse = (AttendeeCategoryPublic);
 
 export type AttendeeCategoriesUpdateAttendeeCategoryData = {
     categoryId: string;
@@ -5357,6 +7044,17 @@ export type AttendeesListAttendeesData = {
 
 export type AttendeesListAttendeesResponse = (ListModel_AttendeeListItem_);
 
+export type AttendeesExportAttendeesCsvData = {
+    categoryId?: (string | null);
+    filters?: (string | null);
+    hasTickets?: (boolean | null);
+    popupId: string;
+    search?: (string | null);
+    xTenantId?: (string | null);
+};
+
+export type AttendeesExportAttendeesCsvResponse = (string);
+
 export type AttendeesGetAttendeeData = {
     attendeeId: string;
     xTenantId?: (string | null);
@@ -5414,7 +7112,7 @@ export type AttendeesPostCheckInData = {
     xTenantId?: (string | null);
 };
 
-export type AttendeesPostCheckInResponse = (TicketPublic);
+export type AttendeesPostCheckInResponse = (StaffTicketPublic);
 
 export type AttendeesGetTicketsByEmailData = {
     email: string;
@@ -5531,6 +7229,7 @@ export type CartsListAbandonedCartsResponse = (ListModel_AbandonedCartPublic_);
 
 export type CartsGetMyCartData = {
     popupId: string;
+    salesFlowId?: (string | null);
 };
 
 export type CartsGetMyCartResponse = ((CartPublic | null));
@@ -5538,12 +7237,14 @@ export type CartsGetMyCartResponse = ((CartPublic | null));
 export type CartsUpdateMyCartData = {
     popupId: string;
     requestBody: CartUpdate;
+    salesFlowId?: (string | null);
 };
 
 export type CartsUpdateMyCartResponse = (CartPublic);
 
 export type CartsDeleteMyCartData = {
     popupId: string;
+    salesFlowId?: (string | null);
 };
 
 export type CartsDeleteMyCartResponse = (void);
@@ -5577,17 +7278,19 @@ export type CheckInListCheckInsData = {
 
 export type CheckInListCheckInsResponse = (ListModel_CheckInListItem_);
 
-export type CheckoutGetRuntimeData = {
+export type CheckoutGetFlowRuntimeData = {
     acceptLanguage?: (string | null);
+    flowSlug: string;
     slug: string;
     xCheckoutPreviewToken?: (string | null);
     xEdgeOsPublishableKey?: (string | null);
     xTenantId?: (string | null);
 };
 
-export type CheckoutGetRuntimeResponse = (CheckoutRuntimeResponse);
+export type CheckoutGetFlowRuntimeResponse = (CheckoutRuntimeResponse);
 
 export type CheckoutPreviewOpenTicketingData = {
+    flowSlug: string;
     requestBody: CheckoutPreviewRequest;
     slug: string;
     xEdgeOsPublishableKey?: (string | null);
@@ -5597,6 +7300,7 @@ export type CheckoutPreviewOpenTicketingData = {
 export type CheckoutPreviewOpenTicketingResponse = (CheckoutPreviewResponse);
 
 export type CheckoutGetCheckoutShareMetaData = {
+    flowSlug: string;
     slug: string;
     xEdgeOsPublishableKey?: (string | null);
     xTenantId?: (string | null);
@@ -5605,6 +7309,7 @@ export type CheckoutGetCheckoutShareMetaData = {
 export type CheckoutGetCheckoutShareMetaResponse = (CheckoutShareMeta);
 
 export type CheckoutPurchaseOpenTicketingData = {
+    flowSlug: string;
     requestBody: OpenTicketingPurchaseCreate;
     slug: string;
     xEdgeOsPublishableKey?: (string | null);
@@ -5613,32 +7318,50 @@ export type CheckoutPurchaseOpenTicketingData = {
 
 export type CheckoutPurchaseOpenTicketingResponse = (OpenTicketingPurchaseResponse);
 
-export type CheckoutUpsertOpenCartData = {
+export type CheckoutListCheckoutAccommodationsData = {
+    flowSlug: string;
+    slug: string;
+    xCheckoutPreviewToken?: (string | null);
+    xEdgeOsPublishableKey?: (string | null);
+    xTenantId?: (string | null);
+};
+
+export type CheckoutListCheckoutAccommodationsResponse = (AccommodationOffer);
+
+export type CheckoutCheckAccommodationAvailabilityData = {
+    flowSlug: string;
+    requestBody: AccommodationAvailabilityRequest;
+    slug: string;
+    xCheckoutPreviewToken?: (string | null);
+    xEdgeOsPublishableKey?: (string | null);
+    xTenantId?: (string | null);
+};
+
+export type CheckoutCheckAccommodationAvailabilityResponse = (Array<PublicAccommodationAvailability>);
+
+export type CheckoutUpsertFlowCartData = {
+    flowSlug: string;
     requestBody: OpenCartUpsert;
     slug: string;
     xEdgeOsPublishableKey?: (string | null);
     xTenantId?: (string | null);
 };
 
-export type CheckoutUpsertOpenCartResponse = (OpenCartPublic);
+export type CheckoutUpsertFlowCartResponse = (OpenCartPublic);
 
-export type CheckoutRestoreOpenCartData = {
-    /**
-     * Cart id from the signed restore link
-     */
+export type CheckoutRestoreFlowCartData = {
     cid: string;
-    /**
-     * HMAC restore token for the cart id
-     */
+    flowSlug: string;
     sig: string;
     slug: string;
     xEdgeOsPublishableKey?: (string | null);
     xTenantId?: (string | null);
 };
 
-export type CheckoutRestoreOpenCartResponse = (OpenCartPublic);
+export type CheckoutRestoreFlowCartResponse = (OpenCartPublic);
 
 export type CheckoutReleasePendingOpenData = {
+    flowSlug: string;
     requestBody: PendingReleaseOpenRequest;
     slug: string;
     xEdgeOsPublishableKey?: (string | null);
@@ -5674,6 +7397,7 @@ export type CouponsListCouponsResponse = (ListModel_CouponPublic_);
 
 export type CouponsCreateCouponData = {
     requestBody: CouponCreate;
+    xEdgeOsAiToolCallId?: (string | null);
     xTenantId?: (string | null);
 };
 
@@ -5689,6 +7413,7 @@ export type CouponsGetCouponResponse = (CouponPublic);
 export type CouponsUpdateCouponData = {
     couponId: string;
     requestBody: CouponUpdate;
+    xEdgeOsAiToolCallId?: (string | null);
     xTenantId?: (string | null);
 };
 
@@ -5706,6 +7431,22 @@ export type CouponsValidateCouponData = {
 };
 
 export type CouponsValidateCouponResponse = (CouponPublic);
+
+export type CustomExportsGetExportCatalogResponse = (ExportCatalogPublic);
+
+export type CustomExportsPreviewCustomExportData = {
+    requestBody: CustomExportSpec;
+    xTenantId?: (string | null);
+};
+
+export type CustomExportsPreviewCustomExportResponse = (ExportPreview);
+
+export type CustomExportsDownloadCustomExportData = {
+    requestBody: ExportDownloadRequest;
+    xTenantId?: (string | null);
+};
+
+export type CustomExportsDownloadCustomExportResponse = (string);
 
 export type DashboardGetDashboardStatsData = {
     /**
@@ -5837,6 +7578,13 @@ export type EventParticipantsAdminAddParticipantData = {
 
 export type EventParticipantsAdminAddParticipantResponse = (EventParticipantPublic);
 
+export type EventParticipantsGetParticipantData = {
+    participantId: string;
+    xTenantId?: (string | null);
+};
+
+export type EventParticipantsGetParticipantResponse = (EventParticipantPublic);
+
 export type EventParticipantsUpdateParticipantData = {
     participantId: string;
     requestBody: EventParticipantUpdate;
@@ -5924,7 +7672,7 @@ export type EventsPublicCalendarIcsData = {
     popupId: string;
 };
 
-export type EventsPublicCalendarIcsResponse = (unknown);
+export type EventsPublicCalendarIcsResponse = (string);
 
 export type EventsListEventsData = {
     eventStatus?: (EventStatus | null);
@@ -6125,7 +7873,7 @@ export type EventsExportEventIcsData = {
     xTenantId?: (string | null);
 };
 
-export type EventsExportEventIcsResponse = (unknown);
+export type EventsExportEventIcsResponse = (string);
 
 export type EventsListPortalEventsData = {
     eventStatus?: (EventStatus | null);
@@ -6240,7 +7988,7 @@ export type EventsExportPortalEventIcsData = {
     eventId: string;
 };
 
-export type EventsExportPortalEventIcsResponse = (unknown);
+export type EventsExportPortalEventIcsResponse = (string);
 
 export type EventSettingsGetEventSettingsData = {
     popupId: string;
@@ -6456,6 +8204,7 @@ export type FormFieldsListFormFieldsData = {
      */
     limit?: number;
     popupId?: (string | null);
+    salesFlowId?: (string | null);
     search?: (string | null);
     /**
      * Number of items to skip
@@ -6510,8 +8259,17 @@ export type FormFieldsDeleteFormFieldData = {
 
 export type FormFieldsDeleteFormFieldResponse = (void);
 
+export type FormFieldsCopyFormToFlowData = {
+    requestBody: CopyFormToFlowRequest;
+    targetFlowId: string;
+    xTenantId?: (string | null);
+};
+
+export type FormFieldsCopyFormToFlowResponse = (CopyFormToFlowResponse);
+
 export type FormFieldsGetApplicationSchemaData = {
     popupId: string;
+    salesFlowId?: (string | null);
     xTenantId?: (string | null);
 };
 
@@ -6522,6 +8280,7 @@ export type FormFieldsGetApplicationSchemaResponse = ({
 export type FormFieldsGetPortalApplicationSchemaData = {
     acceptLanguage?: (string | null);
     popupId: string;
+    salesFlowId?: (string | null);
 };
 
 export type FormFieldsGetPortalApplicationSchemaResponse = ({
@@ -6534,6 +8293,7 @@ export type FormSectionsListFormSectionsData = {
      */
     limit?: number;
     popupId?: (string | null);
+    salesFlowId?: (string | null);
     /**
      * Number of items to skip
      */
@@ -7018,7 +8778,7 @@ export type PaymentsGetPaymentInvoiceData = {
     xTenantId?: (string | null);
 };
 
-export type PaymentsGetPaymentInvoiceResponse = (unknown);
+export type PaymentsGetPaymentInvoiceResponse = ((Blob | File));
 
 export type PaymentsCreateMyApplicationFeeData = {
     requestBody: ApplicationFeeCreate;
@@ -7076,7 +8836,7 @@ export type PaymentsGetMyInvoiceData = {
     paymentId: string;
 };
 
-export type PaymentsGetMyInvoiceResponse = (unknown);
+export type PaymentsGetMyInvoiceResponse = ((Blob | File));
 
 export type PaymentsPreviewMyPaymentData = {
     requestBody: PaymentCreate;
@@ -7100,6 +8860,7 @@ export type PopupReviewersListReviewersData = {
      */
     limit?: number;
     popupId: string;
+    salesFlowId?: (string | null);
     /**
      * Number of items to skip
      */
@@ -7120,6 +8881,7 @@ export type PopupReviewersAddReviewerResponse = (PopupReviewerPublic);
 export type PopupReviewersUpdateReviewerData = {
     popupId: string;
     requestBody: PopupReviewerUpdate;
+    salesFlowId?: (string | null);
     userId: string;
     xTenantId?: (string | null);
 };
@@ -7128,6 +8890,7 @@ export type PopupReviewersUpdateReviewerResponse = (PopupReviewerPublic);
 
 export type PopupReviewersRemoveReviewerData = {
     popupId: string;
+    salesFlowId?: (string | null);
     userId: string;
     xTenantId?: (string | null);
 };
@@ -7184,6 +8947,21 @@ export type PopupsDeletePopupData = {
 
 export type PopupsDeletePopupResponse = (void);
 
+export type PopupsGetPopupHomeData = {
+    popupId: string;
+    xTenantId?: (string | null);
+};
+
+export type PopupsGetPopupHomeResponse = (PopupHomeAdmin);
+
+export type PopupsUpdatePopupHomeData = {
+    popupId: string;
+    requestBody: PopupHomeUpdate;
+    xTenantId?: (string | null);
+};
+
+export type PopupsUpdatePopupHomeResponse = (PopupHomeAdmin);
+
 export type PopupsCreateCheckoutPreviewTokenData = {
     popupId: string;
     xTenantId?: (string | null);
@@ -7196,6 +8974,13 @@ export type PopupsListPortalPopupsData = {
 };
 
 export type PopupsListPortalPopupsResponse = (Array<PopupPublic>);
+
+export type PopupsGetPortalPopupHomeData = {
+    ifNoneMatch?: (string | null);
+    slug: string;
+};
+
+export type PopupsGetPortalPopupHomeResponse = (PopupHomePublic);
 
 export type PopupsGetPortalPopupData = {
     acceptLanguage?: (string | null);
@@ -7302,6 +9087,7 @@ export type ProductsListPortalProductsData = {
      */
     limit?: number;
     popupId?: (string | null);
+    salesFlowId?: (string | null);
     /**
      * Number of items to skip
      */
@@ -7329,6 +9115,90 @@ export type PublishableKeysRevokePublishableKeyData = {
 };
 
 export type PublishableKeysRevokePublishableKeyResponse = (void);
+
+export type SalesFlowsListPortalSalesFlowsData = {
+    popupId: string;
+};
+
+export type SalesFlowsListPortalSalesFlowsResponse = (ListModel_SalesFlowPortalPublic_);
+
+export type SalesFlowsListPortalUpsaleFlowsData = {
+    popupId: string;
+};
+
+export type SalesFlowsListPortalUpsaleFlowsResponse = (ListModel_SalesFlowPortalPublic_);
+
+export type SalesFlowsListPortalDirectSalesFlowsData = {
+    popupId: string;
+};
+
+export type SalesFlowsListPortalDirectSalesFlowsResponse = (ListModel_SalesFlowPortalPublic_);
+
+export type SalesFlowsListSalesFlowsData = {
+    /**
+     * Maximum number of items to return
+     */
+    limit?: number;
+    popupId: string;
+    /**
+     * Number of items to skip
+     */
+    skip?: number;
+    xTenantId?: (string | null);
+};
+
+export type SalesFlowsListSalesFlowsResponse = (ListModel_SalesFlowPublic_);
+
+export type SalesFlowsCreateSalesFlowData = {
+    requestBody: SalesFlowCreate;
+    xTenantId?: (string | null);
+};
+
+export type SalesFlowsCreateSalesFlowResponse = (SalesFlowPublic);
+
+export type SalesFlowsListSalesFlowReadinessData = {
+    popupId: string;
+    xTenantId?: (string | null);
+};
+
+export type SalesFlowsListSalesFlowReadinessResponse = (Array<SalesFlowReadiness>);
+
+export type SalesFlowsListSettingsByTypeData = {
+    xTenantId?: (string | null);
+};
+
+export type SalesFlowsListSettingsByTypeResponse = (FlowSettingsByType);
+
+export type SalesFlowsPreviewSalesFlowStartData = {
+    popupId: string;
+    startFrom?: (string | null);
+    type?: SalesFlowType;
+    xTenantId?: (string | null);
+};
+
+export type SalesFlowsPreviewSalesFlowStartResponse = (FlowStartPreview);
+
+export type SalesFlowsGetSalesFlowData = {
+    flowId: string;
+    xTenantId?: (string | null);
+};
+
+export type SalesFlowsGetSalesFlowResponse = (SalesFlowPublic);
+
+export type SalesFlowsUpdateSalesFlowData = {
+    flowId: string;
+    requestBody: SalesFlowUpdate;
+    xTenantId?: (string | null);
+};
+
+export type SalesFlowsUpdateSalesFlowResponse = (SalesFlowPublic);
+
+export type SalesFlowsDeleteSalesFlowData = {
+    flowId: string;
+    xTenantId?: (string | null);
+};
+
+export type SalesFlowsDeleteSalesFlowResponse = (void);
 
 export type SavedViewsListSavedViewsData = {
     entity: string;
@@ -7613,6 +9483,7 @@ export type ThirdPartyDiscoveryGetThirdPartyOpenapiResponse = ({
 export type TicketingStepsListPortalTicketingStepsData = {
     acceptLanguage?: (string | null);
     popupId: string;
+    salesFlowId?: (string | null);
 };
 
 export type TicketingStepsListPortalTicketingStepsResponse = (ListModel_TicketingStepPublic_);
@@ -7623,6 +9494,7 @@ export type TicketingStepsListTicketingStepsData = {
      */
     limit?: number;
     popupId?: (string | null);
+    salesFlowId?: (string | null);
     /**
      * Number of items to skip
      */
@@ -7660,6 +9532,14 @@ export type TicketingStepsDeleteTicketingStepData = {
 };
 
 export type TicketingStepsDeleteTicketingStepResponse = (void);
+
+export type TicketingStepsCopyStepsToFlowData = {
+    requestBody: CopyStepsToFlowRequest;
+    targetFlowId: string;
+    xTenantId?: (string | null);
+};
+
+export type TicketingStepsCopyStepsToFlowResponse = (CopyStepsToFlowResponse);
 
 export type TracksListTracksData = {
     /**

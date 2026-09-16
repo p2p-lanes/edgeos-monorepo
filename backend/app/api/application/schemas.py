@@ -75,6 +75,13 @@ class ApplicationBase(SQLModel):
     group_id: uuid.UUID | None = Field(
         default=None, foreign_key="groups.id", nullable=True, index=True
     )
+    # The flow this application was submitted under. Required
+    # (sdd/sales-flows-rediseno F4): uq_application_human_flow is keyed on
+    # (human_id, sales_flow_id), and a nullable column made that constraint
+    # enforce nothing, since Postgres treats two NULLs as distinct.
+    sales_flow_id: uuid.UUID = Field(
+        foreign_key="sales_flows.id", nullable=False, index=True
+    )
 
     # Popup-specific fields
     referral: str | None = Field(default=None, nullable=True, max_length=255)
@@ -185,6 +192,11 @@ class ApplicationPublic(BaseModel):
     popup_id: uuid.UUID
     human_id: uuid.UUID
     group_id: uuid.UUID | None = None
+    # The flow this application belongs to, so callers read it instead of
+    # re-deriving it. Always present since sdd/sales-flows-rediseno F4. The
+    # portal's needsFlowChoice (task 9.4) still uses a flow-count check, not
+    # this field — see application/page.tsx for why (deferred, not missing).
+    sales_flow_id: uuid.UUID
 
     # Popup-specific
     referral: str | None = None
@@ -322,6 +334,12 @@ class ApplicationCreate(BaseModel):
     human_id: uuid.UUID | None = None
     group_id: uuid.UUID | None = None  # Optional group to join
 
+    # sdd/sales-flows task 9.7: explicit target flow (URL-derived, e.g. from
+    # the portal's FlowPicker — task 9.4). Must belong to this popup and be
+    # type=application; validated server-side (ApplicationsCRUD.
+    # resolve_target_flow_id). Omitted means the popup's default flow.
+    sales_flow_id: uuid.UUID | None = None
+
     # Attribution columns — groups-rework T-gr-032 (REQ-GR-009, REQ-GR-016)
     invite_id: uuid.UUID | None = None
     referral_id: uuid.UUID | None = None
@@ -394,6 +412,13 @@ class ApplicationAdminCreate(BaseModel):
     status: ApplicationStatus = ApplicationStatus.DRAFT
     group_id: uuid.UUID | None = None
 
+    # sdd/sales-flows task 14.2: explicit target flow for backoffice-created
+    # applications, mirroring ApplicationCreate.sales_flow_id (task 9.7).
+    # Validated by ApplicationsCRUD.resolve_target_flow_id — must belong to
+    # popup_id and be type=application, otherwise 404. Omitted means the
+    # popup's default flow.
+    sales_flow_id: uuid.UUID | None = None
+
     @field_validator("email")
     @classmethod
     def clean_email(cls, v: str) -> str:
@@ -457,7 +482,9 @@ class GrantedPaymentInfo(BaseModel):
     """One $0 payment created by the admin bulk-grant flow."""
 
     payment_id: uuid.UUID
-    application_id: uuid.UUID
+    # None when the person was already at the popup without an application of
+    # their own — the grant went onto their existing attendee row.
+    application_id: uuid.UUID | None
     human_id: uuid.UUID
     email: str
     tickets_created: int

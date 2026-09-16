@@ -1,9 +1,12 @@
 import uuid
 from datetime import UTC, datetime
 
+from sqlalchemy import update
 from sqlalchemy.orm import selectinload
+from sqlalchemy.orm.attributes import set_committed_value
 from sqlmodel import Session, func, select
 
+from app.api.cart._migration import migrate_cart_state
 from app.api.cart.models import Carts
 from app.api.cart.schemas import CartState
 
@@ -49,27 +52,73 @@ class CartsCRUD:
         )
         return session.exec(statement).first()
 
+    def find_by_human_popup_flow(
+        self,
+        session: Session,
+        human_id: uuid.UUID,
+        popup_id: uuid.UUID,
+        sales_flow_id: uuid.UUID,
+    ) -> Carts | None:
+        return session.exec(
+            select(Carts).where(
+                Carts.human_id == human_id,
+                Carts.popup_id == popup_id,
+                Carts.sales_flow_id == sales_flow_id,
+            )
+        ).first()
+
     def get_or_create(
         self,
         session: Session,
         human_id: uuid.UUID,
         popup_id: uuid.UUID,
         tenant_id: uuid.UUID,
+        sales_flow_id: uuid.UUID | None = None,
     ) -> Carts:
         """Get existing cart or create a new empty one."""
-        statement = select(Carts).where(
-            Carts.human_id == human_id,
-            Carts.popup_id == popup_id,
+        cart = (
+            self.find_by_human_popup_flow(session, human_id, popup_id, sales_flow_id)
+            if sales_flow_id
+            else self.find_by_human_popup(session, human_id, popup_id)
         )
-        cart = session.exec(statement).first()
 
+        if cart and sales_flow_id:
+            legacy = session.exec(
+                select(Carts).where(
+                    Carts.human_id == human_id,
+                    Carts.popup_id == popup_id,
+                    Carts.sales_flow_id.is_(None),  # type: ignore[union-attr]
+                )
+            ).first()
+            if legacy:
+                session.delete(legacy)
+                session.commit()
+            return cart
         if cart:
             return cart
+
+        if sales_flow_id:
+            from app.api.sales_flow.crud import sales_flows_crud
+
+            default = sales_flows_crud.get_default_flow(session, popup_id)
+            legacy = session.exec(
+                select(Carts).where(
+                    Carts.human_id == human_id,
+                    Carts.popup_id == popup_id,
+                    Carts.sales_flow_id.is_(None),  # type: ignore[union-attr]
+                )
+            ).first()
+            if legacy and default is not None and default.id == sales_flow_id:
+                legacy.sales_flow_id = sales_flow_id
+                session.add(legacy)
+                session.commit()
+                return legacy
 
         cart = Carts(
             tenant_id=tenant_id,
             human_id=human_id,
             popup_id=popup_id,
+            sales_flow_id=sales_flow_id,
             items={},
         )
         session.add(cart)
@@ -90,22 +139,45 @@ class CartsCRUD:
         races with concurrent deletes (DELETE /my/{popup_id}, checkout cleanup),
         which under RLS surfaces as "Could not refresh instance".
         """
-        cart.items = items.model_dump()
+        cart.items = items.model_dump(mode="json")
         cart.updated_at = datetime.now(UTC)
         session.add(cart)
         session.commit()
         return cart
+
+    def restore_items(self, session: Session, cart: Carts) -> CartState:
+        """Return canonical items and persist a legacy conversion before returning."""
+        raw_items = cart.items
+        items, was_legacy = migrate_cart_state(raw_items)
+        if was_legacy:
+            serialized = items.model_dump(mode="json")
+            statement = (
+                update(Carts)
+                .where(Carts.id == cart.id, Carts.items == raw_items)
+                .values(items=serialized, updated_at=cart.updated_at)
+                .execution_options(synchronize_session=False)
+            )
+            result = session.execute(statement)
+            session.commit()
+            if result.rowcount:
+                set_committed_value(cart, "items", serialized)
+            else:
+                session.refresh(cart)
+                return self.restore_items(session, cart)
+        return items
 
     def delete_by_human_popup(
         self,
         session: Session,
         human_id: uuid.UUID,
         popup_id: uuid.UUID,
+        sales_flow_id: uuid.UUID,
     ) -> None:
-        """Delete cart for a specific human and popup."""
+        """Delete a cart for one human, popup, and sales flow."""
         statement = select(Carts).where(
             Carts.human_id == human_id,
             Carts.popup_id == popup_id,
+            Carts.sales_flow_id == sales_flow_id,
         )
         cart = session.exec(statement).first()
         if cart:
@@ -114,8 +186,7 @@ class CartsCRUD:
 
     # ------------------------------------------------------------------
     # Open-checkout carts. Keyed by human (resolved from the buyer email) just
-    # like authenticated portal carts, so a buyer has a single cart per popup
-    # across both flows.
+    # like authenticated portal carts, so a buyer has one cart per popup and flow.
     # ------------------------------------------------------------------
 
     def upsert_open_cart(
@@ -127,40 +198,29 @@ class CartsCRUD:
         human_id: uuid.UUID,
         email: str,
         items: CartState,
+        sales_flow_id: uuid.UUID | None = None,
     ) -> Carts:
         """Create or update the open-checkout cart for (human, popup).
 
-        Shares the uq_cart_human_popup key with the authenticated portal cart,
-        so the two flows converge on one row. Email is stored for display and
-        restore-link continuity only, not as a key.
+        Shares the human/popup/flow key with the authenticated portal cart. Email
+        is stored for display and restore-link continuity only, not as a key.
         """
-        cart = self.find_by_human_popup(session, human_id, popup_id)
-        if cart is None:
-            cart = Carts(
-                tenant_id=tenant_id,
-                human_id=human_id,
-                popup_id=popup_id,
-                email=email.lower(),
-                items=items.model_dump(),
-            )
-            session.add(cart)
-            session.commit()
-            session.refresh(cart)
-            return cart
-
-        cart.items = items.model_dump()
+        cart = self.get_or_create(
+            session,
+            human_id=human_id,
+            popup_id=popup_id,
+            tenant_id=tenant_id,
+            sales_flow_id=sales_flow_id,
+        )
         cart.email = email.lower()
-        cart.updated_at = datetime.now(UTC)
-        session.add(cart)
-        session.commit()
-        session.refresh(cart)
-        return cart
+        return self.update_items(session, cart, items)
 
     def find_by_id_popup(
         self,
         session: Session,
         cart_id: uuid.UUID,
         popup_id: uuid.UUID,
+        sales_flow_id: uuid.UUID | None = None,
     ) -> Carts | None:
         """Find a cart by id, scoped to a popup (read-only).
 
@@ -170,6 +230,8 @@ class CartsCRUD:
             Carts.id == cart_id,
             Carts.popup_id == popup_id,
         )
+        if sales_flow_id is not None:
+            statement = statement.where(Carts.sales_flow_id == sales_flow_id)
         return session.exec(statement).first()
 
 

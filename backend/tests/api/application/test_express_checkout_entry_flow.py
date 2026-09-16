@@ -31,6 +31,12 @@ from app.api.popup.models import Popups
 from app.api.tenant.models import Tenants
 from app.api.user.models import Users
 from app.core.security import create_access_token
+from tests._flow_helpers import (
+    default_flow_id,
+    group_flow_id,
+    invite_flow_id,
+    provision_default_flow,
+)
 
 REQUIRED_OUTSIDE_LABEL = "T-Shirt Size"
 
@@ -74,14 +80,19 @@ def _make_popup_with_required_field_outside_express(
     )
     db.add(popup)
     db.flush()
+    # Form rows belong to a flow, and a popup built directly never went
+    # through the creation path that provisions the default one.
+    provision_default_flow(db, popup)
 
     personal_section = FormSections(
+        sales_flow_id=default_flow_id(db, popup.id),
         tenant_id=tenant.id,
         popup_id=popup.id,
         label="Personal Information",
         order=0,
     )
     extra_section = FormSections(
+        sales_flow_id=default_flow_id(db, popup.id),
         tenant_id=tenant.id,
         popup_id=popup.id,
         label="Logistics",
@@ -93,6 +104,7 @@ def _make_popup_with_required_field_outside_express(
 
     db.add(
         BaseFieldConfigs(
+            sales_flow_id=default_flow_id(db, popup.id),
             tenant_id=tenant.id,
             popup_id=popup.id,
             field_name="telegram",
@@ -103,6 +115,7 @@ def _make_popup_with_required_field_outside_express(
     )
     db.add(
         FormFields(
+            sales_flow_id=default_flow_id(db, popup.id),
             tenant_id=tenant.id,
             popup_id=popup.id,
             section_id=extra_section.id,
@@ -119,6 +132,7 @@ def _make_popup_with_required_field_outside_express(
 
 def _make_group(db: Session, popup: Popups) -> Groups:
     group = Groups(
+        sales_flow_id=group_flow_id(db, popup.id),
         tenant_id=popup.tenant_id,
         popup_id=popup.id,
         name=f"Entry Group {uuid.uuid4().hex[:6]}",
@@ -134,6 +148,7 @@ def _make_group(db: Session, popup: Popups) -> Groups:
 
 def _make_invite(db: Session, popup: Popups, creator: Users) -> Invites:
     invite = Invites(
+        sales_flow_id=invite_flow_id(db, popup.id),
         tenant_id=popup.tenant_id,
         popup_id=popup.id,
         token=f"tok-{uuid.uuid4().hex[:16]}",
@@ -152,6 +167,7 @@ def _make_invite(db: Session, popup: Popups, creator: Users) -> Invites:
 def _make_referral(db: Session, popup: Popups, referrer: Humans) -> Invites:
     """A referral is an Invite carrying a referrer_human_id."""
     referral = Invites(
+        sales_flow_id=invite_flow_id(db, popup.id),
         tenant_id=popup.tenant_id,
         popup_id=popup.id,
         referrer_human_id=referrer.id,
@@ -257,6 +273,7 @@ class TestExpressCheckoutEntryFlow:
         resp = client.patch(
             f"/api/v1/applications/my/{popup.id}",
             json={"first_name": "Edited", "status": "in review"},
+            params={"sales_flow_id": created.json()["sales_flow_id"]},
             headers=_auth(_human_token(human)),
         )
 

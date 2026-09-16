@@ -22,6 +22,7 @@ from app.api.attendee.models import Attendees
 from app.api.human.models import Humans
 from app.api.popup.models import Popups
 from app.api.tenant.models import Tenants
+from tests._flow_helpers import application_flow_id
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -75,6 +76,7 @@ def _make_app_attendee(
     from app.api.application.schemas import ApplicationStatus
 
     application = Applications(
+        sales_flow_id=application_flow_id(db, popup.id),
         id=uuid.uuid4(),
         tenant_id=tenant.id,
         popup_id=popup.id,

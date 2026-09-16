@@ -6,12 +6,13 @@ import { CheckoutService, type OpenTicketingPurchaseCreate } from "@/client"
 import { withCheckoutLocale } from "@/helpers/checkout"
 import { getMetaAttribution } from "@/lib/meta-pixel"
 
-export function useOpenTicketingPurchase(slug: string) {
+export function useOpenTicketingPurchase(slug: string, flowSlug: string) {
   const { i18n } = useTranslation()
   return useMutation({
     mutationFn: (requestBody: OpenTicketingPurchaseCreate) =>
       CheckoutService.purchaseOpenTicketing({
         slug,
+        flowSlug,
         requestBody: {
           ...getMetaAttribution(),
           ...requestBody,

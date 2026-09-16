@@ -1,6 +1,6 @@
 import { useMemo } from "react"
 import type { TicketingStepPublic } from "@/client"
-import { CONTENT_ONLY_TEMPLATES } from "@/components/checkout-flow/registries/variantRegistry"
+import { PRODUCT_INDEPENDENT_TEMPLATES } from "@/components/checkout-flow/registries/templateClassification"
 import type { ProductsPass } from "@/types/Products"
 
 export interface StepProductResolution {
@@ -16,8 +16,9 @@ function resolveProductsForStep(
   step: TicketingStepPublic,
   allProducts: ProductsPass[],
 ): ProductsPass[] {
-  // Content-only templates have no products by design.
-  if (step.template && CONTENT_ONLY_TEMPLATES.has(step.template)) return []
+  // Content and external-inventory templates have no catalog products by design.
+  if (step.template && PRODUCT_INDEPENDENT_TEMPLATES.has(step.template))
+    return []
   // Confirm step never resolves products.
   if (step.step_type === "confirm") return []
   // No category configured → empty list (silent skip per Decision #2 of proposal).

@@ -30,6 +30,7 @@ from app.api.popup.models import Popups
 from app.api.product.models import Products
 from app.api.tenant.models import Tenants
 from app.core.security import create_access_token
+from tests._flow_helpers import application_flow_id
 
 
 class _FakeProduct:
@@ -181,6 +182,7 @@ def _make_application(
     db: Session, tenant: Tenants, popup: Popups, human: Humans
 ) -> Applications:
     application = Applications(
+        sales_flow_id=application_flow_id(db, popup.id),
         tenant_id=tenant.id,
         popup_id=popup.id,
         human_id=human.id,

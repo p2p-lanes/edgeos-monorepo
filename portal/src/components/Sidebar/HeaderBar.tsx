@@ -141,7 +141,7 @@ const HeaderBar = () => {
 
   const pathSegments = pathname.split("/").filter(Boolean).slice(2)
   const fallbackSegments =
-    city?.sale_type === "direct" ? ["checkout"] : ["application"]
+    city?.takes_applications === false ? ["checkout"] : ["application"]
   const pathsToDisplay =
     pathSegments.length > 0 ? pathSegments : fallbackSegments
 
@@ -151,15 +151,14 @@ const HeaderBar = () => {
   )
 
   // Build cumulative href per segment so each breadcrumb links back to its
-  // own level. Anchored at `/portal/{slug}` when a slug is present;
-  // otherwise we hand the raw path through and let the segment render as
-  // a non-clickable label via `href=undefined`.
+  // own level. Shop has no aggregate route, so it remains a label. Without a
+  // city slug, all segments render as non-clickable labels.
   const base = city?.slug ? `/portal/${city.slug}` : null
 
   return (
     <header
       className={cn(
-        "flex h-14 shrink-0 items-center gap-4 border-b bg-sidebar px-6 text-nav-text transition-[height,transform] duration-300 ease-out",
+        "portal-chrome flex h-14 shrink-0 items-center gap-4 border-b bg-sidebar/95 px-6 text-nav-text backdrop-blur transition-[height,transform] duration-300 ease-out",
         hidden && "h-0 -translate-y-full overflow-hidden border-b-0",
       )}
     >
@@ -177,7 +176,7 @@ const HeaderBar = () => {
           {pathsToDisplay.map((path, idx) => {
             const isCurrent = idx === pathsToDisplay.length - 1
             const href =
-              base != null
+              base != null && path !== "shop"
                 ? `${base}/${pathsToDisplay.slice(0, idx + 1).join("/")}`
                 : undefined
             return (
@@ -200,7 +199,7 @@ const HeaderBar = () => {
       <div className="ml-auto flex items-center gap-2">
         <MobilePopupSwitcher />
         <CartBadge />
-        <LanguageSwitcher />
+        <LanguageSwitcher portalContentClassName="portal-chrome" />
       </div>
     </header>
   )

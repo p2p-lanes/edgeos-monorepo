@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest"
 import {
   buildSectionGroups,
+  getStepAttendeeCategoryIds,
+  hasRenderableSectionProducts,
   isSectionVisibleForApp,
 } from "@/hooks/checkout/ticketSections"
 import type { AttendeePassState } from "@/types/Attendee"
@@ -176,6 +178,56 @@ describe("buildSectionGroups — attendee_categories filtering", () => {
     // main attendee sees only the ungated section
     expect(result).toHaveLength(1)
     expect(result[0].section.key).toBe("all")
+  })
+
+  it("does not keep an attendee visible for a purchase from another step", () => {
+    const purchasedElsewhere = {
+      ...makeProduct("spouse-ticket"),
+      purchased: true,
+    }
+    const parking = makeProduct("parking")
+    const mainOnlySections = [
+      {
+        key: "parking",
+        label: "Parking",
+        order: 0,
+        product_ids: [parking.id],
+        attendee_categories: ["main"],
+      },
+    ]
+
+    expect(
+      hasRenderableSectionProducts(
+        makeAttendee("spouse", [purchasedElsewhere, parking], "spouse"),
+        mainOnlySections,
+      ),
+    ).toBe(false)
+  })
+
+  it("derives companion actions from the current step category gates", () => {
+    expect(
+      getStepAttendeeCategoryIds([
+        {
+          key: "parking",
+          label: "Parking",
+          order: 0,
+          product_ids: ["parking"],
+          attendee_categories: ["main"],
+        },
+      ]),
+    ).toEqual(["main"])
+
+    expect(
+      getStepAttendeeCategoryIds([
+        {
+          key: "open",
+          label: "Open",
+          order: 0,
+          product_ids: ["ticket"],
+          attendee_categories: null,
+        },
+      ]),
+    ).toBeNull()
   })
 })
 

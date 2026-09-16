@@ -861,6 +861,20 @@ AdminOrApiKeySession_ProductsWrite = Annotated[
     Session, Depends(get_admin_or_api_key_tenant_session("products:write"))
 ]
 
+# accommodations (lodging inventory: properties, room types, units, bookings)
+AdminOrApiKey_AccommodationsRead = Annotated[
+    "UserPublic", Depends(CurrentAdminOrApiKey("accommodations:read"))
+]
+AdminOrApiKey_AccommodationsWrite = Annotated[
+    "UserPublic", Depends(CurrentAdminOrApiKey("accommodations:write"))
+]
+AdminOrApiKeySession_AccommodationsRead = Annotated[
+    Session, Depends(get_admin_or_api_key_tenant_session("accommodations:read"))
+]
+AdminOrApiKeySession_AccommodationsWrite = Annotated[
+    Session, Depends(get_admin_or_api_key_tenant_session("accommodations:write"))
+]
+
 # coupons
 AdminOrApiKey_CouponsRead = Annotated[
     "UserPublic", Depends(CurrentAdminOrApiKey("coupons:read"))

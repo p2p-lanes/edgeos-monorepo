@@ -7,6 +7,10 @@
  */
 
 import type { AttendeePassState } from "@/types/Attendee"
+import {
+  type CheckoutRecipientPassState,
+  canSelectRecipientProducts,
+} from "@/types/checkout"
 import type { ProductsPass } from "@/types/Products"
 
 // ---------------------------------------------------------------------------
@@ -92,6 +96,9 @@ export function buildSectionGroups(
   attendee: AttendeePassState,
   sections: TemplateSection[],
 ): { section: TemplateSection; products: ProductsPass[] }[] {
+  if (!canSelectRecipientProducts(attendee as CheckoutRecipientPassState)) {
+    return []
+  }
   if (sections.length === 0) {
     return buildDurationGroups(attendee)
   }
@@ -117,6 +124,31 @@ export function buildSectionGroups(
         .filter(Boolean) as ProductsPass[],
     }))
     .filter((g) => g.products.length > 0)
+}
+
+export function hasRenderableSectionProducts(
+  attendee: AttendeePassState,
+  sections: TemplateSection[],
+): boolean {
+  return buildSectionGroups(attendee, sections).length > 0
+}
+
+/** Category IDs that can add recipients in this step. Null means unrestricted. */
+export function getStepAttendeeCategoryIds(
+  sections: TemplateSection[],
+): string[] | null {
+  if (
+    sections.length === 0 ||
+    sections.some((section) => section.attendee_categories == null)
+  ) {
+    return null
+  }
+
+  return [
+    ...new Set(
+      sections.flatMap((section) => section.attendee_categories ?? []),
+    ),
+  ]
 }
 
 // ---------------------------------------------------------------------------

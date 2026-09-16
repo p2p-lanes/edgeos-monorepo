@@ -1,6 +1,7 @@
 export type ThankYouOrderItem = {
-  name: string
-  quantity: number
+  title: string
+  qty: number
+  price?: number
 }
 
 export type ThankYouOrder = {
@@ -8,7 +9,7 @@ export type ThankYouOrder = {
   first_name?: string
   email_hash?: string
   items?: ThankYouOrderItem[]
-  amount_total?: string
+  amount_total?: string | number
   currency?: string
   issued_at?: string
 }
@@ -48,7 +49,42 @@ export function decodeOrderData(data: string | null): ThankYouOrder | null {
     const bytes = Uint8Array.from(binary, (char) => char.charCodeAt(0))
     const json = new TextDecoder().decode(bytes)
     const parsed = JSON.parse(json)
-    return typeof parsed === "object" && parsed !== null ? parsed : null
+    if (typeof parsed !== "object" || parsed === null) return null
+
+    const order = parsed as Omit<ThankYouOrder, "items"> & {
+      items?: Array<{
+        title?: unknown
+        qty?: unknown
+        price?: unknown
+        name?: unknown
+        quantity?: unknown
+      }>
+    }
+    const items = Array.isArray(order.items)
+      ? order.items.flatMap((item) => {
+          const title =
+            typeof item.title === "string"
+              ? item.title
+              : typeof item.name === "string"
+                ? item.name
+                : null
+          const qty =
+            typeof item.qty === "number"
+              ? item.qty
+              : typeof item.quantity === "number"
+                ? item.quantity
+                : null
+          if (title === null || qty === null) return []
+          return [
+            {
+              title,
+              qty,
+              ...(typeof item.price === "number" ? { price: item.price } : {}),
+            },
+          ]
+        })
+      : undefined
+    return { ...order, items }
   } catch {
     return null
   }

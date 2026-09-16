@@ -169,7 +169,9 @@ class AttendeeProductsBase(SQLModel):
         ),
     )
     tenant_id: uuid.UUID = Field(foreign_key="tenants.id", index=True)
-    attendee_id: uuid.UUID = Field(foreign_key="attendees.id", index=True)
+    attendee_id: uuid.UUID | None = Field(
+        default=None, foreign_key="attendees.id", index=True, nullable=True
+    )
     product_id: uuid.UUID = Field(foreign_key="products.id", index=True)
     check_in_code: str = Field(index=True)
     payment_id: uuid.UUID | None = Field(
@@ -177,6 +179,17 @@ class AttendeeProductsBase(SQLModel):
         foreign_key="payments.id",
         nullable=True,
         index=True,
+    )
+    payment_product_id: uuid.UUID | None = Field(
+        default=None,
+        foreign_key="payment_products.id",
+        nullable=True,
+    )
+    unit_index: int | None = Field(default=None, nullable=True)
+    product_category_snapshot: str | None = Field(default=None, nullable=True)
+    requires_check_in_snapshot: bool | None = Field(default=None, nullable=True)
+    revoked_at: datetime | None = Field(
+        default=None, sa_column=Column(DateTime(timezone=True), nullable=True)
     )
     # Per-purchase metadata blob. Populated by step-specific submission logic
     # (e.g. meal_plan_select stores daily_choices + dietary_restriction +
@@ -211,7 +224,7 @@ class AttendeeProductPublic(BaseModel):
     """
 
     id: uuid.UUID
-    attendee_id: uuid.UUID
+    attendee_id: uuid.UUID | None
     product_id: uuid.UUID
     check_in_code: str
     payment_id: uuid.UUID | None = None
@@ -221,6 +234,9 @@ class AttendeeProductPublic(BaseModel):
     duration_type: str | None = None
     last_scan_at: datetime | None = None
     purchase_metadata: dict | None = None
+    product_category_snapshot: str | None = None
+    requires_check_in_snapshot: bool | None = None
+    revoked_at: datetime | None = None
 
     model_config = ConfigDict(from_attributes=True, extra="forbid")
 

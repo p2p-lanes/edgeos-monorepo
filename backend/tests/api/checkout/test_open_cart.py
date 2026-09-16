@@ -16,9 +16,11 @@ from app.api.cart.models import Carts
 from app.api.human.crud import humans_crud
 from app.api.popup.models import Popups
 from app.api.product.models import Products
+from app.api.sales_flow.crud import sales_flows_crud
 from app.api.shared.enums import SaleType
 from app.api.tenant.models import Tenants
 from app.utils.checkout_signing import build_cart_restore_token
+from tests._flow_helpers import seed_default_steps
 
 
 @pytest.fixture(autouse=True)
@@ -48,6 +50,7 @@ def _make_popup(
     )
     db.add(popup)
     db.flush()
+    seed_default_steps(db, popup, sale_type=SaleType.direct.value)
     return popup
 
 
@@ -69,9 +72,11 @@ def _make_product(db: Session, popup: Popups, *, price: str = "100.00") -> Produ
 
 def _items(product: Products, *, promo_code: str | None = None) -> dict:
     return {
-        "passes": [
+        "lines": [
             {
-                "attendee_id": "att-1",
+                "kind": "product",
+                "assignment": {"kind": "attendee", "attendee_id": "att-1"},
+                "step_type": "tickets",
                 "product_id": str(product.id),
                 "quantity": 2,
             }
@@ -91,7 +96,7 @@ def test_upsert_open_cart_creates_cart_and_returns_restore_token(
     db.commit()
 
     response = client.put(
-        f"/api/v1/checkout/{popup.slug}/cart",
+        f"/api/v1/checkout/{popup.slug}/checkout/cart",
         json={"email": "buyer@test.com", "items": _items(product, promo_code="X10")},
         headers={"X-Tenant-Id": str(tenant_a.id)},
     )
@@ -100,7 +105,11 @@ def test_upsert_open_cart_creates_cart_and_returns_restore_token(
     body = response.json()
     assert body["email"] == "buyer@test.com"
     assert body["items"]["promo_code"] == "X10"
-    assert body["restore_token"] == build_cart_restore_token(body["id"], "s3cr3t")
+    flow = sales_flows_crud.get_default_flow(db, popup.id)
+    assert flow is not None
+    assert body["restore_token"] == build_cart_restore_token(
+        body["id"], "s3cr3t", popup_id=str(popup.id), flow_id=str(flow.id)
+    )
 
     cart = db.exec(
         select(Carts).where(Carts.popup_id == popup.id, Carts.human_id.is_not(None))
@@ -140,7 +149,7 @@ def test_open_cart_converges_with_authenticated_cart(
 
     # Then the open-checkout upsert for the same email resolves to that cart.
     response = client.put(
-        f"/api/v1/checkout/{popup.slug}/cart",
+        f"/api/v1/checkout/{popup.slug}/checkout/cart",
         json={"email": "buyer@test.com", "items": _items(product, promo_code="A")},
         headers={"X-Tenant-Id": str(tenant_a.id)},
     )
@@ -161,7 +170,7 @@ def test_upsert_open_cart_without_secret_has_null_restore_token(
     db.commit()
 
     response = client.put(
-        f"/api/v1/checkout/{popup.slug}/cart",
+        f"/api/v1/checkout/{popup.slug}/checkout/cart",
         json={"email": "buyer@test.com", "items": _items(product)},
         headers={"X-Tenant-Id": str(tenant_a.id)},
     )
@@ -180,12 +189,12 @@ def test_upsert_open_cart_is_idempotent_per_email(
     db.commit()
 
     first = client.put(
-        f"/api/v1/checkout/{popup.slug}/cart",
+        f"/api/v1/checkout/{popup.slug}/checkout/cart",
         json={"email": "buyer@test.com", "items": _items(product, promo_code="A")},
         headers={"X-Tenant-Id": str(tenant_a.id)},
     )
     second = client.put(
-        f"/api/v1/checkout/{popup.slug}/cart",
+        f"/api/v1/checkout/{popup.slug}/checkout/cart",
         json={"email": "buyer@test.com", "items": _items(product, promo_code="B")},
         headers={"X-Tenant-Id": str(tenant_a.id)},
     )
@@ -217,12 +226,12 @@ def test_upsert_open_cart_email_is_case_insensitive(
     db.commit()
 
     first = client.put(
-        f"/api/v1/checkout/{popup.slug}/cart",
+        f"/api/v1/checkout/{popup.slug}/checkout/cart",
         json={"email": "Buyer@Test.com", "items": _items(product, promo_code="A")},
         headers={"X-Tenant-Id": str(tenant_a.id)},
     )
     second = client.put(
-        f"/api/v1/checkout/{popup.slug}/cart",
+        f"/api/v1/checkout/{popup.slug}/checkout/cart",
         json={"email": "BUYER@test.com", "items": _items(product, promo_code="B")},
         headers={"X-Tenant-Id": str(tenant_a.id)},
     )
@@ -249,13 +258,13 @@ def test_restore_open_cart_with_valid_signature_returns_items(
     db.commit()
 
     created = client.put(
-        f"/api/v1/checkout/{popup.slug}/cart",
+        f"/api/v1/checkout/{popup.slug}/checkout/cart",
         json={"email": "buyer@test.com", "items": _items(product, promo_code="X10")},
         headers={"X-Tenant-Id": str(tenant_a.id)},
     ).json()
 
     response = client.get(
-        f"/api/v1/checkout/{popup.slug}/cart",
+        f"/api/v1/checkout/{popup.slug}/checkout/cart",
         params={"cid": created["id"], "sig": created["restore_token"]},
         headers={"X-Tenant-Id": str(tenant_a.id)},
     )
@@ -265,7 +274,7 @@ def test_restore_open_cart_with_valid_signature_returns_items(
     assert body["id"] == created["id"]
     assert body["email"] == "buyer@test.com"
     assert body["items"]["promo_code"] == "X10"
-    assert body["items"]["passes"][0]["quantity"] == 2
+    assert body["items"]["lines"][0]["quantity"] == 2
 
 
 def test_restore_open_cart_invalid_signature_returns_403(
@@ -278,18 +287,18 @@ def test_restore_open_cart_invalid_signature_returns_403(
     db.commit()
 
     created = client.put(
-        f"/api/v1/checkout/{popup.slug}/cart",
+        f"/api/v1/checkout/{popup.slug}/checkout/cart",
         json={"email": "buyer@test.com", "items": _items(product)},
         headers={"X-Tenant-Id": str(tenant_a.id)},
     ).json()
 
     response = client.get(
-        f"/api/v1/checkout/{popup.slug}/cart",
+        f"/api/v1/checkout/{popup.slug}/checkout/cart",
         params={"cid": created["id"], "sig": "tampered"},
         headers={"X-Tenant-Id": str(tenant_a.id)},
     )
 
-    assert response.status_code == 403, response.text
+    assert response.status_code == 404, response.text
 
 
 def test_restore_open_cart_without_secret_returns_404(
@@ -304,13 +313,13 @@ def test_restore_open_cart_without_secret_returns_404(
     db.commit()
 
     created = client.put(
-        f"/api/v1/checkout/{popup.slug}/cart",
+        f"/api/v1/checkout/{popup.slug}/checkout/cart",
         json={"email": "buyer@test.com", "items": _items(product)},
         headers={"X-Tenant-Id": str(tenant_a.id)},
     ).json()
 
     response = client.get(
-        f"/api/v1/checkout/{popup.slug}/cart",
+        f"/api/v1/checkout/{popup.slug}/checkout/cart",
         params={"cid": created["id"], "sig": "anything"},
         headers={"X-Tenant-Id": str(tenant_a.id)},
     )
@@ -330,7 +339,7 @@ def test_restore_open_cart_unknown_cid_returns_404(
     valid_sig = build_cart_restore_token(missing_cid, "s3cr3t")
 
     response = client.get(
-        f"/api/v1/checkout/{popup.slug}/cart",
+        f"/api/v1/checkout/{popup.slug}/checkout/cart",
         params={"cid": missing_cid, "sig": valid_sig},
         headers={"X-Tenant-Id": str(tenant_a.id)},
     )

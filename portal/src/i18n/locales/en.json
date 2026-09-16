@@ -48,6 +48,7 @@
   "status": {
     "not_started": "Not started",
     "draft": "Draft",
+    "pending_fee": "Application fee due",
     "in_review": "Application submitted",
     "accepted": "Application accepted",
     "rejected": "Application rejected",
@@ -62,6 +63,7 @@
   "cta": {
     "not_started": "Apply",
     "draft": "Continue Application",
+    "pending_fee": "Pay Application Fee",
     "in_review": "Edit Application",
     "accepted": "Go to Passes",
     "rejected": "",
@@ -72,7 +74,79 @@
     "no_active_popups": "No Active Popups",
     "no_active_popups_description": "There are no active popups available at the moment. Please check back later.",
     "no_profile": "No profile data available.",
-    "no_profile_contact": "Please contact support if you believe this is an error."
+    "no_profile_contact": "Please contact support if you believe this is an error.",
+    "direct_sales_title": "Purchase options",
+    "direct_sales_description": "Choose an available option for this event.",
+    "door_generic": "Your application",
+    "door_status": {
+      "accepted": "Accepted",
+      "in_review": "In review",
+      "draft": "Draft",
+      "rejected": "Not accepted",
+      "none": "Open"
+    },
+    "door_action": {
+      "passes": "View my purchases",
+      "application": "View application",
+      "apply": "Apply"
+    }
+  },
+  "shop": {
+    "approval_required_title": "Approval required",
+    "approval_required_description": "Your application must be approved before you can purchase this option.",
+    "approval_required_cta": "View application",
+    "estimated_total": "Estimated total",
+    "definitive_total": "Total"
+  },
+  "orders": {
+    "title": "Payments",
+    "description": "Your payment history for this event.",
+    "empty_title": "No payments yet",
+    "empty_description": "Your payment history will appear here.",
+    "total": "Total",
+    "lines": "Payment items",
+    "line_quantity": "Quantity: {{count}}",
+    "legacy_purchase": "Legacy purchase",
+    "invoice": "Invoice",
+    "download_invoice_error": "Failed to download invoice. Please try again.",
+    "status": {
+      "approved": "Approved",
+      "pending": "Pending",
+      "rejected": "Rejected",
+      "expired": "Expired",
+      "cancelled": "Cancelled",
+      "unknown": "Unknown payment status"
+    }
+  },
+  "people": {
+    "title": "You & your group",
+    "description": "Your attendee details and those of companions you manage for this event.",
+    "primary": "Primary attendee",
+    "dependent": "Dependent",
+    "can_manage": "Managed by you",
+    "empty_title": "No attendees linked yet",
+    "empty_description": "After your tickets are confirmed, you and any companions you manage will appear here.",
+    "browse_tickets": "Browse tickets"
+  },
+  "tickets_access": {
+    "title": "Tickets",
+    "description": "Your active event tickets and check-in items.",
+    "empty_title": "No tickets or check-in items yet",
+    "empty_description": "Active event tickets and check-in items will appear here.",
+    "purchased_by_you": "Purchased by you",
+    "show_code": "Show check-in code for {{ticket}}",
+    "checked_in": "Checked in",
+    "active": "Ready for check-in",
+    "access_active": "Access active",
+    "code_title": "Check-in code",
+    "code_description": "Use this code when checking in.",
+    "duration": {
+      "day": "Daily event access",
+      "week": "Weekly event access",
+      "month": "Monthly event access",
+      "full": "Full event access"
+    },
+    "qr_alt": "QR code"
   },
   "auth": {
     "sign_up_or_log_in": "Sign Up or Log In",
@@ -244,7 +318,19 @@
     "cart": {
       "close_aria": "Close cart",
       "empty_title": "Your cart is empty",
-      "empty_description": "Please go back and select some passes to continue."
+      "empty_description": "Please go back and select some passes to continue.",
+      "unknown_attendee": "Unknown attendee",
+      "passes": "Passes",
+      "housing": "Housing",
+      "full_stay": "Full stay",
+      "merchandise": "Merchandise",
+      "patron_contribution": "Patron Contribution",
+      "community_support": "Community Support",
+      "meal_plans": "Meal Plans",
+      "pass_protection": "Pass Protection",
+      "pass_protection_description": "Coverage for all passes",
+      "promo_code": "Promo Code",
+      "promo_code_expired": "Your promo code is no longer valid"
     },
     "actions": {
       "pay": "Pay",
@@ -278,6 +364,109 @@
         "next_image_aria": "Next image"
       }
     },
+    "accommodation": {
+      "default_notice": "Accommodation is paid in full at checkout and is non-refundable.",
+      "in_cart": "In cart",
+      "sleeps": "Sleeps {{count}}",
+      "nights_one": "{{count}} night",
+      "nights_other": "{{count}} nights",
+      "monthly_rate": "monthly rate",
+      "per_night": "night",
+      "includes_tax": "Includes {{amount}} lodging tax",
+      "remove": "Remove",
+      "select": "Select",
+      "only_left_one": "Only {{count}} left",
+      "only_left_other": "Only {{count}} left",
+      "guests_label": "Guests",
+      "guests_one": "{{count}} guest",
+      "guests_other": "{{count}} guests",
+      "guest_name_placeholder": "Guest {{number}} full name",
+      "no_rooms": "No accommodation is available for this checkout.",
+      "check_in": "Check-in",
+      "check_out": "Check-out",
+      "who_is_staying": "Who is staying",
+      "cart_title": "Accommodation",
+      "bed_count": "{{count}} {{type}}",
+      "bed_types": {
+        "king": "King bed",
+        "queen": "Queen bed",
+        "double": "Double bed",
+        "single": "Single bed",
+        "bunk": "Bunk bed",
+        "sofa": "Sofa bed"
+      },
+      "unavailable": {
+        "sold_out": "Fully booked for these dates",
+        "min_stay_not_met": "Needs a longer stay",
+        "outside_bookable_window": "Not available on these dates",
+        "over_capacity": "Too small for your party",
+        "inactive": "Not available",
+        "default": "Not available for these dates"
+      },
+      "stay": {
+        "fewer_guests": "One guest fewer",
+        "more_guests": "One guest more",
+        "checking": "Checking what's free…",
+        "results_one": "{{count}} room for these nights",
+        "results_other": "{{count}} rooms for these nights"
+      },
+      "removed": {
+        "extend_stay_one": "{{count}} more room opens at {{nights}} nights.",
+        "extend_stay_other": "{{count}} more rooms open at {{nights}} nights.",
+        "extend_stay_cta_one": "Stay {{count}} night",
+        "extend_stay_cta_other": "Stay {{count}} nights",
+        "opens_later_one": "{{count}} more room opens on {{date}}.",
+        "opens_later_other": "{{count}} more rooms open on {{date}}.",
+        "move_stay_cta": "Move to {{date}}",
+        "closed_earlier_one": "{{count}} room was bookable until {{date}}.",
+        "closed_earlier_other": "{{count}} rooms were bookable until {{date}}.",
+        "party_too_big_one": "{{count}} room sleeps fewer than {{guests}}. The largest here sleeps {{largest}}.",
+        "party_too_big_other": "{{count}} rooms sleep fewer than {{guests}}. The largest here sleeps {{largest}}.",
+        "taken_one": "{{count}} room is booked for these nights.",
+        "taken_other": "{{count}} rooms are booked for these nights."
+      },
+      "empty": {
+        "title": "No rooms for {{from}} to {{to}}",
+        "body": "Every room here is either booked, too small for your party, or asks for a longer stay."
+      },
+      "dropped": "{{room}} left your stay: {{reason}}.",
+      "form": {
+        "lead_guest": "Lead guest",
+        "guest_number": "Guest {{number}}",
+        "name": "Full name",
+        "not_filled_in": "Not filled in yet",
+        "complete": "Complete",
+        "missing_count_one": "{{count}} missing",
+        "missing_count_other": "{{count}} missing",
+        "same_as_lead": "Same as lead guest",
+        "progress": "{{complete}} of {{total}} guests complete",
+        "booking_contact": "Booking contact",
+        "booking_contact_hint": "Who the property contacts about this room"
+      },
+      "view_details": "View details",
+      "choose": "Choose this room",
+      "choose_room": "Choose a room",
+      "your_room": "Your room",
+      "change_room": "Change room",
+      "beds_label": "Beds",
+      "min_stay_label": "Minimum stay",
+      "about_property": "About {{name}}",
+      "kinds": {
+        "room": "Room",
+        "apartment": "Apartment",
+        "studio": "Studio",
+        "tent": "Tent",
+        "cabin": "Cabin",
+        "other": "Accommodation"
+      },
+      "gallery": {
+        "previous": "Previous photo",
+        "next": "Next photo",
+        "position": "{{current}} of {{total}}",
+        "go_to": "Photo {{number}}",
+        "no_photos": "No photos of this room yet"
+      }
+    },
     "contribution": {
       "fallbackLabel": "Event contribution",
       "fallbackDescription": "Helps fund the event"
@@ -286,10 +475,42 @@
       "not_eligible_caption": "Not eligible for discount",
       "promo_discount_eligible_label": "Promo Discount (eligible items)"
     },
+    "recipient_assignment": {
+      "add_role": "Add {{role}}",
+      "add_title": "Add {{role}}",
+      "edit_title": "Edit {{name}}",
+      "description": "Enter the details for {{role}}. Save when you are done.",
+      "delete_title": "Delete {{name}}",
+      "delete_description": "Are you sure you want to delete this {{role}}?",
+      "deleting": "Deleting...",
+      "delete": "Delete",
+      "full_name": "Full name",
+      "select_field": "Select {{field}}",
+      "update": "Update",
+      "save": "Save",
+      "roles": {
+        "main": "Primary attendee",
+        "spouse": "Spouse",
+        "kid": "Kid",
+        "baby": "Baby",
+        "teen": "Teen"
+      },
+      "fields": {
+        "email": "Email",
+        "gender": "Gender",
+        "age": "Age",
+        "residence": "Residence",
+        "telegram": "Telegram",
+        "phone": "Phone",
+        "date_of_birth": "Date of birth",
+        "age_group": "Age group"
+      }
+    },
     "coupon_no_longer_valid": "This coupon is no longer available. Your total has been updated. Please review and try again.",
     "payment_error": "Something went wrong with your payment. Please try again.",
     "popup_ended_error": "This popup has ended. Purchases are no longer available.",
     "no_products": "No products available for this step.",
+    "not_eligible_for_flow": "This checkout isn't available for your account.",
     "no_images": "No images available for this step.",
     "no_video": "No video available for this step.",
     "no_passes": "No passes available.",
@@ -301,6 +522,8 @@
     "previous_payment_completed": "Your previous payment was completed.",
     "pending_payment_wait": "You have a pending payment. Please wait a few minutes.",
     "payment_cancel_failed": "We could not process your payment. Please try again.",
+    "flow_restriction_violated": "You are not eligible to purchase from this flow.",
+    "product_not_in_flow": "This product is not available through this flow.",
     "amanita": {
       "hero_headline": "4 days of music, art, yoga and workshops",
       "buyer_kicker": "Your details",
@@ -352,12 +575,16 @@
       "catalog_add_aria": "Add {{product}}",
       "catalog_add_one_aria": "Add one more {{product}}",
       "catalog_remove_one_aria": "Remove one {{product}}"
-    }
+    },
+    "toast_guest_details_incomplete": "Some guest details are missing before this booking can be paid."
   },
   "openCheckout": {
     "loading": "Loading checkout...",
     "unavailable_title": "Checkout unavailable",
     "unavailable_description": "This link is invalid or this event is no longer available.",
+    "sign_in_required_title": "Sign in required",
+    "sign_in_required_description": "This checkout is for existing attendees. Sign in to your portal account to continue.",
+    "sign_in_required_cta": "Sign in",
     "tickets_title": "Tickets",
     "tickets_subtitle": "Choose how many tickets you want to buy.",
     "coupon_title": "Coupon",
@@ -380,16 +607,31 @@
     "thank_you_total": "Total",
     "previous_payment_completed": "Your previous payment was completed.",
     "payment_cancel_failed": "We could not process your payment. Please try again.",
-    "pending_payment_wait": "You have a pending payment. Please wait a few minutes."
+    "pending_payment_wait": "You have a pending payment. Please wait a few minutes.",
+    "flow_restriction_violated": "You are not eligible to purchase from this flow.",
+    "product_not_in_flow": "This product is not available through this flow."
+  },
+  "portalThankYou": {
+    "title": "Purchase completed",
+    "description": "Your purchase is complete. Your passes are ready in the portal.",
+    "passes_cta": "View my passes"
   },
   "passes": {
     "your_passes": "Your Passes",
+    "your_purchases": "Your purchases",
+    "your_purchases_description": "View your passes and other purchased products here.",
+    "other_passes": "Other passes",
+    "other_products": "Other products",
+    "other_products_description": "Additional items you've purchased for this event.",
+    "view_payment_details": "View payment details",
+    "companion_attending": "You are attending as a companion.",
+    "companion_attending_city": "You are attending {{city}} as a companion.",
+    "companion_no_passes": "No passes assigned yet. Check back later.",
+    "companion_waiting_acceptance": "Passes will be available once the application is accepted.",
     "buy_passes": "Buy Passes",
-    "your_passes_description": "View and manage your order here.",
+    "upsale_title": "More for you",
+    "upsale_description": "Exclusive add-ons available for your purchase.",
     "loading_passes": "Loading passes information...",
-    "add_spouse": "Add spouse",
-    "add_children": "Add children",
-    "view_invoices": "View invoices",
     "have_coupon": "Have a coupon?",
     "coupon_placeholder": "Enter coupon code",
     "coupon_applied": "Coupon code applied successfully.",
@@ -453,7 +695,7 @@
     }
   },
   "attendees": {
-    "title": "Attendee Directory",
+    "title": "Directory",
     "description": "Reach out to your friends to plan dates, find shared housing, or organize activities together. *This directory includes only the information of those who have voluntarily opted in to share their details.",
     "search_placeholder": "Search by name, email, organization...",
     "export_csv": "Export attendees as CSV",
@@ -503,11 +745,24 @@
     "your_participation": "Your Participation",
     "event": "Event",
     "overview": "Overview",
+    "home": "Home",
     "coming_soon": "(Coming Soon)",
     "soon_badge": "Soon",
     "application": "Application",
-    "passes": "Passes",
-    "attendee_directory": "Attendee Directory",
+    "navigation": "Portal navigation",
+    "mobile_navigation": "Portal navigation menu",
+    "general": "General",
+    "participation": "Participation",
+    "commerce": "General",
+    "checkouts": "Commerce",
+    "community": "Community",
+    "tickets": "Tickets",
+    "orders": "Payments",
+    "shop": "Shop",
+    "people": "Your Details",
+    "tickets_access": "Tickets & Access",
+    "passes": "Purchases",
+    "attendee_directory": "Directory",
     "companion": "Companion",
     "status": "Status",
     "groups": "Groups",
@@ -573,9 +828,9 @@
   },
   "breadcrumbs": {
     "application": "Application",
-    "passes": "Passes",
+    "passes": "Purchases",
     "buy": "Buy",
-    "attendees": "Attendee Directory",
+    "attendees": "Directory",
     "groups": "Groups",
     "profile": "Profile"
   },
@@ -871,9 +1126,6 @@
       "pending_approval_banner_title": "Pending approval",
       "pending_approval_banner_message": "Your event is pending approval and not yet visible to others.",
       "open_in_maps": "Open in Google Maps",
-      "view_on_geobrowser": "View on Geobrowser",
-      "join_on_geo": "Join on Geo",
-      "join_on_geo_tooltip": "Recap, polls and resources",
       "share_button": "Share event",
       "share_link_copied": "Link copied",
       "share_link_error": "Couldn't copy link",
@@ -934,7 +1186,7 @@
       "visibility_private": "Private (invitees only)",
       "visibility_unlisted": "Unlisted (hidden, shareable link)",
       "host_label": "Displayed host (optional)",
-      "host_placeholder_default": "{{name}} (default)",
+      "host_placeholder_popup": "{{name}}",
       "host_placeholder_optional": "Optional",
       "host_use_popup": "Use {{name}}",
       "host_use_me": "Use my name",

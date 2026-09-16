@@ -4,15 +4,12 @@ The meal_plan step ships per-day menu choices, dietary restriction, and
 special request as a single JSONB blob (``purchase_metadata``). Two paths
 materialize ``attendee_products`` rows that must carry it:
 
-1. ``$0 auto-approve`` (cupón 100% off / credits cover cost): products
-   flow directly from the inbound ``PaymentProductRequest`` into
-   ``_add_products_to_attendees``. The snapshot row gets the blob too
-   so a later status-change rebuild still has the data.
+1. ``$0 auto-approve`` (100% coupon / credits cover cost): the payment
+   snapshot is reconciled immediately into ticket-unit lineage.
 
 2. ``SimpleFI paid``: payment is created PENDING, the webhook later
-   approves. ``approve_payment`` rebuilds ``PaymentProductRequest``
-   entries from ``payment.products_snapshot`` — that snapshot must
-   carry ``purchase_metadata`` so the blob survives the async hop.
+   approves. ``approve_payment`` reconciles ``payment.products_snapshot``;
+   that snapshot must carry ``purchase_metadata`` across the async hop.
 
 These tests guard against silent regressions of either path.
 """
@@ -39,6 +36,10 @@ from app.api.payment.schemas import (
 from app.api.popup.models import Popups
 from app.api.product.models import Products
 from app.api.tenant.models import Tenants
+from tests._flow_helpers import (
+    application_flow_id,
+    offer_category,
+)
 
 SAMPLE_METADATA = {
     "daily_choices": {
@@ -84,6 +85,11 @@ def _meal_plan_product(db: Session, popup: Popups, *, price: str = "75") -> Prod
     )
     db.add(p)
     db.flush()
+    step = offer_category(db, popup, "meal_plan")
+    step.template = "meal-plan-select"
+    step.template_config = {"sections": [{"products": [{"product_id": str(p.id)}]}]}
+    db.add(step)
+    db.flush()
     return p
 
 
@@ -100,6 +106,7 @@ def _ticket_product(db: Session, popup: Popups, *, price: str = "10") -> Product
     )
     db.add(p)
     db.flush()
+    offer_category(db, popup, "meal_plan")
     return p
 
 
@@ -107,6 +114,7 @@ def _application_and_attendee(
     db: Session, popup: Popups, human: Humans
 ) -> tuple[Applications, Attendees]:
     app = Applications(
+        sales_flow_id=application_flow_id(db, popup.id),
         id=uuid.uuid4(),
         tenant_id=popup.tenant_id,
         popup_id=popup.id,
@@ -228,6 +236,7 @@ class TestSimpleFiPaidPath:
                 "approve_payment dropped purchase_metadata when rebuilding from "
                 "products_snapshot (regression of PR-#179 fix)"
             )
+            assert ap.product_category_snapshot == "meal_plan"
         finally:
             # Cleanup: attendee_products → payment_products → payment → attendee → app → product
             for ap_row in db.exec(
@@ -291,6 +300,7 @@ class TestZeroAmountAutoApprovePath:
             ).first()
             assert ap is not None
             assert ap.purchase_metadata == SAMPLE_METADATA
+            assert ap.product_category_snapshot == "meal_plan"
 
             pp = db.exec(
                 select(PaymentProducts).where(

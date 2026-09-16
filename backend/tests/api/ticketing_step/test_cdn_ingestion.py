@@ -41,9 +41,10 @@ def _mock_storage() -> MagicMock:
     return s
 
 
-def _step_body(popup_id: uuid.UUID, **extra) -> dict:
+def _step_body(popup_id: uuid.UUID, flow_id: uuid.UUID, **extra) -> dict:
     return {
         "popup_id": str(popup_id),
+        "sales_flow_id": str(flow_id),
         "step_type": "tickets",
         "title": f"cdn-test-{uuid.uuid4().hex[:6]}",
         **extra,
@@ -63,6 +64,7 @@ class TestCdnIngestionCreate:
         client: TestClient,
         admin_token_tenant_a: str,
         popup_tenant_a: Popups,
+        default_flow_tenant_a,
     ) -> None:
         """image-gallery template: images[] external URLs → CDN URLs in persisted step."""
         fetch_mock = AsyncMock(return_value=(b"img-bytes", "image/jpeg"))
@@ -79,6 +81,7 @@ class TestCdnIngestionCreate:
                 headers=_auth(admin_token_tenant_a),
                 json=_step_body(
                     popup_tenant_a.id,
+                    default_flow_tenant_a.id,
                     template="image-gallery",
                     template_config={"images": [EXTERNAL_A, EXTERNAL_B]},
                 ),
@@ -98,6 +101,7 @@ class TestCdnIngestionCreate:
         client: TestClient,
         admin_token_tenant_a: str,
         popup_tenant_a: Popups,
+        default_flow_tenant_a,
     ) -> None:
         """rich-text template: <img src> in html → CDN URL; other markup untouched."""
         fetch_mock = AsyncMock(return_value=(b"img-bytes", "image/jpeg"))
@@ -115,6 +119,7 @@ class TestCdnIngestionCreate:
                 headers=_auth(admin_token_tenant_a),
                 json=_step_body(
                     popup_tenant_a.id,
+                    default_flow_tenant_a.id,
                     template="rich-text",
                     template_config={"html": html_in},
                 ),
@@ -132,6 +137,7 @@ class TestCdnIngestionCreate:
         client: TestClient,
         admin_token_tenant_a: str,
         popup_tenant_a: Popups,
+        default_flow_tenant_a,
     ) -> None:
         """rich-text: &amp; entity-encoded query string in src is correctly rewritten.
 
@@ -153,6 +159,7 @@ class TestCdnIngestionCreate:
                 headers=_auth(admin_token_tenant_a),
                 json=_step_body(
                     popup_tenant_a.id,
+                    default_flow_tenant_a.id,
                     template="rich-text",
                     template_config={"html": html_in},
                 ),
@@ -168,6 +175,7 @@ class TestCdnIngestionCreate:
         client: TestClient,
         admin_token_tenant_a: str,
         popup_tenant_a: Popups,
+        default_flow_tenant_a,
     ) -> None:
         """ticket-select template: sections[].image_url → CDN URL."""
         fetch_mock = AsyncMock(return_value=(b"img-bytes", "image/jpeg"))
@@ -191,6 +199,7 @@ class TestCdnIngestionCreate:
                 headers=_auth(admin_token_tenant_a),
                 json=_step_body(
                     popup_tenant_a.id,
+                    default_flow_tenant_a.id,
                     template="ticket-select",
                     template_config={"sections": [section]},
                 ),
@@ -207,6 +216,7 @@ class TestCdnIngestionCreate:
         client: TestClient,
         admin_token_tenant_a: str,
         popup_tenant_a: Popups,
+        default_flow_tenant_a,
     ) -> None:
         """watermark top-level field: external URL → CDN URL on create."""
         fetch_mock = AsyncMock(return_value=(b"img-bytes", "image/jpeg"))
@@ -223,6 +233,7 @@ class TestCdnIngestionCreate:
                 headers=_auth(admin_token_tenant_a),
                 json=_step_body(
                     popup_tenant_a.id,
+                    default_flow_tenant_a.id,
                     # Use a simple template so template_config ingestion is a no-op
                     template="image-gallery",
                     template_config={"images": []},
@@ -240,6 +251,7 @@ class TestCdnIngestionCreate:
         client: TestClient,
         admin_token_tenant_a: str,
         popup_tenant_a: Popups,
+        default_flow_tenant_a,
     ) -> None:
         """Images already on the CDN host are returned unchanged; fetch_image not called."""
         fetch_mock = AsyncMock(return_value=(b"img-bytes", "image/jpeg"))
@@ -260,6 +272,7 @@ class TestCdnIngestionCreate:
                 headers=_auth(admin_token_tenant_a),
                 json=_step_body(
                     popup_tenant_a.id,
+                    default_flow_tenant_a.id,
                     template="image-gallery",
                     template_config={"images": [CDN_EXISTING]},
                 ),
@@ -274,6 +287,7 @@ class TestCdnIngestionCreate:
         client: TestClient,
         admin_token_tenant_a: str,
         popup_tenant_a: Popups,
+        default_flow_tenant_a,
     ) -> None:
         """IngestionError during fetch → original URL kept; step saves successfully (fail-open)."""
         from app.services.image_ingestion import IngestionError
@@ -292,6 +306,7 @@ class TestCdnIngestionCreate:
                 headers=_auth(admin_token_tenant_a),
                 json=_step_body(
                     popup_tenant_a.id,
+                    default_flow_tenant_a.id,
                     template="image-gallery",
                     template_config={"images": [EXTERNAL_A]},
                 ),
@@ -315,6 +330,7 @@ class TestCdnIngestionUpdate:
         client: TestClient,
         token: str,
         popup_id: uuid.UUID,
+        flow_id: uuid.UUID,
     ) -> str:
         """Create a plain step (no external URLs) to use as a PATCH base.
 
@@ -326,6 +342,7 @@ class TestCdnIngestionUpdate:
             headers=_auth(token),
             json={
                 "popup_id": str(popup_id),
+                "sales_flow_id": str(flow_id),
                 "step_type": "tickets",
                 "title": f"cdn-baseline-{uuid.uuid4().hex[:6]}",
             },
@@ -338,10 +355,11 @@ class TestCdnIngestionUpdate:
         client: TestClient,
         admin_token_tenant_a: str,
         popup_tenant_a: Popups,
+        default_flow_tenant_a,
     ) -> None:
         """PATCH with image-gallery template_config: images[] external → CDN."""
         step_id = self._create_baseline_step(
-            client, admin_token_tenant_a, popup_tenant_a.id
+            client, admin_token_tenant_a, popup_tenant_a.id, default_flow_tenant_a.id
         )
         fetch_mock = AsyncMock(return_value=(b"img-bytes", "image/jpeg"))
         mock_storage = _mock_storage()
@@ -371,10 +389,11 @@ class TestCdnIngestionUpdate:
         client: TestClient,
         admin_token_tenant_a: str,
         popup_tenant_a: Popups,
+        default_flow_tenant_a,
     ) -> None:
         """PATCH watermark field only: external URL → CDN URL."""
         step_id = self._create_baseline_step(
-            client, admin_token_tenant_a, popup_tenant_a.id
+            client, admin_token_tenant_a, popup_tenant_a.id, default_flow_tenant_a.id
         )
         fetch_mock = AsyncMock(return_value=(b"img-bytes", "image/jpeg"))
         mock_storage = _mock_storage()

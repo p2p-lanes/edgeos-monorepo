@@ -145,6 +145,18 @@ vi.mock("@/app/portal/[popupSlug]/events/lib/useEventTimezone", () => ({
   }),
 }))
 
+vi.mock("@/app/portal/[popupSlug]/events/lib/useCanRsvp", () => ({
+  useCanRsvp: () => ({
+    canRsvp: true,
+    reason: null,
+    isLoading: false,
+  }),
+}))
+
+vi.mock("@/app/portal/[popupSlug]/events/lib/SubscribeCalendarButton", () => ({
+  SubscribeCalendarButton: () => <div data-testid="subscribe-calendar" />,
+}))
+
 const mockConsumeEventsViewState = vi.fn().mockReturnValue(null)
 vi.mock("@/app/portal/[popupSlug]/events/lib/eventsViewState", () => ({
   consumeEventsViewState: (...args: unknown[]) =>

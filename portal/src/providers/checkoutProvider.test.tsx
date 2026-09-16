@@ -3,15 +3,52 @@
  * Verifies that the resolver replaces useProductCategories and passes
  * allActiveProducts to cart selection hooks.
  */
-import { act, renderHook } from "@testing-library/react"
+import { act, renderHook, waitFor } from "@testing-library/react"
 import type { ComponentProps, ReactNode } from "react"
-import { describe, expect, it, vi } from "vitest"
+import { beforeEach, describe, expect, it, vi } from "vitest"
 import { CheckoutService, type TicketingStepPublic } from "@/client"
 import type { ApplicationFormSchema } from "@/types/form-schema"
 import type { ProductsPass } from "@/types/Products"
 import { CheckoutProvider, useCheckout } from "./checkoutProvider"
 
+const paymentSubmitSpy = vi.hoisted(() =>
+  vi.fn(({ previewMode }: { previewMode?: boolean }) => ({
+    submitPayment: vi.fn(async () =>
+      previewMode
+        ? { success: false, error: "preview" }
+        : { success: false, error: "empty_cart" },
+    ),
+    isSubmitting: false,
+  })),
+)
+const cityState = vi.hoisted(() => ({
+  current: null as Record<string, unknown> | null,
+}))
+const queryState = vi.hoisted(() => ({ loading: false, authenticated: false }))
+const passesDataSpy = vi.hoisted(() =>
+  vi.fn(() => ({ products: [], loading: queryState.loading })),
+)
+
 // Minimal mocks to avoid network/provider dependencies
+vi.mock("@/client", () => ({
+  ApiError: class ApiError extends Error {
+    body: unknown = null
+  },
+  CheckoutService: {
+    purchaseOpenTicketing: vi.fn(),
+    releasePendingOpen: vi.fn(),
+    restoreFlowCart: vi.fn(),
+    upsertFlowCart: vi.fn(),
+  },
+  CouponsService: { validateCoupon: vi.fn() },
+  OpenAPI: {},
+  PaymentsService: { releaseMyPendingPayment: vi.fn() },
+  TicketingStepsService: { listPortalTicketingSteps: vi.fn() },
+}))
+vi.mock("@/hooks/checkout", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/hooks/checkout")>()),
+  usePaymentSubmit: paymentSubmitSpy,
+}))
 vi.mock("@/providers/applicationProvider", () => ({
   useApplication: () => ({
     getRelevantApplication: () => null,
@@ -19,9 +56,16 @@ vi.mock("@/providers/applicationProvider", () => ({
 }))
 vi.mock("@/providers/cityProvider", () => ({
   useCityProvider: () => ({
-    getCity: () => null,
+    getCity: () => cityState.current,
   }),
 }))
+
+beforeEach(() => {
+  cityState.current = null
+  queryState.loading = false
+  queryState.authenticated = false
+  passesDataSpy.mockClear()
+})
 vi.mock("@/providers/discountProvider", () => ({
   useDiscount: () => ({
     discountApplied: { discount_value: 0 },
@@ -38,13 +82,13 @@ vi.mock("@/providers/passesProvider", () => ({
   }),
 }))
 vi.mock("@/hooks/useGetPassesData", () => ({
-  default: () => ({ products: [], loading: false }),
+  default: passesDataSpy,
 }))
 vi.mock("@/hooks/useIsAuthenticated", () => ({
-  useIsAuthenticated: () => false,
+  useIsAuthenticated: () => queryState.authenticated,
 }))
 vi.mock("@tanstack/react-query", () => ({
-  useQuery: () => ({ data: undefined, isLoading: false }),
+  useQuery: () => ({ data: undefined, isLoading: queryState.loading }),
   useQueryClient: () => ({
     getQueryData: vi.fn(),
     setQueryData: vi.fn(),
@@ -131,6 +175,37 @@ function makeWrapper(
     ) as ReactNode
   }
 }
+
+describe("checkoutProvider override loading", () => {
+  it.each([false, true])("uses supplied sources: nonempty=%s", (nonempty) => {
+    cityState.current = { id: "popup-1" }
+    queryState.authenticated = true
+    queryState.loading = true
+    const products = nonempty
+      ? [makeProduct({ id: "p1", category: "ticket" })]
+      : []
+    const props: Partial<ComponentProps<typeof CheckoutProvider>> = {
+      salesFlowId: "flow-1",
+      productsOverride: products,
+      configuredStepsOverride: [],
+    }
+    const { result, rerender } = renderHook(() => useCheckout(), {
+      wrapper: makeWrapper([], [], props),
+    })
+    expect(result.current.allProducts).toEqual(products)
+    expect(result.current.isInitialLoading).toBe(false)
+    expect(passesDataSpy).toHaveBeenLastCalledWith("flow-1", false)
+
+    props.productsOverride = undefined
+    rerender()
+    expect(passesDataSpy).toHaveBeenLastCalledWith("flow-1", true)
+    expect(result.current.isInitialLoading).toBe(true)
+    props.productsOverride = products
+    props.configuredStepsOverride = undefined
+    rerender()
+    expect(result.current.isInitialLoading).toBe(true)
+  })
+})
 
 // The provider used to synthesize a buyer step whenever an open-ticketing
 // popup carried no `buyer` row, which meant the step could not be left out:
@@ -269,6 +344,270 @@ describe("checkoutProvider — step-aware product wiring", () => {
     expect(resolved).toHaveLength(1)
     // allProducts is still accessible for backward compat
     expect(result.current.allProducts).toHaveLength(1)
+  })
+})
+
+describe("checkoutProvider — public checkout flow propagation", () => {
+  it("forwards the named runtime flow to the payment submit hook", () => {
+    renderHook(() => useCheckout(), {
+      wrapper: makeWrapper([], [], {
+        salesFlowSlug: "merch-store",
+        submitMode: "open-ticketing",
+        submitPopupSlug: "festival-2026",
+      }),
+    })
+
+    expect(paymentSubmitSpy).toHaveBeenLastCalledWith(
+      expect.objectContaining({ salesFlowSlug: "merch-store" }),
+    )
+  })
+})
+
+describe("checkoutProvider — entry-link coupons", () => {
+  const products = [
+    makeProduct({ id: "p1", category: "merch" }),
+    makeProduct({ id: "excluded", category: "merch", discountable: false }),
+  ]
+
+  beforeEach(() => localStorage.clear())
+
+  it("applies an entry coupon after open-cart restoration and release settle", async () => {
+    cityState.current = { id: "popup-1", allows_coupons: true }
+    const validate = vi.fn().mockResolvedValue(20)
+    const { result } = renderHook(() => useCheckout(), {
+      wrapper: makeWrapper([], products, {
+        salesFlowId: "flow-friends",
+        salesFlowSlug: "friends",
+        submitMode: "open-ticketing",
+        submitPopupSlug: "festival",
+        openCartPopupSlug: "festival",
+        initialPromoCode: " friends20 ",
+        validatePromoCodeOverride: validate,
+      }),
+      reactStrictMode: true,
+    })
+
+    await waitFor(() =>
+      expect(validate).toHaveBeenCalledExactlyOnceWith("FRIENDS20"),
+    )
+    await waitFor(() => expect(result.current.cart.promoCodeValid).toBe(true))
+    expect(result.current.cart.promoCode).toBe("FRIENDS20")
+    expect(validate).toHaveBeenCalledExactlyOnceWith("FRIENDS20")
+
+    // Selecting an excluded product first must not discard the link code.
+    act(() => result.current.updateMerchQuantity("excluded", 1))
+    expect(result.current.cart.promoCodeValid).toBe(true)
+    expect(result.current.summary.discount).toBe(0)
+    act(() => result.current.updateMerchQuantity("p1", 1))
+    expect(result.current.summary.discount).toBe(2)
+    expect(result.current.summary.grandTotal).toBe(18)
+    act(() => result.current.updateMerchQuantity("p1", 0))
+    expect(result.current.cart.promoCode).toBe("FRIENDS20")
+    expect(result.current.summary.discount).toBe(0)
+    expect(validate).toHaveBeenCalledTimes(1)
+  })
+
+  it.each([
+    "disabled",
+    "zero-discount",
+    "rejected",
+  ])("keeps normal checkout totals without an error for a %s URL coupon", async (reason) => {
+    cityState.current = { id: "popup-1", allows_coupons: reason !== "disabled" }
+    const validate = vi.fn().mockResolvedValue(0)
+    if (reason === "rejected") validate.mockRejectedValue({ status: 400 })
+    const { result } = renderHook(() => useCheckout(), {
+      wrapper: makeWrapper([], products, {
+        salesFlowId: "flow-friends",
+        salesFlowSlug: "friends",
+        submitMode: "open-ticketing",
+        submitPopupSlug: "festival",
+        openCartPopupSlug: "festival",
+        initialPromoCode: "INVALID",
+        validatePromoCodeOverride: validate,
+      }),
+      reactStrictMode: true,
+    })
+    await act(async () => {})
+    await waitFor(() => expect(result.current.isLoading).toBe(false))
+    expect(validate).toHaveBeenCalledTimes(reason === "disabled" ? 0 : 1)
+    act(() => result.current.updateMerchQuantity("p1", 1))
+    expect(result.current.cart.promoCode).toBe("")
+    expect(result.current.cart.promoCodeValid).toBe(false)
+    expect(result.current.error).toBeNull()
+    expect(result.current.summary.discount).toBe(0)
+    expect(result.current.summary.grandTotal).toBe(10)
+  })
+
+  it("waits for signed cart recovery and release before replacing a saved coupon", async () => {
+    cityState.current = { id: "popup-1", allows_coupons: true }
+    let resolveRestore!: (value: unknown) => void
+    let resolveRelease!: (value: { released: boolean }) => void
+    vi.mocked(CheckoutService.restoreFlowCart).mockReturnValueOnce(
+      new Promise((resolve) => {
+        resolveRestore = resolve
+      }) as never,
+    )
+    vi.mocked(CheckoutService.releasePendingOpen).mockReturnValueOnce(
+      new Promise((resolve) => {
+        resolveRelease = resolve
+      }) as never,
+    )
+    const validate = vi.fn().mockResolvedValue(20)
+    const { result } = renderHook(() => useCheckout(), {
+      wrapper: makeWrapper([], products, {
+        salesFlowId: "flow-friends",
+        salesFlowSlug: "friends",
+        submitMode: "open-ticketing",
+        submitPopupSlug: "festival",
+        openCartPopupSlug: "festival",
+        openCartCid: "cart-id",
+        openCartSig: "test-proof",
+        initialBuyerValues: { email: "buyer@example.com" },
+        initialPromoCode: "FRIENDS20",
+        validatePromoCodeOverride: validate,
+      }),
+    })
+    expect(validate).not.toHaveBeenCalled()
+
+    await act(async () =>
+      resolveRestore({
+        id: "cart-id",
+        restore_token: "test-proof",
+        items: {
+          lines: [],
+          recipients: [],
+          promo_code: "SAVED10",
+          insurance: false,
+          current_step: null,
+        },
+      }),
+    )
+    expect(CheckoutService.releasePendingOpen).toHaveBeenCalledWith({
+      slug: "festival",
+      flowSlug: "friends",
+      requestBody: {
+        cid: "cart-id",
+        sig: "test-proof",
+        email: "buyer@example.com",
+      },
+    })
+    expect(validate).not.toHaveBeenCalled()
+
+    await act(async () => resolveRelease({ released: false }))
+    await waitFor(() => expect(result.current.cart.promoCodeValid).toBe(true))
+    expect(result.current.cart.promoCode).toBe("FRIENDS20")
+    expect(validate).toHaveBeenCalledExactlyOnceWith("FRIENDS20")
+  })
+
+  it.each([
+    { allowsCoupons: false, previewMode: false },
+    { allowsCoupons: true, previewMode: true },
+  ])("ignores entry coupons when disabled or previewing: %o", async ({
+    allowsCoupons,
+    previewMode,
+  }) => {
+    cityState.current = { id: "popup-1", allows_coupons: allowsCoupons }
+    const validate = vi.fn().mockResolvedValue(20)
+    const { result } = renderHook(() => useCheckout(), {
+      wrapper: makeWrapper([], products, {
+        salesFlowId: "flow-friends",
+        salesFlowSlug: "friends",
+        submitMode: "open-ticketing",
+        submitPopupSlug: "festival",
+        openCartPopupSlug: "festival",
+        initialPromoCode: "FRIENDS20",
+        validatePromoCodeOverride: validate,
+        previewMode,
+      }),
+    })
+
+    await act(async () => {})
+    expect(result.current.cart.promoCodeValid).toBe(false)
+    expect(validate).not.toHaveBeenCalled()
+  })
+})
+
+describe("checkoutProvider — Sales Flow checkout boundary", () => {
+  const stay = {
+    accommodationId: "room-1",
+    productId: "room-product",
+    name: "Double room",
+    propertyId: "property-1",
+    propertyName: "Hotel",
+    checkIn: "2026-09-01",
+    checkOut: "2026-09-03",
+    nights: 2,
+    guestCount: 1,
+    guests: [{ name: "Taylor Buyer", answers: {} }],
+    bookerAnswers: {},
+    guestForm: null,
+    subtotal: 100,
+    tax: 10,
+    totalPrice: 110,
+  }
+
+  it("resets stay, buyer, terms and navigation state when the flow changes", async () => {
+    cityState.current = { id: "popup-1" }
+    let flowId = "flow-main"
+    const Wrapper = ({ children }: { children: ReactNode }) => (
+      <CheckoutProvider
+        configuredStepsOverride={[]}
+        productsOverride={[]}
+        cartPersistenceEnabled={false}
+        salesFlowId={flowId}
+      >
+        {children}
+      </CheckoutProvider>
+    )
+    const { result, rerender } = renderHook(() => useCheckout(), {
+      wrapper: Wrapper,
+    })
+
+    act(() => {
+      result.current.addAccommodation(stay)
+      result.current.setBuyerField("email", "old-flow@example.com")
+      result.current.setTermsAccepted(true)
+      result.current.markStepVisited("accommodation")
+      result.current.goToStep("confirm")
+    })
+    expect(result.current.cart.accommodations).toHaveLength(1)
+
+    flowId = "flow-partner"
+    rerender()
+
+    await waitFor(() => {
+      expect(result.current.salesFlowId).toBe("flow-partner")
+      expect(result.current.cart.accommodations).toEqual([])
+      expect(result.current.buyerValues).toEqual({})
+      expect(result.current.termsAccepted).toBe(false)
+      expect(result.current.visitedSteps.size).toBe(0)
+      expect(result.current.currentStep).toBe("passes")
+    })
+  })
+
+  it("includes stays in coupon and contribution calculations", async () => {
+    cityState.current = {
+      id: "popup-1",
+      contribution_enabled: true,
+      contribution_percentage: 10,
+    }
+    const { result } = renderHook(() => useCheckout(), {
+      wrapper: makeWrapper([], [], {
+        salesFlowId: "flow-main",
+        validatePromoCodeOverride: async () => 20,
+      }),
+    })
+
+    act(() => result.current.addAccommodation(stay))
+    await act(async () => {
+      expect(await result.current.applyPromoCode("STAY20")).toBe(true)
+    })
+
+    expect(result.current.summary.accommodationsSubtotal).toBe(110)
+    expect(result.current.summary.discountableSubtotal).toBe(110)
+    expect(result.current.summary.discount).toBe(22)
+    expect(result.current.summary.contributionSubtotal).toBe(8.8)
+    expect(result.current.summary.grandTotal).toBe(96.8)
   })
 })
 

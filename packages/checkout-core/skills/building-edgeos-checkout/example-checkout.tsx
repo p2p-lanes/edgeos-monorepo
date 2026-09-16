@@ -34,12 +34,14 @@ import { useEffect, useMemo, useState } from "react"
 // EdgeOS tells you to point at a dev/staging backend.
 
 const SLUG = "amanita"
+const FLOW_SLUG = "checkout"
 const PUBLISHABLE_KEY = "pk_live_xxxxxxxxxxxxxxxx"
 
 // A shared client lets us prefetch the runtime so we can show a real error
 // screen (the provider alone swallows the load error).
 const client = createCheckoutClient({
   slug: SLUG,
+  flowSlug: FLOW_SLUG,
   publishableKey: PUBLISHABLE_KEY,
   // baseUrl: "http://localhost:8000/api/v1", // dev/staging override only
 })

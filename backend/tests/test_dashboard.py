@@ -11,7 +11,7 @@ from decimal import Decimal
 from fastapi.testclient import TestClient
 from sqlmodel import Session
 
-from app.api.attendee.models import Attendees
+from app.api.attendee.models import AttendeeProducts, Attendees
 from app.api.dashboard.router import (
     _get_accommodation_percentage,
     _get_cumulative_trends,
@@ -363,12 +363,9 @@ class TestRevenueBreakdownNetReconciliation:
 
 
 class TestCategorySourceConsistency:
-    """Count/percentage widgets must detect product category from the live
-    products.category (same source as Tickets by Type), so they reconcile with
-    each other even when the purchase-time snapshot category is stale.
-    """
+    """Legacy NULL lines retain deterministic category fallback reporting."""
 
-    def test_cumulative_tickets_count_live_category(
+    def test_cumulative_tickets_count_snapshot_category(
         self, db: Session, tenant_a: Tenants
     ) -> None:
         popup = Popups(
@@ -420,18 +417,15 @@ class TestCategorySourceConsistency:
                 quantity=2,
                 product_name=ticket.name,
                 product_price=Decimal("250.00"),
-                product_category="month",  # stale snapshot category
+                product_category="ticket",
             )
         )
         db.commit()
 
         trends = _get_cumulative_trends(db, popup.id, "UTC")
-        total_tickets = sum(p.value for p in trends.tickets)
+        assert sum(point.value for point in trends.tickets) == 2
 
-        # Counted as a ticket (live category) despite the stale "month" snapshot.
-        assert total_tickets == 2
-
-    def test_accommodation_percentage_live_category(
+    def test_housing_without_access_lineage_does_not_attach(
         self, db: Session, tenant_a: Tenants
     ) -> None:
         popup = Popups(
@@ -483,12 +477,187 @@ class TestCategorySourceConsistency:
                 quantity=1,
                 product_name=cabin.name,
                 product_price=Decimal("1000.00"),
-                product_category="other",  # stale snapshot category
+                product_category="other",
             )
         )
         db.commit()
 
-        # One housing attendee out of two total people -> 50%, detected via the
-        # live category despite the stale "other" snapshot.
         pct = _get_accommodation_percentage(db, popup.id, total_people=2)
-        assert pct == Decimal("50.0")
+        assert pct == Decimal("0")
+
+
+class TestTypedOwnershipReporting:
+    def test_mixed_orders_use_typed_access_and_same_payment_housing(
+        self,
+        db: Session,
+        tenant_a: Tenants,
+        client: TestClient,
+        operator_token_tenant_a: str,
+    ) -> None:
+        popup = Popups(
+            name="Typed Reporting Popup",
+            slug=f"typed-reporting-{uuid.uuid4().hex[:8]}",
+            tenant_id=tenant_a.id,
+        )
+        db.add(popup)
+        db.flush()
+
+        def product(name: str, category: str, _kind: str | None, duration=None):
+            item = Products(
+                tenant_id=tenant_a.id,
+                popup_id=popup.id,
+                name=name,
+                slug=f"{name.lower().replace(' ', '-')}-{uuid.uuid4().hex[:6]}",
+                price=Decimal("10.00"),
+                category=category,
+                duration_type=duration,
+                discountable=True,
+            )
+            db.add(item)
+            db.flush()
+            return item
+
+        access = product("Custom Access", "vip", "access", "week")
+        participant_ticket = product(
+            "Participant Ticket", "ticket", "participant", "day"
+        )
+        order_ticket = product("Order Ticket", "ticket", "order", "month")
+        housing = product("Cabin", "housing", "order")
+        access_housing = product("Access Housing", "housing", "access", "day")
+        participant_housing = product("Participant Housing", "housing", "participant")
+        merch = product("Merch", "merch", "order")
+        legacy_ticket = product("Legacy Pass", "ticket", None, "full")
+        legacy_housing = product("Legacy Lodge", "housing", None)
+
+        attendees = [
+            Attendees(tenant_id=tenant_a.id, popup_id=popup.id, name=f"Person {i}")
+            for i in range(7)
+        ]
+        db.add_all(attendees)
+        db.flush()
+
+        def payment(status: str, amount: int):
+            item = Payments(
+                tenant_id=tenant_a.id,
+                popup_id=popup.id,
+                status=status,
+                payment_type=PaymentType.PASS_PURCHASE.value,
+                amount=Decimal(amount),
+            )
+            db.add(item)
+            db.flush()
+            return item
+
+        def line(pay, item, quantity=1, attendee=None):
+            snapshot = PaymentProducts(
+                tenant_id=tenant_a.id,
+                payment_id=pay.id,
+                product_id=item.id,
+                attendee_id=attendee.id if attendee else None,
+                quantity=quantity,
+                product_name=item.name,
+                product_price=item.price,
+                product_category=item.category,
+            )
+            db.add(snapshot)
+            db.flush()
+            return snapshot
+
+        def hold(attendee, snapshot, _kind):
+            db.add(
+                AttendeeProducts(
+                    tenant_id=tenant_a.id,
+                    attendee_id=attendee.id,
+                    product_id=snapshot.product_id,
+                    check_in_code=uuid.uuid4().hex,
+                    payment_id=snapshot.payment_id,
+                    payment_product_id=snapshot.id,
+                    unit_index=0,
+                    product_category_snapshot="ticket",
+                )
+            )
+
+        same = payment(PaymentStatus.APPROVED.value, 320)
+        for attendee in attendees[:2]:
+            hold(attendee, line(same, access, attendee=attendee), "access")
+        hold(
+            attendees[4],
+            line(same, participant_ticket, attendee=attendees[4]),
+            "participant",
+        )
+        line(same, order_ticket, 2, attendees[4])
+        line(same, housing, 2)
+        line(same, housing, 3)
+        line(same, access_housing, 7, attendees[4])
+        line(same, participant_housing, 11, attendees[4])
+        line(same, merch, 4)
+
+        access_only = payment(PaymentStatus.APPROVED.value, 10)
+        hold(attendees[2], line(access_only, access, attendee=attendees[2]), "access")
+        separate_housing = payment(PaymentStatus.APPROVED.value, 40)
+        line(separate_housing, housing, 4)
+        legacy = payment(PaymentStatus.APPROVED.value, 20)
+        hold(attendees[3], line(legacy, legacy_ticket, attendee=attendees[3]), None)
+        line(legacy, legacy_housing, attendee=attendees[3])
+
+        cancelled = payment(PaymentStatus.CANCELLED.value, 30)
+        hold(attendees[5], line(cancelled, access, attendee=attendees[5]), "access")
+        line(cancelled, housing, 2)
+        pending = payment(PaymentStatus.PENDING.value, 40)
+        line(pending, access, attendee=attendees[5])
+        line(pending, housing, 3)
+        db.commit()
+
+        response = client.get(
+            f"/api/v1/dashboard/enriched?popup_id={popup.id}",
+            headers={"Authorization": f"Bearer {operator_token_tenant_a}"},
+        )
+        assert response.status_code == 200, response.text
+        data = response.json()
+
+        metrics = data["key_metrics"]
+        assert metrics["people"] == 6
+        assert metrics["paying_people"] == 5
+        assert Decimal(str(metrics["accommodation_percentage"])) == Decimal("66.7")
+        assert Decimal(str(metrics["total_revenue"])) == Decimal("390")
+        assert Decimal(str(metrics["avg_ticket_price"])) == Decimal("97.50")
+        assert Decimal(str(metrics["avg_revenue_per_person"])) == Decimal("78.00")
+
+        assert (
+            sum(point["value"] for point in data["cumulative_trends"]["tickets"]) == 4
+        )
+        distribution = data["distribution"]
+        assert {
+            row["label"]: row["value"] for row in distribution["tickets_by_duration"]
+        } == {
+            "Day Pass": 1,
+            "Month Pass": 2,
+            "Full Event": 1,
+        }
+        assert {
+            row["label"]: row["value"]
+            for row in distribution["accommodation_by_product"]
+        } == {
+            "Access Housing": 7,
+            "Cabin": 9,
+            "Legacy Lodge": 1,
+            "Participant Housing": 11,
+        }
+        assert {
+            row["ticket_type"]: (row["total_attendees"], row["with_accommodation"])
+            for row in distribution["accommodation_attach_rate"]
+        } == {"Day Pass": (1, 1), "Week Pass": (3, 2), "Full Event": (1, 1)}
+
+        categories = {
+            row["category"]: (row["quantity"], Decimal(str(row["revenue"])))
+            for row in data["revenue_breakdown"]["by_category"]
+        }
+        assert categories == {
+            "vip": (3, Decimal("30")),
+            "ticket": (4, Decimal("40")),
+            "housing": (28, Decimal("280")),
+            "merch": (4, Decimal("40")),
+        }
+        assert (data["payments"]["total"], data["payments"]["approved"]) == (6, 4)
+        assert (data["payments"]["pending"], data["payments"]["cancelled"]) == (1, 1)
+        assert Decimal(str(data["payments"]["total_revenue"])) == Decimal("460")

@@ -5,9 +5,11 @@ import { getPortalBaseUrl } from "@/lib/portal-urls"
 export function getCheckoutPreviewUrl(
   baseUrl: string,
   popupSlug: string,
+  flowSlug: string,
   language?: string | null,
 ): string {
   const url = new URL(`${baseUrl}/checkout/${popupSlug}/preview`)
+  url.searchParams.set("flow", flowSlug)
   if (language) url.searchParams.set("lang", language)
   return url.toString()
 }
@@ -29,6 +31,7 @@ export interface PreviewTarget {
 export function resolvePreviewTarget(
   tenant: TenantPublic | null | undefined,
   popupSlug: string | null | undefined,
+  flowSlug: string | null | undefined,
   language?: string | null,
 ): PreviewTarget {
   // Distinct from "no portal domain": the tenant is what carries the custom
@@ -44,6 +47,9 @@ export function resolvePreviewTarget(
   if (!popupSlug) {
     return { url: null, reason: "This event has no slug yet." }
   }
+  if (!flowSlug) {
+    return { url: null, reason: "This event has no selected sales flow yet." }
+  }
   const baseUrl = getPortalBaseUrl(tenant)
   if (!baseUrl) {
     return {
@@ -52,7 +58,7 @@ export function resolvePreviewTarget(
         "The portal URL for this tenant could not be resolved. Set VITE_PORTAL_DOMAIN (e.g. localhost:3000 or dev.edgeos.world) and rebuild the backoffice to preview from this environment.",
     }
   }
-  return { url: getCheckoutPreviewUrl(baseUrl, popupSlug, language) }
+  return { url: getCheckoutPreviewUrl(baseUrl, popupSlug, flowSlug, language) }
 }
 
 /** Origin of the preview iframe — the only origin we post the step draft to. */

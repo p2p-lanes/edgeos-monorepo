@@ -5,10 +5,11 @@ import { createElement } from "react"
 import { useCheckoutRuntime } from "@/app/checkout/[popupSlug]/hooks/useCheckoutRuntime"
 import type { CheckoutRuntimeResponse } from "@/client"
 import { fetchCheckoutRuntime } from "./checkout-runtime"
+import { queryKeys } from "./query-keys"
 
 vi.mock("@/client", () => ({
   CheckoutService: {
-    getRuntime: vi.fn(),
+    getFlowRuntime: vi.fn(),
   },
   ApiError: class ApiError extends Error {
     status: number
@@ -56,7 +57,11 @@ describe("fetchCheckoutRuntime", () => {
       json: () => Promise.resolve(runtimeData),
     })
 
-    const result = await fetchCheckoutRuntime("festival-2026", "tenant-1")
+    const result = await fetchCheckoutRuntime(
+      "festival-2026",
+      "tenant-1",
+      "checkout",
+    )
 
     expect(result).toEqual(runtimeData)
   })
@@ -67,7 +72,11 @@ describe("fetchCheckoutRuntime", () => {
       status: 404,
     })
 
-    const result = await fetchCheckoutRuntime("not-found", "tenant-1")
+    const result = await fetchCheckoutRuntime(
+      "not-found",
+      "tenant-1",
+      "checkout",
+    )
 
     expect(result).toBeNull()
   })
@@ -78,7 +87,11 @@ describe("fetchCheckoutRuntime", () => {
       status: 500,
     })
 
-    const result = await fetchCheckoutRuntime("festival-2026", "tenant-1")
+    const result = await fetchCheckoutRuntime(
+      "festival-2026",
+      "tenant-1",
+      "checkout",
+    )
 
     expect(result).toBeNull()
   })
@@ -86,7 +99,11 @@ describe("fetchCheckoutRuntime", () => {
   it("returns null when fetch throws a network error", async () => {
     global.fetch = vi.fn().mockRejectedValue(new Error("Network error"))
 
-    const result = await fetchCheckoutRuntime("festival-2026", "tenant-1")
+    const result = await fetchCheckoutRuntime(
+      "festival-2026",
+      "tenant-1",
+      "checkout",
+    )
 
     expect(result).toBeNull()
   })
@@ -107,7 +124,11 @@ describe("fetchCheckoutRuntime", () => {
         }),
     )
 
-    const resultPromise = fetchCheckoutRuntime("festival-2026", "tenant-1")
+    const resultPromise = fetchCheckoutRuntime(
+      "festival-2026",
+      "tenant-1",
+      "checkout",
+    )
 
     await act(async () => {
       await vi.advanceTimersByTimeAsync(1500)
@@ -126,10 +147,12 @@ describe("fetchCheckoutRuntime", () => {
       json: () => Promise.resolve(runtimeData),
     })
 
-    await fetchCheckoutRuntime("festival-2026", "tenant-abc")
+    await fetchCheckoutRuntime("festival-2026", "tenant-abc", "checkout")
 
     expect(global.fetch).toHaveBeenCalledWith(
-      expect.stringContaining("/api/v1/checkout/festival-2026/runtime"),
+      expect.stringContaining(
+        "/api/v1/checkout/festival-2026/checkout/runtime",
+      ),
       expect.objectContaining({
         cache: "no-store",
         headers: expect.objectContaining({
@@ -145,14 +168,32 @@ describe("fetchCheckoutRuntime", () => {
       json: () => Promise.resolve(runtimeData),
     })
 
-    await fetchCheckoutRuntime("festival/2026", "tenant-abc")
+    await fetchCheckoutRuntime("festival/2026", "tenant-abc", "checkout")
 
     expect(global.fetch).toHaveBeenCalledWith(
-      expect.stringContaining("/api/v1/checkout/festival%2F2026/runtime"),
+      expect.stringContaining(
+        "/api/v1/checkout/festival%2F2026/checkout/runtime",
+      ),
       expect.anything(),
     )
     expect(global.fetch).not.toHaveBeenCalledWith(
-      expect.stringContaining("/api/v1/checkout/festival/2026/runtime"),
+      expect.stringContaining(
+        "/api/v1/checkout/festival/2026/checkout/runtime",
+      ),
+      expect.anything(),
+    )
+  })
+
+  it("requests the named-flow path when flowSlug is given (sdd/sales-flows D6)", async () => {
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve(runtimeData),
+    })
+
+    await fetchCheckoutRuntime("festival-2026", "tenant-abc", "vip")
+
+    expect(global.fetch).toHaveBeenCalledWith(
+      expect.stringContaining("/api/v1/checkout/festival-2026/vip/runtime"),
       expect.anything(),
     )
   })
@@ -165,11 +206,12 @@ describe("useCheckoutRuntime opts", () => {
 
   it("does not trigger a fetch when initialData and initialDataUpdatedAt within staleTime are supplied", async () => {
     const { CheckoutService } = await import("@/client")
-    const getRuntime = vi.mocked(CheckoutService.getRuntime)
+    const getFlowRuntime = vi.mocked(CheckoutService.getFlowRuntime)
 
     const { result } = renderHook(
       () =>
         useCheckoutRuntime("festival-2026", {
+          flowSlug: "checkout",
           initialData: runtimeData,
           initialDataUpdatedAt: Date.now(),
         }),
@@ -181,23 +223,79 @@ describe("useCheckoutRuntime opts", () => {
     expect(result.current.isLoading).toBe(false)
 
     // queryFn should NOT have been called on mount (data is fresh within staleTime)
-    expect(getRuntime).not.toHaveBeenCalled()
+    expect(getFlowRuntime).not.toHaveBeenCalled()
   })
 
-  it("behaves as before (client fetch) when no opts are provided", async () => {
+  it("fetches the canonical checkout flow when no opts are provided", async () => {
     const { CheckoutService } = await import("@/client")
-    const getRuntime = vi.mocked(CheckoutService.getRuntime)
-    getRuntime.mockResolvedValue(runtimeData)
+    const getFlowRuntime = vi.mocked(CheckoutService.getFlowRuntime)
+    getFlowRuntime.mockResolvedValue(runtimeData)
 
-    const { result } = renderHook(() => useCheckoutRuntime("festival-2026"), {
-      wrapper: createWrapper(),
-    })
+    const { result } = renderHook(
+      () => useCheckoutRuntime("festival-2026", { flowSlug: "checkout" }),
+      {
+        wrapper: createWrapper(),
+      },
+    )
 
     await waitFor(() => {
       expect(result.current.data).toEqual(runtimeData)
     })
 
-    expect(getRuntime).toHaveBeenCalledTimes(1)
-    expect(getRuntime).toHaveBeenCalledWith({ slug: "festival-2026" })
+    expect(getFlowRuntime).toHaveBeenCalledTimes(1)
+    expect(getFlowRuntime).toHaveBeenCalledWith({
+      slug: "festival-2026",
+      flowSlug: "checkout",
+    })
+  })
+
+  it("calls getFlowRuntime when flowSlug is provided (sdd/sales-flows D6)", async () => {
+    const { CheckoutService } = await import("@/client")
+    const getFlowRuntime = vi.mocked(CheckoutService.getFlowRuntime)
+    getFlowRuntime.mockResolvedValue(runtimeData)
+
+    const { result } = renderHook(
+      () => useCheckoutRuntime("festival-2026", { flowSlug: "vip" }),
+      { wrapper: createWrapper() },
+    )
+
+    await waitFor(() => {
+      expect(result.current.data).toEqual(runtimeData)
+    })
+
+    expect(getFlowRuntime).toHaveBeenCalledTimes(1)
+    expect(getFlowRuntime).toHaveBeenCalledWith({
+      slug: "festival-2026",
+      flowSlug: "vip",
+    })
+  })
+})
+
+describe("queryKeys.checkout.runtime", () => {
+  it("does not collide when a flow slug matches a language code", () => {
+    // Before the fix, flowSlug and lang shared one positional slot: both
+    // runtime(slug, "es") and runtime(slug, undefined, "es") produced the
+    // exact same key.
+    const byFlow = queryKeys.checkout.runtime("popup-1", "es")
+    const byLang = queryKeys.checkout.runtime("popup-1", undefined, "es")
+    expect(byFlow).not.toEqual(byLang)
+  })
+
+  it("keeps a stable base key for broad invalidation across flow/lang variants", () => {
+    expect(queryKeys.checkout.runtime("popup-1")).toEqual([
+      "checkout",
+      "runtime",
+      "popup-1",
+      {},
+    ])
+  })
+
+  it("labels both dimensions when flow and language are both present", () => {
+    expect(queryKeys.checkout.runtime("popup-1", "vip", "es")).toEqual([
+      "checkout",
+      "runtime",
+      "popup-1",
+      { flowSlug: "vip", lang: "es" },
+    ])
   })
 })

@@ -30,6 +30,7 @@ from app.api.human.models import Humans
 from app.api.popup.models import Popups
 from app.api.product.models import Products
 from app.api.tenant.models import Tenants
+from tests._flow_helpers import application_flow_id
 
 # ---------------------------------------------------------------------------
 # Helpers (mirror tests/api/application/test_attendee_directory.py)
@@ -51,13 +52,20 @@ def _popup(db: Session, tenant: Tenants) -> Popups:
 def _category(
     db: Session, popup: Popups, key: str, *, is_primary: bool
 ) -> AttendeeCategories:
+    from app.api.attendee_category.crud import attendee_categories_crud
+
+    flow_id = application_flow_id(db, popup.id)
+    if is_primary:
+        existing = attendee_categories_crud.get_primary_for_flow(db, flow_id)
+        if existing is not None:
+            return existing
     cat = AttendeeCategories(
         tenant_id=popup.tenant_id,
         popup_id=popup.id,
+        sales_flow_id=flow_id,
         key=key,
         label=key.capitalize(),
         is_primary=is_primary,
-        enabled_in_passes_flow=True,
     )
     db.add(cat)
     db.commit()
@@ -106,6 +114,7 @@ def _application(
     info_not_shared: list[str] | None = None,
 ) -> Applications:
     app = Applications(
+        sales_flow_id=application_flow_id(db, popup.id),
         id=uuid.uuid4(),
         tenant_id=popup.tenant_id,
         popup_id=popup.id,
@@ -151,6 +160,7 @@ def _attendee(
                     tenant_id=popup.tenant_id,
                     attendee_id=attendee.id,
                     product_id=prod.id,
+                    product_category_snapshot="ticket",
                     check_in_code=uuid.uuid4().hex[:10].upper(),
                 )
             )

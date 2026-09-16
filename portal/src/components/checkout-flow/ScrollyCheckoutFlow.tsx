@@ -4,8 +4,10 @@ import { useParams, useRouter, useSearchParams } from "next/navigation"
 import type { ReactNode } from "react"
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { Loader } from "@/components/ui/Loader"
+import { useCheckoutStepTracking } from "@/hooks/checkout/useCheckoutStepTracking"
 import { readAndClearPendingPaymentRedirectState } from "@/hooks/usePaymentRedirect"
 import { useCheckout } from "@/providers/checkoutProvider"
+import { useCityProvider } from "@/providers/cityProvider"
 import CheckoutToast from "./CheckoutToast"
 import DynamicProductStep from "./DynamicProductStep"
 import { shouldUseDynamicStep } from "./registries/stepRegistry"
@@ -42,8 +44,11 @@ function ScrollyCheckoutFlowInner({
     submitPayment,
     stepConfigs,
     isInitialLoading,
+    previewMode,
     markStepVisited,
   } = useCheckout()
+  const { getCity } = useCityProvider()
+  const popup = getCity()
 
   const searchParams = useSearchParams()
   const params = useParams<{ popupSlug: string }>()
@@ -73,6 +78,10 @@ function ScrollyCheckoutFlowInner({
   const [activeSection, setActiveSection] = useState<string>(
     availableSteps[0] ?? "passes",
   )
+  // Unlike the stepper, this shell can optimistically highlight a destination
+  // while a smooth scroll is still in flight. Analytics waits until the
+  // section actually reaches the observer's active band.
+  const [hasEnteredActiveSection, setHasEnteredActiveSection] = useState(false)
   const scrollToIndexRef = useRef<((index: number) => void) | null>(null)
 
   const footerDesign = "pill" as const
@@ -129,6 +138,17 @@ function ScrollyCheckoutFlowInner({
     () => allSections.filter((s) => s.showInNavbar !== false),
     [allSections],
   )
+
+  useCheckoutStepTracking({
+    activeStepId: activeSection,
+    sections: allSections,
+    popup,
+    enabled:
+      hasEnteredActiveSection &&
+      !previewMode &&
+      !isInitialLoading &&
+      !isSimpleFIReturn,
+  })
 
   const goToConfirm = useCallback(() => {
     const idx = allSections.findIndex((s) => s.id === "confirm")
@@ -258,6 +278,7 @@ function ScrollyCheckoutFlowInner({
         if (id) {
           markStepVisited(id)
           setActiveSection(id)
+          setHasEnteredActiveSection(true)
         }
       }
     }
@@ -340,10 +361,12 @@ function ScrollyCheckoutFlowInner({
               if (id === scrollTargetId) {
                 releaseScrollTarget()
                 setActiveSection(id)
+                setHasEnteredActiveSection(true)
               }
               continue
             }
             setActiveSection(id)
+            setHasEnteredActiveSection(true)
           }
         }
       },
@@ -368,6 +391,7 @@ function ScrollyCheckoutFlowInner({
         () => releaseScrollTarget(true),
         1500,
       )
+      setHasEnteredActiveSection(false)
       setActiveSection(targetId)
       // scrollTop that puts the section top at the scrollport top — same
       // landing as scrollIntoView({block:"start"}) given snap-align:start.
@@ -381,6 +405,7 @@ function ScrollyCheckoutFlowInner({
         if (scrollTargetId === targetId) {
           markStepVisited(targetId)
           setActiveSection(targetId)
+          setHasEnteredActiveSection(true)
           releaseScrollTarget()
         }
       })

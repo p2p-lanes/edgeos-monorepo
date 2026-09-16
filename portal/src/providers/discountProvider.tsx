@@ -1,5 +1,6 @@
 "use client"
 
+import { useSearchParams } from "next/navigation"
 import {
   createContext,
   type ReactNode,
@@ -27,7 +28,13 @@ const DiscountProvider = ({ children }: { children: ReactNode }) => {
   const { getCity } = useCityProvider()
   const city = getCity()
   const { getRelevantApplication } = useApplication()
-  const application = getRelevantApplication()
+  // This provider wraps the checkout rather than living inside it, so
+  // there is no `useCheckout` to ask — the portal carries the door in
+  // `?flow=`. A group discount belongs to the application that joined
+  // that group, and reading another door's used to apply the wrong one
+  // (sdd/sales-flows-rediseno).
+  const flowId = useSearchParams().get("flow")
+  const application = getRelevantApplication(flowId)
   const { data: groups = [] } = useGroupsQuery()
 
   const [discountApplied, setDiscountApplied] = useState<DiscountProps>({
@@ -59,10 +66,13 @@ const DiscountProvider = ({ children }: { children: ReactNode }) => {
           discount_value: groupDiscount,
           discount_type: "percentage",
           discount_code: null,
+          // Keep the popup scope or the reset effect above removes this
+          // discount, causing both effects to alternate indefinitely.
+          city_id: city?.id,
         })
       }
     }
-  }, [application?.group_id, groups, discountApplied.discount_value])
+  }, [application?.group_id, groups, discountApplied.discount_value, city?.id])
 
   const discountRef = useRef(discountApplied)
   discountRef.current = discountApplied

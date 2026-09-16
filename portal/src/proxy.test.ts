@@ -97,7 +97,7 @@ describe("checkout mode with active popup", () => {
     })
   })
 
-  it("M-1: rewrites / to /checkout/summer-fest", async () => {
+  it("M-1: rewrites / to the canonical checkout flow", async () => {
     const req = makeRequest(
       "https://tickets.example.com/",
       "tickets.example.com",
@@ -105,10 +105,10 @@ describe("checkout mode with active popup", () => {
     const result = (await proxy(req)) as unknown as { type: string; url: URL }
 
     expect(result.type).toBe("rewrite")
-    expect(result.url.pathname).toBe("/checkout/summer-fest")
+    expect(result.url.pathname).toBe("/checkout/summer-fest/checkout")
   })
 
-  it("M-1b: preserves the query string when rewriting / to /checkout/summer-fest", async () => {
+  it("M-1b: preserves the query string when rewriting to the canonical checkout flow", async () => {
     // A ?lang= deep link lands on the custom-domain root. Dropping the query
     // here strips the language before SSR and the client ever see it, so the
     // checkout silently falls back to the popup default_language.
@@ -119,7 +119,7 @@ describe("checkout mode with active popup", () => {
     const result = (await proxy(req)) as unknown as { type: string; url: URL }
 
     expect(result.type).toBe("rewrite")
-    expect(result.url.pathname).toBe("/checkout/summer-fest")
+    expect(result.url.pathname).toBe("/checkout/summer-fest/checkout")
     expect(result.url.search).toBe("?lang=en&utm_source=newsletter")
   })
 

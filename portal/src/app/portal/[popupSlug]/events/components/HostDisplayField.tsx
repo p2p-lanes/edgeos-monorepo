@@ -82,7 +82,7 @@ export function HostDisplayField({
         }}
         placeholder={
           trimmedPopup
-            ? t("events.form.host_placeholder_default", { name: trimmedPopup })
+            ? t("events.form.host_placeholder_popup", { name: trimmedPopup })
             : t("events.form.host_placeholder_optional")
         }
       />

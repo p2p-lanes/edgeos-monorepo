@@ -6,23 +6,35 @@ import { useEffect, useMemo, useState } from "react"
 import { useTranslation } from "react-i18next"
 import { toast } from "sonner"
 import type { ApplicationPublic } from "@/client"
+import { ApplicationUnavailable } from "@/components/Portal/ApplicationUnavailable"
 import { Loader } from "@/components/ui/Loader"
 import { useApplicationSchema } from "@/hooks/useApplicationSchema"
+import { useApplicationsQuery } from "@/hooks/useGetApplications"
+import { usePortalSalesFlows } from "@/hooks/usePortalSalesFlows"
+import { useInitialQueryResolution } from "@/lib/initial-query-resolution"
 import { useApplication } from "@/providers/applicationProvider"
 import { useCityProvider } from "@/providers/cityProvider"
 import { useFileUpload } from "../events/lib/useFileUpload"
 import { DynamicApplicationForm } from "./components/dynamic-application-form"
 import { ExistingApplicationCard } from "./components/existing-application-card"
-import { FeePaymentBanner } from "./components/fee-payment-banner"
 import { FormHeader } from "./components/form-header"
 import { SectionSeparator } from "./components/section-separator"
+import { resolveApplicationFlowId } from "./lib/resolveApplicationFlowId"
+import { resolvedApplicationDestination } from "./lib/resolvedApplicationDestination"
+import { shouldRedirectToStatus } from "./lib/shouldRedirectToStatus"
 
-function useFormInitData() {
+/**
+ * @param application The application selected for the current way in.
+ *   Without it,
+ *   someone holding two applications would resume editing whichever the
+ *   provider picked, and could overwrite the wrong one
+ *   (sdd/sales-flows-rediseno).
+ */
+function useFormInitData(application: ApplicationPublic | null) {
   const { getCity, getPopups } = useCityProvider()
-  const { applications, getRelevantApplication } = useApplication()
+  const { applications } = useApplication()
   const city = getCity()
   const popups = getPopups()
-  const application = getRelevantApplication()
 
   return useMemo(() => {
     if (!city || !applications) return { application: null, importSource: null }
@@ -61,24 +73,53 @@ export default function FormPage() {
   const { t } = useTranslation()
   const { getCity } = useCityProvider()
   const { getRelevantApplication } = useApplication()
+  const applicationsQuery = useApplicationsQuery()
   const city = getCity()
-  const application = getRelevantApplication()
   const router = useRouter()
   const searchParams = useSearchParams()
-  // Capture once on mount so a later URL change doesn't tear down the fee
-  // banner while it's still polling for the payment webhook.
+  // Older provider checkouts still return here. Forward them to the overview,
+  // where the fee confirmation is shown alongside the application status.
   const [isReturnFromCheckout] = useState(() =>
     searchParams.has("checkout", "success"),
   )
   // Referral UUID carried from /r/{code} consumption page (REQ-GR-009)
   const referralId = searchParams.get("referral_id")
 
+  // Which way into the gathering this form is for. Entry links carry a
+  // readable flow slug; authenticated portal handoffs carry the internal id.
+  // Both resolve to the id required by the application API.
+  const flowIdentifier = searchParams.get("flow")
+  const flowsQuery = usePortalSalesFlows(city?.id)
+  const portalFlows = flowsQuery.data
+  const applicationsLoading = useInitialQueryResolution(
+    "applications",
+    applicationsQuery,
+  )
+  const flowsLoading = useInitialQueryResolution(
+    `application-flows:${city?.id ?? ""}`,
+    flowsQuery,
+  )
+  const initialFlowsReady = !flowsLoading
+  const selectedFlowId = useMemo(() => {
+    if (!initialFlowsReady || !portalFlows) return null
+    if (!flowIdentifier) {
+      return portalFlows.length === 1 ? portalFlows[0].id : null
+    }
+    return resolveApplicationFlowId(flowIdentifier, portalFlows)
+  }, [flowIdentifier, initialFlowsReady, portalFlows])
+  // Declared after the door, not before it: asking which application this
+  // is without saying which way in used to answer with whichever came last.
+  const application = selectedFlowId
+    ? getRelevantApplication(selectedFlowId)
+    : null
+
   const {
     data: schema,
-    isLoading: schemaLoading,
-    isError,
-  } = useApplicationSchema(city?.id)
-  const { application: existingApp, importSource } = useFormInitData()
+    isPending: schemaPending,
+    isLoadingError: schemaLoadingError,
+  } = useApplicationSchema(city?.id, selectedFlowId)
+  const { application: existingApp, importSource } =
+    useFormInitData(application)
 
   const [showImport, setShowImport] = useState(false)
   const [importedData, setImportedData] = useState<ApplicationPublic | null>(
@@ -92,20 +133,33 @@ export default function FormPage() {
     }
   }, [importSource, existingApp])
 
-  // Resolved applications are no longer accessible from the form.
-  // draft/pending_fee/in review stay editable so the applicant can still finish,
-  // retry the fee payment, or update details while the application is under review.
   useEffect(() => {
     if (
-      application &&
-      (application.status === "accepted" || application.status === "rejected")
-    ) {
-      router.replace(`/portal/${city?.slug}`)
+      !initialFlowsReady ||
+      !city ||
+      portalFlows === undefined ||
+      selectedFlowId
+    )
+      return
+    router.replace(`/portal/${city.slug}`)
+  }, [city, initialFlowsReady, portalFlows, router, selectedFlowId])
+
+  // Resolved applications are no longer accessible from the form.
+  // draft/pending_fee/in review stay editable so the applicant can still
+  // finish, retry the fee payment, or update details while under review.
+  useEffect(() => {
+    if (isReturnFromCheckout && city && selectedFlowId) {
+      router.replace(
+        `/portal/${city.slug}?flow=${selectedFlowId}&checkout=success`,
+      )
+      return
     }
-  }, [application, city, router])
+    if (!application || !shouldRedirectToStatus(application.status)) return
+    router.replace(resolvedApplicationDestination(city?.slug, application))
+  }, [application, city, isReturnFromCheckout, router, selectedFlowId])
 
   useEffect(() => {
-    if (city?.sale_type === "direct") {
+    if (city?.takes_applications === false) {
       router.replace(`/portal/${city.slug}`)
     }
   }, [city, router])
@@ -130,11 +184,17 @@ export default function FormPage() {
     setShowImport(false)
   }
 
-  if (schemaLoading || !city) {
+  if (applicationsLoading || flowsLoading || !city) {
     return <Loader />
   }
 
-  if (city.sale_type === "direct") {
+  if (applicationsQuery.isLoadingError || flowsQuery.isLoadingError) {
+    return <ApplicationUnavailable />
+  }
+
+  if (!portalFlows || !selectedFlowId || schemaPending) return <Loader />
+
+  if (city.takes_applications === false) {
     return <Loader />
   }
 
@@ -142,41 +202,17 @@ export default function FormPage() {
     return <Loader />
   }
 
-  // Resolved applications never render the form. The effect above redirects to
-  // the portal home; show a loader meanwhile to avoid flashing it.
-  if (
-    application?.status === "accepted" ||
-    application?.status === "rejected"
-  ) {
+  // Resolved applications never render the form. The effect above
+  // redirects to the portal home; show a loader meanwhile so it does not
+  // flash. Same check as the effect, from the same function.
+  if (shouldRedirectToStatus(application?.status)) {
     return <Loader />
   }
 
-  // Returning from the fee checkout: show only the confirmation banner while we
-  // poll for the payment webhook. The form must not reappear after paying.
-  if (isReturnFromCheckout) {
-    return (
-      <main className="container py-6 md:py-12 mb-8 px-8 md:px-12">
-        {application ? (
-          <FeePaymentBanner application={application} isReturnFromCheckout />
-        ) : (
-          <Loader />
-        )}
-      </main>
-    )
-  }
+  // Do not flash the form while forwarding a legacy fee-success link.
+  if (isReturnFromCheckout) return <Loader />
 
-  if (isError || !schema) {
-    return (
-      <main className="container py-6 md:py-12 mb-8 px-8 md:px-12">
-        <div className="text-center space-y-4">
-          <h2 className="text-2xl font-bold">{t("application.unavailable")}</h2>
-          <p className="text-heading-secondary">
-            {t("application.unavailable_description")}
-          </p>
-        </div>
-      </main>
-    )
-  }
+  if (schemaLoadingError || !schema) return <ApplicationUnavailable />
 
   // Determine which data to pre-fill:
   // 1. Existing draft/in-review for this popup
@@ -198,11 +234,12 @@ export default function FormPage() {
       </div>
       <FileUploadProvider value={uploadFile}>
         <DynamicApplicationForm
-          key={existingApp?.id ?? importedData?.id ?? "new"}
+          key={`${selectedFlowId}:${existingApp?.id ?? importedData?.id ?? "new"}`}
           schema={schema}
           existingApplication={prefillData}
           popup={city}
           referralId={referralId}
+          salesFlowId={selectedFlowId}
         />
       </FileUploadProvider>
     </main>

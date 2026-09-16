@@ -1,9 +1,10 @@
 import uuid
-from typing import TYPE_CHECKING, Optional
+from datetime import UTC, datetime
+from typing import TYPE_CHECKING
 
-from sqlalchemy import UniqueConstraint
+from sqlalchemy import ForeignKey, Integer, Text, UniqueConstraint
 from sqlalchemy.dialects.postgresql import UUID
-from sqlmodel import Column, Field, Relationship
+from sqlmodel import Column, DateTime, Field, Relationship, SQLModel, func
 
 from app.api.popup.schemas import PopupBase
 
@@ -66,9 +67,9 @@ class Popups(PopupBase, table=True):
     )
 
     # Approval configuration
-    approval_strategy: Optional["ApprovalStrategies"] = Relationship(
+    approval_strategies: list["ApprovalStrategies"] = Relationship(
         back_populates="popup",
-        sa_relationship_kwargs={"cascade": "all, delete-orphan", "uselist": False},
+        sa_relationship_kwargs={"cascade": "all, delete-orphan"},
     )
     reviewers: list["PopupReviewers"] = Relationship(
         back_populates="popup", cascade_delete=True
@@ -91,3 +92,45 @@ class Popups(PopupBase, table=True):
     # directly when sale_type == "direct" — application is optional).
     attendees: list["Attendees"] = Relationship(back_populates="popup")
     payments: list["Payments"] = Relationship(back_populates="popup")
+
+
+class PopupHomePages(SQLModel, table=True):
+    """Large, untrusted popup-home source kept off normal popup queries."""
+
+    __tablename__ = "popup_home_pages"
+
+    popup_id: uuid.UUID = Field(
+        sa_column=Column(
+            UUID(as_uuid=True),
+            ForeignKey("popups.id", ondelete="CASCADE"),
+            primary_key=True,
+        ),
+    )
+    tenant_id: uuid.UUID = Field(
+        sa_column=Column(
+            UUID(as_uuid=True),
+            ForeignKey("tenants.id", ondelete="CASCADE"),
+            nullable=False,
+            index=True,
+        )
+    )
+    html: str | None = Field(default=None, sa_column=Column(Text(), nullable=True))
+    version: int = Field(
+        default=1,
+        sa_column=Column(Integer, nullable=False, server_default="1"),
+    )
+    created_at: datetime = Field(
+        default_factory=lambda: datetime.now(UTC),
+        sa_column=Column(
+            DateTime(timezone=True), server_default=func.now(), nullable=False
+        ),
+    )
+    updated_at: datetime = Field(
+        default_factory=lambda: datetime.now(UTC),
+        sa_column=Column(
+            DateTime(timezone=True),
+            server_default=func.now(),
+            onupdate=func.now(),
+            nullable=False,
+        ),
+    )

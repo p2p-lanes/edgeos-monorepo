@@ -1,48 +1,81 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
-import { useCallback, useRef } from "react"
-import { OpenAPI } from "@/client"
+import { useCallback, useEffect, useRef } from "react"
+import { OpenAPI, type PaymentRecipientRequest } from "@/client"
 import { request } from "@/client/core/request"
 import { useIsAuthenticated } from "@/hooks/useIsAuthenticated"
 import { queryKeys } from "@/lib/query-keys"
 
-export interface CartItemPass {
-  attendee_id: string
-  product_id: string
-  quantity: number
+export type CartAssignment =
+  | { kind: "unassigned" }
+  | { kind: "attendee"; attendee_id: string }
+  | { kind: "recipient"; recipient_key: string }
+
+interface CartLineBase {
+  assignment: CartAssignment
+  step_type: string | null
 }
 
-export interface CartItemHousing {
+export interface CartProductLine extends CartLineBase {
+  kind: "product"
+  product_id: string
+  quantity: number
+  price: number | null
+}
+
+export interface CartDateRangeLine extends CartLineBase {
+  kind: "date_range"
   product_id: string
   check_in: string
   check_out: string
-  quantity?: number
-}
-
-export interface CartItemMerch {
-  product_id: string
   quantity: number
 }
 
-export interface CartItemPatron {
+export interface CartCustomAmountLine extends CartLineBase {
+  kind: "custom_amount"
   product_id: string
   amount: number
   is_custom_amount: boolean
 }
 
-export interface CartItemMealPlan {
-  attendee_id: string
+export interface CartMealPlanLine extends CartLineBase {
+  kind: "meal_plan"
   product_id: string
   daily_choices: Record<string, string> | null
   dietary_restriction: string | null
   special_request: string | null
 }
 
+/** One occupant as the saved cart holds them.
+ *
+ *  `name` may be empty: the checkout renders a slot per guest before any of
+ *  them is filled in. `answers` holds whatever else the step's guest form
+ *  asked, keyed by its field keys. The backend still accepts a bare name for
+ *  carts saved before the form existed, but nothing here writes that shape. */
+export interface CartGuest {
+  name: string
+  answers?: Record<string, unknown>
+}
+
+export interface CartAccommodationLine extends CartLineBase {
+  kind: "accommodation"
+  accommodation_id: string
+  check_in: string
+  check_out: string
+  guest_count: number | null
+  guests: CartGuest[]
+  booker_answers?: Record<string, unknown>
+}
+
+export type CartLine =
+  | CartProductLine
+  | CartDateRangeLine
+  | CartCustomAmountLine
+  | CartMealPlanLine
+  | CartAccommodationLine
+
 export interface CartState {
-  passes: CartItemPass[]
-  housing: CartItemHousing | null
-  merch: CartItemMerch[]
-  patron: CartItemPatron | null
-  meal_plans: CartItemMealPlan[]
+  lines: CartLine[]
+  recipients: PaymentRecipientRequest[]
   promo_code: string | null
   insurance: boolean
   current_step: string | null
@@ -57,26 +90,24 @@ interface CartPublic {
   updated_at: string
 }
 
-const EMPTY_CART: CartState = {
-  passes: [],
-  housing: null,
-  merch: [],
-  patron: null,
-  meal_plans: [],
+export const EMPTY_CART: CartState = {
+  lines: [],
+  recipients: [],
   promo_code: null,
   insurance: false,
   current_step: null,
 }
 
-export function useCart(popupId: string | null) {
+export function useCart(popupId: string | null, salesFlowId?: string | null) {
   const isAuthenticated = useIsAuthenticated()
   return useQuery({
-    queryKey: queryKeys.cart.byPopup(popupId ?? ""),
+    queryKey: queryKeys.cart.byPopup(popupId ?? "", salesFlowId),
     queryFn: async (): Promise<CartState> => {
       const result = await request<CartPublic | null>(OpenAPI, {
         method: "GET",
         url: "/api/v1/carts/my/{popup_id}",
         path: { popup_id: popupId! },
+        query: { sales_flow_id: salesFlowId ?? undefined },
       })
       return result?.items ?? EMPTY_CART
     },
@@ -85,9 +116,13 @@ export function useCart(popupId: string | null) {
   })
 }
 
-export function useSaveCart(popupId: string | null) {
+export function useSaveCart(
+  popupId: string | null,
+  salesFlowId?: string | null,
+) {
   const queryClient = useQueryClient()
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const cartScope = popupId ? `${popupId}:${salesFlowId ?? ""}` : null
   const mutationRef =
     useRef<ReturnType<typeof useMutation<CartPublic, Error, CartState>>>(null)
 
@@ -97,14 +132,30 @@ export function useSaveCart(popupId: string | null) {
         method: "PUT",
         url: "/api/v1/carts/my/{popup_id}",
         path: { popup_id: popupId! },
+        query: { sales_flow_id: salesFlowId ?? undefined },
         body: { items },
       })
     },
     onSuccess: (_data, variables) => {
-      queryClient.setQueryData(queryKeys.cart.byPopup(popupId ?? ""), variables)
+      queryClient.setQueryData(
+        queryKeys.cart.byPopup(popupId ?? "", salesFlowId),
+        variables,
+      )
     },
   })
   mutationRef.current = mutation
+
+  // Never let a pending save created for one door execute after navigation to
+  // another door of the same popup.
+  useEffect(() => {
+    if (!cartScope) return
+    return () => {
+      if (debounceRef.current) {
+        clearTimeout(debounceRef.current)
+        debounceRef.current = null
+      }
+    }
+  }, [cartScope])
 
   const debouncedSave = useCallback(
     (items: CartState) => {
@@ -131,10 +182,13 @@ export function useSaveCart(popupId: string | null) {
       }
 
       // Optimistically update the RQ cache before the server responds
-      queryClient.setQueryData(queryKeys.cart.byPopup(popupId), items)
+      queryClient.setQueryData(
+        queryKeys.cart.byPopup(popupId, salesFlowId),
+        items,
+      )
       mutationRef.current?.mutate(items)
     },
-    [popupId, queryClient],
+    [popupId, queryClient, salesFlowId],
   )
 
   const cancelPendingSave = useCallback(() => {
@@ -147,7 +201,10 @@ export function useSaveCart(popupId: string | null) {
   return { save: debouncedSave, saveImmediate, cancelPendingSave, ...mutation }
 }
 
-export function useClearCart(popupId: string | null) {
+export function useClearCart(
+  popupId: string | null,
+  salesFlowId?: string | null,
+) {
   const queryClient = useQueryClient()
 
   return useMutation({
@@ -156,11 +213,12 @@ export function useClearCart(popupId: string | null) {
         method: "DELETE",
         url: "/api/v1/carts/my/{popup_id}",
         path: { popup_id: popupId! },
+        query: { sales_flow_id: salesFlowId ?? undefined },
       })
     },
     onSuccess: () => {
       queryClient.setQueryData(
-        queryKeys.cart.byPopup(popupId ?? ""),
+        queryKeys.cart.byPopup(popupId ?? "", salesFlowId),
         EMPTY_CART,
       )
     },

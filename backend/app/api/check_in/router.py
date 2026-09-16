@@ -13,6 +13,7 @@ from sqlmodel import Session, func, select
 from sqlmodel import select as sa_select
 
 from app.api.application.models import Applications
+from app.api.attendee.crud import unit_authority_predicate
 from app.api.attendee.models import AttendeeProducts, Attendees
 from app.api.check_in.crud import record_check_in
 from app.api.check_in.models import CheckIn
@@ -25,6 +26,7 @@ from app.api.check_in.schemas import (
     SelfCheckInResult,
     SelfCheckInTicket,
 )
+from app.api.payment.models import PaymentProducts, Payments
 from app.api.popup.models import Popups
 from app.api.product.models import Products
 from app.api.shared.response import ListModel, PaginationLimit, PaginationSkip, Paging
@@ -54,14 +56,8 @@ def _get_self_check_in_popup(
     return popup
 
 
-def _human_ticket_owner_filter(human_id: uuid.UUID, popup_id: uuid.UUID):
-    return (
-        (Applications.human_id == human_id) & (Applications.popup_id == popup_id)
-    ) | (
-        (Attendees.human_id == human_id)
-        & (Attendees.popup_id == popup_id)
-        & Attendees.application_id.is_(None)  # type: ignore[union-attr]
-    )
+def _scannable_unit_filter():
+    return Products.requires_check_in.is_(True)
 
 
 def _first_check_ins_by_ticket(
@@ -89,8 +85,8 @@ def _build_self_check_in_ticket(
     product = ticket.product
     return SelfCheckInTicket(
         attendee_product_id=ticket.id,
-        attendee_name=attendee.name,
-        attendee_category=attendee.category,
+        attendee_name=attendee.name if attendee else None,
+        attendee_category=attendee.category if attendee else None,
         product_name=product.name,
         product_category=product.category,
         duration_type=product.duration_type,
@@ -108,14 +104,20 @@ async def get_my_check_in_options(
     popup = _get_self_check_in_popup(db, popup_slug, current_human.tenant_id)
     statement = (
         select(AttendeeProducts)
-        .join(Attendees, AttendeeProducts.attendee_id == Attendees.id)  # type: ignore[arg-type]
+        .outerjoin(Attendees, AttendeeProducts.attendee_id == Attendees.id)  # type: ignore[arg-type]
         .join(Products, AttendeeProducts.product_id == Products.id)  # type: ignore[arg-type]
         .outerjoin(Applications, Attendees.application_id == Applications.id)  # type: ignore[arg-type]
+        .outerjoin(
+            PaymentProducts,
+            AttendeeProducts.payment_product_id == PaymentProducts.id,  # type: ignore[arg-type]
+        )
+        .outerjoin(Payments, PaymentProducts.payment_id == Payments.id)  # type: ignore[arg-type]
         .where(
             AttendeeProducts.tenant_id == current_human.tenant_id,
-            Attendees.popup_id == popup.id,
-            Products.requires_check_in.is_(True),  # type: ignore[union-attr]
-            _human_ticket_owner_filter(current_human.id, popup.id),
+            Products.popup_id == popup.id,
+            AttendeeProducts.revoked_at.is_(None),
+            _scannable_unit_filter(),
+            unit_authority_predicate(current_human.id, popup.id),
         )
         .options(
             selectinload(AttendeeProducts.attendee),  # type: ignore[arg-type]
@@ -146,13 +148,20 @@ async def confirm_my_check_in(
     # lock and the ownership check.
     ticket = db.exec(
         select(AttendeeProducts)
-        .join(Attendees, AttendeeProducts.attendee_id == Attendees.id)  # type: ignore[arg-type]
+        .outerjoin(Attendees, AttendeeProducts.attendee_id == Attendees.id)  # type: ignore[arg-type]
+        .join(Products, AttendeeProducts.product_id == Products.id)  # type: ignore[arg-type]
         .outerjoin(Applications, Attendees.application_id == Applications.id)  # type: ignore[arg-type]
+        .outerjoin(
+            PaymentProducts,
+            AttendeeProducts.payment_product_id == PaymentProducts.id,  # type: ignore[arg-type]
+        )
+        .outerjoin(Payments, PaymentProducts.payment_id == Payments.id)  # type: ignore[arg-type]
         .where(
             AttendeeProducts.id == request.attendee_product_id,
             AttendeeProducts.tenant_id == current_human.tenant_id,
-            Attendees.popup_id == popup.id,
-            _human_ticket_owner_filter(current_human.id, popup.id),
+            Products.popup_id == popup.id,
+            AttendeeProducts.revoked_at.is_(None),
+            unit_authority_predicate(current_human.id, popup.id),
         )
         .with_for_update(of=AttendeeProducts)
         .options(
@@ -174,15 +183,6 @@ async def confirm_my_check_in(
             detail="Product does not require check-in",
         )
 
-    existing = db.exec(
-        select(CheckIn.id).where(CheckIn.attendee_product_id == ticket.id).limit(1)
-    ).first()
-    if existing is not None:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="Ticket is already checked in",
-        )
-
     event = record_check_in(
         db,
         attendee_product_id=ticket.id,
@@ -193,8 +193,8 @@ async def confirm_my_check_in(
 
     return SelfCheckInResult(
         attendee_product_id=ticket.id,
-        attendee_name=attendee.name,
-        attendee_category=attendee.category,
+        attendee_name=attendee.name if attendee else None,
+        attendee_category=attendee.category if attendee else None,
         product_name=product.name,
         product_category=product.category,
         duration_type=product.duration_type,

@@ -16,6 +16,7 @@ from app.api.group.models import GroupMembers, Groups
 from app.api.human.models import Humans
 from app.api.popup.models import Popups
 from app.api.tenant.models import Tenants
+from tests._flow_helpers import group_flow_id
 
 
 def _make_group(
@@ -26,6 +27,7 @@ def _make_group(
     slug: str | None = None,
 ) -> Groups:
     g = Groups(
+        sales_flow_id=group_flow_id(db, popup.id),
         tenant_id=tenant.id,
         popup_id=popup.id,
         name=f"Group {uuid.uuid4().hex[:6]}",

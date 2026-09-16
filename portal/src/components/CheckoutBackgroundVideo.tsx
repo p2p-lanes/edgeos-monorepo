@@ -9,6 +9,7 @@ import { cn } from "@/lib/utils"
 interface CheckoutBackgroundVideoProps {
   url: string
   className?: string
+  position?: "absolute" | "fixed"
   // TODO: thread a popup-level poster field through when one exists on the
   // popup schema. For now callers can pass a static frame URL explicitly.
   poster?: string
@@ -26,6 +27,7 @@ interface CheckoutBackgroundVideoProps {
 export function CheckoutBackgroundVideo({
   url,
   className,
+  position = "fixed",
   poster,
   preload = "metadata",
 }: CheckoutBackgroundVideoProps) {
@@ -95,7 +97,8 @@ export function CheckoutBackgroundVideo({
         src={url}
         poster={poster}
         className={cn(
-          "fixed inset-0 w-full h-full object-cover -z-10",
+          position === "absolute" ? "absolute" : "fixed",
+          "pointer-events-none inset-0 -z-10 h-full w-full object-cover",
           className,
         )}
         autoPlay={!prefersReducedMotion}

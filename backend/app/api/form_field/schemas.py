@@ -49,6 +49,11 @@ class FormFieldBase(SQLModel):
 
     tenant_id: uuid.UUID = Field(foreign_key="tenants.id", index=True)
     popup_id: uuid.UUID = Field(foreign_key="popups.id", index=True)
+    # sdd/sales-flows-rediseno slice 3: belongs to exactly one flow.
+    # There is no popup-shared tier and nothing is inherited.
+    sales_flow_id: uuid.UUID = Field(
+        foreign_key="sales_flows.id", nullable=False, index=True
+    )
     name: str = Field(index=True)
     label: str
     # Optional short identifier used by the backoffice as the applications
@@ -83,6 +88,7 @@ class FormFieldPublic(BaseModel):
     id: uuid.UUID
     tenant_id: uuid.UUID
     popup_id: uuid.UUID
+    sales_flow_id: uuid.UUID
     name: str
     label: str
     short_label: str | None = None
@@ -110,6 +116,9 @@ class FormFieldPublic(BaseModel):
 
 class FormFieldCreate(BaseModel):
     popup_id: uuid.UUID
+    # The flow whose form this field joins. Writes are explicit; only reads
+    # fall back to the popup's default flow.
+    sales_flow_id: uuid.UUID
     label: str
     short_label: str | None = None
     field_type: str = FormFieldType.TEXT.value
@@ -143,3 +152,17 @@ class FormFieldUpdate(BaseModel):
     max_date: str | None = None
     config: dict[str, Any] | None = None
     width: Literal["full", "half", "half_row"] | None = None
+
+
+class CopyFormToFlowRequest(BaseModel):
+    """sdd/sales-flows task 14.1: HTTP body for the copy-form-to-flow
+    backoffice action. `source_flow_id` omitted copies the popup-shared
+    tier; a specific flow id copies exactly that flow's own rows."""
+
+    source_flow_id: uuid.UUID | None = None
+
+
+class CopyFormToFlowResponse(BaseModel):
+    sections: int
+    base_fields: int
+    fields: int

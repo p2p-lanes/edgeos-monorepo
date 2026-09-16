@@ -45,7 +45,7 @@ export function DistributionCharts({
 }: DistributionChartsProps) {
   if (isLoading || !data) {
     return (
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+      <div className="grid gap-4 @2xl/dashboard:grid-cols-2 @5xl/dashboard:grid-cols-3">
         {Array.from({ length: 3 }).map((_, i) => (
           <Card key={`dist-skeleton-${i.toString()}`}>
             <CardHeader>
@@ -82,7 +82,7 @@ export function DistributionCharts({
   const housingSlices = housingProducts.filter((d) => (d.value ?? 0) > 0)
 
   return (
-    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+    <div className="grid gap-4 @2xl/dashboard:grid-cols-2 @5xl/dashboard:grid-cols-3">
       {/* Tickets by Duration */}
       <Card>
         <CardHeader>

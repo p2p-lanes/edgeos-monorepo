@@ -22,7 +22,10 @@ vi.mock("@tanstack/react-router", () => ({
   }) => <a href={`/applications/${params.id}`}>{children}</a>,
 }))
 
-function renderSection() {
+function renderSection(
+  source: "invite" | "referral" = "invite",
+  sourceId = "invite-1",
+) {
   const client = new QueryClient({
     defaultOptions: { queries: { retry: false } },
   })
@@ -30,8 +33,8 @@ function renderSection() {
     <QueryClientProvider client={client}>
       <SourceApplicationsSection
         popupId="popup-1"
-        source="invite"
-        sourceId="invite-1"
+        source={source}
+        sourceId={sourceId}
       />
     </QueryClientProvider>,
   )
@@ -71,6 +74,21 @@ describe("SourceApplicationsSection", () => {
       filters: JSON.stringify({
         match: "all",
         conditions: [{ field: "invite_id", op: "eq", value: "invite-1" }],
+      }),
+      skip: 0,
+      limit: 10,
+    })
+  })
+
+  it("uses the referral attribution field for attendee-created links", async () => {
+    renderSection("referral", "referral-1")
+
+    expect(await screen.findByText("Ada Lovelace")).toBeTruthy()
+    expect(mocks.listApplications).toHaveBeenCalledWith({
+      popupId: "popup-1",
+      filters: JSON.stringify({
+        match: "all",
+        conditions: [{ field: "referral_id", op: "eq", value: "referral-1" }],
       }),
       skip: 0,
       limit: 10,

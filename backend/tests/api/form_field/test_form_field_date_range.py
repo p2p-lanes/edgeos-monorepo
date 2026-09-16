@@ -12,6 +12,7 @@ from app.api.form_field.crud import form_fields_crud
 from app.api.form_field.models import FormFields
 from app.api.popup.models import Popups
 from app.api.tenant.models import Tenants
+from tests._flow_helpers import default_flow_id, provision_default_flow
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -26,12 +27,14 @@ def _create_date_field(
     client: TestClient,
     token: str,
     popup_id: str,
+    flow_id: str,
     *,
     min_date: str | None = None,
     max_date: str | None = None,
 ) -> dict:
     payload: dict = {
         "popup_id": popup_id,
+        "sales_flow_id": flow_id,
         "label": f"Event Date {uuid.uuid4().hex[:6]}",
         "field_type": "date",
     }
@@ -62,12 +65,14 @@ class TestDateRangeColumns:
         client: TestClient,
         admin_token_tenant_a: str,
         popup_tenant_a: Popups,
+        default_flow_tenant_a,
     ) -> None:
         """T1-a: POST a DATE field with both bounds → DB and response contain them."""
         data = _create_date_field(
             client,
             admin_token_tenant_a,
             str(popup_tenant_a.id),
+            str(default_flow_tenant_a.id),
             min_date="2025-06-01",
             max_date="2025-08-31",
         )
@@ -79,12 +84,14 @@ class TestDateRangeColumns:
         client: TestClient,
         admin_token_tenant_a: str,
         popup_tenant_a: Popups,
+        default_flow_tenant_a,
     ) -> None:
         """T1-b: POST with min_date only → max_date is null in response."""
         data = _create_date_field(
             client,
             admin_token_tenant_a,
             str(popup_tenant_a.id),
+            str(default_flow_tenant_a.id),
             min_date="2025-01-01",
         )
         assert data["min_date"] == "2025-01-01"
@@ -95,12 +102,14 @@ class TestDateRangeColumns:
         client: TestClient,
         admin_token_tenant_a: str,
         popup_tenant_a: Popups,
+        default_flow_tenant_a,
     ) -> None:
         """T1-c: POST with max_date only → min_date is null in response."""
         data = _create_date_field(
             client,
             admin_token_tenant_a,
             str(popup_tenant_a.id),
+            str(default_flow_tenant_a.id),
             max_date="2025-12-31",
         )
         assert data["min_date"] is None
@@ -111,6 +120,7 @@ class TestDateRangeColumns:
         client: TestClient,
         admin_token_tenant_a: str,
         popup_tenant_a: Popups,
+        default_flow_tenant_a,
     ) -> None:
         """T1-d: PATCH sets both to null → DB stores nulls."""
         # Create with bounds
@@ -118,6 +128,7 @@ class TestDateRangeColumns:
             client,
             admin_token_tenant_a,
             str(popup_tenant_a.id),
+            str(default_flow_tenant_a.id),
             min_date="2025-06-01",
             max_date="2025-08-31",
         )
@@ -149,6 +160,7 @@ class TestBuildSchemaIncludesDateRange:
         db: Session,
         admin_token_tenant_a: str,
         popup_tenant_a: Popups,
+        default_flow_tenant_a,
     ) -> None:
         """T5: build_schema_for_popup() returns min_date / max_date in field dict."""
         # Create a date field with bounds
@@ -156,6 +168,7 @@ class TestBuildSchemaIncludesDateRange:
             client,
             admin_token_tenant_a,
             str(popup_tenant_a.id),
+            str(default_flow_tenant_a.id),
             min_date="2025-03-01",
             max_date="2025-09-30",
         )
@@ -183,12 +196,14 @@ class TestBuildSchemaIncludesDateRange:
         client: TestClient,
         admin_token_tenant_a: str,
         popup_tenant_a: Popups,
+        default_flow_tenant_a,
     ) -> None:
         """T5-b: DATE field with no bounds → min_date / max_date keys present as null."""
         field_data = _create_date_field(
             client,
             admin_token_tenant_a,
             str(popup_tenant_a.id),
+            str(default_flow_tenant_a.id),
         )
         field_name = field_data["name"]
 
@@ -235,10 +250,12 @@ class TestValidateDateRange:
         )
         db.add(popup)
         db.flush()
+        provision_default_flow(db, popup)
 
         field = FormFields(
             tenant_id=tenant.id,
             popup_id=popup.id,
+            sales_flow_id=default_flow_id(db, popup.id),
             name=f"event_date_{uuid.uuid4().hex[:6]}",
             label="Event Date",
             field_type="date",

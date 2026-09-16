@@ -40,7 +40,7 @@ export interface FormFieldSchema {
   width?: "full" | "half" | "half_row" | null
 }
 
-/** The runtime `form_schema` payload shape (from GET /checkout/{slug}/runtime). */
+/** The runtime `form_schema` payload shape (from GET /checkout/{slug}/{flowSlug}/runtime). */
 export interface ApplicationFormSchema {
   base_fields: Record<string, FormFieldSchema>
   custom_fields: Record<string, FormFieldSchema>

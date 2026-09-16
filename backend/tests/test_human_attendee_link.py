@@ -14,6 +14,7 @@ from sqlmodel import Session
 from app.api.attendee.crud import attendees_crud
 from app.api.attendee.models import Attendees
 from app.api.human.models import Humans
+from tests._flow_helpers import application_flow_id
 
 
 class TestHumanAttendeeLink:
@@ -65,6 +66,7 @@ class TestHumanAttendeeLink:
 
         # Create application
         application = Applications(
+            sales_flow_id=application_flow_id(db, popup.id),
             id=uuid.uuid4(),
             tenant_id=tenant_id,
             popup_id=popup.id,
@@ -121,6 +123,7 @@ class TestHumanAttendeeLink:
         db.flush()
 
         application = Applications(
+            sales_flow_id=application_flow_id(db, popup.id),
             id=uuid.uuid4(),
             tenant_id=tenant_id,
             popup_id=popup.id,
@@ -177,6 +180,7 @@ class TestHumanAttendeeLink:
         db.flush()
 
         application = Applications(
+            sales_flow_id=application_flow_id(db, popup.id),
             id=uuid.uuid4(),
             tenant_id=tenant_id,
             popup_id=popup.id,
@@ -255,6 +259,7 @@ class TestHumanAttendeeLink:
         db.flush()
 
         application = Applications(
+            sales_flow_id=application_flow_id(db, popup.id),
             id=uuid.uuid4(),
             tenant_id=tenant_id,
             popup_id=popup.id,

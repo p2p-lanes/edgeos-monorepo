@@ -22,10 +22,37 @@ class FormSectionsCRUD(BaseCRUD[FormSections, FormSectionCreate, FormSectionUpda
 
         limit=None returns all sections (no offset/limit) — callers that
         post-filter in Python need the full set to paginate correctly.
+
+        Returns ALL sections for the popup regardless of `sales_flow_id`
+        (admin/legacy management surface — untouched by sdd/sales-flows
+        slice 6 — see `find_by_flow` for one flow's own sections).
         """
         statement = (
             select(FormSections)
             .where(FormSections.popup_id == popup_id)
+            .order_by(FormSections.order)
+        )
+
+        count_statement = select(func.count()).select_from(statement.subquery())
+        total = session.exec(count_statement).one()
+
+        if limit is not None:
+            statement = statement.offset(skip).limit(limit)
+        results = list(session.exec(statement).all())
+
+        return results, total
+
+    def find_by_flow(
+        self,
+        session: Session,
+        flow_id: uuid.UUID,
+        skip: int = 0,
+        limit: int | None = 100,
+    ) -> tuple[list[FormSections], int]:
+        """Sections owned exclusively by `flow_id` (sdd/sales-flows slice 6)."""
+        statement = (
+            select(FormSections)
+            .where(FormSections.sales_flow_id == flow_id)
             .order_by(FormSections.order)
         )
 

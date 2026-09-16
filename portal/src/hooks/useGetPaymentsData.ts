@@ -17,7 +17,7 @@ function mapPayment(p: PaymentPublic): PaymentsProps {
     products_snapshot: (p.products_snapshot ?? []).map(
       (ps: PaymentProductResponse) => ({
         product_id: ps.product_id,
-        attendee_id: ps.attendee_id,
+        attendee_id: ps.attendee_id ?? null,
         quantity: ps.quantity ?? 1,
         product_name: ps.product_name ?? "",
         product_description: ps.product_description ?? null,

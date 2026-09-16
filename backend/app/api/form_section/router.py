@@ -1,8 +1,7 @@
 import uuid
-from typing import Any
 
 from fastapi import APIRouter, HTTPException, status
-from sqlmodel import select
+from sqlmodel import Session, select
 
 from app.api.form_section import crud
 from app.api.form_section.models import FormSections
@@ -30,10 +29,12 @@ async def list_form_sections(
     db: AdminOrApiKeySession_FormsRead,
     _: AdminOrApiKey_FormsRead,
     popup_id: uuid.UUID | None = None,
+    sales_flow_id: uuid.UUID | None = None,
     skip: PaginationSkip = 0,
     limit: PaginationLimit = 100,
 ) -> ListModel[FormSectionPublic]:
     if popup_id:
+        from app.api.form_field.router import _resolve_schema_flow_id
         from app.api.popup.crud import popups_crud
 
         popup = popups_crud.get(db, popup_id)
@@ -42,14 +43,15 @@ async def list_form_sections(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Popup not found",
             )
-        # Fetch all sections for the popup (small set) so the flag filter
-        # runs before pagination — otherwise totals and pages are wrong.
-        all_sections, _ = crud.form_sections_crud.find_by_popup(
-            db, popup_id=popup_id, limit=None
-        )
+        # One flow's sections, never a merge across the popup's flows
+        # (sdd/sales-flows-rediseno slice 3).
+        flow_id = _resolve_schema_flow_id(db, popup_id, sales_flow_id)
+        # Fetch all of them (small set) so the flag filter runs before
+        # pagination — otherwise totals and pages are wrong.
+        all_sections, _ = crud.form_sections_crud.find_by_flow(db, flow_id, limit=None)
         # Gate special-kind sections by current popup flags so the backoffice
         # renders consistently with the portal after a flag is toggled off.
-        filtered = [s for s in all_sections if _section_allowed_by_flags(s, popup)]
+        filtered = [s for s in all_sections if _section_allowed_by_flags(db, s)]
         total = len(filtered)
         sections = filtered[skip : skip + limit]
     else:
@@ -61,9 +63,22 @@ async def list_form_sections(
     )
 
 
-def _section_allowed_by_flags(section: FormSections, popup: Any) -> bool:
+def _section_allowed_by_flags(db: Session, section: FormSections) -> bool:
+    """Whether a special-kind section is asked, per its own flow.
+
+    A section belongs to one flow, so the flag that hides it belongs to that
+    flow too.
+    """
+    from app.api.sales_flow.resolver import config_for  # noqa: PLC0415
+
     if section.kind == FormSectionKind.SCHOLARSHIP.value:
-        return bool(popup.allows_scholarship)
+        return bool(
+            config_for(
+                db,
+                sales_flow_id=section.sales_flow_id,
+                popup_id=section.popup_id,
+            ).allows_scholarship
+        )
     return True
 
 
@@ -91,6 +106,7 @@ async def create_form_section(
     current_user: AdminOrApiKey_FormsWrite,
 ) -> FormSectionPublic:
     from app.api.popup.crud import popups_crud
+    from app.api.sales_flow.resolver import config_for  # noqa: PLC0415
 
     popup = popups_crud.get(db, section_in.popup_id)
     if not popup:
@@ -104,27 +120,41 @@ async def create_form_section(
     else:
         tenant_id = current_user.tenant_id
 
+    # Rejects a flow belonging to another popup.
+    from app.api.form_field.router import _resolve_schema_flow_id
+
+    _resolve_schema_flow_id(db, section_in.popup_id, section_in.sales_flow_id)
+
     # Gate special-kind sections by popup feature flags and uniqueness.
     if section_in.kind != FormSectionKind.STANDARD:
         if (
             section_in.kind == FormSectionKind.SCHOLARSHIP
-            and not popup.allows_scholarship
+            and not config_for(
+                db,
+                sales_flow_id=section_in.sales_flow_id,
+                popup_id=section_in.popup_id,
+            ).allows_scholarship
         ):
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Popup does not allow scholarship",
             )
 
+        # Uniqueness is per flow: two flows may each have their own
+        # scholarship section (slice 3).
         existing = db.exec(
             select(FormSections).where(
-                FormSections.popup_id == section_in.popup_id,
+                FormSections.sales_flow_id == section_in.sales_flow_id,
                 FormSections.kind == section_in.kind.value,
             )
         ).first()
         if existing:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"A section of kind '{section_in.kind.value}' already exists for this popup",
+                detail=(
+                    f"A section of kind '{section_in.kind.value}' already "
+                    "exists for this sales flow"
+                ),
             )
 
     section_data = section_in.model_dump()

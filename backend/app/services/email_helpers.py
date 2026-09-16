@@ -175,6 +175,7 @@ async def send_application_status_email(
             from_address=from_address,
             from_name=from_name,
             popup_id=application.popup_id,
+            sales_flow_id=application.sales_flow_id,
             db_session=db,
         )
     elif current_status == ApplicationStatus.ACCEPTED.value:
@@ -194,6 +195,7 @@ async def send_application_status_email(
                 from_address=from_address,
                 from_name=from_name,
                 popup_id=application.popup_id,
+                sales_flow_id=application.sales_flow_id,
                 db_session=db,
             )
         elif template_type == EmailTemplateType.APPLICATION_ACCEPTED_WITH_DISCOUNT:
@@ -204,6 +206,7 @@ async def send_application_status_email(
                 from_address=from_address,
                 from_name=from_name,
                 popup_id=application.popup_id,
+                sales_flow_id=application.sales_flow_id,
                 db_session=db,
             )
         elif template_type == EmailTemplateType.APPLICATION_ACCEPTED_WITH_INCENTIVE:
@@ -214,6 +217,7 @@ async def send_application_status_email(
                 from_address=from_address,
                 from_name=from_name,
                 popup_id=application.popup_id,
+                sales_flow_id=application.sales_flow_id,
                 db_session=db,
             )
         elif (
@@ -226,6 +230,7 @@ async def send_application_status_email(
                 from_address=from_address,
                 from_name=from_name,
                 popup_id=application.popup_id,
+                sales_flow_id=application.sales_flow_id,
                 db_session=db,
             )
     elif current_status == ApplicationStatus.REJECTED.value:
@@ -240,6 +245,7 @@ async def send_application_status_email(
             from_address=from_address,
             from_name=from_name,
             popup_id=application.popup_id,
+            sales_flow_id=application.sales_flow_id,
             db_session=db,
         )
     # DRAFT, WITHDRAWN: no email

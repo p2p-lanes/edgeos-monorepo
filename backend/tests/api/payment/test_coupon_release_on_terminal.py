@@ -24,6 +24,10 @@ from app.api.payment.schemas import PaymentStatus
 from app.api.popup.models import Popups
 from app.api.shared.enums import SaleType
 from app.api.tenant.models import Tenants
+from tests._flow_helpers import (
+    application_flow_id,
+    coupon_flow_id,
+)
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -55,6 +59,7 @@ def _make_coupon(
     max_uses: int = MAX_USES,
 ) -> Coupons:
     coupon = Coupons(
+        sales_flow_id=coupon_flow_id(db, popup.id),
         id=uuid.uuid4(),
         tenant_id=popup.tenant_id,
         popup_id=popup.id,
@@ -98,6 +103,7 @@ def _make_pending_payment_with_coupon(
     db.flush()
 
     application = Applications(
+        sales_flow_id=application_flow_id(db, popup.id),
         tenant_id=tenant.id,
         popup_id=popup.id,
         human_id=human.id,

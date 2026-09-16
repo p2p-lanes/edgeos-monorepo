@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest"
 import type { PopupPublic } from "@/client"
-import { visiblePortalPopups } from "./portalPopupList"
+import { visiblePortalFallback, visiblePortalPopups } from "./portalPopupList"
 
 const popup = (over: Partial<PopupPublic>): PopupPublic =>
   ({
@@ -29,5 +29,21 @@ describe("visiblePortalPopups", () => {
       popup({ name: "active", status: "active", start_date: "2030-01-01" }),
     ])
     expect(result.map((p) => p.name)).toEqual(["active", "ended"])
+  })
+})
+
+describe("visiblePortalFallback", () => {
+  it("preserves the last popup only while it remains visible", () => {
+    const first = popup({ id: "active-1", slug: "first" })
+    const last = popup({ id: "active-2", slug: "last" })
+
+    expect(visiblePortalFallback([first, last], last)).toBe(last)
+    expect(visiblePortalFallback([first], last)).toBe(first)
+  })
+
+  it("returns null when no visible popup exists", () => {
+    const draft = popup({ id: "draft-1", status: "draft" })
+
+    expect(visiblePortalFallback([], draft)).toBeNull()
   })
 })

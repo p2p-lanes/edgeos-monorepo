@@ -1,7 +1,17 @@
 "use client"
 
 import { type MutableRefObject, useCallback, useEffect, useRef } from "react"
-import { CheckoutService } from "@/client"
+import {
+  CHECKOUT_MODE,
+  type CheckoutMode,
+} from "@/checkout/popupCheckoutPolicy"
+import { CheckoutService, type PaymentRecipientRequest } from "@/client"
+import type {
+  CartAssignment,
+  CartGuest,
+  CartLine,
+  CartState,
+} from "@/hooks/useCartApi"
 import { getProductAvailability } from "@/lib/product-availability"
 import type {
   CheckoutStep,
@@ -14,10 +24,14 @@ import type {
   CartSelectionState,
   RestorationSetters,
 } from "./useCartPersistence"
+import {
+  buildPersistedCartState,
+  deriveCartRestoration,
+} from "./useCartPersistence"
 
 /**
  * What we persist in localStorage per popup slug.
- * Keeping the structure flat and versioned so future migrations are easy.
+ * The current payload is canonical; older bucketed snapshots migrate on read.
  */
 interface OpenCartLocalStorage {
   /** CartState serialized as JSON (mirrors useCartPersistence.buildCartState) */
@@ -28,47 +42,20 @@ interface OpenCartLocalStorage {
   restoreToken: string | null
 }
 
-/** Minimal CartState fields we need for serialization / deserialization. */
-interface CartItemsSnapshot {
-  passes: { attendee_id: string; product_id: string; quantity: number }[]
-  housing: {
-    product_id: string
-    check_in: string
-    check_out: string
-    quantity?: number
-  } | null
-  merch: { product_id: string; quantity: number }[]
-  patron: {
-    product_id: string
-    amount: number
-    is_custom_amount: boolean
-  } | null
-  meal_plans: {
-    attendee_id: string
-    product_id: string
-    daily_choices: Record<string, string> | null
-    dietary_restriction: string | null
-    special_request: string | null
-  }[]
-  /** Flat array of dynamic-step items, keyed by step_type for reconstruction. */
-  dynamic_items: {
-    step_type: string
-    product_id: string
-    quantity: number
-    price: number
-  }[]
-  promo_code: string | null
-  insurance: boolean
-  current_step: string | null
-}
+export type CartItemsSnapshot = CartState
 
 interface UseOpenCartPersistenceParams {
   /** The popup slug — used as localStorage key and in API calls */
   popupSlug: string
+  /** Canonical flow used for every anonymous cart operation. */
+  flowSlug: string
+  /** Enables persistence only for the anonymous checkout surface. */
+  enabled: boolean
   /** Mutable ref that the provider keeps in sync with latest selection state */
   selectionStateRef: MutableRefObject<CartSelectionState>
   /** Products for availability validation during restore */
   products: ProductsPass[]
+  checkoutMode?: CheckoutMode
   /** Whether housing pricing is per-day */
   housingPricePerDay: boolean
   /** State setters used to hydrate the cart from a saved snapshot */
@@ -108,94 +95,352 @@ export interface OpenCartRestorationHandle {
   restorationPromise: Promise<void>
 }
 
-function localStorageKey(slug: string): string {
-  return `open-cart:${slug}`
+export function getOpenCartScope(popupSlug: string, flowSlug?: string | null) {
+  return {
+    storageKey: flowSlug
+      ? `open-cart:${popupSlug}:${flowSlug}`
+      : `open-cart:${popupSlug}`,
+    isNamedFlow: Boolean(flowSlug),
+  }
 }
 
-function readLocalStorage(slug: string): OpenCartLocalStorage | null {
+type UnknownRecord = Record<string, unknown>
+
+function isRecord(value: unknown): value is UnknownRecord {
+  return typeof value === "object" && value !== null && !Array.isArray(value)
+}
+
+function entries(value: unknown): UnknownRecord[] {
+  return Array.isArray(value) ? value.filter(isRecord) : []
+}
+
+function nonEmptyString(value: unknown): string | null {
+  if (typeof value !== "string") return null
+  const trimmed = value.trim()
+  return trimmed.length > 0 ? trimmed : null
+}
+
+function uuidString(value: unknown): string | null {
+  const parsed = nonEmptyString(value)
+  return parsed &&
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+      parsed,
+    )
+    ? parsed
+    : null
+}
+
+function positiveInt(value: unknown, fallback = 1): number {
+  if (typeof value === "boolean") return fallback
+  const parsed = Number(value)
+  return Number.isInteger(parsed) && parsed >= 1 ? parsed : fallback
+}
+
+function nonnegativeNumber(value: unknown): number | null {
+  if (
+    typeof value === "boolean" ||
+    value === null ||
+    (typeof value !== "number" && nonEmptyString(value) === null)
+  )
+    return null
+  const parsed = Number(value)
+  return Number.isFinite(parsed) && parsed >= 0 ? parsed : null
+}
+
+function dateString(value: unknown): string | null {
+  const parsed = nonEmptyString(value)
+  if (!parsed) return null
+  const date = new Date(`${parsed}T00:00:00Z`)
+  return Number.isFinite(date.getTime()) &&
+    date.toISOString().slice(0, 10) === parsed
+    ? parsed
+    : null
+}
+
+/** One guest out of a legacy snapshot, in the shape the line now uses.
+ *
+ *  Returns an array so callers can `flatMap` it: an entry that is neither a
+ *  name nor a record is dropped rather than turned into a blank occupant. */
+function legacyGuest(value: unknown): CartGuest[] {
+  if (typeof value === "string") return [{ name: value }]
+  if (!isRecord(value)) return []
+  const answers = value.answers
+  return [
+    {
+      name: typeof value.name === "string" ? value.name : "",
+      ...(isRecord(answers) ? { answers } : {}),
+    },
+  ]
+}
+
+function parseRecipients(value: unknown): PaymentRecipientRequest[] {
+  const recipients: PaymentRecipientRequest[] = []
+  const seen = new Set<string>()
+  for (const entry of entries(value)) {
+    const recipientKey = nonEmptyString(entry.recipient_key)
+    const name = nonEmptyString(entry.name)
+    if (
+      !recipientKey ||
+      recipientKey.length > 255 ||
+      !name ||
+      seen.has(recipientKey)
+    )
+      continue
+    const email = nonEmptyString(entry.email)
+    const humanId = uuidString(entry.human_id)
+    const attendeeId = uuidString(entry.existing_attendee_id)
+    const categoryId = uuidString(entry.category_id)
+    recipients.push({
+      recipient_key: recipientKey,
+      name,
+      ...(humanId ? { human_id: humanId } : {}),
+      ...(attendeeId ? { existing_attendee_id: attendeeId } : {}),
+      ...(entry.email === null || email?.includes("@") ? { email } : {}),
+      ...(entry.category_id === null || categoryId
+        ? { category_id: categoryId }
+        : {}),
+      ...(isRecord(entry.profile_snapshot)
+        ? { profile_snapshot: entry.profile_snapshot }
+        : {}),
+    })
+    seen.add(recipientKey)
+  }
+  return recipients
+}
+
+function legacyAssignment(
+  entry: UnknownRecord,
+  recipientKeys: Set<string>,
+): CartAssignment {
+  const recipientKey = nonEmptyString(entry.recipient_key)
+  if (recipientKey && recipientKeys.has(recipientKey)) {
+    return { kind: "recipient", recipient_key: recipientKey }
+  }
+  const attendeeId = nonEmptyString(entry.attendee_id)
+  if (!attendeeId) return { kind: "unassigned" }
+  if (attendeeId.startsWith("recipient:")) {
+    const key = attendeeId.slice("recipient:".length)
+    if (recipientKeys.has(key)) return { kind: "recipient", recipient_key: key }
+  }
+  return { kind: "attendee", attendee_id: attendeeId }
+}
+
+function migrateLegacySnapshot(value: UnknownRecord): CartState {
+  const recipients = parseRecipients(value.recipients)
+  const recipientKeys = new Set(recipients.map((item) => item.recipient_key))
+  const lines: CartLine[] = []
+  const passProductIds = new Set<string>()
+  const addProduct = (entry: UnknownRecord, stepType: string | null) => {
+    const productId = nonEmptyString(entry.product_id)
+    if (!productId) return
+    lines.push({
+      kind: "product",
+      assignment: legacyAssignment(entry, recipientKeys),
+      step_type: stepType,
+      product_id: productId,
+      quantity: positiveInt(entry.quantity),
+      price: nonnegativeNumber(entry.price),
+    })
+  }
+
+  for (const entry of entries(value.passes)) {
+    const productId = nonEmptyString(entry.product_id)
+    if (!productId) continue
+    passProductIds.add(productId)
+    addProduct(entry, "tickets")
+  }
+  if (isRecord(value.housing)) {
+    const productId = nonEmptyString(value.housing.product_id)
+    const checkIn = dateString(value.housing.check_in)
+    const checkOut = dateString(value.housing.check_out)
+    if (productId && checkIn && checkOut) {
+      lines.push({
+        kind: "date_range",
+        assignment: legacyAssignment(value.housing, recipientKeys),
+        step_type: "housing",
+        product_id: productId,
+        check_in: checkIn,
+        check_out: checkOut,
+        quantity: positiveInt(value.housing.quantity),
+      })
+    }
+  }
+  for (const entry of entries(value.merch)) addProduct(entry, "merch")
+  if (isRecord(value.patron)) {
+    const productId = nonEmptyString(value.patron.product_id)
+    const amount = nonnegativeNumber(value.patron.amount)
+    if (productId && amount !== null) {
+      lines.push({
+        kind: "custom_amount",
+        assignment: legacyAssignment(value.patron, recipientKeys),
+        step_type: "patron",
+        product_id: productId,
+        amount,
+        is_custom_amount:
+          typeof value.patron.is_custom_amount === "boolean"
+            ? value.patron.is_custom_amount
+            : false,
+      })
+    }
+  }
+  for (const entry of entries(value.meal_plans)) {
+    const productId = nonEmptyString(entry.product_id)
+    if (!productId) continue
+    const choices = isRecord(entry.daily_choices)
+      ? Object.fromEntries(
+          Object.entries(entry.daily_choices).filter(
+            (pair): pair is [string, string] => typeof pair[1] === "string",
+          ),
+        )
+      : null
+    lines.push({
+      kind: "meal_plan",
+      assignment: legacyAssignment(entry, recipientKeys),
+      step_type: "meal_plan",
+      product_id: productId,
+      daily_choices: choices,
+      dietary_restriction:
+        typeof entry.dietary_restriction === "string"
+          ? entry.dietary_restriction
+          : null,
+      special_request:
+        typeof entry.special_request === "string"
+          ? entry.special_request
+          : null,
+    })
+  }
+  for (const entry of entries(value.accommodations)) {
+    const accommodationId = nonEmptyString(entry.accommodation_id)
+    const checkIn = dateString(entry.check_in)
+    const checkOut = dateString(entry.check_out)
+    if (!accommodationId || !checkIn || !checkOut) continue
+    const guestCount = positiveInt(entry.guest_count, 0)
+    lines.push({
+      kind: "accommodation",
+      assignment: legacyAssignment(entry, recipientKeys),
+      step_type: "housing",
+      accommodation_id: accommodationId,
+      check_in: checkIn,
+      check_out: checkOut,
+      guest_count: guestCount || null,
+      // A legacy cart holds bare names; one saved after the guest form
+      // landed holds `{name, answers}`. Both are read, because both are on
+      // disk in somebody's browser right now.
+      guests: Array.isArray(entry.guests)
+        ? entry.guests.flatMap(legacyGuest)
+        : [],
+    })
+  }
+  for (const entry of entries(value.dynamic_items)) {
+    const productId = nonEmptyString(entry.product_id)
+    if (!productId || passProductIds.has(productId)) continue
+    addProduct(entry, nonEmptyString(entry.step_type))
+  }
+  return {
+    lines,
+    recipients,
+    promo_code: typeof value.promo_code === "string" ? value.promo_code : null,
+    insurance: typeof value.insurance === "boolean" ? value.insurance : false,
+    current_step:
+      typeof value.current_step === "string" ? value.current_step : null,
+  }
+}
+
+export function normalizeCartItemsSnapshot(
+  value: unknown,
+): { items: CartItemsSnapshot; migrated: boolean } | null {
+  if (!isRecord(value)) return null
+  if ("lines" in value) {
+    if (!Array.isArray(value.lines)) return null
+    return { items: value as unknown as CartItemsSnapshot, migrated: false }
+  }
+  return { items: migrateLegacySnapshot(value), migrated: true }
+}
+
+function readLocalStorage(storageKey: string): OpenCartLocalStorage | null {
   if (typeof window === "undefined") return null
   try {
-    const raw = window.localStorage.getItem(localStorageKey(slug))
+    const raw = window.localStorage.getItem(storageKey)
     if (!raw) return null
-    return JSON.parse(raw) as OpenCartLocalStorage
+    const parsed: unknown = JSON.parse(raw)
+    if (!isRecord(parsed)) return null
+    const normalized = normalizeCartItemsSnapshot(parsed.items)
+    if (!normalized) return null
+    const saved: OpenCartLocalStorage = {
+      items: normalized.items,
+      cartId: typeof parsed.cartId === "string" ? parsed.cartId : null,
+      restoreToken:
+        typeof parsed.restoreToken === "string" ? parsed.restoreToken : null,
+    }
+    writeLocalStorage(storageKey, saved)
+    return saved
   } catch {
     return null
   }
 }
 
-function writeLocalStorage(slug: string, data: OpenCartLocalStorage): void {
+function writeLocalStorage(
+  storageKey: string,
+  data: OpenCartLocalStorage,
+): void {
   if (typeof window === "undefined") return
   try {
-    window.localStorage.setItem(localStorageKey(slug), JSON.stringify(data))
+    window.localStorage.setItem(storageKey, JSON.stringify(data))
   } catch {
     // Quota exceeded or private-mode — silently ignore
   }
 }
 
-function clearLocalStorage(slug: string): void {
+function clearLocalStorage(storageKey: string): void {
   if (typeof window === "undefined") return
   try {
-    window.localStorage.removeItem(localStorageKey(slug))
+    window.localStorage.removeItem(storageKey)
   } catch {
     // ignore
   }
 }
 
+function restoreScopedOpenCart(
+  popupSlug: string,
+  flowSlug: string,
+  cid: string,
+  sig: string,
+) {
+  return CheckoutService.restoreFlowCart({
+    slug: popupSlug,
+    flowSlug,
+    cid,
+    sig,
+  })
+}
+
+function upsertScopedOpenCart(
+  popupSlug: string,
+  flowSlug: string,
+  email: string,
+  items: CartItemsSnapshot,
+) {
+  const requestBody = { email, items }
+  return CheckoutService.upsertFlowCart({
+    slug: popupSlug,
+    flowSlug,
+    requestBody,
+  })
+}
+
 /** Build a CartItemsSnapshot from the selection state ref. Mirrors useCartPersistence.buildCartState. */
-function buildItemsSnapshot(state: CartSelectionState): CartItemsSnapshot {
-  return {
-    passes: state.selectedPasses.map((p) => ({
-      attendee_id: p.attendeeId,
-      product_id: p.productId,
-      quantity: p.quantity,
-    })),
-    housing: state.housing
-      ? {
-          product_id: state.housing.productId,
-          check_in: state.housing.checkIn,
-          check_out: state.housing.checkOut,
-          quantity: state.housing.quantity,
-        }
-      : null,
-    merch: state.merch.map((m) => ({
-      product_id: m.productId,
-      quantity: m.quantity,
-    })),
-    patron: state.patron
-      ? {
-          product_id: state.patron.productId,
-          amount: state.patron.amount,
-          is_custom_amount: state.patron.isCustomAmount,
-        }
-      : null,
-    meal_plans: state.selectedMealPlans.map((m) => ({
-      attendee_id: m.attendeeId,
-      product_id: m.productId,
-      daily_choices: m.dailyChoices,
-      dietary_restriction: m.dietaryRestriction,
-      special_request: m.specialRequest,
-    })),
-    // Flat array — step_type is the grouping key used to reconstruct the
-    // Record<string, SelectedDynamicItem[]> during hydration.
-    dynamic_items: Object.values(state.dynamicItems)
-      .flat()
-      .map((item) => ({
-        step_type: item.stepType,
-        product_id: item.productId,
-        quantity: item.quantity,
-        price: item.price,
-      })),
-    promo_code: state.promoCodeValid ? state.promoCode : null,
-    insurance: state.insurance,
-    current_step: state.currentStep !== "success" ? state.currentStep : null,
-  }
+export function buildItemsSnapshot(
+  state: CartSelectionState,
+): CartItemsSnapshot {
+  return buildPersistedCartState(state)
 }
 
 /** Returns true if there is at least one product selected in the cart state. */
-function hasCartItems(state: CartSelectionState): boolean {
+export function hasCartItems(state: CartSelectionState): boolean {
   return (
     state.selectedPasses.length > 0 ||
     state.housing !== null ||
+    state.accommodations.length > 0 ||
     state.merch.length > 0 ||
     state.patron !== null ||
     state.selectedMealPlans.length > 0 ||
@@ -204,12 +449,14 @@ function hasCartItems(state: CartSelectionState): boolean {
 }
 
 /** Apply a saved CartItemsSnapshot to the UI state, validating product availability. */
-function hydrateFromSnapshot(
-  snapshot: CartItemsSnapshot,
+export function hydrateFromSnapshot(
+  cartState: CartItemsSnapshot,
   products: ProductsPass[],
   housingPricePerDay: boolean,
   restorationSetters: RestorationSetters,
+  checkoutMode: CheckoutMode = CHECKOUT_MODE.PASS_SYSTEM,
 ): void {
+  const snapshot = deriveCartRestoration(cartState, checkoutMode)
   const {
     setHousing,
     setMerch,
@@ -218,7 +465,12 @@ function hydrateFromSnapshot(
     setInsurance,
     setDynamicItems,
     setPromoCode,
+    restorePassRecipients,
   } = restorationSetters
+
+  if (snapshot.passes.length > 0 && restorePassRecipients) {
+    restorePassRecipients(snapshot.recipients, snapshot.passes)
+  }
 
   // Restore housing — skip products that are sold_out / ended / upcoming.
   if (snapshot.housing) {
@@ -256,7 +508,7 @@ function hydrateFromSnapshot(
   }
 
   // Restore merch — drop items whose product is no longer selectable.
-  if (snapshot.merch?.length) {
+  if (snapshot.merch.length) {
     const restoredMerch = snapshot.merch.reduce<SelectedMerchItem[]>(
       (acc, saved) => {
         const product = products.find((p) => p.id === saved.product_id)
@@ -297,7 +549,7 @@ function hydrateFromSnapshot(
   }
 
   // Restore meal plans — resolve the ProductsPass reference the UI needs.
-  if (snapshot.meal_plans?.length) {
+  if (snapshot.meal_plans.length) {
     const restoredMealPlans = snapshot.meal_plans.reduce<
       SelectedMealPlanItem[]
     >((acc, saved) => {
@@ -317,26 +569,27 @@ function hydrateFromSnapshot(
   }
 
   // Restore insurance
-  if (snapshot.insurance) {
+  if (cartState.insurance) {
     setInsurance(true)
   }
 
   // Restore dynamic items — group flat array back into Record<string, SelectedDynamicItem[]>
   // keyed by step_type. Skip entries whose product is no longer available.
-  if (snapshot.dynamic_items?.length) {
+  if (snapshot.dynamic_items.length) {
     const grouped: Record<string, SelectedDynamicItem[]> = {}
     for (const saved of snapshot.dynamic_items) {
       const product = products.find((p) => p.id === saved.product_id)
-      if (!product) continue
+      const stepType = saved.step_type
+      if (!product || !stepType) continue
       if (!getProductAvailability(product).canSelect) continue
       const entry: SelectedDynamicItem = {
         productId: product.id,
         product,
         quantity: saved.quantity,
-        price: saved.price,
-        stepType: saved.step_type,
+        price: saved.price ?? product.price,
+        stepType,
       }
-      grouped[saved.step_type] = [...(grouped[saved.step_type] ?? []), entry]
+      grouped[stepType] = [...(grouped[stepType] ?? []), entry]
     }
     if (Object.keys(grouped).length > 0) {
       setDynamicItems(grouped)
@@ -346,15 +599,18 @@ function hydrateFromSnapshot(
   // Restore promo code — populate the input field so the gated re-validation
   // (after release settles) can confirm the code is still valid. setPromoCode
   // is optional (not present on non-open-cart flows).
-  if (snapshot.promo_code && setPromoCode) {
-    setPromoCode(snapshot.promo_code)
+  if (cartState.promo_code && setPromoCode) {
+    setPromoCode(cartState.promo_code)
   }
 }
 
 export function useOpenCartPersistence({
   popupSlug,
+  flowSlug,
+  enabled,
   selectionStateRef,
   products,
+  checkoutMode = CHECKOUT_MODE.PASS_SYSTEM,
   housingPricePerDay,
   restorationSetters,
   hasRestoredCheckoutRef,
@@ -364,6 +620,7 @@ export function useOpenCartPersistence({
   cid: cidParam = null,
   sig: sigParam = null,
 }: UseOpenCartPersistenceParams) {
+  const scope = getOpenCartScope(popupSlug, flowSlug)
   // Track the backend cart id and restore token across renders without
   // causing re-renders (these only update localStorage, not UI).
   const cartMetaRef = useRef<{
@@ -387,15 +644,41 @@ export function useOpenCartPersistence({
   // localStorage + optional token-refresh kick. We expose a promise that
   // resolves once all three restore paths have finished. Never rejects.
   const restorationResolveRef = useRef<(() => void) | null>(null)
-  const restorationPromiseRef = useRef<Promise<void>>(
-    new Promise<void>((resolve) => {
+  const restorationPromiseRef = useRef<Promise<void> | null>(null)
+  // Initialize the promise and its resolver together exactly once. A Promise
+  // passed directly to useRef is constructed on every render, overwriting the
+  // resolver while retaining the original promise (notably in Strict Mode).
+  if (restorationPromiseRef.current === null) {
+    restorationPromiseRef.current = new Promise<void>((resolve) => {
       restorationResolveRef.current = resolve
-    }),
-  )
+    })
+  }
+  const previousScopeRef = useRef(scope.storageKey)
+
+  if (previousScopeRef.current !== scope.storageKey) {
+    previousScopeRef.current = scope.storageKey
+    if (debounceRef.current) {
+      clearTimeout(debounceRef.current)
+      debounceRef.current = null
+    }
+    cartMetaRef.current = { cartId: null, restoreToken: null }
+    inFlightUpsertRef.current = Promise.resolve()
+    hasRestoredCheckoutRef.current = false
+    paymentCompleteRef.current = false
+    restorationPromiseRef.current = new Promise<void>((resolve) => {
+      restorationResolveRef.current = resolve
+    })
+  }
 
   // --- Restore: signed-link takes precedence over localStorage ---
   // biome-ignore lint/correctness/useExhaustiveDependencies: one-shot restore; products must be stable before hydrating
   useEffect(() => {
+    const restorationScope = scope.storageKey
+    const resolveRestoration = restorationResolveRef.current
+    if (!enabled) {
+      resolveRestoration?.()
+      return
+    }
     if (hasRestoredCheckoutRef.current) return
 
     // P5 fix: when products have not loaded yet, we cannot restore — do NOT
@@ -407,45 +690,81 @@ export function useOpenCartPersistence({
 
     // On success step, clear localStorage and do not restore.
     if (initialStep === "success") {
-      clearLocalStorage(popupSlug)
+      clearLocalStorage(scope.storageKey)
       paymentCompleteRef.current = true
       // Resolve immediately — nothing to wait for.
-      restorationResolveRef.current?.()
+      resolveRestoration?.()
       return
     }
 
-    // Signed-link restore: cid + sig present in URL
-    if (cidParam && sigParam) {
+    const savedSnapshot = readLocalStorage(scope.storageKey)
+    const hasSignedUrl = Boolean(cidParam && sigParam)
+    const restoreCartId = hasSignedUrl ? cidParam : savedSnapshot?.cartId
+    const restoreToken = hasSignedUrl ? sigParam : savedSnapshot?.restoreToken
+
+    // A signed URL wins, but a same-browser cart can use its stored proof to
+    // reconcile with the backend before trusting its local snapshot.
+    if (restoreCartId && restoreToken) {
       // Resolve restorationPromise only AFTER the async call settles so that
       // the release effect sees the populated cartMetaRef (P1 fix).
-      CheckoutService.restoreOpenCart({
-        slug: popupSlug,
-        cid: cidParam,
-        sig: sigParam,
-      })
+      restoreScopedOpenCart(popupSlug, flowSlug, restoreCartId, restoreToken)
         .then((openCart) => {
-          // Persist the backend meta so the debounced save can merge with it
+          if (previousScopeRef.current !== restorationScope) return
+          const backendItems = openCart.items as unknown as CartItemsSnapshot
+          const local = savedSnapshot
+          const repairFromLocal =
+            backendItems.lines.length === 0 &&
+            local?.cartId === openCart.id &&
+            local.items.lines.length > 0
+          const restoredItems = repairFromLocal ? local.items : backendItems
           cartMetaRef.current = {
             cartId: openCart.id,
             restoreToken: openCart.restore_token ?? null,
           }
-          // Update localStorage with the restored data so same-browser
-          // navigation continues from the same state.
-          writeLocalStorage(popupSlug, {
-            items: openCart.items as CartItemsSnapshot,
+          writeLocalStorage(scope.storageKey, {
+            items: restoredItems,
             cartId: openCart.id,
             restoreToken: openCart.restore_token ?? null,
           })
           hydrateFromSnapshot(
-            openCart.items as CartItemsSnapshot,
+            restoredItems,
             products,
             housingPricePerDay,
             restorationSetters,
+            checkoutMode,
           )
+          if (!repairFromLocal) return
+
+          inFlightUpsertRef.current = inFlightUpsertRef.current
+            .then(() =>
+              upsertScopedOpenCart(
+                popupSlug,
+                flowSlug,
+                openCart.email,
+                restoredItems,
+              ),
+            )
+            .then((repairedCart) => {
+              if (previousScopeRef.current !== restorationScope) return
+              cartMetaRef.current = {
+                cartId: repairedCart.id,
+                restoreToken: repairedCart.restore_token ?? null,
+              }
+              writeLocalStorage(scope.storageKey, {
+                items: restoredItems,
+                cartId: repairedCart.id,
+                restoreToken: repairedCart.restore_token ?? null,
+              })
+            })
+            .catch(() => {
+              // The canonical local snapshot remains available for retry.
+            })
+          return inFlightUpsertRef.current
         })
         .catch(() => {
+          if (previousScopeRef.current !== restorationScope) return
           // 403 (bad signature) or 404 (no cart / no secret) — fall back to localStorage
-          const saved = readLocalStorage(popupSlug)
+          const saved = savedSnapshot
           if (saved) {
             cartMetaRef.current = {
               cartId: saved.cartId,
@@ -456,19 +775,20 @@ export function useOpenCartPersistence({
               products,
               housingPricePerDay,
               restorationSetters,
+              checkoutMode,
             )
           }
         })
         .finally(() => {
           // cartMetaRef is now populated (or fallback localStorage applied).
           // Signal the release effect that it can safely read cartMetaRef.
-          restorationResolveRef.current?.()
+          resolveRestoration?.()
         })
       return
     }
 
     // localStorage same-browser restore
-    const saved = readLocalStorage(popupSlug)
+    const saved = savedSnapshot
     if (saved) {
       cartMetaRef.current = {
         cartId: saved.cartId,
@@ -479,6 +799,7 @@ export function useOpenCartPersistence({
         products,
         housingPricePerDay,
         restorationSetters,
+        checkoutMode,
       )
 
       // restore_token refresh: when a cart was saved before the popup had a
@@ -496,20 +817,18 @@ export function useOpenCartPersistence({
       ) {
         // Signal restoration done before the token-refresh kick, because the
         // existing cartId+null token is sufficient proof for the release call.
-        restorationResolveRef.current?.()
+        resolveRestoration?.()
 
         inFlightUpsertRef.current = inFlightUpsertRef.current.then(() =>
-          CheckoutService.upsertOpenCart({
-            slug: popupSlug,
-            requestBody: { email: buyerEmail, items: saved.items },
-          })
+          upsertScopedOpenCart(popupSlug, flowSlug, buyerEmail, saved.items)
             .then((openCart) => {
+              if (previousScopeRef.current !== restorationScope) return
               if (openCart.restore_token) {
                 cartMetaRef.current = {
                   cartId: openCart.id,
                   restoreToken: openCart.restore_token,
                 }
-                writeLocalStorage(popupSlug, {
+                writeLocalStorage(scope.storageKey, {
                   items: saved.items,
                   cartId: openCart.id,
                   restoreToken: openCart.restore_token,
@@ -522,16 +841,17 @@ export function useOpenCartPersistence({
         )
       } else {
         // No token-refresh needed — signal restoration done immediately.
-        restorationResolveRef.current?.()
+        resolveRestoration?.()
       }
     } else {
       // No localStorage data — nothing to restore.
-      restorationResolveRef.current?.()
+      resolveRestoration?.()
     }
-  }, [products, popupSlug, initialStep])
+  }, [enabled, products, popupSlug, flowSlug, scope.storageKey, initialStep])
 
   // --- Debounced save: localStorage + backend upsert ---
   const scheduleSave = useCallback(() => {
+    if (!enabled) return
     if (!hasRestoredCheckoutRef.current) return
     if (paymentCompleteRef.current) return
 
@@ -548,15 +868,17 @@ export function useOpenCartPersistence({
     // the buyer reaches the "your information" step and enters an email.
     if (!hasCartItems(state)) return
 
+    const saveScope = scope.storageKey
     if (debounceRef.current) {
       clearTimeout(debounceRef.current)
     }
 
     debounceRef.current = setTimeout(() => {
+      if (previousScopeRef.current !== saveScope) return
       const items = buildItemsSnapshot(selectionStateRef.current)
 
       // Save to localStorage immediately (synchronous, fast)
-      writeLocalStorage(popupSlug, {
+      writeLocalStorage(scope.storageKey, {
         items,
         cartId: cartMetaRef.current.cartId,
         restoreToken: cartMetaRef.current.restoreToken,
@@ -569,17 +891,15 @@ export function useOpenCartPersistence({
       // Serialize through inFlightUpsertRef so this call cannot race the
       // mount restore-refresh upsert and clobber cartMetaRef (P4 fix).
       inFlightUpsertRef.current = inFlightUpsertRef.current.then(() =>
-        CheckoutService.upsertOpenCart({
-          slug: popupSlug,
-          requestBody: { email, items },
-        })
+        upsertScopedOpenCart(popupSlug, flowSlug, email, items)
           .then((openCart) => {
+            if (previousScopeRef.current !== saveScope) return
             cartMetaRef.current = {
               cartId: openCart.id,
               restoreToken: openCart.restore_token ?? null,
             }
             // Update localStorage with the backend ids
-            writeLocalStorage(popupSlug, {
+            writeLocalStorage(scope.storageKey, {
               items,
               cartId: openCart.id,
               restoreToken: openCart.restore_token ?? null,
@@ -591,7 +911,10 @@ export function useOpenCartPersistence({
       )
     }, 800)
   }, [
+    enabled,
     popupSlug,
+    flowSlug,
+    scope.storageKey,
     buyerEmail,
     selectionStateRef,
     hasRestoredCheckoutRef,
@@ -614,14 +937,15 @@ export function useOpenCartPersistence({
       clearTimeout(debounceRef.current)
       debounceRef.current = null
     }
-    clearLocalStorage(popupSlug)
+    clearLocalStorage(scope.storageKey)
     cartMetaRef.current = { cartId: null, restoreToken: null }
-  }, [popupSlug])
+  }, [scope.storageKey])
 
   // --- Synchronous flush: cancel debounce and persist immediately ---
   // Called by usePaymentSubmit at the START of submitPayment (open-ticketing mode)
   // so that cartMetaRef has fresh cid/restore_token before the purchase body is built.
   const flushSave = useCallback(async (): Promise<void> => {
+    if (!enabled) return
     if (!hasRestoredCheckoutRef.current) return
     if (paymentCompleteRef.current) return
 
@@ -638,10 +962,11 @@ export function useOpenCartPersistence({
     if (!hasCartItems(state)) return
 
     const items = buildItemsSnapshot(state)
+    const saveScope = scope.storageKey
 
     // Synchronous localStorage write — guarantees cid is readable even if the
     // backend call below fails.
-    writeLocalStorage(popupSlug, {
+    writeLocalStorage(scope.storageKey, {
       items,
       cartId: cartMetaRef.current.cartId,
       restoreToken: cartMetaRef.current.restoreToken,
@@ -651,10 +976,7 @@ export function useOpenCartPersistence({
     const FLUSH_TIMEOUT_MS = 1500
     try {
       const openCart = await Promise.race([
-        CheckoutService.upsertOpenCart({
-          slug: popupSlug,
-          requestBody: { email, items },
-        }),
+        upsertScopedOpenCart(popupSlug, flowSlug, email, items),
         new Promise<never>((_, reject) =>
           setTimeout(
             () => reject(new Error("flush timeout")),
@@ -662,12 +984,13 @@ export function useOpenCartPersistence({
           ),
         ),
       ])
+      if (previousScopeRef.current !== saveScope) return
       cartMetaRef.current = {
         cartId: openCart.id,
         restoreToken: openCart.restore_token ?? null,
       }
       // Update localStorage with the fresh ids so the purchase body picks them up
-      writeLocalStorage(popupSlug, {
+      writeLocalStorage(scope.storageKey, {
         items,
         cartId: openCart.id,
         restoreToken: openCart.restore_token ?? null,
@@ -680,7 +1003,10 @@ export function useOpenCartPersistence({
       )
     }
   }, [
+    enabled,
     popupSlug,
+    flowSlug,
+    scope.storageKey,
     buyerEmail,
     selectionStateRef,
     hasRestoredCheckoutRef,

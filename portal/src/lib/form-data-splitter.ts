@@ -23,6 +23,12 @@ interface SplitCreateParams {
   schema: ApplicationFormSchema
   /** Referral UUID to attribute this application — passed from /r/{code} flow (REQ-GR-009). */
   referralId?: string | null
+  /**
+   * Explicit target sales flow (sdd/sales-flows D6 URL scheme, selected
+   * from the portal gathering overview). Omitted keeps the backend's
+   * default-flow resolution, unchanged from before this slice.
+   */
+  salesFlowId?: string | null
 }
 
 export function splitForCreate({
@@ -31,6 +37,7 @@ export function splitForCreate({
   status,
   schema,
   referralId,
+  salesFlowId,
 }: SplitCreateParams): ApplicationCreate {
   const targetMap = buildTargetMap(schema)
   const profile: Record<string, unknown> = {}
@@ -90,6 +97,9 @@ export function splitForCreate({
     status,
     // Referral attribution — set when user arrived via /r/{code} (REQ-GR-009)
     referral_id: referralId ?? undefined,
+    // Explicit target flow from the gathering overview — omitted keeps the
+    // backend's default-flow resolution.
+    sales_flow_id: salesFlowId ?? undefined,
     // Application-target base fields from the schema (scholarship, etc.)
     // Only fields present in the current popup's schema are included —
     // fields from a previous popup that don't exist here are already

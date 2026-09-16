@@ -9,6 +9,7 @@ from app.api.shared.enums import UserRole
 from app.api.user.models import Users
 from app.api.user.schemas import UserCreate, UserUpdate
 from app.core.dependencies.users import invalidate_user_cache
+from app.core.redis import auth_code_store
 
 
 class UsersCRUD(BaseCRUD[Users, UserCreate, UserUpdate]):
@@ -113,15 +114,43 @@ class UsersCRUD(BaseCRUD[Users, UserCreate, UserUpdate]):
 
         return db_obj
 
-    def soft_delete(self, session: Session, db_obj: Users) -> Users:
+    def mark_deleted(self, session: Session, db_obj: Users) -> None:
+        """Stage a user soft-delete and immediately revoke cached authentication."""
         db_obj.deleted = True
+        db_obj.auth_code = None
+        db_obj.code_expiration = None
+        db_obj.auth_attempts = 0
         session.add(db_obj)
-        session.commit()
-        session.refresh(db_obj)
 
-        # Invalidate cache so user can't continue using cached auth
+        # Security state outside the transaction must be invalidated immediately.
         invalidate_user_cache(db_obj.id)
 
+    def soft_delete_for_tenant(
+        self, session: Session, tenant_id: uuid.UUID
+    ) -> list[Users]:
+        """Stage soft-deletion of every active user owned by a tenant.
+
+        The caller owns the transaction so the users and tenant can be committed
+        together.
+        """
+        users = list(
+            session.exec(
+                select(Users).where(
+                    Users.tenant_id == tenant_id,
+                    Users.deleted == False,  # noqa: E712
+                )
+            ).all()
+        )
+        for user in users:
+            self.mark_deleted(session, user)
+        auth_code_store.delete_user_codes(user.id for user in users)
+        return users
+
+    def soft_delete(self, session: Session, db_obj: Users) -> Users:
+        self.mark_deleted(session, db_obj)
+        auth_code_store.delete_user_code(db_obj.id)
+        session.commit()
+        session.refresh(db_obj)
         return db_obj
 
 

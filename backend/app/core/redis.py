@@ -6,6 +6,7 @@ Configure via REDIS_URL environment variable:
 
 import hmac
 import uuid
+from collections.abc import Iterable
 from datetime import timedelta
 
 import redis
@@ -198,6 +199,33 @@ class AuthCodeStore:
     def verify_user_code(self, user_id: uuid.UUID, code: str) -> tuple[bool, str]:
         """Verify auth code for a user."""
         return self._verify_code(self.PREFIX_USER, str(user_id), code)
+
+    def delete_user_code(self, user_id: uuid.UUID) -> None:
+        """Delete a user's pending auth code and attempt counter."""
+        self.delete_code(self.PREFIX_USER, str(user_id))
+
+    def delete_user_codes(self, user_ids: Iterable[uuid.UUID]) -> None:
+        """Delete pending auth state for multiple users in one Redis call."""
+        identifiers = [str(user_id) for user_id in user_ids]
+        if not identifiers:
+            return
+
+        client = get_redis()
+        if client is None:
+            return
+
+        keys = [
+            key
+            for identifier in identifiers
+            for key in (
+                self._get_key(self.PREFIX_USER, identifier),
+                self._get_attempts_key(self.PREFIX_USER, identifier),
+            )
+        ]
+        try:
+            client.delete(*keys)
+        except redis.RedisError as e:
+            logger.warning(f"Failed to delete user auth codes: {e}")
 
     def verify_human_code(
         self,

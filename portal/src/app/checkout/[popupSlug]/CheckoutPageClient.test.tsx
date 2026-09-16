@@ -1,4 +1,5 @@
 import { act, render, screen } from "@testing-library/react"
+import { ApiError } from "@/client"
 import {
   LANGUAGE_STORAGE_KEY,
   setActiveRequestLanguage,
@@ -34,9 +35,21 @@ const runtimeData = {
     slug: "festival-2026",
     name: "Festival 2026",
   },
+  selected_flow: {
+    id: "flow-1",
+    slug: "festival-2026",
+  },
   products: [],
   buyer_form: [],
   ticketing_steps: [],
+}
+
+function runtimeApiError(status: number) {
+  return new ApiError(
+    { method: "GET", url: "/checkout" } as never,
+    { url: "/checkout", ok: false, status, statusText: "", body: null },
+    "runtime request failed",
+  )
 }
 
 function lastRuntimeOpts(): {
@@ -71,7 +84,7 @@ describe("CheckoutPageClient", () => {
       isError: false,
     })
 
-    render(<CheckoutPageClient popupSlug="festival-2026" />)
+    render(<CheckoutPageClient popupSlug="festival-2026" flowSlug="checkout" />)
 
     // Loader renders a spinner — no text; assert the spinner element exists
     const spinner = document.querySelector(".animate-spin")
@@ -85,7 +98,7 @@ describe("CheckoutPageClient", () => {
       isError: true,
     })
 
-    render(<CheckoutPageClient popupSlug="festival-2026" />)
+    render(<CheckoutPageClient popupSlug="festival-2026" flowSlug="checkout" />)
 
     expect(screen.getByText("openCheckout.unavailable_title")).toBeTruthy()
     expect(
@@ -93,8 +106,49 @@ describe("CheckoutPageClient", () => {
     ).toBeTruthy()
   })
 
+  it("renders the sign-in card with a redirect back to the checkout on 401", () => {
+    mockUseCheckoutRuntime.mockReturnValue({
+      data: undefined,
+      isLoading: false,
+      isError: true,
+      error: runtimeApiError(401),
+    })
+
+    render(
+      <CheckoutPageClient popupSlug="festival-2026" flowSlug="upsale-2026" />,
+    )
+
+    expect(screen.getByText("openCheckout.sign_in_required_title")).toBeTruthy()
+    expect(
+      screen.getByText("openCheckout.sign_in_required_description"),
+    ).toBeTruthy()
+    const link = screen.getByRole("link", {
+      name: "openCheckout.sign_in_required_cta",
+    })
+    expect(link.getAttribute("href")).toBe(
+      "/auth?redirect=%2Fcheckout%2Ffestival-2026%2Fupsale-2026",
+    )
+    expect(screen.queryByText("openCheckout.unavailable_title")).toBeNull()
+  })
+
+  it("keeps the unavailable card for non-401 runtime errors", () => {
+    mockUseCheckoutRuntime.mockReturnValue({
+      data: undefined,
+      isLoading: false,
+      isError: true,
+      error: runtimeApiError(404),
+    })
+
+    render(
+      <CheckoutPageClient popupSlug="festival-2026" flowSlug="upsale-2026" />,
+    )
+
+    expect(screen.getByText("openCheckout.unavailable_title")).toBeTruthy()
+    expect(screen.queryByText("openCheckout.sign_in_required_title")).toBeNull()
+  })
+
   it("renders the shared runtime for the popup slug", () => {
-    render(<CheckoutPageClient popupSlug="festival-2026" />)
+    render(<CheckoutPageClient popupSlug="festival-2026" flowSlug="checkout" />)
 
     expect(screen.getByText("runtime:festival-2026")).toBeTruthy()
   })
@@ -107,6 +161,7 @@ describe("CheckoutPageClient", () => {
     render(
       <CheckoutPageClient
         popupSlug="festival-2026"
+        flowSlug="checkout"
         initialRuntime={runtimeData as never}
         initialDataUpdatedAt={Date.now()}
       />,
@@ -121,7 +176,7 @@ describe("CheckoutPageClient", () => {
     // The mock already returns { user: null } — verify it propagates correctly
     // by rendering without error (OpenCheckoutRuntime is mocked, so we just
     // confirm the component renders the runtime text without throwing)
-    render(<CheckoutPageClient popupSlug="festival-2026" />)
+    render(<CheckoutPageClient popupSlug="festival-2026" flowSlug="checkout" />)
 
     expect(screen.getByText("runtime:festival-2026")).toBeTruthy()
   })
@@ -131,7 +186,7 @@ describe("CheckoutPageClient", () => {
   it("keys the runtime query on the stored language", () => {
     localStorage.setItem(LANGUAGE_STORAGE_KEY, "en")
 
-    render(<CheckoutPageClient popupSlug="festival-2026" />)
+    render(<CheckoutPageClient popupSlug="festival-2026" flowSlug="checkout" />)
 
     expect(lastRuntimeOpts().language).toBe("en")
   })
@@ -143,6 +198,7 @@ describe("CheckoutPageClient", () => {
     render(
       <CheckoutPageClient
         popupSlug="festival-2026"
+        flowSlug="checkout"
         initialRuntime={runtimeData as never}
         initialDataUpdatedAt={updatedAt}
         initialRuntimeLanguage="en"
@@ -161,6 +217,7 @@ describe("CheckoutPageClient", () => {
     render(
       <CheckoutPageClient
         popupSlug="festival-2026"
+        flowSlug="checkout"
         initialRuntime={runtimeData as never}
         initialDataUpdatedAt={Date.now()}
         initialRuntimeLanguage={null}
@@ -175,6 +232,7 @@ describe("CheckoutPageClient", () => {
     render(
       <CheckoutPageClient
         popupSlug="festival-2026"
+        flowSlug="checkout"
         initialRuntime={runtimeData as never}
         initialDataUpdatedAt={1234}
         initialRuntimeLanguage={null}
@@ -188,7 +246,7 @@ describe("CheckoutPageClient", () => {
   it("re-keys when the provider switches the on-screen language", () => {
     localStorage.setItem(LANGUAGE_STORAGE_KEY, "en")
 
-    render(<CheckoutPageClient popupSlug="festival-2026" />)
+    render(<CheckoutPageClient popupSlug="festival-2026" flowSlug="checkout" />)
     expect(lastRuntimeOpts().language).toBe("en")
 
     act(() => {
@@ -207,7 +265,7 @@ describe("CheckoutPageClient", () => {
       },
     } as never)
 
-    render(<CheckoutPageClient popupSlug="festival-2026" />)
+    render(<CheckoutPageClient popupSlug="festival-2026" flowSlug="checkout" />)
 
     // Component renders normally — OpenCheckoutRuntime receives prefilledBuyer
     // via props; we verify no error and runtime renders

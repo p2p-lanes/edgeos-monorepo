@@ -1,6 +1,7 @@
 import type { RichTextConfig } from "../../types"
 import { Checkbox } from "../Checkbox"
 import { FormInputWrapper } from "../FormInputWrapper"
+import { LabelRequired } from "../Label"
 import { MarkdownRenderer } from "../MarkdownContent"
 
 export interface RichTextFormProps {
@@ -58,14 +59,15 @@ export function RichTextForm({
               checkbox. Anchor clicks call stopPropagation in <Markdown> so they
               still open the link. ml-2.5 (10px) over gap-x — gap-x has
               occasionally compressed inside narrow flex parents. */}
-          <label
+          <LabelRequired
             htmlFor={id}
-            className={`${markdownClass} ml-2.5 flex-1 min-w-0 ${
+            isRequired={isRequired}
+            className={`${markdownClass} ml-2.5 flex-1 min-w-0 font-normal ${
               disabled ? "cursor-not-allowed" : "cursor-pointer"
             }`}
           >
             <MarkdownRenderer source={content} stopAnchorPropagation />
-          </label>
+          </LabelRequired>
         </div>
         {error && <p className="text-red-500 text-sm">{error}</p>}
       </FormInputWrapper>

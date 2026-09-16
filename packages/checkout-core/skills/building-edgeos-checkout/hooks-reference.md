@@ -13,8 +13,9 @@ store built by `<CheckoutProvider>`; the store actions they expose are stable
 ```tsx
 interface CheckoutProviderProps {
   children: ReactNode
-  // Build a client from these (the common case):
-  slug?: string
+   // Build a client from these (the common case):
+   slug?: string
+   flowSlug: string                  // canonical sales flow slug
   publishableKey?: string   // → X-EdgeOS-Publishable-Key header
   baseUrl?: string          // OPTIONAL — defaults to the EdgeOS prod API
                             // (DEFAULT_BASE_URL). Override for dev/staging/proxy;
@@ -31,8 +32,8 @@ interface CheckoutProviderProps {
 
 Lifecycle facts:
 - The store is built **exactly once**, on first render. **Changing `slug` /
-  `baseUrl` / `publishableKey` props after mount has no effect.** To switch
-  popups, remount: `<CheckoutProvider key={slug} slug={slug} …>`.
+  `flowSlug` / `baseUrl` / `publishableKey` props after mount has no effect.** To switch
+  popups or flows, remount with a key that includes both values.
 - `autoLoad` (default) fetches runtime on mount. If you pass `initialRuntime`,
   set `autoLoad={false}` to avoid a double fetch.
 - A store the provider built is disposed on unmount; a `store` you passed in is left alone.
@@ -145,6 +146,7 @@ import { useEffect, useState } from "react"
 
 const client = createCheckoutClient({
   slug: "amanita",
+  flowSlug: "checkout",
   baseUrl: "https://api.example/api/v1",
   publishableKey: "pk_live_xxx",
 })
@@ -177,7 +179,7 @@ export function Boot() {
 
 ## Using the API client directly
 
-`createCheckoutClient({ slug, baseUrl, publishableKey })` → a typed `CheckoutClient`:
+`createCheckoutClient({ slug, flowSlug, baseUrl, publishableKey })` → a typed `CheckoutClient`:
 `getRuntime()`, `preview(body)`, `validateCoupon(code)`, `purchase(body)`,
 `upsertCart(body)`, `restoreCart(cid, sig)`. Errors surface as `CheckoutApiError`
 (also exported). You rarely need this — the store composes these for you — but

@@ -15,10 +15,9 @@ import {
 } from "@dnd-kit/core"
 import { arrayMove, sortableKeyboardCoordinates } from "@dnd-kit/sortable"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
-import { createFileRoute } from "@tanstack/react-router"
+import { createFileRoute, useNavigate } from "@tanstack/react-router"
 import { Loader2, Sparkles } from "lucide-react"
 import { useCallback, useMemo, useState } from "react"
-
 import {
   type FormFieldPublic,
   FormFieldsService,
@@ -41,6 +40,8 @@ import { DragOverlayContent } from "@/components/form-builder/DragOverlayContent
 import { FieldConfigPanel } from "@/components/form-builder/FieldConfigPanel"
 import { FieldPalette } from "@/components/form-builder/FieldPalette"
 import { FormCanvas } from "@/components/form-builder/FormCanvas"
+import { CopyFormToFlowDialog } from "@/components/forms/CopyFormToFlowDialog"
+import { FlowScopeBar } from "@/components/SalesFlows/FlowScopeBar"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
@@ -70,10 +71,17 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { useWorkspace } from "@/contexts/WorkspaceContext"
 import useAuth from "@/hooks/useAuth"
 import useCustomToast from "@/hooks/useCustomToast"
+import { rememberFlow, useFlowScope } from "@/hooks/useFlowScope"
 import { createErrorHandler } from "@/utils"
 
 export const Route = createFileRoute("/_layout/form-builder/")({
   component: FormBuilderPage,
+  // A form belongs to one flow, so the address has to name it. Without
+  // this, a link to "the form" means something different depending on who
+  // opens it and what they last looked at.
+  validateSearch: (raw: Record<string, unknown>) => ({
+    ...(typeof raw.flow === "string" && raw.flow ? { flow: raw.flow } : {}),
+  }),
   head: () => ({
     meta: [{ title: "Form Builder - EdgeOS" }],
   }),
@@ -81,25 +89,33 @@ export const Route = createFileRoute("/_layout/form-builder/")({
 
 const UNSECTIONED = "__unsectioned__"
 
-function getAllFormFieldsQueryOptions(popupId: string | null) {
+// A form belongs to one sales flow, so every read and write here is
+// scoped to the flow being edited. Editing one flow's form never changes
+// another's.
+function getAllFormFieldsQueryOptions(popupId: string | null, flowId?: string) {
   return {
     queryFn: () =>
       FormFieldsService.listFormFields({
         popupId: popupId || undefined,
+        salesFlowId: flowId,
         limit: 200,
       }),
-    queryKey: ["form-fields", popupId, "all"],
+    queryKey: ["form-fields", popupId, flowId, "all"],
   }
 }
 
-function getAllFormSectionsQueryOptions(popupId: string | null) {
+function getAllFormSectionsQueryOptions(
+  popupId: string | null,
+  flowId?: string,
+) {
   return {
     queryFn: () =>
       FormSectionsService.listFormSections({
         popupId: popupId || undefined,
+        salesFlowId: flowId,
         limit: 200,
       }),
-    queryKey: ["form-sections", popupId, "all"],
+    queryKey: ["form-sections", popupId, flowId, "all"],
   }
 }
 
@@ -130,6 +146,24 @@ function FormBuilderPage() {
 }
 
 function FormBuilderContent({ popupId }: { popupId: string }) {
+  const navigate = useNavigate()
+  const { flow: flowParam } = Route.useSearch()
+
+  // Whose form is on screen. The URL is the answer; memory only decides
+  // where you land when the URL says nothing.
+  const adoptFlow = useCallback(
+    (flowId: string) => {
+      navigate({ to: "/form-builder", search: { flow: flowId }, replace: true })
+    },
+    [navigate],
+  )
+  const {
+    flows,
+    activeFlowId,
+    isLoading: flowsLoading,
+  } = useFlowScope(popupId, flowParam, adoptFlow)
+  const activeFlow = flows.find((flow) => flow.id === activeFlowId)
+
   const queryClient = useQueryClient()
   const { showSuccessToast, showErrorToast } = useCustomToast()
 
@@ -146,11 +180,13 @@ function FormBuilderContent({ popupId }: { popupId: string }) {
   )
 
   const { data: formFieldsData, isLoading: isLoadingFields } = useQuery({
-    ...getAllFormFieldsQueryOptions(popupId),
+    ...getAllFormFieldsQueryOptions(popupId, activeFlowId),
+    enabled: !!activeFlowId,
   })
 
   const { data: formSectionsData, isLoading: isLoadingSections } = useQuery({
-    ...getAllFormSectionsQueryOptions(popupId),
+    ...getAllFormSectionsQueryOptions(popupId, activeFlowId),
+    enabled: !!activeFlowId,
   })
 
   const { data: popup } = useQuery({
@@ -258,6 +294,7 @@ function FormBuilderContent({ popupId }: { popupId: string }) {
       return FormFieldsService.createFormField({
         requestBody: {
           popup_id: popupId,
+          sales_flow_id: activeFlowId as string,
           label,
           field_type: data.fieldType,
           section_id: data.sectionId,
@@ -303,6 +340,7 @@ function FormBuilderContent({ popupId }: { popupId: string }) {
       FormSectionsService.createFormSection({
         requestBody: {
           popup_id: popupId,
+          sales_flow_id: activeFlowId as string,
           label,
           order: sections.length,
         },
@@ -700,8 +738,28 @@ function FormBuilderContent({ popupId }: { popupId: string }) {
             <Sparkles className="h-4 w-4" />
             Add predefined fields
           </Button>
+          {activeFlow?.type && (
+            <CopyFormToFlowDialog
+              popupId={popupId}
+              targetFlowId={activeFlow.id}
+              targetFlowType={activeFlow.type}
+            />
+          )}
         </div>
       </div>
+
+      <FlowScopeBar
+        popupId={popupId}
+        flows={flows}
+        activeFlowId={activeFlowId}
+        onSelect={(flowId: string) => {
+          rememberFlow(popupId, flowId)
+          setSelectedFieldId(null)
+          navigate({ to: "/form-builder", search: { flow: flowId } })
+        }}
+        isLoading={flowsLoading}
+        resource="form questions"
+      />
 
       <DndContext
         sensors={sensors}

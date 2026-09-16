@@ -54,9 +54,45 @@ services:
       context: .
       dockerfile: backend/Dockerfile
 
+  ai-service:
+    image: edgeos-ai-service:${TAG-latest}
+    restart: always
+    depends_on:
+      backend:
+        condition: service_healthy
+    env_file:
+      - .env
+    environment:
+      - PORT=3002
+      - BACKEND_URL=http://backend:8000
+      - AI_PROVIDER=${AI_PROVIDER-}
+      - OPENAI_API_KEY=${OPENAI_API_KEY-}
+      - GEMINI_API_KEY=${GEMINI_API_KEY-}
+      - AI_MODEL=${AI_MODEL-}
+      - TOOL_APPROVAL_SECRET=${TOOL_APPROVAL_SECRET-}
+    expose:
+      - "3002"
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://localhost:3002/health-check').then(r => { if (!r.ok) process.exit(1) })",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    build:
+      context: .
+      dockerfile: ai-service/Dockerfile
+
   backoffice:
     image: edgeos-backoffice:${TAG-latest}
     restart: always
+    depends_on:
+      ai-service:
+        condition: service_healthy
     ports:
       - "80:80"
     build:

@@ -1,6 +1,7 @@
 "use client"
 
 import type { CheckoutRuntimeProduct, PopupPublic } from "@/client"
+import { getFbclidCapture } from "@/lib/attribution"
 
 type MetaWindow = Window & { fbq?: (...args: unknown[]) => void }
 
@@ -33,8 +34,17 @@ function getCookieValue(name: string) {
 }
 
 export function getMetaAttribution() {
+  const cookieFbc = getCookieValue("_fbc")
+  const fbclidCapture = cookieFbc ? undefined : getFbclidCapture()
+  const fbclid = fbclidCapture?.fbclid.trim()
+  const fbc =
+    cookieFbc ||
+    (fbclid && fbclidCapture
+      ? `fb.1.${fbclidCapture.capturedAt}.${fbclid}`
+      : undefined)
+
   return {
-    fbc: getCookieValue("_fbc"),
+    fbc,
     fbp: getCookieValue("_fbp"),
   }
 }

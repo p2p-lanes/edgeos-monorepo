@@ -29,11 +29,13 @@ interface UseCheckoutStateProps {
   groupId?: string | null
   inviteId?: string | null
   referralId?: string | null
+  salesFlowId?: string | null
   schema?: ApplicationFormSchema
 }
 
 interface BuildCheckoutApplicationMutationPayloadArgs {
   popupId: string
+  salesFlowId?: string | null
   values: CheckoutApplicationValues
   schema: ApplicationFormSchema
   existingApplication: ApplicationPublic | null
@@ -100,6 +102,7 @@ export function readCheckoutSubmitError(error: unknown): CheckoutSubmitError {
 
 export function buildCheckoutApplicationMutationPayload({
   popupId,
+  salesFlowId,
   values,
   schema,
   existingApplication,
@@ -119,13 +122,44 @@ export function buildCheckoutApplicationMutationPayload({
 
   return {
     kind: "create",
-    payload: splitForCreate({
-      values: checkoutValues,
-      popupId,
-      status: "in review",
-      schema,
-    }),
+    payload: {
+      ...splitForCreate({
+        values: checkoutValues,
+        popupId,
+        status: "in review",
+        schema,
+      }),
+      ...(salesFlowId ? { sales_flow_id: salesFlowId } : {}),
+    },
   }
+}
+
+export function findCheckoutApplication(
+  applications: ApplicationPublic[] | undefined,
+  popupId: string,
+  salesFlowId?: string | null,
+): ApplicationPublic | undefined {
+  const popupApplications = (applications ?? []).filter(
+    (application) => application.popup_id === popupId,
+  )
+  if (salesFlowId) {
+    return popupApplications.find(
+      (application) => application.sales_flow_id === salesFlowId,
+    )
+  }
+  return popupApplications.length === 1 ? popupApplications[0] : undefined
+}
+
+export function upsertCheckoutApplication(
+  applications: ApplicationPublic[] | undefined,
+  application: ApplicationPublic,
+): ApplicationPublic[] {
+  return [
+    application,
+    ...(applications ?? []).filter(
+      (candidate) => candidate.id !== application.id,
+    ),
+  ]
 }
 
 const useCheckoutState = ({
@@ -134,6 +168,7 @@ const useCheckoutState = ({
   groupId,
   inviteId,
   referralId,
+  salesFlowId,
   schema,
 }: UseCheckoutStateProps) => {
   const { t } = useTranslation()
@@ -180,10 +215,15 @@ const useCheckoutState = ({
       const existingApps = queryClient.getQueryData<ApplicationPublic[]>(
         queryKeys.applications.mine(),
       )
-      const existingApp = existingApps?.find((app) => app.popup_id === popupId)
+      const existingApp = findCheckoutApplication(
+        existingApps,
+        popupId,
+        salesFlowId,
+      )
 
       const mutationPayload = buildCheckoutApplicationMutationPayload({
         popupId,
+        salesFlowId,
         values: filterCheckoutApplicationValues(
           schema,
           formData as CheckoutApplicationValues,
@@ -194,8 +234,12 @@ const useCheckoutState = ({
 
       let application: ApplicationPublic
       if (mutationPayload.kind === "update") {
+        if (!existingApp?.sales_flow_id) {
+          throw new Error("Application sales flow is required for updates")
+        }
         application = await ApplicationsService.updateMyApplication({
           popupId,
+          salesFlowId: existingApp.sales_flow_id,
           requestBody: {
             ...mutationPayload.payload,
             group_id: groupId ?? undefined,
@@ -220,7 +264,10 @@ const useCheckoutState = ({
     },
     onSuccess: ({ matchingApp }) => {
       if (matchingApp) {
-        queryClient.setQueryData(queryKeys.applications.mine(), [matchingApp])
+        queryClient.setQueryData<ApplicationPublic[]>(
+          queryKeys.applications.mine(),
+          (current) => upsertCheckoutApplication(current, matchingApp),
+        )
         queryClient.invalidateQueries({
           queryKey: [...queryKeys.applications.mine(), "checkout", popupId],
           refetchType: "none",
@@ -253,14 +300,17 @@ const useCheckoutState = ({
           const token = window?.localStorage?.getItem("token")
           if (token) {
             const result = await ApplicationsService.listMyApplications()
-            const existingApp = result.results.find(
-              (app) => app.popup_id === popupId,
+            const existingApp = findCheckoutApplication(
+              result.results,
+              popupId,
+              salesFlowId,
             )
 
             if (existingApp) {
-              queryClient.setQueryData(queryKeys.applications.mine(), [
-                existingApp,
-              ])
+              queryClient.setQueryData<ApplicationPublic[]>(
+                queryKeys.applications.mine(),
+                (current) => upsertCheckoutApplication(current, existingApp),
+              )
               setCheckoutState("passes")
               setErrorMessage(null)
               return
@@ -291,8 +341,10 @@ const useCheckoutState = ({
     mutationFn: async () => {
       if (!popupId) throw new Error("No popup selected")
       if (!groupId) throw new Error("No group selected")
+      if (!salesFlowId) throw new Error("No sales flow selected")
       return ApplicationsService.updateMyApplication({
         popupId,
+        salesFlowId,
         requestBody: { group_id: groupId },
       })
     },
@@ -301,7 +353,10 @@ const useCheckoutState = ({
       setErrorMessage(null)
     },
     onSuccess: (application) => {
-      queryClient.setQueryData(queryKeys.applications.mine(), [application])
+      queryClient.setQueryData<ApplicationPublic[]>(
+        queryKeys.applications.mine(),
+        (current) => upsertCheckoutApplication(current, application),
+      )
       queryClient.invalidateQueries({
         queryKey: queryKeys.attendees.byHumanPopup(popupId),
       })

@@ -1,59 +1,61 @@
 "use client"
 
-import { useParams, useRouter } from "next/navigation"
+import { useParams, useRouter, useSearchParams } from "next/navigation"
 import { useEffect } from "react"
-import { CheckoutBackgroundImage } from "@/components/CheckoutBackgroundImage"
-import { CheckoutBackgroundVideo } from "@/components/CheckoutBackgroundVideo"
-import ScrollyCheckoutFlow from "@/components/checkout-flow/ScrollyCheckoutFlow"
 import { Loader } from "@/components/ui/Loader"
-import { getCheckoutBackground } from "@/lib/background-image"
-import { CheckoutProvider } from "@/providers/checkoutProvider"
+import { usePortalDirectSalesFlows } from "@/hooks/usePortalDirectSalesFlows"
+import { usePortalSalesFlows } from "@/hooks/usePortalSalesFlows"
+import { usePortalUpsaleFlows } from "@/hooks/usePortalUpsaleFlows"
 import { useCityProvider } from "@/providers/cityProvider"
-import PassesProvider, { usePassesProvider } from "@/providers/passesProvider"
 
-export default function BuyPassesContent() {
-  const params = useParams()
-  const router = useRouter()
-  const { attendeePasses: attendees, products } = usePassesProvider()
-  const { getCity } = useCityProvider()
-  const background = getCheckoutBackground(getCity(), "passes")
+type PortalFlow = { id: string; slug: string }
 
-  // The portal layout owns the scroll container (<main id="portal-scroll">),
-  // and the SnapDotNav indicator sits on the right edge of the viewport. The
-  // native scrollbar overlaps it, so hide the scrollbar only while this view
-  // is mounted.
-  useEffect(() => {
-    const main = document.getElementById("portal-scroll")
-    main?.classList.add("no-scrollbar")
-    return () => {
-      main?.classList.remove("no-scrollbar")
-    }
-  }, [])
-
-  const handleBack = () => {
-    router.push(`/portal/${params.popupSlug}/passes`)
-  }
-
-  if (!attendees.length || !products.length) return <Loader />
-
-  return (
-    <PassesProvider attendees={attendees} restoreFromCart>
-      <CheckoutProvider initialStep="passes">
-        {background.type === "image" && (
-          <CheckoutBackgroundImage url={background.url} />
-        )}
-        {background.type === "video" && (
-          <CheckoutBackgroundVideo url={background.url} />
-        )}
-        <div
-          className={`min-h-full w-full ${background.type === "none" ? "bg-background" : ""}`.trim()}
-        >
-          <ScrollyCheckoutFlow
-            onBack={handleBack}
-            onPaymentComplete={() => {}}
-          />
-        </div>
-      </CheckoutProvider>
-    </PassesProvider>
+export function resolveLegacyShopRoute(
+  popupSlug: string,
+  flowIdentifier: string | null,
+  flows: PortalFlow[],
+  collectionsResolved: boolean,
+) {
+  if (!collectionsResolved) return null
+  const flow = flows.find(
+    (item) => item.id === flowIdentifier || item.slug === flowIdentifier,
   )
+
+  return {
+    kind: "shop" as const,
+    target: flow
+      ? `/portal/${popupSlug}/shop/${flow.slug}`
+      : `/portal/${popupSlug}`,
+  }
+}
+
+/** Redirects legacy `?flow=` links to the canonical authenticated Shop route. */
+export default function LegacyBuyPassesRedirect() {
+  const params = useParams<{ popupSlug: string }>()
+  const router = useRouter()
+  const flowIdentifier = useSearchParams().get("flow")
+  const { getCity } = useCityProvider()
+  const city = getCity()
+  const popupId = city?.id ? String(city.id) : undefined
+  const applicationQuery = usePortalSalesFlows(popupId)
+  const directQuery = usePortalDirectSalesFlows(popupId)
+  const upsaleQuery = usePortalUpsaleFlows(popupId)
+  const route = resolveLegacyShopRoute(
+    params.popupSlug,
+    flowIdentifier,
+    [
+      ...(applicationQuery.data ?? []),
+      ...(directQuery.data ?? []),
+      ...(upsaleQuery.data ?? []),
+    ],
+    !applicationQuery.isLoading &&
+      !directQuery.isLoading &&
+      !upsaleQuery.isLoading,
+  )
+
+  useEffect(() => {
+    if (route) router.replace(route.target)
+  }, [route, router])
+
+  return <Loader />
 }

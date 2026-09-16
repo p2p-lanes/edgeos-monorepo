@@ -1,25 +1,45 @@
 import { useQuery } from "@tanstack/react-query"
-import { createFileRoute, Link } from "@tanstack/react-router"
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router"
 import { Pencil } from "lucide-react"
-import { Suspense } from "react"
+import { Suspense, useCallback } from "react"
 
-import { EmailTemplatesService } from "@/client"
+import { EmailTemplatesService, type SalesFlowPublic } from "@/client"
 import { QueryErrorBoundary } from "@/components/Common/QueryErrorBoundary"
 import { WorkspaceAlert } from "@/components/Common/WorkspaceAlert"
+import { FlowScopeBar } from "@/components/SalesFlows/FlowScopeBar"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
 import { useWorkspace } from "@/contexts/WorkspaceContext"
 import useAuth from "@/hooks/useAuth"
+import { rememberFlow, useFlowScope } from "@/hooks/useFlowScope"
 
 export const Route = createFileRoute("/_layout/email-templates/")({
   component: EmailTemplatesPage,
+  // The sale mails on this page belong to one flow, so the address names
+  // it. The gathering mails below them do not move with it.
+  validateSearch: (raw: Record<string, unknown>) => ({
+    ...(typeof raw.flow === "string" && raw.flow ? { flow: raw.flow } : {}),
+  }),
   head: () => ({
     meta: [{ title: "Email Templates - EdgeOS" }],
   }),
 })
 
-export function TemplateList() {
+interface TemplateListProps {
+  /** Whose sale mails are on screen. The route resolves it from the URL. */
+  flowId?: string
+  flows?: SalesFlowPublic[]
+  onSelectFlow?: (flowId: string) => void
+  flowsLoading?: boolean
+}
+
+export function TemplateList({
+  flowId,
+  flows = [],
+  onSelectFlow,
+  flowsLoading = false,
+}: TemplateListProps = {}) {
   const { selectedPopupId, effectiveTenantId } = useWorkspace()
 
   const { data: types } = useQuery({
@@ -44,8 +64,17 @@ export function TemplateList() {
   const tenantCustomByType = new Map(
     tenantTemplates?.results?.map((t) => [t.template_type, t]) ?? [],
   )
+  // Split by tier: a row carrying a flow answers only for that flow, and a
+  // row without one answers only for the gathering. Reading either through
+  // the other is the mix-up this page used to show.
+  const popupRows = popupTemplates?.results ?? []
   const popupCustomByType = new Map(
-    popupTemplates?.results?.map((t) => [t.template_type, t]) ?? [],
+    popupRows.filter((t) => !t.sales_flow_id).map((t) => [t.template_type, t]),
+  )
+  const flowCustomByType = new Map(
+    popupRows
+      .filter((t) => t.sales_flow_id === flowId)
+      .map((t) => [t.template_type, t]),
   )
 
   // Group by category, preserving the backend metadata order.
@@ -63,6 +92,16 @@ export function TemplateList() {
 
   return (
     <div className="space-y-6">
+      {selectedPopupId && (
+        <FlowScopeBar
+          popupId={selectedPopupId}
+          flows={flows}
+          activeFlowId={flowId}
+          onSelect={(nextFlowId: string) => onSelectFlow?.(nextFlowId)}
+          isLoading={flowsLoading}
+          resource="sale emails"
+        />
+      )}
       {categories.map((category) => (
         <div key={category} className="space-y-1">
           <h3 className="px-1 text-xs font-medium uppercase tracking-wider text-muted-foreground">
@@ -70,13 +109,18 @@ export function TemplateList() {
           </h3>
           <div className="divide-y rounded-md border">
             {(byCategory.get(category) ?? []).map((tmpl) => {
-              const requiresPopup = tmpl.scope === "popup"
+              const isFlowScoped = tmpl.scope === "flow"
+              const requiresPopup = isFlowScoped || tmpl.scope === "popup"
               // Without a gathering selected we cannot know whether a
-              // popup-scoped template is customized, so show no badge.
-              const customUnknown = requiresPopup && !selectedPopupId
-              const custom = requiresPopup
-                ? popupCustomByType.get(tmpl.type)
-                : tenantCustomByType.get(tmpl.type)
+              // gathering-scoped template is customized, so show no badge.
+              // Same for a flow-scoped one before a flow is chosen.
+              const customUnknown =
+                (requiresPopup && !selectedPopupId) || (isFlowScoped && !flowId)
+              const custom = isFlowScoped
+                ? flowCustomByType.get(tmpl.type)
+                : requiresPopup
+                  ? popupCustomByType.get(tmpl.type)
+                  : tenantCustomByType.get(tmpl.type)
               return (
                 <div
                   key={tmpl.type}
@@ -118,6 +162,7 @@ export function TemplateList() {
                         <Link
                           to="/email-templates/$type/edit"
                           params={{ type: tmpl.type }}
+                          search={{ flow: isFlowScoped ? flowId : undefined }}
                         >
                           <Pencil className="mr-1.5 h-3.5 w-3.5" />
                           Edit
@@ -136,8 +181,29 @@ export function TemplateList() {
 }
 
 export function EmailTemplatesPage() {
-  const { needsTenantSelection, needsPopupSelection } = useWorkspace()
+  const { needsTenantSelection, needsPopupSelection, selectedPopupId } =
+    useWorkspace()
   const { isOperatorOrAbove } = useAuth()
+  const navigate = useNavigate()
+  const { flow: flowParam } = Route.useSearch()
+
+  // The route owns the address. TemplateList only renders what it is given,
+  // which is also why it can be tested without a router around it.
+  const adoptFlow = useCallback(
+    (nextFlowId: string) => {
+      navigate({
+        to: "/email-templates",
+        search: { flow: nextFlowId },
+        replace: true,
+      })
+    },
+    [navigate],
+  )
+  const {
+    flows,
+    activeFlowId,
+    isLoading: flowsLoading,
+  } = useFlowScope(selectedPopupId ?? undefined, flowParam, adoptFlow)
 
   if (!isOperatorOrAbove) {
     return (
@@ -167,7 +233,18 @@ export function EmailTemplatesPage() {
       {!needsTenantSelection && (
         <QueryErrorBoundary>
           <Suspense fallback={<Skeleton className="h-64 w-full" />}>
-            <TemplateList />
+            <TemplateList
+              flowId={activeFlowId}
+              flows={flows}
+              flowsLoading={flowsLoading}
+              onSelectFlow={(nextFlowId) => {
+                if (selectedPopupId) rememberFlow(selectedPopupId, nextFlowId)
+                navigate({
+                  to: "/email-templates",
+                  search: { flow: nextFlowId },
+                })
+              }}
+            />
           </Suspense>
         </QueryErrorBoundary>
       )}

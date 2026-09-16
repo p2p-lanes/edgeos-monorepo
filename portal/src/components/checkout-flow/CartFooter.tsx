@@ -133,20 +133,33 @@ export default function CartFooter({
         }
         onScrollToStep?.(incomplete)
         focusFirstInvalidInStep(incomplete)
-        triggerCheckoutToast({
-          message: t("checkout.toast_buyer_incomplete_pay", {
-            defaultValue:
-              "Antes de pagar, completá los campos de Tu información.",
-          }),
-          chips: [
-            {
-              label: t("checkout.step_short.buyer", {
-                defaultValue: "Tu información",
-              }),
-              stepId: incomplete,
-            },
-          ],
-        })
+        // The message names the step that is actually incomplete. Buyer info
+        // was the only gated step when this was written; sending someone to
+        // the rooms with "completá Tu información" would be worse than saying
+        // nothing.
+        triggerCheckoutToast(
+          incomplete === "buyer"
+            ? {
+                message: t("checkout.toast_buyer_incomplete_pay", {
+                  defaultValue:
+                    "Antes de pagar, completá los campos de Tu información.",
+                }),
+                chips: [
+                  {
+                    label: t("checkout.step_short.buyer", {
+                      defaultValue: "Tu información",
+                    }),
+                    stepId: incomplete,
+                  },
+                ],
+              }
+            : {
+                message: t("checkout.toast_guest_details_incomplete", {
+                  defaultValue:
+                    "Faltan datos de los huéspedes para completar la reserva.",
+                }),
+              },
+        )
         return
       }
       if (!hasItems) {

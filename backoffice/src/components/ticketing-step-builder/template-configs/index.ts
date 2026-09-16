@@ -1,4 +1,5 @@
 import type { ComponentType } from "react"
+import { AccommodationBookingConfig } from "./AccommodationBookingConfig"
 import { FaqsConfig } from "./FaqsConfig"
 import { HeroConfig } from "./HeroConfig"
 import { HousingDateConfig } from "./HousingDateConfig"
@@ -19,6 +20,7 @@ export const TEMPLATE_CONFIG_REGISTRY: Record<
   ComponentType<TemplateConfigProps>
 > = {
   hero: HeroConfig,
+  "accommodation-booking": AccommodationBookingConfig,
   "ticket-select": TicketSelectConfig,
   "ticket-card": TicketCardConfig,
   "patron-preset": PatronPresetConfig,

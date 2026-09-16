@@ -1,68 +1,95 @@
 "use client"
 
-import { AlertCircle, RefreshCw, Ticket } from "lucide-react"
-import { useParams, useRouter } from "next/navigation"
+import { AlertCircle, RefreshCw, ShoppingBag, Ticket } from "lucide-react"
+import { useParams, useRouter, useSearchParams } from "next/navigation"
 import { useEffect } from "react"
 import { useTranslation } from "react-i18next"
-import { resolvePopupCheckoutPolicy } from "@/checkout/popupCheckoutPolicy"
 import type { CompanionParticipation } from "@/client"
 import { CompanionPasses } from "@/components/CompanionPasses"
 import { Button, ButtonAnimated } from "@/components/ui/button"
 import { Loader } from "@/components/ui/Loader"
 import useHumanAttendeesQuery from "@/hooks/useHumanAttendeesQuery"
+import useHumanPaymentsQuery from "@/hooks/useHumanPaymentsQuery"
 import { useHumanPopupAccess } from "@/hooks/useHumanPopupAccess"
-import { useProductsQuery } from "@/hooks/useProductsQuery"
+import { usePortalDirectSalesFlows } from "@/hooks/usePortalDirectSalesFlows"
+import { usePortalSalesFlows } from "@/hooks/usePortalSalesFlows"
+import { usePortalUpsaleFlows } from "@/hooks/usePortalUpsaleFlows"
+import {
+  getEligiblePortalFlows,
+  groupPassesBySalesFlow,
+  resolvePassPurchaseFlowSlug,
+} from "@/lib/portal-sales-flows"
 import { useApplication } from "@/providers/applicationProvider"
 import { useCityProvider } from "@/providers/cityProvider"
 import { usePassesProvider } from "@/providers/passesProvider"
+import type { AttendeePassState } from "@/types/Attendee"
+import { OtherPurchasedProducts } from "./components/OtherPurchasedProducts"
+import { projectOtherPurchasedProducts } from "./otherProductsProjection"
 import YourPasses from "./Tabs/YourPasses"
 
 export default function HomePasses() {
   const { t } = useTranslation()
-  const params = useParams()
+  const params = useParams<{ popupSlug: string }>()
   const router = useRouter()
-  const { participation } = useApplication()
+  const searchParams = useSearchParams()
+  const explicitFlowIdentifier = searchParams.get("flow")
+  const { getApplicationsForPopup, participation } = useApplication()
   const { getCity } = useCityProvider()
   const { attendeePasses: attendees, products } = usePassesProvider()
   const city = getCity()
-  const policy = resolvePopupCheckoutPolicy(city)
-
-  // Gate access via the unified 7-step access ladder. The hook does NOT
-  // redirect — routing decisions are handled here so they remain testable
-  // in isolation from the query logic.
-  const access = useHumanPopupAccess(city?.id ? String(city.id) : null)
-  const isDirectSale = policy.saleType === "direct"
-
-  // Subscribe to the same attendees query that PassesProvider drives off so
-  // a backend failure shows an inline error UI instead of an infinite loader.
-  const popupId = city?.id ? String(city.id) : null
-  const attendeesQuery = useHumanAttendeesQuery(popupId)
-
-  // Track the products query loading state so the page can distinguish
-  // "still loading" from "loaded but empty". Without this, an empty products
-  // list (or empty attendees) renders an infinite loader instead of an empty
-  // state. This subscribes to the same cached query PassesProvider reads.
-  const productsQuery = useProductsQuery(popupId)
+  const popupId = city?.id ? String(city.id) : undefined
+  const access = useHumanPopupAccess(popupId ?? null)
+  const nobodyApplies = city?.takes_applications === false
+  const attendeesQuery = useHumanAttendeesQuery(popupId ?? null)
+  const paymentsQuery = useHumanPaymentsQuery(popupId, { limit: 100 })
+  const applicationFlowsQuery = usePortalSalesFlows(popupId)
+  const directFlowsQuery = usePortalDirectSalesFlows(popupId)
+  const upsaleFlowsQuery = usePortalUpsaleFlows(popupId)
+  const applicationFlows = applicationFlowsQuery.data ?? []
+  const directFlows = directFlowsQuery.data ?? []
+  const upsaleFlows = upsaleFlowsQuery.data ?? []
+  const applications = getApplicationsForPopup()
+  const approvedApplicationFlowIds = new Set<string>(
+    applications.flatMap((application) =>
+      application.status === "accepted" && application.sales_flow_id
+        ? [application.sales_flow_id]
+        : [],
+    ),
+  )
+  const eligibleFlows = getEligiblePortalFlows({
+    application: applicationFlows,
+    direct: directFlows,
+    upsale: upsaleFlows,
+    approvedApplicationFlowIds,
+  })
+  const eligibleFlowIds = new Set(eligibleFlows.map((flow) => flow.id))
+  const eligibleApplicationFlows = applicationFlows.filter((flow) =>
+    eligibleFlowIds.has(flow.id),
+  )
+  const eligibleDirectFlows = directFlows.filter((flow) =>
+    eligibleFlowIds.has(flow.id),
+  )
+  const purchaseApplications = applications.flatMap((application) =>
+    application.sales_flow_id
+      ? [{ id: application.id, sales_flow_id: application.sales_flow_id }]
+      : [],
+  )
+  const groupedPasses = groupPassesBySalesFlow({
+    attendees,
+    applications: purchaseApplications,
+    eligibleFlows,
+    payments: paymentsQuery.data ?? [],
+  })
 
   useEffect(() => {
-    // For direct-sale popups we keep /passes accessible even when the human
-    // hasn't bought yet — the page renders an empty state with a CTA back to
-    // /checkout. Application popups still gate via the access ladder.
-    if (!isDirectSale && access.state === "denied") {
+    if (!nobodyApplies && access.state === "denied") {
       router.replace(`/portal/${params.popupSlug}`)
     }
-  }, [access.state, isDirectSale, params.popupSlug, router])
+  }, [access.state, nobodyApplies, params.popupSlug, router])
 
-  // Show loader while access is being resolved (and, for non-direct popups,
-  // while redirecting after denial).
-  if (access.state === "loading") {
-    return <Loader />
-  }
-  if (!isDirectSale && access.state === "denied") {
-    return <Loader />
-  }
+  if (!city || access.state === "loading") return <Loader />
+  if (!nobodyApplies && access.state === "denied") return <Loader />
 
-  // Surface initial failures, but keep rendering retained data after a failed refetch.
   if (attendeesQuery.isError && attendeesQuery.data === undefined) {
     return (
       <div className="w-full md:mt-0 mx-auto items-center max-w-3xl p-6 bg-transparent">
@@ -94,10 +121,6 @@ export default function HomePasses() {
     )
   }
 
-  // Companions don't have an Application, so PassesProvider data will be empty.
-  // Show companion-specific passes view instead. The participation flag is
-  // orthogonal to the access gate — both must agree but answer different questions
-  // ("can render?" vs "render which view?").
   if (participation?.type === "companion") {
     return (
       <div className="w-full md:mt-0 mx-auto items-center max-w-3xl p-6 bg-transparent">
@@ -108,11 +131,22 @@ export default function HomePasses() {
     )
   }
 
-  // Empty state shared by both flows. The buy CTA is hidden when there are no
-  // products to sell, so it never becomes a dead-end button.
-  const buyHref = isDirectSale
-    ? `/checkout/${params.popupSlug}`
-    : `/portal/${params.popupSlug}/passes/buy`
+  const getPurchasePath = (attendee?: AttendeePassState) => {
+    const flowSlug = resolvePassPurchaseFlowSlug({
+      explicitFlowIdentifier,
+      attendeeApplicationId: attendee?.application_id,
+      applications: purchaseApplications,
+      eligibleFlows,
+      eligibleApplicationFlows,
+      eligibleDirectFlows,
+    })
+    return flowSlug
+      ? `/portal/${params.popupSlug}/shop/${flowSlug}`
+      : `/portal/${params.popupSlug}`
+  }
+  const openPurchase = (attendee?: AttendeePassState) => {
+    router.push(getPurchasePath(attendee))
+  }
   const emptyState = (
     <div className="w-full md:mt-0 mx-auto items-center max-w-3xl p-6 bg-transparent">
       <div className="flex flex-col items-center justify-center rounded-2xl border bg-card p-10 text-center shadow-sm">
@@ -128,10 +162,7 @@ export default function HomePasses() {
         </p>
         {products.length > 0 && (
           <div className="mt-6">
-            <ButtonAnimated
-              onClick={() => router.push(buyHref)}
-              className="px-9"
-            >
+            <ButtonAnimated onClick={() => openPurchase()} className="px-9">
               {t("cta.buy_tickets")}
             </ButtonAnimated>
           </div>
@@ -140,41 +171,113 @@ export default function HomePasses() {
     </div>
   )
 
-  // Once access resolves, surface explicit empty states instead of an infinite
-  // loader. We only render the loader while a query is genuinely in-flight;
-  // after queries resolve we render either the passes or the empty state.
-  if (isDirectSale) {
-    if (attendeesQuery.isLoading || productsQuery.isLoading) return <Loader />
-    // Direct-sale attendeePasses only build once products exist, so an empty
-    // `attendees` here means the popup has no products or no attendee can be resolved.
-    if (access.state === "denied" || !attendees.length) {
-      return emptyState
-    }
+  if (nobodyApplies) {
+    if (attendeesQuery.isLoading) return <Loader />
   } else {
     if (access.state !== "allowed") return <Loader />
-    // Wait for the underlying queries before deciding empty vs ready.
-    if (attendeesQuery.isLoading || productsQuery.isLoading) return <Loader />
-    // Loaded: the human owns no attendees, or the popup has no products. Either
-    // way there is nothing to render — show the empty state, not a loader.
-    const ownsNoAttendees = (attendeesQuery.data?.length ?? 0) === 0
-    if (ownsNoAttendees || products.length === 0) return emptyState
-    // Inputs are non-empty; PassesProvider may still be assembling
-    // attendeePasses for a tick. This loader is finite.
-    if (!attendees.length) return <Loader />
+    if (attendeesQuery.isLoading) return <Loader />
+    if ((attendeesQuery.data?.length ?? 0) > 0 && !attendees.length) {
+      return <Loader />
+    }
   }
+
+  if (
+    applicationFlowsQuery.isLoading ||
+    directFlowsQuery.isLoading ||
+    upsaleFlowsQuery.isLoading
+  ) {
+    return <Loader />
+  }
+
+  if (paymentsQuery.isLoading) return <Loader />
+
+  const passSections = [
+    ...groupedPasses.sections.map(({ flow, attendees: flowAttendees }) => ({
+      id: flow.id,
+      title: flow.name,
+      attendees: flowAttendees,
+      salesFlowId: flow.id,
+      onSwitchToBuy: () =>
+        router.push(`/portal/${params.popupSlug}/shop/${flow.slug}`),
+    })),
+    ...(groupedPasses.unassignedAttendees.length > 0
+      ? [
+          {
+            id: "other",
+            title: t("passes.other_passes"),
+            attendees: groupedPasses.unassignedAttendees,
+            salesFlowId: null,
+            onSwitchToBuy: undefined,
+          },
+        ]
+      : []),
+  ]
+  const visiblePasses = [
+    ...groupedPasses.sections.flatMap((section) => section.attendees),
+    ...groupedPasses.unassignedAttendees,
+  ].flatMap((attendee) =>
+    (attendee.ticket_entries ?? [])
+      .filter((ticket) => ticket.product_category !== "patreon")
+      .map((ticket) => ({
+        id: ticket.id,
+        paymentId: ticket.payment_id,
+        productId: ticket.product_id,
+      })),
+  )
+  const otherProducts = projectOtherPurchasedProducts(
+    paymentsQuery.data ?? [],
+    new Set(applicationFlows.map((flow) => flow.id)),
+    visiblePasses,
+  )
+
+  if (passSections.length === 0 && otherProducts.length === 0) return emptyState
 
   return (
     <div className="w-full md:mt-0 mx-auto items-center max-w-3xl p-6 bg-transparent">
-      <YourPasses
-        access={access}
-        onSwitchToBuy={() =>
-          router.push(
-            isDirectSale
-              ? `/checkout/${params.popupSlug}`
-              : `/portal/${params.popupSlug}/passes/buy`,
-          )
-        }
-      />
+      <div className="mb-8 flex flex-col gap-2">
+        <div className="flex items-center gap-3">
+          <ShoppingBag className="size-6 text-pass-text" />
+          <h1 className="text-3xl font-bold tracking-tight text-pass-title">
+            {t("passes.your_purchases")}
+          </h1>
+        </div>
+        <p className="text-pass-text">
+          {t("passes.your_purchases_description")}
+        </p>
+      </div>
+
+      <div>
+        {passSections.map((section, index) => (
+          <div
+            key={section.id}
+            className={index === 0 ? "" : "mt-10 border-t border-border pt-10"}
+          >
+            <YourPasses
+              attendees={section.attendees}
+              inlineCta={passSections.length > 1}
+              onSwitchToBuy={section.onSwitchToBuy}
+              readOnly={city.status === "ended"}
+              salesFlowId={section.salesFlowId}
+              sectionTitle={passSections.length > 1 ? section.title : undefined}
+            />
+          </div>
+        ))}
+
+        {otherProducts.length > 0 && (
+          <div
+            className={
+              passSections.length > 0
+                ? "mt-10 border-t border-border pt-10"
+                : ""
+            }
+          >
+            <OtherPurchasedProducts
+              products={otherProducts}
+              paymentsHref={`/portal/${params.popupSlug}/orders`}
+            />
+          </div>
+        )}
+      </div>
     </div>
   )
 }

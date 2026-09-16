@@ -30,6 +30,7 @@ def test_application_received_email_uses_application_human_and_submitted_at(
         status=ApplicationStatus.IN_REVIEW.value,
         submitted_at=datetime(2026, 4, 24, 15, 30, tzinfo=UTC),
         popup_id="popup-1",
+        sales_flow_id="flow-1",
         popup=SimpleNamespace(
             name="Edge Summit",
             tenant=SimpleNamespace(
@@ -74,6 +75,7 @@ def test_application_rejected_email_uses_application_human_details(monkeypatch):
         status=ApplicationStatus.REJECTED.value,
         submitted_at=None,
         popup_id="popup-1",
+        sales_flow_id="flow-1",
         popup=SimpleNamespace(
             name="Edge Summit",
             tenant=SimpleNamespace(

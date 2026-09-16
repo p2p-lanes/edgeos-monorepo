@@ -109,7 +109,7 @@ type KeyMetricsCardsProps = {
 export function KeyMetricsCards({ data, isLoading }: KeyMetricsCardsProps) {
   if (isLoading || !data) {
     return (
-      <div className="grid gap-4 grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
+      <div className="grid grid-cols-1 gap-4 @sm/dashboard:grid-cols-2 @xl/dashboard:grid-cols-3 @5xl/dashboard:grid-cols-6">
         {Array.from({ length: 6 }).map((_, i) => (
           <MetricCardSkeleton key={`skeleton-${i.toString()}`} />
         ))}
@@ -120,7 +120,7 @@ export function KeyMetricsCards({ data, isLoading }: KeyMetricsCardsProps) {
   const currency = data.currency || "USD"
 
   return (
-    <div className="grid gap-4 grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
+    <div className="grid grid-cols-1 gap-4 @sm/dashboard:grid-cols-2 @xl/dashboard:grid-cols-3 @5xl/dashboard:grid-cols-6">
       <MetricCard
         title="People"
         value={(data.people ?? 0).toLocaleString()}

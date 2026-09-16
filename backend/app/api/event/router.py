@@ -735,17 +735,25 @@ def _ics_utc_stamp(dt: datetime) -> str:
 
 
 def _ics_vevent_lines(
-    event, dtstamp: str, *, include_recurrence: bool = False
+    event, dtstamp: str, *, include_recurrence: bool = False, public: bool = False
 ) -> list[str]:
     """Render one VEVENT block as RFC-5545 lines.
+
+    ``public`` drops what the anonymous public calendar JSON deliberately
+    omits (``content`` and ``meeting_url``) so the subscription feed does not
+    leak them; LOCATION falls back to the custom location name.
 
     ``include_recurrence`` emits RRULE/EXDATE so a recurring master expands
     natively in the subscriber's calendar — used by the popup feed. The
     single-event download leaves it off so it adds just that one instance.
     """
     summary = (event.title or "").replace("\n", " ").replace(",", r"\,")
-    description = (event.content or "").replace("\n", r"\n").replace(",", r"\,")
-    location = event.meeting_url or ""
+    description = (
+        "" if public else (event.content or "").replace("\n", r"\n").replace(",", r"\,")
+    )
+    location = (
+        (event.custom_location_name or "") if public else (event.meeting_url or "")
+    )
 
     lines: list[str] = [
         "BEGIN:VEVENT",
@@ -821,7 +829,9 @@ def _render_ics_feed(calendar_name: str, events: list) -> str:
         "X-PUBLISHED-TTL:PT1H",
     ]
     for event in events:
-        lines.extend(_ics_vevent_lines(event, dtstamp, include_recurrence=True))
+        lines.extend(
+            _ics_vevent_lines(event, dtstamp, include_recurrence=True, public=True)
+        )
     lines.append("END:VCALENDAR")
     return "\r\n".join(lines) + "\r\n"
 
@@ -1086,6 +1096,13 @@ async def get_public_event_share_meta(
     dependencies=[
         Depends(RateLimit(limit=120, window_sec=60, key_prefix="rl:events-public-ics")),
     ],
+    response_class=Response,
+    responses={
+        status.HTTP_200_OK: {
+            "description": "Public iCalendar feed",
+            "content": {"text/calendar": {"schema": {"type": "string"}}},
+        }
+    },
 )
 async def public_calendar_ics(
     db: SessionDep,
@@ -1405,6 +1422,11 @@ async def update_event(
     )
     new_start = event_in.start_time or event.start_time
     new_end = event_in.end_time or event.end_time
+    if new_end < new_start:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="end_time must not be before start_time",
+        )
     timing_or_venue_changed = (
         event_in.venue_id is not None
         or event_in.start_time is not None
@@ -2767,7 +2789,16 @@ async def delete_portal_invitation(
 # ---------------------------------------------------------------------------
 
 
-@router.get("/{event_id}/ics")
+@router.get(
+    "/{event_id}/ics",
+    response_class=Response,
+    responses={
+        status.HTTP_200_OK: {
+            "description": "Event iCalendar file",
+            "content": {"text/calendar": {"schema": {"type": "string"}}},
+        }
+    },
+)
 async def export_event_ics(
     event_id: uuid.UUID,
     db: AdminOrApiKeySession_EventsRead,
@@ -3080,8 +3111,8 @@ async def list_portal_events(
     return ListModel[EventPublic](
         results=results,
         # The list is returned unpaginated, so ``paging`` is informational only.
-        # ``total`` is the pre-expansion DB-row count from find_by_popup; the
-        # returned count differs after recurrence expansion and post-filtering.
+        # ``total`` is the expanded occurrence count from find_by_popup; the
+        # returned count can be lower after visibility post-filtering.
         paging=Paging(offset=0, limit=len(results), total=total),
     )
 
@@ -3223,7 +3254,11 @@ async def portal_calendar_summary(
     if managed_only:
         visible = events
     else:
-        visible = _portal_visibility_filter(db, events, current_human.id)
+        # popup_id is required for the viewer's group ids; without it
+        # group-private events counted in the list got no dot here.
+        visible = _portal_visibility_filter(
+            db, events, current_human.id, popup_id=popup_id
+        )
     visible = [e for e in visible if e.status != EventStatus.CANCELLED]
     if rsvped_only:
         visible = _filter_rsvped_events(db, visible, current_human.id)
@@ -3668,6 +3703,11 @@ async def update_portal_event(
     )
     new_start = event_in.start_time or event.start_time
     new_end = event_in.end_time or event.end_time
+    if new_end < new_start:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="end_time must not be before start_time",
+        )
     timing_or_venue_changed = (
         event_in.venue_id is not None
         or event_in.start_time is not None
@@ -3844,7 +3884,16 @@ async def cancel_portal_event(
     return _to_public(updated)
 
 
-@router.get("/portal/events/{event_id}/ics")
+@router.get(
+    "/portal/events/{event_id}/ics",
+    response_class=Response,
+    responses={
+        status.HTTP_200_OK: {
+            "description": "Event iCalendar file",
+            "content": {"text/calendar": {"schema": {"type": "string"}}},
+        }
+    },
+)
 async def export_portal_event_ics(
     event_id: uuid.UUID,
     db: HumanTenantSession,

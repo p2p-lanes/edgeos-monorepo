@@ -1,11 +1,17 @@
 """Unit tests for resolve_active_direct_popup_slug (Task 5.1 / Task 2.1).
 
+Which gathering a tenant's bare `/checkout` lands on. The question used to be
+asked of `popup.sale_type` and is asked of the DEFAULT flow's type now
+(sdd/sales-flows-rediseno slice 6).
+
 Covers scenarios:
-- C-1: single active direct popup → returns its slug
+- C-1: single active gathering whose main way in sells → returns its slug
 - C-2: multiple active popups, start_date tiebreak → earliest wins
 - C-3: multiple active popups, id tiebreak when start_date null for both
 - C-4: no active popup → returns None
-- C-5: only application sale_type → returns None (excluded)
+- C-5: a gathering people apply to → returns None (excluded)
+- C-6: a gathering people apply to that also has a selling door → still
+  excluded, and does not steal the landing from the real storefront
 """
 
 import uuid
@@ -17,8 +23,10 @@ from sqlmodel import Session
 from app.api.checkout.crud import resolve_active_direct_popup_slug
 from app.api.popup.models import Popups
 from app.api.popup.schemas import PopupStatus
+from app.api.sales_flow.models import SalesFlows
 from app.api.shared.enums import SaleType
 from app.api.tenant.models import Tenants
+from tests._flow_helpers import provision_default_flow
 
 
 @pytest.fixture()
@@ -53,6 +61,10 @@ def _popup(
     db.add(p)
     db.commit()
     db.refresh(p)
+    # A popup built straight into the session skips PopupsCRUD.create, and the
+    # resolver now joins the default flow. Without this the row is invisible.
+    provision_default_flow(db, p, sale_type=sale_type.value)
+    db.commit()
     return p
 
 
@@ -89,6 +101,48 @@ def test_application_sale_type_excluded(db: Session) -> None:
     _popup(db, t, slug=f"c5-{uuid.uuid4().hex[:6]}", sale_type=SaleType.application)
     result = resolve_active_direct_popup_slug(db, t.id)
     assert result is None
+
+
+# C-6: a conference with a sponsor's door is not the tenant's storefront
+def test_a_selling_door_does_not_make_a_gathering_the_storefront(db: Session) -> None:
+    """The reason this matches the DEFAULT flow rather than any flow.
+
+    A conference people apply to, starting earlier than the tenant's actual
+    shop, with one door that sells to sponsors. Matching "has a door that
+    sells" would hand it the bare `/checkout` on start_date order, and every
+    stranger following the tenant's checkout link would land on a conference
+    they cannot buy into.
+    """
+    t = Tenants(
+        name=f"Mixed Tenant {uuid.uuid4().hex[:6]}",
+        slug=f"mixed-tenant-{uuid.uuid4().hex[:6]}",
+    )
+    db.add(t)
+    db.commit()
+    db.refresh(t)
+
+    conference = _popup(
+        db,
+        t,
+        slug=f"c6-conference-{uuid.uuid4().hex[:6]}",
+        sale_type=SaleType.application,
+        start_date=datetime(2026, 6, 1, tzinfo=UTC),
+    )
+    db.add(
+        SalesFlows(
+            tenant_id=t.id,
+            popup_id=conference.id,
+            slug=f"sponsors-{uuid.uuid4().hex[:6]}",
+            name="Sponsors",
+            type=SaleType.direct.value,
+        )
+    )
+    db.commit()
+
+    shop_slug = f"c6-shop-{uuid.uuid4().hex[:6]}"
+    _popup(db, t, slug=shop_slug, start_date=datetime(2026, 7, 1, tzinfo=UTC))
+
+    assert resolve_active_direct_popup_slug(db, t.id) == shop_slug
 
 
 # C-2: start_date tiebreak — earliest wins

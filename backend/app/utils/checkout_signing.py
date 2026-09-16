@@ -90,7 +90,13 @@ def sign_data_hex(data: str, secret: str) -> str:
     ).hexdigest()
 
 
-def build_cart_restore_token(cart_id: str, secret: str) -> str:
+def build_cart_restore_token(
+    cart_id: str,
+    secret: str,
+    *,
+    popup_id: str | None = None,
+    flow_id: str | None = None,
+) -> str:
     """HMAC for an open-checkout cart restore link.
 
     Signs the cart id so an anonymous buyer can rebuild their saved cart via
@@ -98,12 +104,21 @@ def build_cart_restore_token(cart_id: str, secret: str) -> str:
     signature makes the link unguessable, so the cart can never be read by
     enumerating ids or emails.
     """
-    return sign_data(cart_id, secret)
+    return sign_data(":".join((cart_id, popup_id or "", flow_id or "")), secret)
 
 
-def verify_cart_restore_token(cart_id: str, sig: str, secret: str) -> bool:
+def verify_cart_restore_token(
+    cart_id: str,
+    sig: str,
+    secret: str,
+    *,
+    popup_id: str | None = None,
+    flow_id: str | None = None,
+) -> bool:
     """Constant-time check of a cart restore token against the cart id."""
-    expected = sign_data(cart_id, secret)
+    expected = build_cart_restore_token(
+        cart_id, secret, popup_id=popup_id, flow_id=flow_id
+    )
     return hmac.compare_digest(expected, sig)
 
 

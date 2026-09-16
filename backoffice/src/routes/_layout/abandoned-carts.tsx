@@ -52,12 +52,11 @@ function formatName(
 }
 
 function getCartItemCount(items: AbandonedCartPublic["items"]): number {
-  let count = 0
-  count += items.passes?.length ?? 0
-  count += items.housing ? 1 : 0
-  count += items.merch?.length ?? 0
-  count += items.patron ? 1 : 0
-  return count
+  return (
+    items.lines?.reduce((count, line) => {
+      return count + (line.kind === "product" ? (line.quantity ?? 1) : 1)
+    }, 0) ?? 0
+  )
 }
 
 const columns: ColumnDef<AbandonedCartPublic>[] = [

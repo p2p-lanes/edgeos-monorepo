@@ -21,6 +21,7 @@ from app.api.human.models import Humans
 from app.api.human.schemas import HumanCreate
 from app.api.popup.models import Popups
 from app.api.tenant.models import Tenants
+from tests._flow_helpers import group_flow_id
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -41,6 +42,7 @@ def _make_popup(db: Session, tenant: Tenants) -> Popups:
 
 def _make_group(db: Session, tenant: Tenants, popup: Popups) -> Groups:
     g = Groups(
+        sales_flow_id=group_flow_id(db, popup.id),
         tenant_id=tenant.id,
         popup_id=popup.id,
         name=f"Whitelist Group {uuid.uuid4().hex[:6]}",
@@ -233,6 +235,7 @@ class TestWhitelistResolutionHook:
         popup = _make_popup(db, tenant_a)
         # Group with cap=1
         g = Groups(
+            sales_flow_id=group_flow_id(db, popup.id),
             tenant_id=tenant_a.id,
             popup_id=popup.id,
             name=f"CapGroup {uuid.uuid4().hex[:6]}",
@@ -281,6 +284,7 @@ def _make_group_with_cap(
     db: Session, tenant: Tenants, popup: Popups, max_members: int | None
 ) -> Groups:
     g = Groups(
+        sales_flow_id=group_flow_id(db, popup.id),
         tenant_id=tenant.id,
         popup_id=popup.id,
         name=f"BackResolve {uuid.uuid4().hex[:6]}",

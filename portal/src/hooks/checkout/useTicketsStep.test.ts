@@ -44,6 +44,9 @@ vi.mock("@/providers/checkoutProvider", () => ({
     editCredit: mockEditCredit,
     isEditing: mockIsEditing,
     editPassesEnabled: true,
+    // The provider resolves this from the door it was told to serve, so the
+    // hook reads it here rather than asking the gathering.
+    checkoutMode: mockCheckoutMode,
     cart: { dynamicItems: mockDynamicItems },
     addDynamicItem: mockAddDynamicItem,
     removeDynamicItem: mockRemoveDynamicItem,
@@ -583,8 +586,8 @@ describe("S3-A: simple_quantity open-checkout VM (Slice 3)", () => {
   })
 })
 
-// S3-B: setRowQuantity("", product, 1) → updateDynamicQuantity called
-describe("S3-B: setRowQuantity on open-checkout routes to updateDynamicQuantity", () => {
+// S3-B: setRowQuantity("", product, 1) inserts an absent cart item
+describe("S3-B: setRowQuantity on open-checkout inserts an absent item", () => {
   beforeEach(() => {
     vi.clearAllMocks()
     mockCheckoutMode = "simple_quantity"
@@ -598,7 +601,7 @@ describe("S3-B: setRowQuantity on open-checkout routes to updateDynamicQuantity"
     mockCheckoutMode = "pass_system"
   })
 
-  it("setRowQuantity('', product, 1) calls updateDynamicQuantity with correct args", () => {
+  it("setRowQuantity('', product, 1) adds a dynamic item with its computed price", () => {
     const pWeek = makeProduct("p-week", { duration_type: "week" })
 
     const { result } = renderHook(() =>
@@ -611,13 +614,51 @@ describe("S3-B: setRowQuantity on open-checkout routes to updateDynamicQuantity"
 
     result.current.setRowQuantity("", pWeek, 1)
 
-    expect(mockUpdateDynamicQuantity).toHaveBeenCalledOnce()
+    expect(mockAddDynamicItem).toHaveBeenCalledOnce()
+    expect(mockAddDynamicItem).toHaveBeenCalledWith(
+      "passes",
+      expect.objectContaining({
+        productId: pWeek.id,
+        product: pWeek,
+        quantity: 1,
+        price: pWeek.price,
+        stepType: "passes",
+      }),
+    )
+    expect(mockUpdateDynamicQuantity).not.toHaveBeenCalled()
+    expect(mockToggleProduct).not.toHaveBeenCalled()
+  })
+
+  it("setRowQuantity updates an item that already exists in the cart", () => {
+    const pWeek = makeProduct("p-week", { duration_type: "week" })
+    mockDynamicItems = {
+      passes: [
+        {
+          productId: pWeek.id,
+          product: pWeek,
+          quantity: 1,
+          price: pWeek.price,
+          stepType: "passes",
+        },
+      ],
+    }
+
+    const { result } = renderHook(() =>
+      useTicketsStep({
+        stepType: "passes",
+        templateConfig: null,
+        products: [pWeek],
+      }),
+    )
+
+    result.current.setRowQuantity("", pWeek, 2)
+
     expect(mockUpdateDynamicQuantity).toHaveBeenCalledWith(
       "passes",
       pWeek.id,
-      1,
+      2,
     )
-    expect(mockToggleProduct).not.toHaveBeenCalled()
+    expect(mockAddDynamicItem).not.toHaveBeenCalled()
   })
 })
 
@@ -1103,7 +1144,7 @@ describe("S2-E: simple_quantity regression (amanita popup)", () => {
     expect(result.current.mode).toBe("simple_quantity")
   })
 
-  it("setRowQuantity calls updateDynamicQuantity and NOT toggleProduct", () => {
+  it("setRowQuantity adds an absent item and does not toggle a pass", () => {
     const pWeek = makeProduct("p-week", { duration_type: "week" })
 
     const { result } = renderHook(() =>
@@ -1116,14 +1157,19 @@ describe("S2-E: simple_quantity regression (amanita popup)", () => {
 
     result.current.setRowQuantity("", pWeek, 2)
 
-    expect(mockUpdateDynamicQuantity).toHaveBeenCalledOnce()
+    expect(mockAddDynamicItem).toHaveBeenCalledOnce()
     expect(mockToggleProduct).not.toHaveBeenCalled()
-    // Must be called with (stepType, productId, qty)
-    expect(mockUpdateDynamicQuantity).toHaveBeenCalledWith(
+    expect(mockAddDynamicItem).toHaveBeenCalledWith(
       "passes",
-      pWeek.id,
-      2,
+      expect.objectContaining({
+        productId: pWeek.id,
+        product: pWeek,
+        quantity: 2,
+        price: pWeek.price * 2,
+        stepType: "passes",
+      }),
     )
+    expect(mockUpdateDynamicQuantity).not.toHaveBeenCalled()
   })
 
   it("toggleRow calls addDynamicItem when quantity was 0, removeDynamicItem when removing", () => {
@@ -1252,7 +1298,7 @@ describe("S5: amanita regression — simple_quantity with virtual buyer attendee
     expect(allRowProductIds).toContain("a862fd84-1bcb-4099-9494-f6fa4bede059")
   })
 
-  it("setRowQuantity routes to updateDynamicQuantity (not passesProvider) with virtual attendee", () => {
+  it("setRowQuantity inserts an absent dynamic item with a virtual attendee", () => {
     const { result } = renderHook(() =>
       useTicketsStep({
         stepType: "passes",
@@ -1263,13 +1309,19 @@ describe("S5: amanita regression — simple_quantity with virtual buyer attendee
 
     result.current.setRowQuantity("", amanitaProducts[0], 2)
 
-    expect(mockUpdateDynamicQuantity).toHaveBeenCalledOnce()
+    expect(mockAddDynamicItem).toHaveBeenCalledOnce()
     expect(mockToggleProduct).not.toHaveBeenCalled()
-    expect(mockUpdateDynamicQuantity).toHaveBeenCalledWith(
+    expect(mockAddDynamicItem).toHaveBeenCalledWith(
       "passes",
-      amanitaProducts[0].id,
-      2,
+      expect.objectContaining({
+        productId: amanitaProducts[0].id,
+        product: amanitaProducts[0],
+        quantity: 2,
+        price: amanitaProducts[0].price * 2,
+        stepType: "passes",
+      }),
     )
+    expect(mockUpdateDynamicQuantity).not.toHaveBeenCalled()
   })
 })
 

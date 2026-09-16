@@ -34,6 +34,11 @@ from app.api.payment.crud import payments_crud
 from app.api.popup.models import Popups
 from app.api.product.models import Products
 from app.api.tenant.models import Tenants
+from tests._flow_helpers import (
+    application_flow_id,
+    offer_category,
+    seed_default_steps,
+)
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -117,6 +122,7 @@ def _get_or_create_application(
     db.flush()
 
     app = Applications(
+        sales_flow_id=application_flow_id(db, popup.id),
         tenant_id=tenant.id,
         popup_id=popup.id,
         human_id=human.id,
@@ -143,6 +149,7 @@ class TestAddProductEnforcement:
         popup_tenant_a: Popups,
     ) -> None:
         """add_product on product with total_stock_remaining=0 → 409."""
+        offer_category(db, popup_tenant_a, "ticket")
         product = _make_product(
             db,
             tenant_a,
@@ -164,6 +171,7 @@ class TestAddProductEnforcement:
         popup_tenant_a: Popups,
     ) -> None:
         """add_product call decrements 1 unit of total_stock_remaining."""
+        offer_category(db, popup_tenant_a, "ticket")
         product = _make_product(
             db,
             tenant_a,
@@ -191,6 +199,7 @@ class TestAddProductEnforcement:
         popup_tenant_a: Popups,
     ) -> None:
         """add_product with NULL stock (unlimited) → succeeds without decrement."""
+        offer_category(db, popup_tenant_a, "ticket")
         product = _make_product(
             db,
             tenant_a,
@@ -257,6 +266,7 @@ class TestAddProductEnforcement:
         """Concurrent add_product on remaining=1: exactly one 200, one 409."""
         from sqlmodel import Session as SyncSession
 
+        offer_category(db, popup_tenant_a, "ticket")
         product = _make_product(
             db,
             tenant_a,
@@ -348,6 +358,7 @@ def _make_ot_popup(db: Session, tenant: Tenants) -> Popups:
     db.add(popup)
     db.commit()
     db.refresh(popup)
+    seed_default_steps(db, popup, sale_type=SaleType.direct.value)
     return popup
 
 
@@ -385,10 +396,20 @@ def _ot_purchase(product: Products, qty: int = 1):
         ProductLine,
     )
 
+    email = f"buyer-{uuid.uuid4().hex[:6]}@test.com"
     return OpenTicketingPurchaseCreate(
-        products=[ProductLine(product_id=product.id, quantity=qty)],
+        products=[
+            ProductLine(product_id=product.id, quantity=qty, recipient_key="buyer")
+        ],
+        recipients=[
+            {
+                "recipient_key": "buyer",
+                "name": "Test Buyer",
+                "email": email,
+            }
+        ],
         buyer=BuyerInfo(
-            email=f"buyer-{uuid.uuid4().hex[:6]}@test.com",
+            email=email,
             first_name="Test",
             last_name="Buyer",
             form_data={},
@@ -424,10 +445,14 @@ class TestOpenTicketingPaymentEnforcement:
         with patch("app.services.simplefi.get_simplefi_client") as mock_sf:
             with pytest.raises(HTTPException) as exc_info:
                 payments_crud.create_open_ticketing_payment(
-                    db, obj=obj, popup=popup, tenant=tenant_a
+                    db,
+                    obj=obj,
+                    popup=popup,
+                    tenant=tenant_a,
+                    flow_slug="checkout",
                 )
         assert exc_info.value.status_code == 422
-        assert "sold_out" in exc_info.value.detail
+        assert exc_info.value.detail == {"code": "quote_unavailable"}
         # SimpleFI must NOT have been called
         mock_sf.assert_not_called()
 
@@ -459,7 +484,11 @@ class TestOpenTicketingPaymentEnforcement:
         with patch("app.services.simplefi.get_simplefi_client") as mock_get_client:
             mock_get_client.return_value.create_payment.return_value = simplefi_response
             payments_crud.create_open_ticketing_payment(
-                db, obj=obj, popup=popup, tenant=tenant_a
+                db,
+                obj=obj,
+                popup=popup,
+                tenant=tenant_a,
+                flow_slug="checkout",
             )
 
         db.expire_all()
@@ -496,7 +525,11 @@ class TestOpenTicketingPaymentEnforcement:
         with patch("app.services.simplefi.get_simplefi_client") as mock_get_client:
             mock_get_client.return_value.create_payment.return_value = simplefi_response
             payment, _, _ = payments_crud.create_open_ticketing_payment(
-                db, obj=obj, popup=popup, tenant=tenant_a
+                db,
+                obj=obj,
+                popup=popup,
+                tenant=tenant_a,
+                flow_slug="checkout",
             )
 
         assert payment is not None
@@ -525,7 +558,11 @@ class TestOpenTicketingPaymentEnforcement:
         with patch("app.services.simplefi.get_simplefi_client"):
             with pytest.raises(HTTPException) as exc_info:
                 payments_crud.create_open_ticketing_payment(
-                    db, obj=obj, popup=popup, tenant=tenant_a
+                    db,
+                    obj=obj,
+                    popup=popup,
+                    tenant=tenant_a,
+                    flow_slug="checkout",
                 )
         assert exc_info.value.status_code == 422
 
@@ -576,7 +613,11 @@ class TestOpenTicketingPaymentEnforcement:
                     )
                     try:
                         payments_crud.create_open_ticketing_payment(
-                            session, obj=obj, popup=popup, tenant=tenant_a
+                            session,
+                            obj=obj,
+                            popup=popup,
+                            tenant=tenant_a,
+                            flow_slug="checkout",
                         )
                         with lock:
                             successes.append(True)
@@ -619,6 +660,7 @@ class TestCreatePaymentEnforcement:
         """total_stock_remaining=0 via create_payment → 409, no payment row."""
         from app.api.payment.schemas import PaymentCreate, PaymentProductRequest
 
+        offer_category(db, popup_tenant_a, "ticket")
         product = _make_product(
             db,
             tenant_a,
@@ -660,6 +702,7 @@ class TestCreatePaymentEnforcement:
         """
         from app.api.payment.schemas import PaymentCreate, PaymentProductRequest
 
+        offer_category(db, popup_tenant_a, "ticket")
         product = _make_product(
             db,
             tenant_a,
@@ -696,6 +739,7 @@ class TestCreatePaymentEnforcement:
         that the cutoff check doesn't reject legitimate, on-time orders)."""
         from app.api.payment.schemas import PaymentCreate, PaymentProductRequest
 
+        offer_category(db, popup_tenant_a, "ticket")
         product = _make_product(
             db,
             tenant_a,
@@ -731,6 +775,7 @@ class TestCreatePaymentEnforcement:
         """qty > max_per_order via create_payment → 422."""
         from app.api.payment.schemas import PaymentCreate, PaymentProductRequest
 
+        offer_category(db, popup_tenant_a, "ticket")
         product = _make_product(
             db,
             tenant_a,

@@ -1,8 +1,8 @@
 """Tests verifying that insurance_percentage is no longer accepted/returned via API (B.1).
 
 POPUP-B1: The API must:
-  - Reject/ignore insurance_percentage on CREATE (field stripped, not 422, kept in DB column only)
-  - Reject/ignore insurance_percentage on UPDATE
+  - Reject insurance_percentage on CREATE
+  - Reject insurance_percentage on UPDATE
   - Not return insurance_percentage in ProductPublic responses
 """
 
@@ -17,14 +17,14 @@ def _admin_headers(token: str) -> dict[str, str]:
 
 
 class TestInsurancePercentageRemovedFromApi:
-    def test_create_product_ignores_insurance_percentage_in_payload(
+    def test_create_product_rejects_insurance_percentage_in_payload(
         self,
         client: TestClient,
         admin_token_tenant_a: str,
         popup_tenant_a,
         db: Session,
     ) -> None:
-        """B.1: sending insurance_percentage in create payload must be ignored (not 422)."""
+        """B.1: removed product fields are rejected by the strict write schema."""
         response = client.post(
             "/api/v1/products",
             headers=_admin_headers(admin_token_tenant_a),
@@ -33,23 +33,20 @@ class TestInsurancePercentageRemovedFromApi:
                 "name": f"Pct Test {uuid.uuid4().hex[:8]}",
                 "price": "50.00",
                 "category": "ticket",
-                "insurance_percentage": "5.00",  # should be ignored
+                "insurance_percentage": "5.00",
             },
         )
-        # Must not fail (200 or 201) — extra unknown field ignored via pydantic
-        assert response.status_code in (200, 201), response.text
-        data = response.json()
-        # insurance_percentage must NOT be in the response at all
-        assert "insurance_percentage" not in data
+        assert response.status_code == 422, response.text
+        assert response.json()["detail"][0]["type"] == "extra_forbidden"
 
-    def test_update_product_ignores_insurance_percentage_in_payload(
+    def test_update_product_rejects_insurance_percentage_in_payload(
         self,
         client: TestClient,
         admin_token_tenant_a: str,
         popup_tenant_a,
         db: Session,
     ) -> None:
-        """B.1: sending insurance_percentage in update payload must be ignored (not 422)."""
+        """B.1: removed product fields are rejected by the strict patch schema."""
         # First create a product
         create_resp = client.post(
             "/api/v1/products",
@@ -64,15 +61,13 @@ class TestInsurancePercentageRemovedFromApi:
         assert create_resp.status_code in (200, 201)
         product_id = create_resp.json()["id"]
 
-        # Now patch with insurance_percentage — should be ignored
         update_resp = client.patch(
             f"/api/v1/products/{product_id}",
             headers=_admin_headers(admin_token_tenant_a),
             json={"insurance_percentage": "7.00"},
         )
-        assert update_resp.status_code == 200, update_resp.text
-        data = update_resp.json()
-        assert "insurance_percentage" not in data
+        assert update_resp.status_code == 422, update_resp.text
+        assert update_resp.json()["detail"][0]["type"] == "extra_forbidden"
 
     def test_create_product_response_does_not_include_insurance_percentage(
         self,

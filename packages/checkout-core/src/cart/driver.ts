@@ -1,5 +1,5 @@
 // Backend cart persistence for open checkout. Debounced upsert to
-// PUT /checkout/{slug}/cart so the server can drive abandoned-cart recovery
+// PUT /checkout/{slug}/{flowSlug}/cart so the server can drive abandoned-cart recovery
 // email, plus restore from a signed link (cid/sig). Tracks the cart meta
 // (cartId + restoreToken) that becomes the purchase continuity proof used to
 // supersede a prior PENDING payment.

@@ -1,6 +1,7 @@
 "use client"
 
 import {
+  BedDouble,
   HandCoins,
   Heart,
   Home,
@@ -15,7 +16,7 @@ import { useTranslation } from "react-i18next"
 import { resolveStepIcon } from "@/lib/checkoutStepIcons"
 import { useCheckout } from "@/providers/checkoutProvider"
 import { useCityProvider } from "@/providers/cityProvider"
-import { formatCurrency } from "@/types/checkout"
+import { formatCheckoutDate, formatCurrency } from "@/types/checkout"
 
 export default function CartItemList({
   showServiceFee = true,
@@ -34,6 +35,7 @@ export default function CartItemList({
     togglePass,
     resetDayProduct,
     clearHousing,
+    removeAccommodation,
     updateMerchQuantity,
     clearPatron,
     removeMealPlan,
@@ -71,7 +73,7 @@ export default function CartItemList({
 
   const getAttendeeName = (attendeeId: string): string => {
     const attendee = attendees.find((a) => a.id === attendeeId)
-    return attendee?.name || "Unknown"
+    return attendee?.name || t("checkout.cart.unknown_attendee")
   }
 
   const handleRemovePass = (attendeeId: string, productId: string) => {
@@ -92,7 +94,7 @@ export default function CartItemList({
       {cart.passes.length > 0 && (
         <div className="mb-4">
           <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
-            Passes
+            {t("checkout.cart.passes")}
           </h4>
           <div className="space-y-2">
             {cart.passes.map((pass) => (
@@ -132,11 +134,63 @@ export default function CartItemList({
         </div>
       )}
 
+      {/* Booked rooms */}
+      {cart.accommodations.length > 0 && (
+        <div className="mb-4">
+          <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
+            {t("checkout.accommodation.cart_title")}
+          </h4>
+          <div className="space-y-1">
+            {cart.accommodations.map((item) => (
+              <div
+                key={`${item.accommodationId}-${item.checkIn}-${item.checkOut}`}
+                className="flex items-center justify-between py-2"
+              >
+                <div className="flex items-center gap-3 flex-1 min-w-0">
+                  <BedDouble className="w-4 h-4 text-muted-foreground shrink-0" />
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium text-foreground truncate">
+                      {item.name}
+                    </p>
+                    <p className="text-xs text-muted-foreground truncate">
+                      {item.propertyName ? `${item.propertyName} · ` : ""}
+                      {formatCheckoutDate(item.checkIn)} →{" "}
+                      {formatCheckoutDate(item.checkOut)} ·{" "}
+                      {t("checkout.accommodation.guests", {
+                        count: item.guestCount,
+                      })}
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-medium text-foreground">
+                    {formatCurrency(item.totalPrice)}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      removeAccommodation(
+                        item.accommodationId,
+                        item.checkIn,
+                        item.checkOut,
+                      )
+                    }
+                    className="p-1 text-muted-foreground hover:text-destructive transition-colors"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Housing */}
       {cart.housing && (
         <div className="mb-4">
           <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
-            Housing
+            {t("checkout.cart.housing")}
           </h4>
           <div className="flex items-center justify-between py-2">
             <div className="flex items-center gap-3 flex-1 min-w-0">
@@ -152,8 +206,10 @@ export default function CartItemList({
                 </p>
                 <p className="text-xs text-muted-foreground">
                   {cart.housing.pricePerDay !== false
-                    ? `${cart.housing.nights} night${cart.housing.nights !== 1 ? "s" : ""}`
-                    : "Full stay"}
+                    ? t("checkout.accommodation.nights", {
+                        count: cart.housing.nights,
+                      })
+                    : t("checkout.cart.full_stay")}
                 </p>
               </div>
             </div>
@@ -177,7 +233,7 @@ export default function CartItemList({
       {cart.merch.length > 0 && (
         <div className="mb-4">
           <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
-            Merchandise
+            {t("checkout.cart.merchandise")}
           </h4>
           <div className="space-y-2">
             {cart.merch.map((item) => (
@@ -220,13 +276,13 @@ export default function CartItemList({
       {cart.patron && (
         <div className="mb-4">
           <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
-            Patron Contribution
+            {t("checkout.cart.patron_contribution")}
           </h4>
           <div className="flex items-center justify-between py-2">
             <div className="flex items-center gap-3">
               <Heart className="w-4 h-4 text-muted-foreground shrink-0" />
               <span className="text-sm font-medium text-foreground">
-                Community Support
+                {t("checkout.cart.community_support")}
               </span>
             </div>
             <div className="flex items-center gap-2">
@@ -250,7 +306,7 @@ export default function CartItemList({
       {cart.mealPlans.length > 0 && (
         <div className="mb-4">
           <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
-            Meal Plans
+            {t("checkout.cart.meal_plans")}
           </h4>
           <div className="space-y-2">
             {cart.mealPlans.map((mp) => (
@@ -337,13 +393,13 @@ export default function CartItemList({
       {cart.insurance && summary.insuranceSubtotal > 0 && (
         <div className="mb-4">
           <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
-            Pass Protection
+            {t("checkout.cart.pass_protection")}
           </h4>
           <div className="flex items-center justify-between py-2">
             <div className="flex items-center gap-3">
               <Shield className="w-4 h-4 text-muted-foreground shrink-0" />
               <span className="text-sm font-medium text-foreground">
-                Coverage for all passes
+                {t("checkout.cart.pass_protection_description")}
               </span>
             </div>
             <span className="text-sm font-medium text-foreground">
@@ -385,7 +441,7 @@ export default function CartItemList({
       {cart.promoCodeValid && cart.promoCode && (
         <div className="mb-4">
           <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
-            Promo Code
+            {t("checkout.cart.promo_code")}
           </h4>
           <div className="flex items-center justify-between py-2">
             <div className="flex items-center gap-3">

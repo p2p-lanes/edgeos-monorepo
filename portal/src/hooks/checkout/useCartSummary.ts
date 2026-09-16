@@ -1,6 +1,7 @@
 import { useMemo } from "react"
 import type {
   CheckoutCartSummary,
+  SelectedAccommodationItem,
   SelectedDynamicItem,
   SelectedHousingItem,
   SelectedMealPlanItem,
@@ -22,6 +23,13 @@ function isNonDiscountableProduct(product: {
 interface UseCartSummaryParams {
   selectedPasses: SelectedPassItem[]
   housing: SelectedHousingItem | null
+  /**
+   * Booked rooms. Their price is the server's quote for the stay, not a
+   * product price, so there is no `discountable` flag to read off a product
+   * here — the shadow product is created discountable and the backend puts
+   * these lines in the discount base like any other.
+   */
+  accommodations: SelectedAccommodationItem[]
   merch: SelectedMerchItem[]
   patron: SelectedPatronItem | null
   mealPlans: SelectedMealPlanItem[]
@@ -48,6 +56,7 @@ interface UseCartSummaryParams {
 export function useCartSummary({
   selectedPasses,
   housing,
+  accommodations,
   merch,
   patron,
   mealPlans,
@@ -84,6 +93,10 @@ export function useCartSummary({
       .reduce((sum, m) => sum + m.totalPrice, 0)
     const discountableMerchSubtotal =
       merchSubtotal - nonDiscountableMerchSubtotal
+    const accommodationsSubtotal = accommodations.reduce(
+      (sum, item) => sum + item.totalPrice,
+      0,
+    )
     const patronSubtotal = patron?.amount ?? 0
     // One meal-plan entry = one weekly product purchase. Price already on the
     // resolved product reference; sum across all (attendee × week) entries.
@@ -121,7 +134,8 @@ export function useCartSummary({
       (housingDiscountable ? housingSubtotal : 0) +
       discountableMerchSubtotal +
       discountableMealPlansSubtotal +
-      discountableDynamicSubtotal
+      discountableDynamicSubtotal +
+      accommodationsSubtotal
     const promoDiscount = (discountableSubtotal * discountValue) / 100
 
     const nonDiscountableTotal =
@@ -157,6 +171,7 @@ export function useCartSummary({
       merch.reduce((sum, m) => sum + (m.quantity ?? 1), 0) +
       (patron ? 1 : 0) +
       mealPlans.length +
+      accommodations.length +
       allDynamicItems.reduce((sum, d) => sum + (d.quantity ?? 1), 0)
 
     return {
@@ -165,6 +180,7 @@ export function useCartSummary({
       merchSubtotal,
       patronSubtotal,
       mealPlansSubtotal,
+      accommodationsSubtotal,
       insuranceSubtotal,
       contributionSubtotal,
       discountableSubtotal,
@@ -179,6 +195,7 @@ export function useCartSummary({
   }, [
     selectedPasses,
     housing,
+    accommodations,
     merch,
     patron,
     mealPlans,

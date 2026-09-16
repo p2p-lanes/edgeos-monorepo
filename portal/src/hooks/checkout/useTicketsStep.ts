@@ -11,10 +11,7 @@
  */
 
 import { useMemo } from "react"
-import {
-  CHECKOUT_MODE,
-  resolvePopupCheckoutPolicy,
-} from "@/checkout/popupCheckoutPolicy"
+import { CHECKOUT_MODE } from "@/checkout/popupCheckoutPolicy"
 import { deriveProductState, type ProductSaleState } from "@/lib/product-state"
 import { useCheckout } from "@/providers/checkoutProvider"
 import { useCityProvider } from "@/providers/cityProvider"
@@ -224,12 +221,11 @@ export function useTicketsStep({
     addDynamicItem,
     removeDynamicItem,
     updateDynamicQuantity,
+    checkoutMode,
   } = useCheckout()
 
   const { getCity } = useCityProvider()
-  const city = getCity()
-  const checkoutPolicy = resolvePopupCheckoutPolicy(city)
-  const checkoutMode = checkoutPolicy.checkoutMode
+  const _city = getCity()
 
   // Merge isEditing from both sources — passesProvider is authoritative for
   // pass_system; checkoutProvider exposes the same value for consumers that

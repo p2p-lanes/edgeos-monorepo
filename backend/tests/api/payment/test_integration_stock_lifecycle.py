@@ -35,6 +35,7 @@ from app.api.shared.enums import SaleType
 from app.api.tenant.models import Tenants
 from app.api.user.models import Users
 from app.core.security import create_access_token
+from tests._flow_helpers import application_flow_id
 
 # ---------------------------------------------------------------------------
 # Fixtures / Helpers
@@ -119,6 +120,7 @@ def _make_payment_with_product(
     db.flush()
 
     application = Applications(
+        sales_flow_id=application_flow_id(db, popup.id),
         tenant_id=tenant.id,
         popup_id=popup.id,
         human_id=human.id,
@@ -446,14 +448,14 @@ class TestCancelRejectRestoration:
         product_after = db.get(Products, product.id)
         assert product_after.total_stock_remaining == 5  # 3 + 2
 
-    def test_cancel_approved_payment_does_not_restore_stock(
+    def test_cancel_approved_payment_restores_stock(
         self,
         client: TestClient,
         db: Session,
         tenant_a: Tenants,
         admin_user_tenant_a: Users,
     ) -> None:
-        """APPROVED → CANCELLED: explicitly out-of-scope refund flow, no restoration."""
+        """APPROVED -> CANCELLED restores the immutable commercial quantity."""
         popup = _make_direct_popup(db, tenant_a)
         product = _make_product(
             db,
@@ -486,8 +488,7 @@ class TestCancelRejectRestoration:
 
         db.expire_all()
         product_after = db.get(Products, product.id)
-        # Stock must NOT be restored for APPROVED → CANCELLED
-        assert product_after.total_stock_remaining == 6
+        assert product_after.total_stock_remaining == 10
 
 
 # ---------------------------------------------------------------------------
@@ -531,6 +532,7 @@ class TestApplicationFlowEnforcement:
         db.flush()
 
         application = Applications(
+            sales_flow_id=application_flow_id(db, popup.id),
             tenant_id=tenant_a.id,
             popup_id=popup.id,
             human_id=human.id,

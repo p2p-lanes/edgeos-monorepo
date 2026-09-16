@@ -7,7 +7,7 @@ from app.api.base_field_config.constants import BASE_FIELD_DEFINITIONS
 from app.api.base_field_config.crud import (
     base_field_configs_crud,
     ensure_base_field_update_allowed,
-    field_applies_to_popup,
+    field_applies_to_flow,
 )
 from app.api.base_field_config.models import BaseFieldConfigs
 from app.api.base_field_config.schemas import BaseFieldConfigUpdate, CatalogField
@@ -18,7 +18,13 @@ if TYPE_CHECKING:
 
     from app.api.popup.models import Popups
 from app.api.form_field.models import FormFields
-from app.api.form_field.schemas import FormFieldCreate, FormFieldPublic, FormFieldUpdate
+from app.api.form_field.schemas import (
+    CopyFormToFlowRequest,
+    CopyFormToFlowResponse,
+    FormFieldCreate,
+    FormFieldPublic,
+    FormFieldUpdate,
+)
 from app.api.shared.enums import UserRole
 from app.api.shared.response import ListModel, PaginationLimit, PaginationSkip, Paging
 from app.api.translation.service import delete_translations_for_entity
@@ -49,6 +55,7 @@ def _base_config_to_public(config: BaseFieldConfigs) -> FormFieldPublic:
         id=config.id,
         tenant_id=config.tenant_id,
         popup_id=config.popup_id,
+        sales_flow_id=config.sales_flow_id,
         name=config.field_name,
         label=config.label or "",
         field_type=config.field_type or definition["type"],
@@ -66,14 +73,19 @@ def _base_config_to_public(config: BaseFieldConfigs) -> FormFieldPublic:
     )
 
 
-def _get_base_fields_as_public(db: "Session", popup: "Popups") -> list[FormFieldPublic]:
-    """Build FormFieldPublic entries from existing BaseFieldConfigs, filtered
-    by the popup's current feature flags."""
-    configs = base_field_configs_crud.find_by_popup(db, popup.id)
+def _get_base_fields_as_public(
+    db: "Session", popup: "Popups", flow_id: uuid.UUID
+) -> list[FormFieldPublic]:
+    """Build FormFieldPublic entries from one flow's BaseFieldConfigs,
+    filtered by what that same flow decided to ask."""
+    from app.api.sales_flow.resolver import config_for  # noqa: PLC0415
+
+    config = config_for(db, sales_flow_id=flow_id, popup_id=popup.id)
+    configs = base_field_configs_crud.find_by_flow(db, flow_id)
     return [
         _base_config_to_public(c)
         for c in configs
-        if field_applies_to_popup(c.field_name, popup)
+        if field_applies_to_flow(c.field_name, config)
     ]
 
 
@@ -82,6 +94,7 @@ async def list_form_fields(
     db: AdminOrApiKeySession_FormsRead,
     _: AdminOrApiKey_FormsRead,
     popup_id: uuid.UUID | None = None,
+    sales_flow_id: uuid.UUID | None = None,
     search: str | None = None,
     skip: PaginationSkip = 0,
     limit: PaginationLimit = 100,
@@ -96,17 +109,20 @@ async def list_form_fields(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Popup not found",
             )
-        base_fields = _get_base_fields_as_public(db, popup)
-        custom_fields, custom_total = crud.form_fields_crud.find_by_popup(
-            db, popup_id=popup_id, skip=skip, limit=limit, search=search
+        # One flow's form, never a merge across the popup's flows
+        # (sdd/sales-flows-rediseno slice 3).
+        flow_id = _resolve_schema_flow_id(db, popup_id, sales_flow_id)
+        base_fields = _get_base_fields_as_public(db, popup, flow_id)
+        custom_fields, custom_total = crud.form_fields_crud.find_by_flow(
+            db, flow_id, skip=skip, limit=limit, search=search
         )
         all_fields = base_fields + [_to_public(f) for f in custom_fields]
         # Sort by (section.order, position) so fields group by section and
         # appear in their configured order. Sorting by position alone
         # interleaves fields across sections (e.g. a position=0 field from
         # section 2 lands between position=0 and position=1 of section 1).
-        sections, _section_total = form_sections_crud.find_by_popup(
-            db, popup_id, skip=0, limit=1000
+        sections, _section_total = form_sections_crud.find_by_flow(
+            db, flow_id, skip=0, limit=1000
         )
         # Unsectioned fields (section_id is None) sort last by using +inf.
         section_order_by_id: dict[uuid.UUID, int] = {s.id: s.order for s in sections}
@@ -143,6 +159,7 @@ async def list_available_base_fields(
     fields disabled by the popup's feature flags.
     """
     from app.api.popup.crud import popups_crud
+    from app.api.sales_flow.resolver import config_for  # noqa: PLC0415
 
     popup = popups_crud.get(db, popup_id)
     if not popup:
@@ -154,6 +171,9 @@ async def list_available_base_fields(
     configured = {
         c.field_name for c in base_field_configs_crud.find_by_popup(db, popup_id)
     }
+    # This catalog is popup-scoped and names no flow, so it answers for the
+    # default one — the same flow its create endpoint writes into.
+    catalog_config = config_for(db, sales_flow_id=None, popup_id=popup_id)
 
     available: list[CatalogField] = []
     for field_name, definition in BASE_FIELD_DEFINITIONS.items():
@@ -163,7 +183,7 @@ async def list_available_base_fields(
             # Elementals must always be present — they're seeded and not
             # offered in the "add field" catalog.
             continue
-        if not field_applies_to_popup(field_name, popup):
+        if not field_applies_to_flow(field_name, catalog_config):
             continue
         available.append(
             CatalogField(
@@ -192,6 +212,7 @@ async def create_base_field_config(
 ) -> FormFieldPublic:
     """Add a catalog base field to a popup by creating its BaseFieldConfig."""
     from app.api.popup.crud import popups_crud
+    from app.api.sales_flow.resolver import config_for  # noqa: PLC0415
 
     popup = popups_crud.get(db, popup_id)
     if not popup:
@@ -207,7 +228,9 @@ async def create_base_field_config(
             detail=f"Field '{field_name}' is not in the catalog",
         )
 
-    if not field_applies_to_popup(field_name, popup):
+    if not field_applies_to_flow(
+        field_name, config_for(db, sales_flow_id=None, popup_id=popup_id)
+    ):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"Popup does not allow field '{field_name}'",
@@ -308,12 +331,17 @@ async def create_form_field(
     else:
         tenant_id = current_user.tenant_id
 
+    # Rejects a flow that belongs to another popup, and resolves the
+    # default flow when the caller did not name one.
+    flow_id = _resolve_schema_flow_id(db, field_in.popup_id, field_in.sales_flow_id)
+
     # Auto-generate the internal field name from label
     name = crud.form_fields_crud.generate_field_name(
         db, field_in.label, field_in.popup_id
     )
 
     field_data = field_in.model_dump()
+    field_data["sales_flow_id"] = flow_id
     field_data["tenant_id"] = tenant_id
     field_data["name"] = name
     field = FormFields(**field_data)
@@ -420,16 +448,100 @@ async def delete_form_field(
     base_field_configs_crud.delete(db, base_config)
 
 
+def _resolve_schema_flow_id(
+    db: "Session", popup_id: uuid.UUID, sales_flow_id: uuid.UUID | None
+) -> uuid.UUID:
+    """The flow whose form to build: the requested one, or the popup's
+    default flow when none was named.
+
+    An explicit ``sales_flow_id`` must belong to this popup (mirrors
+    ``ticketing_step/router.py::_get_flow_or_404`` — rejects cross-popup
+    flow injection via a client-supplied id). A missing compatibility default
+    makes the legacy, unscoped schema unavailable rather than silently empty.
+    """
+    from app.api.sales_flow.crud import sales_flows_crud
+
+    if sales_flow_id is not None:
+        flow = sales_flows_crud.get(db, sales_flow_id)
+        if not flow or flow.popup_id != popup_id:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Sales flow not found for this popup",
+            )
+        return flow.id
+
+    default_flow = sales_flows_crud.get_default_flow(db, popup_id)
+    if default_flow is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Sales flow not found",
+        )
+    return default_flow.id
+
+
+@router.post(
+    "/copy-to-flow/{target_flow_id}",
+    response_model=CopyFormToFlowResponse,
+)
+async def copy_form_to_flow(
+    target_flow_id: uuid.UUID,
+    body: CopyFormToFlowRequest,
+    db: AdminOrApiKeySession_FormsWrite,
+    _: AdminOrApiKey_FormsWrite,
+) -> CopyFormToFlowResponse:
+    """Copy a form (sections + base field configs + custom fields) into
+    `target_flow_id` (sdd/sales-flows task 14.1 — HTTP half of the CRUD
+    method shipped in slice 6, task 6.3).
+
+    `target_flow_id`'s own popup/tenant are resolved server-side, never
+    trusted from the client. `source_flow_id` (body) names the flow to copy
+    from and must belong to the SAME popup and have the same type as the
+    target. Omitted copies from the popup's compatibility default when one
+    exists.
+    """
+    from app.api.sales_flow.crud import sales_flows_crud
+
+    target_flow = sales_flows_crud.get(db, target_flow_id)
+    if not target_flow:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Sales flow not found",
+        )
+
+    source_flow_id = _resolve_schema_flow_id(
+        db, target_flow.popup_id, body.source_flow_id
+    )
+    source_flow = sales_flows_crud.get(db, source_flow_id)
+    if source_flow is None or source_flow.type != target_flow.type:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Source sales flow must have the same type as the target flow",
+        )
+
+    counts = crud.form_fields_crud.copy_form_to_flow(
+        db,
+        popup_id=target_flow.popup_id,
+        tenant_id=target_flow.tenant_id,
+        target_flow_id=target_flow.id,
+        source_flow_id=source_flow_id,
+    )
+    return CopyFormToFlowResponse(**counts)
+
+
 @router.get("/schema/{popup_id}", response_model=dict[str, Any])
 async def get_application_schema(
     popup_id: uuid.UUID,
     db: AdminOrApiKeySession_FormsRead,
     _: AdminOrApiKey_FormsRead,
+    sales_flow_id: uuid.UUID | None = None,
 ) -> dict[str, Any]:
     """Get the complete application schema for a popup.
 
-    Returns a schema combining base application fields with
-    custom form fields defined for the popup.
+    Returns a schema combining base application fields with custom form
+    fields defined for the resolved sales flow (falling back to the
+    popup-shared tier — see ``build_schema_for_flow``). ``sales_flow_id``
+    resolves an explicit flow (sdd/sales-flows D6 URL scheme, task 9.8);
+    omitted resolves the popup's primary flow, as before.
     """
     from app.api.popup.crud import popups_crud
 
@@ -440,7 +552,8 @@ async def get_application_schema(
             detail="Popup not found",
         )
 
-    return crud.form_fields_crud.build_schema_for_popup(db, popup_id)
+    flow_id = _resolve_schema_flow_id(db, popup_id, sales_flow_id)
+    return crud.form_fields_crud.build_schema_for_flow(db, popup_id, flow_id)
 
 
 @router.get("/portal/schema/{popup_id}", response_model=dict[str, Any])
@@ -449,8 +562,15 @@ async def get_portal_application_schema(
     db: HumanTenantSession,
     _: CurrentHuman,
     accept_language: Annotated[str | None, Header(alias="Accept-Language")] = None,
+    sales_flow_id: uuid.UUID | None = None,
 ) -> dict[str, Any]:
-    """Get the application form schema for a popup (Portal)."""
+    """Get the application form schema for a popup (Portal).
+
+    Resolves the sales flow named by ``sales_flow_id`` (sdd/sales-flows D6
+    URL scheme, task 9.8 — for the FlowPicker, task 9.4), falling back to
+    the popup's primary flow when omitted (falling back further to the
+    popup-shared tier — see ``build_schema_for_flow``).
+    """
     from app.api.popup.crud import popups_crud
 
     popup = popups_crud.get(db, popup_id)
@@ -460,7 +580,8 @@ async def get_portal_application_schema(
             detail="Popup not found",
         )
 
-    schema = crud.form_fields_crud.build_schema_for_popup(db, popup_id)
+    flow_id = _resolve_schema_flow_id(db, popup_id, sales_flow_id)
+    schema = crud.form_fields_crud.build_schema_for_flow(db, popup_id, flow_id)
 
     lang = None
     if accept_language and accept_language != "en":

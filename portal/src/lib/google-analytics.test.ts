@@ -1,9 +1,8 @@
 import { afterEach, describe, expect, it, vi } from "vitest"
-import { trackGAPurchase } from "./google-analytics"
+import { trackGACheckoutStep, trackGAPurchase } from "./google-analytics"
 
 describe("trackGAPurchase", () => {
   afterEach(() => {
-    // biome-ignore lint/performance/noDelete: reset global gtag between tests
     delete (window as Window & { gtag?: unknown }).gtag
     vi.restoreAllMocks()
   })
@@ -35,6 +34,29 @@ describe("trackGAPurchase", () => {
         { item_id: "prod_a", quantity: 2, price: 0 },
         { item_id: "prod_b", quantity: 1, price: 0 },
       ],
+    })
+  })
+
+  it("maps a dynamic checkout step into a GA4 custom event", () => {
+    const gtag = vi.fn()
+    ;(window as Window & { gtag?: unknown }).gtag = gtag
+
+    trackGACheckoutStep({
+      popup: { id: "popup_1", slug: "edge-city", name: "Edge City" },
+      stepNumber: 2,
+      stepId: "buyer",
+      stepType: "buyer",
+      stepName: "Tu información",
+    })
+
+    expect(gtag).toHaveBeenCalledWith("event", "checkout_step", {
+      popup_id: "popup_1",
+      popup_slug: "edge-city",
+      popup_name: "Edge City",
+      step_number: 2,
+      step_id: "buyer",
+      step_type: "buyer",
+      step_name: "Tu información",
     })
   })
 

@@ -1,4 +1,5 @@
 packages:
+  - ai-service
   - backoffice
   - portal
   - e2e

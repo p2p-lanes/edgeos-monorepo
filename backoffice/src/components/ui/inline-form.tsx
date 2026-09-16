@@ -17,10 +17,12 @@ function HeroInput({ className, ...props }: React.ComponentProps<"input">) {
 
 function InlineSection({
   title,
+  description,
   children,
   className,
 }: {
   title?: string
+  description?: string
   children: React.ReactNode
   className?: string
 }) {
@@ -30,6 +32,9 @@ function InlineSection({
         <h3 className="px-1 text-xs font-medium uppercase tracking-wider text-muted-foreground">
           {title}
         </h3>
+      )}
+      {description && (
+        <p className="px-1 pb-1 text-xs text-muted-foreground">{description}</p>
       )}
       <div className="divide-y divide-border">{children}</div>
     </div>

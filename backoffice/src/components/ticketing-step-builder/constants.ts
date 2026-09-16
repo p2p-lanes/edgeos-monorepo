@@ -1,4 +1,5 @@
 import {
+  BedDouble,
   CheckCircle,
   CheckSquare,
   FileText,
@@ -35,6 +36,17 @@ export interface TemplateDefinition {
    *  template), a title-derived type like "your-information" would leave the
    *  step configured and invisible. */
   stepType?: string
+  /**
+   * The key of the template that replaces this one.
+   *
+   * Deprecating rather than deleting, because a template is not just an
+   * entry in this list: it is a column value on rows that already exist.
+   * Tenants are still selling through steps on the old template and the
+   * checkout still renders them, so removing it here would leave those
+   * steps pointing at a template the backoffice cannot name or configure.
+   * What this does is stop it being chosen again.
+   */
+  deprecatedBy?: string
 }
 
 export const TEMPLATE_DEFINITIONS: TemplateDefinition[] = [
@@ -63,10 +75,22 @@ export const TEMPLATE_DEFINITIONS: TemplateDefinition[] = [
     icon: Heart,
   },
   {
+    key: "accommodation-booking",
+    label: "Accommodation",
+    description:
+      "Rooms with real availability and nightly pricing. Inventory is managed in Accommodations — this step only picks what is offered here",
+    icon: BedDouble,
+    stepType: "housing",
+  },
+  {
     key: "housing-date",
-    label: "Housing",
-    description: "Property cards with date range",
+    label: "Housing (legacy)",
+    description: "Property cards with date range, priced as plain products",
     icon: HomeIcon,
+    // Accommodation does the same job against real inventory: it knows what
+    // is free on the chosen nights, quotes the stay on the server instead of
+    // multiplying a product price, and records who is staying.
+    deprecatedBy: "accommodation-booking",
   },
   {
     key: "merch-image",
@@ -117,6 +141,9 @@ export const TEMPLATE_DEFINITIONS: TemplateDefinition[] = [
 /** Templates that don't display products and therefore don't need a product category. */
 export const CONTENT_ONLY_TEMPLATES = new Set([
   "hero",
+  // Reads the accommodation inventory, not products: a product category
+  // would be meaningless (and the shadow products are hidden anyway).
+  "accommodation-booking",
   "youtube-video",
   "image-gallery",
   "faqs",

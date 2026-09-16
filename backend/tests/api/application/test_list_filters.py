@@ -24,6 +24,7 @@ from app.api.invite.models import Invites
 from app.api.popup.models import Popups
 from app.api.tenant.models import Tenants
 from app.api.user.models import Users
+from tests._flow_helpers import application_flow_id, invite_flow_id
 from tests.api.application_review.test_pending_reviews import (
     _auth,
     _make_admin,
@@ -67,6 +68,7 @@ def _make_application(
     db.flush()
 
     application = Applications(
+        sales_flow_id=application_flow_id(db, popup.id),
         tenant_id=tenant.id,
         popup_id=popup.id,
         human_id=human.id,
@@ -147,15 +149,18 @@ class TestApplicationListFilters:
         )
         db.add(referrer)
         db.flush()
+        flow_id = invite_flow_id(db, popup.id)
         invite = Invites(
             tenant_id=tenant_a.id,
             popup_id=popup.id,
+            sales_flow_id=flow_id,
             token=f"filter-invite-{uuid.uuid4().hex[:8]}",
             created_by=admin.id,
         )
         referral = Invites(
             tenant_id=tenant_a.id,
             popup_id=popup.id,
+            sales_flow_id=flow_id,
             token=f"filter-referral-{uuid.uuid4().hex[:8]}",
             referrer_human_id=referrer.id,
             auto_approve=True,

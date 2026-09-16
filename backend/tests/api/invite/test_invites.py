@@ -27,6 +27,10 @@ from app.api.popup.schemas import PopupStatus
 from app.api.tenant.models import Tenants
 from app.api.user.models import Users
 from app.core.security import create_access_token
+from tests._flow_helpers import (
+    invite_flow_id,
+    seed_default_steps,
+)
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -62,6 +66,7 @@ def _make_popup(
     db.add(popup)
     db.commit()
     db.refresh(popup)
+    seed_default_steps(db, popup)
     return popup
 
 
@@ -94,6 +99,7 @@ def _make_invite(
 ) -> Invites:
     invite_token = token or f"tok-{uuid.uuid4().hex[:16]}"
     inv = Invites(
+        sales_flow_id=invite_flow_id(db, popup.id),
         tenant_id=popup.tenant_id,
         popup_id=popup.id,
         token=invite_token,

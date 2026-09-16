@@ -84,18 +84,11 @@ export function ApprovalStrategyForm({
   const queryClient = useQueryClient()
   const { showSuccessToast, showErrorToast } = useCustomToast()
 
-  const {
-    data: strategy,
-    isLoading,
-    error,
-  } = useQuery({
+  const { data: strategy, isLoading } = useQuery({
     queryKey: ["approval-strategy", popupId],
     queryFn: () => ApprovalStrategiesService.getApprovalStrategy({ popupId }),
     retry: false,
   })
-
-  // Check if no strategy exists (404 error)
-  const hasNoStrategy = !strategy && (error as ApiError)?.status === 404
 
   const saveMutation = useMutation({
     mutationFn: (data: ApprovalStrategyCreate) =>
@@ -112,11 +105,11 @@ export function ApprovalStrategyForm({
     onError: (err) => createErrorHandler(showErrorToast)(err as ApiError),
   })
 
-  const deleteMutation = useMutation({
+  const disableMutation = useMutation({
     mutationFn: () =>
       ApprovalStrategiesService.deleteApprovalStrategy({ popupId }),
     onSuccess: () => {
-      showSuccessToast("Approval strategy removed (auto-accept enabled)")
+      showSuccessToast("Application review disabled")
       queryClient.invalidateQueries({
         queryKey: ["approval-strategy", popupId],
       })
@@ -139,38 +132,16 @@ export function ApprovalStrategyForm({
     )
   }
 
-  // No strategy configured - show simple state with option to enable
-  if (hasNoStrategy) {
+  if (!strategy) {
     return (
       <SectionShell
         variant={variant}
         title="Application Review"
-        description="Configure how applications are reviewed before acceptance"
+        description="Approval strategy could not be loaded"
       >
-        <div className="space-y-4">
-          <Alert>
-            <Info className="h-4 w-4" />
-            <AlertDescription>
-              Applications are currently <strong>auto-accepted</strong> when
-              submitted. Configure a review strategy below to require manual
-              approval.
-            </AlertDescription>
-          </Alert>
-          {!readOnly && (
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() =>
-                saveMutation.mutate({ strategy_type: "any_reviewer" })
-              }
-              disabled={saveMutation.isPending}
-            >
-              {saveMutation.isPending
-                ? "Enabling..."
-                : "Enable Application Review"}
-            </Button>
-          )}
-        </div>
+        <p className="text-sm text-muted-foreground">
+          Refresh the page and try again.
+        </p>
       </SectionShell>
     )
   }
@@ -178,13 +149,14 @@ export function ApprovalStrategyForm({
   // Strategy exists - render the form with loaded data
   return (
     <ApprovalStrategyFormInner
+      key={`${strategy.id}:${strategy.updated_at}:${strategy.strategy_type}`}
       variant={variant}
       strategy={strategy!}
       readOnly={readOnly}
       onSave={(data) => saveMutation.mutate(data)}
-      onDelete={() => deleteMutation.mutate()}
+      onDisable={() => disableMutation.mutate()}
       isSaving={saveMutation.isPending}
-      isDeleting={deleteMutation.isPending}
+      isDisabling={disableMutation.isPending}
     />
   )
 }
@@ -195,17 +167,17 @@ function ApprovalStrategyFormInner({
   strategy,
   readOnly,
   onSave,
-  onDelete,
+  onDisable,
   isSaving,
-  isDeleting,
+  isDisabling,
 }: {
   variant?: "card" | "inline"
   strategy: ApprovalStrategyPublic
   readOnly: boolean
   onSave: (data: ApprovalStrategyCreate) => void
-  onDelete: () => void
+  onDisable: () => void
   isSaving: boolean
-  isDeleting: boolean
+  isDisabling: boolean
 }) {
   const form = useForm({
     defaultValues: {
@@ -240,14 +212,14 @@ function ApprovalStrategyFormInner({
       title="Application Review"
       description="Configure how applications are reviewed and accepted"
       action={
-        !readOnly ? (
+        !readOnly && strategyType !== "auto_accept" ? (
           <Button
             type="button"
             variant="ghost"
             size="sm"
             className="text-destructive hover:text-destructive"
-            onClick={onDelete}
-            disabled={isDeleting}
+            onClick={onDisable}
+            disabled={isDisabling}
           >
             <Trash2 className="h-4 w-4 mr-1" />
             Disable Review

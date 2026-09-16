@@ -31,6 +31,7 @@ from app.api.payment.schemas import PaymentStatus, PaymentType
 from app.api.popup.models import Popups
 from app.api.shared.enums import SaleType
 from app.api.tenant.models import Tenants
+from tests._flow_helpers import application_flow_id
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -71,6 +72,7 @@ def _make_pending_fee_application(
     db: Session, tenant: Tenants, popup: Popups, human: Humans
 ) -> Applications:
     application = Applications(
+        sales_flow_id=application_flow_id(db, popup.id),
         tenant_id=tenant.id,
         popup_id=popup.id,
         human_id=human.id,

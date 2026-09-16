@@ -26,6 +26,7 @@ class EmailLogCRUD:
         to_email: str,
         status: EmailLogStatus | str,
         popup_id: uuid.UUID | None = None,
+        sales_flow_id: uuid.UUID | None = None,
         application_id: uuid.UUID | None = None,
         payment_id: uuid.UUID | None = None,
         human_id: uuid.UUID | None = None,
@@ -36,6 +37,7 @@ class EmailLogCRUD:
         log = EmailLogs(
             tenant_id=tenant_id,
             popup_id=popup_id,
+            sales_flow_id=sales_flow_id,
             template_type=str(template_type),
             to_email=to_email,
             application_id=application_id,
@@ -55,6 +57,8 @@ class EmailLogCRUD:
         *,
         template_type: str,
         popup_id: uuid.UUID | None = None,
+        sales_flow_id: uuid.UUID | None = None,
+        flow_is_default: bool = False,
         application_id: uuid.UUID | None = None,
         payment_id: uuid.UUID | None = None,
         to_email: str | None = None,
@@ -64,7 +68,15 @@ class EmailLogCRUD:
         Counts only rows with status ``sent`` for the given template type,
         scoped by whichever entity key is provided (plus ``popup_id`` so an
         email-keyed count never conflates two popups). Used to enforce the
-        per-popup cadence (repeat every M days) and cap (max K sends).
+        per-popup-flow cadence (repeat every M days) and cap (max K sends).
+
+        ``sales_flow_id`` partitions history per flow (sdd/sales-flows
+        slice 10). When ``flow_is_default`` is also true, a row with
+        ``sales_flow_id IS NULL`` counts too — migration-hazard mitigation:
+        the same-slice migration backfills every reminder-type row it can
+        reach, but any row it legitimately can't (its popup had no default
+        flow at backfill time) must still count against that popup's
+        default-flow dispatch instead of silently vanishing from history.
         """
         conditions = [
             EmailLogs.template_type == str(template_type),
@@ -72,6 +84,16 @@ class EmailLogCRUD:
         ]
         if popup_id is not None:
             conditions.append(EmailLogs.popup_id == popup_id)
+        if sales_flow_id is not None:
+            if flow_is_default:
+                conditions.append(
+                    or_(
+                        EmailLogs.sales_flow_id == sales_flow_id,
+                        EmailLogs.sales_flow_id.is_(None),
+                    )
+                )
+            else:
+                conditions.append(EmailLogs.sales_flow_id == sales_flow_id)
         if application_id is not None:
             conditions.append(EmailLogs.application_id == application_id)
         if payment_id is not None:

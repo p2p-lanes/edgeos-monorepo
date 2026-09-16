@@ -1,6 +1,6 @@
 import uuid
 
-from fastapi import APIRouter, status
+from fastapi import APIRouter, HTTPException, status
 
 from app.api.cart.crud import carts_crud
 from app.api.cart.schemas import (
@@ -9,7 +9,6 @@ from app.api.cart.schemas import (
     CartPaymentInfo,
     CartPopupInfo,
     CartPublic,
-    CartState,
     CartUpdate,
 )
 from app.api.shared.response import ListModel, PaginationLimit, PaginationSkip, Paging
@@ -21,6 +20,21 @@ from app.core.dependencies.users import (
 )
 
 router = APIRouter(prefix="/carts", tags=["carts"])
+
+
+def _resolve_cart_flow_id(
+    db: HumanTenantSession, popup_id: uuid.UUID, sales_flow_id: uuid.UUID | None
+) -> uuid.UUID:
+    from app.api.sales_flow.crud import sales_flows_crud
+
+    flow = (
+        sales_flows_crud.get(db, sales_flow_id)
+        if sales_flow_id is not None
+        else sales_flows_crud.get_default_flow(db, popup_id)
+    )
+    if flow is None or flow.popup_id != popup_id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Not found")
+    return flow.id
 
 
 @router.get("", response_model=ListModel[AbandonedCartPublic])
@@ -77,7 +91,7 @@ async def list_abandoned_carts(
             )
         payments = list(db.exec(payment_stmt).all())
 
-        items = CartState.model_validate(cart.items) if cart.items else CartState()
+        items = carts_crud.restore_items(db, cart)
 
         human_info = (
             CartHumanInfo(
@@ -127,18 +141,21 @@ async def get_my_cart(
     popup_id: uuid.UUID,
     db: HumanTenantSession,
     current_human: CurrentHuman,
+    sales_flow_id: uuid.UUID | None = None,
 ) -> CartPublic | None:
     """Get cart for current human and popup (Portal). Returns null if none exists."""
-    cart = carts_crud.find_by_human_popup(
+    flow_id = _resolve_cart_flow_id(db, popup_id, sales_flow_id)
+    cart = carts_crud.find_by_human_popup_flow(
         db,
         human_id=current_human.id,
         popup_id=popup_id,
+        sales_flow_id=flow_id,
     )
 
     if not cart:
         return None
 
-    items = CartState.model_validate(cart.items) if cart.items else CartState()
+    items = carts_crud.restore_items(db, cart)
 
     return CartPublic(
         id=cart.id,
@@ -156,22 +173,25 @@ async def update_my_cart(
     cart_in: CartUpdate,
     db: HumanTenantSession,
     current_human: CurrentHuman,
+    sales_flow_id: uuid.UUID | None = None,
 ) -> CartPublic:
     """Replace cart items for current human and popup (Portal)."""
     from app.api.popup.crud import popups_crud
     from app.api.popup.guards import ensure_popup_writable
 
     ensure_popup_writable(popups_crud.get(db, popup_id))
+    flow_id = _resolve_cart_flow_id(db, popup_id, sales_flow_id)
 
     cart = carts_crud.get_or_create(
         db,
         human_id=current_human.id,
         popup_id=popup_id,
         tenant_id=current_human.tenant_id,
+        sales_flow_id=flow_id,
     )
 
     cart = carts_crud.update_items(db, cart, cart_in.items)
-    items = CartState.model_validate(cart.items) if cart.items else CartState()
+    items = carts_crud.restore_items(db, cart)
 
     return CartPublic(
         id=cart.id,
@@ -188,16 +208,19 @@ async def delete_my_cart(
     popup_id: uuid.UUID,
     db: HumanTenantSession,
     current_human: CurrentHuman,
+    sales_flow_id: uuid.UUID | None = None,
 ) -> None:
     """Clear cart for current human and popup (Portal)."""
     from app.api.popup.crud import popups_crud
     from app.api.popup.guards import ensure_popup_writable
 
     ensure_popup_writable(popups_crud.get(db, popup_id))
+    flow_id = _resolve_cart_flow_id(db, popup_id, sales_flow_id)
 
     carts_crud.delete_by_human_popup(
         db,
         human_id=current_human.id,
         popup_id=popup_id,
+        sales_flow_id=flow_id,
     )
     db.commit()

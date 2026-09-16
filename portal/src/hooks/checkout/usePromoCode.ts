@@ -5,6 +5,7 @@ import {
   useRef,
   useState,
 } from "react"
+import { useTranslation } from "react-i18next"
 import { toast } from "sonner"
 import { CouponsService } from "@/client"
 import type { CartState } from "@/hooks/useCartApi"
@@ -12,12 +13,16 @@ import type { DiscountProps } from "@/types/discounts"
 
 interface UsePromoCodeParams {
   cityId: string | undefined
+  salesFlowId?: string | null
   discountAppliedValue: number
   setDiscount: (discount: DiscountProps) => void
   resetDiscount: () => void
   savedCart: CartState | null | undefined
   hasRestoredCheckoutRef: MutableRefObject<boolean>
   validatePromoCodeOverride?: (code: string) => Promise<number | null>
+  /** Entry-link coupon. Validated once per flow, after cart restore/release,
+   *  instead of the saved cart's code. Buyers can still remove or replace it. */
+  initialPromoCode?: string | null
   /** When true, allows re-validation of a restored promo code to proceed.
    *  Used to gate open-cart promo re-validation until the release-on-mount
    *  call settles so the coupon field never flashes "Invalid" before the
@@ -27,24 +32,34 @@ interface UsePromoCodeParams {
 
 export function usePromoCode({
   cityId,
+  salesFlowId = null,
   discountAppliedValue,
   setDiscount,
   resetDiscount,
   savedCart,
   hasRestoredCheckoutRef,
   validatePromoCodeOverride,
+  initialPromoCode = null,
   releaseSettled = true,
 }: UsePromoCodeParams) {
+  const { t } = useTranslation()
   const [promoCode, setPromoCode] = useState("")
   const [promoCodeValid, setPromoCodeValid] = useState(false)
   const [promoCodeDiscount, setPromoCodeDiscount] = useState(0)
 
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const promoScope = `${cityId ?? ""}:${salesFlowId ?? ""}`
+  const activePromoScopeRef = useRef(promoScope)
+  activePromoScopeRef.current = promoScope
 
   const applyPromoCode = useCallback(
-    async (code: string): Promise<boolean> => {
+    async (
+      code: string,
+      { silent = false }: { silent?: boolean } = {},
+    ): Promise<boolean> => {
       if (!cityId && !validatePromoCodeOverride) return false
+      const validationScope = promoScope
 
       setIsLoading(true)
       setError(null)
@@ -55,6 +70,7 @@ export function usePromoCode({
           : await CouponsService.validateCoupon({
               requestBody: {
                 popup_id: cityId!,
+                sales_flow_id: salesFlowId ?? undefined,
                 code: code.toUpperCase(),
               },
             })
@@ -64,10 +80,12 @@ export function usePromoCode({
             : ((rawResponse as { discount_value?: number })?.discount_value ??
               0)
 
+        if (activePromoScopeRef.current !== validationScope) return false
+
         // A 0% (or missing) discount is meaningless — surfacing it as a valid
         // applied code confuses users ("Code applied!" + unchanged total).
         if (discountValue <= 0) {
-          setError("Invalid promo code")
+          if (!silent) setError(t("checkout.errors.confirm_coupon_invalid"))
           return false
         }
 
@@ -89,10 +107,20 @@ export function usePromoCode({
       } catch {
         return false
       } finally {
-        setIsLoading(false)
+        if (activePromoScopeRef.current === validationScope) {
+          setIsLoading(false)
+        }
       }
     },
-    [cityId, discountAppliedValue, setDiscount, validatePromoCodeOverride],
+    [
+      cityId,
+      discountAppliedValue,
+      setDiscount,
+      validatePromoCodeOverride,
+      salesFlowId,
+      t,
+      promoScope,
+    ],
   )
 
   const clearPromoCode = useCallback(() => {
@@ -106,7 +134,23 @@ export function usePromoCode({
   // Gated on releaseSettled to prevent a "Invalid promo code" flash when the
   // backend coupon hold is not yet freed (the circularity fix).
   const hasRevalidatedPromoRef = useRef(false)
+  const previousPromoScopeRef = useRef(promoScope)
+  const promoScopeChanged = previousPromoScopeRef.current !== promoScope
   useEffect(() => {
+    if (!promoScopeChanged) return
+    previousPromoScopeRef.current = promoScope
+    hasRevalidatedPromoRef.current = false
+    setPromoCode("")
+    setPromoCodeValid(false)
+    setPromoCodeDiscount(0)
+    setIsLoading(false)
+    setError(null)
+    resetDiscount()
+  }, [promoScope, promoScopeChanged, resetDiscount])
+  useEffect(() => {
+    // The scope-reset effect runs first. Re-validation starts on the following
+    // render so an old flow's promo code can never be validated for the new one.
+    if (promoScopeChanged) return
     if (hasRevalidatedPromoRef.current || !hasRestoredCheckoutRef.current)
       return
     // Gate: wait for the pending-release call to settle before re-validating.
@@ -121,10 +165,23 @@ export function usePromoCode({
       return
     }
 
+    const entryCode = initialPromoCode?.trim()
+    if (entryCode) {
+      hasRevalidatedPromoRef.current = true
+      // An explicit entry-link code wins over a restored one. Clear the
+      // restored state first so a rejected URL code never appears applied.
+      // URL coupons are best-effort: invalid, expired, disabled, or failed
+      // validation must leave a normal checkout, without an error banner.
+      clearPromoCode()
+      void applyPromoCode(entryCode, { silent: true })
+      return
+    }
+
     // Open-cart path: savedCart is null (cartPersistenceEnabled=false) but
     // hydrateFromSnapshot has already called setPromoCode with the restored code.
     // Re-validate via the override (uses public slug-based endpoint, no cityId needed).
     if (validatePromoCodeOverride && promoCode) {
+      const validationScope = promoScope
       hasRevalidatedPromoRef.current = true
       // Note: hasRevalidatedPromoRef is set before the async call so that a
       // concurrent savedCart write cannot trigger a second re-validation attempt.
@@ -133,6 +190,7 @@ export function usePromoCode({
       // A retry loop would risk double-applying a single-use coupon hold.
       validatePromoCodeOverride(promoCode)
         .then((discountValue) => {
+          if (activePromoScopeRef.current !== validationScope) return
           const value = discountValue ?? 0
           if (value <= 0) {
             // P3 fix: clear silently AND reset all promo state so the UI
@@ -153,6 +211,7 @@ export function usePromoCode({
           })
         })
         .catch(() => {
+          if (activePromoScopeRef.current !== validationScope) return
           // P3 fix: on transport error, clear all promo state (same as expired
           // path) so the UI stays consistent — no dangling visible code without
           // a discount applied to it. hasRevalidatedPromoRef stays true:
@@ -170,17 +229,20 @@ export function usePromoCode({
     if (!savedCart?.promo_code || !cityId) return
 
     hasRevalidatedPromoRef.current = true
+    const validationScope = promoScope
 
     CouponsService.validateCoupon({
       requestBody: {
         popup_id: String(cityId),
+        sales_flow_id: salesFlowId ?? undefined,
         code: savedCart.promo_code,
       },
     })
       .then((result) => {
+        if (activePromoScopeRef.current !== validationScope) return
         const discountValue = result.discount_value ?? 0
         if (discountValue <= 0) {
-          toast.info("Your promo code is no longer valid")
+          toast.info(t("checkout.cart.promo_code_expired"))
           return
         }
         setPromoCode(savedCart.promo_code!)
@@ -194,11 +256,16 @@ export function usePromoCode({
         })
       })
       .catch(() => {
-        toast.info("Your promo code is no longer valid")
+        if (activePromoScopeRef.current !== validationScope) return
+        toast.info(t("checkout.cart.promo_code_expired"))
       })
   }, [
     savedCart,
     cityId,
+    salesFlowId,
+    initialPromoCode,
+    applyPromoCode,
+    clearPromoCode,
     promoCode,
     setDiscount,
     hasRestoredCheckoutRef.current,
@@ -206,6 +273,9 @@ export function usePromoCode({
     promoCodeValid,
     releaseSettled,
     resetDiscount,
+    promoScopeChanged,
+    promoScope,
+    t,
   ])
 
   return {

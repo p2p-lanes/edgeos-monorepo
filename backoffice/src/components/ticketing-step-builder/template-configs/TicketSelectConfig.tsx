@@ -128,6 +128,7 @@ export function TicketSelectConfig({
   config,
   onChange,
   popupId,
+  salesFlowId,
   productCategory,
 }: TemplateConfigProps) {
   const parsed = parseConfigSections(config)
@@ -145,10 +146,12 @@ export function TicketSelectConfig({
   })
 
   const { data: categoriesData } = useQuery({
-    queryKey: ["attendee-categories", popupId],
+    queryKey: ["sales-flow-attendee-categories", salesFlowId],
     queryFn: () =>
-      AttendeeCategoriesService.listAttendeeCategories({ popupId }),
-    enabled: !!popupId,
+      AttendeeCategoriesService.listSalesFlowAttendeeCategories({
+        flowId: salesFlowId,
+      }),
+    enabled: !!salesFlowId,
     staleTime: 0,
     refetchOnMount: "always",
   })

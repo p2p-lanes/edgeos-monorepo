@@ -22,6 +22,7 @@ from app.api.payment.models import PaymentProducts, Payments
 from app.api.popup.models import Popups
 from app.api.product.models import Products
 from app.api.tenant.models import Tenants
+from tests._flow_helpers import application_flow_id
 
 
 def _auth(token: str) -> dict[str, str]:
@@ -47,6 +48,7 @@ def _seed_history(db: Session, tenant: Tenants, popup: Popups, human: Humans) ->
     products, and one attendee — one of each timeline kind, with controlled times.
     """
     application = Applications(
+        sales_flow_id=application_flow_id(db, popup.id),
         id=uuid.uuid4(),
         tenant_id=tenant.id,
         popup_id=popup.id,

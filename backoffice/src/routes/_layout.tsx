@@ -19,6 +19,7 @@ import {
   TenantsService,
   UsersService,
 } from "@/client"
+import { AIAssistant } from "@/components/ai/AIAssistant"
 import { CommandPalette } from "@/components/Common/CommandPalette"
 import { ShortcutsDialog } from "@/components/Common/ShortcutsDialog"
 import { TourOverlay } from "@/components/onboarding/TourOverlay"
@@ -220,6 +221,7 @@ function Breadcrumbs() {
     <nav className="flex items-center gap-1 text-sm">
       <Link
         to="/"
+        aria-label="Dashboard"
         className="text-muted-foreground hover:text-foreground transition-colors"
       >
         <Home className="h-4 w-4" />
@@ -316,6 +318,7 @@ function ShortcutsHint() {
 
 function Layout() {
   const [shortcutsOpen, setShortcutsOpen] = useState(false)
+  const { isOperatorOrAbove } = useAuth()
 
   const toggleShortcutsDialog = () => {
     setShortcutsOpen((prev) => !prev)
@@ -334,16 +337,17 @@ function Layout() {
           <SidebarTrigger className="-ml-1 text-muted-foreground" />
           <Separator orientation="vertical" className="h-4" />
           <Breadcrumbs />
-          <div className="ml-auto flex items-center gap-4">
+          <div className="ml-auto flex items-center gap-3">
             <ShortcutsHint />
             <WorkspaceIndicator />
+            {isOperatorOrAbove && <AIAssistant />}
           </div>
         </header>
-        <main className="flex-1 p-6 md:p-8">
+        <div className="flex-1 p-6 md:p-8">
           <div className="mx-auto max-w-7xl">
             <Outlet />
           </div>
-        </main>
+        </div>
       </SidebarInset>
     </SidebarProvider>
   )

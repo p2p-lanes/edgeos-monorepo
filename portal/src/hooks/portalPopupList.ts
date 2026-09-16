@@ -24,3 +24,14 @@ export function visiblePortalPopups(popups: PopupPublic[]): PopupPublic[] {
       return a.name.localeCompare(b.name)
     })
 }
+
+export function visiblePortalFallback(
+  popups: PopupPublic[],
+  lastValidPopup: PopupPublic | null,
+): PopupPublic | null {
+  if (lastValidPopup) {
+    const stillVisible = popups.find((popup) => popup.id === lastValidPopup.id)
+    if (stillVisible) return stillVisible
+  }
+  return popups[0] ?? null
+}

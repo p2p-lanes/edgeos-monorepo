@@ -149,4 +149,36 @@ describe("useCheckoutSteps", () => {
     // housing and merch filtered because resolver entries are empty
     expect(result.current.availableSteps).toEqual(["passes", "confirm"])
   })
+
+  it("keeps accommodation booking visible without catalog products", () => {
+    const accommodation = makeStep({
+      id: "stay",
+      step_type: "accommodation",
+      order: 0,
+      template: "accommodation-booking",
+    })
+    const configuredSteps = [
+      accommodation,
+      makeStep({ step_type: "confirm", order: 1 }),
+    ]
+    const productsByStepId = new Map<string, ProductsPass[]>([
+      ["stay", []],
+      ["confirm", []],
+    ])
+
+    const { result } = renderHook(() =>
+      useCheckoutSteps({
+        initialStep: "accommodation",
+        configuredSteps,
+        productsByStepId,
+        selectedPassesCount: 0,
+        dynamicItemsCount: 0,
+        productIndependentItemsCount: 1,
+        isEditing: false,
+      }),
+    )
+
+    expect(result.current.availableSteps).toEqual(["accommodation", "confirm"])
+    expect(result.current.canProceedToStep("confirm")).toBe(true)
+  })
 })

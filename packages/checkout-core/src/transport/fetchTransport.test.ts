@@ -15,6 +15,7 @@ describe("createFetchTransport", () => {
     const t = createFetchTransport({
       baseUrl: "https://api.example.com/api/v1/",
       slug: "demo",
+      flowSlug: "checkout",
       publishableKey: "pk_live_abc",
       fetch: fetchMock as unknown as typeof fetch,
     })
@@ -35,10 +36,11 @@ describe("createFetchTransport", () => {
     const t = createFetchTransport({
       baseUrl: "https://x/api/v1",
       slug: "d",
+      flowSlug: "checkout",
       fetch: fetchMock as unknown as typeof fetch,
     })
 
-    await t.request("GET", "/checkout/d/runtime")
+    await t.request("GET", "/checkout/d/checkout/runtime")
 
     const [, init] = fetchMock.mock.calls[0]
     expect(init.headers["X-EdgeOS-Publishable-Key"]).toBeUndefined()
@@ -46,16 +48,23 @@ describe("createFetchTransport", () => {
   })
 
   it("throws CheckoutApiError with status + detail on non-2xx", async () => {
-    const fetchMock = vi.fn().mockResolvedValue(errResponse(403, { detail: "nope" }))
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue(errResponse(403, { detail: "nope" }))
     const t = createFetchTransport({
       baseUrl: "https://x/api/v1",
       slug: "d",
+      flowSlug: "checkout",
       fetch: fetchMock as unknown as typeof fetch,
     })
 
-    await expect(t.request("GET", "/x")).rejects.toBeInstanceOf(CheckoutApiError)
+    await expect(t.request("GET", "/x")).rejects.toBeInstanceOf(
+      CheckoutApiError,
+    )
 
-    const err = (await t.request("GET", "/x").catch((e) => e)) as CheckoutApiError
+    const err = (await t
+      .request("GET", "/x")
+      .catch((e) => e)) as CheckoutApiError
     expect(err.status).toBe(403)
     expect(err.detail).toEqual({ detail: "nope" })
   })
@@ -71,6 +80,7 @@ describe("createFetchTransport", () => {
     const t = createFetchTransport({
       baseUrl: "https://x/api/v1",
       slug: "d",
+      flowSlug: "checkout",
       fetch: fetchMock as unknown as typeof fetch,
     })
 

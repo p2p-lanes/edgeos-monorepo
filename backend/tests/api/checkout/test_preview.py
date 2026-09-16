@@ -10,10 +10,12 @@ from sqlmodel import Session
 
 from app.api.tenant.models import Tenants
 from tests.api.checkout.test_purchase import (
+    _default_flow,
     _make_field,
     _make_popup,
     _make_product,
     _make_section,
+    _recipient,
 )
 
 
@@ -44,7 +46,9 @@ def test_preview_open_ticketing_computes_breakdown(
     obj = CheckoutPreviewRequest(
         products=[{"product_id": str(product.id), "quantity": 2}]
     )
-    result = payments_crud.preview_open_ticketing(db, obj, popup)
+    result = payments_crud.preview_open_ticketing(
+        db, obj, popup, _default_flow(db, popup)
+    )
 
     assert result.total == Decimal("240.00")
     assert result.post_discount_amount == Decimal("240.00")
@@ -63,7 +67,7 @@ def test_preview_route_happy_path(
     db.commit()
 
     response = client.post(
-        f"/api/v1/checkout/{popup.slug}/preview",
+        f"/api/v1/checkout/{popup.slug}/checkout/preview",
         json={"products": [{"product_id": str(product.id), "quantity": 3}]},
         headers={"X-Tenant-Id": str(tenant_a.id)},
     )
@@ -87,7 +91,7 @@ def test_preview_total_matches_purchase_amount(
     db.commit()
 
     preview = client.post(
-        f"/api/v1/checkout/{popup.slug}/preview",
+        f"/api/v1/checkout/{popup.slug}/checkout/preview",
         json={"products": [{"product_id": str(product.id), "quantity": 2}]},
         headers={"X-Tenant-Id": str(tenant_a.id)},
     )
@@ -101,9 +105,16 @@ def test_preview_total_matches_purchase_amount(
             is_installment_plan=False,
         )
         purchase = client.post(
-            f"/api/v1/checkout/{popup.slug}/purchase",
+            f"/api/v1/checkout/{popup.slug}/checkout/purchase",
             json={
-                "products": [{"product_id": str(product.id), "quantity": 2}],
+                "products": [
+                    {
+                        "product_id": str(product.id),
+                        "quantity": 2,
+                        "recipient_key": "buyer",
+                    }
+                ],
+                "recipients": [_recipient(product)],
                 "buyer": {
                     "email": "parity@test.com",
                     "first_name": "P",

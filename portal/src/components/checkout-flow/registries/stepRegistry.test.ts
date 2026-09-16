@@ -9,6 +9,7 @@ function makeStep(
     id: overrides.id ?? overrides.step_type,
     popup_id: "popup-id",
     tenant_id: "tenant-id",
+    sales_flow_id: "sales-flow-id",
     step_type: overrides.step_type,
     title: overrides.title ?? overrides.step_type,
     description: overrides.description ?? null,

@@ -14,6 +14,7 @@ function step(
     id,
     tenant_id: "tenant-1",
     popup_id: "popup-1",
+    sales_flow_id: "flow-1",
     step_type: "tickets",
     title: `Step ${id}`,
     order: 0,

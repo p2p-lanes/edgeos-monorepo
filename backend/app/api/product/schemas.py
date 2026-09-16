@@ -99,6 +99,11 @@ class ProductBase(SQLModel):
         default=False,
         sa_column=Column(Boolean, nullable=False, server_default="false"),
     )
+    # Marks a product owned by another module rather than by an admin.
+    # Currently only "accommodation": the shadow product backing a room type,
+    # kept in sync by app/api/accommodation/crud.py. Hidden from the product
+    # list and not editable by hand. NULL = an ordinary, admin-owned product.
+    managed_by: str | None = Field(default=None, nullable=True, index=True)
 
 
 class ProductPublic(ProductBase):
@@ -138,7 +143,7 @@ class ProductCreate(BaseModel):
     requires_check_in: bool = False
     discountable: bool = True
 
-    model_config = ConfigDict(str_strip_whitespace=True)
+    model_config = ConfigDict(str_strip_whitespace=True, extra="forbid")
 
     @model_validator(mode="after")
     def validate_patreon_price(self) -> "ProductCreate":
@@ -219,6 +224,8 @@ class ProductUpdate(BaseModel):
     requires_check_in: bool | None = None
     discountable: bool | None = None
 
+    model_config = ConfigDict(str_strip_whitespace=True, extra="forbid")
+
     @model_validator(mode="after")
     def validate_patreon_price(self) -> "ProductUpdate":
         """Reject updates that set category=patreon with a nonzero price."""
@@ -285,7 +292,7 @@ class ProductBatchItem(BaseModel):
     requires_check_in: bool = False
     discountable: bool = True
 
-    model_config = ConfigDict(str_strip_whitespace=True)
+    model_config = ConfigDict(str_strip_whitespace=True, extra="forbid")
 
     @model_validator(mode="after")
     def validate_ticket_fields(self) -> "ProductBatchItem":

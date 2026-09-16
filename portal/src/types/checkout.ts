@@ -1,3 +1,5 @@
+import type { PaymentRecipientRequest } from "@/client"
+import type { AccommodationGuestForm } from "@/lib/accommodationForm"
 import type { AttendeePassState } from "./Attendee"
 import type { ProductsPass } from "./Products"
 
@@ -8,6 +10,7 @@ export type CheckoutStep =
   | "tickets"
   | "buyer"
   | "housing"
+  | "accommodation"
   | "merch"
   | "patron"
   | "confirm"
@@ -65,9 +68,84 @@ export interface SelectedPassItem {
   product: ProductsPass
   attendeeId: string
   attendee: AttendeePassState
+  /** Stable draft identity. Absent only while restoring legacy attendee lines. */
+  recipient?: CheckoutRecipientDraft
   quantity: number
   price: number
   originalPrice?: number
+}
+
+/**
+ * Portal recipient state reuses the generated payment snapshot contract while
+ * remaining attached to the pass-selection model until payment submission.
+ */
+export type CheckoutRecipientDraft = PaymentRecipientRequest
+
+export type CheckoutRecipientPassState = AttendeePassState & {
+  recipient?: CheckoutRecipientDraft
+}
+
+export function canSelectRecipientProducts(
+  attendee: CheckoutRecipientPassState,
+): boolean {
+  return !(
+    attendee.recipient?.existing_attendee_id && attendee.category_id == null
+  )
+}
+
+interface RecipientDraftOverrides {
+  name?: string
+  email?: string | null
+  profileSnapshot?: Record<string, unknown>
+}
+
+/**
+ * Projects an attendee-shaped UI recipient into a stable cart recipient.
+ * Embedded draft identity always wins, so reloads never generate a new key.
+ */
+export function buildCheckoutRecipientDraft(
+  attendee: CheckoutRecipientPassState,
+  overrides: RecipientDraftOverrides = {},
+): CheckoutRecipientDraft {
+  const embedded = attendee.recipient
+  // A persisted attendee selected as a companion must stay attendee-owned even
+  // when that row happens to be linked to a Human. Re-inferring human_id here
+  // would turn the companion into the buyer during cart restoration/payment.
+  const embeddedAttendeeId = embedded?.existing_attendee_id ?? undefined
+  const humanId = embeddedAttendeeId
+    ? undefined
+    : (embedded?.human_id ?? attendee.human_id ?? undefined)
+  const isPersistedAccountlessAttendee =
+    !humanId &&
+    Boolean(
+      attendee.created_at || attendee.updated_at || attendee.application_id,
+    )
+  const existingAttendeeId =
+    embeddedAttendeeId ??
+    (isPersistedAccountlessAttendee ? attendee.id : undefined)
+  const profileSnapshot = {
+    ...(attendee.additional_data ?? {}),
+    ...(attendee.category ? { category: attendee.category } : {}),
+    ...(attendee.gender ? { gender: attendee.gender } : {}),
+    ...(embedded?.profile_snapshot ?? {}),
+    ...(overrides.profileSnapshot ?? {}),
+  }
+
+  return {
+    recipient_key:
+      embedded?.recipient_key ??
+      (humanId ? `human:${humanId}` : `draft:${attendee.id}`),
+    ...(humanId ? { human_id: humanId } : {}),
+    ...(existingAttendeeId ? { existing_attendee_id: existingAttendeeId } : {}),
+    name: overrides.name ?? embedded?.name ?? attendee.name,
+    ...((overrides.email ?? embedded?.email ?? attendee.email) !== undefined
+      ? { email: overrides.email ?? embedded?.email ?? attendee.email }
+      : {}),
+    ...((embedded?.category_id ?? attendee.category_id) !== undefined
+      ? { category_id: embedded?.category_id ?? attendee.category_id }
+      : {}),
+    profile_snapshot: profileSnapshot,
+  }
 }
 
 export interface SelectedHousingItem {
@@ -99,7 +177,7 @@ export interface SelectedPatronItem {
 
 /**
  * One meal-plan cart entry — bound to a specific (attendee, weekly product) pair.
- * Mirrors `CartItemMealPlan` from the cart API; carries the resolved product
+ * Mirrors the `meal_plan` cart line; carries the resolved product
  * + display fields the UI needs.
  *
  * `dailyChoices` maps ISO weekday dates → menu_option key (or "chef").
@@ -113,6 +191,52 @@ export interface SelectedMealPlanItem {
   dailyChoices: Record<string, string> | null
   dietaryRestriction: string | null
   specialRequest: string | null
+}
+
+/**
+ * One booked room in the cart.
+ *
+ * Unlike every other cart item this one has no product-derived price: the
+ * charge comes from the server's quote for those exact dates, because
+ * date-range rules and the long-stay rate make "nightly × nights" wrong more
+ * often than it is right. `totalPrice` is the quote's total, tax included
+ * (the same number the backend charges), and `subtotal`/`tax` are carried only
+ * so the breakdown can show its parts.
+ *
+ * `productId` is the accommodation's shadow product. The purchase line must
+ * point at it, or the backend refuses the booking metadata.
+ */
+/** One occupant as the checkout holds them, before the booking exists. */
+export interface CheckoutGuest {
+  name: string
+  answers: Record<string, unknown>
+}
+
+export interface SelectedAccommodationItem {
+  accommodationId: string
+  productId: string
+  name: string
+  propertyId: string
+  propertyName: string
+  checkIn: string
+  checkOut: string
+  nights: number
+  guestCount: number
+  /** One entry per guest, in order. Slots exist before they are filled in. */
+  guests: CheckoutGuest[]
+  /** Answers from whoever the room is for, keyed by the form's field keys. */
+  bookerAnswers: Record<string, unknown>
+  /**
+   * What this checkout asks about the people staying, read from the step's
+   * `template_config`. Captured when the room is added so the cart carries
+   * everything needed to validate it, including from screens where the
+   * accommodation step is not mounted.
+   */
+  guestForm: AccommodationGuestForm | null
+  subtotal: number
+  tax: number
+  totalPrice: number
+  imageUrl?: string | null
 }
 
 export interface SelectedDynamicItem {
@@ -130,6 +254,7 @@ export interface CheckoutCartState {
   merch: SelectedMerchItem[]
   patron: SelectedPatronItem | null
   mealPlans: SelectedMealPlanItem[]
+  accommodations: SelectedAccommodationItem[]
   promoCode: string
   promoCodeValid: boolean
   promoCodeDiscount: number
@@ -146,6 +271,7 @@ export interface CheckoutCartSummary {
   merchSubtotal: number
   patronSubtotal: number
   mealPlansSubtotal: number
+  accommodationsSubtotal: number
   insuranceSubtotal: number
   contributionSubtotal: number
   /**
@@ -275,6 +401,7 @@ export function createInitialCartState(): CheckoutCartState {
     merch: [],
     patron: null,
     mealPlans: [],
+    accommodations: [],
     promoCode: "",
     promoCodeValid: false,
     promoCodeDiscount: 0,
@@ -292,6 +419,7 @@ export function createInitialSummary(): CheckoutCartSummary {
     merchSubtotal: 0,
     patronSubtotal: 0,
     mealPlansSubtotal: 0,
+    accommodationsSubtotal: 0,
     insuranceSubtotal: 0,
     contributionSubtotal: 0,
     discountableSubtotal: 0,

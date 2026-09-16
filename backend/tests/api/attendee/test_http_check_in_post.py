@@ -17,9 +17,10 @@ import uuid
 from decimal import Decimal
 
 from fastapi.testclient import TestClient
-from sqlmodel import Session
+from sqlmodel import Session, select
 
 from app.api.attendee.models import AttendeeProducts, Attendees
+from app.api.check_in.models import CheckIn
 from app.api.human.models import Humans
 from app.api.popup.models import Popups
 from app.api.product.models import Products
@@ -37,7 +38,11 @@ def _auth(user: Users) -> dict[str, str]:
     return {"Authorization": f"Bearer {token}"}
 
 
-def _make_product(db: Session, tenant: Tenants, popup: Popups) -> Products:
+def _make_product(
+    db: Session,
+    tenant: Tenants,
+    popup: Popups,
+) -> Products:
     product = Products(
         id=uuid.uuid4(),
         tenant_id=tenant.id,
@@ -99,6 +104,8 @@ def _make_ticket(
         attendee_id=attendee.id,
         product_id=product.id,
         check_in_code=code or f"CI{uuid.uuid4().hex[:6].upper()}",
+        product_category_snapshot=product.category,
+        requires_check_in_snapshot=product.requires_check_in,
     )
     db.add(ticket)
     db.commit()
@@ -198,7 +205,7 @@ class TestPostCheckIn:
             "first_scan_at must not change on re-scan"
         )
 
-    def test_non_scannable_product_returns_400(
+    def test_current_product_check_in_state_controls_scanning(
         self,
         client: TestClient,
         db: Session,
@@ -206,25 +213,16 @@ class TestPostCheckIn:
         popup_tenant_a: Popups,
         admin_user_tenant_a: Users,
     ) -> None:
-        """POST with a code from a `requires_check_in=False` product returns 400."""
-        product = Products(
-            id=uuid.uuid4(),
-            tenant_id=tenant_a.id,
-            popup_id=popup_tenant_a.id,
-            name=f"Non-Scannable {uuid.uuid4().hex[:6]}",
-            slug=f"ns-{uuid.uuid4().hex[:6]}",
-            price=Decimal("10"),
-            category="merch",
-            requires_check_in=False,
-        )
-        db.add(product)
-        db.commit()
-        db.refresh(product)
-
+        product = _make_product(db, tenant_a, popup_tenant_a)
         human = _make_human(db, tenant_a)
         attendee = _make_attendee(db, tenant_a, popup_tenant_a, human)
         code = f"NOSCAN{uuid.uuid4().hex[:2].upper()}"
-        _make_ticket(db, tenant_a, attendee, product, code=code)
+        ticket = _make_ticket(db, tenant_a, attendee, product, code=code)
+        ticket.requires_check_in_snapshot = False
+        product.requires_check_in = False
+        db.add(ticket)
+        db.add(product)
+        db.commit()
 
         response = client.post(
             f"/api/v1/attendees/check-in/{code}?popup_id={popup_tenant_a.id}",
@@ -237,6 +235,54 @@ class TestPostCheckIn:
         assert "does not require check-in" in response.json()["detail"].lower(), (
             f"Expected detail to mention non-scannable; got {response.json()['detail']!r}"
         )
+
+        product.requires_check_in = True
+        db.add(product)
+        db.commit()
+
+        response = client.post(
+            f"/api/v1/attendees/check-in/{code}?popup_id={popup_tenant_a.id}",
+            json={"source": "qr"},
+            headers=_auth(admin_user_tenant_a),
+        )
+        assert response.status_code == 200, response.text
+
+    def test_allocated_meal_plan_scans_and_persists_history(
+        self,
+        client: TestClient,
+        db: Session,
+        tenant_a: Tenants,
+        popup_tenant_a: Popups,
+        admin_user_tenant_a: Users,
+    ) -> None:
+        product = _make_product(db, tenant_a, popup_tenant_a)
+        product.category = "meal_plan"
+        product.requires_check_in = True
+        db.add(product)
+        db.commit()
+        human = _make_human(db, tenant_a)
+        attendee = _make_attendee(db, tenant_a, popup_tenant_a, human)
+        code = f"MEAL{uuid.uuid4().hex[:4].upper()}"
+        ticket = _make_ticket(db, tenant_a, attendee, product, code=code)
+        ticket.requires_check_in_snapshot = True
+        db.add(ticket)
+        db.commit()
+
+        response = client.post(
+            f"/api/v1/attendees/check-in/{code}?popup_id={popup_tenant_a.id}",
+            json={"source": "qr"},
+            headers=_auth(admin_user_tenant_a),
+        )
+
+        assert response.status_code == 200, response.text
+        assert response.json()["attendee"]["id"] == str(attendee.id)
+        assert response.json()["product"]["category"] == "meal_plan"
+        assert response.json()["total_scans"] == 1
+        events = db.exec(
+            select(CheckIn).where(CheckIn.attendee_product_id == ticket.id)
+        ).all()
+        assert len(events) == 1
+        assert events[0].payload == {"source": "qr"}
 
     def test_cross_popup_returns_404(
         self,
@@ -289,10 +335,6 @@ class TestPostCheckIn:
         admin_user_tenant_a: Users,
     ) -> None:
         """POST with source='manual' stores that source in ticket_events.payload."""
-        from sqlmodel import select
-
-        from app.api.check_in.models import CheckIn
-
         product = _make_product(db, tenant_a, popup_tenant_a)
         human = _make_human(db, tenant_a)
         attendee = _make_attendee(db, tenant_a, popup_tenant_a, human)

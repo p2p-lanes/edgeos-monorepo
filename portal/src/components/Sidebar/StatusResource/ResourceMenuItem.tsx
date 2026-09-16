@@ -58,6 +58,8 @@ const ResourceMenuItem = ({
     <SidebarMenuButton
       disabled={isDisabled}
       isActive={isActive}
+      aria-current={isActive ? "page" : undefined}
+      aria-label={resource.name}
       onClick={handleClick}
       className={cn(isGroup ? "py-2" : "py-5", level > 0 && "pl-6")}
     >

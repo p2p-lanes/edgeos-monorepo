@@ -4,9 +4,21 @@ import { describe, expect, it, vi } from "vitest"
 import { ApplicationAccessSources } from "./ApplicationAccessSources"
 
 vi.mock("@tanstack/react-router", () => ({
-  Link: ({ children, to }: { children: ReactNode; to: string }) => (
-    <a href={to}>{children}</a>
-  ),
+  Link: ({
+    children,
+    params,
+    to,
+  }: {
+    children: ReactNode
+    params: Record<string, string>
+    to: string
+  }) => {
+    const href = Object.entries(params).reduce(
+      (path, [key, value]) => path.replace(`$${key}`, value),
+      to,
+    )
+    return <a href={href}>{children}</a>
+  },
 }))
 
 describe("ApplicationAccessSources", () => {
@@ -28,7 +40,17 @@ describe("ApplicationAccessSources", () => {
     )
 
     expect(screen.getByText("Builders")).toBeTruthy()
-    expect(screen.getByText("vip-code")).toBeTruthy()
-    expect(screen.getByText("ada-code")).toBeTruthy()
+    expect(screen.getByRole("link", { name: "Builders" })).toHaveAttribute(
+      "href",
+      "/groups/group-1/edit",
+    )
+    expect(screen.getByRole("link", { name: "vip-code" })).toHaveAttribute(
+      "href",
+      "/invites/invite-1/edit",
+    )
+    expect(screen.getByRole("link", { name: "ada-code" })).toHaveAttribute(
+      "href",
+      "/invites/referral-1/edit",
+    )
   })
 })

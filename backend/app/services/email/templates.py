@@ -500,6 +500,31 @@ TENANT_SCOPED_TEMPLATE_TYPES = {
     EmailTemplateType.LOGIN_CODE_HUMAN,
 }
 
+# LOGIN_CODE_USER is left where it was, and it does not resolve a custom
+# row under any tier: its sender (`auth/crud.py`) passes no popup, while
+# `ck_email_templates_scope` requires every non-login_code_human row to
+# have one. That predates the scope split and moving it means changing the
+# constraint and migrating rows — a separate change, not a quiet rider on
+# this one.
+
+# Produced by a sale, so owned by the flow that made it
+# (sdd/sales-flows-rediseno). Everything else a gathering sends — event
+# invitations, schedule changes, the check-in pass — reaches people
+# regardless of which flow they came through, and stays at popup level.
+FLOW_SCOPED_TEMPLATE_TYPES = {
+    EmailTemplateType.APPLICATION_RECEIVED,
+    EmailTemplateType.APPLICATION_ACCEPTED,
+    EmailTemplateType.APPLICATION_REJECTED,
+    EmailTemplateType.APPLICATION_ACCEPTED_WITH_DISCOUNT,
+    EmailTemplateType.APPLICATION_ACCEPTED_WITH_INCENTIVE,
+    EmailTemplateType.APPLICATION_ACCEPTED_SCHOLARSHIP_REJECTED,
+    EmailTemplateType.ABANDONED_APPLICATION,
+    EmailTemplateType.PAYMENT_CONFIRMED,
+    EmailTemplateType.ABANDONED_CART,
+    EmailTemplateType.PURCHASE_REMINDER,
+    EmailTemplateType.EDIT_PASSES_CONFIRMED,
+}
+
 
 def coerce_email_template_type(
     template_type: EmailTemplateType | str,
@@ -512,11 +537,13 @@ def coerce_email_template_type(
 
 
 def get_template_scope(template_type: EmailTemplateType | str) -> TemplateScope:
-    return (
-        TemplateScope.TENANT
-        if coerce_email_template_type(template_type) in TENANT_SCOPED_TEMPLATE_TYPES
-        else TemplateScope.POPUP
-    )
+    """The one tier that owns `template_type`. Never a chain."""
+    resolved = coerce_email_template_type(template_type)
+    if resolved in TENANT_SCOPED_TEMPLATE_TYPES:
+        return TemplateScope.TENANT
+    if resolved in FLOW_SCOPED_TEMPLATE_TYPES:
+        return TemplateScope.FLOW
+    return TemplateScope.POPUP
 
 
 AUTH_TEMPLATE_METADATA: list[dict[str, Any]] = [

@@ -2,7 +2,7 @@ import uuid
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
-from sqlalchemy import UniqueConstraint
+from sqlalchemy import Index, text
 from sqlalchemy.dialects.postgresql import UUID
 from sqlmodel import Column, DateTime, Field, Relationship, func
 
@@ -14,12 +14,26 @@ if TYPE_CHECKING:
 
 
 class ApprovalStrategies(ApprovalStrategyBase, table=True):
-    """Approval strategy for a popup.
+    """How a gathering or one application flow accepts applications.
 
-    Defines the rules for reviewing and accepting applications.
+    A row without ``sales_flow_id`` is the gathering default. Application
+    flows may own an override; direct and upsale flows never do.
     """
 
-    __table_args__ = (UniqueConstraint("popup_id", name="uq_approval_strategy_popup"),)
+    __table_args__ = (
+        Index(
+            "uq_approval_strategy_flow",
+            "sales_flow_id",
+            unique=True,
+            postgresql_where=text("sales_flow_id IS NOT NULL"),
+        ),
+        Index(
+            "uq_approval_strategy_popup_shared",
+            "popup_id",
+            unique=True,
+            postgresql_where=text("sales_flow_id IS NULL"),
+        ),
+    )
 
     id: uuid.UUID = Field(
         default_factory=uuid.uuid4,
@@ -46,5 +60,5 @@ class ApprovalStrategies(ApprovalStrategyBase, table=True):
     )
 
     # Relationships
-    popup: "Popups" = Relationship(back_populates="approval_strategy")
+    popup: "Popups" = Relationship(back_populates="approval_strategies")
     tenant: "Tenants" = Relationship()

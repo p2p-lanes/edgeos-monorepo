@@ -76,6 +76,20 @@ def test_create_attendee_with_nonexistent_category_rejected(
 # ---------------------------------------------------------------------------
 
 
+def _default_flow_id_via_api(client, token: str, popup_id: str) -> str:
+    """The popup's default sales flow — required to create a ticketing step
+    since sdd/sales-flows-rediseno slice 2."""
+    resp = client.get(
+        "/api/v1/sales-flows",
+        headers=_admin_headers(token),
+        params={"popup_id": popup_id, "limit": 100},
+    )
+    assert resp.status_code == 200, resp.text
+    flows = [f for f in resp.json()["results"] if f["is_default"]]
+    assert flows, f"popup {popup_id} has no default sales flow"
+    return flows[0]["id"]
+
+
 def test_ticketing_step_create_with_unknown_uuid_rejected(
     client: TestClient,
     admin_token_tenant_a: str,
@@ -115,12 +129,14 @@ def test_ticketing_step_create_with_valid_uuid_accepted(
     popup = _create_popup_via_api(client, admin_token_tenant_a)
     popup_id = popup["id"]
     main_cat_id = _get_main_category_id(client, admin_token_tenant_a, popup_id)
+    flow_id = _default_flow_id_via_api(client, admin_token_tenant_a, popup_id)
 
     resp = client.post(
         "/api/v1/ticketing-steps",
         headers=_admin_headers(admin_token_tenant_a),
         json={
             "popup_id": popup_id,
+            "sales_flow_id": flow_id,
             "step_type": "product_selection",
             "title": "Test Step Valid",
             "template": "ticket-select",
@@ -148,6 +164,7 @@ def test_ticketing_step_update_with_unknown_uuid_rejected(
     popup = _create_popup_via_api(client, admin_token_tenant_a)
     popup_id = popup["id"]
     main_cat_id = _get_main_category_id(client, admin_token_tenant_a, popup_id)
+    flow_id = _default_flow_id_via_api(client, admin_token_tenant_a, popup_id)
 
     # Create a valid step first
     create_resp = client.post(
@@ -155,6 +172,7 @@ def test_ticketing_step_update_with_unknown_uuid_rejected(
         headers=_admin_headers(admin_token_tenant_a),
         json={
             "popup_id": popup_id,
+            "sales_flow_id": flow_id,
             "step_type": "product_selection",
             "title": "Update Test Step",
             "template": "ticket-select",

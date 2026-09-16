@@ -25,6 +25,12 @@ vi.mock("@/providers/checkoutProvider", () => ({
   }),
 }))
 
+vi.mock("@/providers/cityProvider", () => ({
+  useCityProvider: () => ({
+    getCity: () => ({ id: "popup_1", slug: "popup-a", name: "Popup A" }),
+  }),
+}))
+
 vi.mock("./DynamicProductStep", () => ({
   default: () => <div>dynamic-step</div>,
 }))

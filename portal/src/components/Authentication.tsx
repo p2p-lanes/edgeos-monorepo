@@ -17,7 +17,7 @@ const Authentication = ({ children }: { children: ReactNode }) => {
     }
   }, [user, isUserLoading, router])
 
-  if (isUserLoading || !user) return <Loader />
+  if (isUserLoading || !user) return <Loader fullScreen />
 
   return children
 }

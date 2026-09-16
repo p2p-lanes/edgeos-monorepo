@@ -12,6 +12,20 @@ import { getProductAvailability } from "@/lib/product-availability"
 import type { SelectedDynamicItem } from "@/types/checkout"
 import type { ProductsPass } from "@/types/Products"
 import { dispatchPaymentError } from "./errorDispatch"
+import type { CartSelectionState } from "./useCartPersistence"
+import {
+  buildItemsSnapshot as buildRealItemsSnapshot,
+  hasCartItems as hasRealCartItems,
+  hydrateFromSnapshot,
+  normalizeCartItemsSnapshot,
+} from "./useOpenCartPersistence"
+
+vi.mock("@/client", () => ({
+  CheckoutService: {
+    restoreFlowCart: vi.fn(),
+    upsertFlowCart: vi.fn(),
+  },
+}))
 
 // ---------------------------------------------------------------------------
 // Test helpers — inlined types to match the module's internal shapes
@@ -162,6 +176,129 @@ describe("hasCartItems — dynamicItems gap (ADR-R7)", () => {
         dynamicItems: {},
       }),
     ).toBe(true)
+  })
+})
+
+describe("accommodation-only cart persistence", () => {
+  const state = {
+    selectedPasses: [],
+    housing: null,
+    accommodations: [
+      {
+        accommodationId: "room-1",
+        productId: "shadow-room-1",
+        name: "Double room",
+        propertyId: "property-1",
+        propertyName: "Hotel",
+        checkIn: "2026-09-01",
+        checkOut: "2026-09-03",
+        nights: 2,
+        guestCount: 1,
+        guests: [{ name: "Taylor Buyer", answers: {} }],
+        bookerAnswers: {},
+        guestForm: null,
+        subtotal: 100,
+        tax: 10,
+        totalPrice: 110,
+      },
+    ],
+    merch: [],
+    patron: null,
+    selectedMealPlans: [],
+    dynamicItems: {},
+    promoCode: "",
+    promoCodeValid: false,
+    insurance: false,
+    currentStep: "housing",
+  } satisfies CartSelectionState
+
+  it("counts and serializes a cart whose only item is a stay", () => {
+    expect(hasRealCartItems(state)).toBe(true)
+    expect(buildRealItemsSnapshot(state).lines).toContainEqual({
+      kind: "accommodation",
+      assignment: { kind: "unassigned" },
+      step_type: "accommodation",
+      accommodation_id: "room-1",
+      check_in: "2026-09-01",
+      check_out: "2026-09-03",
+      guest_count: 1,
+      guests: [{ name: "Taylor Buyer", answers: {} }],
+      booker_answers: {},
+    })
+  })
+
+  it("does not restore a saved stay because the cart never held the room", () => {
+    const setAccommodations = vi.fn()
+    const snapshot = buildRealItemsSnapshot(state)
+
+    hydrateFromSnapshot(snapshot, [], true, {
+      setHousing: vi.fn(),
+      setAccommodations,
+      setMerch: vi.fn(),
+      setPatron: vi.fn(),
+      setMealPlans: vi.fn(),
+      setInsurance: vi.fn(),
+      setDynamicItems: vi.fn(),
+    })
+
+    expect(setAccommodations).not.toHaveBeenCalled()
+  })
+})
+
+describe("legacy snapshot migration", () => {
+  it("recovers dynamic-only carts and leaves canonical snapshots unchanged", () => {
+    const migrated = normalizeCartItemsSnapshot({
+      passes: [],
+      dynamic_items: [
+        {
+          step_type: "tickets",
+          product_id: "ticket-1",
+          quantity: 2,
+          price: 200,
+        },
+      ],
+      promo_code: "SAVE",
+    })
+
+    expect(migrated?.migrated).toBe(true)
+    expect(migrated?.items.lines).toEqual([
+      {
+        kind: "product",
+        assignment: { kind: "unassigned" },
+        step_type: "tickets",
+        product_id: "ticket-1",
+        quantity: 2,
+        price: 200,
+      },
+    ])
+
+    const canonical = normalizeCartItemsSnapshot(migrated?.items)
+    expect(canonical).toEqual({ items: migrated?.items, migrated: false })
+  })
+
+  it("reads a stay whose guests are bare names, and one whose guests answered", () => {
+    // Both shapes are sitting in somebody's localStorage right now: bare
+    // names predate the guest form, records postdate it. Dropping either
+    // loses a party the buyer already typed in.
+    const migrated = normalizeCartItemsSnapshot({
+      accommodations: [
+        {
+          accommodation_id: "room-1",
+          check_in: "2026-09-01",
+          check_out: "2026-09-03",
+          guest_count: 2,
+          guests: ["Ada", { name: "Grace", answers: { age: 36 } }],
+        },
+      ],
+    })
+
+    expect(migrated?.migrated).toBe(true)
+    const line = migrated?.items.lines[0]
+    expect(line?.kind).toBe("accommodation")
+    expect(line?.kind === "accommodation" && line.guests).toEqual([
+      { name: "Ada" },
+      { name: "Grace", answers: { age: 36 } },
+    ])
   })
 })
 

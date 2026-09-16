@@ -36,6 +36,11 @@ from app.api.product.models import Products
 from app.api.shared.enums import SaleType
 from app.api.tenant.models import Tenants
 from app.services.simplefi.client import CancelOutcome, CancelOutcomeAmbiguousError
+from tests._flow_helpers import (
+    application_flow_id,
+    coupon_flow_id,
+    seed_default_steps,
+)
 
 # ---------------------------------------------------------------------------
 # Shared helpers
@@ -77,6 +82,7 @@ def _make_application(
 ) -> Applications:
     """Create a minimal Application for testing."""
     application = Applications(
+        sales_flow_id=application_flow_id(db, popup.id),
         id=uuid.uuid4(),
         tenant_id=tenant.id,
         popup_id=popup.id,
@@ -122,6 +128,7 @@ def _make_coupon(
     max_uses: int = 5,
 ) -> Coupons:
     coupon = Coupons(
+        sales_flow_id=coupon_flow_id(db, popup.id),
         id=uuid.uuid4(),
         tenant_id=popup.tenant_id,
         popup_id=popup.id,
@@ -966,6 +973,7 @@ class TestSupersedePendingDisabled:
         from app.core.config import settings as _app_settings
 
         popup = _make_popup(db, tenant_a, slug_prefix="b3-oc")
+        seed_default_steps(db, popup, sale_type=SaleType.direct.value)
         product = _make_product(db, tenant_a, popup)
         buyer_email = f"b3-buyer-{uuid.uuid4().hex[:8]}@example.com"
 
@@ -983,7 +991,12 @@ class TestSupersedePendingDisabled:
 
         obj = OpenTicketingPurchaseCreate(
             buyer=BuyerInfo(email=buyer_email, first_name="B3", last_name="Test"),
-            products=[ProductLine(product_id=product.id, quantity=1)],
+            products=[
+                ProductLine(product_id=product.id, quantity=1, recipient_key="buyer")
+            ],
+            recipients=[
+                {"recipient_key": "buyer", "name": "B3 Test", "email": buyer_email}
+            ],
         )
 
         with patch.object(_app_settings, "SUPERSEDE_PENDING_ENABLED", False):
@@ -999,7 +1012,11 @@ class TestSupersedePendingDisabled:
                 ) as spy_check:
                     new_payment, checkout_url, _ = (
                         payments_crud.create_open_ticketing_payment(
-                            db, obj=obj, popup=popup, tenant=tenant_a
+                            db,
+                            obj=obj,
+                            popup=popup,
+                            tenant=tenant_a,
+                            flow_slug="checkout",
                         )
                     )
 
@@ -1047,6 +1064,7 @@ class TestContinuityProofGate:
         )
 
         popup = _make_popup(db, tenant_a, slug_prefix="proof-atk")
+        seed_default_steps(db, popup, sale_type=SaleType.direct.value)
         product = _make_product(db, tenant_a, popup)
         victim_email = f"victim-{uuid.uuid4().hex[:8]}@example.com"
 
@@ -1057,7 +1075,16 @@ class TestContinuityProofGate:
         # Attacker knows the victim's email but has no signed cart proof
         obj = OpenTicketingPurchaseCreate(
             buyer=BuyerInfo(email=victim_email, first_name="Evil", last_name="Bot"),
-            products=[ProductLine(product_id=product.id, quantity=1)],
+            products=[
+                ProductLine(product_id=product.id, quantity=1, recipient_key="buyer")
+            ],
+            recipients=[
+                {
+                    "recipient_key": "buyer",
+                    "name": "Evil Bot",
+                    "email": victim_email,
+                }
+            ],
             # cid and sig deliberately absent
         )
 
@@ -1067,7 +1094,11 @@ class TestContinuityProofGate:
 
             with pytest.raises(HTTPException) as exc_info:
                 payments_crud.create_open_ticketing_payment(
-                    db, obj=obj, popup=popup, tenant=tenant_a
+                    db,
+                    obj=obj,
+                    popup=popup,
+                    tenant=tenant_a,
+                    flow_slug="checkout",
                 )
 
         exc = exc_info.value
@@ -1112,6 +1143,7 @@ class TestContinuityProofGate:
         )
         db.add(popup)
         db.flush()
+        seed_default_steps(db, popup, sale_type=SaleType.direct.value)
 
         product = _make_product(db, tenant_a, popup)
         buyer_email = f"realbuyer-{uuid.uuid4().hex[:8]}@example.com"
@@ -1142,7 +1174,16 @@ class TestContinuityProofGate:
 
         obj = OpenTicketingPurchaseCreate(
             buyer=BuyerInfo(email=buyer_email, first_name="Real", last_name="Buyer"),
-            products=[ProductLine(product_id=product.id, quantity=1)],
+            products=[
+                ProductLine(product_id=product.id, quantity=1, recipient_key="buyer")
+            ],
+            recipients=[
+                {
+                    "recipient_key": "buyer",
+                    "name": "Real Buyer",
+                    "email": buyer_email,
+                }
+            ],
             cid=cart.id,
             sig=valid_sig,
         )
@@ -1154,7 +1195,11 @@ class TestContinuityProofGate:
             mock_sf.return_value = mock_client
 
             new_payment, checkout_url, _ = payments_crud.create_open_ticketing_payment(
-                db, obj=obj, popup=popup, tenant=tenant_a
+                db,
+                obj=obj,
+                popup=popup,
+                tenant=tenant_a,
+                flow_slug="checkout",
             )
 
         # Prior payment cancelled by supersede
@@ -1194,6 +1239,7 @@ class TestContinuityProofGate:
         )
         db.add(popup)
         db.flush()
+        seed_default_steps(db, popup, sale_type=SaleType.direct.value)
 
         product = _make_product(db, tenant_a, popup)
         victim_email = f"victim-{uuid.uuid4().hex[:8]}@example.com"
@@ -1222,7 +1268,16 @@ class TestContinuityProofGate:
         # Submit purchase as victim but presenting attacker's cart proof
         obj = OpenTicketingPurchaseCreate(
             buyer=BuyerInfo(email=victim_email, first_name="Evil", last_name="Bot"),
-            products=[ProductLine(product_id=product.id, quantity=1)],
+            products=[
+                ProductLine(product_id=product.id, quantity=1, recipient_key="buyer")
+            ],
+            recipients=[
+                {
+                    "recipient_key": "buyer",
+                    "name": "Evil Bot",
+                    "email": victim_email,
+                }
+            ],
             cid=attacker_cart.id,
             sig=attacker_sig,
         )
@@ -1234,7 +1289,11 @@ class TestContinuityProofGate:
 
             with pytest.raises(HTTPException) as exc_info:
                 payments_crud.create_open_ticketing_payment(
-                    db, obj=obj, popup=popup, tenant=tenant_a
+                    db,
+                    obj=obj,
+                    popup=popup,
+                    tenant=tenant_a,
+                    flow_slug="checkout",
                 )
 
         exc = exc_info.value
@@ -1263,6 +1322,7 @@ class TestContinuityProofGate:
         )
 
         popup = _make_popup(db, tenant_a, slug_prefix="proof-none")
+        seed_default_steps(db, popup, sale_type=SaleType.direct.value)
         product = _make_product(db, tenant_a, popup)
         buyer_email = f"fresh-{uuid.uuid4().hex[:8]}@example.com"
 
@@ -1275,7 +1335,16 @@ class TestContinuityProofGate:
 
         obj = OpenTicketingPurchaseCreate(
             buyer=BuyerInfo(email=buyer_email, first_name="Fresh", last_name="Buyer"),
-            products=[ProductLine(product_id=product.id, quantity=1)],
+            products=[
+                ProductLine(product_id=product.id, quantity=1, recipient_key="buyer")
+            ],
+            recipients=[
+                {
+                    "recipient_key": "buyer",
+                    "name": "Fresh Buyer",
+                    "email": buyer_email,
+                }
+            ],
             # No cid/sig — no proof, but no pending payment either
         )
 
@@ -1285,7 +1354,11 @@ class TestContinuityProofGate:
             mock_sf.return_value = mock_client
 
             new_payment, checkout_url, _ = payments_crud.create_open_ticketing_payment(
-                db, obj=obj, popup=popup, tenant=tenant_a
+                db,
+                obj=obj,
+                popup=popup,
+                tenant=tenant_a,
+                flow_slug="checkout",
             )
 
         assert new_payment is not None

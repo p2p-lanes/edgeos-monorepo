@@ -23,30 +23,38 @@ if TYPE_CHECKING:
         OpenTicketingPurchaseCreate,
     )
     from app.api.human.models import Humans
+    from app.api.human.schemas import HumanPublic
     from app.api.popup.models import Popups
+    from app.api.sales_flow.models import SalesFlows
     from app.api.tenant.models import Tenants
+from app.api.accommodation import payments as accommodation_payments
+from app.api.accommodation.constants import PRODUCT_MANAGED_BY_ACCOMMODATION
 from app.api.application.schemas import ApplicationStatus, ScholarshipStatus
 from app.api.attendee.crud import attendees_crud, generate_check_in_code
 from app.api.attendee.models import AttendeeProducts, Attendees
+from app.api.attendee.validation import validate_required_fields
+from app.api.attendee_category.models import AttendeeCategories
 from app.api.coupon.crud import coupons_crud
 from app.api.form_section.models import FormSections
 from app.api.human.crud import humans_crud
-from app.api.payment.models import PaymentProducts, Payments
+from app.api.payment.models import PaymentProducts, PaymentRecipients, Payments
 from app.api.payment.schemas import (
     PaymentCreate,
     PaymentFilter,
     PaymentFilters,
     PaymentPreview,
     PaymentProductRequest,
+    PaymentRecipientRequest,
     PaymentSource,
     PaymentStatus,
+    PaymentType,
     PaymentUpdate,
 )
 from app.api.product.models import Products
 from app.api.product.product_state import ProductSaleState, derive_product_state
-from app.api.product.schemas import ProductPublic
 from app.api.shared.crud import BaseCRUD
 from app.core.filters import build_filter_expression
+from app.services.restrictions.offering import flow_product_recipient_category_ids
 from app.utils.checkout_signing import (
     append_query_params,
     build_signed_redirect_url,
@@ -57,6 +65,19 @@ from app.utils.checkout_signing import (
 
 # Decimal precision for money calculations
 MONEY_PRECISION = Decimal("0.01")
+
+
+def _classify_product_unit(line: PaymentProducts) -> str | None:
+    """Classify immutable line evidence without fulfillment configuration."""
+    if (
+        line.product_category.lower() == "ticket"
+        or getattr(line, "attendee_id", None) is not None
+        or getattr(line, "payment_recipient_id", None) is not None
+    ):
+        return "attendee"
+    if line.requires_check_in_snapshot is True:
+        return "ownerless"
+    return None
 
 
 class ReleaseResult:
@@ -176,11 +197,20 @@ def _build_purchase_thank_you_payload(
 
 
 def _resolve_open_checkout_success_url(
-    popup: "Popups", internal_thank_you_url: str, payload: dict, *, locale: str
+    flow: "SalesFlows | None",
+    internal_thank_you_url: str,
+    payload: dict,
+    *,
+    locale: str,
 ) -> str:
     """Resolve where a successful open-checkout buyer lands.
 
-    A custom popup success URL overrides the portal thank-you: signed with the
+    The landing page belongs to the flow the buyer came through, not to the
+    popup: two flows selling the same event can hand their buyers to two
+    different pages, which is the whole point of separating them. Every flow
+    carries its own copy of what the popup used to answer (`d4f1a72e9c85`).
+
+    A custom success URL overrides the portal thank-you: signed with the
     order payload when a signing secret is set (external page verifies it),
     plain otherwise. A ``{locale}`` placeholder in the custom URL is replaced
     with the checkout language (e.g. ``.../{locale}/gracias`` → ``.../es/gracias``).
@@ -192,23 +222,104 @@ def _resolve_open_checkout_success_url(
     external and internal alike — outside the signed payload, so the landing
     page can render in the buyer's language without touching HMAC verification.
     """
-    custom = popup.open_checkout_success_url
+    from app.api.sales_flow.resolver import build_effective_config  # noqa: PLC0415
+
+    config = build_effective_config(flow) if flow is not None else None
+    custom = config.open_checkout_success_url if config else None
     if custom:
         custom = custom.replace("{locale}", locale)
         custom = append_query_params(custom, [("lang", locale)])
-        secret = popup.open_checkout_signing_secret
+        secret = config.open_checkout_signing_secret if config else None
         return build_signed_redirect_url(custom, payload, secret) if secret else custom
     internal = append_query_params(internal_thank_you_url, [("lang", locale)])
     return build_unsigned_redirect_url(internal, payload)
 
 
-def _internal_open_checkout_thank_you_url(
-    portal_base: str, landing_is_checkout: bool, popup: "Popups", payment: Payments
+def _resolve_open_checkout_cancel_url(
+    flow: "SalesFlows", portal_base: str, popup: "Popups", *, locale: str
 ) -> str:
-    """Portal thank-you URL for the open-checkout flow (landing-mode aware)."""
-    if landing_is_checkout:
-        return f"{portal_base}/thank-you?payment_id={payment.id}"
-    return f"{portal_base}/checkout/{popup.slug}/thank-you?payment_id={payment.id}"
+    """Return to the same sales flow, unless it explicitly overrides cancellation.
+
+    Always use the canonical flow link, including on checkout-landing domains:
+    their root rewrites to the default `checkout` flow, not necessarily this one.
+    Keeping the flow also restores the correct flow-scoped cart on return.
+    """
+    from app.api.sales_flow.resolver import build_effective_config  # noqa: PLC0415
+
+    custom = build_effective_config(flow).open_checkout_cancel_url
+    if custom:
+        return custom
+    return append_query_params(
+        f"{portal_base}/checkout/{popup.slug}/{flow.slug}",
+        [("cancelled", "1"), ("lang", locale)],
+    )
+
+
+def _internal_open_checkout_thank_you_url(
+    portal_base: str,
+    landing_is_checkout: bool,
+    popup: "Popups",
+    payment: Payments | uuid.UUID,
+    *,
+    flow_slug: str | None = None,
+    return_context: str = "direct",
+) -> str:
+    """Internal thank-you URL for the request's explicit checkout context."""
+    if return_context == "portal":
+        base = f"{portal_base}/portal/{popup.slug}/thank-you"
+    elif landing_is_checkout:
+        base = f"{portal_base}/thank-you"
+    else:
+        base = f"{portal_base}/checkout/{popup.slug}/thank-you"
+    payment_id = payment if isinstance(payment, uuid.UUID) else payment.id
+    query = [("payment_id", str(payment_id))]
+    if flow_slug is not None:
+        query.append(("flow", flow_slug))
+    return append_query_params(base, query)
+
+
+def _resolve_application_payment_success_url(
+    flow: "SalesFlows",
+    application: Applications,
+    payment_id: uuid.UUID,
+    *,
+    items: list[dict],
+    amount: Decimal,
+    currency: str,
+    locale: str | None,
+    return_context: str,
+) -> str:
+    from app.api.shared.enums import LandingMode  # noqa: PLC0415
+    from app.api.tenant.utils import get_portal_url  # noqa: PLC0415
+
+    popup = application.popup
+    lang = locale or popup.default_language or "en"
+    now = datetime.now(UTC)
+    human = application.human
+    payload = build_thank_you_payload(
+        order_id=str(payment_id),
+        first_name=human.first_name if human and human.first_name else "",
+        email=human.email if human else "",
+        items=items,
+        amount_total=float(amount),
+        currency=currency,
+        issued_at=now.isoformat(),
+        exp=int(now.timestamp()) + 30 * 60,
+    )
+    portal_base = get_portal_url(popup.tenant)
+    return _resolve_open_checkout_success_url(
+        flow,
+        _internal_open_checkout_thank_you_url(
+            portal_base,
+            popup.tenant.landing_mode == LandingMode.checkout,
+            popup,
+            payment_id,
+            flow_slug=flow.slug,
+            return_context=return_context,
+        ),
+        payload,
+        locale=lang,
+    )
 
 
 def resolve_patron_template_config(
@@ -277,13 +388,15 @@ def validate_patron_amount(amount: Decimal, template_config: dict) -> None:
 
 
 def calculate_insurance_amount(
-    popup: "Any",
+    config: "Any",
     product_quantity_pairs: "list[tuple[Any, int]]",
 ) -> Decimal:
-    """Pure function: compute insurance amount from popup settings + eligible products.
+    """Pure function: compute insurance amount from a flow's fee settings.
 
     Args:
-        popup: Object with .insurance_enabled (bool) and .insurance_percentage (Decimal|None).
+        config: The flow's `EffectiveFlowConfig` — .insurance_enabled (bool)
+            and .insurance_percentage (Decimal|None). Duck-typed on purpose so
+            the function stays testable without a database.
         product_quantity_pairs: List of (product, quantity) where product has
             .price (Decimal) and .insurance_eligible (bool).
 
@@ -291,9 +404,9 @@ def calculate_insurance_amount(
         Total insurance amount rounded to 2 decimal places.
         Returns Decimal("0") if insurance is disabled or percentage is None.
     """
-    if not popup.insurance_enabled:
+    if not config.insurance_enabled:
         return Decimal("0")
-    if popup.insurance_percentage is None:
+    if config.insurance_percentage is None:
         return Decimal("0")
 
     eligible_subtotal = Decimal("0")
@@ -301,24 +414,24 @@ def calculate_insurance_amount(
         if product.insurance_eligible:
             eligible_subtotal += product.price * quantity
 
-    return (eligible_subtotal * popup.insurance_percentage / 100).quantize(
+    return (eligible_subtotal * config.insurance_percentage / 100).quantize(
         MONEY_PRECISION, rounding=ROUND_HALF_UP
     )
 
 
 def calculate_contribution_amount(
-    popup: "Any",
+    config: "Any",
     products_subtotal: Decimal,
 ) -> Decimal:
-    """Pure function: compute contribution amount from popup settings + pre-fee subtotal.
+    """Pure function: compute contribution amount from a flow's fee settings.
 
-    Contribution is MANDATORY when enabled at popup level — there is no buyer opt-in
-    flag. Mirrors `calculate_insurance_amount` shape but drops the per-product
+    Contribution is MANDATORY when the flow enables it — there is no buyer
+    opt-in flag. Mirrors `calculate_insurance_amount` shape but drops the per-product
     eligibility filter (contribution applies over the full pre-fee order subtotal).
 
     Args:
-        popup: Object with .contribution_enabled (bool) and
-            .contribution_percentage (Decimal|None).
+        config: The flow's `EffectiveFlowConfig` — .contribution_enabled
+            (bool) and .contribution_percentage (Decimal|None).
         products_subtotal: Pre-fee snapshot of the order amount
             (post-discount, pre-insurance, pre-contribution).
 
@@ -326,12 +439,12 @@ def calculate_contribution_amount(
         Contribution amount rounded to 2 decimal places.
         Returns Decimal("0") if contribution is disabled or percentage is None.
     """
-    if not popup.contribution_enabled:
+    if not config.contribution_enabled:
         return Decimal("0")
-    if popup.contribution_percentage is None:
+    if config.contribution_percentage is None:
         return Decimal("0")
 
-    return (products_subtotal * popup.contribution_percentage / 100).quantize(
+    return (products_subtotal * config.contribution_percentage / 100).quantize(
         MONEY_PRECISION, rounding=ROUND_HALF_UP
     )
 
@@ -364,10 +477,12 @@ class OpenTicketingAmounts:
 def compute_open_ticketing_amounts(
     session: Session,
     popup: Any,
+    flow: Any,
     products_map: "dict[uuid.UUID, Products]",
     lines: Any,
     coupon_code: str | None,
     insurance: bool,
+    line_prices: "dict[int, Decimal] | None" = None,
 ) -> OpenTicketingAmounts:
     """Authoritative open-ticketing money math, shared by /purchase and /preview.
 
@@ -375,14 +490,24 @@ def compute_open_ticketing_amounts(
     discountable/non-discountable split, single-coupon discount on the
     discountable bucket, then insurance + contribution fees on the post-discount
     subtotal (fees never compound). No side effects — computes only.
+
+    ``flow`` is the door being bought through, and it decides all three: whether
+    a coupon is taken at all, and both fee rates. Sharing this function is what
+    keeps the displayed total equal to the charged one, so it has to be the same
+    door on both sides — a popup-level answer here would quietly diverge for
+    every flow that is not the default.
     """
     amount_lines: list[OpenTicketingAmountLine] = []
     discountable_amount = Decimal("0")
     non_discountable_amount = Decimal("0")
 
-    for line in lines:
+    for index, line in enumerate(lines):
         product = products_map[line.product_id]
-        line_total = product.price * line.quantity
+        # An accommodation's price is not on the product: it depends on the
+        # dates, so the caller resolves it first and passes it in by position
+        # (two lines can book the same room type for different dates).
+        unit_price = (line_prices or {}).get(index, product.price)
+        line_total = unit_price * line.quantity
         is_discountable = not (
             product.category == "patreon" or not product.discountable
         )
@@ -394,7 +519,7 @@ def compute_open_ticketing_amounts(
             OpenTicketingAmountLine(
                 product_id=product.id,
                 quantity=line.quantity,
-                unit_price=product.price,
+                unit_price=unit_price,
                 line_total=line_total,
                 discountable=is_discountable,
             )
@@ -412,8 +537,16 @@ def compute_open_ticketing_amounts(
     resolved_coupon_code: str | None = None
     discount_value: Decimal | None = None
     if coupon_code and discountable_amount > Decimal("0"):
+        if flow is None:
+            # Every popup is provisioned with a default flow, so reaching here
+            # means that invariant is already broken. Say so rather than fail
+            # on an attribute.
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="This event is not ready to take coupons yet.",
+            )
         coupon = coupons_crud.validate_coupon(
-            session, code=coupon_code, popup_id=popup.id
+            session, code=coupon_code, popup_id=popup.id, flow_id=flow.id
         )
         discount_value = Decimal(str(coupon.discount_value))
         discountable_amount = _get_discounted_price(discountable_amount, discount_value)
@@ -423,16 +556,20 @@ def compute_open_ticketing_amounts(
     discount_amount = pre_discount_discountable - discountable_amount
     post_discount_amount = discountable_amount + non_discountable_amount
 
+    from app.api.sales_flow.resolver import build_effective_config  # noqa: PLC0415
+
+    fees = build_effective_config(flow) if flow is not None else None
+
     insurance_amount = Decimal("0")
-    if insurance and post_discount_amount > Decimal("0"):
+    if insurance and post_discount_amount > Decimal("0") and fees:
         insurance_amount = calculate_insurance_amount(
-            popup,
+            fees,
             [(products_map[line.product_id], line.quantity) for line in lines],
         )
 
     contribution_amount = Decimal("0")
-    if popup.contribution_enabled and popup.contribution_percentage:
-        contribution_amount = calculate_contribution_amount(popup, post_discount_amount)
+    if fees and fees.contribution_enabled and fees.contribution_percentage:
+        contribution_amount = calculate_contribution_amount(fees, post_discount_amount)
 
     total_amount = post_discount_amount + insurance_amount + contribution_amount
 
@@ -496,6 +633,8 @@ def _edit_giveup_credit(application: Applications, discount_value: Decimal) -> D
     total = Decimal("0")
     for attendee in application.attendees:
         for ap in attendee.attendee_products:
+            if ap.revoked_at is not None:
+                continue
             if ap.product.category == "patreon":
                 continue
             if ap.product.duration_type not in ("week", "day"):
@@ -508,6 +647,7 @@ def _edit_giveup_credit(application: Applications, discount_value: Decimal) -> D
 def _calculate_amounts(
     session: Session,
     requested_products: list[PaymentProductRequest],
+    line_prices: "dict[int, Decimal] | None" = None,
 ) -> tuple[Decimal, Decimal]:
     """
     Calculate standard and non-discountable amounts.
@@ -532,13 +672,16 @@ def _calculate_amounts(
     product_models = {p.id: p for p in session.exec(statement).all()}
 
     attendees: dict[uuid.UUID, dict[str, Decimal]] = {}
-    for req_prod in requested_products:
+    for index, req_prod in enumerate(requested_products):
         product_model = product_models.get(req_prod.product_id)
         if not product_model:
             logger.error(f"Product model not found for ID: {req_prod.product_id}")
             continue
 
         quantity = req_prod.quantity
+        # Accommodations price by date, not by product: the caller resolves
+        # the nightly total up front and passes it in keyed by line position.
+        unit_price = (line_prices or {}).get(index, product_model.price)
         attendee_id = req_prod.attendee_id
         if attendee_id not in attendees:
             attendees[attendee_id] = {
@@ -553,10 +696,10 @@ def _calculate_amounts(
             if product_model.category == "patreon":
                 line_amount = req_prod.unit_price_override or Decimal("0")
             else:
-                line_amount = product_model.price * quantity
+                line_amount = unit_price * quantity
             attendees[attendee_id]["non_discountable"] += line_amount
         else:
-            attendees[attendee_id]["standard"] += product_model.price * quantity
+            attendees[attendee_id]["standard"] += unit_price * quantity
 
     standard_amount = sum((a["standard"] for a in attendees.values()), Decimal("0"))
     non_discountable_amount = sum(
@@ -617,6 +760,27 @@ def _calculate_price(
     return discounted_standard + non_discountable_amount, credit_applied
 
 
+def _installment_interval(config: "Any | None") -> str:
+    """The billing cadence a flow bills its installments on.
+
+    The popup's column is NOT NULL with a `month` default; the flow's is
+    nullable like every other Class B column, so a flow that never named an
+    interval falls back to the same default rather than handing SimpleFi a
+    None it would have to guess at.
+    """
+    from app.api.shared.enums import InstallmentInterval  # noqa: PLC0415
+
+    interval = getattr(config, "installments_interval", None) if config else None
+    return interval or InstallmentInterval.month.value
+
+
+def _installment_interval_count(config: "Any | None") -> int:
+    """How many intervals apart the installments fall. See `_installment_interval`
+    for why a missing value becomes the popup column's own default of 1."""
+    count = getattr(config, "installments_interval_count", None) if config else None
+    return count or 1
+
+
 def _calculate_max_installments(
     deadline: datetime,
     ceiling: int,
@@ -674,11 +838,13 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
 
     def get_by_external_id(self, session: Session, external_id: str) -> Payments | None:
         """Get a payment by external ID."""
+
         statement = select(Payments).where(Payments.external_id == external_id)
         return session.exec(statement).first()
 
     def get_many(self, session: Session, ids: list[uuid.UUID]) -> list[Payments]:
         """Get payments by id in a single query. Missing ids are skipped."""
+
         if not ids:
             return []
         statement = select(Payments).where(Payments.id.in_(ids))  # type: ignore[attr-defined]
@@ -699,6 +865,7 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
         Completed (paid==total), cancelled, rejected, and expired plans are
         treated as finalized and do NOT block subsequent payments.
         """
+
         statement = select(Payments).where(
             Payments.application_id == application_id,
             Payments.is_installment_plan == True,  # noqa: E712
@@ -718,6 +885,7 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
         form_data: dict[str, Any],
     ) -> None:
         """Validate required custom buyer fields. form_data is keyed by raw field name; base fields (email/first_name/last_name) live top-level on BuyerInfo and are validated by Pydantic."""
+
         # Hidden sections are never rendered in the checkout, so their fields
         # can't be required here.
         required_field_names = {
@@ -767,6 +935,7 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
         entry URL (utm_*, fbclid, landing_segment, anonymous_id). Stored under a
         namespaced key so an outbound purchase webhook can read it back later.
         """
+
         sections_snapshot: list[dict[str, Any]] = []
 
         ordered_sections = sorted(
@@ -815,6 +984,7 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
         products: list[PaymentProductRequest],
         *,
         granted_by_user_id: uuid.UUID | None = None,
+        replace_access: bool = False,
     ) -> Payments:
         """Auto-approve a $0 payment and materialize tickets, flush-only.
 
@@ -829,11 +999,14 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
         can participate in a larger atomic batch (admin grant) or be paired
         with caller-side commit + email dispatch (self-service flows).
         """
+
         payment.status = PaymentStatus.APPROVED.value
         if granted_by_user_id is not None:
             payment.granted_by_user_id = granted_by_user_id
-        self._add_products_to_attendees(session, products, payment_id=payment.id)
         session.flush()
+        self._reconcile_payment_fulfillment(
+            session, payment, replace_access=replace_access
+        )
         return payment
 
     def preview_open_ticketing(
@@ -841,72 +1014,22 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
         session: Session,
         obj: "CheckoutPreviewRequest",
         popup: "Popups",
+        flow: "Any",
+        current_human: "HumanPublic | None" = None,
     ) -> "CheckoutPreviewResponse":
-        """Compute the authoritative price breakdown without creating anything.
+        """Evaluate the shared checkout gate and return its quote."""
+        from app.api.checkout.gate_quote import evaluate_gate_quote
 
-        Same product validation (membership + sale window) and same money math
-        as ``create_open_ticketing_payment``; no side effects.
-        """
-        from app.api.checkout.schemas import (
-            CheckoutPreviewLine,
-            CheckoutPreviewResponse,
-        )
-
-        product_ids = [line.product_id for line in obj.products]
-        products_statement = select(Products).where(
-            Products.id.in_(product_ids),  # type: ignore[attr-defined]
-            Products.popup_id == popup.id,
-            Products.is_active == True,  # noqa: E712
-            Products.deleted_at.is_(None),  # type: ignore[attr-defined]
-        )
-        valid_products = list(session.exec(products_statement).all())
-        if {p.id for p in valid_products} != set(product_ids):
-            raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                detail="Some products are not available or inactive",
-            )
-        for product in valid_products:
-            state = derive_product_state(ProductPublic.model_validate(product))
-            if state != ProductSaleState.on_sale:
-                raise HTTPException(
-                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                    detail=(
-                        f"Product '{product.name}' is not on sale "
-                        f"(state: {state.value})"
-                    ),
-                )
-
-        products_map = {p.id: p for p in valid_products}
-        amounts = compute_open_ticketing_amounts(
+        return evaluate_gate_quote(
             session,
             popup,
-            products_map,
+            flow,
             obj.products,
             coupon_code=obj.coupon_code,
             insurance=obj.insurance,
-        )
-        return CheckoutPreviewResponse(
-            lines=[
-                CheckoutPreviewLine(
-                    product_id=line.product_id,
-                    quantity=line.quantity,
-                    unit_price=line.unit_price,
-                    line_total=line.line_total,
-                    discountable=line.discountable,
-                )
-                for line in amounts.lines
-            ],
-            discountable_amount=amounts.discountable_amount,
-            non_discountable_amount=amounts.non_discountable_amount,
-            coupon_code=amounts.coupon_code,
-            discount_value=amounts.discount_value,
-            discount_amount=amounts.discount_amount,
-            post_discount_amount=amounts.post_discount_amount,
-            insurance_amount=amounts.insurance_amount,
-            contribution_amount=amounts.contribution_amount,
-            total=amounts.total_amount,
-            currency=amounts.currency,
-        )
+            buyer=obj.buyer,
+            current_human=current_human,
+        ).response
 
     def create_open_ticketing_payment(
         self,
@@ -914,7 +1037,9 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
         obj: "OpenTicketingPurchaseCreate",
         popup: "Popups",
         tenant: "Tenants",
+        flow_slug: str,
         attribution: dict[str, str | None] | None = None,
+        current_human: "HumanPublic | None" = None,
     ) -> tuple[Payments, str, str | None]:
         """Create an anonymous open-ticketing payment with per-ticket attendees.
 
@@ -923,30 +1048,58 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
         ``redirect_url`` is set only for the zero-amount bypass when the popup
         configures a custom open-checkout success URL — paid flows redirect via
         SimpleFi and return None.
+
+        The canonical flow slug resolves through the full `resolve_flow`
+        contract (unknown, unavailable, inactive, or wrong-type -> 404/403).
+        `assert_upsale_eligible` is a no-op unless the resolved flow is
+        upsale-type.
         """
+        from app.api.checkout.gate_quote import (
+            assert_quote_current,
+            evaluate_gate_quote,
+            resolve_checkout_flow,
+        )
         from app.api.popup.schemas import PopupStatus
-        from app.api.shared.enums import SaleType
+        from app.api.sales_flow.resolver import build_effective_config
+        from app.api.sales_flow.schemas import SalesFlowType
         from app.api.tenant.utils import get_portal_url
         from app.services.simplefi import get_simplefi_client
-
-        popup_statement = (
-            select(FormSections)
-            .where(FormSections.popup_id == popup.id)
-            .options(selectinload(FormSections.form_fields))  # ty: ignore[invalid-argument-type]
-            .order_by(FormSections.order)  # type: ignore[arg-type]
-        )
-        popup.form_sections = list(session.exec(popup_statement).all())
 
         if popup.status != PopupStatus.active.value:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Popup is not active",
             )
-        if popup.sale_type != SaleType.direct.value:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Popup does not support open ticketing",
-            )
+        # The flow decides. It is required at every anonymous checkout entry
+        # point, so no popup-level fallback can price or charge another flow.
+        target_flow = resolve_checkout_flow(
+            session,
+            popup,
+            flow_slug,
+            require_types={SalesFlowType.direct, SalesFlowType.upsale},
+        )
+        gate = evaluate_gate_quote(
+            session,
+            popup,
+            target_flow,
+            obj.products,
+            coupon_code=obj.coupon_code,
+            insurance=obj.insurance,
+            buyer=obj.buyer,
+            current_human=current_human,
+            lock_products=True,
+            require_complete=True,
+        )
+        if obj.quote_token:
+            assert_quote_current(obj.quote_token, gate)
+
+        popup_statement = (
+            select(FormSections)
+            .where(FormSections.sales_flow_id == target_flow.id)
+            .options(selectinload(FormSections.form_fields))  # ty: ignore[invalid-argument-type]
+            .order_by(FormSections.order)  # type: ignore[arg-type]
+        )
+        popup.form_sections = list(session.exec(popup_statement).all())
 
         buyer = humans_crud.find_or_create(
             session,
@@ -974,44 +1127,29 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
             buyer.last_name = obj.buyer.last_name
         session.add(buyer)
 
-        self._validate_open_ticketing_form_data(popup, obj.buyer.form_data)
-
-        product_ids = [line.product_id for line in obj.products]
-        products_statement = select(Products).where(
-            Products.id.in_(product_ids),  # type: ignore[attr-defined]
-            Products.popup_id == popup.id,
-            Products.is_active == True,  # noqa: E712
-            Products.deleted_at.is_(None),  # type: ignore[attr-defined]
-        )
-        valid_products = list(session.exec(products_statement).all())
-        if {product.id for product in valid_products} != set(product_ids):
-            raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                detail="Some products are not available or inactive",
-            )
-
-        # Reject products outside their sale window. Closes the stale-tab
-        # loophole where the UI was rendered before sale_ends_at passed.
-        for product in valid_products:
-            state = derive_product_state(ProductPublic.model_validate(product))
-            if state != ProductSaleState.on_sale:
-                raise HTTPException(
-                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                    detail=(
-                        f"Product '{product.name}' is not on sale "
-                        f"(state: {state.value})"
-                    ),
-                )
-
+        valid_products = gate.products
         products_map = {product.id: product for product in valid_products}
-        fabricated_requests = [
-            PaymentProductRequest(
-                product_id=line.product_id,
-                attendee_id=uuid.uuid4(),
-                quantity=line.quantity,
-            )
-            for line in obj.products
-        ]
+        selected_recipients = self._validate_recipient_requests(
+            session,
+            obj.recipients,
+            obj.products,
+            valid_products,
+            buyer_human_id=buyer.id,
+            tenant_id=tenant.id,
+            popup_id=popup.id,
+            sales_flow_id=target_flow.id,
+        )
+        self._validate_open_attendee_lines(
+            session,
+            obj.products,
+            valid_products,
+            buyer_human_id=buyer.id,
+            tenant_id=tenant.id,
+            popup_id=popup.id,
+            sales_flow_id=target_flow.id,
+        )
+        resolved_stays = gate.accommodation_lines
+        stay_prices = accommodation_payments.line_prices(resolved_stays)
         # ADR-2 supersede pre-step + advisory lock: the ENTIRE new machinery
         # (proof gate, supersede, advisory lock, sibling re-check) is gated on
         # SUPERSEDE_PENDING_ENABLED so that setting it to False restores exact
@@ -1052,7 +1190,12 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
             #   pending_payment_exists (NO SimpleFi call made).
             # Missing/invalid proof + no pending payment → proceed normally.
             _has_proof = self._validate_cart_continuity_proof(
-                session, popup, obj.buyer.email, obj.cid, obj.sig
+                session,
+                popup,
+                obj.buyer.email,
+                obj.cid,
+                obj.sig,
+                sales_flow_id=target_flow.id,
             )
 
             if _has_proof:
@@ -1065,6 +1208,7 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
                     email=obj.buyer.email,
                     popup_id=popup.id,
                     locale=obj.locale,
+                    return_context=obj.return_context,
                 )
 
                 # ADR-2 advisory lock: serialize concurrent open-checkout
@@ -1129,19 +1273,22 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
                     session, obj.buyer.email, popup.id
                 )
 
-            # Validate per-order caps (cheap in-memory check, fail fast before DB).
-            self._validate_max_per_order(fabricated_requests, valid_products)
             # Atomically decrement total-stock counters (409 if sold out).
-            self._decrement_total_stocks(session, fabricated_requests, valid_products)
+            self._decrement_total_stocks(session, obj.products, valid_products)
 
             # Store buyer email (lowercase) in snapshot for supersede JSONB lookup
             # on future payment attempts by the same buyer.
             buyer_snapshot["buyer_email"] = obj.buyer.email.lower()
+            buyer_snapshot["buyer_name"] = buyer_name
 
             payment = Payments(
                 tenant_id=tenant.id,
                 application_id=None,
                 popup_id=popup.id,
+                buyer_human_id=buyer.id,
+                # Provenance only (design D7) — the flow this payment was
+                # made through, never read back for authorization/pricing.
+                sales_flow_id=target_flow.id if target_flow is not None else None,
                 status=PaymentStatus.PENDING.value,
                 amount=Decimal("0"),
                 currency=popup.currency,
@@ -1154,15 +1301,8 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
             )
             session.add(payment)
             session.flush()
-
-            # One attendee per (human, popup) for direct sales — Design §2.1
-            attendee = attendees_crud.find_or_create_direct_attendee(
-                session,
-                human_id=buyer.id,
-                popup_id=popup.id,
-                tenant_id=tenant.id,
-                name=buyer_name,
-                email=obj.buyer.email,
+            recipient_snapshots = self._snapshot_recipients(
+                session, payment, selected_recipients
             )
 
             # Snapshot rows for the order (one PaymentProducts per unit).
@@ -1170,41 +1310,69 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
             # _add_products_to_attendees when the webhook confirms the payment.
             # Pre-creating them here caused duplicates (double the tickets) on
             # every approved checkout.
+            # Reserve the rooms first, so the booking id is already in each
+            # line's metadata when the snapshot rows below copy it. Same
+            # transaction as the payment: a failure anywhere releases them.
+            stay_bookings = accommodation_payments.create_holds(
+                session,
+                payment_id=payment.id,
+                resolved=resolved_stays,
+                lines=obj.products,
+                hold_expires_at=datetime.now(UTC)
+                + timedelta(minutes=_settings.PENDING_SWEEP_STALE_MINUTES),
+                human_id=buyer.id,
+                buyer_name=buyer_name,
+                buyer_email=obj.buyer.email,
+            )
+
             payment_products: list[PaymentProducts] = []
-            for line in obj.products:
+            for line_index, line in enumerate(obj.products):
                 product = products_map[line.product_id]
+                # For a stay this is the quote total, not the product's price:
+                # the product row only carries the base nightly rate.
+                stay_price = stay_prices.get(line_index)
                 for _ in range(line.quantity):
                     pp = PaymentProducts(
                         tenant_id=tenant.id,
                         payment_id=payment.id,
                         product_id=product.id,
-                        attendee_id=attendee.id,
+                        attendee_id=line.attendee_id,
+                        payment_recipient_id=(
+                            recipient_snapshots[line.recipient_key].id
+                            if line.recipient_key
+                            else None
+                        ),
                         quantity=1,
                         product_name=product.name,
                         product_description=product.description,
                         product_price=product.price,
                         product_category=product.category or "",
+                        requires_check_in_snapshot=product.requires_check_in,
                         product_currency=popup.currency,
+                        effective_unit_price=stay_price,
+                        purchase_metadata=line.purchase_metadata,
                     )
                     session.add(pp)
                     payment_products.append(pp)
 
+            if stay_bookings:
+                session.flush()
+                accommodation_payments.attach_payment_products(
+                    session, payment_id=payment.id, bookings=stay_bookings
+                )
+
             # Authoritative amounts — the SAME math POST /checkout/{slug}/preview
             # serves, so the displayed total always matches what is charged.
             # Coupon consumption stays deferred below (this computes only).
-            amounts = compute_open_ticketing_amounts(
-                session,
-                popup,
-                products_map,
-                obj.products,
-                coupon_code=obj.coupon_code,
-                insurance=obj.insurance,
-            )
+            amounts = gate.amounts
             if amounts.coupon_id is not None:
                 payment.coupon_id = amounts.coupon_id
                 payment.coupon_code = amounts.coupon_code
                 payment.discount_value = amounts.discount_value
 
+            # Dev's shared math already applied the coupon and both fees, and
+            # sharing it with /preview is what keeps the displayed total equal
+            # to the charged one. The flow it was handed decided all three.
             post_discount_amount = amounts.post_discount_amount
             payment.amount = post_discount_amount
 
@@ -1215,7 +1383,12 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
                 payment.insurance_amount = amounts.insurance_amount
                 payment.amount += amounts.insurance_amount
 
-            if popup.contribution_enabled and popup.contribution_percentage:
+            flow_fees = build_effective_config(target_flow) if target_flow else None
+            if (
+                flow_fees
+                and flow_fees.contribution_enabled
+                and flow_fees.contribution_percentage
+            ):
                 payment.contribution_amount = amounts.contribution_amount
                 payment.amount += amounts.contribution_amount
 
@@ -1239,9 +1412,14 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
                 exp=int(now.timestamp()) + 30 * 60,
             )
             success_redirect = _resolve_open_checkout_success_url(
-                popup,
+                target_flow,
                 _internal_open_checkout_thank_you_url(
-                    portal_base, landing_is_checkout, popup, payment
+                    portal_base,
+                    landing_is_checkout,
+                    popup,
+                    payment,
+                    flow_slug=target_flow.slug,
+                    return_context=obj.return_context,
                 ),
                 thank_you_payload,
                 locale=obj.locale or popup.default_language or "en",
@@ -1265,7 +1443,9 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
                         PaymentProductRequest(
                             product_id=pp.product_id,
                             attendee_id=pp.attendee_id,
+                            recipient_key=pp.recipient_key,
                             quantity=pp.quantity,
+                            purchase_metadata=pp.purchase_metadata,
                         )
                         for pp in payment_products
                     ],
@@ -1290,15 +1470,15 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
 
             # SimpleFi performs the redirect, so hand it the resolved success URL
             # (custom-signed, or the portal thank-you with the order data). The
-            # cancel URL stays the landing-aware portal page unless the popup
-            # overrides it. Application fee / pass purchase are untouched.
+            # cancel URL returns to this sales flow unless it overrides it.
+            # Application-backed payments use their own redirects below.
             success_url = success_redirect
-            if landing_is_checkout:
-                cancel_url = f"{portal_base}/?cancelled=1"
-            else:
-                cancel_url = f"{portal_base}/checkout/{popup.slug}?cancelled=1"
-            if popup.open_checkout_cancel_url:
-                cancel_url = popup.open_checkout_cancel_url
+            cancel_url = _resolve_open_checkout_cancel_url(
+                target_flow,
+                portal_base,
+                popup,
+                locale=obj.locale or popup.default_language or "en",
+            )
             reference = {
                 "email": buyer.email,
                 "human_id": str(buyer.id),
@@ -1320,15 +1500,16 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
             # is all SimpleFi needs to create a plan.
             max_installments: int | None = None
             if (
-                popup.installments_enabled
-                and popup.installments_deadline is not None
-                and popup.installments_max is not None
+                flow_fees
+                and flow_fees.installments_enabled
+                and flow_fees.installments_deadline is not None
+                and flow_fees.installments_max is not None
             ):
                 computed = _calculate_max_installments(
-                    popup.installments_deadline,
-                    popup.installments_max,
-                    popup.installments_interval,
-                    popup.installments_interval_count,
+                    flow_fees.installments_deadline,
+                    flow_fees.installments_max,
+                    _installment_interval(flow_fees),
+                    _installment_interval_count(flow_fees),
                 )
                 if computed >= 2:
                     max_installments = computed
@@ -1354,8 +1535,8 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
                 success_path=success_url,
                 cancel_path=cancel_url,
                 max_installments=max_installments,
-                installment_interval=popup.installments_interval,
-                installment_interval_count=popup.installments_interval_count,
+                installment_interval=_installment_interval(flow_fees),
+                installment_interval_count=_installment_interval_count(flow_fees),
                 user_email=buyer.email,
                 plan_name=popup.name,
                 success_behavior=popup.simplefi_success_behavior,
@@ -1430,20 +1611,26 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
             )
         )
 
-        # Direct-sale leg: payment has a product snapshot linked to an attendee
-        # with human_id == human_id and popup_id == popup_id (no application)
+        # Direct-sale leg: payment itself has no application, but its product
+        # snapshot can legitimately reuse an attendee linked to one. Ownership
+        # follows that real attendee's Human, not the attendee's origin.
         direct_leg = (
             select(Payments.id)
             .join(PaymentProducts, PaymentProducts.payment_id == Payments.id)  # type: ignore[arg-type]
             .join(Attendees, PaymentProducts.attendee_id == Attendees.id)  # type: ignore[arg-type]
             .where(
+                Payments.application_id.is_(None),  # type: ignore[union-attr]
                 Attendees.human_id == human_id,
                 Attendees.popup_id == popup_id,
-                Attendees.application_id.is_(None),  # type: ignore[union-attr]
             )
         )
 
-        union_ids = app_leg.union(direct_leg).subquery()
+        snapshot_leg = select(Payments.id).where(
+            Payments.buyer_human_id == human_id,
+            Payments.popup_id == popup_id,
+        )
+
+        union_ids = app_leg.union(direct_leg, snapshot_leg).subquery()
 
         count_statement = select(func.count()).where(
             Payments.id.in_(select(union_ids.c.id))  # type: ignore[arg-type]
@@ -1473,6 +1660,7 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
         limit: int = 100,
     ) -> tuple[list[Payments], int]:
         """Find payments by application_id."""
+
         statement = select(Payments).where(Payments.application_id == application_id)
 
         count_statement = select(func.count()).select_from(statement.subquery())
@@ -1490,6 +1678,7 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
         application_id: uuid.UUID,
     ) -> Payments | None:
         """Get the most recent payment for an application."""
+
         statement = (
             select(Payments)
             .where(Payments.application_id == application_id)
@@ -1529,6 +1718,7 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
         - Application payment: application.human_id matches current human.
         - Direct-sale payment: any snapshot attendee human_id matches current human.
         """
+
         statement = (
             select(Payments)
             .where(Payments.id == payment_id)
@@ -1544,6 +1734,9 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
         payment = session.exec(statement).first()
         if payment is None:
             return None
+
+        if payment.buyer_human_id == current_human_id:
+            return payment
 
         if (
             payment.application is not None
@@ -1571,6 +1764,7 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
         """
         from app.api.application.schemas import ApplicationStatus
         from app.api.payment.schemas import PaymentStatus, PaymentType
+        from app.api.sales_flow.resolver import config_for  # noqa: PLC0415
         from app.api.tenant.utils import get_portal_url
 
         # 1. Validate application is pending fee
@@ -1580,10 +1774,15 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
                 detail="Application is not awaiting fee payment",
             )
 
-        # 2. Validate popup is configured for fee
-        application_fee_amount = popup.application_fee_amount
+        # 2. Validate the flow this application came through charges a fee
+        fee_config = config_for(
+            session,
+            sales_flow_id=application.sales_flow_id,
+            popup_id=application.popup_id,
+        )
+        application_fee_amount = fee_config.application_fee_amount
         if (
-            not popup.requires_application_fee
+            not fee_config.requires_application_fee
             or application_fee_amount is None
             or application_fee_amount <= 0
         ):
@@ -1660,10 +1859,16 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
 
         simplefi_client = get_simplefi_client(simplefi_api_key)
 
-        # Build success/cancel paths for fee flow
+        # Keep both returns scoped to the application that incurred this fee.
         portal_base = get_portal_url(popup.tenant)
-        success_path = f"{portal_base}/portal/{popup.slug}/application?checkout=success"
-        cancel_path = f"{portal_base}/portal/{popup.slug}/application"
+        cancel_path = (
+            f"{portal_base}/portal/{popup.slug}/application"
+            f"?flow={application.sales_flow_id}"
+        )
+        success_path = (
+            f"{portal_base}/portal/{popup.slug}"
+            f"?flow={application.sales_flow_id}&checkout=success"
+        )
 
         reference = {
             "email": application.human.email if application.human else "",
@@ -1713,6 +1918,8 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
             tenant_id=application.tenant_id,
             application_id=application.id,
             popup_id=application.popup_id,
+            buyer_human_id=application.human_id,
+            sales_flow_id=application.sales_flow_id,
             status=simplefi_response.status,
             amount=fee_amount,
             currency=popup.currency,
@@ -1782,10 +1989,24 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
                 )
                 .exists()
             )
+            application_buyer_match = (
+                select(Applications.id)
+                .join(Humans, Applications.human_id == Humans.id)
+                .where(
+                    Applications.id == Payments.application_id,
+                    or_(
+                        Humans.email.ilike(pattern),
+                        Humans.first_name.ilike(pattern),
+                        Humans.last_name.ilike(pattern),
+                    ),
+                )
+                .exists()
+            )
             statement = statement.where(
                 or_(
                     Payments.external_id.ilike(pattern),
                     attendee_match,
+                    application_buyer_match,
                 )
             )
 
@@ -1973,7 +2194,13 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
         application: Applications,
     ) -> None:
         """Validate that all attendees belong to this application."""
-        attendee_ids = {p.attendee_id for p in requested_products}
+        attendee_ids = {
+            product.attendee_id
+            for product in requested_products
+            if product.attendee_id is not None
+        }
+        if not attendee_ids:
+            return
         statement = select(Attendees).where(
             Attendees.id.in_(attendee_ids),  # type: ignore[attr-defined]
             Attendees.application_id == application.id,
@@ -1986,17 +2213,619 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
                 detail="Some attendees do not belong to this application",
             )
 
+    @staticmethod
+    def _recipient_error() -> HTTPException:
+        return HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Recipient is not valid for this payment",
+        )
+
+    def _validate_recipient_requests(
+        self,
+        session: Session,
+        recipients: list[PaymentRecipientRequest],
+        lines: Any,
+        products: list[Products],
+        *,
+        buyer_human_id: uuid.UUID,
+        tenant_id: uuid.UUID,
+        popup_id: uuid.UUID,
+        application_id: uuid.UUID | None = None,
+        sales_flow_id: uuid.UUID | None = None,
+    ) -> list[PaymentRecipientRequest]:
+        """Validate every referenced recipient and select recipient-owned snapshots."""
+        products_by_id = {product.id: product for product in products}
+        recipients_by_key = {
+            recipient.recipient_key: recipient for recipient in recipients
+        }
+        if len(recipients_by_key) != len(recipients):
+            raise self._recipient_error()
+        referenced: set[str] = set()
+        snapshot_keys: set[str] = set()
+        ticket_recipient_keys = {
+            line.recipient_key
+            for line in lines
+            if line.recipient_key is not None
+            and line.product_id in products_by_id
+            and (products_by_id[line.product_id].category or "").lower() == "ticket"
+        }
+        product_role_eligibility = (
+            flow_product_recipient_category_ids(session, sales_flow_id, popup_id)
+            if sales_flow_id is not None
+            else {}
+        )
+        if sales_flow_id is not None:
+            from app.api.ticketing_step.models import TicketingSteps
+
+            has_ticket_recipient_config = (
+                session.exec(
+                    select(TicketingSteps.id).where(
+                        TicketingSteps.sales_flow_id == sales_flow_id,
+                        TicketingSteps.popup_id == popup_id,
+                        TicketingSteps.is_enabled == True,  # noqa: E712
+                        TicketingSteps.template == "ticket-select",
+                    )
+                ).first()
+                is not None
+            )
+        else:
+            has_ticket_recipient_config = False
+        payment_context = Payments(
+            tenant_id=tenant_id,
+            popup_id=popup_id,
+            buyer_human_id=buyer_human_id,
+            application_id=application_id,
+            sales_flow_id=sales_flow_id,
+        )
+        for line in lines:
+            product = products_by_id.get(line.product_id)
+            if product is None:
+                raise self._recipient_error()
+            accepts_recipient = self._product_accepts_recipient(
+                session, product, sales_flow_id=sales_flow_id
+            )
+            if accepts_recipient and (
+                (line.attendee_id is None) == (line.recipient_key is None)
+            ):
+                raise HTTPException(
+                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                    detail="Payment product identity is not valid",
+                )
+            recipient = recipients_by_key.get(line.recipient_key)
+            if line.recipient_key is not None:
+                referenced.add(line.recipient_key)
+                if accepts_recipient:
+                    snapshot_keys.add(line.recipient_key)
+            self._resolve_unit_recipient(
+                session, payment_context, line, product, recipient
+            )
+
+        validated = [
+            recipient
+            for recipient in recipients
+            if recipient.recipient_key in referenced
+        ]
+        if referenced - set(recipients_by_key):
+            raise self._recipient_error()
+        if (
+            session.exec(
+                select(Humans.id).where(
+                    Humans.id == buyer_human_id,
+                    Humans.tenant_id == tenant_id,
+                )
+            ).first()
+            is None
+        ):
+            raise self._recipient_error()
+
+        attendee_ids = {
+            recipient.existing_attendee_id
+            for recipient in validated
+            if recipient.existing_attendee_id is not None
+        }
+        attendees_by_id = {
+            attendee.id: attendee
+            for attendee in session.exec(
+                select(Attendees).where(
+                    Attendees.id.in_(attendee_ids),  # type: ignore[attr-defined]
+                    Attendees.tenant_id == tenant_id,
+                    Attendees.popup_id == popup_id,
+                )
+            ).all()
+        }
+        historical_category_ids = {
+            attendee.category_id
+            for attendee in attendees_by_id.values()
+            if attendee.category_id is not None
+        }
+        historical_primary_category_ids = set(
+            session.exec(
+                select(AttendeeCategories.id).where(
+                    AttendeeCategories.id.in_(historical_category_ids),  # type: ignore[attr-defined]
+                    AttendeeCategories.tenant_id == tenant_id,
+                    AttendeeCategories.popup_id == popup_id,
+                    AttendeeCategories.is_primary.is_(True),  # type: ignore[union-attr]
+                )
+            ).all()
+        )
+        application_is_owned_by_buyer = (
+            application_id is not None
+            and session.exec(
+                select(Applications.id).where(
+                    Applications.id == application_id,
+                    Applications.human_id == buyer_human_id,
+                    Applications.tenant_id == tenant_id,
+                    Applications.popup_id == popup_id,
+                )
+            ).first()
+            is not None
+        )
+        legacy_self_attendee_ids = {
+            attendee.id
+            for attendee in attendees_by_id.values()
+            if application_is_owned_by_buyer
+            and attendee.application_id == application_id
+            and attendee.human_id is None
+            and attendee.managed_by_human_id in (None, buyer_human_id)
+            and (
+                attendee.category_id is None
+                or attendee.category_id in historical_primary_category_ids
+            )
+        }
+        primary_category = (
+            session.exec(
+                select(AttendeeCategories).where(
+                    AttendeeCategories.sales_flow_id == sales_flow_id,
+                    AttendeeCategories.tenant_id == tenant_id,
+                    AttendeeCategories.popup_id == popup_id,
+                    AttendeeCategories.is_primary.is_(True),  # type: ignore[union-attr]
+                    AttendeeCategories.deleted_at.is_(None),  # type: ignore[union-attr]
+                )
+            ).first()
+            if sales_flow_id is not None
+            else None
+        )
+        primary_category_id = primary_category.id if primary_category else None
+        primary_role_recipient_keys: set[str] = set()
+
+        for recipient in validated:
+            if recipient.human_id is not None and recipient.human_id != buyer_human_id:
+                raise self._recipient_error()
+            if recipient.human_id is not None and recipient.existing_attendee_id:
+                raise self._recipient_error()
+            legacy_self = recipient.existing_attendee_id in legacy_self_attendee_ids
+            direct_self = (
+                application_id is None
+                and recipient.recipient_key in ticket_recipient_keys
+                and primary_category_id is not None
+                and recipient.human_id is None
+                and recipient.existing_attendee_id is None
+                and recipient.category_id in (None, primary_category_id)
+            )
+            uses_primary_role = (
+                recipient.human_id == buyer_human_id or legacy_self or direct_self
+            )
+            if direct_self:
+                recipient.human_id = buyer_human_id
+            if uses_primary_role:
+                primary_role_recipient_keys.add(recipient.recipient_key)
+                if recipient.category_id is None:
+                    recipient.category_id = primary_category_id
+
+        recipient_identities = [
+            self._recipient_person_identity(recipient) for recipient in validated
+        ]
+        if len(recipient_identities) != len(set(recipient_identities)):
+            raise self._recipient_error()
+
+        category_ids = {
+            recipient.category_id
+            for recipient in validated
+            if recipient.category_id is not None
+        }
+        categories_by_id = {
+            category.id: category
+            for category in session.exec(
+                select(AttendeeCategories).where(
+                    AttendeeCategories.id.in_(category_ids),  # type: ignore[attr-defined]
+                    AttendeeCategories.tenant_id == tenant_id,
+                    AttendeeCategories.popup_id == popup_id,
+                    AttendeeCategories.deleted_at.is_(None),  # type: ignore[union-attr]
+                )
+            ).all()
+        }
+
+        for recipient in validated:
+            category = categories_by_id.get(recipient.category_id)
+            if recipient.category_id is not None and (
+                category is None
+                or (
+                    sales_flow_id is not None
+                    and category.sales_flow_id != sales_flow_id
+                )
+            ):
+                raise self._recipient_error()
+            if (
+                recipient.recipient_key in primary_role_recipient_keys
+                and recipient.category_id != primary_category_id
+            ):
+                raise self._recipient_error()
+            if (
+                category is not None
+                and recipient.recipient_key not in primary_role_recipient_keys
+                and category.is_primary
+            ):
+                raise self._recipient_error()
+            existing = attendees_by_id.get(recipient.existing_attendee_id)
+            if recipient.existing_attendee_id is not None:
+                accessible = attendees_crud.get_for_human_popup(
+                    session,
+                    attendee_id=recipient.existing_attendee_id,
+                    human_id=buyer_human_id,
+                    popup_id=popup_id,
+                    tenant_id=tenant_id,
+                )
+                if existing is None or accessible is None:
+                    raise self._recipient_error()
+                if existing.human_id == buyer_human_id:
+                    raise self._recipient_error()
+
+            if category is not None:
+                validate_required_fields(
+                    category.required_fields or [],
+                    {
+                        **recipient.profile_snapshot,
+                        "name": recipient.name,
+                        "email": str(recipient.email) if recipient.email else None,
+                    },
+                )
+            for line in lines:
+                if line.recipient_key != recipient.recipient_key:
+                    continue
+                product = products_by_id[line.product_id]
+                if (
+                    sales_flow_id is not None
+                    and (product.category or "").lower() == "ticket"
+                ):
+                    allowed_roles = product_role_eligibility.get(product.id)
+                    if (
+                        has_ticket_recipient_config
+                        and product.id not in product_role_eligibility
+                    ):
+                        raise self._recipient_error()
+                    if (
+                        product.id in product_role_eligibility
+                        and allowed_roles is not None
+                        and recipient.category_id not in allowed_roles
+                    ):
+                        raise self._recipient_error()
+        selected = [
+            recipient
+            for recipient in validated
+            if recipient.recipient_key in snapshot_keys
+        ]
+        if application_id is not None and sales_flow_id is not None:
+            self._enforce_recipient_category_limits(
+                session,
+                application_id=application_id,
+                sales_flow_id=sales_flow_id,
+                current_recipients=selected,
+                categories_by_id=categories_by_id,
+            )
+        return selected
+
+    @staticmethod
+    def _recipient_person_identity(
+        recipient: PaymentRecipientRequest | PaymentRecipients,
+    ) -> tuple[str, str]:
+        if recipient.human_id is not None:
+            return ("human", str(recipient.human_id))
+        attendee_id = getattr(recipient, "attendee_id", None)
+        if attendee_id is not None or recipient.existing_attendee_id is not None:
+            return ("attendee", str(attendee_id or recipient.existing_attendee_id))
+        return ("draft", recipient.recipient_key)
+
+    def _enforce_recipient_category_limits(
+        self,
+        session: Session,
+        *,
+        application_id: uuid.UUID,
+        sales_flow_id: uuid.UUID,
+        current_recipients: list[PaymentRecipientRequest | PaymentRecipients],
+        categories_by_id: dict[uuid.UUID, AttendeeCategories],
+    ) -> None:
+        capped_categories = {
+            category_id: category
+            for category_id, category in categories_by_id.items()
+            if category.max_per_application is not None
+        }
+        if not capped_categories:
+            return
+
+        approved_recipients = list(
+            session.exec(
+                select(PaymentRecipients)
+                .join(Payments, Payments.id == PaymentRecipients.payment_id)
+                .join(
+                    PaymentProducts,
+                    PaymentProducts.payment_recipient_id == PaymentRecipients.id,
+                )
+                .where(
+                    Payments.application_id == application_id,
+                    Payments.sales_flow_id == sales_flow_id,
+                    Payments.status == PaymentStatus.APPROVED.value,
+                    PaymentProducts.payment_id == Payments.id,
+                    PaymentRecipients.category_id.in_(  # type: ignore[attr-defined]
+                        capped_categories
+                    ),
+                )
+                .distinct()
+            ).all()
+        )
+        identities_by_category: dict[uuid.UUID, set[tuple[str, str]]] = {
+            category_id: set() for category_id in capped_categories
+        }
+        for recipient in approved_recipients:
+            if recipient.category_id in identities_by_category:
+                identities_by_category[recipient.category_id].add(
+                    self._recipient_person_identity(recipient)
+                )
+        for recipient in current_recipients:
+            if recipient.category_id in identities_by_category:
+                identities_by_category[recipient.category_id].add(
+                    self._recipient_person_identity(recipient)
+                )
+
+        for category_id, category in capped_categories.items():
+            identities = identities_by_category[category_id]
+            if len(identities) > category.max_per_application:
+                raise self._recipient_error()
+
+    def _enforce_payment_recipient_limits_for_approval(
+        self, session: Session, payment: Payments
+    ) -> None:
+        """Recheck cumulative recipient limits at the approval boundary."""
+        if payment.application_id is None or payment.sales_flow_id is None:
+            return
+
+        application_id = session.exec(
+            select(Applications.id)
+            .where(
+                Applications.id == payment.application_id,
+                Applications.tenant_id == payment.tenant_id,
+                Applications.popup_id == payment.popup_id,
+                Applications.sales_flow_id == payment.sales_flow_id,
+            )
+            .with_for_update()
+        ).first()
+        if application_id is None:
+            raise self._fulfillment_error()
+
+        current_recipients = list(
+            session.exec(
+                select(PaymentRecipients)
+                .join(
+                    PaymentProducts,
+                    PaymentProducts.payment_recipient_id == PaymentRecipients.id,
+                )
+                .where(
+                    PaymentRecipients.payment_id == payment.id,
+                    PaymentProducts.payment_id == payment.id,
+                )
+                .distinct()
+            ).all()
+        )
+        category_ids = {
+            recipient.category_id
+            for recipient in current_recipients
+            if recipient.category_id is not None
+        }
+        if not category_ids:
+            return
+
+        categories_by_id = {
+            category.id: category
+            for category in session.exec(
+                select(AttendeeCategories).where(
+                    AttendeeCategories.id.in_(category_ids),  # type: ignore[attr-defined]
+                    AttendeeCategories.tenant_id == payment.tenant_id,
+                    AttendeeCategories.popup_id == payment.popup_id,
+                    AttendeeCategories.sales_flow_id == payment.sales_flow_id,
+                    AttendeeCategories.deleted_at.is_(None),  # type: ignore[union-attr]
+                )
+            ).all()
+        }
+        self._enforce_recipient_category_limits(
+            session,
+            application_id=payment.application_id,
+            sales_flow_id=payment.sales_flow_id,
+            current_recipients=current_recipients,
+            categories_by_id=categories_by_id,
+        )
+
+    def _validate_open_attendee_lines(
+        self,
+        session: Session,
+        lines: Any,
+        products: list[Products],
+        *,
+        buyer_human_id: uuid.UUID,
+        tenant_id: uuid.UUID,
+        popup_id: uuid.UUID,
+        sales_flow_id: uuid.UUID | None = None,
+    ) -> None:
+        """Validate explicit legacy attendee lines in open checkout."""
+        attendee_ids = {line.attendee_id for line in lines if line.attendee_id}
+        if not attendee_ids:
+            return
+        attendees = {
+            attendee.id: attendee
+            for attendee in session.exec(
+                select(Attendees).where(Attendees.id.in_(attendee_ids))  # type: ignore[attr-defined]
+            ).all()
+        }
+        products_by_id = {product.id: product for product in products}
+        for line in lines:
+            if line.attendee_id is None:
+                continue
+            attendee = attendees.get(line.attendee_id)
+            product = products_by_id.get(line.product_id)
+            if attendee is None or product is None:
+                raise self._recipient_error()
+            self._resolve_unit_recipient(
+                session,
+                Payments(
+                    tenant_id=tenant_id,
+                    popup_id=popup_id,
+                    buyer_human_id=buyer_human_id,
+                    sales_flow_id=sales_flow_id,
+                ),
+                line,
+                product,
+            )
+
+    @staticmethod
+    def _product_accepts_recipient(
+        session: Session,
+        product: Products,
+        *,
+        sales_flow_id: uuid.UUID | None,
+    ) -> bool:
+        if product.managed_by == PRODUCT_MANAGED_BY_ACCOMMODATION:
+            return True
+        if (product.category or "").lower() == "ticket":
+            return True
+        if sales_flow_id is None:
+            return False
+        from app.api.ticketing_step.models import TicketingSteps
+
+        configs = session.exec(
+            select(TicketingSteps.template_config).where(
+                TicketingSteps.popup_id == product.popup_id,
+                TicketingSteps.sales_flow_id == sales_flow_id,
+                TicketingSteps.template == "meal-plan-select",
+                TicketingSteps.is_enabled == True,  # noqa: E712
+            )
+        ).all()
+        matches = sum(
+            str(item.get("product_id")) == str(product.id)
+            for config in configs
+            for section in (config or {}).get("sections") or []
+            for item in section.get("products") or []
+        )
+        return matches == 1
+
+    def _resolve_unit_recipient(
+        self,
+        session: Session,
+        payment: Payments,
+        line: Any,
+        product: Products,
+        recipient: PaymentRecipientRequest | PaymentRecipients | None = None,
+    ) -> Attendees | None:
+        """Resolve self or centrally authorized existing-attendee identity."""
+        selected_id = line.attendee_id or (
+            recipient.existing_attendee_id if recipient is not None else None
+        )
+        has_recipient = selected_id is not None or recipient is not None
+        is_validated_snapshot = isinstance(recipient, PaymentRecipients)
+        if not is_validated_snapshot and not self._product_accepts_recipient(
+            session, product, sales_flow_id=payment.sales_flow_id
+        ):
+            if has_recipient:
+                raise self._recipient_error()
+            return None
+        if recipient is not None and recipient.human_id is not None:
+            if (
+                selected_id is not None
+                or payment.buyer_human_id is None
+                or recipient.human_id != payment.buyer_human_id
+            ):
+                raise self._recipient_error()
+            attendee = session.exec(
+                select(Attendees)
+                .where(
+                    Attendees.tenant_id == payment.tenant_id,
+                    Attendees.popup_id == payment.popup_id,
+                    Attendees.human_id == recipient.human_id,
+                )
+                .order_by(Attendees.created_at, Attendees.id)
+            ).first()
+            if attendee is None:
+                return None
+            selected_id = attendee.id
+        if selected_id is None:
+            return None
+
+        attendee = session.get(Attendees, selected_id)
+        if (
+            attendee is None
+            or attendee.tenant_id != payment.tenant_id
+            or attendee.popup_id != payment.popup_id
+        ):
+            raise self._recipient_error()
+        buyer_human_id = payment.buyer_human_id
+        if (
+            buyer_human_id is None
+            or session.exec(
+                select(Humans.id).where(
+                    Humans.id == buyer_human_id,
+                    Humans.tenant_id == payment.tenant_id,
+                )
+            ).first()
+            is None
+        ):
+            raise self._recipient_error()
+        if attendee.human_id == buyer_human_id:
+            return attendee
+        authorized = attendees_crud.get_for_human_popup(
+            session,
+            attendee_id=attendee.id,
+            human_id=buyer_human_id,
+            popup_id=payment.popup_id,
+            tenant_id=payment.tenant_id,
+        )
+        if authorized is None:
+            raise self._recipient_error()
+        return attendee
+
+    @staticmethod
+    def _snapshot_recipients(
+        session: Session,
+        payment: Payments,
+        recipients: list[PaymentRecipientRequest],
+    ) -> dict[str, PaymentRecipients]:
+        snapshots: dict[str, PaymentRecipients] = {}
+        for recipient in recipients:
+            snapshot = PaymentRecipients(
+                tenant_id=payment.tenant_id,
+                payment_id=payment.id,
+                recipient_key=recipient.recipient_key,
+                human_id=recipient.human_id,
+                existing_attendee_id=recipient.existing_attendee_id,
+                name=recipient.name,
+                email=str(recipient.email) if recipient.email else None,
+                category_id=recipient.category_id,
+                profile_snapshot=recipient.profile_snapshot.copy(),
+            )
+            session.add(snapshot)
+            snapshots[recipient.recipient_key] = snapshot
+        session.flush()
+        return snapshots
+
     def _calculate_insurance(
         self,
         session: Session,
         requested_products: list[PaymentProductRequest],
         popup: "Popups | None" = None,
+        sales_flow_id: uuid.UUID | None = None,
     ) -> Decimal:
-        """Calculate insurance amount using popup.insurance_percentage and product.insurance_eligible.
+        """Insurance for an order, from the fee settings of the flow it is in.
 
-        Uses popup-level insurance settings (POPUP-6). Falls back to zero if popup is not provided
-        or popup insurance is disabled. The legacy per-product insurance_percentage field is no
-        longer read from this path.
+        The rate belongs to the flow being bought through, so a door can sell
+        without insurance while another offers it. Zero when there is no popup
+        to resolve a flow against, or when that flow has insurance off. The
+        legacy per-product `insurance_percentage` is not read from this path.
         """
         if popup is None:
             return Decimal("0")
@@ -2013,7 +2842,36 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
             for rp in requested_products
             if rp.product_id in product_models
         ]
-        return calculate_insurance_amount(popup, product_quantity_pairs)
+        from app.api.sales_flow.resolver import config_for  # noqa: PLC0415
+
+        return calculate_insurance_amount(
+            config_for(
+                session,
+                sales_flow_id=sales_flow_id,
+                popup_id=popup.id,
+            ),
+            product_quantity_pairs,
+        )
+
+    def _resolve_stays(
+        self,
+        session: Session,
+        popup: Any,
+        sales_flow_id: uuid.UUID,
+        products: list[PaymentProductRequest],
+    ) -> tuple[list[Any], dict[int, Decimal]]:
+        """Validate and price the accommodation lines of a request, if any.
+
+        A stay costs what its dates cost, so this has to run before the money
+        math — both in the preview and in the real purchase, or the buyer would
+        be shown one total and charged another. No-op for carts without a room.
+        """
+        if not any(accommodation_payments.is_accommodation_line(p) for p in products):
+            return [], {}
+        resolved = accommodation_payments.resolve_lines(
+            session, popup, sales_flow_id, products
+        )
+        return resolved, accommodation_payments.line_prices(resolved)
 
     def _apply_discounts(
         self,
@@ -2022,6 +2880,8 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
         application: Applications,
     ) -> PaymentPreview:
         """Calculate all discounts and return payment preview."""
+        from app.api.sales_flow.resolver import config_for  # noqa: PLC0415
+
         discount_assigned = Decimal("0")
 
         response = PaymentPreview(
@@ -2034,9 +2894,13 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
             discount_value=discount_assigned,
         )
 
+        _resolved_stays, stay_prices = self._resolve_stays(
+            session, application.popup, application.sales_flow_id, obj.products
+        )
         standard_amount, non_discountable_amount = _calculate_amounts(
             session,
             obj.products,
+            line_prices=stay_prices,
         )
 
         response.original_amount = standard_amount + non_discountable_amount
@@ -2073,6 +2937,7 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
                 session,
                 code=obj.coupon_code,
                 popup_id=application.popup_id,
+                flow_id=application.sales_flow_id,
             )
             coupon_discount = Decimal(str(coupon.discount_value))
             discounted_amount, discounted_credit_applied = _calculate_price(
@@ -2170,15 +3035,29 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
         # so skip the calc even when the toggle was persisted as true.
         if obj.insurance and pre_fee_amount > Decimal("0"):
             popup = application.popup if application else None
-            insurance_amount = self._calculate_insurance(session, obj.products, popup)
+            insurance_amount = self._calculate_insurance(
+                session,
+                obj.products,
+                popup,
+                sales_flow_id=application.sales_flow_id if application else None,
+            )
             response.insurance_amount = insurance_amount
             response.amount += insurance_amount
 
         # Calculate contribution fee (mandatory when popup enables it — no buyer opt-in).
         # Uses the pre-fee snapshot so contribution base does not include insurance.
         popup = application.popup if application else None
-        if popup and popup.contribution_enabled and popup.contribution_percentage:
-            contribution_amount = calculate_contribution_amount(popup, pre_fee_amount)
+        fees = (
+            config_for(
+                session,
+                sales_flow_id=application.sales_flow_id,
+                popup_id=application.popup_id,
+            )
+            if application
+            else None
+        )
+        if fees and fees.contribution_enabled and fees.contribution_percentage:
+            contribution_amount = calculate_contribution_amount(fees, pre_fee_amount)
             response.contribution_amount = contribution_amount
             response.amount += contribution_amount
 
@@ -2205,9 +3084,19 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
             )
 
         self._validate_application(application)
-        self._validate_products(session, obj.products, application)
+        valid_products = self._validate_products(session, obj.products, application)
         self._validate_attendees(session, obj.products, application)
-
+        self._validate_recipient_requests(
+            session,
+            obj.recipients,
+            obj.products,
+            valid_products,
+            buyer_human_id=application.human_id,
+            tenant_id=application.tenant_id,
+            popup_id=application.popup_id,
+            application_id=application.id,
+            sales_flow_id=application.sales_flow_id,
+        )
         return self._apply_discounts(session, obj, application)
 
     def _find_recent_duplicate_payment(
@@ -2230,8 +3119,25 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
         )
 
         incoming_fingerprint = sorted(
-            (p.product_id, p.attendee_id, p.quantity) for p in obj.products
+            (
+                p.product_id,
+                ("attendee", str(p.attendee_id))
+                if p.attendee_id
+                else ("recipient", p.recipient_key or ""),
+                p.quantity,
+            )
+            for p in obj.products
         )
+        referenced_recipient_keys = {
+            product.recipient_key
+            for product in obj.products
+            if product.recipient_key is not None
+        }
+        incoming_recipients = {
+            recipient.recipient_key: recipient.model_dump(mode="json")
+            for recipient in obj.recipients
+            if recipient.recipient_key in referenced_recipient_keys
+        }
 
         candidates = list(
             session.exec(
@@ -2242,17 +3148,45 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
                     Payments.created_at >= window_start,
                     Payments.amount == preview.amount,
                 )
-                .options(selectinload(Payments.products_snapshot))  # type: ignore[arg-type]
+                .options(
+                    selectinload(Payments.products_snapshot),  # type: ignore[arg-type]
+                    selectinload(Payments.recipients),  # type: ignore[arg-type]
+                )
                 .order_by(desc(Payments.created_at))
             ).all()
         )
 
         for candidate in candidates:
             snapshot = sorted(
-                (pp.product_id, pp.attendee_id, pp.quantity)
+                (
+                    pp.product_id,
+                    ("attendee", str(pp.attendee_id))
+                    if pp.attendee_id
+                    else ("recipient", pp.recipient_key or ""),
+                    pp.quantity,
+                )
                 for pp in candidate.products_snapshot
             )
-            if snapshot == incoming_fingerprint:
+            candidate_recipients = {
+                recipient.recipient_key: {
+                    "recipient_key": recipient.recipient_key,
+                    "human_id": str(recipient.human_id) if recipient.human_id else None,
+                    "existing_attendee_id": str(recipient.existing_attendee_id)
+                    if recipient.existing_attendee_id
+                    else None,
+                    "name": recipient.name,
+                    "email": recipient.email,
+                    "category_id": str(recipient.category_id)
+                    if recipient.category_id
+                    else None,
+                    "profile_snapshot": recipient.profile_snapshot,
+                }
+                for recipient in candidate.recipients
+            }
+            if (
+                snapshot == incoming_fingerprint
+                and candidate_recipients == incoming_recipients
+            ):
                 return candidate
 
         return None
@@ -2279,9 +3213,95 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
         )
         return session.exec(statement).first()
 
+    def _enforce_restrictions_for_application(
+        self,
+        session: Session,
+        application_id: uuid.UUID,
+        obj: "PaymentCreate",
+    ) -> None:
+        """sdd/sales-flows slice 12 (design D5/D6): restriction_rule +
+        D3 flow-exclusivity gate for the authenticated purchase path
+        (`create_payment`). Read-only — raises 403/404, never mutates.
+
+        No-op (fail open, matching the anonymous path's own degrade
+        precedent — slice 13 deviation #2) when the application has no
+        resolvable flow, e.g. a legacy fixture popup built directly in the
+        DB without task 5.0's default-flow provisioning.
+        """
+        from app.api.sales_flow.crud import sales_flows_crud
+        from app.services.restrictions.context import build_context
+        from app.services.restrictions.enforcement import assert_products_allowed
+
+        application = self._get_application_with_products(session, application_id)
+        if application is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Application not found",
+            )
+
+        flow = sales_flows_crud.get(session, application.sales_flow_id)
+        if flow is None:
+            return
+
+        context = build_context(
+            session,
+            application.popup,
+            flow,
+            human=application.human,
+            application=application,
+        )
+        assert_products_allowed(
+            session,
+            flow,
+            application.popup,
+            [p.product_id for p in obj.products],
+            context,
+        )
+
     # Idempotency window for duplicate-submit detection. Anything outside
     # this window is treated as a legitimate new purchase intent.
     _DUPLICATE_WINDOW_SECONDS = 300
+
+    def resolve_application_payment_success_url(
+        self,
+        session: Session,
+        payment: Payments,
+        application: Applications,
+        *,
+        locale: str | None,
+        return_context: str,
+    ) -> str:
+        """Resolve the approved application payment destination for the API."""
+        from app.api.sales_flow.models import SalesFlows  # noqa: PLC0415
+
+        flow = session.get(SalesFlows, application.sales_flow_id)
+        if flow is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Sales flow not found",
+            )
+
+        return _resolve_application_payment_success_url(
+            flow,
+            application,
+            payment.id,
+            items=[
+                {
+                    "title": line.product_name,
+                    "qty": line.quantity,
+                    "price": float(
+                        line.effective_unit_price
+                        if line.effective_unit_price is not None
+                        else line.product_price
+                    ),
+                }
+                for line in payment.products_snapshot
+            ],
+            amount=payment.amount,
+            currency=payment.currency,
+            locale=locale,
+            return_context=return_context,
+        )
 
     def create_payment(
         self,
@@ -2306,7 +3326,31 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
         omitted (e.g. in background flows or tests that do not have a portal
         user), the system actor is used as the fallback.
         """
+        from app.api.sales_flow.resolver import config_for  # noqa: PLC0415
+
         application_id = _require_application_id(obj.application_id)
+
+        # Removed passes are omitted from edit requests, not sent with zero units.
+        # Reject invalid lines before preview or superseding an existing payment.
+        if any(product.quantity <= 0 for product in obj.products):
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="Each product quantity must be at least 1.",
+            )
+
+        # sdd/sales-flows slice 12 (design D5/D6, call-site table): the
+        # restriction gate must run before the SUPERSEDE_PENDING_ENABLED
+        # block AND before the FOR UPDATE application lock below — a
+        # read-only check, so this is a separate, minimal fetch rather than
+        # reordering the rest of this function's well-tested structure
+        # (the full eager-loaded `application` is fetched again further
+        # down, once the lock/duplicate-short-circuit machinery needs it).
+        self._enforce_restrictions_for_application(session, application_id, obj)
+
+        # Superseding a pending provider payment is destructive. Reject an
+        # invalid recipient payload before that external cancellation, then
+        # preview again under the application lock for authoritative pricing.
+        self.preview_payment(session, obj)
 
         # ADR-2 supersede pre-step: cancel any prior PENDING SimpleFi payment
         # for this application BEFORE acquiring the application row lock and
@@ -2422,6 +3466,23 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
                 detail="Application not found",
             )
 
+        from app.api.sales_flow.models import SalesFlows  # noqa: PLC0415
+
+        target_flow = session.get(SalesFlows, application.sales_flow_id)
+        if target_flow is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Sales flow not found",
+            )
+
+        # Same resolution the preview just ran, repeated on purpose: it
+        # re-validates the dates and re-quotes immediately before the rooms are
+        # held, so a stay that became unbookable between preview and purchase is
+        # refused rather than sold.
+        resolved_stays, stay_prices = self._resolve_stays(
+            session, application.popup, application.sales_flow_id, obj.products
+        )
+
         # Block edit_passes when an installment plan is in flight on this
         # application. SimpleFi keeps charging the plan independent of our
         # state, so swapping passes would leave attendee products inconsistent
@@ -2448,6 +3509,18 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
                         "cancel it."
                     ),
                 )
+
+        selected_recipients = self._validate_recipient_requests(
+            session,
+            obj.recipients,
+            obj.products,
+            valid_products,
+            buyer_human_id=application.human_id,
+            tenant_id=application.tenant_id,
+            popup_id=application.popup_id,
+            application_id=application.id,
+            sales_flow_id=application.sales_flow_id,
+        )
 
         # Handle zero or negative amount (credit covers cost)
         if preview.amount <= 0:
@@ -2496,23 +3569,14 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
                     )
                 preview.credit_applied = current_stored_credit
 
-            # Clear existing products if editing passes
-            if obj.edit_passes:
-                # Build a temporary payment-like object to reuse _clear_application_products
-                attendee_ids = {p.attendee_id for p in obj.products}
-                statement = select(AttendeeProducts).where(
-                    AttendeeProducts.attendee_id.in_(attendee_ids)  # type: ignore[attr-defined]
-                )
-                existing_products = list(session.exec(statement).all())
-                for ap in existing_products:
-                    session.delete(ap)
-                session.flush()
-
             # Create payment record first so AttendeeProducts can link to it.
             payment = Payments(
                 tenant_id=application.tenant_id,
                 application_id=obj.application_id,
                 popup_id=application.popup_id,
+                buyer_human_id=application.human_id,
+                # Provenance only (design D7) — the application's own flow.
+                sales_flow_id=application.sales_flow_id,
                 status=PaymentStatus.APPROVED.value,
                 amount=preview.amount,
                 insurance_amount=preview.insurance_amount,
@@ -2532,6 +3596,9 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
             )
             session.add(payment)
             session.flush()
+            recipient_snapshots = self._snapshot_recipients(
+                session, payment, selected_recipients
+            )
 
             # Emit passes.edited audit event for the edit-passes settlement.
             # Placed here (after flush, payment.id is available) so the row is
@@ -2561,37 +3628,67 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
             )
             products_map = {p.id: p for p in session.exec(prod_statement).all()}
 
-            for req_prod in obj.products:
+            # Reserve the rooms before the snapshot rows copy the metadata:
+            # create_holds writes booking_id into each line. Zero-amount means
+            # nothing will ever be charged, so the booking is confirmed outright
+            # instead of waiting for a webhook that never fires.
+            stay_bookings = accommodation_payments.create_holds(
+                session,
+                payment_id=payment.id,
+                resolved=resolved_stays,
+                lines=obj.products,
+                confirmed=True,
+                human_id=application.human_id,
+                buyer_email=application.human.email if application.human else None,
+            )
+
+            for line_index, req_prod in enumerate(obj.products):
                 product = products_map.get(req_prod.product_id)
                 if product:
                     is_patreon = product.category == "patreon"
+                    stay_price = stay_prices.get(line_index)
                     payment_product = PaymentProducts(
                         tenant_id=application.tenant_id,
                         payment_id=payment.id,
                         product_id=req_prod.product_id,
                         attendee_id=req_prod.attendee_id,
+                        payment_recipient_id=(
+                            recipient_snapshots[req_prod.recipient_key].id
+                            if req_prod.recipient_key
+                            else None
+                        ),
                         quantity=req_prod.quantity,
                         product_name=product.name,
                         product_description=product.description,
                         product_price=Decimal("0") if is_patreon else product.price,
                         product_category=product.category or "",
+                        requires_check_in_snapshot=product.requires_check_in,
                         product_currency=preview.currency,
                         effective_unit_price=req_prod.unit_price_override
                         if is_patreon
-                        else None,
+                        else stay_price,
                         purchase_metadata=req_prod.purchase_metadata,
                     )
                     session.add(payment_product)
 
-            # Increment coupon usage if used
+            if stay_bookings:
+                session.flush()
+                accommodation_payments.attach_payment_products(
+                    session, payment_id=payment.id, bookings=stay_bookings
+                )
+
+            # Redeem in the same transaction as credit settlement and fulfillment.
             if preview.coupon_id:
-                coupons_crud.use_coupon(session, preview.coupon_id)
+                coupons_crud.use_coupon(session, preview.coupon_id, commit=False)
 
             # Clear cart after successful purchase
             from app.api.cart.crud import carts_crud
 
             carts_crud.delete_by_human_popup(
-                session, human_id=application.human_id, popup_id=application.popup_id
+                session,
+                human_id=application.human_id,
+                popup_id=application.popup_id,
+                sales_flow_id=application.sales_flow_id,
             )
 
             session.add(application)
@@ -2599,7 +3696,12 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
             # Shared finalizer: materializes AttendeeProducts and flushes.
             # Same code path as the anonymous open-ticketing flow and the
             # admin bulk-grant flow so they can't drift again.
-            self._finalize_zero_amount_payment(session, payment, obj.products)
+            self._finalize_zero_amount_payment(
+                session,
+                payment,
+                obj.products,
+                replace_access=obj.edit_passes,
+            )
             session.commit()
             session.refresh(payment)
 
@@ -2642,7 +3744,10 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
                     if req_prod.product_id in products_map
                     else "",
                     "quantity": req_prod.quantity,
-                    "attendee_id": str(req_prod.attendee_id),
+                    "attendee_id": str(req_prod.attendee_id)
+                    if req_prod.attendee_id
+                    else None,
+                    "recipient_key": req_prod.recipient_key,
                 }
                 for req_prod in obj.products
             ],
@@ -2653,24 +3758,61 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
         # in-flight plans are blocked by the guard above so we only see fresh
         # purchases here.
         popup = application.popup
+        terms = config_for(
+            session,
+            sales_flow_id=application.sales_flow_id,
+            popup_id=application.popup_id,
+        )
         max_installments: int | None = None
         if (
             not obj.edit_passes
-            and popup.installments_enabled
-            and popup.installments_deadline is not None
-            and popup.installments_max is not None
+            and terms.installments_enabled
+            and terms.installments_deadline is not None
+            and terms.installments_max is not None
         ):
             computed = _calculate_max_installments(
-                popup.installments_deadline,
-                popup.installments_max,
-                popup.installments_interval,
-                popup.installments_interval_count,
+                terms.installments_deadline,
+                terms.installments_max,
+                _installment_interval(terms),
+                _installment_interval_count(terms),
             )
             if computed >= 2:
                 max_installments = computed
 
         try:
             from app.api.tenant.utils import get_portal_url
+
+            # An unscoped /passes/buy sends the buyer to the generic shop.
+            # Use the application's own flow, never the popup's default flow.
+            portal_base = get_portal_url(application.popup.tenant)
+            cancel_path = (
+                f"{portal_base}/portal/{application.popup.slug}/passes/buy"
+                f"?flow={application.sales_flow_id}"
+            )
+            payment_id = uuid.uuid4()
+            success_path = _resolve_application_payment_success_url(
+                target_flow,
+                application,
+                payment_id,
+                items=[
+                    {
+                        "title": products_map[line.product_id].name,
+                        "qty": line.quantity,
+                        "price": float(
+                            line.unit_price_override
+                            if line.unit_price_override is not None
+                            else stay_prices.get(
+                                index, products_map[line.product_id].price
+                            )
+                        ),
+                    }
+                    for index, line in enumerate(obj.products)
+                ],
+                amount=preview.amount,
+                currency=preview.currency,
+                locale=obj.locale,
+                return_context=obj.return_context,
+            )
 
             logger.info(
                 "Creating SimpleFI pass payment: application_id={} popup_id={} tenant_id={} amount={} currency={} product_count={} coupon_code={} edit_passes={} insurance={} max_installments={}",
@@ -2692,10 +3834,12 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
                 currency=preview.currency,
                 reference=reference,
                 memo=application.popup.tenant.name,
-                portal_base_override=get_portal_url(application.popup.tenant),
+                portal_base_override=portal_base,
+                success_path=success_path,
+                cancel_path=cancel_path,
                 max_installments=max_installments,
-                installment_interval=popup.installments_interval,
-                installment_interval_count=popup.installments_interval_count,
+                installment_interval=_installment_interval(terms),
+                installment_interval_count=_installment_interval_count(terms),
                 user_email=application.human.email if application.human else None,
                 plan_name=popup.name,
                 success_behavior=popup.simplefi_success_behavior,
@@ -2720,9 +3864,13 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
         # payment_request_id) and installments_total stays NULL until the
         # `installment_plan_activated` webhook delivers the buyer's pick.
         payment = Payments(
+            id=payment_id,
             tenant_id=application.tenant_id,
             application_id=obj.application_id,
             popup_id=application.popup_id,
+            buyer_human_id=application.human_id,
+            # Provenance only (design D7) — the application's own flow.
+            sales_flow_id=application.sales_flow_id,
             status=simplefi_response.status,
             amount=preview.amount,
             insurance_amount=preview.insurance_amount,
@@ -2750,6 +3898,9 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
 
         session.add(payment)
         session.flush()  # Get payment ID
+        recipient_snapshots = self._snapshot_recipients(
+            session, payment, selected_recipients
+        )
 
         # Debit the application's credit balance at payment creation (reservation).
         # This must happen after flush so payment.id exists for the audit log.
@@ -2783,28 +3934,55 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
                 details={"payment_id": str(payment.id)},
             )
 
+        # Hold the rooms before the snapshot rows copy the metadata, so each
+        # line already carries its booking_id. Released automatically if the
+        # payment expires or is cancelled.
+        stay_bookings = accommodation_payments.create_holds(
+            session,
+            payment_id=payment.id,
+            resolved=resolved_stays,
+            lines=obj.products,
+            hold_expires_at=datetime.now(UTC)
+            + timedelta(minutes=_settings.PENDING_SWEEP_STALE_MINUTES),
+            human_id=application.human_id,
+            buyer_email=application.human.email if application.human else None,
+        )
+
         # Create product snapshots
-        for req_prod in obj.products:
+        for line_index, req_prod in enumerate(obj.products):
             product = products_map.get(req_prod.product_id)
             if product:
                 is_patreon = product.category == "patreon"
+                stay_price = stay_prices.get(line_index)
                 payment_product = PaymentProducts(
                     tenant_id=application.tenant_id,
                     payment_id=payment.id,
                     product_id=req_prod.product_id,
                     attendee_id=req_prod.attendee_id,
+                    payment_recipient_id=(
+                        recipient_snapshots[req_prod.recipient_key].id
+                        if req_prod.recipient_key
+                        else None
+                    ),
                     quantity=req_prod.quantity,
                     product_name=product.name,
                     product_description=product.description,
                     product_price=Decimal("0") if is_patreon else product.price,
                     product_category=product.category or "",
+                    requires_check_in_snapshot=product.requires_check_in,
                     product_currency=preview.currency,
                     effective_unit_price=req_prod.unit_price_override
                     if is_patreon
-                    else None,
+                    else stay_price,
                     purchase_metadata=req_prod.purchase_metadata,
                 )
                 session.add(payment_product)
+
+        if stay_bookings:
+            session.flush()
+            accommodation_payments.attach_payment_products(
+                session, payment_id=payment.id, bookings=stay_bookings
+            )
 
         # Increment coupon usage if used
         if preview.coupon_id:
@@ -2838,6 +4016,8 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
         Used to clear the open-checkout cart, which is now keyed by (human, popup)
         like the authenticated portal cart.
         """
+        if payment.buyer_human_id is not None:
+            return payment.buyer_human_id
         snapshot = payment.products_snapshot
         if not snapshot:
             return None
@@ -2861,17 +4041,26 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
         This is called when payment is confirmed (e.g., webhook from payment provider).
         All changes are committed atomically -- on failure, everything is rolled back.
         """
-        payment = self.get(session, payment_id)
+        payment = session.exec(
+            select(Payments)
+            .where(Payments.id == payment_id)
+            .execution_options(populate_existing=True)
+            .with_for_update()
+        ).first()
         if not payment:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Payment not found",
             )
-
-        if payment.status == PaymentStatus.APPROVED.value:
-            return payment  # Already approved
-
         try:
+            if payment.status not in (
+                PaymentStatus.PENDING.value,
+                PaymentStatus.APPROVED.value,
+            ):
+                raise self._invalid_transition(payment.status, PaymentStatus.APPROVED)
+            was_approved = payment.status == PaymentStatus.APPROVED.value
+            if not was_approved:
+                self._enforce_payment_recipient_limits_for_approval(session, payment)
             # Set payment fields directly (no intermediate commit)
             payment.status = PaymentStatus.APPROVED.value
             if not payment.currency:
@@ -2885,22 +4074,10 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
                 payment.source = source
             session.add(payment)
 
-            # Clear existing products if editing passes
-            if payment.edit_passes:
-                self._clear_application_products(session, payment)
-
-            # Add products to attendees
-            products_to_add = [
-                PaymentProductRequest(
-                    product_id=pp.product_id,
-                    attendee_id=pp.attendee_id,
-                    quantity=pp.quantity,
-                    purchase_metadata=pp.purchase_metadata,
-                )
-                for pp in payment.products_snapshot
-            ]
-            self._add_products_to_attendees(
-                session, products_to_add, payment_id=payment.id
+            self._reconcile_payment_fulfillment(
+                session,
+                payment,
+                replace_access=payment.edit_passes and not was_approved,
             )
 
             # Clear cart after successful payment. Application flow clears by
@@ -2908,19 +4085,22 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
             # buyer email so a returning buyer never restores an already-paid cart.
             from app.api.cart.crud import carts_crud
 
-            if payment.application:
+            if not was_approved and payment.application:
                 carts_crud.delete_by_human_popup(
                     session,
                     human_id=payment.application.human_id,
                     popup_id=payment.application.popup_id,
+                    sales_flow_id=payment.sales_flow_id
+                    or payment.application.sales_flow_id,
                 )
-            elif payment.popup_id:
+            elif not was_approved and payment.popup_id and payment.sales_flow_id:
                 buyer_human_id = self._direct_buyer_human_id(session, payment)
                 if buyer_human_id:
                     carts_crud.delete_by_human_popup(
                         session,
                         human_id=buyer_human_id,
                         popup_id=payment.popup_id,
+                        sales_flow_id=payment.sales_flow_id,
                     )
 
             # Single atomic commit for the entire operation
@@ -2940,36 +4120,422 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
 
         return payment
 
-    def _clear_application_products(
+    @staticmethod
+    def _fulfillment_error() -> HTTPException:
+        return HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Recipient could not be fulfilled",
+        )
+
+    @staticmethod
+    def _invalid_transition(
+        old_status: str, new_status: PaymentStatus
+    ) -> HTTPException:
+        return HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={
+                "code": "invalid_payment_transition",
+                "message": (
+                    f"Payment cannot transition from {old_status} to {new_status.value}"
+                ),
+            },
+        )
+
+    def _lock_attendee(
+        self, session: Session, attendee_id: uuid.UUID
+    ) -> Attendees | None:
+        return session.exec(
+            select(Attendees).where(Attendees.id == attendee_id).with_for_update()
+        ).first()
+
+    def _resolve_recipient_attendee(
         self,
         session: Session,
         payment: Payments,
+        recipient: PaymentRecipients,
+    ) -> Attendees:
+        if (
+            recipient.tenant_id != payment.tenant_id
+            or recipient.payment_id != payment.id
+        ):
+            raise self._fulfillment_error()
+        buyer_human_id = payment.buyer_human_id
+        if (
+            buyer_human_id is None
+            or session.exec(
+                select(Humans.id)
+                .where(
+                    Humans.id == buyer_human_id,
+                    Humans.tenant_id == payment.tenant_id,
+                )
+                .with_for_update()
+            ).first()
+            is None
+        ):
+            raise self._fulfillment_error()
+        if recipient.category_id is not None:
+            category = session.exec(
+                select(AttendeeCategories).where(
+                    AttendeeCategories.id == recipient.category_id,
+                    AttendeeCategories.tenant_id == payment.tenant_id,
+                    AttendeeCategories.popup_id == payment.popup_id,
+                    AttendeeCategories.deleted_at.is_(None),  # type: ignore[union-attr]
+                )
+            ).first()
+            if category is None or (
+                payment.sales_flow_id is not None
+                and category.sales_flow_id != payment.sales_flow_id
+            ):
+                raise self._fulfillment_error()
+
+        if (
+            recipient.attendee_id is not None
+            and recipient.existing_attendee_id is not None
+            and recipient.attendee_id != recipient.existing_attendee_id
+        ):
+            raise self._fulfillment_error()
+        requested_attendee_id = recipient.attendee_id or recipient.existing_attendee_id
+        attendee = (
+            self._lock_attendee(session, requested_attendee_id)
+            if requested_attendee_id
+            else None
+        )
+        if requested_attendee_id is not None and attendee is None:
+            raise self._fulfillment_error()
+
+        if recipient.human_id is not None:
+            if (
+                recipient.existing_attendee_id is not None
+                or recipient.human_id != buyer_human_id
+            ):
+                raise self._fulfillment_error()
+            human = session.exec(
+                select(Humans)
+                .where(
+                    Humans.id == recipient.human_id,
+                    Humans.tenant_id == payment.tenant_id,
+                )
+                .with_for_update()
+            ).first()
+            if human is None:
+                raise self._fulfillment_error()
+            if attendee is None:
+                attendee = session.exec(
+                    select(Attendees)
+                    .where(
+                        Attendees.tenant_id == payment.tenant_id,
+                        Attendees.popup_id == payment.popup_id,
+                        Attendees.human_id == recipient.human_id,
+                    )
+                    .order_by(Attendees.created_at, Attendees.id)
+                    .limit(1)
+                    .with_for_update()
+                ).first()
+            if attendee is not None and (
+                attendee.tenant_id != payment.tenant_id
+                or attendee.popup_id != payment.popup_id
+                or attendee.human_id != recipient.human_id
+            ):
+                raise self._fulfillment_error()
+        elif attendee is not None:
+            authorized = attendees_crud.get_for_human_popup(
+                session,
+                attendee_id=attendee.id,
+                human_id=buyer_human_id,
+                popup_id=payment.popup_id,
+                tenant_id=payment.tenant_id,
+            )
+            if authorized is None:
+                raise self._fulfillment_error()
+
+        if attendee is None:
+            from app.services.trial_limits import enforce_trial_attendee_cap
+
+            enforce_trial_attendee_cap(session, payment.tenant_id)
+            attendee = Attendees(
+                tenant_id=payment.tenant_id,
+                application_id=None,
+                popup_id=payment.popup_id,
+                human_id=recipient.human_id,
+                managed_by_human_id=(
+                    None if recipient.human_id is not None else buyer_human_id
+                ),
+                name=recipient.name,
+                email=recipient.email,
+                category_id=None,
+                additional_data=recipient.profile_snapshot,
+            )
+            session.add(attendee)
+            session.flush()
+
+        if recipient.attendee_id is None:
+            recipient.attendee_id = attendee.id
+            session.add(recipient)
+        elif recipient.attendee_id != attendee.id:
+            raise self._fulfillment_error()
+        return attendee
+
+    def _reconcile_payment_fulfillment(
+        self,
+        session: Session,
+        payment: Payments,
+        *,
+        replace_access: bool = False,
     ) -> None:
-        """Clear all existing products for attendees in this payment's application.
+        """Reconcile legacy personal fulfillment and classified product units."""
+        if payment.payment_type == PaymentType.APPLICATION_FEE.value:
+            return
 
-        Used when edit_passes=True to replace existing products with new ones.
-        """
-        # Get all attendee IDs from this payment's products
-        attendee_ids = {pp.attendee_id for pp in payment.products_snapshot}
+        lines = list(
+            session.exec(
+                select(PaymentProducts)
+                .where(PaymentProducts.payment_id == payment.id)
+                .order_by(PaymentProducts.created_at, PaymentProducts.id)
+                .with_for_update()
+            ).all()
+        )
+        product_ids = {line.product_id for line in lines}
+        products = list(
+            session.exec(
+                select(Products).where(
+                    Products.id.in_(product_ids),  # type: ignore[attr-defined]
+                    Products.tenant_id == payment.tenant_id,
+                    Products.popup_id == payment.popup_id,
+                )
+            ).all()
+        )
+        products_by_id = {product.id: product for product in products}
+        for line in lines:
+            if (
+                line.tenant_id != payment.tenant_id
+                or line.quantity <= 0
+                or line.product_id not in products_by_id
+            ):
+                raise self._fulfillment_error()
 
+        classifications = {line.id: _classify_product_unit(line) for line in lines}
+        personal_lines = [
+            line for line in lines if classifications[line.id] == "attendee"
+        ]
+        ownerless_lines = [
+            line for line in lines if classifications[line.id] == "ownerless"
+        ]
+
+        recipients = list(
+            session.exec(
+                select(PaymentRecipients)
+                .where(PaymentRecipients.payment_id == payment.id)
+                .order_by(PaymentRecipients.created_at, PaymentRecipients.id)
+                .with_for_update()
+            ).all()
+        )
+        recipients_by_id = {recipient.id: recipient for recipient in recipients}
+        for recipient in recipients:
+            if recipient.tenant_id != payment.tenant_id:
+                raise self._fulfillment_error()
+        referenced_recipient_ids = {
+            line.payment_recipient_id
+            for line in personal_lines
+            if line.payment_recipient_id is not None
+        }
+        resolved_recipients: dict[uuid.UUID, Attendees] = {}
+        for recipient_id in referenced_recipient_ids:
+            recipient = recipients_by_id.get(recipient_id)
+            if recipient is None:
+                raise self._fulfillment_error()
+            line = next(
+                p for p in personal_lines if p.payment_recipient_id == recipient_id
+            )
+            try:
+                self._resolve_unit_recipient(
+                    session,
+                    payment,
+                    line,
+                    products_by_id[line.product_id],
+                    recipient,
+                )
+            except HTTPException as error:
+                raise self._fulfillment_error() from error
+            resolved_recipients[recipient_id] = self._resolve_recipient_attendee(
+                session, payment, recipient
+            )
+
+        attendees_by_line: dict[uuid.UUID, Attendees] = {}
+        for line in personal_lines:
+            if line.payment_recipient_id:
+                recipient = recipients_by_id.get(line.payment_recipient_id)
+                attendee = resolved_recipients.get(line.payment_recipient_id)
+                if recipient is None or attendee is None:
+                    raise self._fulfillment_error()
+                if line.attendee_id is None:
+                    line.attendee_id = attendee.id
+                    session.add(line)
+                elif line.attendee_id is not None and line.attendee_id != attendee.id:
+                    raise self._fulfillment_error()
+            elif line.attendee_id is None:
+                raise self._fulfillment_error()
+            else:
+                attendee = self._lock_attendee(session, line.attendee_id)
+                if attendee is None or (
+                    attendee.tenant_id != payment.tenant_id
+                    or attendee.popup_id != payment.popup_id
+                ):
+                    raise self._fulfillment_error()
+            attendees_by_line[line.id] = attendee
+
+        line_ids = [line.id for line in personal_lines + ownerless_lines]
+        if replace_access:
+            self._replace_access_holdings(
+                session,
+                payment.id,
+                {line.id for line in lines},
+                {attendee.id for attendee in attendees_by_line.values()},
+            )
+
+        tickets = (
+            list(
+                session.exec(
+                    select(AttendeeProducts)
+                    .where(
+                        or_(
+                            AttendeeProducts.payment_id == payment.id,
+                            AttendeeProducts.payment_product_id.in_(line_ids),  # type: ignore[attr-defined]
+                        )
+                    )
+                    .order_by(AttendeeProducts.id)
+                    .with_for_update()
+                ).all()
+            )
+            if line_ids
+            else []
+        )
+        by_lineage = {
+            (ticket.payment_product_id, ticket.unit_index): ticket
+            for ticket in tickets
+            if ticket.payment_product_id in line_ids
+        }
+        unlinked: dict[tuple[uuid.UUID, uuid.UUID], list[AttendeeProducts]] = {}
+        for ticket in tickets:
+            if ticket.payment_product_id is None:
+                unlinked.setdefault((ticket.attendee_id, ticket.product_id), []).append(
+                    ticket
+                )
+
+        expected_lineage: set[tuple[uuid.UUID, int]] = set()
+        for line in personal_lines:
+            attendee_id = attendees_by_line[line.id].id
+            candidates = unlinked.get((attendee_id, line.product_id), [])
+            for unit_index in range(line.quantity):
+                key = (line.id, unit_index)
+                expected_lineage.add(key)
+                ticket = by_lineage.get(key) or (
+                    candidates.pop(0) if candidates else None
+                )
+                if ticket is None:
+                    ticket = AttendeeProducts(
+                        tenant_id=payment.tenant_id,
+                        attendee_id=attendee_id,
+                        product_id=line.product_id,
+                        check_in_code=generate_check_in_code(""),
+                    )
+                    session.add(ticket)
+                ticket.attendee_id = attendee_id
+                ticket.product_id = line.product_id
+                ticket.payment_id = payment.id
+                ticket.payment_product_id = line.id
+                ticket.unit_index = unit_index
+                ticket.revoked_at = None
+                ticket.product_category_snapshot = line.product_category
+                ticket.requires_check_in_snapshot = line.requires_check_in_snapshot
+                if ticket.purchase_metadata is None:
+                    ticket.purchase_metadata = line.purchase_metadata
+                session.add(ticket)
+
+        for line in ownerless_lines:
+            for unit_index in range(line.quantity):
+                key = (line.id, unit_index)
+                expected_lineage.add(key)
+                ticket = by_lineage.get(key)
+                if ticket is None:
+                    ticket = AttendeeProducts(
+                        tenant_id=payment.tenant_id,
+                        attendee_id=None,
+                        product_id=line.product_id,
+                        check_in_code=generate_check_in_code(""),
+                    )
+                    session.add(ticket)
+                ticket.attendee_id = None
+                ticket.product_id = line.product_id
+                ticket.payment_id = payment.id
+                ticket.payment_product_id = line.id
+                ticket.unit_index = unit_index
+                ticket.revoked_at = None
+                ticket.product_category_snapshot = line.product_category
+                ticket.requires_check_in_snapshot = line.requires_check_in_snapshot
+                if ticket.purchase_metadata is None:
+                    ticket.purchase_metadata = line.purchase_metadata
+                session.add(ticket)
+
+        unexpected: list[AttendeeProducts] = []
+        for ticket in tickets:
+            lineage = (ticket.payment_product_id, ticket.unit_index)
+            if (
+                ticket.payment_product_id in line_ids
+                and lineage not in expected_lineage
+            ):
+                unexpected.append(ticket)
+        for candidates in unlinked.values():
+            unexpected.extend(candidates)
+        revoked_at = datetime.now(UTC)
+        for ticket in unexpected:
+            if ticket.revoked_at is None:
+                ticket.revoked_at = revoked_at
+                session.add(ticket)
+
+        accommodation_payments.confirm_for_payment(session, payment.id)
+        accommodation_payments.link_payment_product_attendees(session, payment.id)
+        session.flush()
+
+    def _replace_access_holdings(
+        self,
+        session: Session,
+        payment_id: uuid.UUID,
+        payment_line_ids: set[uuid.UUID],
+        attendee_ids: set[uuid.UUID],
+    ) -> None:
+        """Revoke prior active access holdings for one edit-passes settlement."""
         if not attendee_ids:
             return
 
-        # Delete all AttendeeProducts for these attendees
-        statement = select(AttendeeProducts).where(
-            AttendeeProducts.attendee_id.in_(attendee_ids)  # type: ignore[attr-defined]
+        statement = (
+            select(AttendeeProducts)
+            .join(Products, Products.id == AttendeeProducts.product_id)
+            .where(
+                AttendeeProducts.attendee_id.in_(attendee_ids),  # type: ignore[attr-defined]
+                AttendeeProducts.product_category_snapshot == "ticket",
+                AttendeeProducts.revoked_at.is_(None),  # type: ignore[union-attr]
+                or_(
+                    AttendeeProducts.payment_id.is_(None),  # type: ignore[union-attr]
+                    AttendeeProducts.payment_id != payment_id,
+                ),
+                or_(
+                    AttendeeProducts.payment_product_id.is_(None),  # type: ignore[union-attr]
+                    AttendeeProducts.payment_product_id.not_in(payment_line_ids),  # type: ignore[union-attr]
+                ),
+            )
+            .with_for_update()
         )
-        existing_products = list(session.exec(statement).all())
-
-        for ap in existing_products:
-            session.delete(ap)
+        holdings = list(session.exec(statement).all())
+        revoked_at = datetime.now(UTC)
+        for holding in holdings:
+            holding.revoked_at = revoked_at
+            session.add(holding)
 
         session.flush()
         logger.info(
-            "Cleared %d existing products for %d attendees (payment %s, edit_passes=True)",
-            len(existing_products),
+            "Revoked {} replaced access holdings for {} attendees",
+            len(holdings),
             len(attendee_ids),
-            payment.id,
         )
 
     def _remove_products_from_attendees(
@@ -2977,57 +4543,37 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
         session: Session,
         payment: Payments,
     ) -> None:
-        """Remove all AttendeeProducts rows linked to this payment.
-
-        Uses payment_id FK for precise removal — avoids deleting tickets that
-        belong to a different payment but share the same (attendee, product) pair.
-        """
-        logger.info("Removing products from attendees for payment {}", payment.id)
-        statement = select(AttendeeProducts).where(
-            AttendeeProducts.payment_id == payment.id,
-        )
-        tickets = list(session.exec(statement).all())
-        for ticket in tickets:
-            session.delete(ticket)
-
-        session.flush()
-
-    def _add_products_to_attendees(
-        self,
-        session: Session,
-        products: list[PaymentProductRequest],
-        payment_id: uuid.UUID | None = None,
-    ) -> None:
-        """Add products to attendees after payment approval.
-
-        Each PaymentProductRequest.quantity creates N new AttendeeProducts rows.
-        Always-INSERT — no upsert. Each row is an independent ticket with its own
-        UUID and check_in_code.
-        """
-        if not products:
+        """Revoke active units linked to this payment without deleting history."""
+        locked_payment = self._lock_payment(session, payment.id)
+        if locked_payment is None:
             return
-
-        first_attendee = session.get(Attendees, products[0].attendee_id)
-        if not first_attendee:
-            logger.error(f"Attendee not found: {products[0].attendee_id}")
-            return
-
-        tenant_id = first_attendee.tenant_id
-
-        for req_prod in products:
-            for _ in range(req_prod.quantity):
-                attendee_product = AttendeeProducts(
-                    id=uuid.uuid4(),
-                    tenant_id=tenant_id,
-                    attendee_id=req_prod.attendee_id,
-                    product_id=req_prod.product_id,
-                    check_in_code=generate_check_in_code(""),
-                    payment_id=payment_id,
-                    purchase_metadata=req_prod.purchase_metadata,
+        logger.info("Revoking product units for payment {}", payment.id)
+        tickets = list(
+            session.exec(
+                select(AttendeeProducts)
+                .where(
+                    AttendeeProducts.payment_id == payment.id,
+                    AttendeeProducts.revoked_at.is_(None),  # type: ignore[union-attr]
                 )
-                session.add(attendee_product)
+                .with_for_update()
+            ).all()
+        )
+        revoked_at = datetime.now(UTC)
+        for ticket in tickets:
+            ticket.revoked_at = revoked_at
+            session.add(ticket)
 
         session.flush()
+
+    @staticmethod
+    def _lock_payment(session: Session, payment_id: uuid.UUID) -> Payments | None:
+        """Lock and refresh one Payment as the lifecycle transition marker."""
+        return session.exec(
+            select(Payments)
+            .where(Payments.id == payment_id)
+            .with_for_update()
+            .execution_options(populate_existing=True)
+        ).first()
 
     def _restore_payment_stock(
         self,
@@ -3037,28 +4583,40 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
         """Restore total_stock_remaining and shared_stock_remaining for every
         product/tier in the payment.
 
-        Source of truth for per-product quantities: payment.products_snapshot
-        (PaymentProducts rows keyed by payment_id).  SimpleFI's webhook payload
-        carries only the external payment_request.id — no per-product data.
-        We look up the local Payments row and iterate its snapshot here.
+        Source of truth for per-product quantities is the immutable
+        PaymentProducts rows keyed by payment_id. SimpleFI's webhook payload
+        carries only the external payment_request.id, so the local snapshot is
+        queried after locking the Payment.
 
-        Idempotency contract: callers MUST verify that the payment is currently
-        in a stock-holding status (PENDING) before calling this method.  The
-        LEAST-clamp in restore_total_stock / restore_shared_stock provides a
-        structural backstop against double-restore drift past the cap, but the
-        status guard prevents the semantic double-count.
-
-        APPROVED → CANCELLED (refund flow) is OUT OF SCOPE: callers must not
-        invoke this method when old_status == APPROVED.  That path requires a
-        separate refund-stock decision and is intentionally not wired here.
-        See design §4.2 and proposal locked decisions.
+        Locks the Payment and restores only while it still holds stock. The
+        terminal status is the compare-and-set marker that makes replay and
+        concurrent cancellation exact-once; Product caps remain a backstop.
         """
         from app.api.product.crud import products_crud
 
-        if not payment.products_snapshot:
+        locked_payment = self._lock_payment(session, payment.id)
+        if locked_payment is None or locked_payment.status in {
+            PaymentStatus.CANCELLED.value,
+            PaymentStatus.EXPIRED.value,
+            PaymentStatus.REJECTED.value,
+        }:
             return
 
-        for pp in payment.products_snapshot:
+        # Free the rooms this payment was holding. Runs before the early return
+        # below: a cart of nothing but accommodation has no product snapshot to
+        # restore, and its rooms would stay locked until the hold expiry.
+        # Confirmed bookings are left alone — a refund is a separate decision.
+        accommodation_payments.release_for_payment(session, locked_payment.id)
+
+        if not locked_payment.products_snapshot:
+            return
+
+        products = session.exec(
+            select(PaymentProducts).where(
+                PaymentProducts.payment_id == locked_payment.id
+            )
+        ).all()
+        for pp in products:
             # Restore per-product total stock counter (no-op for unlimited products).
             products_crud.restore_total_stock(session, pp.product_id, pp.quantity)
 
@@ -3078,20 +4636,13 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
         dispatch is the caller's responsibility because this method is
         synchronous.
 
-        Acquires a ``SELECT ... FOR UPDATE`` row lock before reading the current
-        status so that a concurrent webhook path (which also calls approve_payment
-        via update_status) cannot add products a second time.  The lock also
-        refreshes the session identity map so approve_payment sees the current
-        DB state even when supersede_pending_payments pre-loaded the payment as
-        PENDING in the same session.
+        Acquires a ``SELECT ... FOR UPDATE`` row lock before reconciling through
+        approve_payment. Fulfillment lineage, rather than status alone, makes an
+        already-approved replay safe and repairs missing ticket units.
 
         Returns the (possibly freshly) approved payment.
         """
-        # Lock the row and get a fresh DB read, overriding any stale PENDING
-        # value cached in the session identity map from the earlier supersede
-        # lookup.  After this query, session.get(Payments, payment.id) returns
-        # the refreshed instance, so approve_payment's own idempotency guard
-        # sees the current status from the DB.
+        # Lock the row and refresh stale state loaded by supersede/sweeper paths.
         fresh = session.exec(
             select(Payments).where(Payments.id == payment.id).with_for_update()
         ).first()
@@ -3100,10 +4651,6 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Payment not found",
             )
-        if fresh.status == PaymentStatus.APPROVED.value:
-            # Already approved by a concurrent transaction (e.g. webhook beat
-            # supersede to the lock).  Return without adding products again.
-            return fresh
         return self.approve_payment(session, payment.id)
 
     def _check_no_pending_sibling_by_application(
@@ -3146,6 +4693,7 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
         session: Session,
         email: str,
         popup_id: uuid.UUID,
+        sales_flow_id: uuid.UUID | None = None,
     ) -> Payments | None:
         """Return the first PENDING SimpleFi open-checkout payment for email+popup, or None.
 
@@ -3153,7 +4701,7 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
         payment exists without triggering any SimpleFi calls.  Same query as
         supersede_pending_payments (email path) so they stay in sync.
         """
-        return session.exec(
+        statement = (
             select(Payments)
             .where(
                 Payments.popup_id == popup_id,
@@ -3164,7 +4712,10 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
             )
             .where(text("buyer_snapshot->>'buyer_email' = :email"))
             .params(email=email.lower())
-        ).first()
+        )
+        if sales_flow_id is not None:
+            statement = statement.where(Payments.sales_flow_id == sales_flow_id)
+        return session.exec(statement).first()
 
     def _validate_cart_continuity_proof(
         self,
@@ -3173,6 +4724,7 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
         buyer_email: str,
         cid: uuid.UUID | None,
         sig: str | None,
+        sales_flow_id: uuid.UUID | None = None,
     ) -> bool:
         """Return True iff cid+sig constitute a valid cart continuity proof for this buyer+popup.
 
@@ -3187,18 +4739,46 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
         5. The cart's email matches the buyer email (case-insensitive).
 
         A valid token for a different email or a different popup is always invalid.
+
+        The secret is read from the popup on purpose, unlike the open-checkout
+        landing redirect, which now reads the flow's. A cart is popup-scoped and
+        its restore link is issued before any flow is resolved, so a per-flow
+        secret would have nothing to verify against. The popup's is
+        auto-provisioned at creation and never surfaced as a setting.
         """
         if cid is None or sig is None:
             return False
         secret = popup.open_checkout_signing_secret
         if not secret:
             return False
-        if not verify_cart_restore_token(str(cid), sig, secret):
-            return False
         from app.api.cart.crud import carts_crud as _carts_crud  # noqa: PLC0415
 
-        cart = _carts_crud.find_by_id_popup(session, cid, popup.id)
+        cart = _carts_crud.find_by_id_popup(session, cid, popup.id, sales_flow_id)
+        legacy_proof = False
+        if cart is None and sales_flow_id is not None:
+            candidate = _carts_crud.find_by_id_popup(session, cid, popup.id)
+            from app.api.sales_flow.crud import sales_flows_crud  # noqa: PLC0415
+
+            default = sales_flows_crud.get_default_flow(session, popup.id)
+            if (
+                candidate is not None
+                and candidate.sales_flow_id is None
+                and default is not None
+                and default.id == sales_flow_id
+            ):
+                cart = candidate
+                legacy_proof = True
         if cart is None:
+            return False
+        cart_flow_id = cart.sales_flow_id
+        valid = verify_cart_restore_token(
+            str(cid),
+            sig,
+            secret,
+            popup_id=str(popup.id),
+            flow_id=str(cart_flow_id or ""),
+        ) or (legacy_proof and verify_cart_restore_token(str(cid), sig, secret))
+        if not valid:
             return False
         cart_email: str = getattr(cart, "email", None) or ""
         return cart_email.lower() == buyer_email.lower()
@@ -3279,6 +4859,7 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
         email: str | None = None,
         popup_id: uuid.UUID | None = None,
         locale: str | None = None,
+        return_context: str = "direct",
     ) -> None:
         """Cancel any prior PENDING SimpleFi payment for this buyer before creating a new one.
 
@@ -3299,9 +4880,9 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
           release of coupon, stock, and credit holds.  Returns normally.
         - ALREADY_APPROVED: calls ``_reconcile_approved`` (idempotent approve),
           then raises HTTP 409 ``previous_payment_completed``. The detail body
-          carries no payment identifiers; for open checkout it includes a
-          SIGNED thank-you redirect URL only when the popup has signing
-          configured, otherwise no URL at all.
+          carries no payment identifiers; open checkout uses a signed external
+          redirect when configured, or a generic internal page for an explicit
+          portal return context with no external destination.
         - Any exception (CancelOutcomeAmbiguousError, transport, 5xx): raises
           HTTP 502 ``payment_cancel_failed``.  Holds are NOT released — never
           release without SimpleFi confirmation.
@@ -3314,7 +4895,8 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
             email: Buyer email for open-checkout lookup (requires popup_id).
             popup_id: Required when email is provided.
             locale: Checkout language of the new purchase attempt, forwarded
-                to the 409 signed redirect. Falls back to the popup default.
+                to the resolved 409 redirect. Falls back to the popup default.
+            return_context: Explicit direct or portal origin for safe fallback.
         """
 
         # Locate the prior PENDING SimpleFi payment for this buyer
@@ -3336,7 +4918,11 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
             return  # No prior pending payment — nothing to supersede
 
         self._supersede_located_pending(
-            session, prior, anonymous=(application_id is None), locale=locale
+            session,
+            prior,
+            anonymous=(application_id is None),
+            locale=locale,
+            return_context=return_context,
         )
 
     def _supersede_located_pending(
@@ -3346,6 +4932,7 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
         *,
         anonymous: bool,
         locale: str | None = None,
+        return_context: str = "direct",
     ) -> None:
         """Cancel an already-located PENDING SimpleFi payment and release its holds.
 
@@ -3383,6 +4970,8 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
                        ALREADY_APPROVED redirect URL is constructed.
         """
         from app.api.popup.models import Popups as _Popups
+        from app.api.sales_flow.models import SalesFlows as _SalesFlows
+        from app.api.sales_flow.resolver import build_effective_config
         from app.api.tenant.models import Tenants as _Tenants
         from app.api.tenant.utils import get_portal_url
         from app.services.simplefi import get_simplefi_client
@@ -3460,11 +5049,11 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
             # Build a safe redirect URL for the 409 response.
             # Security contract (S1):
             #   - Never expose the raw payment UUID to anonymous callers.
-            #   - Open checkout: return a SIGNED external redirect ONLY when
-            #     both a signing secret AND an external success URL are configured.
-            #     Any other case omits redirect_url (portal falls back to
-            #     message-only).  An unsigned internal portal URL MUST NOT be
-            #     returned here — it carries the raw payment UUID in the path.
+            #   - Open checkout: return a SIGNED external redirect when both a
+            #     signing secret and external success URL are configured.
+            #     An explicit portal request with no external destination may
+            #     use the generic portal completion page because it carries no
+            #     payment UUID. Direct checkout otherwise remains message-only.
             #   - Authenticated: redirect to the buyer's own passes page; no
             #     payment UUID is needed or included.
             redirect_url: str | None = None
@@ -3472,8 +5061,27 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
 
             if anonymous and _popup is not None and _tenant is not None:
                 # Open-checkout path: signed external redirect only.
-                secret = _popup.open_checkout_signing_secret
-                if secret and _popup.open_checkout_success_url:
+                # The landing page belongs to the flow this payment was made
+                # through — the same one that answered on the way in, read
+                # back off the payment's own provenance column.
+                #
+                # A payment predating that column names no flow. It still went
+                # through one, so the popup's default answers for it rather
+                # than the buyer losing a redirect that worked when they paid.
+                _flow = (
+                    session.get(_SalesFlows, prior.sales_flow_id)
+                    if prior.sales_flow_id
+                    else None
+                )
+                if _flow is None:
+                    from app.api.sales_flow.crud import (  # noqa: PLC0415
+                        sales_flows_crud as _flows_crud,
+                    )
+
+                    _flow = _flows_crud.get_default_flow(session, prior.popup_id)
+                _config = build_effective_config(_flow) if _flow is not None else None
+                secret = _config.open_checkout_signing_secret if _config else None
+                if secret and _config and _config.open_checkout_success_url:
                     _now = datetime.now(UTC)
                     payload = build_thank_you_payload(
                         order_id=str(prior.id),
@@ -3499,14 +5107,27 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
                         exp=int(_now.timestamp()) + 30 * 60,
                     )
                     lang = locale or _popup.default_language or "en"
-                    success_base = _popup.open_checkout_success_url.replace(
+                    success_base = _config.open_checkout_success_url.replace(
                         "{locale}", lang
                     )
                     success_base = append_query_params(success_base, [("lang", lang)])
                     redirect_url = build_signed_redirect_url(
                         success_base, payload, secret
                     )
-                # else: no signing secret or no external URL — omit redirect_url
+                # When a portal checkout has no resolved external destination,
+                # the request-level context can safely return a generic internal
+                # completion page without exposing the payment id.
+                if (
+                    redirect_url is None
+                    and return_context == "portal"
+                    and not (_config and _config.open_checkout_success_url)
+                ):
+                    portal_base = get_portal_url(_tenant)
+                    lang = locale or _popup.default_language or "en"
+                    redirect_url = append_query_params(
+                        f"{portal_base}/portal/{_popup.slug}/thank-you",
+                        [("lang", lang), ("flow", _flow.slug)],
+                    )
 
             elif not anonymous and _popup is not None and _tenant is not None:
                 # Authenticated path: send buyer to their own passes page.
@@ -3527,6 +5148,7 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
         session: Session,
         *,
         popup: "Popups",
+        sales_flow_id: uuid.UUID | None = None,
         email: str,
         cid: uuid.UUID | None,
         sig: str | None,
@@ -3567,11 +5189,15 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
 
         # Validate proof BEFORE any DB read that could leak payment existence.
         # Invalid/missing proof → immediate no-op (enumeration-safe).
-        if not self._validate_cart_continuity_proof(session, popup, email, cid, sig):
+        if not self._validate_cart_continuity_proof(
+            session, popup, email, cid, sig, sales_flow_id
+        ):
             return ReleaseResult(released=False)
 
         # Locate PENDING payment for this email+popup.
-        prior = self._find_pending_by_email_popup(session, email, popup.id)
+        prior = self._find_pending_by_email_popup(
+            session, email, popup.id, sales_flow_id
+        )
         if prior is None:
             return ReleaseResult(released=False)
 
@@ -3596,7 +5222,9 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
             return ReleaseResult(released=False)
 
         # Re-locate after lock: a concurrent caller may have cancelled it already.
-        prior = self._find_pending_by_email_popup(session, email, popup.id)
+        prior = self._find_pending_by_email_popup(
+            session, email, popup.id, sales_flow_id
+        )
         if prior is None:
             return ReleaseResult(released=False)
 
@@ -3686,9 +5314,7 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
         # points; the old two-step approach — raw text() lock + self.get() —
         # would return the stale PENDING from the identity map and release
         # holds a second time).
-        payment = session.exec(
-            select(Payments).where(Payments.id == payment_id).with_for_update()
-        ).first()
+        payment = self._lock_payment(session, payment_id)
         if not payment:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
@@ -3696,17 +5322,40 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
             )
 
         old_status = payment.status
-
-        # Restore stock when transitioning OUT of PENDING into a terminal non-approved
-        # state.  Idempotency guard: only restore when old_status was PENDING.
-        # APPROVED → CANCELLED (refund flow) is explicitly OUT OF SCOPE per design
-        # §4.2 — no stock restoration in that path (separate future feature).
-        if (
-            new_status
-            in (PaymentStatus.CANCELLED, PaymentStatus.REJECTED, PaymentStatus.EXPIRED)
-            and old_status == PaymentStatus.PENDING.value
+        if old_status == new_status.value and new_status != PaymentStatus.APPROVED:
+            session.commit()
+            session.refresh(payment)
+            return payment
+        terminal_statuses = {
+            PaymentStatus.CANCELLED.value,
+            PaymentStatus.EXPIRED.value,
+            PaymentStatus.REJECTED.value,
+        }
+        if old_status in terminal_statuses and new_status.value in terminal_statuses:
+            session.commit()
+            session.refresh(payment)
+            return payment
+        valid_transition = old_status == PaymentStatus.PENDING.value or (
+            old_status == PaymentStatus.APPROVED.value
+            and new_status == PaymentStatus.CANCELLED
+        )
+        if not valid_transition and not (
+            old_status == PaymentStatus.APPROVED.value
+            and new_status == PaymentStatus.APPROVED
         ):
+            error = self._invalid_transition(old_status, new_status)
+            session.rollback()
+            raise error
+
+        leaving_stock_holding_status = new_status in (
+            PaymentStatus.CANCELLED,
+            PaymentStatus.REJECTED,
+            PaymentStatus.EXPIRED,
+        ) and old_status in {PaymentStatus.PENDING.value, PaymentStatus.APPROVED.value}
+        if leaving_stock_holding_status:
+            self._remove_products_from_attendees(session, payment)
             self._restore_payment_stock(session, payment)
+        if leaving_stock_holding_status and old_status == PaymentStatus.PENDING.value:
             # Release the coupon use held since payment creation. Same guard as
             # stock (PENDING-only) prevents semantic double-release. APPROVED is
             # out of scope: a paid coupon use must stay consumed.
@@ -3730,24 +5379,20 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
                         payment=payment,
                     )
 
-        payment.status = new_status.value
-
-        # If approving, add products to attendees
         if (
             new_status == PaymentStatus.APPROVED
             and old_status != PaymentStatus.APPROVED.value
         ):
-            products_to_add = [
-                PaymentProductRequest(
-                    product_id=pp.product_id,
-                    attendee_id=pp.attendee_id,
-                    quantity=pp.quantity,
-                    purchase_metadata=pp.purchase_metadata,
-                )
-                for pp in payment.products_snapshot
-            ]
-            self._add_products_to_attendees(
-                session, products_to_add, payment_id=payment.id
+            self._enforce_payment_recipient_limits_for_approval(session, payment)
+
+        payment.status = new_status.value
+
+        if new_status == PaymentStatus.APPROVED:
+            self._reconcile_payment_fulfillment(
+                session,
+                payment,
+                replace_access=payment.edit_passes
+                and old_status != PaymentStatus.APPROVED.value,
             )
 
         session.add(payment)

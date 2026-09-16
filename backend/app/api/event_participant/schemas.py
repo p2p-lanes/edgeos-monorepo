@@ -52,6 +52,9 @@ class EventParticipantPublic(EventParticipantBase):
     """Participant schema for API responses."""
 
     id: uuid.UUID
+    # Resolved from the participant's event so administrative clients and the
+    # AI broker can show the actual gathering affected by an ID-based action.
+    popup_id: uuid.UUID | None = None
     # Joined from Humans. Populated by router helpers when listing participants
     # so clients can render a real name instead of a UUID; None when the
     # referenced human is missing (deleted / cross-tenant link).

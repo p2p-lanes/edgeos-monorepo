@@ -40,9 +40,21 @@ vi.mock("framer-motion", () => ({
   },
 }))
 
+vi.mock("@/client", () => ({
+  ApiError: class ApiError extends Error {
+    status = 500
+  },
+  ApplicationsService: {
+    detachCompanion: vi.fn(),
+    getMyParticipation: vi.fn(),
+  },
+}))
+
 vi.mock("@/hooks/useApplicationSchema", () => ({
-  useApplicationSchema: (popupId: string | undefined) =>
-    mockUseApplicationSchema(popupId),
+  useApplicationSchema: (
+    popupId: string | undefined,
+    salesFlowId: string | undefined,
+  ) => mockUseApplicationSchema(popupId, salesFlowId),
 }))
 
 vi.mock("react-i18next", () => ({
@@ -80,7 +92,44 @@ vi.mock("@/providers/cityProvider", () => ({
 }))
 
 vi.mock("@/components/checkout-flow/ScrollyCheckoutFlow", () => ({
-  default: () => <div>passes-flow</div>,
+  default: ({ navExtraContent }: { navExtraContent?: ReactNode }) => (
+    <div>
+      {navExtraContent}
+      passes-flow
+    </div>
+  ),
+}))
+
+vi.mock("@/components/Sidebar/SidebarComponents", () => ({
+  SidebarProvider: ({ children }: { children: ReactNode }) => <>{children}</>,
+}))
+
+vi.mock("@/providers/passesProvider", () => ({
+  default: ({
+    children,
+    salesFlowId,
+  }: {
+    children: ReactNode
+    salesFlowId?: string | null
+  }) => (
+    <div data-flow-id={salesFlowId ?? ""} data-testid="passes-provider">
+      {children}
+    </div>
+  ),
+}))
+
+vi.mock("@/providers/checkoutProvider", () => ({
+  CheckoutProvider: ({
+    children,
+    salesFlowId,
+  }: {
+    children: ReactNode
+    salesFlowId?: string | null
+  }) => (
+    <div data-flow-id={salesFlowId ?? ""} data-testid="checkout-provider">
+      {children}
+    </div>
+  ),
 }))
 
 vi.mock("./UserInfoForm", () => ({
@@ -109,12 +158,26 @@ const popup = {
   checkout_mode: "pass_system",
 } as const
 
+const directPopup = {
+  ...popup,
+  takes_applications: false,
+} as const
+
 describe("PopupCheckoutContent application schema gating", () => {
   beforeEach(() => {
     mockReplace.mockReset()
     mockSetCityPreselected.mockReset()
+    mockUseApplicationSchema.mockReset()
+    mockUseCheckoutState.mockReset()
+    mockGetRelevantApplication.mockReset()
+    mockGetCity.mockReset()
+    mockUseQueryClient.mockReset()
     mockUseQueryClient.mockReturnValue({
       removeQueries: vi.fn(),
+    })
+    mockUseApplicationSchema.mockReturnValue({
+      data: undefined,
+      isLoading: false,
     })
     mockGetCity.mockReturnValue({ slug: "popup-slug" })
     mockGetRelevantApplication.mockReturnValue(null)
@@ -228,6 +291,36 @@ describe("PopupCheckoutContent application schema gating", () => {
     expect(screen.getByText("schema-form")).toBeTruthy()
   })
 
+  it("clears every query before returning a direct checkout to email entry", async () => {
+    const clear = vi.fn()
+    const removeQueries = vi.fn()
+    const setCheckoutState = vi.fn()
+    mockUseQueryClient.mockReturnValue({ clear, removeQueries })
+    mockUseCheckoutState.mockReturnValue({
+      checkoutState: "passes",
+      isSubmitting: false,
+      errorMessage: null,
+      handleSubmit: vi.fn(),
+      setCheckoutState,
+    })
+
+    renderWithClient(
+      <PopupCheckoutContent
+        popup={directPopup as never}
+        background={{ className: "bg" }}
+      />,
+    )
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "Signed in as human@example.com" }),
+    )
+    fireEvent.click(await screen.findByRole("button", { name: "Change email" }))
+
+    expect(clear).toHaveBeenCalledOnce()
+    expect(removeQueries).not.toHaveBeenCalled()
+    expect(setCheckoutState).toHaveBeenCalledWith("form")
+  })
+
   it("keeps products hidden while a manual-approval link is in review", () => {
     mockUseApplicationSchema.mockReturnValue({
       data: {
@@ -251,5 +344,84 @@ describe("PopupCheckoutContent application schema gating", () => {
     expect(screen.queryByText("passes-flow")).toBeNull()
     fireEvent.click(screen.getByRole("button"))
     expect(mockReplace).toHaveBeenCalledWith("/portal/popup-slug")
+  })
+
+  it("scopes both checkout providers to the application flow", () => {
+    mockUseApplicationSchema.mockReturnValue({
+      data: undefined,
+      isLoading: false,
+    })
+    mockUseCheckoutState.mockReturnValue({
+      checkoutState: "passes",
+      isSubmitting: false,
+      errorMessage: null,
+      handleSubmit: vi.fn(),
+      setCheckoutState: vi.fn(),
+    })
+    mockGetRelevantApplication.mockReturnValue({
+      id: "application-1",
+      sales_flow_id: "flow-application",
+      status: "approved",
+    })
+
+    renderWithClient(
+      <PopupCheckoutContent
+        popup={directPopup as never}
+        background={{ className: "bg" }}
+      />,
+    )
+
+    expect(screen.getByTestId("passes-provider").dataset.flowId).toBe(
+      "flow-application",
+    )
+    expect(screen.getByTestId("checkout-provider").dataset.flowId).toBe(
+      "flow-application",
+    )
+  })
+
+  it("does not substitute another application when an explicit flow is selected", () => {
+    mockUseApplicationSchema.mockReturnValue({
+      data: undefined,
+      isLoading: false,
+    })
+    mockUseCheckoutState.mockReturnValue({
+      checkoutState: "passes",
+      isSubmitting: false,
+      errorMessage: null,
+      handleSubmit: vi.fn(),
+      setCheckoutState: vi.fn(),
+    })
+    mockGetRelevantApplication.mockImplementation((flowId?: string) =>
+      flowId
+        ? null
+        : {
+            id: "application-other",
+            sales_flow_id: "flow-other",
+            status: "approved",
+          },
+    )
+
+    renderWithClient(
+      <PopupCheckoutContent
+        popup={popup as never}
+        background={{ className: "bg" }}
+        salesFlowId="flow-selected"
+      />,
+    )
+
+    expect(screen.getByTestId("passes-provider").dataset.flowId).toBe(
+      "flow-selected",
+    )
+    expect(screen.getByTestId("checkout-provider").dataset.flowId).toBe(
+      "flow-selected",
+    )
+    expect(mockGetRelevantApplication).toHaveBeenCalledWith("flow-selected")
+    expect(mockUseApplicationSchema).toHaveBeenCalledWith(
+      "popup-1",
+      "flow-selected",
+    )
+    expect(mockUseCheckoutState).toHaveBeenCalledWith(
+      expect.objectContaining({ salesFlowId: "flow-selected" }),
+    )
   })
 })

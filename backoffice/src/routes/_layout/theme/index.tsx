@@ -1,12 +1,22 @@
 import { useQuery } from "@tanstack/react-query"
 import { createFileRoute } from "@tanstack/react-router"
+import { Palette } from "lucide-react"
+import { useState } from "react"
 
-import { PopupsService } from "@/client"
+import { PopupsService, SalesFlowsService } from "@/client"
 import { WorkspaceAlert } from "@/components/Common/WorkspaceAlert"
 import { ThemeConfigForm } from "@/components/forms/ThemeConfigForm"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import { Skeleton } from "@/components/ui/skeleton"
 import { useWorkspace } from "@/contexts/WorkspaceContext"
 import useAuth from "@/hooks/useAuth"
+import { salesFlowsQueryKey } from "@/lib/salesFlowQueries"
 
 export const Route = createFileRoute("/_layout/theme/")({
   component: ThemePage,
@@ -41,11 +51,26 @@ function ThemePage() {
   return <ThemePageContent popupId={selectedPopupId!} />
 }
 
+const GATHERING = "__gathering__"
+
 function ThemePageContent({ popupId }: { popupId: string }) {
+  // What is being restyled. A flow chooses how its checkout looks; the
+  // gathering's own theme still dresses its portal pages, where no flow is
+  // in scope. Two surfaces, two owners — so both stay editable here and
+  // neither falls back to the other.
+  const [scope, setScope] = useState<string>(GATHERING)
+
   const { data: popup, isLoading } = useQuery({
     queryKey: ["popups", popupId],
     queryFn: () => PopupsService.getPopup({ popupId }),
   })
+
+  const { data: flowsData } = useQuery({
+    queryKey: salesFlowsQueryKey(popupId),
+    queryFn: () => SalesFlowsService.listSalesFlows({ popupId, limit: 100 }),
+  })
+  const flows = flowsData?.results ?? []
+  const activeFlow = flows.find((f) => f.id === scope)
 
   if (isLoading || !popup) {
     return (
@@ -60,16 +85,47 @@ function ThemePageContent({ popupId }: { popupId: string }) {
       <div>
         <h1 className="text-2xl font-bold tracking-tight">Theme</h1>
         <p className="text-muted-foreground">
-          Colors, typography and radius for the {popup.name} portal and checkout
-          flow.
+          {activeFlow
+            ? `Colors, typography and radius for the ${activeFlow.name} checkout.`
+            : `Colors, typography and radius for the ${popup.name} portal pages.`}
+        </p>
+      </div>
+
+      <div className="flex flex-wrap items-center gap-3 rounded-lg border bg-muted/30 px-4 py-3">
+        <Palette className="h-4 w-4 shrink-0 text-muted-foreground" />
+        <Select value={scope} onValueChange={setScope}>
+          <SelectTrigger
+            className="h-8 w-64 bg-background"
+            aria-label="Theme scope"
+          >
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value={GATHERING}>Gathering portal pages</SelectItem>
+            {flows.map((flow) => (
+              <SelectItem key={flow.id} value={flow.id}>
+                {flow.name} checkout
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <p className="text-muted-foreground text-sm">
+          Each flow's checkout has its own look. Changing one never changes
+          another.
         </p>
       </div>
       {/* Re-mount the form when the popup context changes so its internal
           useState snapshots take the new popup's theme_config. */}
       <ThemeConfigForm
-        key={popup.id}
+        key={activeFlow?.id ?? popup.id}
         popupId={popup.id}
-        themeConfig={popup.theme_config as Record<string, unknown> | null}
+        salesFlowId={activeFlow?.id}
+        themeConfig={
+          (activeFlow?.theme_config ?? popup.theme_config) as Record<
+            string,
+            unknown
+          > | null
+        }
         previewEvent={{
           name: popup.name,
           tagline: popup.tagline ?? null,

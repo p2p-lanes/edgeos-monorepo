@@ -2,6 +2,7 @@
 
 import {
   AlertCircle,
+  BedDouble,
   CloudRain,
   HandCoins,
   Heart,
@@ -106,6 +107,7 @@ export default function ConfirmStep() {
     isEditing && attendees.some((a) => a.products.some((p) => p.edit))
   const hasCartItems =
     cart.passes.length > 0 ||
+    cart.accommodations.length > 0 ||
     cart.housing ||
     cart.merch.length > 0 ||
     cart.patron ||
@@ -310,6 +312,53 @@ export default function ConfirmStep() {
         )}
 
         {/* Housing Section */}
+        {/* Booked rooms. Their price is a server quote held on the cart
+            entry, not a product price, so nothing here multiplies. */}
+        {cart.accommodations.length > 0 && (
+          <>
+            <div className="border-t border-border" />
+            <div className="px-5 py-4">
+              <div className="flex items-center gap-2 mb-3">
+                <BedDouble className="w-4 h-4 text-muted-foreground" />
+                <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                  {t("checkout.accommodation.cart_title")}
+                </span>
+              </div>
+              <div className="flex flex-col gap-3">
+                {cart.accommodations.map((item) => (
+                  <div
+                    key={`${item.accommodationId}-${item.checkIn}-${item.checkOut}`}
+                    className="flex items-start justify-between gap-3"
+                  >
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium text-foreground">
+                        {item.name}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        {item.propertyName ? `${item.propertyName} · ` : ""}
+                        {formatCheckoutDate(item.checkIn)} →{" "}
+                        {formatCheckoutDate(item.checkOut)}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        {t("checkout.accommodation.nights", {
+                          count: item.nights,
+                        })}
+                        {" · "}
+                        {t("checkout.accommodation.guests", {
+                          count: item.guestCount,
+                        })}
+                      </p>
+                    </div>
+                    <span className="shrink-0 font-medium text-foreground text-sm">
+                      {formatCurrency(item.totalPrice)}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </>
+        )}
+
         {cart.housing && (
           <>
             <div className="border-t border-border" />

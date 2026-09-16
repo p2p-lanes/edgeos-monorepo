@@ -77,9 +77,11 @@ class TenantsCRUD(BaseCRUD[Tenants, TenantCreate, TenantUpdate]):
         return tenant
 
     def soft_delete(self, session: Session, db_obj: Tenants) -> Tenants:
+        from app.api.user.crud import users_crud
         from app.core.tenant_db import revoke_tenant_credentials
 
         revoke_tenant_credentials(session, db_obj.id)
+        users_crud.soft_delete_for_tenant(session, db_obj.id)
         return super().soft_delete(session, db_obj)
 
 

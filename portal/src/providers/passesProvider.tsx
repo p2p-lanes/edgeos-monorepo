@@ -11,10 +11,10 @@ import {
 import {
   CHECKOUT_MODE,
   type CheckoutMode,
-  resolvePopupCheckoutPolicy,
+  resolveFlowCheckoutPolicy,
 } from "@/checkout/popupCheckoutPolicy"
 import type { AttendeePurchases } from "@/client"
-import { useCart } from "@/hooks/useCartApi"
+import { type CartState, useCart } from "@/hooks/useCartApi"
 import useGetPassesData from "@/hooks/useGetPassesData"
 import { usePurchasesQuery } from "@/hooks/useGetPurchases"
 import { getPriceStrategy } from "@/strategies/PriceStrategy"
@@ -22,12 +22,18 @@ import { getProductStrategy } from "@/strategies/ProductStrategies"
 import { getPurchaseStrategy } from "@/strategies/PurchaseStrategy"
 import { isPassQuantityBased } from "@/strategies/passQuantityHelper"
 import type { AttendeePassState } from "@/types/Attendee"
+import {
+  buildCheckoutRecipientDraft,
+  type CheckoutRecipientDraft,
+  type CheckoutRecipientPassState,
+  canSelectRecipientProducts,
+} from "@/types/checkout"
 import type { ProductsPass } from "@/types/Products"
 import { useCityProvider } from "./cityProvider"
 import { useDiscount } from "./discountProvider"
 
 interface PassesContext_interface {
-  attendeePasses: AttendeePassState[]
+  attendeePasses: CheckoutRecipientPassState[]
   toggleProduct: (
     attendeeId: string,
     product: ProductsPass,
@@ -38,6 +44,11 @@ interface PassesContext_interface {
   isEditing: boolean
   toggleEditing: (editing?: boolean) => void
   clearSelections: () => void
+  addRecipientDraft: (recipient: CheckoutRecipientDraft) => string
+  restoreRecipientSelections: (
+    recipients: CheckoutRecipientDraft[],
+    passes: CartPassSelection[],
+  ) => void
 }
 
 export const PassesContext = createContext<PassesContext_interface | null>(null)
@@ -51,8 +62,12 @@ interface PassesProviderProps {
    */
   attendees: AttendeePassState[]
   restoreFromCart?: boolean
+  /** How the door being shopped sells. Absent means none is in scope — the
+   *  portal's own passes list — which reads the same as it always has. */
+  flowType?: string | null
   productsOverride?: ProductsPass[]
   purchasesOverride?: AttendeePurchases[]
+  salesFlowId?: string | null
 }
 
 /**
@@ -101,12 +116,12 @@ export function mergeAvailableAndPurchasedProducts(
  * Uses purchasesMap (from dedicated purchases endpoint) for purchased product state.
  */
 export function buildBaseAttendeePasses(
-  attendees: AttendeePassState[],
+  attendees: CheckoutRecipientPassState[],
   products: ProductsPass[],
   discountValue: number,
   purchasesMap: Map<string, ProductsPass[]>,
   checkoutMode: CheckoutMode = CHECKOUT_MODE.PASS_SYSTEM,
-): AttendeePassState[] {
+): CheckoutRecipientPassState[] {
   const priceStrategy = getPriceStrategy(checkoutMode)
   const purchaseStrategy = getPurchaseStrategy(checkoutMode)
 
@@ -169,23 +184,53 @@ export function buildBaseAttendeePasses(
  * Applies saved cart selections onto already-built attendeePasses.
  * Mutates nothing — returns a new array.
  */
-function applyCartSelections(
-  attendeePasses: AttendeePassState[],
-  cartPasses: { attendee_id: string; product_id: string; quantity: number }[],
-): AttendeePassState[] {
+export interface CartPassSelection {
+  attendee_id?: string | null
+  recipient_key?: string | null
+  product_id: string
+  quantity?: number
+}
+
+function getAssignedProductSelections(
+  cart: CartState | undefined,
+): CartPassSelection[] {
+  if (!cart) return []
+  return cart.lines.reduce<CartPassSelection[]>((selections, line) => {
+    if (line.kind !== "product" || line.assignment.kind === "unassigned")
+      return selections
+    selections.push({
+      product_id: line.product_id,
+      quantity: line.quantity,
+      ...(line.assignment.kind === "attendee"
+        ? { attendee_id: line.assignment.attendee_id }
+        : { recipient_key: line.assignment.recipient_key }),
+    })
+    return selections
+  }, [])
+}
+
+export function applyCartSelections(
+  attendeePasses: CheckoutRecipientPassState[],
+  cartPasses: CartPassSelection[],
+): CheckoutRecipientPassState[] {
   if (!cartPasses.length) return attendeePasses
 
   // Build a lookup for O(1) access
   const cartLookup = new Map<string, number>()
   for (const cp of cartPasses) {
-    cartLookup.set(`${cp.attendee_id}:${cp.product_id}`, cp.quantity)
+    const identity = cp.recipient_key ?? cp.attendee_id
+    if (identity)
+      cartLookup.set(`${identity}:${cp.product_id}`, cp.quantity ?? 1)
   }
 
   return attendeePasses.map((attendee) => ({
     ...attendee,
     products: attendee.products.map((product) => {
-      const key = `${attendee.id}:${product.id}`
-      const cartQuantity = cartLookup.get(key)
+      const attendeeQuantity = cartLookup.get(`${attendee.id}:${product.id}`)
+      const recipientQuantity = attendee.recipient
+        ? cartLookup.get(`${attendee.recipient.recipient_key}:${product.id}`)
+        : undefined
+      const cartQuantity = recipientQuantity ?? attendeeQuantity
       if (cartQuantity === undefined) return product
 
       const isDayPass = product.duration_type === "day"
@@ -209,6 +254,208 @@ function applyCartSelections(
       }
     }),
   }))
+}
+
+export function restoreRecipientDrafts(
+  attendees: CheckoutRecipientPassState[],
+  recipients: CheckoutRecipientDraft[],
+  popupId: string,
+): CheckoutRecipientPassState[] {
+  if (recipients.length === 0) return attendees
+
+  const remaining = new Map(
+    recipients.map((recipient) => [recipient.recipient_key, recipient]),
+  )
+  const restored = attendees.map((attendee) => {
+    const recipient = recipients.find((candidate) =>
+      recipientMatchesAttendee(attendee, candidate),
+    )
+    if (!recipient) return attendee
+    remaining.delete(recipient.recipient_key)
+    const currentRecipient = attendee.recipient
+    const currentRoleIsAuthoritative = Boolean(
+      currentRecipient?.human_id ||
+        (currentRecipient?.existing_attendee_id &&
+          currentRecipient.category_id != null),
+    )
+    const mergedRecipient: CheckoutRecipientDraft = currentRoleIsAuthoritative
+      ? {
+          ...recipient,
+          ...currentRecipient,
+          profile_snapshot: currentRecipient?.profile_snapshot ?? {},
+        }
+      : {
+          ...currentRecipient,
+          ...recipient,
+          profile_snapshot: {
+            ...(currentRecipient?.profile_snapshot ?? {}),
+            ...(recipient.profile_snapshot ?? {}),
+          },
+        }
+    if (currentRecipient?.human_id) {
+      delete mergedRecipient.existing_attendee_id
+    } else if (currentRecipient?.existing_attendee_id) {
+      mergedRecipient.existing_attendee_id =
+        currentRecipient.existing_attendee_id
+      delete mergedRecipient.human_id
+    }
+    return applyRecipientDraftToAttendee(attendee, mergedRecipient)
+  })
+
+  for (const recipient of remaining.values()) {
+    const normalizedRecipient: CheckoutRecipientDraft = { ...recipient }
+    if (normalizedRecipient.existing_attendee_id) {
+      delete normalizedRecipient.human_id
+    }
+    const profile = normalizedRecipient.profile_snapshot ?? {}
+    restored.push({
+      id: `recipient:${normalizedRecipient.recipient_key}`,
+      tenant_id: "",
+      popup_id: popupId,
+      application_id: null,
+      human_id: normalizedRecipient.human_id ?? null,
+      name: normalizedRecipient.name,
+      category_id: normalizedRecipient.category_id ?? null,
+      category: typeof profile.category === "string" ? profile.category : null,
+      email: normalizedRecipient.email ?? null,
+      gender: typeof profile.gender === "string" ? profile.gender : null,
+      additional_data: profile,
+      products: [],
+      recipient: normalizedRecipient,
+    })
+  }
+
+  return restored
+}
+
+function applyRecipientDraftToAttendee(
+  attendee: CheckoutRecipientPassState,
+  recipient: CheckoutRecipientDraft,
+): CheckoutRecipientPassState {
+  const profile = recipient.profile_snapshot ?? {}
+  return {
+    ...attendee,
+    name: recipient.name,
+    email: recipient.email ?? null,
+    category_id: recipient.category_id ?? null,
+    category: typeof profile.category === "string" ? profile.category : null,
+    gender:
+      typeof profile.gender === "string" ? profile.gender : attendee.gender,
+    additional_data: profile,
+    recipient,
+  }
+}
+
+function resetProductSelection(product: ProductsPass): ProductsPass {
+  if (product.purchased) {
+    return { ...product, selected: false, edit: false, disabled: false }
+  }
+  const isMultiUnit =
+    product.duration_type !== "day" && isPassQuantityBased(product)
+  const quantity =
+    product.duration_type === "day"
+      ? (product.original_quantity ?? 0)
+      : isMultiUnit
+        ? 0
+        : 1
+  return {
+    ...product,
+    selected: false,
+    edit: false,
+    disabled: false,
+    quantity,
+  }
+}
+
+function recipientMatchesAttendee(
+  attendee: CheckoutRecipientPassState,
+  recipient: CheckoutRecipientDraft,
+): boolean {
+  return (
+    recipient.recipient_key === attendee.recipient?.recipient_key ||
+    recipient.existing_attendee_id === attendee.id ||
+    Boolean(recipient.human_id && recipient.human_id === attendee.human_id) ||
+    recipient.recipient_key ===
+      buildCheckoutRecipientDraft(attendee).recipient_key
+  )
+}
+
+function preserveLocalRecipientDrafts(
+  attendees: CheckoutRecipientPassState[],
+  existing: CheckoutRecipientPassState[],
+): CheckoutRecipientPassState[] {
+  const localDrafts = existing.filter(
+    (candidate) =>
+      candidate.recipient &&
+      !attendees.some((attendee) =>
+        recipientMatchesAttendee(
+          attendee,
+          candidate.recipient as CheckoutRecipientDraft,
+        ),
+      ),
+  )
+  return [...attendees, ...localDrafts]
+}
+
+export function rebuildRecipientPasses(
+  attendees: CheckoutRecipientPassState[],
+  recipients: CheckoutRecipientDraft[],
+  passes: CartPassSelection[],
+  popupId: string,
+  products: ProductsPass[],
+  discountValue: number,
+  purchasesMap: Map<string, ProductsPass[]>,
+  checkoutMode: CheckoutMode,
+  existing: CheckoutRecipientPassState[] = [],
+) {
+  const mergedRecipients = new Map(
+    recipients.map((recipient) => [recipient.recipient_key, recipient]),
+  )
+  for (const attendee of existing) {
+    const recipient = attendee.recipient
+    if (!recipient) continue
+    const isAssignedExistingAttendee = Boolean(
+      recipient.existing_attendee_id && recipient.category_id != null,
+    )
+    const isLocalOrBuyerRecipient = !recipient.existing_attendee_id
+    if (isAssignedExistingAttendee || isLocalOrBuyerRecipient) {
+      mergedRecipients.set(recipient.recipient_key, recipient)
+    }
+  }
+  const recipientAttendees = preserveLocalRecipientDrafts(
+    restoreRecipientDrafts(attendees, [...mergedRecipients.values()], popupId),
+    existing,
+  )
+  const rebuilt = buildBaseAttendeePasses(
+    recipientAttendees,
+    products,
+    discountValue,
+    purchasesMap,
+    checkoutMode,
+  )
+  return applyCartSelections(
+    existing.length > 0 ? preserveSelections(rebuilt, existing) : rebuilt,
+    passes,
+  )
+}
+
+export function projectRecipientDraft(
+  attendeePasses: CheckoutRecipientPassState[],
+  recipient: CheckoutRecipientDraft,
+  popupId: string,
+  products: ProductsPass[],
+  discountValue: number,
+  purchasesMap: Map<string, ProductsPass[]>,
+  checkoutMode: CheckoutMode,
+): CheckoutRecipientPassState[] {
+  const projected = buildBaseAttendeePasses(
+    restoreRecipientDrafts([], [recipient], popupId),
+    products,
+    discountValue,
+    purchasesMap,
+    checkoutMode,
+  )
+  return preserveLocalRecipientDrafts(attendeePasses, projected)
 }
 
 /**
@@ -252,26 +499,41 @@ const PassesProvider = ({
   children,
   attendees,
   restoreFromCart = false,
+  flowType = null,
   productsOverride,
   purchasesOverride,
+  salesFlowId,
 }: PassesProviderProps) => {
   const { discountApplied } = useDiscount()
-  const [attendeePasses, setAttendeePasses] = useState<AttendeePassState[]>([])
+  const [attendeePasses, setAttendeePasses] = useState<
+    CheckoutRecipientPassState[]
+  >([])
 
   const [isEditing, setIsEditing] = useState(false)
-  const { products: queriedProducts } = useGetPassesData()
+  const { products: queriedProducts } = useGetPassesData(
+    salesFlowId,
+    productsOverride === undefined,
+  )
   const products = productsOverride ?? queriedProducts
   const { getCity } = useCityProvider()
   const city = getCity()
-  const checkoutPolicy = resolvePopupCheckoutPolicy(city)
+  const checkoutPolicy = resolveFlowCheckoutPolicy(flowType)
   const cityId = city?.id ? String(city.id) : null
-  const previousCityIdRef = useRef(cityId)
+  const checkoutScope = `${cityId ?? ""}:${salesFlowId ?? ""}`
+  const previousCheckoutScopeRef = useRef(checkoutScope)
   const hasInitializedRef = useRef(false)
   const hasRestoredCartRef = useRef(false)
-  const { data: savedCartPasses } = useCart(restoreFromCart ? cityId : null)
+  const { data: savedCartPasses } = useCart(
+    restoreFromCart ? cityId : null,
+    salesFlowId,
+  )
 
   // Dedicated purchases query — granular invalidation after payment
-  const { data: queriedPurchasesData } = usePurchasesQuery(cityId)
+  const { data: queriedPurchasesData } = usePurchasesQuery(
+    cityId,
+    attendees,
+    purchasesOverride === undefined,
+  )
   const purchasesData = purchasesOverride ?? queriedPurchasesData
   const purchasesMap = useMemo(
     () => buildPurchasesMap(purchasesData),
@@ -290,15 +552,15 @@ const PassesProvider = ({
   const prevProductsRef = useRef(products)
   const prevPurchasesMapRef = useRef(purchasesMap)
 
-  // Reset when city changes so stale data doesn't persist
+  // A sales flow is a complete cart boundary, even when the popup is unchanged.
   useEffect(() => {
-    if (previousCityIdRef.current === cityId) return
-    previousCityIdRef.current = cityId
+    if (previousCheckoutScopeRef.current === checkoutScope) return
+    previousCheckoutScopeRef.current = checkoutScope
     setAttendeePasses([])
     hasInitializedRef.current = false
     hasRestoredCartRef.current = false
     setIsEditing(false)
-  }, [cityId])
+  }, [checkoutScope])
 
   // Stable toggleProduct — reads discount & editing from refs, never recreated
   const toggleProduct = useCallback(
@@ -315,17 +577,40 @@ const PassesProvider = ({
         checkoutPolicy.checkoutMode,
       )
       setAttendeePasses((current) =>
-        strategy.handleSelection(
-          current,
-          attendeeId,
-          product,
-          discountRef.current,
-          exclusivityScopeIds,
-          attendeeVisibleProductIds,
-        ),
+        current.some(
+          (attendee) =>
+            attendee.id === attendeeId && !canSelectRecipientProducts(attendee),
+        )
+          ? current
+          : strategy.handleSelection(
+              current,
+              attendeeId,
+              product,
+              discountRef.current,
+              exclusivityScopeIds,
+              attendeeVisibleProductIds,
+            ),
       )
     },
     [checkoutPolicy.checkoutMode],
+  )
+
+  const addRecipientDraft = useCallback(
+    (recipient: CheckoutRecipientDraft) => {
+      setAttendeePasses((current) =>
+        projectRecipientDraft(
+          current,
+          recipient,
+          cityId ?? "",
+          products,
+          discountRef.current.discount_value,
+          purchasesMap,
+          checkoutPolicy.checkoutMode,
+        ),
+      )
+      return `recipient:${recipient.recipient_key}`
+    },
+    [cityId, products, purchasesMap, checkoutPolicy.checkoutMode],
   )
 
   // Ref to read savedCartPasses inside init effect without it being a dep
@@ -335,7 +620,7 @@ const PassesProvider = ({
   // Main effect: handles initialization, structural changes, and discount-only price recalculation.
   // savedCartPasses is read from ref (not a dep) to avoid re-running when cart is saved during checkout.
   useEffect(() => {
-    if (attendees.length === 0 || products.length === 0) return
+    if (products.length === 0) return
 
     const discountValue = discountApplied.discount_value
     const discountChanged = discountValue !== prevDiscountValueRef.current
@@ -351,8 +636,13 @@ const PassesProvider = ({
 
     if (!hasInitializedRef.current) {
       // First initialization — build base passes with prices
-      let basePasses = buildBaseAttendeePasses(
+      const cart = savedCartPassesRef.current
+      const cartPasses = getAssignedProductSelections(cart)
+      let basePasses = rebuildRecipientPasses(
         attendees,
+        cart?.recipients ?? [],
+        [],
+        cityId ?? "",
         products,
         discountValue,
         purchasesMap,
@@ -360,14 +650,9 @@ const PassesProvider = ({
       )
 
       // Apply cart selections in the same tick if already available (avoids extra render cycle)
-      const cart = savedCartPassesRef.current
-      if (
-        restoreFromCart &&
-        !hasRestoredCartRef.current &&
-        cart?.passes?.length
-      ) {
+      if (restoreFromCart && !hasRestoredCartRef.current && cartPasses.length) {
         hasRestoredCartRef.current = true
-        basePasses = applyCartSelections(basePasses, cart.passes)
+        basePasses = applyCartSelections(basePasses, cartPasses)
       }
 
       hasInitializedRef.current = true
@@ -377,14 +662,20 @@ const PassesProvider = ({
 
     // Structural change (attendees/products/purchases changed) — rebuild with current discount
     if (structuralChange) {
-      const basePasses = buildBaseAttendeePasses(
-        attendees,
-        products,
-        discountValue,
-        purchasesMap,
-        checkoutPolicy.checkoutMode,
+      const cart = savedCartPassesRef.current
+      setAttendeePasses((current) =>
+        rebuildRecipientPasses(
+          attendees,
+          cart?.recipients ?? [],
+          [],
+          cityId ?? "",
+          products,
+          discountValue,
+          purchasesMap,
+          checkoutPolicy.checkoutMode,
+          current,
+        ),
       )
-      setAttendeePasses((current) => preserveSelections(basePasses, current))
       return
     }
 
@@ -417,6 +708,7 @@ const PassesProvider = ({
     discountApplied.discount_value,
     restoreFromCart,
     checkoutPolicy.checkoutMode,
+    cityId,
   ])
 
   // Cart restoration for late-arriving cart data (cart loads after initialization)
@@ -424,14 +716,51 @@ const PassesProvider = ({
     if (!restoreFromCart) return
     if (hasRestoredCartRef.current) return
     if (!hasInitializedRef.current) return
-    if (attendeePasses.length === 0) return
-    if (!savedCartPasses?.passes?.length) return
+    if (!savedCartPasses) return
+    const cartPasses = getAssignedProductSelections(savedCartPasses)
+    if (!cartPasses.length) return
 
     hasRestoredCartRef.current = true
-    setAttendeePasses((current) =>
-      applyCartSelections(current, savedCartPasses.passes),
-    )
-  }, [restoreFromCart, attendeePasses.length, savedCartPasses])
+    setAttendeePasses((current) => {
+      return rebuildRecipientPasses(
+        current,
+        savedCartPasses.recipients,
+        cartPasses,
+        cityId ?? "",
+        products,
+        discountRef.current.discount_value,
+        purchasesMap,
+        checkoutPolicy.checkoutMode,
+        current,
+      )
+    })
+  }, [
+    restoreFromCart,
+    savedCartPasses,
+    checkoutPolicy.checkoutMode,
+    cityId,
+    products,
+    purchasesMap,
+  ])
+
+  const restoreRecipientSelections = useCallback(
+    (recipients: CheckoutRecipientDraft[], passes: CartPassSelection[]) => {
+      setAttendeePasses((current) => {
+        return rebuildRecipientPasses(
+          current,
+          recipients,
+          passes,
+          cityId ?? "",
+          products,
+          discountRef.current.discount_value,
+          purchasesMap,
+          checkoutPolicy.checkoutMode,
+          current,
+        )
+      })
+    },
+    [cityId, products, purchasesMap, checkoutPolicy.checkoutMode],
+  )
 
   const toggleEditing = useCallback((editing?: boolean) => {
     setAttendeePasses((current) =>
@@ -461,21 +790,7 @@ const PassesProvider = ({
           if (p.purchased) {
             return { ...p, selected: false, edit: false, disabled: false }
           }
-          const isMultiUnit =
-            p.duration_type !== "day" && isPassQuantityBased(p)
-          const initialQuantity =
-            p.duration_type === "day"
-              ? (p.original_quantity ?? 0)
-              : isMultiUnit
-                ? 0
-                : 1
-          return {
-            ...p,
-            selected: false,
-            edit: false,
-            disabled: false,
-            quantity: initialQuantity,
-          }
+          return resetProductSelection(p)
         }),
       })),
     )
@@ -489,6 +804,8 @@ const PassesProvider = ({
       isEditing,
       toggleEditing,
       clearSelections,
+      addRecipientDraft,
+      restoreRecipientSelections,
     }),
     [
       attendeePasses,
@@ -497,6 +814,8 @@ const PassesProvider = ({
       isEditing,
       toggleEditing,
       clearSelections,
+      addRecipientDraft,
+      restoreRecipientSelections,
     ],
   )
 

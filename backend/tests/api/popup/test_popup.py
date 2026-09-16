@@ -14,7 +14,12 @@ import uuid
 from unittest.mock import patch
 
 from fastapi.testclient import TestClient
+from sqlmodel import Session, select
 
+from app.api.approval_strategy.models import ApprovalStrategies
+from app.api.base_field_config.models import BaseFieldConfigs
+from app.api.form_section.models import FormSections
+from app.api.sales_flow.models import SalesFlows
 from app.api.shared.enums import SaleType
 
 
@@ -190,3 +195,65 @@ def test_update_popup_race_condition_returns_409_not_500(
     assert response2.status_code == 409, response2.text
     body = response2.json()
     assert "slug" in body["detail"].lower()
+
+
+def test_unchanged_direct_popup_with_application_sibling_saves_without_reseeding(
+    client: TestClient,
+    db: Session,
+    admin_token_tenant_a: str,
+) -> None:
+    suffix = uuid.uuid4().hex[:8]
+    popup_response = client.post(
+        "/api/v1/popups",
+        headers=_admin_headers(admin_token_tenant_a),
+        json={"name": f"Mixed Flow Popup {suffix}", "sale_type": "direct"},
+    )
+    assert popup_response.status_code == 201, popup_response.text
+    popup_id = popup_response.json()["id"]
+
+    flow_response = client.post(
+        "/api/v1/sales-flows",
+        headers=_admin_headers(admin_token_tenant_a),
+        json={
+            "popup_id": popup_id,
+            "slug": f"apply-{suffix}",
+            "name": "Apply",
+            "type": "application",
+        },
+    )
+    assert flow_response.status_code == 201, flow_response.text
+    application_flow_id = uuid.UUID(flow_response.json()["id"])
+
+    response = client.patch(
+        f"/api/v1/popups/{popup_id}",
+        headers=_admin_headers(admin_token_tenant_a),
+        json={"name": popup_response.json()["name"]},
+    )
+
+    assert response.status_code == 200, response.text
+    popup_uuid = uuid.UUID(popup_id)
+    direct_flow = db.exec(
+        select(SalesFlows).where(
+            SalesFlows.popup_id == popup_uuid,
+            SalesFlows.type == "direct",
+        )
+    ).one()
+    strategies = db.exec(
+        select(ApprovalStrategies).where(ApprovalStrategies.popup_id == popup_uuid)
+    ).all()
+    assert [strategy.sales_flow_id for strategy in strategies] == [None]
+    assert direct_flow.id not in {strategy.sales_flow_id for strategy in strategies}
+    assert db.exec(
+        select(FormSections).where(FormSections.sales_flow_id == application_flow_id)
+    ).first()
+    assert db.exec(
+        select(BaseFieldConfigs).where(
+            BaseFieldConfigs.sales_flow_id == application_flow_id
+        )
+    ).first()
+    assert (
+        db.exec(
+            select(FormSections).where(FormSections.sales_flow_id == direct_flow.id)
+        ).first()
+        is None
+    )

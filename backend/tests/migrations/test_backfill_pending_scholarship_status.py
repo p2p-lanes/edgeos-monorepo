@@ -9,6 +9,7 @@ from sqlmodel import Session
 from app.api.application.models import Applications
 from app.api.human.models import Humans
 from app.api.popup.models import Popups
+from app.api.sales_flow.crud import sales_flows_crud
 from app.api.tenant.models import Tenants
 
 
@@ -36,6 +37,9 @@ def test_backfill_pending_scholarship_status_preserves_existing_decisions(
     )
     db.add(popup)
     db.flush()
+    flow = sales_flows_crud.provision_default_flow(
+        db, popup_id=popup.id, tenant_id=tenant_a.id, sale_type="application"
+    )
 
     def make_human() -> Humans:
         human = Humans(
@@ -50,6 +54,7 @@ def test_backfill_pending_scholarship_status_preserves_existing_decisions(
         tenant_id=tenant_a.id,
         popup_id=popup.id,
         human_id=make_human().id,
+        sales_flow_id=flow.id,
         scholarship_request=True,
         scholarship_status=None,
     )
@@ -57,6 +62,7 @@ def test_backfill_pending_scholarship_status_preserves_existing_decisions(
         tenant_id=tenant_a.id,
         popup_id=popup.id,
         human_id=make_human().id,
+        sales_flow_id=flow.id,
         scholarship_request=True,
         scholarship_status="approved",
     )
@@ -64,6 +70,7 @@ def test_backfill_pending_scholarship_status_preserves_existing_decisions(
         tenant_id=tenant_a.id,
         popup_id=popup.id,
         human_id=make_human().id,
+        sales_flow_id=flow.id,
         scholarship_request=False,
         scholarship_status=None,
     )

@@ -18,6 +18,7 @@ import { createCheckoutClient } from "@edgeos/checkout-core"
 
 const client = createCheckoutClient({
   slug: "amanita",                 // your popup slug
+  flowSlug: "checkout",            // canonical sales flow slug
   publishableKey: "pk_live_xxxx",  // → X-EdgeOS-Publishable-Key header
   baseUrl: undefined,              // OPTIONAL — defaults to the EdgeOS prod API
                                    // (DEFAULT_BASE_URL). Override for dev/staging/
@@ -26,18 +27,18 @@ const client = createCheckoutClient({
 })
 ```
 
-`CheckoutClientOptions = { slug: string; baseUrl?: string; publishableKey?: string; fetch?: typeof fetch }`.
+`CheckoutClientOptions = { slug: string; flowSlug: string; baseUrl?: string; publishableKey?: string; fetch?: typeof fetch }`.
 
 The `CheckoutClient` is a typed wrapper over the API. You rarely call it directly
 (the store composes it), but it's there for prefetch, SSR, or bespoke flows:
 
 ```ts
-client.getRuntime()                    // GET  /checkout/{slug}/runtime  → catalog + form + steps
-client.preview(body)                   // POST /checkout/{slug}/preview  → authoritative breakdown
+client.getRuntime()                    // GET  /checkout/{slug}/{flowSlug}/runtime  → catalog + form + steps
+client.preview(body)                   // POST /checkout/{slug}/{flowSlug}/preview  → authoritative breakdown
 client.validateCoupon(code)            // POST coupon validation
-client.purchase(body)                  // POST /checkout/{slug}/purchase → pay URL
-client.upsertCart(body)                // PUT  /checkout/{slug}/cart     → persist anon cart by email
-client.restoreCart(cid, sig)           // GET  /checkout/{slug}/cart?cid&sig → restore from signed link
+client.purchase(body)                  // POST /checkout/{slug}/{flowSlug}/purchase → pay URL
+client.upsertCart(body)                // PUT  /checkout/{slug}/{flowSlug}/cart     → persist anon cart by email
+client.restoreCart(cid, sig)           // GET  /checkout/{slug}/{flowSlug}/cart?cid&sig → restore from signed link
 ```
 
 Errors surface as **`CheckoutApiError`** (exported) — has the HTTP status and the

@@ -2,9 +2,19 @@ import {
   CHECKOUT_MODE,
   type CheckoutMode,
 } from "@/checkout/popupCheckoutPolicy"
-import type { PaymentProductRequest_Input as PaymentProductRequest } from "@/client"
+import type {
+  PaymentProductRequest_Input as PaymentProductRequest,
+  PaymentRecipientRequest,
+} from "@/client"
+import { guestsForWire } from "@/lib/accommodationForm"
+import {
+  type BuyerIdentity,
+  NO_BUYER_IDENTITY,
+  withBuyerIdentity,
+} from "@/lib/buyerIdentity"
 import type { AttendeePassState } from "@/types/Attendee"
 import type {
+  SelectedAccommodationItem,
   SelectedDynamicItem,
   SelectedHousingItem,
   SelectedMealPlanItem,
@@ -13,10 +23,26 @@ import type {
   SelectedPatronItem,
 } from "@/types/checkout"
 
+export interface OpenTicketBuyer {
+  email: string
+  firstName: string
+  lastName: string
+}
+
+export class MissingTicketBuyerError extends Error {
+  constructor() {
+    super("Complete the buyer information before paying for tickets")
+  }
+}
+
 interface BuildPaymentProductsParams {
   attendeePasses: AttendeePassState[]
   selectedPasses: SelectedPassItem[]
   housing: SelectedHousingItem | null
+  accommodations?: SelectedAccommodationItem[]
+  /** What the checkout already knows about the buyer. Defaults to knowing
+   *  nothing, which leaves every booking exactly as the cart holds it. */
+  buyerIdentity?: BuyerIdentity
   merch: SelectedMerchItem[]
   patron: SelectedPatronItem | null
   selectedMealPlans?: SelectedMealPlanItem[]
@@ -25,10 +51,13 @@ interface BuildPaymentProductsParams {
   appCredit: string | number | null | undefined
   checkoutMode?: CheckoutMode
   editPassesEnabled?: boolean
+  submitMode?: "application" | "open-ticketing"
+  openTicketBuyer?: OpenTicketBuyer | null
 }
 
 interface BuildPaymentProductsResult {
   products: PaymentProductRequest[]
+  recipients: PaymentRecipientRequest[]
   isMonthUpgrade: boolean
 }
 
@@ -68,25 +97,85 @@ function detectMonthUpgrade(attendeePasses: AttendeePassState[]): boolean {
  * - Month upgrade mode (month selected with existing week/day)
  * - Day pass quantity deltas (quantity - original_quantity)
  * - Housing, merch, and patron products
+ * - Accommodation bookings (priced server-side from their dates)
  */
 export function buildPaymentProducts({
   attendeePasses,
   selectedPasses,
   housing,
+  accommodations = [],
+  buyerIdentity = NO_BUYER_IDENTITY,
   merch,
   patron,
   selectedMealPlans = [],
   dynamicItems,
   isEditing,
-  appCredit,
   checkoutMode = CHECKOUT_MODE.PASS_SYSTEM,
   editPassesEnabled = false,
+  submitMode = "application",
+  openTicketBuyer,
 }: BuildPaymentProductsParams): BuildPaymentProductsResult {
   const isMonthUpgrade =
     editPassesEnabled &&
     checkoutMode === CHECKOUT_MODE.PASS_SYSTEM &&
     detectMonthUpgrade(attendeePasses)
   const products: PaymentProductRequest[] = []
+  const recipients = new Map<string, PaymentRecipientRequest>()
+  const accommodationAttendeeId =
+    submitMode === "application"
+      ? attendeePasses.find(
+          (attendee) =>
+            !attendee.id.startsWith("open-buyer-") &&
+            !attendee.id.startsWith("recipient:"),
+        )?.id
+      : undefined
+  const selectedPassesByIdentity = new Map(
+    selectedPasses.map((pass) => [
+      `${pass.attendeeId}:${pass.productId}`,
+      pass,
+    ]),
+  )
+
+  const recipientForAttendee = (
+    attendee: AttendeePassState,
+  ): PaymentRecipientRequest | undefined =>
+    (attendee as AttendeePassState & { recipient?: PaymentRecipientRequest })
+      .recipient
+
+  const recipientIdentity = (
+    attendeeId: string,
+    recipient?: PaymentRecipientRequest,
+  ): Pick<PaymentProductRequest, "attendee_id" | "recipient_key"> => {
+    if (!recipient) return { attendee_id: attendeeId }
+
+    if (!recipients.has(recipient.recipient_key)) {
+      recipients.set(recipient.recipient_key, recipient)
+    }
+    return { recipient_key: recipient.recipient_key }
+  }
+
+  const passIdentity = (
+    pass: SelectedPassItem,
+  ): Pick<PaymentProductRequest, "attendee_id" | "recipient_key"> => {
+    const attendee = attendeePasses.find(
+      (candidate) => candidate.id === pass.attendeeId,
+    )
+    return recipientIdentity(
+      pass.attendeeId,
+      pass.recipient ?? recipientForAttendee(attendee ?? pass.attendee),
+    )
+  }
+
+  const attendeeProductIdentity = (
+    attendee: AttendeePassState,
+    _product: SelectedPassItem["product"],
+    selectedPass?: SelectedPassItem,
+  ): Pick<PaymentProductRequest, "attendee_id" | "recipient_key"> => {
+    return recipientIdentity(
+      attendee.id,
+      selectedPass?.recipient ?? recipientForAttendee(attendee),
+    )
+  }
 
   if (isEditing) {
     // Editing mode: send kept + new products
@@ -96,15 +185,18 @@ export function buildPaymentProducts({
         if (product.purchased && !product.edit) {
           products.push({
             product_id: product.id,
-            attendee_id: attendee.id,
+            ...attendeeProductIdentity(attendee, product),
             quantity: product.quantity ?? 1,
           })
         }
         // New: selected and not previously purchased
         if (product.selected && !product.purchased) {
+          const selectedPass = selectedPassesByIdentity.get(
+            `${attendee.id}:${product.id}`,
+          )
           products.push({
             product_id: product.id,
-            attendee_id: attendee.id,
+            ...attendeeProductIdentity(attendee, product, selectedPass),
             quantity:
               product.duration_type === "day"
                 ? (product.quantity ?? 1) - (product.original_quantity ?? 0)
@@ -114,11 +206,9 @@ export function buildPaymentProducts({
       }
     }
   } else {
-    const hasAccountCredit = appCredit ? Number(appCredit) > 0 : false
-
-    // When there's account credit or month upgrade, include purchased products
-    // so the backend can recalculate totals with credits applied
-    if (hasAccountCredit || isMonthUpgrade) {
+    // Only replacement upgrades need kept purchases. Stored account credit is
+    // applied server-side; normal purchases must contain only new units.
+    if (isMonthUpgrade) {
       for (const attendee of attendeePasses) {
         const hasFullOrMonth = attendee.products.some(
           (p) =>
@@ -140,7 +230,7 @@ export function buildPaymentProducts({
 
           products.push({
             product_id: product.id,
-            attendee_id: attendee.id,
+            ...attendeeProductIdentity(attendee, product),
             quantity: product.quantity ?? 1,
           })
         }
@@ -148,24 +238,20 @@ export function buildPaymentProducts({
     }
 
     // Add selected passes
+    const selectedPassProductIds = new Set<string>()
     for (const pass of selectedPasses) {
+      selectedPassProductIds.add(pass.productId)
       products.push({
         product_id: pass.productId,
-        attendee_id: pass.attendeeId,
+        ...passIdentity(pass),
         quantity: pass.quantity,
       })
     }
-
-    // When no pass is in selectedPasses (e.g., tickets selected via DynamicProductStep),
-    // attach side-products to the application's first existing attendee instead of "".
-    const firstAttendeeId =
-      selectedPasses[0]?.attendeeId ?? attendeePasses[0]?.id ?? ""
 
     // Add merch
     for (const item of merch) {
       products.push({
         product_id: item.productId,
-        attendee_id: firstAttendeeId,
         quantity: item.quantity,
       })
     }
@@ -175,7 +261,6 @@ export function buildPaymentProducts({
       const baseQty = housing.pricePerDay ? housing.nights : 1
       products.push({
         product_id: housing.productId,
-        attendee_id: firstAttendeeId,
         quantity: baseQty * (housing.quantity ?? 1),
       })
     }
@@ -184,32 +269,114 @@ export function buildPaymentProducts({
     if (patron) {
       products.push({
         product_id: patron.productId,
-        attendee_id: firstAttendeeId,
         quantity: 1,
         unit_price_override: patron.amount,
       })
     }
 
+    // Simple-quantity tickets have no attendee selector. Materialize one
+    // attempt-local recipient per unit from the buyer form, not from a human
+    // id inferred from email. Distinct keys keep guest tickets from collapsing
+    // onto one attendee at fulfillment. Rebuilt at submit time for BOTH fresh
+    // and restored carts so old unassigned carts and edited buyer details work.
+    // Keys are stable across retries, and counters span steps containing the
+    // same product. Explicit selected-pass identities above are left intact.
+    const ticketUnitCounts = new Map<string, number>()
+    const addOpenTicket = (item: SelectedDynamicItem) => {
+      const email = openTicketBuyer?.email.trim()
+      const name = [openTicketBuyer?.firstName, openTicketBuyer?.lastName]
+        .filter(Boolean)
+        .join(" ")
+        .trim()
+      if (!email || !name) throw new MissingTicketBuyerError()
+      for (let unit = 0; unit < item.quantity; unit++) {
+        let index = ticketUnitCounts.get(item.productId) ?? 0
+        let key: string
+        do {
+          key = `open-ticket:${item.productId}:${index++}`
+        } while (recipients.has(key))
+        ticketUnitCounts.set(item.productId, index)
+        // The quantity UI does not collect guest profiles. Preserve the buyer
+        // contact snapshot per unit, as anonymous checkout does, without
+        // claiming these drafts are an existing human or attendee.
+        recipients.set(key, {
+          recipient_key: key,
+          name,
+          email,
+          category_id: null,
+        })
+        products.push({
+          product_id: item.productId,
+          recipient_key: key,
+          quantity: 1,
+        })
+      }
+    }
+
     // Add dynamic step items
     for (const items of Object.values(dynamicItems)) {
       for (const item of items) {
-        if (item.quantity > 0) {
+        // A restored legacy cart can contain the same ticket in dynamicItems
+        // and selectedPasses. Keep the attendee-scoped representation.
+        if (item.quantity > 0 && !selectedPassProductIds.has(item.productId)) {
+          if (
+            submitMode === "open-ticketing" &&
+            item.product.category?.toLowerCase() === "ticket"
+          ) {
+            addOpenTicket(item)
+            continue
+          }
           products.push({
             product_id: item.productId,
-            attendee_id: firstAttendeeId,
             quantity: item.quantity,
           })
         }
       }
     }
 
+    // Add accommodations: one line per booked room, pointing at that room's
+    // shadow product. No price travels: the backend re-quotes the stay from
+    // the dates in `purchase_metadata` and charges that, so a tampered price
+    // has nothing to tamper with. `quantity` must be 1, because a second room is a
+    // second line, because each one is assigned its own unit.
+    for (const stay of accommodations) {
+      // The step stopped asking the buyer for their own email, phone and
+      // name once the buyer step or the account already had them. This is
+      // where those answers become real ones, in the single place the
+      // booking leaves for the server, so the property's registry and the
+      // backend's `validate_answers` both see a complete form.
+      const item = withBuyerIdentity(stay, buyerIdentity)
+      products.push({
+        product_id: item.productId,
+        ...(accommodationAttendeeId
+          ? { attendee_id: accommodationAttendeeId }
+          : {}),
+        quantity: 1,
+        purchase_metadata: {
+          kind: "accommodation_booking",
+          accommodation_id: item.accommodationId,
+          check_in: item.checkIn,
+          check_out: item.checkOut,
+          guest_count: item.guestCount,
+          guests: guestsForWire(item.guests),
+          booker_answers: item.bookerAnswers,
+        },
+      })
+    }
+
     // Add meal plans — one PaymentProductRequest per (attendee, weekly product),
     // each carrying the per-purchase metadata blob the backend persists onto
     // AttendeeProducts.purchase_metadata.
     for (const item of selectedMealPlans) {
+      const attendee = attendeePasses.find(
+        (candidate) => candidate.id === item.attendeeId,
+      )
       products.push({
         product_id: item.productId,
-        attendee_id: item.attendeeId,
+        ...recipientIdentity(
+          item.attendeeId,
+          attendee ? recipientForAttendee(attendee) : undefined,
+        ),
         quantity: 1,
         purchase_metadata: {
           daily_choices: item.dailyChoices,
@@ -220,5 +387,5 @@ export function buildPaymentProducts({
     }
   }
 
-  return { products, isMonthUpgrade }
+  return { products, recipients: [...recipients.values()], isMonthUpgrade }
 }

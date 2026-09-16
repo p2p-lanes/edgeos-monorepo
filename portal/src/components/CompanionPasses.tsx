@@ -49,11 +49,14 @@ export function CompanionPasses({ participation }: CompanionPassesProps) {
       <div className="flex flex-col gap-2 max-w-3xl">
         <div className="flex items-center gap-3">
           <Ticket className="w-6 h-6 text-gray-700" />
-          <h1 className="text-3xl font-bold tracking-tight">Your Passes</h1>
+          <h1 className="text-3xl font-bold tracking-tight">
+            {t("passes.your_passes")}
+          </h1>
         </div>
         <p className="text-muted-foreground/75">
-          You&apos;re attending {city?.name ? `${city.name} ` : ""}as a
-          companion.
+          {city?.name
+            ? t("passes.companion_attending_city", { city: city.name })
+            : t("passes.companion_attending")}
         </p>
       </div>
 
@@ -71,11 +74,13 @@ export function CompanionPasses({ participation }: CompanionPassesProps) {
         </Badge>
       </div>
 
-      {/* Tickets */}
-      {isAccepted && (
+      {/* Tickets. A companion can buy for themselves, and that ticket lands on
+          this very row, so having tickets is enough to show them — waiting on
+          somebody else's application must not hide a pass they paid for. */}
+      {(hasTickets || isAccepted) && (
         <div className="rounded-xl bg-white p-5 shadow-sm border border-gray-200">
           <h3 className="text-sm font-medium text-muted-foreground mb-3">
-            Your Passes
+            {t("passes.your_passes")}
           </h3>
           {hasTickets ? (
             <div>
@@ -127,16 +132,16 @@ export function CompanionPasses({ participation }: CompanionPassesProps) {
             </div>
           ) : (
             <p className="text-sm text-muted-foreground py-4 text-center">
-              No passes assigned yet. Check back later.
+              {t("passes.companion_no_passes")}
             </p>
           )}
         </div>
       )}
 
-      {!isAccepted && (
+      {!hasTickets && !isAccepted && (
         <div className="rounded-xl bg-white p-5 shadow-sm border border-gray-200">
           <p className="text-sm text-muted-foreground text-center">
-            Passes will be available once the application is accepted.
+            {t("passes.companion_waiting_acceptance")}
           </p>
         </div>
       )}

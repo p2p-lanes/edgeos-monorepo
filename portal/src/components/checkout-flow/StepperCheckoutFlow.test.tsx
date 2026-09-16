@@ -335,15 +335,41 @@ describe("StepperCheckoutFlow", () => {
       expect(extra.classList.contains("pointer-events-auto")).toBe(true)
     })
 
-    it("keeps the default skin's nav bar full-width with its own background", () => {
+    it("keeps the default skin's nav bar full-width and owned by checkout tokens", () => {
       stepConfigsOverride = [PASSES_STEP_CONFIG]
       const { container } = render(<StepperCheckoutFlow />)
 
       const nav = container.querySelector('nav[aria-label="Checkout sections"]')
       const bar = nav?.parentElement as HTMLElement
+      const activePill = nav?.querySelector(
+        '[aria-current="step"]',
+      ) as HTMLElement
+      const inactivePill = Array.from(
+        nav?.querySelectorAll("button") ?? [],
+      ).find((button) => button !== activePill) as HTMLElement
       expect(bar.classList.contains("sticky")).toBe(true)
-      expect(bar.className).toContain("bg-background/90")
+      expect(bar.classList).toContain("bg-checkout-navbar-bg")
+      expect(bar.className).not.toContain("bg-background")
       expect(nav?.className).not.toContain("max-w-")
+      expect(activePill.classList).toContain("bg-checkout-badge-bg")
+      expect(activePill.classList).toContain("text-checkout-nav-text")
+      expect(inactivePill.className).toContain("text-checkout-nav-text/70")
+    })
+
+    it("keeps the default footer and primary action owned by checkout tokens", () => {
+      render(<StepperCheckoutFlow />)
+      const cta = screen.getByTestId("stepper-next")
+      const back = screen.getByRole("button", { name: "common.back" })
+      const total = screen.getByText("$100")
+      const footer = cta.parentElement as HTMLElement
+
+      expect(footer.classList).toContain("bg-checkout-bottom-bar-bg")
+      expect(footer.classList).toContain("text-checkout-bottom-bar-text")
+      expect(footer.className).not.toContain("bg-background")
+      expect(back.className).toContain("text-checkout-bottom-bar-text/60")
+      expect(total.classList).toContain("text-checkout-bottom-bar-text")
+      expect(cta.classList).toContain("bg-checkout-button")
+      expect(cta.classList).toContain("text-checkout-button-title")
     })
 
     it("renders the amanita CTA as a flat gold fill, not the gem frame", () => {

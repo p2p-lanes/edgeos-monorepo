@@ -1,9 +1,11 @@
 """Router for the open-ticketing checkout API.
 
 Endpoints:
-- GET  /checkout/{slug}/runtime  — public, anonymous, rate-limited 120/min/IP
-- GET  /checkout/{slug}/share    — public, anonymous, rate-limited 120/min/IP
-- POST /checkout/{slug}/purchase — public, anonymous, rate-limited 10/min/IP
+- GET  /checkout/{slug}/{flow_slug}/runtime
+- GET  /checkout/{slug}/{flow_slug}/share
+- POST /checkout/{slug}/{flow_slug}/purchase
+- GET  /checkout/{slug}/{flow_slug}/accommodations
+- POST /checkout/{slug}/{flow_slug}/accommodations/availability
 """
 
 import uuid
@@ -15,12 +17,20 @@ from fastapi import (
     Depends,
     Header,
     HTTPException,
-    Query,
     Request,
     status,
 )
 from loguru import logger
 
+from app.api.accommodation.public import (
+    availability_for_popup,
+    offer_for_popup,
+)
+from app.api.accommodation.schemas import (
+    AccommodationAvailabilityRequest,
+    AccommodationOffer,
+    PublicAccommodationAvailability,
+)
 from app.api.cart.crud import carts_crud
 from app.api.cart.schemas import CartState, OpenCartPublic, OpenCartUpsert
 from app.api.checkout.crud import (
@@ -46,7 +56,7 @@ from app.api.payment.router import (
 from app.api.payment.schemas import PaymentStatus, PendingReleaseResponse
 from app.api.translation.service import parse_accept_language
 from app.core.dependencies.tenants import PublicTenant
-from app.core.dependencies.users import SessionDep
+from app.core.dependencies.users import OptionalHuman, SessionDep
 from app.core.rate_limit import RateLimit
 from app.services.meta_capi import (
     enqueue_initiate_checkout_event,
@@ -106,8 +116,49 @@ def _enqueue_checkout_purchase_event(
         )
 
 
+def _resolve_accommodation_checkout(
+    db: object,
+    slug: str,
+    flow_slug: str,
+    tenant_id: uuid.UUID,
+    current_human: object | None,
+    preview_token: str | None,
+):
+    """Resolve one flow for accommodation reads, honouring a preview token.
+
+    Same rule as ``get_runtime``: a token minted for a different popup falls
+    back to the public gates instead of unlocking a draft.
+    """
+    preview_popup_id = resolve_preview_popup_id(preview_token)
+    if preview_popup_id is not None:
+        popup = get_open_ticketing_popup(db, slug, tenant_id, preview=True)
+        if popup.id == preview_popup_id:
+            from app.api.sales_flow.crud import sales_flows_crud
+
+            flow = sales_flows_crud.get_by_slug(db, popup.id, flow_slug)
+            if flow is None:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND, detail="Not found"
+                )
+            return popup, flow
+
+    from app.api.checkout.gate_quote import resolve_checkout_flow
+    from app.api.sales_flow.eligibility import assert_upsale_eligible
+    from app.api.sales_flow.schemas import SalesFlowType
+
+    popup = get_open_ticketing_popup(db, slug, tenant_id)
+    flow = resolve_checkout_flow(
+        db,
+        popup,
+        flow_slug,
+        require_types={SalesFlowType.direct, SalesFlowType.upsale},
+    )
+    assert_upsale_eligible(db, flow, popup.id, tenant_id, current_human)
+    return popup, flow
+
+
 @router.get(
-    "/{slug}/runtime",
+    "/{slug}/{flow_slug}/runtime",
     response_model=CheckoutRuntimeResponse,
     dependencies=[
         Depends(
@@ -115,19 +166,25 @@ def _enqueue_checkout_purchase_event(
         ),
     ],
 )
-async def get_runtime(
+async def get_flow_runtime(
     slug: str,
+    flow_slug: str,
     db: SessionDep,
     tenant: PublicTenant,
+    current_human: OptionalHuman,
     accept_language: Annotated[str | None, Header(alias="Accept-Language")] = None,
     preview_token: Annotated[
         str | None, Header(alias=CHECKOUT_PREVIEW_TOKEN_HEADER)
     ] = None,
 ) -> CheckoutRuntimeResponse:
-    """Return popup metadata, products, buyer form, and ticketing steps for anonymous checkout.
+    """Return checkout runtime data for a canonical flow URL.
 
-    Fully public endpoint (no JWT). Only serves sale_type=direct active popups.
-    Rate-limited 120/min/IP.
+    Unknown or reserved flow
+    slugs, a flow belonging to a different popup, or a flow whose effective
+    status isn't active all resolve to 404/403. An upsale-type flow additionally requires a
+    portal-authenticated, eligible human (sdd/sales-flows slice 13, design
+    D8): anonymous -> 401, authenticated-but-ineligible -> 403. Rate-limited
+    120/min/IP.
 
     A preview token (minted for an authenticated operator by
     POST /popups/{popup_id}/checkout-preview-token) additionally serves the
@@ -142,18 +199,19 @@ async def get_runtime(
         # back to the public rules instead of unlocking the draft.
         popup = get_open_ticketing_popup(db, slug, tenant.id, preview=True)
         preview = popup.id == preview_popup_id
-
     return runtime_for_slug(
         db,
         slug,
         tenant.id,
+        flow_slug,
         parse_accept_language(accept_language),
-        preview=preview,
+        current_human,
+        preview,
     )
 
 
 @router.post(
-    "/{slug}/preview",
+    "/{slug}/{flow_slug}/preview",
     response_model=CheckoutPreviewResponse,
     dependencies=[
         Depends(RateLimit(limit=60, window_sec=60, key_prefix="rl:checkout-preview")),
@@ -161,21 +219,31 @@ async def get_runtime(
 )
 async def preview_open_ticketing(
     slug: str,
+    flow_slug: str,
     request_in: CheckoutPreviewRequest,
     db: SessionDep,
     tenant: PublicTenant,
+    current_human: OptionalHuman,
 ) -> CheckoutPreviewResponse:
     """Return a server-computed price breakdown for an anonymous cart.
 
-    Authoritative for display; identical math to POST /purchase. No side effects.
+    Authoritative for display; identical math to the named purchase endpoint. No side effects.
     Rate-limited 60/min/IP.
     """
+    from app.api.checkout.gate_quote import resolve_checkout_flow
+    from app.api.sales_flow.schemas import SalesFlowType
+
     popup = get_open_ticketing_popup(db, slug, tenant.id)
-    return payments_crud.preview_open_ticketing(db, request_in, popup)
+    flow = resolve_checkout_flow(
+        db, popup, flow_slug, require_types={SalesFlowType.direct, SalesFlowType.upsale}
+    )
+    return payments_crud.preview_open_ticketing(
+        db, request_in, popup, flow, current_human=current_human
+    )
 
 
 @router.get(
-    "/{slug}/share",
+    "/{slug}/{flow_slug}/share",
     response_model=CheckoutShareMeta,
     dependencies=[
         Depends(
@@ -185,6 +253,7 @@ async def preview_open_ticketing(
 )
 async def get_checkout_share_meta(
     slug: str,
+    flow_slug: str,
     db: SessionDep,
     tenant: PublicTenant,
 ) -> CheckoutShareMeta:
@@ -194,11 +263,11 @@ async def get_checkout_share_meta(
     exposes only the popup name, tagline, location and cover image — never
     products, buyer forms or ticketing steps.
 
-    Only active ``sale_type=direct`` popups for the resolved tenant are
-    returned; everything else gets an opaque 404.
+    Only active direct flows for the resolved tenant are returned; everything
+    else gets an opaque 404.
     """
     try:
-        return share_meta_for_slug(db, slug, tenant.id)
+        return share_meta_for_slug(db, slug, tenant.id, flow_slug)
     except HTTPException as exc:
         if exc.status_code in {
             status.HTTP_403_FORBIDDEN,
@@ -211,7 +280,7 @@ async def get_checkout_share_meta(
 
 
 @router.post(
-    "/{slug}/purchase",
+    "/{slug}/{flow_slug}/purchase",
     response_model=OpenTicketingPurchaseResponse,
     dependencies=[
         Depends(RateLimit(limit=10, window_sec=60, key_prefix="rl:checkout-purchase")),
@@ -236,13 +305,21 @@ async def get_checkout_share_meta(
 )
 async def purchase_open_ticketing(
     slug: str,
+    flow_slug: str,
     request_in: OpenTicketingPurchaseCreate,
     request: Request,
     background_tasks: BackgroundTasks,
     db: SessionDep,
     tenant: PublicTenant,
+    current_human: OptionalHuman,
 ) -> OpenTicketingPurchaseResponse:
-    """Create an anonymous open-ticketing payment and return provider checkout data."""
+    """Create an open-ticketing payment and return provider checkout data — public/anonymous for direct flows, sign-in and eligibility required for upsale flows.
+
+    The route always names the canonical flow. When the resolved flow is
+    upsale-type, the same portal-auth + approved-payment gate as the runtime
+    applies server-side (design D8) — UI-only gating is never sufficient,
+    since this is the endpoint that actually creates the payment.
+    """
     popup = get_open_ticketing_popup(db, slug, tenant.id)
 
     payment, checkout_url, redirect_url = payments_crud.create_open_ticketing_payment(
@@ -255,6 +332,8 @@ async def purchase_open_ticketing(
             fbc=request_in.fbc,
             fbp=request_in.fbp,
         ),
+        flow_slug=flow_slug,
+        current_human=current_human,
     )
 
     if checkout_url and payment.status == PaymentStatus.PENDING.value:
@@ -293,32 +372,106 @@ async def purchase_open_ticketing(
     )
 
 
-def _to_open_cart_public(cart: object, *, restore_token: str | None) -> OpenCartPublic:
-    """Build the anonymous cart response, coercing stored JSONB into CartState."""
-    raw_items = getattr(cart, "items", None) or {}
+@router.get(
+    "/{slug}/{flow_slug}/accommodations",
+    response_model=AccommodationOffer,
+    dependencies=[
+        Depends(
+            RateLimit(limit=120, window_sec=60, key_prefix="rl:checkout-accommodations")
+        ),
+    ],
+)
+async def list_checkout_accommodations(
+    slug: str,
+    flow_slug: str,
+    db: SessionDep,
+    tenant: PublicTenant,
+    current_human: OptionalHuman,
+    preview_token: Annotated[
+        str | None, Header(alias=CHECKOUT_PREVIEW_TOKEN_HEADER)
+    ] = None,
+) -> AccommodationOffer:
+    """Room types this checkout sells, before any dates are picked.
+
+    404 when the popup has no enabled ``accommodation-booking`` step, the
+    same answer an unknown slug gets, because whether a checkout has the
+    section turned off is not an anonymous caller's business.
+
+    Honours the preview token for the same reason ``/runtime`` does: the step
+    preview in the backoffice renders against real inventory, and a popup
+    still in draft would otherwise show an empty section to the admin who is
+    configuring it.
+    """
+    popup, flow = _resolve_accommodation_checkout(
+        db, slug, flow_slug, tenant.id, current_human, preview_token
+    )
+    return offer_for_popup(db, popup.id, flow.id, currency=popup.currency)
+
+
+@router.post(
+    "/{slug}/{flow_slug}/accommodations/availability",
+    response_model=list[PublicAccommodationAvailability],
+    dependencies=[
+        Depends(
+            RateLimit(
+                limit=60, window_sec=60, key_prefix="rl:checkout-accommodation-avail"
+            )
+        ),
+    ],
+)
+async def check_accommodation_availability(
+    slug: str,
+    flow_slug: str,
+    request_in: AccommodationAvailabilityRequest,
+    db: SessionDep,
+    tenant: PublicTenant,
+    current_human: OptionalHuman,
+    preview_token: Annotated[
+        str | None, Header(alias=CHECKOUT_PREVIEW_TOKEN_HEADER)
+    ] = None,
+) -> list[PublicAccommodationAvailability]:
+    """Free rooms and the price of the stay, for every room type at once.
+
+    Read-only: nothing is held here. A room is only taken off the market by
+    the payment, so two buyers can both be quoted the last room and the
+    second one finds out at purchase, which is the honest place to find out,
+    since a hold taken on a date change would leak rooms to browsers.
+    """
+    popup, flow = _resolve_accommodation_checkout(
+        db, slug, flow_slug, tenant.id, current_human, preview_token
+    )
+    return availability_for_popup(
+        db,
+        popup.id,
+        flow.id,
+        check_in=request_in.check_in,
+        check_out=request_in.check_out,
+        guest_count=request_in.guest_count,
+        currency=popup.currency,
+    )
+
+
+def _to_open_cart_public(
+    cart: object, *, items: CartState, restore_token: str | None
+) -> OpenCartPublic:
+    """Build an anonymous cart response from canonical items."""
     return OpenCartPublic(
         id=cart.id,  # type: ignore[attr-defined]
         popup_id=cart.popup_id,  # type: ignore[attr-defined]
         email=cart.email or "",  # type: ignore[attr-defined]
-        items=CartState(**raw_items),
+        items=items,
         restore_token=restore_token,
         created_at=getattr(cart, "created_at", None),
         updated_at=getattr(cart, "updated_at", None),
     )
 
 
-@router.put(
-    "/{slug}/cart",
-    response_model=OpenCartPublic,
-    dependencies=[
-        Depends(RateLimit(limit=30, window_sec=60, key_prefix="rl:checkout-cart")),
-    ],
-)
-async def upsert_open_cart(
+async def _upsert_open_cart(
     slug: str,
     cart_in: OpenCartUpsert,
     db: SessionDep,
     tenant: PublicTenant,
+    flow_slug: str,
 ) -> OpenCartPublic:
     """Save (create or replace) the open-checkout cart for an email.
 
@@ -328,7 +481,10 @@ async def upsert_open_cart(
     `restore_token` when the popup configures an open_checkout_signing_secret so
     the client can later rebuild the cart cross-device. Rate-limited 30/min/IP.
     """
+    from app.api.checkout.gate_quote import resolve_checkout_flow
+
     popup = get_open_ticketing_popup(db, slug, tenant.id)
+    flow = resolve_checkout_flow(db, popup, flow_slug)
     # Normalize before resolving the human: SQLModel skips the HumanBase email
     # validator on table inserts, so find_or_create is case-sensitive and a
     # differently-cased email would otherwise spawn a second human and cart.
@@ -341,27 +497,46 @@ async def upsert_open_cart(
         human_id=human.id,
         email=email,
         items=cart_in.items,
+        sales_flow_id=flow.id,
     )
     secret = popup.open_checkout_signing_secret
-    restore_token = build_cart_restore_token(str(cart.id), secret) if secret else None
-    return _to_open_cart_public(cart, restore_token=restore_token)
+    restore_token = (
+        build_cart_restore_token(
+            str(cart.id), secret, popup_id=str(popup.id), flow_id=str(flow.id)
+        )
+        if secret
+        else None
+    )
+    return _to_open_cart_public(
+        cart, items=carts_crud.restore_items(db, cart), restore_token=restore_token
+    )
 
 
-@router.get(
-    "/{slug}/cart",
+@router.put(
+    "/{slug}/{flow_slug}/cart",
     response_model=OpenCartPublic,
     dependencies=[
-        Depends(
-            RateLimit(limit=60, window_sec=60, key_prefix="rl:checkout-cart-restore")
-        ),
+        Depends(RateLimit(limit=30, window_sec=60, key_prefix="rl:checkout-cart"))
     ],
 )
-async def restore_open_cart(
+async def upsert_flow_cart(
+    slug: str,
+    flow_slug: str,
+    cart_in: OpenCartUpsert,
+    db: SessionDep,
+    tenant: PublicTenant,
+) -> OpenCartPublic:
+    """Save an open-checkout cart for the resolved flow."""
+    return await _upsert_open_cart(slug, cart_in, db, tenant, flow_slug)
+
+
+async def _restore_open_cart(
     slug: str,
     db: SessionDep,
     tenant: PublicTenant,
-    cid: uuid.UUID = Query(..., description="Cart id from the signed restore link"),
-    sig: str = Query(..., description="HMAC restore token for the cart id"),
+    cid: uuid.UUID,
+    sig: str,
+    flow_slug: str,
 ) -> OpenCartPublic:
     """Restore an anonymous cart from a signed link (cid + sig).
 
@@ -369,21 +544,49 @@ async def restore_open_cart(
     by enumerating ids or emails. Requires the popup to have an
     open_checkout_signing_secret. Rate-limited 60/min/IP.
     """
+    from app.api.checkout.gate_quote import resolve_checkout_flow
+
     popup = get_open_ticketing_popup(db, slug, tenant.id)
+    flow = resolve_checkout_flow(db, popup, flow_slug)
     secret = popup.open_checkout_signing_secret
     if not secret:
-        raise HTTPException(status_code=404, detail="Cart restore is not available")
-    if not verify_cart_restore_token(str(cid), sig, secret):
-        raise HTTPException(status_code=403, detail="Invalid cart link")
+        raise HTTPException(status_code=404, detail="Not found")
+    if not verify_cart_restore_token(
+        str(cid), sig, secret, popup_id=str(popup.id), flow_id=str(flow.id)
+    ):
+        raise HTTPException(status_code=404, detail="Not found")
 
-    cart = carts_crud.find_by_id_popup(db, cid, popup.id)
+    cart = carts_crud.find_by_id_popup(db, cid, popup.id, flow.id)
     if cart is None:
-        raise HTTPException(status_code=404, detail="Cart not found")
-    return _to_open_cart_public(cart, restore_token=sig)
+        raise HTTPException(status_code=404, detail="Not found")
+    return _to_open_cart_public(
+        cart, items=carts_crud.restore_items(db, cart), restore_token=sig
+    )
+
+
+@router.get(
+    "/{slug}/{flow_slug}/cart",
+    response_model=OpenCartPublic,
+    dependencies=[
+        Depends(
+            RateLimit(limit=60, window_sec=60, key_prefix="rl:checkout-cart-restore")
+        )
+    ],
+)
+async def restore_flow_cart(
+    slug: str,
+    flow_slug: str,
+    db: SessionDep,
+    tenant: PublicTenant,
+    cid: uuid.UUID,
+    sig: str,
+) -> OpenCartPublic:
+    """Restore a flow-scoped cart from a signed link."""
+    return await _restore_open_cart(slug, db, tenant, cid, sig, flow_slug)
 
 
 @router.post(
-    "/{slug}/pending/release",
+    "/{slug}/{flow_slug}/pending/release",
     response_model=PendingReleaseResponse,
     dependencies=[
         Depends(
@@ -409,6 +612,7 @@ async def restore_open_cart(
 )
 async def release_pending_open(
     slug: str,
+    flow_slug: str,
     request_in: PendingReleaseOpenRequest,
     db: SessionDep,
     tenant: PublicTenant,
@@ -430,10 +634,17 @@ async def release_pending_open(
 
     Rate-limited 30/min/IP (matching the neighboring cart endpoint).
     """
+    from app.api.checkout.gate_quote import resolve_checkout_flow
+    from app.api.sales_flow.schemas import SalesFlowType
+
     popup = get_open_ticketing_popup(db, slug, tenant.id)
+    flow = resolve_checkout_flow(
+        db, popup, flow_slug, require_types={SalesFlowType.direct}
+    )
     result = payments_crud.release_pending_open(
         db,
         popup=popup,
+        sales_flow_id=flow.id,
         email=str(request_in.email),
         cid=request_in.cid,
         sig=request_in.sig,

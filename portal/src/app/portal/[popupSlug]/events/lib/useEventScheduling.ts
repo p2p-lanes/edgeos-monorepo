@@ -1,5 +1,6 @@
 "use client"
 
+import { localTzNaiveToUtc } from "@edgeos/shared-events"
 import { useMemo, useState } from "react"
 
 export type DurationUnit = "minutes" | "hours"
@@ -29,28 +30,7 @@ export function combineDateTimeInTz(
   const [y, mo, d] = dateStr.split("-").map(Number)
   const [h, mi] = hhmm.split(":").map(Number)
   if ([y, mo, d, h, mi].some((n) => Number.isNaN(n))) return Number.NaN
-  const guess = Date.UTC(y, (mo ?? 1) - 1, d ?? 1, h ?? 0, mi ?? 0, 0)
-  const parts = new Intl.DateTimeFormat("en-US", {
-    timeZone: tz,
-    hour12: false,
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-    second: "2-digit",
-  }).formatToParts(new Date(guess))
-  const get = (t: string) => Number(parts.find((p) => p.type === t)?.value)
-  const asUtc = Date.UTC(
-    get("year"),
-    get("month") - 1,
-    get("day"),
-    get("hour") === 24 ? 0 : get("hour"),
-    get("minute"),
-    get("second"),
-  )
-  const offsetMin = Math.round((asUtc - guess) / 60000)
-  return guess - offsetMin * 60_000
+  return localTzNaiveToUtc(`${dateStr}T${hhmm}`, tz).getTime()
 }
 
 /** Format a Date as "HH:mm" in the given timezone. */

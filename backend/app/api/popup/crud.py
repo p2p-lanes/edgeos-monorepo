@@ -19,8 +19,10 @@ class PopupsCRUD(BaseCRUD[Popups, PopupCreate, PopupUpdate]):
         return self.get_by_field(session, "slug", slug)
 
     def create(self, session: Session, obj_in: PopupCreate) -> Popups:
-        """Create a popup and seed the main attendee category in the same transaction."""
-        from app.api.attendee_category.crud import attendee_categories_crud
+        """Create a popup and its default sales flow in one transaction."""
+        from app.api.approval_strategy.crud import approval_strategies_crud
+        from app.api.approval_strategy.schemas import ApprovalStrategyCreate
+        from app.api.sales_flow.crud import sales_flows_crud
 
         popup = self.model(**obj_in.model_dump())
 
@@ -34,12 +36,50 @@ class PopupsCRUD(BaseCRUD[Popups, PopupCreate, PopupUpdate]):
         session.add(popup)
         session.flush()  # Get the popup id without committing
 
-        # Seed main category in same transaction
-        attendee_categories_crud.seed_main_for_popup(session, popup.id, popup.tenant_id)
+        # sdd/sales-flows task 5.0: new popups receive a compatibility default
+        # sales flow. Mirrors the slice-2 backfill behavior for pre-existing
+        # popups. Class B columns stay NULL (D1).
+        # Seeded from the creation request rather than from the column it was
+        # written to. What the organiser chose here is a decision about the
+        # first door, and the flow is where that decision lives from now on.
+        sales_flows_crud.provision_default_flow(
+            session,
+            popup_id=popup.id,
+            tenant_id=popup.tenant_id,
+            sale_type=obj_in.sale_type.value,
+        )
+        approval_strategies_crud.create_for_popup(
+            session,
+            popup_id=popup.id,
+            tenant_id=popup.tenant_id,
+            strategy_in=ApprovalStrategyCreate(),
+            commit=False,
+        )
 
         session.commit()
         session.refresh(popup)
         return popup
+
+    def update(
+        self,
+        session: Session,
+        db_obj: Popups,
+        obj_in: PopupUpdate,
+        *,
+        commit: bool = True,
+    ) -> Popups:
+        """Update a popup, optionally leaving commit ownership to the route."""
+        update_data = obj_in.model_dump(exclude_unset=True)
+        for field, value in update_data.items():
+            setattr(db_obj, field, value)
+
+        session.add(db_obj)
+        if commit:
+            session.commit()
+            session.refresh(db_obj)
+        else:
+            session.flush()
+        return db_obj
 
     def _apply_sorting(
         self,

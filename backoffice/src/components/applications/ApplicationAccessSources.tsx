@@ -24,21 +24,10 @@ function SourceLink({ source }: { source: ApplicationAccessSource }) {
       </Link>
     )
   }
-  if (source.kind === "invite") {
-    return (
-      <Link
-        to="/invites/$inviteId/edit"
-        params={{ inviteId: source.id }}
-        className={className}
-      >
-        {source.label}
-      </Link>
-    )
-  }
   return (
     <Link
-      to="/referrals/$referralId/edit"
-      params={{ referralId: source.id }}
+      to="/invites/$inviteId/edit"
+      params={{ inviteId: source.id }}
       className={className}
     >
       {source.label}

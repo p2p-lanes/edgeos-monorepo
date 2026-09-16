@@ -34,12 +34,26 @@ def _reviewer_to_public(
         popup_id=reviewer.popup_id,
         user_id=reviewer.user_id,
         tenant_id=reviewer.tenant_id,
+        sales_flow_id=reviewer.sales_flow_id,
         is_required=reviewer.is_required,
         weight_multiplier=reviewer.weight_multiplier,
         created_at=reviewer.created_at,
         user_email=user.email if user else None,
         user_full_name=user.full_name if user else None,
     )
+
+
+def _get_flow_or_404(db: TenantSession, popup_id: uuid.UUID, flow_id: uuid.UUID):
+    """Verify a sales flow exists and belongs to this popup (sdd/sales-flows D4)."""
+    from app.api.sales_flow.crud import sales_flows_crud
+
+    flow = sales_flows_crud.get(db, flow_id)
+    if not flow or flow.popup_id != popup_id:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Sales flow not found for this popup",
+        )
+    return flow
 
 
 def _fetch_users_by_ids(
@@ -62,10 +76,18 @@ async def list_reviewers(
     db: TenantSession,
     session: SessionDep,
     _: CurrentAdmin,
+    sales_flow_id: uuid.UUID | None = None,
     skip: PaginationSkip = 0,
     limit: PaginationLimit = 100,
 ) -> ListModel[PopupReviewerPublic]:
-    """List designated reviewers for a popup."""
+    """List designated reviewers for a popup.
+
+    Without `sales_flow_id`, returns the popup-shared tier only
+    (sdd/sales-flows D4) — identical to this popup's reviewer list before
+    this slice. With `sales_flow_id`, returns the RESOLVED reviewer set for
+    that flow per its `reviewers_mode` (inherit -> popup-shared tier;
+    override -> only that flow's own rows, possibly empty).
+    """
     from app.api.popup.crud import popups_crud
 
     # Verify popup exists
@@ -76,7 +98,15 @@ async def list_reviewers(
             detail="Popup not found",
         )
 
-    reviewers, total = popup_reviewers_crud.find_by_popup(db, popup_id, skip, limit)
+    if sales_flow_id is not None:
+        _get_flow_or_404(db, popup_id, sales_flow_id)
+        resolved = popup_reviewers_crud.resolve_for_flow(db, popup_id, sales_flow_id)
+        total = len(resolved)
+        reviewers = resolved[skip : skip + limit]
+    else:
+        reviewers, total = popup_reviewers_crud.find_popup_shared(
+            db, popup_id, skip, limit
+        )
 
     users_by_id = _fetch_users_by_ids(session, [r.user_id for r in reviewers])
 
@@ -98,7 +128,8 @@ async def add_reviewer(
     session: SessionDep,
     _current_user: CurrentWriter,
 ) -> PopupReviewerPublic:
-    """Add a reviewer to a popup."""
+    """Add a reviewer to a popup, or to one specific sales flow of that
+    popup when `reviewer_in.sales_flow_id` is set (sdd/sales-flows D4)."""
     from app.api.popup.crud import popups_crud
     from app.api.user.crud import users_crud
 
@@ -109,6 +140,9 @@ async def add_reviewer(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Popup not found",
         )
+
+    if reviewer_in.sales_flow_id is not None:
+        _get_flow_or_404(db, popup_id, reviewer_in.sales_flow_id)
 
     # Verify user exists and has appropriate role (use main session for users table)
     user = users_crud.get(session, reviewer_in.user_id)
@@ -131,8 +165,10 @@ async def add_reviewer(
             detail="Only ADMIN or SUPERADMIN users can be reviewers",
         )
 
-    # Check if already a reviewer
-    existing = popup_reviewers_crud.get_by_popup_user(db, popup_id, reviewer_in.user_id)
+    # Check if already a reviewer at this tier
+    existing = popup_reviewers_crud.get_by_popup_user(
+        db, popup_id, reviewer_in.user_id, flow_id=reviewer_in.sales_flow_id
+    )
     if existing:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -154,8 +190,14 @@ async def update_reviewer(
     db: TenantSession,
     session: SessionDep,
     _current_user: CurrentWriter,
+    sales_flow_id: uuid.UUID | None = None,
 ) -> PopupReviewerPublic:
-    """Update a reviewer's settings."""
+    """Update a reviewer's settings.
+
+    `sales_flow_id` selects the tier (sdd/sales-flows D4): omitted targets
+    the popup-shared reviewer, provided targets that flow's own reviewer
+    row.
+    """
     from app.api.popup.crud import popups_crud
     from app.api.user.crud import users_crud
 
@@ -167,7 +209,9 @@ async def update_reviewer(
             detail="Popup not found",
         )
 
-    reviewer = popup_reviewers_crud.get_by_popup_user(db, popup_id, user_id)
+    reviewer = popup_reviewers_crud.get_by_popup_user(
+        db, popup_id, user_id, flow_id=sales_flow_id
+    )
     if not reviewer:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -188,8 +232,14 @@ async def remove_reviewer(
     user_id: uuid.UUID,
     db: TenantSession,
     _current_user: CurrentWriter,
+    sales_flow_id: uuid.UUID | None = None,
 ) -> None:
-    """Remove a reviewer from a popup."""
+    """Remove a reviewer from a popup.
+
+    `sales_flow_id` selects the tier (sdd/sales-flows D4). Removing the last
+    flow-tier reviewer for a flow resets that flow's `reviewers_mode` back
+    to 'inherit'.
+    """
     from app.api.popup.crud import popups_crud
 
     # Verify popup exists
@@ -200,11 +250,13 @@ async def remove_reviewer(
             detail="Popup not found",
         )
 
-    reviewer = popup_reviewers_crud.get_by_popup_user(db, popup_id, user_id)
+    reviewer = popup_reviewers_crud.get_by_popup_user(
+        db, popup_id, user_id, flow_id=sales_flow_id
+    )
     if not reviewer:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Reviewer not found",
         )
 
-    popup_reviewers_crud.delete(db, reviewer)
+    popup_reviewers_crud.delete_reviewer(db, reviewer)

@@ -28,6 +28,12 @@ from app.api.product.models import Products
 from app.api.shared.enums import SaleType
 from app.api.tenant.models import Tenants
 from app.api.ticketing_step.models import TicketingSteps
+from tests._flow_helpers import (
+    application_flow_id,
+    default_flow_id,
+    offer_category,
+    provision_default_flow,
+)
 
 # ---- Fixtures ---------------------------------------------------------------
 
@@ -67,6 +73,9 @@ def _make_popup(
     )
     db.add(popup)
     db.flush()
+    provision_default_flow(db, popup)
+    offer_category(db, popup, "patreon")
+    offer_category(db, popup, "ticket")
     return popup
 
 
@@ -85,6 +94,7 @@ def _make_patreon_product(db: Session, popup: Popups) -> Products:
     )
     db.add(product)
     db.flush()
+    offer_category(db, popup, "patreon")
     return product
 
 
@@ -101,6 +111,7 @@ def _make_ticket_product(db: Session, popup: Popups, price: str = "3000") -> Pro
     )
     db.add(product)
     db.flush()
+    offer_category(db, popup, "patreon")
     return product
 
 
@@ -114,10 +125,37 @@ def _make_patron_step(
 ) -> TicketingSteps:
     if presets is None:
         presets = [2500, 5000, 7500]
+
+    # A seeded popup already has its one enabled patron step
+    # (uq_ticketing_step_patron_flow), so reuse it instead of colliding.
+    from sqlmodel import select
+
+    flow_id = default_flow_id(db, popup.id)
+    existing = db.exec(
+        select(TicketingSteps).where(
+            TicketingSteps.sales_flow_id == flow_id,
+            TicketingSteps.template == "patron-preset",
+        )
+    ).first()
+    if existing is not None:
+        # Another test in the session may have left it disabled; this helper
+        # promises a resolvable patron step.
+        existing.is_enabled = True
+        existing.template_config = {
+            "minimum": minimum,
+            "presets": presets,
+            "allow_custom": allow_custom,
+        }
+        db.add(existing)
+        db.commit()
+        db.refresh(existing)
+        return existing
+
     step = TicketingSteps(
         id=uuid.uuid4(),
         tenant_id=popup.tenant_id,
         popup_id=popup.id,
+        sales_flow_id=default_flow_id(db, popup.id),
         step_type="patron",
         title="Patron",
         template="patron-preset",
@@ -140,6 +178,7 @@ def _make_application_with_attendee(
     human,
 ) -> tuple[Applications, Attendees]:
     app = Applications(
+        sales_flow_id=application_flow_id(db, popup.id),
         id=uuid.uuid4(),
         tenant_id=popup.tenant_id,
         popup_id=popup.id,
@@ -209,6 +248,7 @@ class TestResolvePatronTemplateConfig:
             id=uuid.uuid4(),
             tenant_id=popup_tenant_a.tenant_id,
             popup_id=popup_tenant_a.id,
+            sales_flow_id=default_flow_id(db, popup_tenant_a.id),
             step_type="patron",
             title="Patron",
             order=99,
@@ -262,7 +302,6 @@ class TestPatronPaymentCreation:
                 products=[
                     PaymentProductRequest(
                         product_id=product.id,
-                        attendee_id=attendee.id,
                         quantity=1,
                         unit_price_override=Decimal("5000"),
                     )
@@ -342,7 +381,6 @@ class TestPatronPaymentCreation:
                 ),
                 PaymentProductRequest(
                     product_id=patron_product.id,
-                    attendee_id=attendee.id,
                     quantity=1,
                     unit_price_override=Decimal("5000"),
                 ),
@@ -376,7 +414,6 @@ class TestPatronPaymentCreation:
                 products=[
                     PaymentProductRequest(
                         product_id=product.id,
-                        attendee_id=attendee.id,
                         quantity=1,
                         unit_price_override=Decimal("5000"),
                     )
@@ -408,7 +445,6 @@ class TestPatronPaymentCreation:
                 products=[
                     PaymentProductRequest(
                         product_id=product.id,
-                        attendee_id=attendee.id,
                         quantity=1,
                         unit_price_override=Decimal("999"),
                     )
@@ -468,7 +504,6 @@ class TestPatronPaymentCreation:
                 products=[
                     PaymentProductRequest(
                         product_id=product.id,
-                        attendee_id=attendee.id,
                         quantity=2,
                         unit_price_override=Decimal("5000"),
                     )

@@ -1,6 +1,7 @@
 import uuid
+from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, Header, HTTPException, status
 
 from app.api.coupon import crud
 from app.api.coupon.schemas import (
@@ -42,8 +43,13 @@ async def validate_coupon_public(
 ) -> CouponValidatePublicResponse:
     """Validate a coupon code for an anonymous open-ticketing checkout (no JWT required).
 
-    Returns coupon details on success. Returns 400 with uniform message for
-    any invalid/expired/unknown state. Returns 403 if popup is not direct-sale.
+    Resolves the requested sales flow, or the popup's primary flow when
+    `flow_slug` is omitted, and
+    gates on `direct`/`upsale` flow types. Returns coupon details on
+    success. Returns 400 with the uniform "Invalid or expired coupon"
+    message for every failure state — unknown popup, unknown flow slug,
+    inactive popup/flow, wrong flow type, or any invalid/expired/unknown
+    coupon state — so an anonymous caller can never distinguish them.
     Rate-limited 30/min/IP.
     """
     return crud.coupons_crud.validate_public(
@@ -51,6 +57,7 @@ async def validate_coupon_public(
         popup_slug=request_in.popup_slug,
         code=request_in.code,
         tenant_id=tenant.id,
+        flow_slug=request_in.flow_slug,
     )
 
 
@@ -103,6 +110,47 @@ async def get_coupon(
     return CouponPublic.model_validate(coupon)
 
 
+def _resolve_coupon_flow_id(
+    db: SessionDep,
+    popup_id: uuid.UUID,
+    explicit_flow_id: uuid.UUID | None,
+) -> uuid.UUID:
+    """The flow a coupon discounts.
+
+    Omitted means the popup's default flow, which is the only flow a
+    coupon's `allows_coupons` check was ever read from
+    (sdd/sales-flows-rediseno).
+
+    Any flow type may own one. Unlike an invite or a group, redeeming a
+    coupon creates nothing — it discounts a sale, and every flow sells.
+    """
+    from app.api.sales_flow.crud import sales_flows_crud
+
+    if explicit_flow_id is None:
+        default_flow = sales_flows_crud.get_default_flow(db, popup_id)
+        if default_flow is None:
+            from app.api.popup.crud import popups_crud
+
+            if popups_crud.get(db, popup_id) is None:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="Popup not found",
+                )
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Sales flow not found",
+            )
+        return default_flow.id
+
+    flow = sales_flows_crud.get(db, explicit_flow_id)
+    if flow is None or flow.popup_id != popup_id:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Sales flow not found for this popup",
+        )
+    return flow.id
+
+
 @router.post("/validate", response_model=CouponPublic)
 async def validate_coupon(
     coupon_in: CouponValidate,
@@ -115,7 +163,10 @@ async def validate_coupon(
     This endpoint is used by the ticketing portal to check if a coupon is valid
     before applying it to a payment.
     """
-    coupon = crud.coupons_crud.validate_coupon(db, coupon_in.code, coupon_in.popup_id)
+    flow_id = _resolve_coupon_flow_id(db, coupon_in.popup_id, coupon_in.sales_flow_id)
+    coupon = crud.coupons_crud.validate_coupon(
+        db, coupon_in.code, coupon_in.popup_id, flow_id
+    )
     return CouponPublic.model_validate(coupon)
 
 
@@ -124,15 +175,24 @@ async def create_coupon(
     coupon_in: CouponCreate,
     db: AdminOrApiKeySession_CouponsWrite,
     current_user: AdminOrApiKey_CouponsWrite,
+    x_ai_tool_call_id: Annotated[
+        str | None, Header(alias="X-EdgeOS-AI-Tool-Call-Id")
+    ] = None,
 ) -> CouponPublic:
     """Create a new coupon (BO only)."""
 
-    # Check for existing coupon with same code in popup
-    existing = crud.coupons_crud.get_by_code(db, coupon_in.code, coupon_in.popup_id)
+    coupon_in.sales_flow_id = _resolve_coupon_flow_id(
+        db, coupon_in.popup_id, coupon_in.sales_flow_id
+    )
+
+    # A code is unique per flow, so the same word may exist in another one.
+    existing = crud.coupons_crud.get_by_code(
+        db, coupon_in.code, coupon_in.sales_flow_id
+    )
     if existing:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="A coupon with this code already exists in this popup",
+            detail="A coupon with this code already exists in this sales flow",
         )
 
     # Set tenant_id based on user role
@@ -157,6 +217,34 @@ async def create_coupon(
     coupon = Coupons(**coupon_data)
 
     db.add(coupon)
+
+    # Stage the audit row in the same transaction as the coupon. The optional
+    # tool-call id is supplied by the internal AI service; regular backoffice
+    # creates are audited too, without AI metadata.
+    from app.api.audit_log.actor import actor_from_user
+    from app.api.audit_log.constants import AuditAction, AuditEntityType
+    from app.api.audit_log.crud import audit_logs_crud
+
+    audit_logs_crud.record(
+        db,
+        tenant_id=tenant_id,
+        actor=actor_from_user(current_user),
+        action=AuditAction.COUPON_CREATED,
+        entity_type=AuditEntityType.COUPON,
+        entity_id=coupon.id,
+        entity_label=coupon.code,
+        popup_id=coupon.popup_id,
+        details={
+            "via_ai": x_ai_tool_call_id is not None,
+            "ai_tool_call_id": x_ai_tool_call_id,
+            "snapshot": {
+                "code": coupon.code,
+                "discount_value": coupon.discount_value,
+                "max_uses": coupon.max_uses,
+                "is_active": coupon.is_active,
+            },
+        },
+    )
     db.commit()
     db.refresh(coupon)
 
@@ -168,7 +256,10 @@ async def update_coupon(
     coupon_id: uuid.UUID,
     coupon_in: CouponUpdate,
     db: AdminOrApiKeySession_CouponsWrite,
-    _current_user: AdminOrApiKey_CouponsWrite,
+    current_user: AdminOrApiKey_CouponsWrite,
+    x_ai_tool_call_id: Annotated[
+        str | None, Header(alias="X-EdgeOS-AI-Tool-Call-Id")
+    ] = None,
 ) -> CouponPublic:
     """Update a coupon (BO only)."""
 
@@ -182,15 +273,48 @@ async def update_coupon(
 
     # Check code uniqueness if being updated
     if coupon_in.code and coupon_in.code.upper() != coupon.code:
-        existing = crud.coupons_crud.get_by_code(db, coupon_in.code, coupon.popup_id)
+        existing = crud.coupons_crud.get_by_code(
+            db, coupon_in.code, coupon.sales_flow_id
+        )
         if existing:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="A coupon with this code already exists in this popup",
+                detail="A coupon with this code already exists in this sales flow",
             )
 
-    updated = crud.coupons_crud.update(db, coupon, coupon_in)
-    return CouponPublic.model_validate(updated)
+    before = CouponPublic.model_validate(coupon).model_dump(mode="json")
+    update_data = coupon_in.model_dump(exclude_unset=True)
+    for field, value in update_data.items():
+        setattr(coupon, field, value)
+    db.add(coupon)
+
+    from app.api.audit_log.actor import actor_from_user
+    from app.api.audit_log.constants import AuditAction, AuditEntityType
+    from app.api.audit_log.crud import audit_logs_crud
+
+    after = CouponPublic.model_validate(coupon).model_dump(mode="json")
+    changed_fields = {
+        field: {"from": before[field], "to": after[field]} for field in update_data
+    }
+    audit_logs_crud.record(
+        db,
+        tenant_id=coupon.tenant_id,
+        actor=actor_from_user(current_user),
+        action=AuditAction.COUPON_UPDATED,
+        entity_type=AuditEntityType.COUPON,
+        entity_id=coupon.id,
+        entity_label=coupon.code,
+        popup_id=coupon.popup_id,
+        details={
+            "via_ai": x_ai_tool_call_id is not None,
+            "ai_tool_call_id": x_ai_tool_call_id,
+            "changes": changed_fields,
+            "snapshot": after,
+        },
+    )
+    db.commit()
+    db.refresh(coupon)
+    return CouponPublic.model_validate(coupon)
 
 
 @router.delete("/{coupon_id}", status_code=status.HTTP_204_NO_CONTENT)

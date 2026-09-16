@@ -17,7 +17,9 @@ class Coupons(CouponBase, table=True):
     """Coupon code model for discounts."""
 
     __table_args__ = (
-        UniqueConstraint("code", "popup_id", name="uq_coupon_code_popup_id"),
+        # A code is unique per flow, not per gathering, so the same word can
+        # mean a different discount in two flows.
+        UniqueConstraint("code", "sales_flow_id", name="uq_coupon_code_sales_flow_id"),
         Index("ix_coupons_popup_active", "popup_id", "is_active"),
         Index(
             "ix_coupons_active_lookup",

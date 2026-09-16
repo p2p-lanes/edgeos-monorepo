@@ -1,5 +1,27 @@
 from sqlmodel import SQLModel
 
+# Accommodations (lodging inventory, pricing rules and bookings)
+from app.api.accommodation.models import (
+    AccommodationBookings,
+    AccommodationImageLinks,
+    AccommodationImages,
+    AccommodationPriceRules,
+    AccommodationProperties,
+    Accommodations,
+    AccommodationUnits,
+)
+from app.api.accommodation.schemas import (
+    AccommodationAvailability,
+    AccommodationCreate,
+    AccommodationPropertyCreate,
+    AccommodationPropertyPublic,
+    AccommodationPropertyUpdate,
+    AccommodationPublic,
+    AccommodationQuote,
+    AccommodationUpdate,
+)
+from app.api.ai_conversation.models import AIConversations, AIConversationUsage
+from app.api.ai_execution.models import AIExecutions
 from app.api.api_key.models import ApiKeys
 from app.api.api_key.schemas import ApiKeyCreate, ApiKeyCreated, ApiKeyPublic
 
@@ -27,7 +49,7 @@ from app.api.approval_strategy.schemas import (
 from app.api.attendee.models import AttendeeProducts, Attendees
 from app.api.attendee.schemas import AttendeeCreate, AttendeePublic, AttendeeUpdate
 
-# Attendee category (declarative per-popup categories replacing hardcoded enum)
+# Attendee category (declarative per-flow categories replacing hardcoded enum)
 from app.api.attendee_category.models import AttendeeCategories
 from app.api.attendee_category.schemas import (
     AttendeeCategoryCreate,
@@ -116,10 +138,18 @@ from app.api.human.schemas import HumanCreate, HumanPublic, HumanUpdate
 from app.api.invite.models import Invites
 
 # Payment models
-from app.api.payment.models import PaymentProducts, Payments
+from app.api.payment.models import PaymentProducts, PaymentRecipients, Payments
 from app.api.payment.schemas import PaymentCreate, PaymentPublic, PaymentUpdate
-from app.api.popup.models import Popups
-from app.api.popup.schemas import PopupAdmin, PopupCreate, PopupPublic, PopupUpdate
+from app.api.popup.models import PopupHomePages, Popups
+from app.api.popup.schemas import (
+    PopupAdmin,
+    PopupCreate,
+    PopupHomeAdmin,
+    PopupHomePublic,
+    PopupHomeUpdate,
+    PopupPublic,
+    PopupUpdate,
+)
 from app.api.popup_reviewer.models import PopupReviewers
 from app.api.popup_reviewer.schemas import (
     PopupReviewerCreate,
@@ -161,6 +191,22 @@ from app.api.user.schemas import UserCreate, UserPublic, UserUpdate
 
 __all__ = [
     "SQLModel",
+    # Accommodations
+    "AccommodationProperties",
+    "Accommodations",
+    "AccommodationUnits",
+    "AccommodationPriceRules",
+    "AccommodationBookings",
+    "AccommodationImages",
+    "AccommodationImageLinks",
+    "AccommodationCreate",
+    "AccommodationUpdate",
+    "AccommodationPublic",
+    "AccommodationPropertyCreate",
+    "AccommodationPropertyUpdate",
+    "AccommodationPropertyPublic",
+    "AccommodationQuote",
+    "AccommodationAvailability",
     # Audit log
     "AuditLog",
     "AuditLogPublic",
@@ -169,6 +215,10 @@ __all__ = [
     "AttendeeCategoryCreate",
     "AttendeeCategoryPublic",
     "AttendeeCategoryUpdate",
+    # AI conversations
+    "AIConversations",
+    "AIConversationUsage",
+    "AIExecutions",
     # API keys
     "ApiKeys",
     "ApiKeyCreate",
@@ -186,6 +236,10 @@ __all__ = [
     "Popups",
     "PopupAdmin",
     "PopupCreate",
+    "PopupHomePages",
+    "PopupHomeAdmin",
+    "PopupHomePublic",
+    "PopupHomeUpdate",
     "PopupPublic",
     "PopupUpdate",
     "TenantCredentials",
@@ -269,6 +323,7 @@ __all__ = [
     # Payments
     "Payments",
     "PaymentProducts",
+    "PaymentRecipients",
     "PaymentCreate",
     "PaymentPublic",
     "PaymentUpdate",

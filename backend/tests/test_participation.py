@@ -19,6 +19,10 @@ from app.api.human.models import Humans
 from app.api.popup.models import Popups
 from app.api.tenant.models import Tenants
 from app.core.security import create_access_token
+from tests._flow_helpers import (
+    application_flow_id,
+    seed_default_steps,
+)
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -35,6 +39,7 @@ def _make_popup(db: Session, tenant: Tenants, *, slug_suffix: str) -> Popups:
     db.add(popup)
     db.commit()
     db.refresh(popup)
+    seed_default_steps(db, popup)
     return popup
 
 
@@ -62,6 +67,7 @@ def _make_application(
 ) -> Applications:
     """Create an application for a human in a popup."""
     application = Applications(
+        sales_flow_id=application_flow_id(db, popup.id),
         tenant_id=tenant.id,
         popup_id=popup.id,
         human_id=human.id,
@@ -85,10 +91,10 @@ def _make_category(
     cat = AttendeeCategories(
         tenant_id=tenant.id,
         popup_id=popup.id,
+        sales_flow_id=application_flow_id(db, popup.id),
         key=key,
         label=key.capitalize(),
         is_primary=(key == "main"),
-        enabled_in_passes_flow=True,
     )
     db.add(cat)
     db.commit()
@@ -118,8 +124,9 @@ def _make_attendee(
     # Find or create the category for this popup
     cat = db.exec(
         select(AttendeeCategories).where(
-            AttendeeCategories.popup_id == application.popup_id,
+            AttendeeCategories.sales_flow_id == application.sales_flow_id,
             AttendeeCategories.key == category,
+            AttendeeCategories.deleted_at.is_(None),  # type: ignore[union-attr]
         )
     ).first()
     if cat is None:
@@ -174,6 +181,7 @@ class TestFindCompanionForPopup:
         )
         db.add(popup)
         db.flush()
+        seed_default_steps(db, popup)
 
         # Main applicant
         main_human = Humans(
@@ -195,6 +203,7 @@ class TestFindCompanionForPopup:
 
         # Application by main human
         application = Applications(
+            sales_flow_id=application_flow_id(db, popup.id),
             id=uuid.uuid4(),
             tenant_id=tenant_id,
             popup_id=popup.id,
@@ -250,6 +259,7 @@ class TestFindCompanionForPopup:
         )
         db.add(popup)
         db.flush()
+        seed_default_steps(db, popup)
 
         human = Humans(
             id=uuid.uuid4(),
@@ -261,6 +271,7 @@ class TestFindCompanionForPopup:
 
         # Application owned by this human
         application = Applications(
+            sales_flow_id=application_flow_id(db, popup.id),
             id=uuid.uuid4(),
             tenant_id=tenant_id,
             popup_id=popup.id,
@@ -309,6 +320,7 @@ class TestFindCompanionForPopup:
         )
         db.add(popup)
         db.flush()
+        seed_default_steps(db, popup)
 
         human = Humans(
             id=uuid.uuid4(),

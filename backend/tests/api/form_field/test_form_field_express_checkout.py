@@ -17,6 +17,7 @@ from app.api.form_field.models import FormFields
 from app.api.form_section.models import FormSections
 from app.api.popup.models import Popups
 from app.api.tenant.models import Tenants
+from tests._flow_helpers import default_flow_id, provision_default_flow
 
 
 def _make_popup(db: Session, tenant: Tenants) -> Popups:
@@ -27,6 +28,7 @@ def _make_popup(db: Session, tenant: Tenants) -> Popups:
     )
     db.add(popup)
     db.flush()
+    provision_default_flow(db, popup)
     return popup
 
 
@@ -36,6 +38,7 @@ def _make_section(
     section = FormSections(
         tenant_id=tenant.id,
         popup_id=popup.id,
+        sales_flow_id=default_flow_id(db, popup.id),
         label=label,
         order=order,
     )
@@ -57,6 +60,7 @@ def _make_field(
     field = FormFields(
         tenant_id=tenant.id,
         popup_id=popup.id,
+        sales_flow_id=default_flow_id(db, popup.id),
         section_id=section.id,
         name=name,
         label=label,
@@ -88,6 +92,7 @@ class TestExpressCheckoutCustomFields:
             BaseFieldConfigs(
                 tenant_id=tenant_a.id,
                 popup_id=popup.id,
+                sales_flow_id=default_flow_id(db, popup.id),
                 field_name="telegram",
                 section_id=personal_section.id,
                 required=False,
@@ -130,6 +135,7 @@ class TestExpressCheckoutCustomFields:
             BaseFieldConfigs(
                 tenant_id=tenant_a.id,
                 popup_id=popup.id,
+                sales_flow_id=default_flow_id(db, popup.id),
                 field_name="telegram",
                 section_id=personal_section.id,
                 required=False,
@@ -169,6 +175,7 @@ class TestExpressCheckoutBaseFields:
             BaseFieldConfigs(
                 tenant_id=tenant_a.id,
                 popup_id=popup.id,
+                sales_flow_id=default_flow_id(db, popup.id),
                 field_name="referral",
                 section_id=section.id,
                 required=True,

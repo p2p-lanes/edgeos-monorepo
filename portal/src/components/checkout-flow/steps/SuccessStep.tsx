@@ -13,6 +13,7 @@ import { useCallback, useEffect, useState } from "react"
 import { Button } from "@/components/ui/button"
 import type { VerifiedPaymentStatus } from "@/hooks/checkout"
 import { cn } from "@/lib/utils"
+import { useCheckout } from "@/providers/checkoutProvider"
 import { useCityProvider } from "@/providers/cityProvider"
 
 interface SuccessStepProps {
@@ -25,6 +26,7 @@ export default function SuccessStep({
   const router = useRouter()
   const { getCity } = useCityProvider()
   const city = getCity()
+  const { salesFlowId, salesFlowSlug } = useCheckout()
   const [countdown, setCountdown] = useState(30)
 
   const passesUrl = city?.slug ? `/portal/${city.slug}/passes` : "/portal"
@@ -34,8 +36,13 @@ export default function SuccessStep({
   }, [passesUrl, router])
 
   const handleRetry = useCallback(() => {
-    router.push(city?.slug ? `/portal/${city.slug}/passes/buy` : "/portal")
-  }, [city?.slug, router])
+    const flowIdentifier = salesFlowSlug ?? salesFlowId
+    router.push(
+      city?.slug && flowIdentifier
+        ? `/portal/${city.slug}/shop/${flowIdentifier}`
+        : "/portal",
+    )
+  }, [city?.slug, router, salesFlowId, salesFlowSlug])
 
   // Only countdown when payment is approved
   useEffect(() => {

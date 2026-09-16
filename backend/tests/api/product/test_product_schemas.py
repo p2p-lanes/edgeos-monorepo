@@ -12,6 +12,19 @@ from pydantic import ValidationError
 from app.api.product.schemas import ProductCreate, ProductUpdate
 
 
+@pytest.mark.parametrize(
+    ("schema", "payload"),
+    [
+        (ProductCreate, {"popup_id": uuid.uuid4(), "name": "Ticket", "price": 10}),
+        (ProductUpdate, {"name": "Renamed"}),
+    ],
+)
+def test_product_writes_reject_fulfillment_type(schema, payload) -> None:
+    with pytest.raises(ValidationError) as error:
+        schema(**payload, fulfillment_type="access")
+    assert error.value.errors()[0]["type"] == "extra_forbidden"
+
+
 class TestProductCreatePatreonPrice:
     """ProductCreate must reject price > 0 for category=patreon."""
 

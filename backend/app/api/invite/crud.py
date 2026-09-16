@@ -212,9 +212,19 @@ class InvitesCRUD(BaseCRUD[Invites, InviteCreate, InviteUpdate]):
                 detail="An invite with this token already exists for this popup",
             )
 
+        if obj_in.sales_flow_id is None:
+            # The router resolves and validates it before calling here, so
+            # reaching this means a caller skipped that step rather than
+            # that a default is wanted.
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="This invite has no sales flow.",
+            )
+
         invite = Invites(
             tenant_id=tenant_id,
             popup_id=obj_in.popup_id,
+            sales_flow_id=obj_in.sales_flow_id,
             token=token,
             recipient_email=(
                 obj_in.recipient_email.lower() if obj_in.recipient_email else None
@@ -264,6 +274,9 @@ class InvitesCRUD(BaseCRUD[Invites, InviteCreate, InviteUpdate]):
         link = Invites(
             tenant_id=tenant_id,
             popup_id=obj_in.popup_id,
+            sales_flow_id=self._flow_for_attendee_link(
+                session, obj_in.popup_id, referrer_human_id
+            ),
             referrer_human_id=referrer_human_id,
             token=token,
             max_uses=effective_max_uses,
@@ -276,6 +289,39 @@ class InvitesCRUD(BaseCRUD[Invites, InviteCreate, InviteUpdate]):
         session.commit()
         session.refresh(link)
         return link
+
+    def _flow_for_attendee_link(
+        self,
+        session: Session,
+        popup_id: uuid.UUID,
+        referrer_human_id: uuid.UUID,
+    ) -> uuid.UUID:
+        """The door an attendee's own link lands people in.
+
+        The one they came through themselves. Someone accepted as a volunteer
+        shares the volunteer way in, which is the only reading that does not
+        surprise either end of the link — and every invite names a flow since
+        the re-key, so it has to name one.
+
+        An attendee who bought without applying names no door; the popup's
+        default answers for them, which is where they would have landed anyway.
+        """
+        from app.api.application.crud import applications_crud
+        from app.api.sales_flow.crud import sales_flows_crud
+
+        application = applications_crud.get_by_human_popup(
+            session, referrer_human_id, popup_id
+        )
+        if application is not None and application.sales_flow_id:
+            return application.sales_flow_id
+
+        default_flow = sales_flows_crud.get_default_flow(session, popup_id)
+        if default_flow is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Sales flow not found",
+            )
+        return default_flow.id
 
     def update_invite(
         self,

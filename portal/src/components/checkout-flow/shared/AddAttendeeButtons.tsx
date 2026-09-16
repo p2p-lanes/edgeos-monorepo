@@ -2,6 +2,7 @@
 
 import { Plus } from "lucide-react"
 import { useState } from "react"
+import { useTranslation } from "react-i18next"
 import { AttendeeModal } from "@/app/portal/[popupSlug]/passes/components/AttendeeModal"
 import type { AttendeeCategoryPublic } from "@/client"
 import useAttendee from "@/hooks/useAttendee"
@@ -10,30 +11,29 @@ import { cn } from "@/lib/utils"
 import { useCityProvider } from "@/providers/cityProvider"
 import { usePassesProvider } from "@/providers/passesProvider"
 import type { AttendeePassState } from "@/types/Attendee"
+import { resolveRecipientRoleLabel } from "./recipientAssignmentLabels"
 
 interface AddAttendeeButtonsProps {
   onAttendeeAdded?: (attendeeId: string) => void
   className?: string
-}
-
-function resolveLabel(cat: AttendeeCategoryPublic): string {
-  const meta = cat.display_meta as Record<string, unknown> | undefined
-  const metaLabel = meta?.label
-  if (metaLabel && typeof metaLabel === "string" && metaLabel.trim() !== "") {
-    return metaLabel
-  }
-  return cat.key.charAt(0).toUpperCase() + cat.key.slice(1)
+  allowedCategoryIds?: string[] | null
+  mode?: "checkout" | "management"
+  salesFlowId?: string | null
 }
 
 export default function AddAttendeeButtons({
   onAttendeeAdded,
   className,
+  allowedCategoryIds,
+  mode = "checkout",
+  salesFlowId,
 }: AddAttendeeButtonsProps) {
+  const { t } = useTranslation()
   const { getCity } = useCityProvider()
   const city = getCity()
   const popupId = city?.id ? String(city.id) : ""
-  const { categories } = useAttendeeCategories(popupId)
-  const { attendeePasses: attendees } = usePassesProvider()
+  const { categories } = useAttendeeCategories(popupId, salesFlowId)
+  const { attendeePasses: attendees, addRecipientDraft } = usePassesProvider()
   const { addAttendee, loading } = useAttendee()
 
   const [selectedCategory, setSelectedCategory] =
@@ -51,30 +51,52 @@ export default function AddAttendeeButtons({
     countByCategoryId.set(id, (countByCategoryId.get(id) ?? 0) + 1)
   }
 
-  const available = categories.filter((c) => {
-    if (c.is_primary) return false
-    if (c.enabled_in_passes_flow === false) return false
-    const max = c.max_per_application
+  const categoryIsAvailable = (category: AttendeeCategoryPublic) => {
+    if (category.is_primary) return false
+    if (allowedCategoryIds && !allowedCategoryIds.includes(category.id))
+      return false
+    const max = category.max_per_application
     if (max == null) return true
-    const current = countByCategoryId.get(c.id) ?? 0
+    const current = countByCategoryId.get(category.id) ?? 0
     return current < max
+  }
+  const available = categories.filter((c) => {
+    return categoryIsAvailable(c)
   })
-
   if (available.length === 0) return null
 
   const handleSubmit = async (
     data: AttendeePassState & { category_id?: string },
   ) => {
     if (!selectedCategory) return
-    const result = await addAttendee({
+    if (mode === "management") {
+      const attendee = await addAttendee({
+        name: data.name ?? "",
+        email: data.email ?? "",
+        category_id: data.category_id ?? selectedCategory.id,
+        gender: data.gender ?? "",
+        additional_data: data.additional_data,
+      })
+      setSelectedCategory(null)
+      if (attendee?.id) onAttendeeAdded?.(attendee.id)
+      return
+    }
+
+    const recipientKey = `draft:${crypto.randomUUID()}`
+    const email = data.email?.trim()
+    const attendeeId = addRecipientDraft({
+      recipient_key: recipientKey,
       name: data.name ?? "",
-      email: data.email ?? "",
+      ...(email ? { email } : {}),
       category_id: data.category_id ?? selectedCategory.id,
-      gender: data.gender ?? "",
-      additional_data: data.additional_data,
+      profile_snapshot: {
+        ...(data.additional_data ?? {}),
+        category: selectedCategory.key,
+        gender: data.gender ?? "",
+      },
     })
     setSelectedCategory(null)
-    if (result?.id && onAttendeeAdded) onAttendeeAdded(result.id)
+    onAttendeeAdded?.(attendeeId)
   }
 
   return (
@@ -84,14 +106,18 @@ export default function AddAttendeeButtons({
           key={cat.id}
           type="button"
           onClick={() => setSelectedCategory(cat)}
-          disabled={loading}
+          disabled={mode === "management" && loading}
           className={cn(
             "flex items-center gap-1.5 text-pass-text hover:text-pass-title transition-colors whitespace-nowrap disabled:opacity-50",
             className,
           )}
         >
           <Plus className="w-3.5 h-3.5" />
-          <span>Add {resolveLabel(cat)}</span>
+          <span>
+            {t("checkout.recipient_assignment.add_role", {
+              role: resolveRecipientRoleLabel(cat, t),
+            })}
+          </span>
         </button>
       ))}
 
