@@ -235,7 +235,6 @@ export function SalesFlowForm({
       )
       const basePayload = {
         slug: value.slug,
-        name: value.name,
         type: value.type,
         visibility: value.visibility,
         is_default: value.is_default,
@@ -257,7 +256,11 @@ export function SalesFlowForm({
           showErrorToast("Please fill in slug and name")
           return
         }
-        createMutation.mutate({ popup_id: popupId, ...basePayload })
+        createMutation.mutate({
+          popup_id: popupId,
+          name: value.name,
+          ...basePayload,
+        })
       }
     },
   })
@@ -275,30 +278,32 @@ export function SalesFlowForm({
         }}
         className="mx-auto max-w-2xl space-y-6"
       >
-        <div className="space-y-3">
-          <form.Field
-            name="name"
-            validators={{
-              onBlur: ({ value }) =>
-                !readOnly && !value ? "Name is required" : undefined,
-            }}
-          >
-            {(field) => (
-              <div>
-                <HeroInput
-                  placeholder="FLOW NAME"
-                  value={field.state.value}
-                  onBlur={field.handleBlur}
-                  onChange={(e) => field.handleChange(e.target.value)}
-                  disabled={readOnly}
-                />
-                <FieldError errors={field.state.meta.errors} />
-              </div>
-            )}
-          </form.Field>
-        </div>
+        {!isEdit && (
+          <div className="space-y-3">
+            <form.Field
+              name="name"
+              validators={{
+                onBlur: ({ value }) =>
+                  !readOnly && !value ? "Name is required" : undefined,
+              }}
+            >
+              {(field) => (
+                <div>
+                  <HeroInput
+                    placeholder="FLOW NAME"
+                    value={field.state.value}
+                    onBlur={field.handleBlur}
+                    onChange={(e) => field.handleChange(e.target.value)}
+                    disabled={readOnly}
+                  />
+                  <FieldError errors={field.state.meta.errors} />
+                </div>
+              )}
+            </form.Field>
+          </div>
+        )}
 
-        <Separator />
+        {!isEdit && <Separator />}
 
         <InlineSection title="Identity">
           <form.Field
