@@ -11,9 +11,11 @@ import { SalesFlowUrlCard } from "@/components/forms/SalesFlowUrlCard"
 import { FlowClosureCard } from "@/components/SalesFlows/FlowClosureCard"
 import { FlowSectionLinks } from "@/components/SalesFlows/FlowSectionLinks"
 import { FlowStandingCard } from "@/components/SalesFlows/FlowStandingCard"
+import { RenameSalesFlowDialog } from "@/components/SalesFlows/RenameSalesFlowDialog"
 import { InlineSection } from "@/components/ui/inline-form"
 import { Separator } from "@/components/ui/separator"
 import { Skeleton } from "@/components/ui/skeleton"
+import useAuth from "@/hooks/useAuth"
 import { useCurrentTenant } from "@/hooks/useCurrentTenant"
 import { useGoBack } from "@/hooks/useGoBack"
 import { getPortalBaseUrl } from "@/lib/portal-urls"
@@ -33,6 +35,7 @@ function getSalesFlowQueryOptions(flowId: string) {
 }
 
 function EditSalesFlowContent({ flowId }: { flowId: string }) {
+  const { isOperatorOrAbove } = useAuth()
   const goBack = useGoBack({ to: "/sales-flows" })
   const { data: salesFlow } = useSuspenseQuery(getSalesFlowQueryOptions(flowId))
   const { data: popup } = useQuery({
@@ -44,7 +47,12 @@ function EditSalesFlowContent({ flowId }: { flowId: string }) {
 
   return (
     <div className="mx-auto max-w-2xl space-y-6">
-      <SalesFlowScopeBanner flowName={salesFlow.name} />
+      <div className="flex flex-wrap items-center gap-3">
+        <div className="min-w-0 flex-1">
+          <SalesFlowScopeBanner flowName={salesFlow.name} />
+        </div>
+        {isOperatorOrAbove && <RenameSalesFlowDialog flow={salesFlow} />}
+      </div>
 
       <SalesFlowUrlCard
         portalBaseUrl={portalBaseUrl}

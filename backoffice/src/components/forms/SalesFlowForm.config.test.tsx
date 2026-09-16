@@ -217,6 +217,28 @@ describe("SalesFlowForm - flow-owned settings", () => {
     expect(payload.allows_scholarship).toBe(false)
   })
 
+  it("preserves draft settings after a rename without sending the old name", async () => {
+    const user = userEvent.setup()
+    const { rerender } = renderForm()
+    await openGroup("Application Settings")
+    await user.click(await screen.findByLabelText(/scholarship/i))
+
+    rerender(
+      <SalesFlowForm
+        popupId="popup-1"
+        defaultValues={{ ...FLOW_BASE, name: "Community" } as FlowDefaults}
+        onSuccess={vi.fn()}
+      />,
+    )
+    expect(screen.getByLabelText(/scholarship/i)).not.toBeChecked()
+    await user.click(screen.getByRole("button", { name: /save/i }))
+
+    await waitFor(() => expect(mockUpdateSalesFlow).toHaveBeenCalled())
+    const payload = mockUpdateSalesFlow.mock.calls[0][0].requestBody
+    expect(payload).not.toHaveProperty("name")
+    expect(payload.allows_scholarship).toBe(false)
+  })
+
   it("keeps an untouched value instead of clearing it", async () => {
     const user = userEvent.setup()
     renderForm({ allows_scholarship: true, allows_coupons: false })
