@@ -1,6 +1,7 @@
 """Router for the open-ticketing checkout API.
 
 Endpoints:
+- GET  /checkout/{slug}/primary
 - GET  /checkout/{slug}/{flow_slug}/runtime
 - GET  /checkout/{slug}/{flow_slug}/share
 - POST /checkout/{slug}/{flow_slug}/purchase
@@ -46,6 +47,7 @@ from app.api.checkout.schemas import (
     OpenTicketingPurchaseCreate,
     OpenTicketingPurchaseResponse,
     PendingReleaseOpenRequest,
+    PrimaryCheckoutFlow,
 )
 from app.api.human.crud import humans_crud
 from app.api.payment.crud import payments_crud
@@ -155,6 +157,31 @@ def _resolve_accommodation_checkout(
     )
     assert_upsale_eligible(db, flow, popup.id, tenant_id, current_human)
     return popup, flow
+
+
+@router.get(
+    "/{slug}/primary",
+    response_model=PrimaryCheckoutFlow,
+    dependencies=[
+        Depends(RateLimit(limit=120, window_sec=60, key_prefix="rl:checkout-primary")),
+    ],
+)
+async def get_primary_checkout_flow(
+    slug: str,
+    db: SessionDep,
+    tenant: PublicTenant,
+) -> PrimaryCheckoutFlow:
+    """Resolve a popup's canonical primary sales-flow URL segment.
+
+    The database's ``is_default`` flag is authoritative. The endpoint does not
+    assume that a direct flow keeps its initially provisioned ``checkout`` slug,
+    and popup lookup remains scoped to the tenant resolved from the request.
+    """
+    from app.api.sales_flow.resolver import resolve_flow
+
+    popup = get_open_ticketing_popup(db, slug, tenant.id)
+    flow = resolve_flow(db, popup)
+    return PrimaryCheckoutFlow(flow_slug=flow.slug)
 
 
 @router.get(

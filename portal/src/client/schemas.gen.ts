@@ -22345,6 +22345,19 @@ tells a reviewer whether this person already took part in other popups of
 the tenant, and how much they bought when they did.`
 } as const;
 
+export const PrimaryCheckoutFlowSchema = {
+    properties: {
+        flow_slug: {
+            type: 'string',
+            title: 'Flow Slug'
+        }
+    },
+    type: 'object',
+    required: ['flow_slug'],
+    title: 'PrimaryCheckoutFlow',
+    description: "Canonical URL slug for a popup's primary sales flow."
+} as const;
+
 export const ProductBatchSchema = {
     properties: {
         popup_id: {
