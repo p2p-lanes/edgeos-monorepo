@@ -484,16 +484,20 @@ class TestPopupFlagGuards:
     ) -> None:
         """create_internal raises 403 when referral_id is set and referrals_enabled=False.
 
-        Triangulation: same shape test for referral flag.
+        Triangulation: same shape test for referral flag. The referral has to
+        exist: which switch applies depends on whether the link was shared
+        from another popup, so the link is read before the gate.
         """
         from unittest.mock import MagicMock
 
         from fastapi import HTTPException
 
         from app.api.application.crud import ApplicationsCRUD
+        from app.api.invite.models import Invites
 
         popup = _make_popup(db, tenant_a)
         human = _make_human(db, tenant_a)
+        referrer = _make_human(db, tenant_a)
 
         from app.api.sales_flow.crud import sales_flows_crud
 
@@ -501,10 +505,21 @@ class TestPopupFlagGuards:
         assert flow is not None
         assert not flow.referrals_enabled, "copied from a popup that has them off"
 
+        referral = Invites(
+            tenant_id=tenant_a.id,
+            popup_id=popup.id,
+            sales_flow_id=flow.id,
+            referrer_human_id=referrer.id,
+            token=f"flag-{uuid.uuid4().hex[:12]}",
+            auto_approve=True,
+        )
+        db.add(referral)
+        db.commit()
+
         app_data = MagicMock()
         app_data.popup_id = popup.id
         app_data.invite_id = None
-        app_data.referral_id = uuid.uuid4()
+        app_data.referral_id = referral.id
         app_data.group_id = None
         app_data.status = None
         app_data.custom_fields = None

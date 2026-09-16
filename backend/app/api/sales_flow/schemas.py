@@ -205,6 +205,10 @@ class SalesFlowBase(SQLModel):
     invites_enabled: bool | None = Field(default=None, nullable=True)
     referrals_enabled: bool | None = Field(default=None, nullable=True)
     max_referrals_per_attendee: int | None = Field(default=None, nullable=True)
+    # Whether attendees of other popups in the tenant may share this way in.
+    # The flow that receives the people decides, and its own
+    # max_referrals_per_attendee caps each of those links.
+    cross_popup_referrals_enabled: bool | None = Field(default=None, nullable=True)
     checkin_pass_lead_days: int | None = Field(default=None, nullable=True)
     open_checkout_success_url: str | None = Field(default=None, nullable=True)
     open_checkout_cancel_url: str | None = Field(default=None, nullable=True)
@@ -256,6 +260,7 @@ class SalesFlowCreate(BaseModel):
     invites_enabled: bool | None = None
     referrals_enabled: bool | None = None
     max_referrals_per_attendee: int | None = None
+    cross_popup_referrals_enabled: bool | None = None
     checkin_pass_lead_days: int | None = None
     open_checkout_success_url: str | None = None
     open_checkout_cancel_url: str | None = None
@@ -336,6 +341,7 @@ class SalesFlowUpdate(BaseModel):
     invites_enabled: bool | None = None
     referrals_enabled: bool | None = None
     max_referrals_per_attendee: int | None = None
+    cross_popup_referrals_enabled: bool | None = None
     checkin_pass_lead_days: int | None = None
     open_checkout_success_url: str | None = None
     open_checkout_cancel_url: str | None = None
@@ -518,6 +524,7 @@ EFFECTIVE_CONFIG_FIELDS: tuple[str, ...] = (
     "invites_enabled",
     "referrals_enabled",
     "max_referrals_per_attendee",
+    "cross_popup_referrals_enabled",
     "checkin_pass_lead_days",
     "open_checkout_success_url",
     "open_checkout_cancel_url",
@@ -543,6 +550,8 @@ APPLICATION_ONLY_FIELDS: frozenset[str] = frozenset(
         "application_fee_amount",
         "allows_scholarship",
         "allows_incentive",
+        # Only an application flow can take someone in through a link.
+        "cross_popup_referrals_enabled",
         "abandoned_application_delay_days",
         "abandoned_application_repeat_days",
         "abandoned_application_max_count",
@@ -564,7 +573,7 @@ def fields_for(flow_type: str | None) -> tuple[str, ...]:
     """The configuration a flow of this type can actually use.
 
     Everything outside the two sets above applies to every kind of way in:
-    fees, installments, coupons, invites, cart reminders. Only the eleven
+    fees, installments, coupons, invites, cart reminders. Only the twelve
     listed are type-bound, and handing a flow the ones it cannot use is worse
     than leaving them empty — an organiser who finds a signing secret on their
     volunteers door has no way to know it was never going to be read.
@@ -660,6 +669,7 @@ class EffectiveFlowConfig(BaseModel):
     invites_enabled: bool | None = None
     referrals_enabled: bool | None = None
     max_referrals_per_attendee: int | None = None
+    cross_popup_referrals_enabled: bool | None = None
     checkin_pass_lead_days: int | None = None
     open_checkout_success_url: str | None = None
     open_checkout_cancel_url: str | None = None

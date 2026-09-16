@@ -44,6 +44,11 @@ class Invites(SQLModel, table=True):
         Index("ix_invites_tenant_id", "tenant_id"),
         Index("ix_invites_popup_recipient_email", "popup_id", "recipient_email"),
         Index("ix_invites_referrer_human_id", "referrer_human_id"),
+        CheckConstraint(
+            "source_popup_id IS NULL OR referrer_human_id IS NOT NULL",
+            name="ck_invites_source_popup_portal_only",
+        ),
+        Index("ix_invites_source_popup_id", "source_popup_id"),
     )
 
     id: uuid.UUID = Field(
@@ -92,6 +97,11 @@ class Invites(SQLModel, table=True):
     referrer_human_id: uuid.UUID | None = Field(
         default=None, foreign_key="humans.id", nullable=True
     )
+    # Set when an attendee shares a popup they are not in: the popup whose
+    # access let them share. NULL for a link into the sharer's own popup.
+    source_popup_id: uuid.UUID | None = Field(
+        default=None, foreign_key="popups.id", nullable=True
+    )
     expires_at: datetime | None = Field(
         default=None, nullable=True, sa_type=DateTime(timezone=True)
     )
@@ -113,7 +123,9 @@ class Invites(SQLModel, table=True):
 
     # Relationships
     tenant: "Tenants" = Relationship()
-    popup: "Popups" = Relationship()
+    popup: "Popups" = Relationship(
+        sa_relationship_kwargs={"foreign_keys": "[Invites.popup_id]"},
+    )
     redeemed_by_human: Optional["Humans"] = Relationship(
         sa_relationship_kwargs={"foreign_keys": "[Invites.redeemed_by_human_id]"},
     )
@@ -133,6 +145,11 @@ class Invites(SQLModel, table=True):
     def is_portal_created(self) -> bool:
         """True when an attendee created this link from the portal."""
         return self.referrer_human_id is not None
+
+    @property
+    def is_cross_popup(self) -> bool:
+        """True when the sharer's access comes from another popup."""
+        return self.source_popup_id is not None
 
     @property
     def code(self) -> str:

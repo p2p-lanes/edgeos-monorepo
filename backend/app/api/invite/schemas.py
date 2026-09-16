@@ -88,9 +88,14 @@ class InvitePortalCreate(BaseModel):
     An attendee sets far less than an admin: the policy fields (discount,
     auto_approve) stay admin-only, and max_uses is dictated by the popup's
     max_referrals_per_attendee quota.
+
+    ``source_popup_id`` names another popup of the same tenant whose access
+    lets the attendee share ``popup_id`` without being in it. Omitted, or equal
+    to ``popup_id``, means the attendee shares their own popup.
     """
 
     popup_id: uuid.UUID
+    source_popup_id: uuid.UUID | None = None
     token: str | None = None
     max_uses: int | None = None
     expires_at: datetime | None = None
@@ -145,10 +150,27 @@ class InvitePublic(BaseModel):
     expires_at: datetime | None = None
     created_by: uuid.UUID | None = None
     referrer_human_id: uuid.UUID | None = None
+    # Set on an attendee link into a popup its owner is not in: the popup
+    # whose access let them share it.
+    source_popup_id: uuid.UUID | None = None
     created_at: datetime
     updated_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class CrossPopupReferralTarget(BaseModel):
+    """A popup an attendee may share from the popup they are in.
+
+    ``link`` is the attendee's existing link into it, if they have one. It
+    may predate the cross-popup share, since an attendee holds one link per
+    popup whichever way it was created.
+    """
+
+    popup_id: uuid.UUID
+    name: str
+    slug: str
+    link: InvitePublic | None = None
 
 
 class InvitePublicPreview(BaseModel):

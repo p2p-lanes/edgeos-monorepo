@@ -145,6 +145,93 @@ function ReferralRow({
   )
 }
 
+function apiErrorDetail(err: unknown): string | null {
+  return err instanceof ApiError &&
+    err.body &&
+    typeof err.body === "object" &&
+    typeof (err.body as { detail?: unknown }).detail === "string"
+    ? (err.body as { detail: string }).detail
+    : null
+}
+
+/**
+ * Links into other popups of this tenant, shared from this one.
+ *
+ * The backend decides who may share and which popups accept these links, so
+ * an empty answer (no targets, or someone who may not share) hides the
+ * section entirely rather than explaining why.
+ */
+function CrossPopupReferrals({ sourcePopupId }: { sourcePopupId: string }) {
+  const { t } = useTranslation()
+  const queryClient = useQueryClient()
+  const queryKey = ["referrals", "cross-targets", sourcePopupId]
+
+  const { data: targets } = useQuery({
+    queryKey,
+    queryFn: () => InvitesService.listCrossPopupTargets({ sourcePopupId }),
+  })
+
+  const createMutation = useMutation({
+    mutationFn: (targetPopupId: string) =>
+      InvitesService.createMyLink({
+        requestBody: {
+          popup_id: targetPopupId,
+          source_popup_id: sourcePopupId,
+        },
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey })
+    },
+    onError: (err) => {
+      toast.error(apiErrorDetail(err) ?? t("referrals.create_error"))
+    },
+  })
+
+  if (!targets?.length) return null
+
+  return (
+    <section className="space-y-3 pt-4">
+      <div>
+        <h2 className="text-lg font-semibold tracking-tight">
+          {t("referrals.cross_title")}
+        </h2>
+        <p className="text-sm text-muted-foreground mt-1">
+          {t("referrals.cross_description")}
+        </p>
+      </div>
+      <div className="space-y-3">
+        {targets.map((target) => (
+          <div key={target.popup_id} className="space-y-2">
+            <div className="flex items-center justify-between gap-4">
+              <p className="text-sm font-medium truncate">{target.name}</p>
+              {!target.link && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => createMutation.mutate(target.popup_id)}
+                  disabled={createMutation.isPending}
+                >
+                  {createMutation.isPending &&
+                  createMutation.variables === target.popup_id ? (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  ) : null}
+                  {t("referrals.cross_create")}
+                </Button>
+              )}
+            </div>
+            {target.link && (
+              <ReferralRow
+                referral={target.link}
+                onDeleted={() => queryClient.invalidateQueries({ queryKey })}
+              />
+            )}
+          </div>
+        ))}
+      </div>
+    </section>
+  )
+}
+
 const ReferralsPage = () => {
   const { t } = useTranslation()
   const { getCity } = useCityProvider()
@@ -181,14 +268,7 @@ const ReferralsPage = () => {
       })
     },
     onError: (err) => {
-      const detail =
-        err instanceof ApiError &&
-        err.body &&
-        typeof err.body === "object" &&
-        typeof (err.body as { detail?: unknown }).detail === "string"
-          ? (err.body as { detail: string }).detail
-          : t("referrals.create_error")
-      toast.error(detail)
+      toast.error(apiErrorDetail(err) ?? t("referrals.create_error"))
     },
   })
 
@@ -264,6 +344,8 @@ const ReferralsPage = () => {
           </div>
         </>
       )}
+
+      {city?.id && <CrossPopupReferrals sourcePopupId={city.id} />}
     </div>
   )
 }

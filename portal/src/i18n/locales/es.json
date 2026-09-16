@@ -900,7 +900,10 @@
     "preview_login_required_title": "Ingresa para aplicar",
     "preview_login_required_description": "Necesitas iniciar sesión para aplicar a través de este enlace de referido.",
     "one_link_notice": "Ya tienes un enlace de referido. Cada asistente obtiene un enlace: compártelo para invitar a otros.",
-    "disabled_badge": "Deshabilitado"
+    "disabled_badge": "Deshabilitado",
+    "cross_title": "Invitá a alguien a otro evento",
+    "cross_description": "Compartí un enlace a otro de nuestros eventos, aunque vos no vayas.",
+    "cross_create": "Crear enlace"
   },
   "invite": {
     "loading": "Cargando invitación...",
