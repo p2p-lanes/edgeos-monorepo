@@ -4650,6 +4650,13 @@ export type PreviousApplicationSummary = {
 };
 
 /**
+ * Canonical URL slug for a popup's primary sales flow.
+ */
+export type PrimaryCheckoutFlow = {
+    flow_slug: string;
+};
+
+/**
  * Schema for batch product creation.
  */
 export type ProductBatch = {
@@ -7277,6 +7284,14 @@ export type CheckInListCheckInsData = {
 };
 
 export type CheckInListCheckInsResponse = (ListModel_CheckInListItem_);
+
+export type CheckoutGetPrimaryCheckoutFlowData = {
+    slug: string;
+    xEdgeOsPublishableKey?: (string | null);
+    xTenantId?: (string | null);
+};
+
+export type CheckoutGetPrimaryCheckoutFlowResponse = (PrimaryCheckoutFlow);
 
 export type CheckoutGetFlowRuntimeData = {
     acceptLanguage?: (string | null);
