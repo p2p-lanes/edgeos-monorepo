@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react"
+import { fireEvent, render, screen } from "@testing-library/react"
 import type { ReactNode } from "react"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 import Home from "./page"
@@ -19,7 +19,8 @@ const mocks = vi.hoisted(() => ({
   doorsLoading: false,
   doorsError: false,
   participation: null as { type: string } | null,
-  directPanel: vi.fn(),
+  directFlows: [] as Array<{ id: string; slug: string; name: string }>,
+  push: vi.fn(),
   replace: vi.fn(),
   search: "",
   getRelevantApplication: vi.fn(),
@@ -27,7 +28,7 @@ const mocks = vi.hoisted(() => ({
 }))
 
 vi.mock("next/navigation", () => ({
-  useRouter: () => ({ push: vi.fn(), replace: mocks.replace }),
+  useRouter: () => ({ push: mocks.push, replace: mocks.replace }),
   useSearchParams: () => new URLSearchParams(mocks.search),
 }))
 
@@ -54,11 +55,8 @@ vi.mock("@/hooks/useGatheringDoors", () => ({
   }),
 }))
 
-vi.mock("@/components/Portal/DirectSalesFlowsPanel", () => ({
-  DirectSalesFlowsPanel: (props: { popupSlug: string; popupId: string }) => {
-    mocks.directPanel(props)
-    return <div data-testid="direct-sales-panel" />
-  },
+vi.mock("@/hooks/usePortalDirectSalesFlows", () => ({
+  usePortalDirectSalesFlows: () => ({ data: mocks.directFlows }),
 }))
 
 vi.mock("@/components/Card/EventCard", () => {
@@ -74,7 +72,17 @@ vi.mock("@/components/Card/EventCard", () => {
       Location: () => null,
       DateRange: () => null,
       Progress: () => <div data-testid="application-progress" />,
-      ApplyButton: () => <button type="button">Apply</button>,
+      ApplyButton: ({
+        onClick,
+        labelKey,
+      }: {
+        onClick: () => void
+        labelKey?: string
+      }) => (
+        <button type="button" onClick={onClick}>
+          {labelKey ?? "Apply"}
+        </button>
+      ),
     },
   )
   return { EventCard }
@@ -118,18 +126,27 @@ describe("portal event overview", () => {
     mocks.doorsLoading = false
     mocks.doorsError = false
     mocks.participation = null
-    mocks.directPanel.mockClear()
+    mocks.directFlows = []
+    mocks.push.mockClear()
     mocks.replace.mockClear()
     mocks.search = ""
     mocks.getRelevantApplication.mockReset().mockReturnValue(null)
     mocks.feeBanner.mockClear()
   })
 
-  it("does not mount direct sales for an event without applications", () => {
+  it("shows the existing Buy Tickets CTA for a portal-listed direct flow", () => {
+    mocks.directFlows = [{ id: "flow-1", slug: "checkout", name: "Checkout" }]
+
     render(<Home />)
 
-    expect(screen.queryByTestId("direct-sales-panel")).toBeNull()
-    expect(mocks.directPanel).not.toHaveBeenCalled()
+    fireEvent.click(screen.getByRole("button", { name: "cta.buy_tickets" }))
+    expect(mocks.push).toHaveBeenCalledWith("/checkout/my-event/checkout")
+  })
+
+  it("hides the Buy Tickets CTA when no direct flow is portal-listed", () => {
+    render(<Home />)
+
+    expect(screen.queryByRole("button", { name: "cta.buy_tickets" })).toBeNull()
   })
 
   it("redirects an invisible popup slug to the portal root after loading", () => {
@@ -147,7 +164,6 @@ describe("portal event overview", () => {
 
     render(<Home />)
 
-    expect(screen.queryByTestId("direct-sales-panel")).toBeNull()
     expect(screen.getAllByTestId("application-door")).toHaveLength(2)
   })
 
@@ -283,6 +299,5 @@ describe("portal event overview", () => {
     render(<Home />)
 
     expect(screen.getByTestId("companion-view")).toBeTruthy()
-    expect(screen.queryByTestId("direct-sales-panel")).toBeNull()
   })
 })

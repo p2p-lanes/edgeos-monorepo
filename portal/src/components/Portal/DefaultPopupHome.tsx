@@ -12,6 +12,7 @@ import { GatheringDoorCard } from "@/components/Portal/GatheringDoorCard"
 import { ScholarshipStatusBadge } from "@/components/ScholarshipStatusBadge"
 import { Loader } from "@/components/ui/Loader"
 import { useGatheringDoors } from "@/hooks/useGatheringDoors"
+import { usePortalDirectSalesFlows } from "@/hooks/usePortalDirectSalesFlows"
 import { useApplication } from "@/providers/applicationProvider"
 import { useCityProvider } from "@/providers/cityProvider"
 
@@ -29,6 +30,9 @@ export default function DefaultPopupHome() {
     isLoading: doorsLoading,
     isError: doorsError,
   } = useGatheringDoors(city?.id ? String(city.id) : null)
+  const directFlowsQuery = usePortalDirectSalesFlows(
+    city?.takes_applications === false && city.id ? String(city.id) : undefined,
+  )
 
   useEffect(() => {
     if (popupsLoaded && !city) router.replace("/portal")
@@ -37,6 +41,7 @@ export default function DefaultPopupHome() {
   if (!city) return popupsLoaded ? null : <Loader />
 
   const nobodyApplies = city?.takes_applications === false
+  const listedDirectFlow = directFlowsQuery.data?.[0]
 
   if (!nobodyApplies && doorsLoading) return <Loader />
   if (!nobodyApplies && doorsError) return <ApplicationUnavailable />
@@ -108,7 +113,9 @@ export default function DefaultPopupHome() {
 
   const onClickApply = () => {
     if (nobodyApplies) {
-      router.push(`/checkout/${city.slug}/checkout`)
+      if (listedDirectFlow) {
+        router.push(`/checkout/${city.slug}/${listedDirectFlow.slug}`)
+      }
       return
     }
     if (status === "accepted") {
@@ -136,12 +143,13 @@ export default function DefaultPopupHome() {
                 popup={city}
               />
             )}
-            {city.status !== "ended" && (
-              <EventCard.ApplyButton
-                onClick={onClickApply}
-                labelKey={nobodyApplies ? "cta.buy_tickets" : undefined}
-              />
-            )}
+            {city.status !== "ended" &&
+              (!nobodyApplies || listedDirectFlow) && (
+                <EventCard.ApplyButton
+                  onClick={onClickApply}
+                  labelKey={nobodyApplies ? "cta.buy_tickets" : undefined}
+                />
+              )}
           </EventCard.Content>
         </EventCard>
       </div>
