@@ -27,7 +27,12 @@ from tests._flow_helpers import application_flow_id
 
 
 def _make_popup(
-    db: Session, tenant: Tenants, *, suffix: str, status: str = "ended"
+    db: Session,
+    tenant: Tenants,
+    *,
+    suffix: str,
+    status: str = "ended",
+    visible_in_portal: bool = True,
 ) -> Popups:
     popup = Popups(
         id=uuid.uuid4(),
@@ -36,6 +41,7 @@ def _make_popup(
         slug=f"http-ended-{suffix}-{uuid.uuid4().hex[:6]}",
         sale_type="application",
         status=status,
+        visible_in_portal=visible_in_portal,
         currency="USD",
         # Far-future start_date so this popup sorts to the top of its status
         # group (list_portal_popups orders start_date DESC NULLS LAST and caps
@@ -119,6 +125,48 @@ class TestListPortalPopupsHttp:
 
         assert response.status_code == 200
         assert str(draft.id) not in {popup["id"] for popup in response.json()}
+
+    def test_hidden_active_popup_is_not_listed(
+        self,
+        client: TestClient,
+        db: Session,
+        tenant_a: Tenants,
+    ) -> None:
+        hidden = _make_popup(
+            db,
+            tenant_a,
+            suffix="list-hidden",
+            status="active",
+            visible_in_portal=False,
+        )
+        human = _make_human(db, tenant_a, suffix="list-hidden")
+
+        response = client.get(_list_url(), headers=_auth(human))
+
+        assert response.status_code == 200
+        assert str(hidden.id) not in {popup["id"] for popup in response.json()}
+
+    def test_hidden_active_popup_remains_in_public_checkout_list(
+        self,
+        client: TestClient,
+        db: Session,
+        tenant_a: Tenants,
+    ) -> None:
+        hidden = _make_popup(
+            db,
+            tenant_a,
+            suffix="public-list-hidden",
+            status="active",
+            visible_in_portal=False,
+        )
+
+        response = client.get(
+            "/api/v1/popups/public/list",
+            headers={"X-Tenant-Id": str(tenant_a.id)},
+        )
+
+        assert response.status_code == 200
+        assert str(hidden.id) in {popup["id"] for popup in response.json()}
 
     def test_participant_sees_ended_popup_in_list(
         self,
