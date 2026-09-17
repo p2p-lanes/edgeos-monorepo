@@ -1714,8 +1714,8 @@ def flatten_template(template_type: EmailTemplateType) -> str:
 
 
 TEMPLATE_TYPE_METADATA: list[dict[str, Any]] = [
-    *AUTH_TEMPLATE_METADATA,
-    *[{**meta, "scope": TemplateScope.POPUP} for meta in POPUP_TEMPLATE_METADATA],
+    {**meta, "scope": get_template_scope(meta["type"])}
+    for meta in [*AUTH_TEMPLATE_METADATA, *POPUP_TEMPLATE_METADATA]
 ]
 
 CUSTOMIZABLE_TEMPLATE_TYPES = {meta["type"] for meta in TEMPLATE_TYPE_METADATA}
