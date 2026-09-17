@@ -114,7 +114,10 @@ def test_template_types_expose_scope_metadata(client, admin_token_tenant_a: str)
     by_type = {item["type"]: item for item in response.json()}
 
     assert by_type["login_code_human"]["scope"] == "tenant"
-    assert by_type["application_received"]["scope"] == "popup"
+    assert by_type["application_received"]["scope"] == "flow"
+    assert by_type["payment_confirmed"]["scope"] == "flow"
+    assert by_type["event_invitation"]["scope"] == "popup"
+    assert by_type["check_in_pass"]["scope"] == "popup"
     assert any(
         variable["name"] == "auth_code"
         for variable in by_type["login_code_human"]["variables"]
