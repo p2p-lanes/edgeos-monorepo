@@ -495,8 +495,12 @@ async def list_portal_popups(
     """
     from app.api.application.crud import applications_crud  # noqa: PLC0415
 
-    active_popups, _ = crud.find(db, status=PopupStatus.active, limit=100)
-    ended_popups, _ = crud.find(db, status=PopupStatus.ended, limit=100)
+    active_popups, _ = crud.find(
+        db, status=PopupStatus.active, visible_in_portal=True, limit=100
+    )
+    ended_popups, _ = crud.find(
+        db, status=PopupStatus.ended, visible_in_portal=True, limit=100
+    )
     participated_ended = [
         p
         for p in ended_popups
