@@ -1,9 +1,18 @@
+import pytest
+
 from app.api.email_template.schemas import EmailTemplateType
 from app.services.email.templates import (
     TEMPLATE_TYPE_METADATA,
     ApplicationAcceptedContext,
     flatten_template,
+    get_template_scope,
 )
+
+
+@pytest.mark.parametrize("metadata", TEMPLATE_TYPE_METADATA, ids=lambda m: m["type"])
+def test_editor_scope_matches_template_resolution_scope(metadata) -> None:
+    """The editor must look in the same tier as the sender for saved templates."""
+    assert metadata["scope"] == get_template_scope(metadata["type"])
 
 
 def test_application_accepted_context_does_not_expose_unsupported_fields() -> None:
