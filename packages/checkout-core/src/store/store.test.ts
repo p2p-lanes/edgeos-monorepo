@@ -3,40 +3,38 @@ import { createAnalyticsBus } from "../analytics/bus"
 import type { CheckoutClient } from "../client"
 import type {
   CheckoutPreviewResponse,
-  CheckoutRuntimeResponse,
+  CheckoutProduct,
+  CheckoutProductsResponse,
 } from "../types/api"
 import { createCheckoutStore } from "./store"
 
-function runtime(): CheckoutRuntimeResponse {
+function product(over: Partial<CheckoutProduct> = {}): CheckoutProduct {
   return {
-    popup: { id: "pop1", slug: "demo", name: "Demo", currency: "USD" },
-    products: [
-      {
-        tenant_id: "t",
-        popup_id: "pop1",
-        id: "p1",
-        name: "Ticket",
-        slug: "ticket",
-        price: "100",
-        category: "ticket",
-        currency: "USD",
-        is_active: true,
-      },
-    ],
-    buyer_form: [],
-    ticketing_steps: [
-      { id: "s1", tenant_id: "t", popup_id: "pop1", step_type: "tickets", title: "Tickets" },
-      { id: "s2", tenant_id: "t", popup_id: "pop1", step_type: "buyer", title: "Buyer" },
-      { id: "s3", tenant_id: "t", popup_id: "pop1", step_type: "confirm", title: "Confirm" },
-    ],
-    form_schema: {
-      base_fields: {
-        email: { type: "text", label: "Email", required: true },
-        first_name: { type: "text", label: "First name", required: true },
-        last_name: { type: "text", label: "Last name", required: true },
-      },
-      custom_fields: {},
+    tenant_id: "t",
+    popup_id: "pop1",
+    id: "p1",
+    name: "Ticket",
+    slug: "ticket",
+    price: "100",
+    category: "ticket",
+    currency: "USD",
+    is_active: true,
+    ...over,
+  }
+}
+
+function products(): CheckoutProductsResponse {
+  return { products: [product()] }
+}
+
+function formSchema() {
+  return {
+    base_fields: {
+      email: { type: "text", label: "Email", required: true },
+      first_name: { type: "text", label: "First name", required: true },
+      last_name: { type: "text", label: "Last name", required: true },
     },
+    custom_fields: {},
   }
 }
 
@@ -56,7 +54,9 @@ function preview(total: string): CheckoutPreviewResponse {
 
 function mockClient(over: Partial<CheckoutClient> = {}): CheckoutClient {
   return {
-    getRuntime: vi.fn().mockResolvedValue(runtime()),
+    getProducts: vi.fn().mockResolvedValue(products()),
+    getForm: vi.fn().mockResolvedValue({ form_schema: formSchema() }),
+    getPrimaryFlow: vi.fn().mockResolvedValue("checkout"),
     preview: vi.fn().mockResolvedValue(preview("200")),
     validateCoupon: vi.fn().mockResolvedValue({
       code: "SAVE",
@@ -88,21 +88,40 @@ beforeEach(() => vi.useFakeTimers())
 afterEach(() => vi.useRealTimers())
 
 describe("createCheckoutStore", () => {
-  it("loads runtime, derives steps and emits ViewContent", async () => {
+  it("loads catalogue + form in one pass and emits ViewContent", async () => {
     const track = vi.fn()
+    const client = mockClient()
     const store = createCheckoutStore({
-      client: mockClient(),
-      runtime: runtime(),
+      client,
+      popupSlug: "demo",
       analytics: createAnalyticsBus([{ track }]),
     })
 
     await store.load()
 
-    expect(store.getState().steps).toEqual(["passes", "buyer", "confirm"])
-    expect(store.getState().currentStep).toBe("passes")
+    expect(client.getProducts).toHaveBeenCalled()
+    expect(client.getForm).toHaveBeenCalled()
+    expect(store.getState().products).toHaveLength(1)
+    expect(store.getState().formSchema).not.toBeNull()
+    expect(store.getState().loaded).toBe(true)
     expect(track).toHaveBeenCalledWith(
       expect.objectContaining({ type: "view_content" }),
     )
+  })
+
+  it("does not fetch what the caller seeded", async () => {
+    const client = mockClient()
+    const store = createCheckoutStore({
+      client,
+      products: [product()],
+      formSchema: null,
+    })
+
+    await store.load()
+
+    expect(client.getProducts).not.toHaveBeenCalled()
+    expect(client.getForm).not.toHaveBeenCalled()
+    expect(store.getState().products).toHaveLength(1)
   })
 
   it("prices selection via /preview (debounced) and tracks AddToCart", async () => {
@@ -110,7 +129,6 @@ describe("createCheckoutStore", () => {
     const track = vi.fn()
     const store = createCheckoutStore({
       client,
-      runtime: runtime(),
       analytics: createAnalyticsBus([{ track }]),
       pricingDebounceMs: 100,
     })
@@ -131,7 +149,7 @@ describe("createCheckoutStore", () => {
   })
 
   it("dispose() is idempotent and reflected by isDisposed()", () => {
-    const store = createCheckoutStore({ client: mockClient(), runtime: runtime() })
+    const store = createCheckoutStore({ client: mockClient() })
     expect(store.isDisposed()).toBe(false)
     store.dispose()
     expect(store.isDisposed()).toBe(true)
@@ -144,11 +162,7 @@ describe("createCheckoutStore", () => {
     // must NOT reuse a disposed store, because its pricing subscription is dead —
     // the /preview call still fires but its result never reaches store state.
     const client = mockClient()
-    const store = createCheckoutStore({
-      client,
-      runtime: runtime(),
-      pricingDebounceMs: 100,
-    })
+    const store = createCheckoutStore({ client, pricingDebounceMs: 100 })
     await store.load()
 
     store.dispose()
@@ -162,29 +176,9 @@ describe("createCheckoutStore", () => {
     expect(store.getState().pricing.preview).toBeNull()
   })
 
-  it("gates steps behind selection and buyer completeness", async () => {
-    const store = createCheckoutStore({ client: mockClient(), runtime: runtime() })
-    await store.load()
-
-    // Nothing selected → cannot advance past the first step.
-    expect(store.goToStep("buyer")).toBe(false)
-
-    store.setQuantity("p1", 1)
-    expect(store.goToStep("buyer")).toBe(true)
-
-    // Buyer incomplete → cannot reach confirm.
-    expect(store.goToStep("confirm")).toBe(false)
-    store.setBuyer({ email: "a@b.co", first_name: "Ada", last_name: "Lovelace" })
-    expect(store.goToStep("confirm")).toBe(true)
-  })
-
   it("validates a coupon and re-prices with it", async () => {
     const client = mockClient()
-    const store = createCheckoutStore({
-      client,
-      runtime: runtime(),
-      pricingDebounceMs: 50,
-    })
+    const store = createCheckoutStore({ client, pricingDebounceMs: 50 })
     await store.load()
     store.setQuantity("p1", 1)
 
@@ -200,7 +194,7 @@ describe("createCheckoutStore", () => {
 
   it("submits: flushes cart, purchases, returns the checkout url", async () => {
     const client = mockClient()
-    const store = createCheckoutStore({ client, runtime: runtime() })
+    const store = createCheckoutStore({ client })
     await store.load()
     store.setQuantity("p1", 2)
     store.setBuyer({
@@ -215,7 +209,6 @@ describe("createCheckoutStore", () => {
     expect(client.upsertCart).toHaveBeenCalled() // cart flushed for continuity
     expect(client.purchase).toHaveBeenCalledWith(
       expect.objectContaining({
-        products: [{ product_id: "p1", quantity: 2 }],
         buyer: {
           email: "a@b.co",
           first_name: "Ada",
@@ -231,8 +224,75 @@ describe("createCheckoutStore", () => {
     expect(store.getState().submitting).toBe(false)
   })
 
+  it("names the buyer as the recipient of every ticket line", async () => {
+    // The API refuses a `ticket` line that identifies nobody, so a checkout
+    // that never sets a recipient could not buy a ticket at all.
+    const client = mockClient()
+    const store = createCheckoutStore({ client })
+    await store.load()
+    store.setQuantity("p1", 1)
+    store.setBuyer({
+      email: "a@b.co",
+      first_name: "Ada",
+      last_name: "Lovelace",
+      custom_shirt: "L",
+    })
+
+    await store.submit()
+
+    expect(client.purchase).toHaveBeenCalledWith(
+      expect.objectContaining({
+        products: [
+          { product_id: "p1", quantity: 1, recipient_key: "buyer" },
+        ],
+        recipients: [
+          {
+            recipient_key: "buyer",
+            name: "Ada Lovelace",
+            email: "a@b.co",
+            profile_snapshot: { shirt: "L" },
+          },
+        ],
+      }),
+    )
+  })
+
+  it("leaves a non-ticket line without a recipient", async () => {
+    const client = mockClient({
+      getProducts: vi
+        .fn()
+        .mockResolvedValue({ products: [product({ category: "merch" })] }),
+    })
+    const store = createCheckoutStore({ client })
+    await store.load()
+    store.setQuantity("p1", 1)
+    store.setBuyer({ email: "a@b.co", first_name: "Ada", last_name: "L" })
+
+    await store.submit()
+
+    expect(client.purchase).toHaveBeenCalledWith(
+      expect.objectContaining({
+        products: [{ product_id: "p1", quantity: 1 }],
+        recipients: [],
+      }),
+    )
+  })
+
+  it("records a failed load in state and still rejects", async () => {
+    // A UI that never awaited load() (the React provider calls it for you) has
+    // only state to go by, and an empty catalogue reads as a sold-out event.
+    const client = mockClient({
+      getProducts: vi.fn().mockRejectedValue(new Error("offline")),
+    })
+    const store = createCheckoutStore({ client })
+
+    await expect(store.load()).rejects.toThrow("offline")
+    expect(store.getState().error).toBe("offline")
+    expect(store.getState().loaded).toBe(false)
+  })
+
   it("submit throws when nothing is selected", async () => {
-    const store = createCheckoutStore({ client: mockClient(), runtime: runtime() })
+    const store = createCheckoutStore({ client: mockClient() })
     await store.load()
     await expect(store.submit()).rejects.toThrow("Nothing selected")
   })

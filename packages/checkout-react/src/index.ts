@@ -13,7 +13,6 @@ export {
   useCheckout,
   useCheckoutState,
   usePreview,
-  useSteps,
 } from "./hooks"
 
 // Re-export the core so consumers get types + factories from one entry point.

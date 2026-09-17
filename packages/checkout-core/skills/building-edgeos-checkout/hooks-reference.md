@@ -13,9 +13,8 @@ store built by `<CheckoutProvider>`; the store actions they expose are stable
 ```tsx
 interface CheckoutProviderProps {
   children: ReactNode
-   // Build a client from these (the common case):
-   slug?: string
-   flowSlug: string                  // canonical sales flow slug
+  // Build a client from these (the common case):
+  slug?: string             // popup slug. NO flow slug: the client resolves the primary flow
   publishableKey?: string   // → X-EdgeOS-Publishable-Key header
   baseUrl?: string          // OPTIONAL — defaults to the EdgeOS prod API
                             // (DEFAULT_BASE_URL). Override for dev/staging/proxy;
@@ -24,7 +23,8 @@ interface CheckoutProviderProps {
   store?: CheckoutStore          // adopt a pre-built store (you own its lifecycle)
   client?: CheckoutClient        // adopt a pre-built API client
   transport?: Transport          // custom HTTP boundary (SSR, tests, auth)
-  initialRuntime?: CheckoutRuntimeResponse  // seed to skip the mount fetch
+  initialProducts?: CheckoutProduct[]                // seed the catalogue, skip that fetch
+  initialFormSchema?: ApplicationFormSchema | null   // seed the buyer form the same way
   analytics?: AnalyticsBus       // Meta Pixel / GA adapter
   autoLoad?: boolean             // default true → store.load() on mount
 }
@@ -32,28 +32,34 @@ interface CheckoutProviderProps {
 
 Lifecycle facts:
 - The store is built **exactly once**, on first render. **Changing `slug` /
-  `flowSlug` / `baseUrl` / `publishableKey` props after mount has no effect.** To switch
-  popups or flows, remount with a key that includes both values.
-- `autoLoad` (default) fetches runtime on mount. If you pass `initialRuntime`,
-  set `autoLoad={false}` to avoid a double fetch.
+  `baseUrl` / `publishableKey` props after mount has no effect.** To switch
+  popups, remount with a `key` that includes the slug.
+- `autoLoad` (default) fetches the catalogue and the buyer form on mount. If you
+  pass both seeds, set `autoLoad={false}` to avoid a double fetch.
 - A store the provider built is disposed on unmount; a `store` you passed in is left alone.
+- **StrictMode:** React runs cleanup→setup on the same instance, which would leave
+  the subtree pointed at a store the cleanup already disposed (blank total, no
+  cart). The provider detects that and **rebuilds a fresh store** before loading,
+  so you need no workaround, but don't be surprised that an internally-built
+  store is constructed twice in dev.
 
 ## Hooks
 
 ### `useCheckout()`
 ```ts
 {
-  runtime: CheckoutRuntimeResponse | null   // null = loading OR failed (see below)
-  currentStep: CheckoutStep
-  steps: CheckoutStep[]
+  products: CheckoutProduct[]               // the popup's whole active catalogue
+  formSchema: ApplicationFormSchema | null  // the buyer form to render/validate
+  loaded: boolean                           // false = loading OR failed (see below)
   submitting: boolean
   error: string | null                      // last submit error message
-  goToStep(step): boolean                    // false if the step isn't reachable yet
-  nextStep(): void
-  previousStep(): void
-  submit(): Promise<SubmitResult>            // creates payment; see below
+  submit(): Promise<SubmitResult>           // creates payment; see below
 }
 ```
+
+**No step navigation.** `useSteps` is gone, and so are `steps`, `currentStep`,
+`goToStep`, `nextStep` and `previousStep`. Which screen is showing is your own
+`useState`; see `example-checkout.tsx`.
 
 `submit()` resolves to:
 ```ts
@@ -69,6 +75,11 @@ interface SubmitResult {
 It **rejects** on network / 4xx / 5xx — always `try/catch`. On reject,
 `useCheckout().error` is set. It throws synchronously if the cart is empty
 (`"Nothing selected"`) or a submit is already running.
+
+`submit()` also fills in the **recipients** the API demands for ticket products:
+each line whose product `category` is `"ticket"` gets `recipient_key: "buyer"`,
+and one recipient is sent for the buyer (name, email, `profile_snapshot`). See
+`api-contract.md` → *Recipients* for selling to other people.
 
 ### `useCart()`
 ```ts
@@ -118,48 +129,54 @@ It **rejects** on network / 4xx / 5xx — always `try/catch`. On reject,
 - `applyCoupon` resolves `false` for an invalid code (it never throws); a valid
   coupon may still yield no discount until `/preview` reflects it.
 
-### `useSteps()`
-Navigation slice only: `{ steps, currentStep, goToStep, nextStep, previousStep }`.
-Use when a component only drives step movement.
-
 ### `useCheckoutState()`
 Returns the entire `CheckoutStoreState` (escape hatch for advanced cases):
 ```ts
 interface CheckoutStoreState {
-  runtime, steps, currentStep, selection, buyer, coupon, pricing, cartMeta, submitting, error
+  products, formSchema, loaded, selection, buyer, coupon, pricing, cartMeta, submitting, error
 }
 ```
 
-## Detecting a failed runtime load (the load-status gap)
+## Detecting a failed load
 
-`<CheckoutProvider autoLoad>` swallows the `load()` error, so `runtime === null`
-can't tell "loading" from "failed". If you need retry/error UI, prefetch the
-runtime yourself and seed it:
+`<CheckoutProvider autoLoad>` calls `load()` for you, so you never see its
+rejection. Read `useCheckout().error` instead: the store records the failure
+there and leaves `loaded` at `false`, which is how you tell "still loading" from
+"failed". Prefetching is still an option when you want to own the fetch itself
+(SSR, or a page that already has the catalogue):
 
 ```tsx
 import {
+  type ApplicationFormSchema,
+  type CheckoutProduct,
   CheckoutProvider,
   createCheckoutClient,
-  type CheckoutRuntimeResponse,
 } from "@edgeos/checkout-react"
 import { useEffect, useState } from "react"
 
 const client = createCheckoutClient({
   slug: "amanita",
-  flowSlug: "checkout",
   baseUrl: "https://api.example/api/v1",
   publishableKey: "pk_live_xxx",
 })
 
 export function Boot() {
-  const [runtime, setRuntime] = useState<CheckoutRuntimeResponse | null>(null)
+  const [boot, setBoot] = useState<{
+    products: CheckoutProduct[]
+    formSchema: ApplicationFormSchema | null
+  } | null>(null)
   const [failed, setFailed] = useState(false)
 
   useEffect(() => {
     let alive = true
-    client
-      .getRuntime()
-      .then((r) => alive && setRuntime(r))
+    Promise.all([client.getProducts(), client.getForm()])
+      .then(([p, f]) => {
+        if (!alive) return
+        setBoot({
+          products: p.products,
+          formSchema: f.form_schema as unknown as ApplicationFormSchema,
+        })
+      })
       .catch(() => alive && setFailed(true))
     return () => {
       alive = false
@@ -167,10 +184,15 @@ export function Boot() {
   }, [])
 
   if (failed) return <RetryScreen />
-  if (!runtime) return <LoadingScreen />
+  if (!boot) return <LoadingScreen />
 
   return (
-    <CheckoutProvider client={client} initialRuntime={runtime} autoLoad={false}>
+    <CheckoutProvider
+      client={client}
+      initialProducts={boot.products}
+      initialFormSchema={boot.formSchema}
+      autoLoad={false}
+    >
       <YourCheckout />
     </CheckoutProvider>
   )
@@ -179,11 +201,13 @@ export function Boot() {
 
 ## Using the API client directly
 
-`createCheckoutClient({ slug, flowSlug, baseUrl, publishableKey })` → a typed `CheckoutClient`:
-`getRuntime()`, `preview(body)`, `validateCoupon(code)`, `purchase(body)`,
-`upsertCart(body)`, `restoreCart(cid, sig)`. Errors surface as `CheckoutApiError`
-(also exported). You rarely need this — the store composes these for you — but
-it's there for prefetch (above), SSR, or bespoke flows.
+`createCheckoutClient({ slug, baseUrl, publishableKey })` → a typed `CheckoutClient`:
+`getProducts()`, `getForm()`, `getPrimaryFlow()`, `preview(body)`,
+`validateCoupon(code)`, `purchase(body)`, `upsertCart(body)`,
+`restoreCart(cid, sig)`. No flow slug anywhere: the client resolves the popup's
+primary flow once and uses it for preview/purchase/cart. Errors surface as
+`CheckoutApiError` (also exported). You rarely need this — the store composes
+these for you — but it's there for prefetch (above), SSR, or bespoke flows.
 
 ## Analytics adapters (optional)
 

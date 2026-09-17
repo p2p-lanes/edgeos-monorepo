@@ -1,42 +1,34 @@
-import type {
-  CheckoutRuntimeResponse,
-  Transport,
-} from "@edgeos/checkout-core"
+import type { CheckoutProduct, Transport } from "@edgeos/checkout-core"
 import { act, render, renderHook, screen, waitFor } from "@testing-library/react"
 import { type ReactNode, StrictMode } from "react"
 import { describe, expect, it, vi } from "vitest"
 import { CheckoutProvider } from "./CheckoutProvider"
 import { useCheckoutStore } from "./context"
-import { useCheckout, useCart, usePreview } from "./hooks"
+import { useCart, useCheckout, usePreview } from "./hooks"
 
-function runtime(): CheckoutRuntimeResponse {
-  return {
-    popup: { id: "pop1", slug: "demo", name: "Demo", currency: "USD" },
-    products: [
-      {
-        tenant_id: "t",
-        popup_id: "pop1",
-        id: "p1",
-        name: "Ticket",
-        slug: "ticket",
-        price: "100",
-        category: "ticket",
-        is_active: true,
-      },
-    ],
-    buyer_form: [],
-    ticketing_steps: [
-      { id: "s1", tenant_id: "t", popup_id: "pop1", step_type: "tickets", title: "Tickets" },
-      { id: "s2", tenant_id: "t", popup_id: "pop1", step_type: "confirm", title: "Confirm" },
-    ],
-  }
+function products(): CheckoutProduct[] {
+  return [
+    {
+      tenant_id: "t",
+      popup_id: "pop1",
+      id: "p1",
+      name: "Ticket",
+      slug: "ticket",
+      price: "100",
+      category: "ticket",
+      is_active: true,
+    },
+  ]
 }
 
 /** A transport that returns canned bodies per path. */
 function fakeTransport(): Transport {
   return {
     request: (async (_m: string, path: string) => {
+      if (path.endsWith("/primary")) return { flow_slug: "checkout" }
       if (path.endsWith("/preview")) return { total: "200", currency: "USD" }
+      if (path.endsWith("/products")) return { products: products() }
+      if (path.endsWith("/form")) return { form_schema: {} }
       return {}
     }) as Transport["request"],
   }
@@ -44,12 +36,10 @@ function fakeTransport(): Transport {
 
 function wrapper(extra?: Partial<React.ComponentProps<typeof CheckoutProvider>>) {
   return ({ children }: { children: ReactNode }) => (
-      <CheckoutProvider
-        slug="demo"
-        flowSlug="checkout"
+    <CheckoutProvider
+      slug="demo"
       baseUrl="https://api/api/v1"
       transport={fakeTransport()}
-      initialRuntime={runtime()}
       {...extra}
     >
       {children}
@@ -58,11 +48,18 @@ function wrapper(extra?: Partial<React.ComponentProps<typeof CheckoutProvider>>)
 }
 
 describe("CheckoutProvider + hooks", () => {
-  it("exposes derived steps once loaded", async () => {
+  it("exposes the catalogue once loaded", async () => {
     const { result } = renderHook(() => useCheckout(), { wrapper: wrapper() })
-    await waitFor(() => expect(result.current.steps.length).toBeGreaterThan(0))
-    expect(result.current.steps).toEqual(["passes", "confirm"])
-    expect(result.current.currentStep).toBe("passes")
+    await waitFor(() => expect(result.current.loaded).toBe(true))
+    expect(result.current.products.map((p) => p.id)).toEqual(["p1"])
+  })
+
+  it("serves a seeded catalogue without fetching", async () => {
+    const { result } = renderHook(() => useCheckout(), {
+      wrapper: wrapper({ initialProducts: products(), initialFormSchema: null }),
+    })
+    await waitFor(() => expect(result.current.loaded).toBe(true))
+    expect(result.current.products).toHaveLength(1)
   })
 
   it("useCart mutations flow back into state", async () => {
@@ -70,7 +67,7 @@ describe("CheckoutProvider + hooks", () => {
       () => ({ cart: useCart(), checkout: useCheckout() }),
       { wrapper: wrapper() },
     )
-    await waitFor(() => expect(result.current.checkout.steps.length).toBeGreaterThan(0))
+    await waitFor(() => expect(result.current.checkout.loaded).toBe(true))
 
     act(() => result.current.cart.setQuantity("p1", 2))
     expect(result.current.cart.quantities).toEqual({ p1: 2 })
@@ -108,7 +105,12 @@ describe("CheckoutProvider + hooks", () => {
     }
     render(
       <StrictMode>
-        <CheckoutProvider slug="demo" flowSlug="checkout" transport={fakeTransport()} initialRuntime={runtime()}>
+        <CheckoutProvider
+          slug="demo"
+          transport={fakeTransport()}
+          initialProducts={products()}
+          initialFormSchema={null}
+        >
           <Probe />
         </CheckoutProvider>
       </StrictMode>,
@@ -132,7 +134,13 @@ describe("CheckoutProvider + hooks", () => {
 
   it("renders children", () => {
     render(
-      <CheckoutProvider slug="demo" flowSlug="checkout" transport={fakeTransport()} initialRuntime={runtime()} autoLoad={false}>
+      <CheckoutProvider
+        slug="demo"
+        transport={fakeTransport()}
+        initialProducts={products()}
+        initialFormSchema={null}
+        autoLoad={false}
+      >
         <span>hello</span>
       </CheckoutProvider>,
     )

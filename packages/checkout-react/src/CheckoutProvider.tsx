@@ -1,7 +1,8 @@
 import {
   type AnalyticsBus,
+  type ApplicationFormSchema,
   type CheckoutClient,
-  type CheckoutRuntimeResponse,
+  type CheckoutProduct,
   type CheckoutStore,
   createCheckoutClient,
   createCheckoutStore,
@@ -18,13 +19,13 @@ export interface CheckoutProviderProps {
   client?: CheckoutClient
   /** Or build a client from these (slug required unless `store`/`client` given). */
   slug?: string
-  /** Canonical sales flow for every checkout request. */
-  flowSlug: string
   baseUrl?: string
   publishableKey?: string
   transport?: Transport
-  /** Seed runtime to avoid a double fetch (SSR / already-bootstrapped page). */
-  initialRuntime?: CheckoutRuntimeResponse
+  /** Seed the catalogue to avoid a fetch (SSR / already-bootstrapped page). */
+  initialProducts?: CheckoutProduct[]
+  /** Seed the buyer form the same way. */
+  initialFormSchema?: ApplicationFormSchema | null
   analytics?: AnalyticsBus
   /** Call store.load() on mount (default true). */
   autoLoad?: boolean
@@ -36,7 +37,6 @@ function buildStore(props: CheckoutProviderProps): CheckoutStore {
     createCheckoutClient(
       {
         slug: props.slug ?? "",
-        flowSlug: props.flowSlug,
         baseUrl: props.baseUrl,
         publishableKey: props.publishableKey,
       },
@@ -44,7 +44,9 @@ function buildStore(props: CheckoutProviderProps): CheckoutStore {
     )
   return createCheckoutStore({
     client,
-    runtime: props.initialRuntime,
+    products: props.initialProducts,
+    formSchema: props.initialFormSchema,
+    popupSlug: props.slug,
     analytics: props.analytics,
   })
 }
@@ -85,7 +87,9 @@ export function CheckoutProvider(props: CheckoutProviderProps) {
     }
     const store = storeRef.current
     if (!store) return
-    if (autoLoad) void store.load()
+    // The store records the failure in `state.error`, so swallow the rejection
+    // here rather than leaving an unhandled one in the console.
+    if (autoLoad) store.load().catch(() => {})
     return () => {
       if (ownedRef.current) store.dispose()
     }

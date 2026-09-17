@@ -16,7 +16,6 @@ describe("@edgeos/checkout-core public surface", () => {
       "createGaAdapter",
       "buildOrderLines",
       "buildFormZodSchema",
-      "deriveAvailableSteps",
       "emptySelection",
       "selectionToCartState",
       "cartStateToSelection",
@@ -31,38 +30,36 @@ describe("@edgeos/checkout-core public surface", () => {
 
   it("drives a full flow end-to-end through the barrel", async () => {
     const client = sdk.createCheckoutClient(
-      { slug: "demo", flowSlug: "checkout" },
+      { slug: "demo" },
       {
         request: async <T>(_m: string, path: string): Promise<T> =>
-          (path.endsWith("/purchase")
-            ? { payment_id: "x", status: "pending", checkout_url: "u", amount: "1", currency: "USD" }
-            : { total: "1" }) as T,
+          (path.endsWith("/primary")
+            ? { flow_slug: "checkout" }
+            : path.endsWith("/purchase")
+              ? { payment_id: "x", status: "pending", checkout_url: "u", amount: "1", currency: "USD" }
+              : { total: "1" }) as T,
       },
     )
     const store = sdk.createCheckoutStore({
       client,
-      runtime: {
-        popup: { id: "p", slug: "demo" },
-        products: [
-          {
-            tenant_id: "t",
-            popup_id: "p",
-            id: "p1",
-            name: "T",
-            slug: "t",
-            price: "1",
-            category: "ticket",
-            is_active: true,
-          },
-        ],
-        buyer_form: [],
-        ticketing_steps: [
-          { id: "s1", tenant_id: "t", popup_id: "p", step_type: "tickets", title: "T" },
-        ],
-      },
+      popupSlug: "demo",
+      formSchema: null,
+      products: [
+        {
+          tenant_id: "t",
+          popup_id: "p",
+          id: "p1",
+          name: "T",
+          slug: "t",
+          price: "1",
+          category: "ticket",
+          is_active: true,
+        },
+      ],
     })
     await store.load()
     store.setQuantity("p1", 1)
+    store.setBuyer({ email: "a@b.co", first_name: "A", last_name: "B" })
     const res = await store.submit()
     expect(res.checkoutUrl).toBe("u")
   })

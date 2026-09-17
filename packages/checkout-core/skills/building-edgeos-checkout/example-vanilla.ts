@@ -7,56 +7,78 @@
 //   • the price comes only from state.pricing.preview (server-authoritative)
 //   • buyer custom fields are stored with the `custom_` prefix
 //   • submit() returns a checkoutUrl you redirect to — it does not "finish" the order
-//   • a failed runtime load is distinguished from "still loading" (we prefetch)
+//   • a failed load is distinguished from "still loading" (we prefetch)
 //   • buyer input is validated with the SDK's own Zod builder
+//
+// Note there are no EdgeOS "steps" here: which screens exist, and when the buyer
+// moves between them, is this app's own decision (`screen` below). The SDK
+// supplies the catalogue, the buyer form, the price and the payment.
 //
 // The DOM plumbing (createElement, innerHTML) is a placeholder — port the SAME
 // store calls to Vue's reactive()/onMounted, Svelte stores, Solid signals, etc.
 // The store contract is identical everywhere; only the render layer changes.
 
 import {
+  type ApplicationFormSchema,
   buildFormZodSchema,
+  type CheckoutStoreState,
   createCheckoutClient,
   createCheckoutStore,
-  validateBuyerValues,
-  type ApplicationFormSchema,
-  type CheckoutStoreState,
   type FormFieldSchema,
+  validateBuyerValues,
 } from "@edgeos/checkout-core"
 
 // ---- config ----------------------------------------------------------------
 // You only need your slug + publishable key (generate the key in the EdgeOS
-// backoffice → your Organization → Checkout SDK Keys). The API URL defaults to
-// EdgeOS production; add `baseUrl: "http://localhost:8000/api/v1"` below only if
-// EdgeOS tells you to point at a dev/staging backend.
+// backoffice → your Organization → Checkout SDK Keys). There is no sales-flow
+// slug: the client resolves the popup's primary flow itself. The API URL
+// defaults to EdgeOS production; add `baseUrl: "http://localhost:8000/api/v1"`
+// below only if EdgeOS tells you to point at a dev/staging backend.
 
 const SLUG = "amanita"
-const FLOW_SLUG = "checkout"
 const PUBLISHABLE_KEY = "pk_live_xxxxxxxxxxxxxxxx"
+
+// Screens are OUR state, not the SDK's. Add as many as your design needs.
+type Screen = "catalogue" | "buyer"
+let screen: Screen = "catalogue"
 
 // ---- boot ------------------------------------------------------------------
 
 export async function mountCheckout(root: HTMLElement): Promise<() => void> {
   const client = createCheckoutClient({
     slug: SLUG,
-    flowSlug: FLOW_SLUG,
     publishableKey: PUBLISHABLE_KEY,
     // baseUrl: "http://localhost:8000/api/v1", // dev/staging override only
   })
 
-  // Prefetch the runtime ourselves so we can show a real error screen — the
-  // store's own load() swallows the fetch error (runtime just stays null).
+  // Prefetch the catalogue and the buyer form ourselves so we can show a real
+  // error screen. (store.load() rejects too, so a try/catch around it would work
+  // just as well; prefetching also lets us seed and skip the fetch.)
+  // Both endpoints require the publishable key; without it they answer 401.
   root.textContent = "Loading…"
-  let runtime
+  let products: CheckoutStoreState["products"]
+  let formSchema: ApplicationFormSchema | null
   try {
-    runtime = await client.getRuntime()
+    const [catalogue, form] = await Promise.all([
+      client.getProducts(),
+      client.getForm(),
+    ])
+    // /products is the popup's WHOLE active catalogue (ticketing steps ignored,
+    // accommodation shadow products excluded). Grouping it is our job.
+    products = catalogue.products
+    formSchema = form.form_schema as unknown as ApplicationFormSchema
   } catch {
     root.textContent = "Couldn’t load the checkout. Please try again."
     return () => {}
   }
 
-  // Seed the runtime so the store doesn't fetch it again.
-  const store = createCheckoutStore({ client, runtime })
+  // Seed both so the store doesn't fetch them again.
+  const store = createCheckoutStore({
+    client,
+    products,
+    formSchema,
+    popupSlug: SLUG, // labels analytics events
+  })
 
   // Subscribe: render() runs on EVERY state change (cart, pricing, buyer, …).
   const unsubscribe = store.subscribe((state) => render(root, store, state))
@@ -76,11 +98,10 @@ export async function mountCheckout(root: HTMLElement): Promise<() => void> {
 type Store = ReturnType<typeof createCheckoutStore>
 
 function render(root: HTMLElement, store: Store, state: CheckoutStoreState) {
-  const { runtime, selection, pricing, buyer } = state
-  if (!runtime) return
+  const { products, formSchema, loaded, selection, pricing, buyer } = state
+  if (!loaded) return
 
-  const products = (runtime.products ?? []).filter((p) => p.is_active !== false)
-  const popupName = String((runtime.popup as { name?: string }).name ?? "Checkout")
+  const active = products.filter((p) => p.is_active !== false)
   const preview = pricing.preview
   const total = preview?.total ?? null // Money string, or null when cart is empty
   const saved = preview?.discount_amount
@@ -91,73 +112,105 @@ function render(root: HTMLElement, store: Store, state: CheckoutStoreState) {
     if (text != null) el.textContent = text
     return el
   }
-
-  root.append(h("h1", popupName))
-
-  // --- tickets (quantity steppers) ---
-  const tickets = h("section")
-  tickets.append(h("h2", "Tickets"))
-  for (const p of products) {
-    const qty = selection.quantities[p.id] ?? 0
-    const row = h("div")
-    row.append(h("span", `${p.name} — ${p.currency ?? ""} ${p.price}`)) // price rendered verbatim
-
-    const minus = h("button", "−") as HTMLButtonElement
-    minus.onclick = () => store.setQuantity(p.id, Math.max(0, qty - 1))
-    const count = h("output", String(qty))
-    const plus = h("button", "+") as HTMLButtonElement
-    plus.onclick = () => store.setQuantity(p.id, qty + 1)
-
-    row.append(minus, count, plus)
-    tickets.append(row)
+  const goTo = (next: Screen) => {
+    screen = next
+    render(root, store, store.getState())
   }
-  root.append(tickets)
 
-  // --- coupon ---
-  const couponBox = h("div")
-  const couponInput = h("input") as HTMLInputElement
-  couponInput.placeholder = "Coupon code"
-  const applyBtn = h("button", "Apply") as HTMLButtonElement
-  // applyCoupon resolves false for an invalid code (it never throws) and reprices.
-  applyBtn.onclick = () => void store.applyCoupon(couponInput.value)
-  couponBox.append(couponInput, applyBtn)
-  if (state.coupon.code) {
-    couponBox.append(h("span", ` ${state.coupon.valid ? "applied" : "invalid"}`))
-    if (state.coupon.valid) {
-      const removeBtn = h("button", "remove") as HTMLButtonElement
-      removeBtn.onclick = () => store.clearCoupon()
-      couponBox.append(removeBtn)
+  root.append(h("h1", screen === "catalogue" ? "Checkout" : "Your information"))
+
+  if (screen === "catalogue") {
+    // --- tickets (quantity steppers) ---
+    const tickets = h("section")
+    tickets.append(h("h2", "Tickets"))
+    for (const p of active) {
+      const qty = selection.quantities[p.id] ?? 0
+      const row = h("div")
+      row.append(h("span", `${p.name} — ${p.currency ?? ""} ${p.price}`)) // price rendered verbatim
+
+      const minus = h("button", "−") as HTMLButtonElement
+      minus.onclick = () => store.setQuantity(p.id, Math.max(0, qty - 1))
+      const count = h("output", String(qty))
+      const plus = h("button", "+") as HTMLButtonElement
+      plus.onclick = () => store.setQuantity(p.id, qty + 1)
+
+      row.append(minus, count, plus)
+      tickets.append(row)
     }
-  }
-  root.append(couponBox)
+    root.append(tickets)
 
-  // --- price summary (server-authoritative) ---
-  const summary = h("dl")
-  summary.style.opacity = pricing.status === "loading" ? "0.5" : "1"
-  if (total === null) {
-    summary.append(h("p", "Add a ticket to see the total."))
-  } else {
-    if (saved && Number(saved) > 0) {
-      summary.append(h("dt", "You saved"), h("dd", saved)) // discount_amount = savings
+    // --- coupon ---
+    const couponBox = h("div")
+    const couponInput = h("input") as HTMLInputElement
+    couponInput.placeholder = "Coupon code"
+    const applyBtn = h("button", "Apply") as HTMLButtonElement
+    // applyCoupon resolves false for an invalid code (it never throws) and reprices.
+    applyBtn.onclick = () => void store.applyCoupon(couponInput.value)
+    couponBox.append(couponInput, applyBtn)
+    if (state.coupon.code) {
+      couponBox.append(h("span", ` ${state.coupon.valid ? "applied" : "invalid"}`))
+      if (state.coupon.valid) {
+        const removeBtn = h("button", "remove") as HTMLButtonElement
+        removeBtn.onclick = () => store.clearCoupon()
+        couponBox.append(removeBtn)
+      }
     }
-    summary.append(h("dt", "Total"), h("dd", `${preview?.currency ?? ""} ${total}`))
-  }
-  root.append(summary)
+    root.append(couponBox)
 
-  // --- buyer form (driven by runtime.form_schema) ---
+    root.append(buildSummary(pricing.status, total, saved, preview?.currency))
+
+    const continueBtn = h("button", "Continue") as HTMLButtonElement
+    continueBtn.disabled = total === null // gate on a priced cart
+    continueBtn.onclick = () => goTo("buyer")
+    root.append(continueBtn)
+    return
+  }
+
+  // --- buyer screen ---
   // buyer.values: base fields raw, custom fields keyed as custom_<name>.
-  root.append(buildBuyerForm(store, runtime.form_schema as ApplicationFormSchema | null, buyer.values))
+  root.append(buildBuyerForm(store, formSchema, buyer.values))
+  root.append(buildSummary(pricing.status, total, saved, preview?.currency))
 
-  // --- error + pay ---
   if (state.error) {
     const err = h("p", state.error)
     err.setAttribute("role", "alert")
     root.append(err)
   }
+
+  const backBtn = h("button", "Back") as HTMLButtonElement
+  backBtn.onclick = () => goTo("catalogue")
+  root.append(backBtn)
+
   const payBtn = h("button", state.submitting ? "Processing…" : "Pay") as HTMLButtonElement
-  payBtn.disabled = state.submitting || total === null // gate on a priced cart
+  payBtn.disabled = state.submitting || total === null
   payBtn.onclick = () => void handlePay(store)
   root.append(payBtn)
+}
+
+// ---- price summary (server-authoritative) ----------------------------------
+
+function buildSummary(
+  status: string,
+  total: string | null,
+  saved: string | undefined,
+  currency: string | undefined,
+): HTMLElement {
+  const summary = document.createElement("dl")
+  summary.style.opacity = status === "loading" ? "0.5" : "1"
+  const line = (tag: string, text: string) => {
+    const el = document.createElement(tag)
+    el.textContent = text
+    return el
+  }
+  if (total === null) {
+    summary.append(line("p", "Add a ticket to see the total."))
+    return summary
+  }
+  if (saved && Number(saved) > 0) {
+    summary.append(line("dt", "You saved"), line("dd", saved)) // discount_amount = savings
+  }
+  summary.append(line("dt", "Total"), line("dd", `${currency ?? ""} ${total}`))
+  return summary
 }
 
 // ---- buyer form ------------------------------------------------------------
@@ -168,9 +221,6 @@ function buildBuyerForm(
   buyer: Record<string, unknown>,
 ): HTMLElement {
   const section = document.createElement("section")
-  const heading = document.createElement("h2")
-  heading.textContent = "Your information"
-  section.append(heading)
 
   // Base fields keyed by raw name; custom fields keyed with the `custom_` prefix.
   // That prefix is how the core routes them into the API's form_data — without
@@ -277,6 +327,8 @@ function buildField(
 
 async function handlePay(store: Store): Promise<void> {
   try {
+    // submit() stamps recipient_key "buyer" on every ticket line and sends the
+    // matching recipient, since the API refuses a ticket that names nobody.
     const result = await store.submit()
     // Paid order: redirect to the SimpleFi hosted pay page.
     if (result.checkoutUrl) {

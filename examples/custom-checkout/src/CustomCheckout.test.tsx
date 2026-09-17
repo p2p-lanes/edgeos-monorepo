@@ -5,7 +5,7 @@
 
 import {
   CheckoutProvider,
-  type CheckoutRuntimeResponse,
+  type CheckoutProduct,
   type Transport,
 } from "@edgeos/checkout-react"
 import {
@@ -18,36 +18,30 @@ import {
 import { describe, expect, it, vi } from "vitest"
 import { CustomCheckout } from "./CustomCheckout"
 
-function runtime(): CheckoutRuntimeResponse {
-  return {
-    popup: { id: "pop1", slug: "my-event", name: "My Event", currency: "USD" },
-    products: [
-      {
-        tenant_id: "t",
-        popup_id: "pop1",
-        id: "p1",
-        name: "General Admission",
-        slug: "ga",
-        price: "100",
-        category: "ticket",
-        currency: "USD",
-        is_active: true,
-      },
-    ],
-    buyer_form: [],
-    ticketing_steps: [
-      { id: "s1", tenant_id: "t", popup_id: "pop1", step_type: "tickets", title: "Tickets" },
-      { id: "s2", tenant_id: "t", popup_id: "pop1", step_type: "buyer", title: "Buyer" },
-      { id: "s3", tenant_id: "t", popup_id: "pop1", step_type: "confirm", title: "Confirm" },
-    ],
-    form_schema: {
-      base_fields: {
-        email: { type: "text", label: "Email", required: true },
-        first_name: { type: "text", label: "First name", required: true },
-        last_name: { type: "text", label: "Last name", required: true },
-      },
-      custom_fields: {},
+function products(): CheckoutProduct[] {
+  return [
+    {
+      tenant_id: "t",
+      popup_id: "pop1",
+      id: "p1",
+      name: "General Admission",
+      slug: "ga",
+      price: "100",
+      category: "ticket",
+      currency: "USD",
+      is_active: true,
     },
+  ]
+}
+
+function formSchema() {
+  return {
+    base_fields: {
+      email: { type: "text", label: "Email", required: true },
+      first_name: { type: "text", label: "First name", required: true },
+      last_name: { type: "text", label: "Last name", required: true },
+    },
+    custom_fields: {},
   }
 }
 
@@ -55,6 +49,9 @@ function runtime(): CheckoutRuntimeResponse {
 function fakeTransport(): Transport {
   return {
     request: (async (_method: string, path: string, body?: unknown) => {
+      if (path.endsWith("/primary")) return { flow_slug: "checkout" }
+      if (path.endsWith("/products")) return { products: products() }
+      if (path.endsWith("/form")) return { form_schema: formSchema() }
       if (path.endsWith("/preview")) {
         const qty =
           (body as { products: { quantity: number }[] }).products[0]
@@ -96,7 +93,6 @@ function renderExample(onCheckoutUrl: (u: string) => void) {
       slug="my-event"
       baseUrl="https://api/api/v1"
       transport={fakeTransport()}
-      initialRuntime={runtime()}
     >
       <CustomCheckout onCheckoutUrl={onCheckoutUrl} />
     </CheckoutProvider>,
@@ -108,7 +104,7 @@ describe("CustomCheckout (reference example)", () => {
     const onCheckoutUrl = vi.fn()
     renderExample(onCheckoutUrl)
 
-    // Product renders from the runtime.
+    // Product renders from the catalogue endpoint.
     await screen.findByText(/General Admission/)
 
     // Add 2 tickets → the server-authoritative total appears.

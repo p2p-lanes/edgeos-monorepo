@@ -133,6 +133,22 @@ class CheckoutRuntimeResponse(BaseModel):
     theme_config: dict[str, Any] | None = None
 
 
+class SdkProductsResponse(BaseModel):
+    """Response for GET /checkout/{slug}/products (publishable key only).
+
+    An object rather than a bare list so this can grow a field without
+    breaking every published SDK version at once.
+    """
+
+    products: list[CheckoutRuntimeProduct]
+
+
+class SdkFormResponse(BaseModel):
+    """Response for GET /checkout/{slug}/form (publishable key only)."""
+
+    form_schema: dict[str, Any]
+
+
 class CheckoutShareMeta(BaseModel):
     """Tiny, unauthenticated projection for social/OpenGraph share previews.
 

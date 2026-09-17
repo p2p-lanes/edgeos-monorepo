@@ -15,7 +15,6 @@ describe("createFetchTransport", () => {
     const t = createFetchTransport({
       baseUrl: "https://api.example.com/api/v1/",
       slug: "demo",
-      flowSlug: "checkout",
       publishableKey: "pk_live_abc",
       fetch: fetchMock as unknown as typeof fetch,
     })
@@ -36,7 +35,6 @@ describe("createFetchTransport", () => {
     const t = createFetchTransport({
       baseUrl: "https://x/api/v1",
       slug: "d",
-      flowSlug: "checkout",
       fetch: fetchMock as unknown as typeof fetch,
     })
 
@@ -54,7 +52,6 @@ describe("createFetchTransport", () => {
     const t = createFetchTransport({
       baseUrl: "https://x/api/v1",
       slug: "d",
-      flowSlug: "checkout",
       fetch: fetchMock as unknown as typeof fetch,
     })
 
@@ -80,7 +77,6 @@ describe("createFetchTransport", () => {
     const t = createFetchTransport({
       baseUrl: "https://x/api/v1",
       slug: "d",
-      flowSlug: "checkout",
       fetch: fetchMock as unknown as typeof fetch,
     })
 

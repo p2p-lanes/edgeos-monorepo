@@ -18,6 +18,8 @@ from app.api.checkout.schemas import (
     CheckoutRuntimeProduct,
     CheckoutRuntimeResponse,
     CheckoutShareMeta,
+    SdkFormResponse,
+    SdkProductsResponse,
 )
 from app.api.form_field.crud import form_fields_crud
 from app.api.form_field.models import FormFields
@@ -146,6 +148,35 @@ def _get_popup_by_slug_or_404(
             detail="Popup not found",
         )
     return popup
+
+
+def _apply_form_schema_overlay(
+    form_schema: dict,
+    fields: list[FormFields],
+    field_translations: dict[uuid.UUID, dict],
+    section_translations: dict[uuid.UUID, dict],
+) -> None:
+    """Overlay field and section translations onto a built form schema.
+
+    In place, and shared by the checkout runtime and the SDK's own form
+    endpoint so one payload can never drift into a different language than
+    the other.
+    """
+    for f in fields:
+        if f.id in field_translations:
+            t_data = field_translations[f.id]
+            entry = form_schema["custom_fields"].get(f.name)
+            if entry:
+                for key in TRANSLATABLE_FIELDS["form_field"]:
+                    if key in t_data:
+                        entry[key] = t_data[key]
+    for section_dict in form_schema["sections"]:
+        sid = uuid.UUID(section_dict["id"])
+        if sid in section_translations:
+            t_data = section_translations[sid]
+            for key in TRANSLATABLE_FIELDS["form_section"]:
+                if key in t_data:
+                    section_dict[key] = t_data[key]
 
 
 def runtime_for_slug(
@@ -325,21 +356,9 @@ def runtime_for_slug(
 
     form_schema = form_fields_crud.build_schema_for_flow(session, popup.id, flow.id)
     if lang:
-        for f in fields:
-            if f.id in field_translations:
-                t_data = field_translations[f.id]
-                entry = form_schema["custom_fields"].get(f.name)
-                if entry:
-                    for key in TRANSLATABLE_FIELDS["form_field"]:
-                        if key in t_data:
-                            entry[key] = t_data[key]
-        for section_dict in form_schema["sections"]:
-            sid = uuid.UUID(section_dict["id"])
-            if sid in section_translations:
-                t_data = section_translations[sid]
-                for key in TRANSLATABLE_FIELDS["form_section"]:
-                    if key in t_data:
-                        section_dict[key] = t_data[key]
+        _apply_form_schema_overlay(
+            form_schema, fields, field_translations, section_translations
+        )
 
     return CheckoutRuntimeResponse(
         selected_flow=selected_flow(flow),
@@ -384,3 +403,81 @@ def share_meta_for_slug(
         location=popup.location,
         image_url=popup.image_url,
     )
+
+
+def sdk_products_for_slug(
+    session: Session,
+    slug: str,
+    tenant_id: uuid.UUID,
+    lang: str | None = None,
+) -> SdkProductsResponse:
+    """Every product an SDK client may sell for this popup.
+
+    The whole active catalogue, deliberately unfiltered by ticketing steps:
+    an SDK client builds its own checkout and its own gating, so "what this
+    flow's steps offer" is not a question it asks (see the
+    sdk-primary-flow-catalog plan). The purchase path relaxes the same rule
+    for key-authenticated callers, so what this lists is what it can sell.
+
+    Shadow products stay out: an accommodation is sold through its own
+    endpoints with dates and availability, never as a bare product id.
+    """
+    popup = get_open_ticketing_popup(session, slug, tenant_id)
+    products = list(
+        session.exec(
+            select(Products).where(
+                Products.popup_id == popup.id,
+                Products.is_active == True,  # noqa: E712
+                Products.deleted_at.is_(None),  # type: ignore[attr-defined]
+                Products.managed_by.is_(None),  # type: ignore[attr-defined]
+            )
+        ).all()
+    )
+
+    translations: dict[uuid.UUID, dict] = {}
+    if lang:
+        translations = get_translations_bulk(
+            session, "product", [p.id for p in products], lang
+        )
+
+    def _product(p: Products) -> CheckoutRuntimeProduct:
+        data = {**p.model_dump(), "currency": popup.currency}
+        data = apply_translation_overlay(
+            data, translations.get(p.id), TRANSLATABLE_FIELDS["product"]
+        )
+        return CheckoutRuntimeProduct.model_validate(data)
+
+    return SdkProductsResponse(products=[_product(p) for p in products])
+
+
+def sdk_form_for_slug(
+    session: Session,
+    slug: str,
+    tenant_id: uuid.UUID,
+    lang: str | None = None,
+) -> SdkFormResponse:
+    """The buyer form an SDK client must render, from the primary flow.
+
+    Required fields are enforced at purchase, so this is not decoration: a
+    client that skips a required field gets a 422 it cannot explain. The
+    primary flow answers here because it is the one the SDK charges through.
+    """
+    from app.api.sales_flow.resolver import resolve_flow
+
+    popup = get_open_ticketing_popup(session, slug, tenant_id)
+    flow = resolve_flow(session, popup)
+
+    form_schema = form_fields_crud.build_schema_for_flow(session, popup.id, flow.id)
+    if lang:
+        fields, _ = form_fields_crud.find_by_flow(session, flow.id, skip=0, limit=1000)
+        section_ids = [
+            uuid.UUID(section["id"]) for section in form_schema.get("sections", [])
+        ]
+        _apply_form_schema_overlay(
+            form_schema,
+            fields,
+            get_translations_bulk(session, "form_field", [f.id for f in fields], lang),
+            get_translations_bulk(session, "form_section", section_ids, lang),
+        )
+
+    return SdkFormResponse(form_schema=form_schema)

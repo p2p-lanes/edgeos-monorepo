@@ -1,7 +1,8 @@
 // How a client boots the reference checkout on their own page. Wrap the app in
-// <CheckoutProvider> with the popup slug + the per-popup publishable key
+// <CheckoutProvider> with the popup slug + the tenant publishable key
 // (pk_live_…, browser-safe) and the API base URL. The provider fetches the
-// runtime and drives everything through the headless core.
+// catalogue and the buyer form, and drives everything through the headless
+// core. No sales flow is named: the SDK resolves the popup's primary one.
 //
 // This file is illustrative (not run by the test). In a real app this is your
 // Vite/Next entry point.
