@@ -19587,6 +19587,11 @@ export const PopupAdminSchema = {
             '$ref': '#/components/schemas/PopupStatus',
             default: 'draft'
         },
+        visible_in_portal: {
+            type: 'boolean',
+            title: 'Visible In Portal',
+            default: true
+        },
         sale_type: {
             '$ref': '#/components/schemas/SaleType',
             default: 'application'
@@ -20194,6 +20199,11 @@ export const PopupCreateSchema = {
         status: {
             '$ref': '#/components/schemas/PopupStatus',
             default: 'draft'
+        },
+        visible_in_portal: {
+            type: 'boolean',
+            title: 'Visible In Portal',
+            default: true
         },
         sale_type: {
             '$ref': '#/components/schemas/SaleType',
@@ -21438,6 +21448,17 @@ export const PopupUpdateSchema = {
                     type: 'null'
                 }
             ]
+        },
+        visible_in_portal: {
+            anyOf: [
+                {
+                    type: 'boolean'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Visible In Portal'
         },
         sale_type: {
             anyOf: [

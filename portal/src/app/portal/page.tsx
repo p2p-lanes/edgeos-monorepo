@@ -25,10 +25,10 @@ const Page = () => {
     }
   }, [popupsLoaded, getCity, router])
 
-  // LEGACY: clickable_in_portal, visible_in_portal removed – popups are pre-filtered by status === 'active'
-  const hasActivePopups = getPopups().length > 0
+  // Portal popups are pre-filtered by status and visible_in_portal.
+  const hasVisiblePopups = getPopups().length > 0
 
-  if (popupsLoaded && !hasActivePopups) {
+  if (popupsLoaded && !hasVisiblePopups) {
     return (
       <div className="w-full h-full flex items-center justify-center p-4">
         <Card className="max-w-md w-full text-center p-6">

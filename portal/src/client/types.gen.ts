@@ -4250,6 +4250,7 @@ export type PopupAdmin = {
     start_date?: (string | null);
     end_date?: (string | null);
     status?: PopupStatus;
+    visible_in_portal?: boolean;
     sale_type?: SaleType;
     checkout_mode?: CheckoutMode;
     allows_coupons?: (boolean | null);
@@ -4325,6 +4326,7 @@ export type PopupCreate = {
     start_date?: (string | null);
     end_date?: (string | null);
     status?: PopupStatus;
+    visible_in_portal?: boolean;
     sale_type?: SaleType;
     checkout_mode?: (CheckoutMode | null);
     allows_coupons?: (boolean | null);
@@ -4508,6 +4510,7 @@ export type PopupUpdate = {
     location?: (string | null);
     slug?: (string | null);
     status?: (PopupStatus | null);
+    visible_in_portal?: (boolean | null);
     sale_type?: (SaleType | null);
     checkout_mode?: (CheckoutMode | null);
     start_date?: (string | null);

@@ -234,6 +234,7 @@ export function PopupForm({
       tagline: defaultValues?.tagline ?? "",
       location: defaultValues?.location ?? "",
       status: defaultValues?.status ?? "draft",
+      visible_in_portal: defaultValues?.visible_in_portal ?? true,
       sale_type: (defaultValues?.sale_type ?? "application") as SaleType,
       checkout_mode: (defaultValues?.checkout_mode ??
         deriveCheckoutMode(
@@ -290,6 +291,7 @@ export function PopupForm({
         tagline: value.tagline || null,
         location: value.location || null,
         status: value.status as PopupCreate["status"],
+        visible_in_portal: value.visible_in_portal,
         start_date: toUTCDate(value.start_date),
         end_date: toUTCDate(value.end_date),
         image_url: value.image_url || null,
@@ -902,7 +904,26 @@ export function PopupForm({
             forceMount
             className="space-y-6 data-[state=inactive]:hidden"
           >
-            {/* Event Options */}
+            <InlineSection title="Portal visibility">
+              <form.Field name="visible_in_portal">
+                {(field) => (
+                  <InlineRow
+                    icon={<Globe className="h-4 w-4 text-muted-foreground" />}
+                    label="Show in portal"
+                    description="Show this gathering in the portal and gathering selector."
+                  >
+                    <Switch
+                      id="visible_in_portal"
+                      checked={field.state.value}
+                      onCheckedChange={(checked) => field.handleChange(checked)}
+                      disabled={readOnly}
+                    />
+                  </InlineRow>
+                )}
+              </form.Field>
+            </InlineSection>
+
+            <Separator />
 
             {/* Self-service check-in feature flag */}
             <InlineSection title="Self-service check-in">
