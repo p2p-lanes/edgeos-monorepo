@@ -2394,9 +2394,17 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
             if recipient.human_id is not None and recipient.existing_attendee_id:
                 raise self._recipient_error()
             legacy_self = recipient.existing_attendee_id in legacy_self_attendee_ids
+            # Simple-quantity checkout intentionally creates one attempt-local
+            # draft per ticket unit. Those ``open-ticket:`` recipients must stay
+            # distinct: promoting every draft to the buyer gives them the same
+            # human identity and the duplicate-person guard below rejects carts
+            # with more than one ticket. Explicit/legacy self recipients retain
+            # the primary-role inference.
+            is_open_ticket_draft = recipient.recipient_key.startswith("open-ticket:")
             direct_self = (
                 application_id is None
                 and recipient.recipient_key in ticket_recipient_keys
+                and not is_open_ticket_draft
                 and primary_category_id is not None
                 and recipient.human_id is None
                 and recipient.existing_attendee_id is None

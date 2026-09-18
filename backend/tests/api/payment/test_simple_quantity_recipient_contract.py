@@ -25,7 +25,7 @@ FIXTURE = (
 
 @pytest.mark.parametrize("signed_in", [False, True])
 @pytest.mark.parametrize("categorized", [False, True])
-def test_portal_simple_quantity_contract_requires_roles_and_fulfills_each_unit(
+def test_portal_simple_quantity_contract_preserves_drafts_and_fulfills_each_unit(
     client, db, tenant_a, signed_in, categorized
 ):
     popup, flow = _open_context(db, tenant_a)
@@ -97,12 +97,6 @@ def test_portal_simple_quantity_contract_requires_roles_and_fulfills_each_unit(
             headers=headers,
             json=body,
         )
-    if not categorized:
-        assert response.status_code == 422
-        assert response.json()["detail"] == "Recipient is not valid for this payment"
-        provider.assert_not_called()
-        return
-
     assert response.status_code == 200, response.text
     assert response.json()["checkout_url"] == "https://pay.test/simple-quantity"
     provider.return_value.create_payment.assert_called_once()
