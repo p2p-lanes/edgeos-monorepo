@@ -983,26 +983,19 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
         payment: Payments,
         products: list[PaymentProductRequest],
         *,
-        granted_by_user_id: uuid.UUID | None = None,
         replace_access: bool = False,
     ) -> Payments:
         """Auto-approve a $0 payment and materialize tickets, flush-only.
 
-        Used by three flows that all converge on the same write:
+        Used by checkout flows that converge on the same write:
         - authenticated application checkout when discounts zero the cart
         - anonymous open-ticketing checkout when a 100% coupon zeroes it
-        - admin bulk grant ($0 comps).
 
-        Sets status=APPROVED, optionally records `granted_by_user_id` (admin
-        grant only), and INSERTs AttendeeProducts for the given line items.
-        Does NOT commit — callers own the transaction boundary so this helper
-        can participate in a larger atomic batch (admin grant) or be paired
-        with caller-side commit + email dispatch (self-service flows).
+        Sets status=APPROVED and materializes product units for the payment.
+        Does NOT commit; callers own the transaction and email dispatch.
         """
 
         payment.status = PaymentStatus.APPROVED.value
-        if granted_by_user_id is not None:
-            payment.granted_by_user_id = granted_by_user_id
         session.flush()
         self._reconcile_payment_fulfillment(
             session, payment, replace_access=replace_access

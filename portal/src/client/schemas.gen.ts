@@ -2950,7 +2950,7 @@ export const AdminGrantTicketsResponseSchema = {
     properties: {
         granted: {
             items: {
-                '$ref': '#/components/schemas/GrantedPaymentInfo'
+                '$ref': '#/components/schemas/GrantedAttendeeInfo'
             },
             type: 'array',
             title: 'Granted'
@@ -13921,24 +13921,12 @@ export const GrantProductItemSchema = {
     description: 'One product line in the admin bulk-grant request.'
 } as const;
 
-export const GrantedPaymentInfoSchema = {
+export const GrantedAttendeeInfoSchema = {
     properties: {
-        payment_id: {
+        attendee_id: {
             type: 'string',
             format: 'uuid',
-            title: 'Payment Id'
-        },
-        application_id: {
-            anyOf: [
-                {
-                    type: 'string',
-                    format: 'uuid'
-                },
-                {
-                    type: 'null'
-                }
-            ],
-            title: 'Application Id'
+            title: 'Attendee Id'
         },
         human_id: {
             type: 'string',
@@ -13955,9 +13943,9 @@ export const GrantedPaymentInfoSchema = {
         }
     },
     type: 'object',
-    required: ['payment_id', 'application_id', 'human_id', 'email', 'tickets_created'],
-    title: 'GrantedPaymentInfo',
-    description: 'One $0 payment created by the admin bulk-grant flow.'
+    required: ['attendee_id', 'human_id', 'email', 'tickets_created'],
+    title: 'GrantedAttendeeInfo',
+    description: 'Products assigned directly to one attendee by the backoffice.'
 } as const;
 
 export const GroupAdminUpdateSchema = {

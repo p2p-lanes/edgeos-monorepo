@@ -77,9 +77,7 @@ const useResources = () => {
     doors.length > 1
       ? (doors.find((door) => door.flowId === flowId)?.name ?? null)
       : null
-  const endedAccess = useHumanPopupAccess(
-    city?.status === "ended" && city?.id ? String(city.id) : null,
-  )
+  const popupAccess = useHumanPopupAccess(popupId)
 
   if (!city) {
     return { resources: [], doorName: null }
@@ -104,7 +102,7 @@ const useResources = () => {
     const resources = buildEndedResources({
       t,
       city,
-      participated: endedAccess.state === "allowed",
+      participated: popupAccess.state === "allowed",
     })
     resources[0].path = overviewPath
     if (hasCustomHome) resources.unshift(homeResource)
@@ -269,7 +267,10 @@ const useResources = () => {
     {
       name: t("sidebar.passes"),
       icon: Ticket,
-      status: popupParticipationAccepted ? "active" : "hidden",
+      status:
+        popupParticipationAccepted || popupAccess.state === "allowed"
+          ? "active"
+          : "hidden",
       path: `/portal/${city.slug}/passes`,
       group: "commerce",
     },
