@@ -523,7 +523,7 @@ export type AdminGrantTicketsRequest = {
  * Response payload from POST /applications/admin/grant-tickets.
  */
 export type AdminGrantTicketsResponse = {
-    granted: Array<GrantedPaymentInfo>;
+    granted: Array<GrantedAttendeeInfo>;
 };
 
 export type AIConversationPublic = {
@@ -2965,11 +2965,10 @@ export type GrantCreditResponse = {
 };
 
 /**
- * One $0 payment created by the admin bulk-grant flow.
+ * Products assigned directly to one attendee by the backoffice.
  */
-export type GrantedPaymentInfo = {
-    payment_id: string;
-    application_id: (string | null);
+export type GrantedAttendeeInfo = {
+    attendee_id: string;
     human_id: string;
     email: string;
     tickets_created: number;

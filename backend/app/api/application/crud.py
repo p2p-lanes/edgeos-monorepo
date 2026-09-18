@@ -52,21 +52,6 @@ if TYPE_CHECKING:
 # applicant and their spouse appear.
 DIRECTORY_VISIBLE_CATEGORY_KEYS = ("main", "spouse")
 
-# Default ``info_not_shared`` for applications materialized by an admin grant
-# (comped/gifted tickets): every field the directory can mask. The recipient
-# never filled the form, so nothing is shared until they opt in themselves.
-GRANTED_DEFAULT_INFO_NOT_SHARED = (
-    "first_name",
-    "last_name",
-    "email",
-    "telegram",
-    "role",
-    "organization",
-    "residence",
-    "age",
-    "gender",
-)
-
 
 def _is_draft_status(status_value: object) -> bool:
     """True when an application is being created/saved as a draft.
@@ -1792,101 +1777,6 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
         session.add(snapshot)
         session.flush()
         return snapshot
-
-    def promote_to_accepted(
-        self,
-        session: Session,
-        application: Applications,
-    ) -> Applications:
-        """Flush-only flip of an existing Application to ACCEPTED.
-
-        Used by the admin bulk-grant endpoint when a Human already has an
-        application for the popup but it is still in draft/in-review/etc.
-        Sets `accepted_at`, writes an audit snapshot, and flushes — the
-        caller owns the transaction so the entire grant batch stays atomic.
-
-        Idempotent: a no-op when the application is already accepted.
-        """
-
-        if application.status == ApplicationStatus.ACCEPTED.value:
-            return application
-
-        application.status = ApplicationStatus.ACCEPTED.value
-        application.accepted_at = datetime.now(UTC)
-        session.add(application)
-        self.create_snapshot(session, application, "admin_grant_accepted")
-        _maybe_grant_fee_credit(session, application)
-        return application
-
-    def create_for_admin_grant(
-        self,
-        session: Session,
-        *,
-        tenant_id: uuid.UUID,
-        popup_id: uuid.UUID,
-        human: "Humans",
-    ) -> Applications:
-        """Flush-only minimal Application + main Attendee for admin bulk grants.
-
-        Skips custom_fields validation, approval strategy, group whitelisting,
-        and the form-section fee gate — admin grants bypass user-facing checks
-        because they are the staff-side equivalent of marking a ticket as comp.
-        Status is hard-set to ACCEPTED and `accepted_at`/`submitted_at` are
-        stamped to now.
-
-        Caller owns the transaction boundary so a sold-out failure mid-batch
-        rolls back every Human/Application/Attendee created in this run.
-        """
-
-        from app.api.attendee_category.crud import attendee_categories_crud
-        from app.api.form_field.crud import form_fields_crud
-
-        now = datetime.now(UTC)
-        # sdd/sales-flows slice 5: stamp the popup's default flow, same as
-        # every other application-creation path. The caller (grant_tickets_admin)
-        # already confirmed no application exists for this human/popup via
-        # get_by_human_popup before reaching here, so this never collides.
-        flow_id = self.resolve_creation_flow_id(session, popup_id)
-        application = Applications(
-            tenant_id=tenant_id,
-            popup_id=popup_id,
-            human_id=human.id,
-            sales_flow_id=flow_id,
-            status=ApplicationStatus.ACCEPTED.value,
-            submitted_at=now,
-            accepted_at=now,
-            custom_fields_schema=form_fields_crud.build_schema_for_flow(
-                session, popup_id, flow_id
-            ),
-            # Granted (comped/gifted) people never filled the application
-            # form, so they never consented to sharing anything: default the
-            # attendee-directory privacy to fully hidden. They can opt in
-            # later by editing their privacy preferences. Grants to people
-            # with an EXISTING application keep whatever they chose.
-            info_not_shared=list(GRANTED_DEFAULT_INFO_NOT_SHARED),
-        )
-        session.add(application)
-        session.flush()
-
-        main_cat = attendee_categories_crud.get_primary_for_flow(session, flow_id)
-        name = (
-            f"{human.first_name or ''} {human.last_name or ''}".strip() or human.email
-        )
-        attendee = Attendees(
-            tenant_id=tenant_id,
-            application_id=application.id,
-            popup_id=popup_id,
-            name=name,
-            email=human.email,
-            gender=human.gender,
-            human_id=human.id,
-            category_id=main_cat.id if main_cat else None,
-        )
-        session.add(attendee)
-        self.create_snapshot(session, application, "admin_grant_created")
-        session.flush()
-        _maybe_grant_fee_credit(session, application)
-        return application
 
     def accept(
         self,

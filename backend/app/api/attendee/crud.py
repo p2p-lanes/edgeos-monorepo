@@ -2,7 +2,7 @@ import random
 import string
 import uuid
 from datetime import UTC, datetime
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from fastapi import HTTPException, status
 from sqlalchemy import and_, or_
@@ -22,6 +22,9 @@ from app.api.audit_log.actor import AuditActor
 from app.api.audit_log.constants import AuditAction, AuditEntityType
 from app.api.shared.crud import BaseCRUD
 from app.core.filters import build_filter_expression
+
+if TYPE_CHECKING:
+    from app.api.application.schemas import GrantedAttendeeInfo, PersonGrantItem
 
 
 def _attendee_condition_expression(condition: AttendeeFilterCondition):
@@ -275,7 +278,7 @@ class AttendeesCRUD(BaseCRUD[Attendees, AttendeeCreate, AttendeeUpdate]):
         self,
         session: Session,
         tenant_id: uuid.UUID,
-        application_id: uuid.UUID,
+        application_id: uuid.UUID | None,
         popup_id: uuid.UUID,
         name: str,
         category: str | None = None,
@@ -1008,6 +1011,9 @@ class AttendeesCRUD(BaseCRUD[Attendees, AttendeeCreate, AttendeeUpdate]):
         tenant_id: uuid.UUID | None = None,
         actor: AuditActor | None = None,
         grant_key: str | None = None,
+        *,
+        commit: bool = True,
+        audit_action: str = AuditAction.TICKET_ADD,
     ) -> None:
         """Add multiple tickets (product × quantity) to an attendee atomically.
 
@@ -1043,7 +1049,6 @@ class AttendeesCRUD(BaseCRUD[Attendees, AttendeeCreate, AttendeeUpdate]):
                     status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
                     detail=f"'{product.name}' is not available",
                 )
-            _require_ticket_product(product)
             products.append((line_index, product, quantity))
 
         added: list[dict] = []
@@ -1107,11 +1112,132 @@ class AttendeesCRUD(BaseCRUD[Attendees, AttendeeCreate, AttendeeUpdate]):
                 session,
                 attendee=attendee,
                 actor=actor,
-                action=AuditAction.TICKET_ADD,
-                details={"products": added},
+                action=audit_action,
+                details={
+                    "products": added,
+                    "tickets_created": sum(item["quantity"] for item in added),
+                },
             )
 
-        session.commit()
+        if commit:
+            session.commit()
+        else:
+            session.flush()
+
+    def grant_products_to_people(
+        self,
+        session: Session,
+        *,
+        popup_id: uuid.UUID,
+        people: list["PersonGrantItem"],
+        actor: AuditActor,
+    ) -> list["GrantedAttendeeInfo"]:
+        """Assign popup products atomically, without a payment or sales flow.
+
+        Existing applications are not part of a manual assignment. New people
+        receive an application-less attendee with no flow-owned category.
+        """
+        from app.api.application.schemas import GrantedAttendeeInfo
+        from app.api.human.crud import humans_crud
+        from app.api.human.models import Humans
+        from app.api.popup.crud import popups_crud
+        from app.api.product.crud import products_crud
+
+        popup = popups_crud.get(session, popup_id)
+        if popup is None:
+            raise HTTPException(status_code=404, detail="Popup not found")
+
+        # Keep the first row for each normalized email, matching the BO import.
+        unique_people = {}
+        for person in people:
+            unique_people.setdefault(person.email, person)
+
+        quantities: dict[uuid.UUID, int] = {}
+        for person in unique_people.values():
+            for item in person.products:
+                quantities[item.product_id] = (
+                    quantities.get(item.product_id, 0) + item.quantity
+                )
+
+        for product_id, quantity in quantities.items():
+            product = products_crud.get(session, product_id)
+            if product is None or product.popup_id != popup_id or not product.is_active:
+                raise HTTPException(
+                    status_code=422,
+                    detail="One or more products are unavailable, inactive, or not in this popup",
+                )
+            if (
+                product.total_stock_remaining is not None
+                and product.total_stock_remaining < quantity
+            ):
+                raise HTTPException(
+                    status_code=409,
+                    detail={
+                        "error": "stock_exhausted",
+                        "product_id": str(product.id),
+                        "product_name": product.name,
+                        "requested": quantity,
+                        "available": product.total_stock_remaining,
+                        "message": f"Not enough stock for '{product.name}'",
+                    },
+                )
+
+        granted = []
+        try:
+            for person in unique_people.values():
+                human = humans_crud.get_or_create_by_email(
+                    session,
+                    email=person.email,
+                    tenant_id=popup.tenant_id,
+                    default_first_name=person.first_name,
+                    default_last_name=person.last_name,
+                )
+                # Serialize grants for the same person before resolving their attendee.
+                human = session.exec(
+                    select(Humans)
+                    .where(Humans.id == human.id)
+                    .with_for_update()
+                    .execution_options(populate_existing=True)
+                ).one()
+                if person.first_name and not human.first_name:
+                    human.first_name = person.first_name
+                if person.last_name and not human.last_name:
+                    human.last_name = person.last_name
+                session.add(human)
+                attendee = self.find_attendee_for_human(session, human.id, popup_id)
+                if attendee is None:
+                    attendee = self.create_internal(
+                        session,
+                        tenant_id=popup.tenant_id,
+                        application_id=None,
+                        popup_id=popup_id,
+                        name=human.full_name or human.email,
+                        email=human.email,
+                        gender=human.gender,
+                        human_id=human.id,
+                        commit=False,
+                    )
+                self.add_products(
+                    session,
+                    attendee.id,
+                    [(item.product_id, item.quantity) for item in person.products],
+                    actor=actor,
+                    commit=False,
+                    audit_action=AuditAction.TICKET_GRANT,
+                )
+                granted.append(
+                    GrantedAttendeeInfo(
+                        attendee_id=attendee.id,
+                        human_id=human.id,
+                        email=human.email,
+                        tickets_created=sum(item.quantity for item in person.products),
+                    )
+                )
+            session.commit()
+        except Exception:
+            session.rollback()
+            raise
+        return granted
 
     def remove_ticket(
         self,
