@@ -10,6 +10,7 @@ import {
   Power,
   ShieldCheck,
 } from "lucide-react"
+import { useRef } from "react"
 import {
   type InviteCreate,
   type InvitePublic,
@@ -55,6 +56,7 @@ export function InviteForm({ defaultValues, onSuccess }: InviteFormProps) {
   const isEdit = !!defaultValues
   const isReferral = Boolean(defaultValues?.referrer_human_id)
   const readOnly = !isOperatorOrAbove
+  const skipBlockerRef = useRef(false)
 
   const formatDateForInput = (date: string | null | undefined) => {
     if (!date) return ""
@@ -79,6 +81,8 @@ export function InviteForm({ defaultValues, onSuccess }: InviteFormProps) {
           }),
       })
       queryClient.invalidateQueries({ queryKey: ["invites"] })
+      // FlowPicker restores its default after reset while navigation settles.
+      skipBlockerRef.current = true
       form.reset()
       onSuccess()
     },
@@ -154,7 +158,7 @@ export function InviteForm({ defaultValues, onSuccess }: InviteFormProps) {
     },
   })
 
-  const blocker = useUnsavedChanges(form)
+  const blocker = useUnsavedChanges(form, skipBlockerRef)
   const isPending = createMutation.isPending || updateMutation.isPending
 
   if (!isEdit && !isContextReady) {
