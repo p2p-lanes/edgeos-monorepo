@@ -327,8 +327,15 @@ prefix**. `store.submit()` runs `stripCustomPrefix`, so `custom_phone` → sent 
 `form_data.phone`. **A field you store without the `custom_` prefix (and that
 isn't one of the three base fields) is dropped and never reaches the backend.**
 
+**Render `email`, `first_name` and `last_name` ALWAYS.** `base_fields` is empty
+for a popup whose operator never configured the base questions, but `BuyerInfo`
+requires all three no matter what: a checkout that renders only what the schema
+lists collects no email and gets a 422 at payment. The store knows this, so
+`buyerComplete` stays `false` until all three are filled, whatever the schema
+says.
+
 **`form_schema` (from `GET /checkout/{slug}/form`) is the source of truth for
-rendering and validation.** It drives which fields exist:
+everything else.** It drives which fields exist beyond those three:
 ```ts
 interface ApplicationFormSchema {
   base_fields: Record<string, FormFieldSchema>    // key by raw name

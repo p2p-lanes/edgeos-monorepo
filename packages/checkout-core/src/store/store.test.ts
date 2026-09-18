@@ -291,6 +291,25 @@ describe("createCheckoutStore", () => {
     expect(store.getState().loaded).toBe(false)
   })
 
+  it("never calls a buyer complete without email, first and last name", async () => {
+    // This popup's form configures no base questions at all, yet /purchase
+    // still requires the three: trusting the schema alone would enable the pay
+    // button for a buyer the API then rejects with a 422.
+    const client = mockClient({
+      getForm: vi
+        .fn()
+        .mockResolvedValue({ form_schema: { base_fields: {}, custom_fields: {} } }),
+    })
+    const store = createCheckoutStore({ client })
+    await store.load()
+
+    store.setBuyer({ first_name: "Ada", last_name: "Lovelace" })
+    expect(store.getState().buyerComplete).toBe(false)
+
+    store.setBuyer({ email: "a@b.co" })
+    expect(store.getState().buyerComplete).toBe(true)
+  })
+
   it("submit throws when nothing is selected", async () => {
     const store = createCheckoutStore({ client: mockClient() })
     await store.load()

@@ -104,14 +104,16 @@ and one recipient is sent for the buyer (name, email, `profile_snapshot`). See
   status: PricingStatus            // "idle" | "loading" | "success" | "error"
   preview: CheckoutPreviewResponse | null
   total: string | null             // convenience: preview?.total ?? null
-  error: string | null
+  error: CheckoutApiError | Error | null   // an Error, NOT a string: render error.message
 }
 ```
 - Debounced: after a cart/coupon change, `status` briefly = `"loading"`, then
   `"success"`. Show a subtle "updating…" state, not a full spinner.
 - `total === null` when the cart is empty → disable Pay/Continue.
 - On a preview error the previous `preview` is kept (stale) and `error` is set;
-  decide whether to keep showing the stale total or block.
+  decide whether to keep showing the stale total or block. Note the shape
+  differs from `useCheckout().error`, which is a plain string: this one is the
+  thrown error, so a `CheckoutApiError` still carries its `status`.
 
 ### `useBuyerForm()`
 ```ts

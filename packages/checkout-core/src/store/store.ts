@@ -119,6 +119,16 @@ export interface CheckoutStore {
  */
 const BUYER_RECIPIENT_KEY = "buyer"
 
+/**
+ * The three fields /purchase always demands, whatever the form says.
+ *
+ * `form_schema.base_fields` is empty for a popup whose operator never
+ * configured the base questions, but `BuyerInfo` still requires these, so a
+ * checkout that trusted the schema alone would collect no email and fail at
+ * payment with a 422 it could not explain.
+ */
+const ALWAYS_REQUIRED_BASE = ["email", "first_name", "last_name"] as const
+
 function isTicket(product: CheckoutProduct | undefined): boolean {
   return (product?.category ?? "").toLowerCase() === "ticket"
 }
@@ -194,17 +204,14 @@ export function createCheckoutStore(
   }
 
   function isBuyerFilled(): boolean {
-    if (state.formSchema)
-      return isBuyerComplete(
-        buildFormZodSchema(state.formSchema),
-        state.buyer.values,
-      )
     const v = state.buyer.values
-    return (
-      !!String(v.email ?? "") &&
-      !!String(v.first_name ?? "") &&
-      !!String(v.last_name ?? "")
+    const hasBase = ALWAYS_REQUIRED_BASE.every((name) =>
+      Boolean(String(v[name] ?? "").trim()),
     )
+    if (!hasBase) return false
+    if (state.formSchema)
+      return isBuyerComplete(buildFormZodSchema(state.formSchema), v)
+    return true
   }
 
   /** A schema is only usable once it carries the fields the builder expects. */

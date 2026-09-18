@@ -77,3 +77,5 @@ dist-ssr/
 .next/
 *.tsbuildinfo
 infra/
+# Local pack output (pnpm pack), never committed
+packages/*/*.tgz

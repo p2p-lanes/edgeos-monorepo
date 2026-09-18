@@ -96,6 +96,12 @@ unsubscribe()
 store.dispose()
 ```
 
+**You do not need to install `zod`.** `buildFormZodSchema()` returns a zod
+schema, but you never have to name its type: write
+`ReturnType<typeof buildFormZodSchema>` when you need to pass it around. Adding
+zod to your own dependencies just to spell a type is a second copy waiting to
+drift from the SDK's.
+
 ## Quick start — React (the adapter)
 
 This is the path for **React**. Full reference: **`hooks-reference.md`**. A
@@ -245,6 +251,7 @@ const { valid, errors } = validateBuyerValues(schema, values)   // errors: field
 | Treating `submit()` as "order done" | It returns a `checkoutUrl` — you must redirect to it |
 | Reusing a disposed store | After `dispose()`, `isDisposed()` is true — build a new store |
 | Spinner forever because `loaded` is false | A failed load leaves `loaded` false; read `error` to show a retry instead |
+| Rendering only `base_fields` when it is empty | The three base fields are always required; render them yourself and gate on `buyerComplete` |
 | Passing `flowSlug` to the client or provider | Gone in 0.2.0: the client resolves the popup's primary flow itself |
 | Looking for `steps` / `currentStep` / `goToStep` | Gone in 0.2.0: screens are your app's own state |
 | Hand-rolling `purchase()` without `recipients` | A ticket line needs a recipient; use `store.submit()` or send recipients yourself |
