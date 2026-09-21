@@ -201,6 +201,46 @@ def test_consumers_share_active_allocated_ticket_truth(
     assert humans_crud.get_profile_stats(db, world.grant_human.id).total_days == 1
 
 
+def test_purchases_http_returns_only_active_product_units(
+    client: TestClient, mixed_units
+) -> None:
+    world = mixed_units
+    token = create_access_token(subject=world.paid_human.id, token_type="human")
+
+    response = client.get(
+        f"/api/v1/applications/my/{world.popup.id}/purchases",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+
+    assert response.status_code == 200, response.text
+    attendee = next(
+        row for row in response.json() if row["attendee_id"] == str(world.paid.id)
+    )
+    assert len(attendee["products"]) == 1
+    assert attendee["products"][0]["id"] == str(world.ticket.id)
+    assert attendee["products"][0]["quantity"] == 2
+
+
+def test_purchases_http_includes_paymentless_active_grants(
+    client: TestClient, mixed_units
+) -> None:
+    world = mixed_units
+    token = create_access_token(subject=world.grant_human.id, token_type="human")
+
+    response = client.get(
+        f"/api/v1/applications/my/{world.popup.id}/purchases",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+
+    assert response.status_code == 200, response.text
+    attendee = next(
+        row for row in response.json() if row["attendee_id"] == str(world.granted.id)
+    )
+    assert [(product["id"], product["quantity"]) for product in attendee["products"]] == [
+        (str(world.ticket.id), 1)
+    ]
+
+
 def test_directory_http_uses_the_same_ticket_population(
     client: TestClient, mixed_units
 ) -> None:

@@ -531,7 +531,6 @@ const PassesProvider = ({
   // Dedicated purchases query — granular invalidation after payment
   const { data: queriedPurchasesData } = usePurchasesQuery(
     cityId,
-    attendees,
     purchasesOverride === undefined,
   )
   const purchasesData = purchasesOverride ?? queriedPurchasesData

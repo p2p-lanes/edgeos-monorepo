@@ -7,7 +7,7 @@ from typing import Any
 from fastapi import HTTPException, status
 from sqlalchemy import and_, or_
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy.orm import selectinload
+from sqlalchemy.orm import selectinload, with_loader_criteria
 from sqlmodel import Session, func, select
 
 from app.api.attendee.models import AttendeeProducts, Attendees
@@ -857,7 +857,18 @@ class AttendeesCRUD(BaseCRUD[Attendees, AttendeeCreate, AttendeeUpdate]):
                     AttendeeProducts.product  # ty: ignore[invalid-argument-type]
                 ),
                 selectinload(Attendees.category_ref),  # type: ignore[arg-type]
+                # Payment rows preserve financial history, while this projection
+                # represents current ownership. Revoked product units must never
+                # be exposed as purchases, regardless of their payment status.
+                with_loader_criteria(
+                    AttendeeProducts,
+                    AttendeeProducts.revoked_at.is_(None),
+                    include_aliases=True,
+                ),
             )
+            # A caller may already have loaded the unfiltered relationship in this
+            # request. Refresh it so the active-only criterion is authoritative.
+            .execution_options(populate_existing=True)
         )
         return list(session.exec(statement).all())
 
