@@ -57,7 +57,6 @@ export function buildApplicationFilterFieldDefs(
   customFields: CustomFilterField[],
   reviewerOptions: { value: string; label: string }[] = [],
   baseFieldOptions: Record<string, string[]> = {},
-  hideReviewedBy = false,
 ): FilterFieldDef[] {
   const fixed: FilterFieldDef[] = [
     {
@@ -108,17 +107,25 @@ export function buildApplicationFilterFieldDefs(
       kind: "boolean",
       ops: ["eq"],
     },
-    ...(reviewerOptions.length && !hideReviewedBy
-      ? [
-          {
-            key: "reviewed_by",
-            label: "Reviewed by",
-            kind: "select",
-            ops: ["eq", "neq"],
-            options: reviewerOptions,
-          } satisfies FilterFieldDef,
-        ]
-      : []),
+    {
+      key: "reviewed_by",
+      label: "Reviewed by",
+      kind: "select",
+      ops: ["eq", "neq"],
+      options: reviewerOptions,
+    },
+    {
+      key: "review_decision",
+      label: "Review vote",
+      kind: "select",
+      ops: ["eq", "neq"],
+      options: [
+        { value: "strong_yes", label: "Strong yes" },
+        { value: "yes", label: "Yes" },
+        { value: "no", label: "No" },
+        { value: "strong_no", label: "Strong no" },
+      ],
+    },
     { key: "submitted_at", label: "Submitted", kind: "date", ops: DATE_OPS },
     { key: "accepted_at", label: "Accepted", kind: "date", ops: DATE_OPS },
     { key: "referral", label: "Referral", kind: "text", ops: FULL_TEXT_OPS },
@@ -145,7 +152,6 @@ export function ApplicationFilterBuilder({
   customFields,
   reviewerOptions,
   baseFieldOptions,
-  hideReviewedBy,
   match,
   conditions,
   onChange,
@@ -154,7 +160,6 @@ export function ApplicationFilterBuilder({
   customFields: CustomFilterField[]
   reviewerOptions?: { value: string; label: string }[]
   baseFieldOptions?: Record<string, string[]>
-  hideReviewedBy?: boolean
   match: FilterMatch
   conditions: FilterCondition[]
   onChange: (match: FilterMatch, conditions: FilterCondition[]) => void
@@ -166,7 +171,6 @@ export function ApplicationFilterBuilder({
         customFields,
         reviewerOptions,
         baseFieldOptions,
-        hideReviewedBy,
       )}
       match={match}
       conditions={conditions}

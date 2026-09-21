@@ -114,6 +114,9 @@ export function ReviewersManager({
     onSuccess: () => {
       showSuccessToast("Reviewer added")
       queryClient.invalidateQueries({ queryKey: ["popup-reviewers", popupId] })
+      queryClient.invalidateQueries({
+        queryKey: ["applications", popupId, "reviewers"],
+      })
       setIsAddDialogOpen(false)
       setSelectedUserId("")
       setIsRequired(false)
@@ -131,6 +134,9 @@ export function ReviewersManager({
     onSuccess: () => {
       showSuccessToast("Reviewer removed")
       queryClient.invalidateQueries({ queryKey: ["popup-reviewers", popupId] })
+      queryClient.invalidateQueries({
+        queryKey: ["applications", popupId, "reviewers"],
+      })
     },
     onError: (err) => createErrorHandler(showErrorToast)(err as ApiError),
   })

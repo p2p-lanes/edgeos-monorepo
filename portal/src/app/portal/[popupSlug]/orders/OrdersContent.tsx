@@ -132,6 +132,19 @@ export function OrdersContent({
                 className="divide-y divide-slate-100 border-y border-slate-100"
                 aria-label={t("orders.lines")}
               >
+                {order.isApplicationFee && (
+                  <li className="flex items-center justify-between gap-4 py-3 text-sm first:pt-0 last:pb-0">
+                    <div>
+                      <p className="font-medium">
+                        {t("orders.application_fee")}
+                      </p>
+                      <p className="text-muted-foreground">
+                        {t("orders.application_fee_description")}
+                      </p>
+                    </div>
+                    <p>{formattedAmount(order.total, order.currency)}</p>
+                  </li>
+                )}
                 {order.lines.map((line) => (
                   <li
                     key={line.id}

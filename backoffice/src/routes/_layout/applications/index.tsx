@@ -1629,10 +1629,6 @@ function ApplicationsTableContent({
           value: reviewer.id,
           label: reviewer.full_name ?? reviewer.email ?? "Unknown reviewer",
         }))}
-        hideReviewedBy={
-          searchParams.groupBy === "reviewed_by" ||
-          searchParams.subGroupBy === "reviewed_by"
-        }
         match={filterMatch}
         conditions={filterConditions}
         onChange={setFilters}
