@@ -43,6 +43,39 @@ const statusColors: Record<string, string> = {
   rejected: "bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-200",
 }
 
+// A published event's badge reports who can see it, not its status: the
+// status alone read "Public" on private and unlisted events too.
+const visibilityBadge: Record<string, { labelKey: string; className: string }> =
+  {
+    public: {
+      labelKey: "events.form.visibility_public",
+      className: statusColors.published,
+    },
+    private: {
+      labelKey: "events.form.visibility_private_short",
+      className:
+        "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300",
+    },
+    unlisted: {
+      labelKey: "events.form.visibility_unlisted_short",
+      className: "bg-muted text-muted-foreground",
+    },
+  }
+
+function eventBadge(event: EventPublic): {
+  labelKey: string
+  className: string
+} {
+  if (event.status === "published") {
+    const badge = visibilityBadge[event.visibility ?? "public"]
+    if (badge) return badge
+  }
+  return {
+    labelKey: `events.status.${event.status}`,
+    className: statusColors[event.status as string] ?? "",
+  }
+}
+
 function groupByDate(
   events: EventPublic[],
   formatDayKey: (d: string) => string,
@@ -462,11 +495,9 @@ export function ListBody({
                                 {isAuthed && (
                                   <Badge
                                     variant="secondary"
-                                    className={
-                                      statusColors[event.status as string] ?? ""
-                                    }
+                                    className={eventBadge(event).className}
                                   >
-                                    {t(`events.status.${event.status}`)}
+                                    {t(eventBadge(event).labelKey)}
                                   </Badge>
                                 )}
                               </div>
