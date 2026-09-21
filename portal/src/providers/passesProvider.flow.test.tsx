@@ -3,9 +3,9 @@ import { act, renderHook, waitFor } from "@testing-library/react"
 import type { ReactNode } from "react"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import {
+  ApplicationsService,
   type AttendeePurchases,
   CancelablePromise,
-  PaymentsService,
   type ProductsListPortalProductsResponse,
   ProductsService,
 } from "@/client"
@@ -39,9 +39,7 @@ beforeEach(() => {
   vi.spyOn(ProductsService, "listPortalProducts").mockResolvedValue({
     results: [],
   } as never)
-  vi.spyOn(PaymentsService, "listMyPaymentsByPopup").mockResolvedValue({
-    results: [],
-  } as never)
+  vi.spyOn(ApplicationsService, "getMyPurchases").mockResolvedValue([])
 })
 afterEach(() => {
   client.clear()
@@ -88,7 +86,7 @@ describe("PassesProvider override query ownership", () => {
     })
     expect(result.current.products).toEqual(productsOverride)
     expect.soft(ProductsService.listPortalProducts).not.toHaveBeenCalled()
-    expect.soft(PaymentsService.listMyPaymentsByPopup).not.toHaveBeenCalled()
+    expect.soft(ApplicationsService.getMyPurchases).not.toHaveBeenCalled()
 
     productsOverride = undefined
     rerender()
@@ -99,11 +97,11 @@ describe("PassesProvider override query ownership", () => {
       }),
     )
     await waitFor(() => expect(result.current.products).toEqual([]))
-    expect(PaymentsService.listMyPaymentsByPopup).not.toHaveBeenCalled()
+    expect(ApplicationsService.getMyPurchases).not.toHaveBeenCalled()
     purchasesOverride = undefined
     rerender()
     await waitFor(() =>
-      expect(PaymentsService.listMyPaymentsByPopup).toHaveBeenCalledWith({
+      expect(ApplicationsService.getMyPurchases).toHaveBeenCalledWith({
         popupId: "popup-1",
       }),
     )
@@ -111,7 +109,7 @@ describe("PassesProvider override query ownership", () => {
       await client.invalidateQueries()
     })
     expect(ProductsService.listPortalProducts).toHaveBeenCalledTimes(2)
-    expect(PaymentsService.listMyPaymentsByPopup).toHaveBeenCalledTimes(2)
+    expect(ApplicationsService.getMyPurchases).toHaveBeenCalledTimes(2)
   })
 
   it("keeps normal product polling and stale-time behavior", async () => {
