@@ -31,9 +31,10 @@ checkout, so **nothing in the SDK takes a flow slug**. The client calls
 again if it fails so a transient error doesn't poison the client) and spends that
 slug on `/preview`, `/purchase` and `/cart`.
 
-A publishable key may only be used on that **primary** flow. A call naming any
-other flow is **403**: a key must never turn a flow configured for a narrower
-audience into an anonymous storefront.
+The relaxations below apply **only on that primary flow**. A key naming any
+other flow (something the SDK itself never does) is served by that flow's normal
+rules, every gate intact, exactly as it was before 0.2.0: a key never turns a
+flow configured for a narrower audience into an anonymous storefront.
 
 ### What the key relaxes (and what it never does)
 

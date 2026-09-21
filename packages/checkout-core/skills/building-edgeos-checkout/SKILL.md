@@ -54,7 +54,8 @@ To integrate you need just **two** things:
 You do **not** need a sales flow slug. Sales flows are an EdgeOS-internal
 concept: the client resolves the popup's **primary** flow once
 (`GET /checkout/{slug}/primary`, memoized) and spends it on preview, purchase and
-cart for you. A key that names some other flow is refused with `403`.
+cart for you. Only that flow gets the SDK's relaxed rules: a call naming some
+other flow is served by that flow's normal rules, as it always was.
 
 You do **not** need an API URL: the SDK targets the EdgeOS production API by
 default (`DEFAULT_BASE_URL`). There is an optional `baseUrl`, but you only set it

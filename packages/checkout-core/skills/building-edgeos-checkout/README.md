@@ -64,8 +64,8 @@ You can also invoke it explicitly: `/building-edgeos-checkout`.
 - The **popup slug**.
 - (Only if not prod) the **API base URL**, including `/api/v1`.
 
-Not a sales flow slug: the SDK resolves the popup's primary flow itself, and a
-key that names any other flow is refused with `403`.
+Not a sales flow slug: the SDK resolves the popup's primary flow itself. Only
+that flow gets the SDK's relaxed rules; any other flow keeps its normal ones.
 
 ## Keeping it accurate
 

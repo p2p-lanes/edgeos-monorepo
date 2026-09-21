@@ -1074,7 +1074,9 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
             )
         # The flow decides. It is required at every anonymous checkout entry
         # point, so no popup-level fallback can price or charge another flow.
-        target_flow = resolve_sale_flow(session, popup, flow_slug, is_sdk=is_sdk)
+        target_flow, relaxed = resolve_sale_flow(
+            session, popup, flow_slug, is_sdk=is_sdk
+        )
         gate = evaluate_gate_quote(
             session,
             popup,
@@ -1086,7 +1088,7 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
             current_human=current_human,
             lock_products=True,
             require_complete=True,
-            is_sdk=is_sdk,
+            is_sdk=relaxed,
         )
         if obj.quote_token:
             assert_quote_current(obj.quote_token, gate)
@@ -1136,7 +1138,7 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
             tenant_id=tenant.id,
             popup_id=popup.id,
             sales_flow_id=target_flow.id,
-            is_sdk=is_sdk,
+            is_sdk=relaxed,
         )
         self._validate_open_attendee_lines(
             session,

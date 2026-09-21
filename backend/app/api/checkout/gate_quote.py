@@ -72,34 +72,35 @@ def resolve_sale_flow(
     flow_slug: str,
     *,
     is_sdk: bool,
-) -> "SalesFlows":
-    """Resolve the flow a checkout sale runs through, for preview or purchase.
+) -> tuple["SalesFlows", bool]:
+    """Resolve the flow a sale runs through, and whether its gates relax.
 
-    A portal call keeps today's contract exactly: only direct/upsale flows
-    sell, anything else is 403 at the door.
+    Returns ``(flow, relaxed)``. ``relaxed`` is True only for a publishable-key
+    call on the popup's PRIMARY flow: that is the SDK's storefront, whose
+    client owns its own gating, so it sells through whatever type the primary
+    flow happens to be and skips the eligibility and catalogue gates.
 
-    An SDK call (publishable key) is allowed through whatever type the
-    PRIMARY flow happens to be, because a gathering that reviews applicants
-    still has one primary way in and the SDK client owns its own gating.
-    That relaxation is deliberately confined to the primary flow: a key must
-    never turn some other flow, configured for a narrower audience, into an
-    anonymous storefront.
+    Every other call keeps today's contract exactly, and that includes a key
+    naming some other flow. Those used to work before the SDK moved to the
+    primary flow (SDK 0.1.0 clients name flows themselves), so they are served
+    as they always were, every gate intact, rather than turned away: a key
+    must never make a narrower flow an anonymous storefront, and it must not
+    break a checkout that was already selling through one either.
     """
-    if not is_sdk:
-        return resolve_checkout_flow(
+    if is_sdk:
+        flow = resolve_checkout_flow(session, popup, flow_slug)
+        if flow.is_default:
+            return flow, True
+
+    return (
+        resolve_checkout_flow(
             session,
             popup,
             flow_slug,
             require_types={SalesFlowType.direct, SalesFlowType.upsale},
-        )
-
-    flow = resolve_checkout_flow(session, popup, flow_slug)
-    if not flow.is_default:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="This endpoint is not available for this sales flow",
-        )
-    return flow
+        ),
+        False,
+    )
 
 
 def _unavailable(status_code: int = status.HTTP_422_UNPROCESSABLE_ENTITY) -> None:

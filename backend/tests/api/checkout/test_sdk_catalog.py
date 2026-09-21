@@ -183,15 +183,12 @@ def test_preview_prices_a_product_no_step_offers(
     assert without_key.json()["detail"]["code"] == "product_not_in_flow"
 
 
-def test_a_key_may_only_name_the_primary_flow(
-    client: TestClient, db: Session, tenant_a: Tenants
-) -> None:
+def _secondary_flow(db: Session, popup, *, offers: str | None):
+    """A second direct flow, optionally with a step selling one category."""
     from app.api.sales_flow.models import SalesFlows
 
-    popup = _make_popup(db, tenant_a, slug_prefix="sdk-second")
-    product = _make_product(db, popup)
-    secondary = SalesFlows(
-        tenant_id=tenant_a.id,
+    flow = SalesFlows(
+        tenant_id=popup.tenant_id,
         popup_id=popup.id,
         type=SaleType.direct.value,
         slug="sponsors",
@@ -199,7 +196,36 @@ def test_a_key_may_only_name_the_primary_flow(
         is_default=False,
         order=1,
     )
-    db.add(secondary)
+    db.add(flow)
+    db.flush()
+    if offers is not None:
+        db.add(
+            TicketingSteps(
+                tenant_id=popup.tenant_id,
+                popup_id=popup.id,
+                sales_flow_id=flow.id,
+                step_type="tickets",
+                template="ticket-select",
+                product_category=offers,
+                title="Tickets",
+            )
+        )
+    db.commit()
+    return flow
+
+
+def test_a_key_on_another_flow_keeps_every_gate(
+    client: TestClient, db: Session, tenant_a: Tenants
+) -> None:
+    """Only the primary flow is the SDK's storefront.
+
+    A key naming some other flow is served exactly as before the SDK moved to
+    the primary flow, gates intact: this flow's steps offer nothing, so the
+    product is still refused. It must not become an anonymous storefront.
+    """
+    popup = _make_popup(db, tenant_a, slug_prefix="sdk-second")
+    product = _make_product(db, popup)
+    _secondary_flow(db, popup, offers=None)
     raw = _mint_key(db, tenant_a)
 
     response = client.post(
@@ -209,6 +235,30 @@ def test_a_key_may_only_name_the_primary_flow(
     )
 
     assert response.status_code == 403, response.text
+    assert response.json()["detail"]["code"] == "product_not_in_flow"
+
+
+def test_a_key_on_another_flow_still_sells_what_that_flow_offers(
+    client: TestClient, db: Session, tenant_a: Tenants
+) -> None:
+    """SDK 0.1.0 clients name their flow themselves; that must keep working.
+
+    Turning a key away from every non-primary flow would have broken a
+    checkout already selling through one. It is served by the normal rules.
+    """
+    popup = _make_popup(db, tenant_a, slug_prefix="sdk-legacy")
+    product = _make_product(db, popup, price="80.00")
+    _secondary_flow(db, popup, offers="ticket")
+    raw = _mint_key(db, tenant_a)
+
+    response = client.post(
+        f"/api/v1/checkout/{popup.slug}/sponsors/preview",
+        json={"products": [{"product_id": str(product.id), "quantity": 1}]},
+        headers=_key_headers(raw),
+    )
+
+    assert response.status_code == 200, response.text
+    assert response.json()["total"] == "80.00"
 
 
 def test_preview_still_refuses_a_disabled_product(

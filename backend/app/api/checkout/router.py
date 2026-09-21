@@ -320,9 +320,9 @@ async def preview_open_ticketing(
     from app.api.checkout.gate_quote import resolve_sale_flow
 
     popup = get_open_ticketing_popup(db, slug, tenant.id)
-    flow = resolve_sale_flow(db, popup, flow_slug, is_sdk=is_sdk)
+    flow, relaxed = resolve_sale_flow(db, popup, flow_slug, is_sdk=is_sdk)
     return payments_crud.preview_open_ticketing(
-        db, request_in, popup, flow, current_human=current_human, is_sdk=is_sdk
+        db, request_in, popup, flow, current_human=current_human, is_sdk=relaxed
     )
 
 
