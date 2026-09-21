@@ -6,11 +6,14 @@ ticket layer plus inventory; the payment_products financial snapshot is left
 untouched on purpose.
 """
 
+import csv
+import io
 import uuid
 from decimal import Decimal
 
 import pytest
 from fastapi import HTTPException
+from fastapi.testclient import TestClient
 from sqlmodel import Session, func, select
 
 from app.api.attendee import crud as attendee_crud
@@ -20,6 +23,7 @@ from app.api.payment.models import Payments
 from app.api.popup.models import Popups
 from app.api.product.models import Products
 from app.api.tenant.models import Tenants
+from app.core.security import create_access_token
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -301,6 +305,90 @@ class TestSwapTicketProduct:
 
 
 class TestRemoveProduct:
+    @pytest.mark.parametrize("remaining", [0, 1])
+    def test_removed_ticket_stays_absent_after_reload(
+        self,
+        client: TestClient,
+        db: Session,
+        tenant_a: Tenants,
+        popup_tenant_a: Popups,
+        admin_token_tenant_a: str,
+        remaining: int,
+    ) -> None:
+        product = _make_product(db, tenant_a, popup_tenant_a, stock=5)
+        attendee = _make_attendee(db, tenant_a, popup_tenant_a)
+        attendee.email = attendee.human.email
+        db.add(attendee)
+        db.commit()
+        attendee_crud.attendees_crud.add_products(
+            db, attendee.id, [(product.id, remaining + 1)]
+        )
+        headers = {"Authorization": f"Bearer {admin_token_tenant_a}"}
+        url = f"/api/v1/attendees/{attendee.id}"
+        before = client.get(url, headers=headers)
+        assert before.status_code == 200
+        tickets = before.json()["products"]
+        removed_id = tickets[0]["id"]
+        expected_ids = {ticket["id"] for ticket in tickets[1:]}
+
+        # A repeated removal must also leave the remaining tickets and stock alone.
+        for _ in range(2):
+            removed = client.delete(f"{url}/tickets/{removed_id}", headers=headers)
+            assert removed.status_code == 200, removed.text
+            assert {
+                ticket["id"] for ticket in removed.json()["products"]
+            } == expected_ids
+
+            reloaded = client.get(url, headers=headers)
+            assert reloaded.status_code == 200
+            assert {
+                ticket["id"] for ticket in reloaded.json()["products"]
+            } == expected_ids
+
+        db.expire_all()
+        assert db.get(AttendeeProducts, uuid.UUID(removed_id)).revoked_at is not None
+        db.refresh(product)
+        assert product.total_stock_remaining == 5 - remaining
+
+        listed = client.get(
+            "/api/v1/attendees",
+            params={"popup_id": str(popup_tenant_a.id), "search": attendee.email},
+            headers=headers,
+        )
+        assert listed.status_code == 200
+        assert len(listed.json()["results"]) == 1
+        assert len(listed.json()["results"][0]["products"]) == remaining
+
+        exported = client.get(
+            "/api/v1/attendees/export.csv",
+            params={"popup_id": str(popup_tenant_a.id), "search": attendee.email},
+            headers=headers,
+        )
+        assert exported.status_code == 200
+        rows = list(csv.DictReader(io.StringIO(exported.text)))
+        assert [row["Product ID"] for row in rows] == (
+            [str(product.id)] if remaining else [""]
+        )
+
+        by_email = client.get(
+            f"/api/v1/attendees/tickets/{attendee.email}", headers=headers
+        )
+        assert by_email.status_code == 200
+        assert len(by_email.json()) == remaining
+        if remaining:
+            assert len(by_email.json()[0]["products"]) == remaining
+
+        human_token = create_access_token(subject=attendee.human_id, token_type="human")
+        portal = client.get(
+            f"/api/v1/attendees/my/popup/{popup_tenant_a.id}",
+            headers={"Authorization": f"Bearer {human_token}"},
+        )
+        assert portal.status_code == 200
+        assert len(portal.json()["results"]) == 1
+        assert {
+            ticket["id"] for ticket in portal.json()["results"][0]["products"]
+        } == expected_ids
+
     def test_remove_revokes_ticket_and_restores_stock(
         self,
         db: Session,
@@ -431,7 +519,7 @@ class TestAddProducts:
         assert exc.value.status_code == 422
 
     @pytest.mark.parametrize("category", ["meal_plan", "housing", "merch"])
-    def test_ticket_batch_rejects_non_access_products_before_writes(
+    def test_assignment_supports_mixed_product_categories(
         self,
         db: Session,
         tenant_a: Tenants,
@@ -439,7 +527,7 @@ class TestAddProducts:
         category: str,
     ) -> None:
         access = _make_product(db, tenant_a, popup_tenant_a, stock=5)
-        invalid = _make_product(
+        extra = _make_product(
             db,
             tenant_a,
             popup_tenant_a,
@@ -448,16 +536,22 @@ class TestAddProducts:
         )
         attendee = _make_attendee(db, tenant_a, popup_tenant_a)
 
-        with pytest.raises(HTTPException):
-            attendee_crud.attendees_crud.add_products(
-                db, attendee.id, [(access.id, 1), (invalid.id, 1)]
-            )
+        attendee_crud.attendees_crud.add_products(
+            db, attendee.id, [(access.id, 1), (extra.id, 1)]
+        )
 
-        db.rollback()
-        assert _ticket_count(db, attendee.id) == 0
+        assert _ticket_count(db, attendee.id) == 2
         db.refresh(access)
-        db.refresh(invalid)
-        assert (access.total_stock_remaining, invalid.total_stock_remaining) == (5, 5)
+        db.refresh(extra)
+        assert (access.total_stock_remaining, extra.total_stock_remaining) == (4, 4)
+        units = db.exec(
+            select(AttendeeProducts).where(AttendeeProducts.attendee_id == attendee.id)
+        ).all()
+        assert {unit.product_category_snapshot for unit in units} == {
+            "ticket",
+            category,
+        }
+        assert all(unit.payment_id is None for unit in units)
 
 
 @pytest.mark.parametrize("category", ["ticket", "meal_plan"])

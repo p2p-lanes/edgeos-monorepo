@@ -427,6 +427,37 @@ describe("Passes page", () => {
     expect(screen.queryByRole("button", { name: /Buy passes/ })).toBeNull()
   })
 
+  it("shows a manually assigned ticket without a payment or application when only an application flow exists", () => {
+    mocks.applications = []
+    mocks.products = []
+    mocks.participation = { type: "none" }
+    mocks.attendeePasses = [
+      {
+        id: "invited-attendee",
+        application_id: null,
+        products: [],
+        ticket_entries: [
+          {
+            id: "assigned-ticket",
+            attendee_id: "invited-attendee",
+            product_id: "assigned-product",
+            payment_id: null,
+            check_in_code: "INVITEDQR",
+            product_name: "Assigned ticket",
+          },
+        ],
+      },
+    ]
+    mocks.attendeesQuery.data = [{ id: "invited-attendee" }]
+
+    render(<HomePasses />)
+
+    expect(screen.getByText("Assigned ticket")).toBeTruthy()
+    expect(screen.getByTestId("selected-sales-flow").textContent).toBe("other")
+    expect(screen.queryByRole("button", { name: /Buy passes/ })).toBeNull()
+    expect(replace).not.toHaveBeenCalled()
+  })
+
   it("renders Other passes as a separate section without a purchase action", () => {
     mocks.directFlows = [directFlow]
     mocks.attendeePasses.push({

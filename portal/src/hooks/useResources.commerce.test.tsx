@@ -2,6 +2,10 @@ import { renderHook } from "@testing-library/react"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 
 const mocks = vi.hoisted(() => ({
+  access: { state: "denied" } as {
+    state: "allowed" | "denied" | "loading"
+    source?: "attendee"
+  },
   applicationStatus: "accepted" as string | null,
   applicationFlows: undefined as Flow[] | undefined,
   directFlows: undefined as Flow[] | undefined,
@@ -44,7 +48,8 @@ vi.mock("@/hooks/useGatheringDoors", () => ({
 }))
 
 vi.mock("@/hooks/useHumanPopupAccess", () => ({
-  useHumanPopupAccess: () => ({ state: "allowed" }),
+  useHumanPopupAccess: (popupId: string | null) =>
+    popupId ? mocks.access : { state: "loading" },
 }))
 
 vi.mock("@/hooks/usePortalSalesFlows", () => ({
@@ -125,6 +130,7 @@ const visibleCheckouts = (
 
 describe("useResources Commerce navigation", () => {
   beforeEach(() => {
+    mocks.access = { state: "denied" }
     mocks.applicationStatus = "accepted"
     mocks.applicationFlows = []
     mocks.directFlows = []
@@ -135,6 +141,31 @@ describe("useResources Commerce navigation", () => {
     mocks.takesApplications = true
     mocks.directoryEnabled = false
     mocks.customHomeEnabled = false
+  })
+
+  it("shows passes for an assigned ticket with only an application flow and no application", () => {
+    mocks.applicationStatus = null
+    mocks.applicationFlows = [attendeeFlow]
+    mocks.access = { state: "allowed", source: "attendee" }
+
+    const { result, rerender } = renderHook(() => useResources())
+
+    expect(visibleCommerce(result.current.resources)).toContainEqual(
+      expect.objectContaining({
+        name: "sidebar.passes",
+        status: "active",
+        path: "/portal/summit/passes",
+      }),
+    )
+    expect(visibleCheckouts(result.current.resources)).toEqual([])
+
+    mocks.access = { state: "denied" }
+    rerender()
+    expect(
+      visibleCommerce(result.current.resources).some(
+        (resource) => resource.name === "sidebar.passes",
+      ),
+    ).toBe(false)
   })
 
   it("adds Home and keeps Application on its own overview when a custom home is enabled", () => {
