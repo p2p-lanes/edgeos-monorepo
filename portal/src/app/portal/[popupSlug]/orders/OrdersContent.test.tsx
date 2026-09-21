@@ -23,6 +23,9 @@ const translate = (key: string, values?: { count?: number }) => {
         "orders.status.unknown": "Unknown payment status",
         "orders.legacy_purchase": "Legacy purchase",
         "orders.total": "Total",
+        "orders.lines": "Payment items",
+        "orders.application_fee": "Application fee",
+        "orders.application_fee_description": "Fee for your event application.",
         "orders.invoice": "Invoice",
         "orders.empty_title": "No payments yet",
         "orders.empty_description": "Your payment history will appear here.",
@@ -125,9 +128,46 @@ describe("OrdersContent", () => {
     expect(screen.getByRole("heading", { name: "Payments" })).toBeTruthy()
     expect(screen.queryByText("Orders")).toBeNull()
     expect(screen.getByText("Event shirt")).toBeTruthy()
+    expect(screen.queryByText("Application fee")).toBeNull()
     expect(screen.getByText("Approved")).toBeTruthy()
     expect(screen.getByText("Total")).toBeTruthy()
     expect(screen.getByRole("button", { name: "Invoice" })).toBeTruthy()
+  })
+
+  it.each([
+    [],
+    undefined,
+  ])("renders application fees without products (%j)", (productsSnapshot) => {
+    render(
+      <OrdersContent
+        invoiceAvailable={false}
+        payments={[
+          {
+            id: "fee-payment",
+            tenant_id: "tenant-1",
+            popup_id: "popup-1",
+            payment_type: "application_fee",
+            status: "approved",
+            amount: "999.00",
+            currency: "EUR",
+            sales_flow_id: "application-flow",
+            created_at: "2026-09-15T12:00:00Z",
+            products_snapshot: productsSnapshot,
+          },
+        ]}
+      />,
+    )
+
+    const items = screen.getByRole("list", { name: "Payment items" })
+    expect(within(items).getAllByRole("listitem")).toHaveLength(1)
+    expect(within(items).getByText("Application fee")).toBeTruthy()
+    expect(
+      within(items).getByText("Fee for your event application."),
+    ).toBeTruthy()
+    expect(within(items).getByText("EUR 999.00")).toBeTruthy()
+    expect(screen.getAllByText("EUR 999.00")).toHaveLength(2)
+    expect(screen.getByText("Approved")).toBeTruthy()
+    expect(screen.getByText("Date 2026-09-15T12:00:00Z")).toBeTruthy()
   })
 
   it("renders unknown legacy payments without a purchase action", () => {
@@ -152,6 +192,7 @@ describe("OrdersContent", () => {
 
     expect(screen.getByText("Unknown payment status")).toBeTruthy()
     expect(screen.getByText("Legacy purchase")).toBeTruthy()
+    expect(screen.queryByText("Application fee")).toBeNull()
     expect(screen.queryByRole("button", { name: "Invoice" })).toBeNull()
     expect(screen.queryByRole("link", { name: /shop|buy/i })).toBeNull()
   })
