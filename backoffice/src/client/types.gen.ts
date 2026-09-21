@@ -809,7 +809,7 @@ export type ApplicationReviewCreate = {
 };
 
 /**
- * A reviewer who has submitted at least one review for a popup.
+ * A configured reviewer or past review submitter for a popup.
  */
 export type ApplicationReviewerOption = {
     id: string;

@@ -105,6 +105,8 @@
     "empty_description": "Tu historial de pagos aparecerá aquí.",
     "total": "Total",
     "lines": "Artículos del pago",
+    "application_fee": "Tarifa de aplicación",
+    "application_fee_description": "Tarifa por tu aplicación al evento.",
     "line_quantity": "Cantidad: {{count}}",
     "legacy_purchase": "Compra heredada",
     "invoice": "Factura",

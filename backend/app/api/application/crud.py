@@ -4,7 +4,7 @@ from decimal import Decimal
 from typing import TYPE_CHECKING, Any
 
 from fastapi import HTTPException, status
-from sqlalchemy import case, desc, exists, nullslast, or_
+from sqlalchemy import and_, case, desc, exists, nullslast, or_
 from sqlalchemy.dialects import postgresql
 from sqlalchemy.orm import selectinload
 from sqlmodel import Session, col, func, select
@@ -82,10 +82,11 @@ def _is_draft_status(status_value: object) -> bool:
 def _filter_condition_expression(
     condition: ApplicationFilterCondition,
     reviewer_id: uuid.UUID | None = None,
+    vote_reviewer_ids: tuple[uuid.UUID, ...] = (),
 ):
     """Application-specific conditions; None delegates to the shared engine.
 
-    Handles the virtual reviewer fields, the reviewed_by EXISTS, custom.*
+    Handles the virtual reviewer fields, reviewer/vote EXISTS, custom.*
     JSONB accessors, status, and the Humans-join fields. Standard columns
     (dates, text, booleans) fall through to the engine defaults.
     """
@@ -111,6 +112,26 @@ def _filter_condition_expression(
             .where(ApplicationReviews.reviewer_id == condition.uuid_value)
         )
         return has_row if condition.op == "eq" else ~has_row
+
+    if condition.field == "review_decision":
+        has_row = (
+            exists()
+            .where(ApplicationReviews.application_id == Applications.id)
+            .where(ApplicationReviews.decision == condition.value)
+            .correlate(Applications)
+        )
+        # Under match=all each selected reviewer must satisfy the vote filter.
+        # Keep both predicates on the same row, so another person's vote cannot
+        # satisfy the selected reviewer's condition. neq means no matching vote.
+        matches = (
+            [
+                has_row.where(ApplicationReviews.reviewer_id == rid)
+                for rid in vote_reviewer_ids
+            ]
+            if vote_reviewer_ids
+            else [has_row]
+        )
+        return and_(*(match if condition.op == "eq" else ~match for match in matches))
 
     custom_name = condition.custom_field_name
     if custom_name is not None:
@@ -148,10 +169,24 @@ def build_application_filter_expression(
                         f"Filtering by '{condition.field}' requires a signed-in user."
                     ),
                 )
+    vote_reviewer_ids: list[uuid.UUID] = []
+    if filters.match == "all":
+        for condition in filters.conditions:
+            if condition.field == "reviewed_by" and condition.op == "eq":
+                vote_reviewer_ids.append(condition.uuid_value)
+            elif (
+                condition.field == "reviewed_by_me"
+                and condition.value is True
+                and reviewer_id is not None
+            ):
+                vote_reviewer_ids.append(reviewer_id)
+
     return build_filter_expression(
         filters,
         Applications,
-        condition_override=lambda c: _filter_condition_expression(c, reviewer_id),
+        condition_override=lambda c: _filter_condition_expression(
+            c, reviewer_id, tuple(vote_reviewer_ids)
+        ),
     )
 
 
@@ -583,14 +618,21 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
         session: Session,
         popup_id: uuid.UUID,
     ) -> list[uuid.UUID]:
-        """Return every user who has submitted a review for a popup."""
+        """Return configured reviewers and past review submitters for a popup."""
+        from app.api.popup_reviewer.crud import popup_reviewers_crud
+
         statement = (
             select(ApplicationReviews.reviewer_id)
             .join(Applications, ApplicationReviews.application_id == Applications.id)
             .where(Applications.popup_id == popup_id)
             .distinct()
         )
-        return list(session.exec(statement).all())
+        submitted_ids = set(session.exec(statement).all())
+        configured_ids = {
+            reviewer.user_id
+            for reviewer in popup_reviewers_crud.find_all_by_popup(session, popup_id)
+        }
+        return list(submitted_ids | configured_ids)
 
     def find_by_status(
         self,

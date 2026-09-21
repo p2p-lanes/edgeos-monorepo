@@ -34,7 +34,7 @@ export class AccommodationsService {
             }
         });
     }
-    
+
     /**
      * Create Property
      * @param data The data for the request.
@@ -57,7 +57,7 @@ export class AccommodationsService {
             }
         });
     }
-    
+
     /**
      * Get Property
      * @param data The data for the request.
@@ -81,7 +81,7 @@ export class AccommodationsService {
             }
         });
     }
-    
+
     /**
      * Update Property
      * @param data The data for the request.
@@ -108,7 +108,7 @@ export class AccommodationsService {
             }
         });
     }
-    
+
     /**
      * Delete Property
      * Delete a property. Refused while it still holds room types.
@@ -139,7 +139,7 @@ export class AccommodationsService {
             }
         });
     }
-    
+
     /**
      * Get Calendar
      * Property -> room type -> unit -> bookings for a date window.
@@ -172,7 +172,7 @@ export class AccommodationsService {
             }
         });
     }
-    
+
     /**
      * Get Availability
      * @param data The data for the request.
@@ -202,7 +202,7 @@ export class AccommodationsService {
             }
         });
     }
-    
+
     /**
      * List Bookings
      * @param data The data for the request.
@@ -238,7 +238,7 @@ export class AccommodationsService {
             }
         });
     }
-    
+
     /**
      * Create Manual Booking
      * Create a booking by hand: a comp, a phone reservation, a block.
@@ -266,7 +266,7 @@ export class AccommodationsService {
             }
         });
     }
-    
+
     /**
      * Get Booking
      * One booking, with the room, the building and the sibling units.
@@ -295,7 +295,7 @@ export class AccommodationsService {
             }
         });
     }
-    
+
     /**
      * Update Booking
      * Reassign a unit, edit guests/notes, or cancel.
@@ -327,7 +327,7 @@ export class AccommodationsService {
             }
         });
     }
-    
+
     /**
      * Block Range
      * Take every unit of a room type off the market for a range.
@@ -355,7 +355,7 @@ export class AccommodationsService {
             }
         });
     }
-    
+
     /**
      * Export Bookings
      * Same filters as the bookings list, rendered as CSV.
@@ -392,7 +392,7 @@ export class AccommodationsService {
             }
         });
     }
-    
+
     /**
      * List Images
      * @param data The data for the request.
@@ -416,7 +416,7 @@ export class AccommodationsService {
             }
         });
     }
-    
+
     /**
      * Create Image
      * Register an already-uploaded file in the popup's photo bank.
@@ -443,7 +443,7 @@ export class AccommodationsService {
             }
         });
     }
-    
+
     /**
      * Delete Image
      * @param data The data for the request.
@@ -467,7 +467,7 @@ export class AccommodationsService {
             }
         });
     }
-    
+
     /**
      * Update Unit
      * @param data The data for the request.
@@ -494,7 +494,7 @@ export class AccommodationsService {
             }
         });
     }
-    
+
     /**
      * Delete Unit
      * Remove a unit. Refused while a guest is (or will be) in it.
@@ -519,7 +519,7 @@ export class AccommodationsService {
             }
         });
     }
-    
+
     /**
      * Update Price Rule
      * @param data The data for the request.
@@ -546,7 +546,7 @@ export class AccommodationsService {
             }
         });
     }
-    
+
     /**
      * Delete Price Rule
      * @param data The data for the request.
@@ -570,7 +570,7 @@ export class AccommodationsService {
             }
         });
     }
-    
+
     /**
      * Bulk Update Accommodations
      * Apply one patch to many room types (by ids or by filter).
@@ -594,7 +594,7 @@ export class AccommodationsService {
             }
         });
     }
-    
+
     /**
      * Bulk Price Accommodations
      * Set or shift prices across many room types.
@@ -621,7 +621,7 @@ export class AccommodationsService {
             }
         });
     }
-    
+
     /**
      * List Accommodations
      * @param data The data for the request.
@@ -649,7 +649,7 @@ export class AccommodationsService {
             }
         });
     }
-    
+
     /**
      * Create Accommodation
      * Create a room type (and its shadow product, and optionally its units).
@@ -673,7 +673,7 @@ export class AccommodationsService {
             }
         });
     }
-    
+
     /**
      * Get Accommodation
      * @param data The data for the request.
@@ -697,7 +697,7 @@ export class AccommodationsService {
             }
         });
     }
-    
+
     /**
      * Update Accommodation
      * @param data The data for the request.
@@ -724,7 +724,7 @@ export class AccommodationsService {
             }
         });
     }
-    
+
     /**
      * Delete Accommodation
      * Retire a room type (soft delete).
@@ -752,7 +752,7 @@ export class AccommodationsService {
             }
         });
     }
-    
+
     /**
      * Duplicate Accommodation
      * Clone a room type: definition, units, rules and photos, no bookings.
@@ -780,7 +780,7 @@ export class AccommodationsService {
             }
         });
     }
-    
+
     /**
      * Bulk Create Units
      * Add units from explicit labels or ``prefix`` + ``count``.
@@ -811,7 +811,7 @@ export class AccommodationsService {
             }
         });
     }
-    
+
     /**
      * List Price Rules
      * @param data The data for the request.
@@ -835,7 +835,7 @@ export class AccommodationsService {
             }
         });
     }
-    
+
     /**
      * Create Price Rule
      * @param data The data for the request.
@@ -862,7 +862,7 @@ export class AccommodationsService {
             }
         });
     }
-    
+
     /**
      * Set Accommodation Images
      * Replace the photo list of a room type, in the given order.
@@ -893,7 +893,7 @@ export class AccommodationsService {
             }
         });
     }
-    
+
     /**
      * List Portal Accommodations
      * Room types this popup's checkout sells, before any dates are picked.
@@ -920,7 +920,7 @@ export class AccommodationsService {
             }
         });
     }
-    
+
     /**
      * Check Portal Accommodation Availability
      * Free rooms and the price of the stay, for every room type at once.
@@ -981,7 +981,7 @@ export class AdminApiKeysService {
             }
         });
     }
-    
+
     /**
      * List Admin Api Keys
      * List admin API keys.
@@ -1006,7 +1006,7 @@ export class AdminApiKeysService {
             }
         });
     }
-    
+
     /**
      * Get Admin Api Key
      * Retrieve a specific admin API key.
@@ -1035,7 +1035,7 @@ export class AdminApiKeysService {
             }
         });
     }
-    
+
     /**
      * Revoke Admin Api Key
      * Revoke an admin API key by setting revoked_at.
@@ -1087,7 +1087,7 @@ export class AiConversationsService {
             }
         });
     }
-    
+
     /**
      * Get Ai Conversation
      * Get one conversation owned by the current operator.
@@ -1112,7 +1112,7 @@ export class AiConversationsService {
             }
         });
     }
-    
+
     /**
      * Upsert Ai Conversation
      * Create or replace one sanitized conversation owned by the caller.
@@ -1140,7 +1140,7 @@ export class AiConversationsService {
             }
         });
     }
-    
+
     /**
      * Delete Ai Conversation
      * Delete one conversation owned by the current operator.
@@ -1195,7 +1195,7 @@ export class AiExecutionsService {
             }
         });
     }
-    
+
     /**
      * Complete Ai Execution
      * Persist a successful sanitized result so retries never repeat the write.
@@ -1237,7 +1237,7 @@ export class ApiKeysService {
             url: '/api/v1/api-keys'
         });
     }
-    
+
     /**
      * Create an API key
      * @param data The data for the request.
@@ -1256,7 +1256,7 @@ export class ApiKeysService {
             }
         });
     }
-    
+
     /**
      * Revoke an API key
      * @param data The data for the request.
@@ -1309,7 +1309,7 @@ export class ApplicationReviewsService {
             }
         });
     }
-    
+
     /**
      * Submit Review
      * Submit or update a review for an application.
@@ -1340,7 +1340,7 @@ export class ApplicationReviewsService {
             }
         });
     }
-    
+
     /**
      * Get Review Summary
      * Get a summary of reviews for an application.
@@ -1365,7 +1365,7 @@ export class ApplicationReviewsService {
             }
         });
     }
-    
+
     /**
      * List Pending Reviews
      * List applications pending review by the current user.
@@ -1399,7 +1399,7 @@ export class ApplicationReviewsService {
             }
         });
     }
-    
+
     /**
      * List My Reviews
      * List reviews submitted by the current user.
@@ -1426,7 +1426,7 @@ export class ApplicationReviewsService {
             }
         });
     }
-    
+
     /**
      * Skip Application
      * Skip an application: drop it from your own pending queue without voting.
@@ -1456,7 +1456,7 @@ export class ApplicationReviewsService {
             }
         });
     }
-    
+
     /**
      * Unskip Application
      * Un-skip an application: return it to your pending queue.
@@ -1496,6 +1496,12 @@ export class ApplicationsService {
      * resolve against the calling user's own skips and reviews. The
      * ``reviewed_by`` field (ops ``eq``/``neq``, reviewer user id as UUID
      * string) matches applications reviewed (or not) by that reviewer.
+     * ``review_decision`` (ops ``eq``/``neq``) matches at least one review
+     * with the selected vote: ``strong_yes``, ``yes``, ``no``, or ``strong_no``.
+     * Under ``match=all``, positive ``reviewed_by``/``reviewed_by_me`` filters
+     * scope votes to each selected reviewer, matching the same review row.
+     * Otherwise votes may come from any reviewer. ``neq`` excludes matching
+     * votes within that scope. Under ``match=any``, conditions are independent.
      *
      * ``group_by``/``group_value`` scope the list to one bucket of a grouped
      * view (same whitelist and NULL/empty collapsing as the group-counts
@@ -1547,7 +1553,7 @@ export class ApplicationsService {
             }
         });
     }
-    
+
     /**
      * Create Application Admin
      * Create an application as admin (BO only - superadmin for testing).
@@ -1574,7 +1580,7 @@ export class ApplicationsService {
             }
         });
     }
-    
+
     /**
      * Get Application Group Counts
      * Count a popup's applications grouped by one field (BO only).
@@ -1622,10 +1628,10 @@ export class ApplicationsService {
             }
         });
     }
-    
+
     /**
      * List Application Reviewers
-     * List users who have submitted at least one review for a popup.
+     * List configured reviewers (popup and flow tiers) and past review submitters.
      * @param data The data for the request.
      * @param data.popupId
      * @param data.xTenantId
@@ -1647,7 +1653,7 @@ export class ApplicationsService {
             }
         });
     }
-    
+
     /**
      * Admin bulk-grant of free tickets
      * Atomically grant free tickets to a batch of people for a popup.
@@ -1689,7 +1695,7 @@ export class ApplicationsService {
             }
         });
     }
-    
+
     /**
      * Get Application
      * Get a single application (BO only).
@@ -1714,7 +1720,7 @@ export class ApplicationsService {
             }
         });
     }
-    
+
     /**
      * List this applicant's applications to other popups
      * List the same human's applications to the tenant's other popups (BO only).
@@ -1745,7 +1751,7 @@ export class ApplicationsService {
             }
         });
     }
-    
+
     /**
      * Grant credit to an application
      * Grant credit to a specific application (BO admin only).
@@ -1777,7 +1783,7 @@ export class ApplicationsService {
             }
         });
     }
-    
+
     /**
      * List your applications
      * List applications for the current human (Portal).
@@ -1800,7 +1806,7 @@ export class ApplicationsService {
             }
         });
     }
-    
+
     /**
      * List your tickets
      * List all tickets for the current human (Portal).
@@ -1819,7 +1825,7 @@ export class ApplicationsService {
             url: '/api/v1/applications/my/tickets'
         });
     }
-    
+
     /**
      * Get your participation in a popup
      * Get participation status for the current human in a popup (Portal).
@@ -1845,7 +1851,7 @@ export class ApplicationsService {
             }
         });
     }
-    
+
     /**
      * List your purchases for a popup
      * Get purchased products grouped by attendee for a popup (Portal).
@@ -1866,7 +1872,7 @@ export class ApplicationsService {
             }
         });
     }
-    
+
     /**
      * Get your application for a popup
      * Get current human's application for a popup (Portal).
@@ -1887,7 +1893,7 @@ export class ApplicationsService {
             }
         });
     }
-    
+
     /**
      * Update your application for a sales flow
      * Update the current human's application in a selected sales flow.
@@ -1915,7 +1921,7 @@ export class ApplicationsService {
             }
         });
     }
-    
+
     /**
      * Detach yourself as a companion from another application
      * Remove the current human from being a companion on another applicant's
@@ -1948,7 +1954,7 @@ export class ApplicationsService {
             }
         });
     }
-    
+
     /**
      * Create your application
      * Create an application for the current human (Portal).
@@ -1968,7 +1974,7 @@ export class ApplicationsService {
             }
         });
     }
-    
+
     /**
      * List the attendees directory for a popup
      * List attendees directory for a popup (Portal).
@@ -2000,7 +2006,7 @@ export class ApplicationsService {
             }
         });
     }
-    
+
     /**
      * Export the attendees directory for a popup as CSV
      * Export attendees directory as CSV (Portal).
@@ -2027,7 +2033,7 @@ export class ApplicationsService {
             }
         });
     }
-    
+
     /**
      * Add an attendee to your application
      * Add an attendee to current human's application (Portal).
@@ -2051,7 +2057,7 @@ export class ApplicationsService {
             }
         });
     }
-    
+
     /**
      * Update an attendee on your application
      * Update an attendee in current human's application (Portal).
@@ -2077,7 +2083,7 @@ export class ApplicationsService {
             }
         });
     }
-    
+
     /**
      * Remove an attendee from your application
      * Delete an attendee from current human's application (Portal).
@@ -2100,7 +2106,7 @@ export class ApplicationsService {
             }
         });
     }
-    
+
     /**
      * Review Scholarship
      * Approve or reject a scholarship request on an application (BO admin only).
@@ -2132,7 +2138,7 @@ export class ApplicationsService {
             }
         });
     }
-    
+
     /**
      * List Application Comments
      * List an application's comments, oldest first.
@@ -2157,7 +2163,7 @@ export class ApplicationsService {
             }
         });
     }
-    
+
     /**
      * Create Application Comment
      * Add a comment to an application.
@@ -2185,7 +2191,7 @@ export class ApplicationsService {
             }
         });
     }
-    
+
     /**
      * Update Application Comment
      * Edit your own comment.
@@ -2215,7 +2221,7 @@ export class ApplicationsService {
             }
         });
     }
-    
+
     /**
      * Delete Application Comment
      * Soft-delete a comment: the author, or any superadmin. Row is preserved.
@@ -2269,7 +2275,7 @@ export class ApprovalStrategiesService {
             }
         });
     }
-    
+
     /**
      * Create Or Update Approval Strategy
      * Create or update approval strategy for a popup.
@@ -2297,7 +2303,7 @@ export class ApprovalStrategiesService {
             }
         });
     }
-    
+
     /**
      * Update Approval Strategy
      * Update approval strategy for a popup.
@@ -2325,7 +2331,7 @@ export class ApprovalStrategiesService {
             }
         });
     }
-    
+
     /**
      * Delete Approval Strategy
      * Idempotently disable review by resetting the gathering to AUTO_ACCEPT.
@@ -2377,7 +2383,7 @@ export class AttendeeCategoriesService {
             }
         });
     }
-    
+
     /**
      * List Attendee Categories Portal
      * Portal counterpart of list_attendee_categories — accepts Human tokens.
@@ -2405,7 +2411,7 @@ export class AttendeeCategoriesService {
             }
         });
     }
-    
+
     /**
      * List Sales Flow Attendee Categories
      * List the active attendee categories owned by one sales flow.
@@ -2430,7 +2436,7 @@ export class AttendeeCategoriesService {
             }
         });
     }
-    
+
     /**
      * Create Sales Flow Attendee Category
      * Create or restore a category owned by this flow.
@@ -2458,7 +2464,7 @@ export class AttendeeCategoriesService {
             }
         });
     }
-    
+
     /**
      * Get Attendee Category
      * Get one attendee category in the current organization.
@@ -2483,7 +2489,7 @@ export class AttendeeCategoriesService {
             }
         });
     }
-    
+
     /**
      * Update Attendee Category
      * Update an attendee category (ADMIN only).
@@ -2515,7 +2521,7 @@ export class AttendeeCategoriesService {
             }
         });
     }
-    
+
     /**
      * Delete Attendee Category
      * Delete an attendee category (ADMIN only).
@@ -2575,7 +2581,7 @@ export class AttendeesService {
             }
         });
     }
-    
+
     /**
      * Create a companion attendee
      * Create a companion attendee (spouse/child) for the current Human's application.
@@ -2607,7 +2613,7 @@ export class AttendeesService {
             }
         });
     }
-    
+
     /**
      * Update your attendee
      * Update a self, explicitly managed, or legacy-owned Attendee.
@@ -2633,7 +2639,7 @@ export class AttendeesService {
             }
         });
     }
-    
+
     /**
      * Delete your attendee
      * Delete a companion attendee using the dual-path auth predicate.
@@ -2659,7 +2665,7 @@ export class AttendeesService {
             }
         });
     }
-    
+
     /**
      * Edit your meal-plan ticket choices
      * Edit a purchased meal-plan ticket's per-day choices (portal, no payment).
@@ -2698,7 +2704,7 @@ export class AttendeesService {
             }
         });
     }
-    
+
     /**
      * List Attendees
      * List attendees with optional filters (BO only).
@@ -2751,7 +2757,7 @@ export class AttendeesService {
             }
         });
     }
-    
+
     /**
      * Export attendees as CSV
      * Export the selected gathering's attendees using the BO list filters.
@@ -2784,7 +2790,7 @@ export class AttendeesService {
             }
         });
     }
-    
+
     /**
      * Get Attendee
      * Get a single attendee with full ticket details (BO only).
@@ -2814,7 +2820,7 @@ export class AttendeesService {
             }
         });
     }
-    
+
     /**
      * Update Attendee
      * Update an attendee (BO only).
@@ -2842,7 +2848,7 @@ export class AttendeesService {
             }
         });
     }
-    
+
     /**
      * Delete Attendee
      * Delete an attendee (BO only).
@@ -2867,7 +2873,7 @@ export class AttendeesService {
             }
         });
     }
-    
+
     /**
      * Add a ticket to an attendee
      * Add tickets (N products × quantity) to an existing attendee (BO only).
@@ -2901,7 +2907,7 @@ export class AttendeesService {
             }
         });
     }
-    
+
     /**
      * Change the product of an attendee's ticket
      * Swap the product of a single ticket (BO only, no payment).
@@ -2935,7 +2941,7 @@ export class AttendeesService {
             }
         });
     }
-    
+
     /**
      * Remove a ticket from an attendee
      * Remove a single ticket from an attendee (BO only).
@@ -2965,7 +2971,7 @@ export class AttendeesService {
             }
         });
     }
-    
+
     /**
      * Post Check In
      * Record a check-in event and return enriched TicketPublic (BO - scanner endpoint).
@@ -3014,7 +3020,7 @@ export class AttendeesService {
             }
         });
     }
-    
+
     /**
      * Get Tickets By Email
      * Get all tickets/products for an email across all events (BO).
@@ -3118,7 +3124,7 @@ export class AuthService {
             }
         });
     }
-    
+
     /**
      * User Authenticate
      * Authenticate a user and return a JWT token.
@@ -3139,7 +3145,7 @@ export class AuthService {
             }
         });
     }
-    
+
     /**
      * Scanner Login
      * Initiate scanner login. Accepts CHECK_IN_CONTROLLER, OPERATOR, ADMIN, and SUPERADMIN.
@@ -3160,7 +3166,7 @@ export class AuthService {
             }
         });
     }
-    
+
     /**
      * Scanner Authenticate
      * Authenticate a scanner operator and return a JWT token.
@@ -3182,7 +3188,7 @@ export class AuthService {
             }
         });
     }
-    
+
     /**
      * Human Login
      * Initiate authentication for a human.
@@ -3203,7 +3209,7 @@ export class AuthService {
             }
         });
     }
-    
+
     /**
      * Human Authenticate
      * Authenticate a human and return a JWT token.
@@ -3223,7 +3229,7 @@ export class AuthService {
             }
         });
     }
-    
+
     /**
      * Third Party Human Login
      * Initiate OTP login for an EXISTING human via a third-party integration.
@@ -3256,7 +3262,7 @@ export class AuthService {
             }
         });
     }
-    
+
     /**
      * Third Party Human Authenticate
      * Verify OTP and mint a third-party JWT for an existing human.
@@ -3314,7 +3320,7 @@ export class BaseFieldConfigsService {
             }
         });
     }
-    
+
     /**
      * Update Base Field Config
      * @param data The data for the request.
@@ -3372,7 +3378,7 @@ export class CartsService {
             }
         });
     }
-    
+
     /**
      * Get My Cart
      * Get cart for current human and popup (Portal). Returns null if none exists.
@@ -3397,7 +3403,7 @@ export class CartsService {
             }
         });
     }
-    
+
     /**
      * Update My Cart
      * Replace cart items for current human and popup (Portal).
@@ -3425,7 +3431,7 @@ export class CartsService {
             }
         });
     }
-    
+
     /**
      * Delete My Cart
      * Clear cart for current human and popup (Portal).
@@ -3472,7 +3478,7 @@ export class CheckInService {
             }
         });
     }
-    
+
     /**
      * Confirm My Check In
      * @param data The data for the request.
@@ -3495,7 +3501,7 @@ export class CheckInService {
             }
         });
     }
-    
+
     /**
      * List Check Ins
      * List check-ins with attendee + product names (BO only).
@@ -3612,7 +3618,7 @@ export class CheckoutService {
             }
         });
     }
-    
+
     /**
      * Preview Open Ticketing
      * Return a server-computed price breakdown for an anonymous cart.
@@ -3647,7 +3653,7 @@ export class CheckoutService {
             }
         });
     }
-    
+
     /**
      * Get Checkout Share Meta
      * Unauthenticated checkout metadata for social/OpenGraph share previews.
@@ -3683,7 +3689,7 @@ export class CheckoutService {
             }
         });
     }
-    
+
     /**
      * Purchase Open Ticketing
      * Create an open-ticketing payment and return provider checkout data — public/anonymous for direct flows, sign-in and eligibility required for upsale flows.
@@ -3722,7 +3728,7 @@ export class CheckoutService {
             }
         });
     }
-    
+
     /**
      * List Checkout Accommodations
      * Room types this checkout sells, before any dates are picked.
@@ -3762,7 +3768,7 @@ export class CheckoutService {
             }
         });
     }
-    
+
     /**
      * Check Accommodation Availability
      * Free rooms and the price of the stay, for every room type at once.
@@ -3801,7 +3807,7 @@ export class CheckoutService {
             }
         });
     }
-    
+
     /**
      * Upsert Flow Cart
      * Save an open-checkout cart for the resolved flow.
@@ -3833,7 +3839,7 @@ export class CheckoutService {
             }
         });
     }
-    
+
     /**
      * Restore Flow Cart
      * Restore a flow-scoped cart from a signed link.
@@ -3868,7 +3874,7 @@ export class CheckoutService {
             }
         });
     }
-    
+
     /**
      * Release Pending Open
      * Opportunistically release a buyer's own prior PENDING payment on checkout return.
@@ -3954,7 +3960,7 @@ export class CouponsService {
             }
         });
     }
-    
+
     /**
      * List Coupons
      * List all coupons with optional filters (BO only).
@@ -3987,7 +3993,7 @@ export class CouponsService {
             }
         });
     }
-    
+
     /**
      * Create Coupon
      * Create a new coupon (BO only).
@@ -4013,7 +4019,7 @@ export class CouponsService {
             }
         });
     }
-    
+
     /**
      * Get Coupon
      * Get a single coupon by ID (BO only).
@@ -4038,7 +4044,7 @@ export class CouponsService {
             }
         });
     }
-    
+
     /**
      * Update Coupon
      * Update a coupon (BO only).
@@ -4068,7 +4074,7 @@ export class CouponsService {
             }
         });
     }
-    
+
     /**
      * Delete Coupon
      * Delete a coupon (BO only).
@@ -4093,7 +4099,7 @@ export class CouponsService {
             }
         });
     }
-    
+
     /**
      * Validate Coupon
      * Validate a coupon code (Portal - Human only).
@@ -4131,7 +4137,7 @@ export class CustomExportsService {
             url: '/api/v1/custom-exports/catalog'
         });
     }
-    
+
     /**
      * Preview Custom Export
      * Validate an export plan and count its exact result without creating a file.
@@ -4155,7 +4161,7 @@ export class CustomExportsService {
             }
         });
     }
-    
+
     /**
      * Download Custom Export
      * Generate the exact previously previewed CSV or XLSX export.
@@ -4206,7 +4212,7 @@ export class DashboardService {
             }
         });
     }
-    
+
     /**
      * Get Enriched Dashboard
      * Get enriched dashboard with KPIs, trends, breakdowns, and distributions.
@@ -4286,7 +4292,7 @@ export class EmailTemplatesService {
             url: '/api/v1/email-templates/types'
         });
     }
-    
+
     /**
      * Get Default Template
      * @param data The data for the request.
@@ -4306,7 +4312,7 @@ export class EmailTemplatesService {
             }
         });
     }
-    
+
     /**
      * Preview Template
      * @param data The data for the request.
@@ -4329,7 +4335,7 @@ export class EmailTemplatesService {
             }
         });
     }
-    
+
     /**
      * Send Test Email
      * @param data The data for the request.
@@ -4352,7 +4358,7 @@ export class EmailTemplatesService {
             }
         });
     }
-    
+
     /**
      * List Email Templates
      * @param data The data for the request.
@@ -4380,7 +4386,7 @@ export class EmailTemplatesService {
             }
         });
     }
-    
+
     /**
      * Create Email Template
      * @param data The data for the request.
@@ -4403,7 +4409,7 @@ export class EmailTemplatesService {
             }
         });
     }
-    
+
     /**
      * Get Email Template
      * @param data The data for the request.
@@ -4427,7 +4433,7 @@ export class EmailTemplatesService {
             }
         });
     }
-    
+
     /**
      * Update Email Template
      * @param data The data for the request.
@@ -4454,7 +4460,7 @@ export class EmailTemplatesService {
             }
         });
     }
-    
+
     /**
      * Delete Email Template
      * @param data The data for the request.
@@ -4509,7 +4515,7 @@ export class EventParticipantsService {
             }
         });
     }
-    
+
     /**
      * Admin Add Participant
      * Admin adds a participant to an event (backoffice).
@@ -4533,7 +4539,7 @@ export class EventParticipantsService {
             }
         });
     }
-    
+
     /**
      * Get Participant
      * Get one event participant with its resolved gathering.
@@ -4558,7 +4564,7 @@ export class EventParticipantsService {
             }
         });
     }
-    
+
     /**
      * Update Participant
      * Update a participant (backoffice).
@@ -4586,7 +4592,7 @@ export class EventParticipantsService {
             }
         });
     }
-    
+
     /**
      * Delete Participant
      * Delete a participant (backoffice).
@@ -4611,7 +4617,7 @@ export class EventParticipantsService {
             }
         });
     }
-    
+
     /**
      * List Portal Participants
      * List participants for an event (portal).
@@ -4642,7 +4648,7 @@ export class EventParticipantsService {
             }
         });
     }
-    
+
     /**
      * List Portal Attendee Emails
      * Emails of an event's active RSVPers, for its managers (portal).
@@ -4671,7 +4677,7 @@ export class EventParticipantsService {
             }
         });
     }
-    
+
     /**
      * RSVP to an event
      * Register current human for an event (portal).
@@ -4695,7 +4701,7 @@ export class EventParticipantsService {
             }
         });
     }
-    
+
     /**
      * Cancel your RSVP to an event
      * Cancel current human's registration (portal).
@@ -4722,7 +4728,7 @@ export class EventParticipantsService {
             }
         });
     }
-    
+
     /**
      * Check In
      * Check in current human for an event (portal).
@@ -4799,7 +4805,7 @@ export class EventsService {
             }
         });
     }
-    
+
     /**
      * Get Public Event Share Meta
      * Unauthenticated event metadata for social/OpenGraph share previews.
@@ -4837,7 +4843,7 @@ export class EventsService {
             }
         });
     }
-    
+
     /**
      * Public Calendar Ics
      * Anonymous iCalendar subscription feed of a popup's public events.
@@ -4864,7 +4870,7 @@ export class EventsService {
             }
         });
     }
-    
+
     /**
      * List Events
      * List events with optional filters (backoffice).
@@ -4924,7 +4930,7 @@ export class EventsService {
             }
         });
     }
-    
+
     /**
      * Create Event
      * @param data The data for the request.
@@ -4947,7 +4953,7 @@ export class EventsService {
             }
         });
     }
-    
+
     /**
      * List Event Hosts
      * List distinct event hosts for a popup (backoffice creator filter).
@@ -4976,7 +4982,7 @@ export class EventsService {
             }
         });
     }
-    
+
     /**
      * Get Event
      * @param data The data for the request.
@@ -5000,7 +5006,7 @@ export class EventsService {
             }
         });
     }
-    
+
     /**
      * Update Event
      * @param data The data for the request.
@@ -5027,7 +5033,7 @@ export class EventsService {
             }
         });
     }
-    
+
     /**
      * Delete Event
      * @param data The data for the request.
@@ -5051,7 +5057,7 @@ export class EventsService {
             }
         });
     }
-    
+
     /**
      * Get Event Admin Notes
      * Read an event's staff-only notes (any backoffice user).
@@ -5076,7 +5082,7 @@ export class EventsService {
             }
         });
     }
-    
+
     /**
      * Update Event Admin Notes
      * Set an event's staff-only notes (requires events write access).
@@ -5104,7 +5110,7 @@ export class EventsService {
             }
         });
     }
-    
+
     /**
      * Cancel Event
      * @param data The data for the request.
@@ -5128,7 +5134,7 @@ export class EventsService {
             }
         });
     }
-    
+
     /**
      * Set Recurrence
      * Set/replace/clear the RRULE on a series master.
@@ -5160,7 +5166,7 @@ export class EventsService {
             }
         });
     }
-    
+
     /**
      * List Overrides
      * Detached override children of a recurring series master.
@@ -5190,7 +5196,7 @@ export class EventsService {
             }
         });
     }
-    
+
     /**
      * Detach Occurrence
      * Materialize a single occurrence of a recurring series as its own row.
@@ -5224,7 +5230,7 @@ export class EventsService {
             }
         });
     }
-    
+
     /**
      * Delete Occurrence
      * Skip a single occurrence by appending it to the master's EXDATEs.
@@ -5255,7 +5261,7 @@ export class EventsService {
             }
         });
     }
-    
+
     /**
      * Check Availability
      * Check whether a venue is free for a candidate time window.
@@ -5279,7 +5285,7 @@ export class EventsService {
             }
         });
     }
-    
+
     /**
      * Check Availability Portal
      * Portal-facing variant of /check-availability authenticated as a human.
@@ -5304,7 +5310,7 @@ export class EventsService {
             }
         });
     }
-    
+
     /**
      * Check Recurring Availability
      * Server-side preflight for a (possibly recurring) event.
@@ -5337,7 +5343,7 @@ export class EventsService {
             }
         });
     }
-    
+
     /**
      * List Invitations
      * @param data The data for the request.
@@ -5361,7 +5367,7 @@ export class EventsService {
             }
         });
     }
-    
+
     /**
      * Bulk Invite
      * @param data The data for the request.
@@ -5388,7 +5394,7 @@ export class EventsService {
             }
         });
     }
-    
+
     /**
      * Delete Invitation
      * @param data The data for the request.
@@ -5414,7 +5420,7 @@ export class EventsService {
             }
         });
     }
-    
+
     /**
      * List Portal Invitations
      * @param data The data for the request.
@@ -5434,7 +5440,7 @@ export class EventsService {
             }
         });
     }
-    
+
     /**
      * Bulk Invite Portal
      * @param data The data for the request.
@@ -5457,7 +5463,7 @@ export class EventsService {
             }
         });
     }
-    
+
     /**
      * Approve Event
      * @param data The data for the request.
@@ -5484,7 +5490,7 @@ export class EventsService {
             }
         });
     }
-    
+
     /**
      * Reject Event
      * @param data The data for the request.
@@ -5511,7 +5517,7 @@ export class EventsService {
             }
         });
     }
-    
+
     /**
      * Delete Portal Invitation
      * @param data The data for the request.
@@ -5533,7 +5539,7 @@ export class EventsService {
             }
         });
     }
-    
+
     /**
      * Export Event Ics
      * @param data The data for the request.
@@ -5557,7 +5563,7 @@ export class EventsService {
             }
         });
     }
-    
+
     /**
      * List Portal Events
      * @param data The data for the request.
@@ -5601,7 +5607,7 @@ export class EventsService {
             }
         });
     }
-    
+
     /**
      * Create Portal Event
      * @param data The data for the request.
@@ -5620,7 +5626,7 @@ export class EventsService {
             }
         });
     }
-    
+
     /**
      * List Portal Popup Tags
      * Distinct event tags for the popup — used by the portal events
@@ -5642,7 +5648,7 @@ export class EventsService {
             }
         });
     }
-    
+
     /**
      * Portal Hidden Events Count
      * Return how many events the human has hidden (optionally for a popup).
@@ -5666,7 +5672,7 @@ export class EventsService {
             }
         });
     }
-    
+
     /**
      * List Portal Track Event Counts
      * Distinct published-event count per track for a popup.
@@ -5691,7 +5697,7 @@ export class EventsService {
             }
         });
     }
-    
+
     /**
      * List Portal Venue Event Counts
      * Distinct published-event count per venue for a popup.
@@ -5716,7 +5722,7 @@ export class EventsService {
             }
         });
     }
-    
+
     /**
      * Portal Calendar Summary
      * Per-day event counts for a popup's calendar grid.
@@ -5759,7 +5765,7 @@ export class EventsService {
             }
         });
     }
-    
+
     /**
      * Get Portal Event
      * Fetch a single event for the portal.
@@ -5788,7 +5794,7 @@ export class EventsService {
             }
         });
     }
-    
+
     /**
      * Update Portal Event
      * @param data The data for the request.
@@ -5811,7 +5817,7 @@ export class EventsService {
             }
         });
     }
-    
+
     /**
      * Get Portal Event Admin Notes
      * Read an event's staff-only notes from the portal (staff humans only).
@@ -5832,7 +5838,7 @@ export class EventsService {
             }
         });
     }
-    
+
     /**
      * Update Portal Event Admin Notes
      * Set an event's staff-only notes from the portal (staff humans only).
@@ -5856,7 +5862,7 @@ export class EventsService {
             }
         });
     }
-    
+
     /**
      * Hide Portal Event
      * Hide an event from the current human's portal.
@@ -5882,7 +5888,7 @@ export class EventsService {
             }
         });
     }
-    
+
     /**
      * Unhide Portal Event
      * Undo a prior hide.
@@ -5903,7 +5909,7 @@ export class EventsService {
             }
         });
     }
-    
+
     /**
      * Cancel Portal Event
      * @param data The data for the request.
@@ -5923,7 +5929,7 @@ export class EventsService {
             }
         });
     }
-    
+
     /**
      * Export Portal Event Ics
      * @param data The data for the request.
@@ -5970,7 +5976,7 @@ export class EventSettingsService {
             }
         });
     }
-    
+
     /**
      * Upsert Event Settings
      * Create or update event settings for a popup (backoffice).
@@ -5998,7 +6004,7 @@ export class EventSettingsService {
             }
         });
     }
-    
+
     /**
      * Update Event Settings
      * Partial update of event settings (backoffice).
@@ -6026,7 +6032,7 @@ export class EventSettingsService {
             }
         });
     }
-    
+
     /**
      * Get Portal Event Settings
      * Get event settings for a popup (portal). Returns null if not configured.
@@ -6080,7 +6086,7 @@ export class EventVenuesService {
             }
         });
     }
-    
+
     /**
      * Create Venue
      * @param data The data for the request.
@@ -6103,7 +6109,7 @@ export class EventVenuesService {
             }
         });
     }
-    
+
     /**
      * Reorder Venues
      * Persist a manual venue ordering for a popup.
@@ -6134,7 +6140,7 @@ export class EventVenuesService {
             }
         });
     }
-    
+
     /**
      * Get Venue
      * @param data The data for the request.
@@ -6158,7 +6164,7 @@ export class EventVenuesService {
             }
         });
     }
-    
+
     /**
      * Update Venue
      * @param data The data for the request.
@@ -6185,7 +6191,7 @@ export class EventVenuesService {
             }
         });
     }
-    
+
     /**
      * Delete Venue
      * @param data The data for the request.
@@ -6209,7 +6215,7 @@ export class EventVenuesService {
             }
         });
     }
-    
+
     /**
      * Set Weekly Hours
      * @param data The data for the request.
@@ -6236,7 +6242,7 @@ export class EventVenuesService {
             }
         });
     }
-    
+
     /**
      * List Exceptions
      * @param data The data for the request.
@@ -6260,7 +6266,7 @@ export class EventVenuesService {
             }
         });
     }
-    
+
     /**
      * Create Exception
      * @param data The data for the request.
@@ -6287,7 +6293,7 @@ export class EventVenuesService {
             }
         });
     }
-    
+
     /**
      * Update Exception
      * @param data The data for the request.
@@ -6316,7 +6322,7 @@ export class EventVenuesService {
             }
         });
     }
-    
+
     /**
      * Delete Exception
      * @param data The data for the request.
@@ -6342,7 +6348,7 @@ export class EventVenuesService {
             }
         });
     }
-    
+
     /**
      * List Photos
      * @param data The data for the request.
@@ -6366,7 +6372,7 @@ export class EventVenuesService {
             }
         });
     }
-    
+
     /**
      * Add Photo
      * @param data The data for the request.
@@ -6393,7 +6399,7 @@ export class EventVenuesService {
             }
         });
     }
-    
+
     /**
      * Update Photo
      * @param data The data for the request.
@@ -6422,7 +6428,7 @@ export class EventVenuesService {
             }
         });
     }
-    
+
     /**
      * Delete Photo
      * @param data The data for the request.
@@ -6448,7 +6454,7 @@ export class EventVenuesService {
             }
         });
     }
-    
+
     /**
      * Get Availability
      * Return open windows and busy slots for a venue in the given range.
@@ -6481,7 +6487,7 @@ export class EventVenuesService {
             }
         });
     }
-    
+
     /**
      * Get Portal Availability
      * Portal-side availability query — same shape as the backoffice one,
@@ -6517,7 +6523,7 @@ export class EventVenuesService {
             }
         });
     }
-    
+
     /**
      * List Portal Venues
      * @param data The data for the request.
@@ -6543,7 +6549,7 @@ export class EventVenuesService {
             }
         });
     }
-    
+
     /**
      * Create Portal Venue
      * Create a venue as a human (portal). Respects popup event settings.
@@ -6563,7 +6569,7 @@ export class EventVenuesService {
             }
         });
     }
-    
+
     /**
      * Update Portal Venue
      * Let a human edit a venue they created from the portal. Admin-only
@@ -6589,7 +6595,7 @@ export class EventVenuesService {
             }
         });
     }
-    
+
     /**
      * Delete Portal Venue
      * Let a human delete a venue they created. Blocked if the venue still
@@ -6645,7 +6651,7 @@ export class FormFieldsService {
             }
         });
     }
-    
+
     /**
      * Create Form Field
      * @param data The data for the request.
@@ -6668,7 +6674,7 @@ export class FormFieldsService {
             }
         });
     }
-    
+
     /**
      * List Available Base Fields
      * List catalog base fields that are not yet configured for this popup.
@@ -6696,7 +6702,7 @@ export class FormFieldsService {
             }
         });
     }
-    
+
     /**
      * Create Base Field Config
      * Add a catalog base field to a popup by creating its BaseFieldConfig.
@@ -6723,7 +6729,7 @@ export class FormFieldsService {
             }
         });
     }
-    
+
     /**
      * Get Form Field
      * @param data The data for the request.
@@ -6747,7 +6753,7 @@ export class FormFieldsService {
             }
         });
     }
-    
+
     /**
      * Update Form Field
      * @param data The data for the request.
@@ -6774,7 +6780,7 @@ export class FormFieldsService {
             }
         });
     }
-    
+
     /**
      * Delete Form Field
      * @param data The data for the request.
@@ -6798,7 +6804,7 @@ export class FormFieldsService {
             }
         });
     }
-    
+
     /**
      * Copy Form To Flow
      * Copy a form (sections + base field configs + custom fields) into
@@ -6834,7 +6840,7 @@ export class FormFieldsService {
             }
         });
     }
-    
+
     /**
      * Get Application Schema
      * Get the complete application schema for a popup.
@@ -6869,7 +6875,7 @@ export class FormFieldsService {
             }
         });
     }
-    
+
     /**
      * Get Portal Application Schema
      * Get the application form schema for a popup (Portal).
@@ -6935,7 +6941,7 @@ export class FormSectionsService {
             }
         });
     }
-    
+
     /**
      * Create Form Section
      * @param data The data for the request.
@@ -6958,7 +6964,7 @@ export class FormSectionsService {
             }
         });
     }
-    
+
     /**
      * Get Form Section
      * @param data The data for the request.
@@ -6982,7 +6988,7 @@ export class FormSectionsService {
             }
         });
     }
-    
+
     /**
      * Update Form Section
      * @param data The data for the request.
@@ -7009,7 +7015,7 @@ export class FormSectionsService {
             }
         });
     }
-    
+
     /**
      * Delete Form Section
      * @param data The data for the request.
@@ -7085,7 +7091,7 @@ export class GroupsService {
             }
         });
     }
-    
+
     /**
      * Create Group
      * Create a new group (BO only).
@@ -7109,7 +7115,7 @@ export class GroupsService {
             }
         });
     }
-    
+
     /**
      * Get Group
      * Get a single group with members (BO only).
@@ -7134,7 +7140,7 @@ export class GroupsService {
             }
         });
     }
-    
+
     /**
      * Update Group
      * Update a group (BO only - full admin access).
@@ -7162,7 +7168,7 @@ export class GroupsService {
             }
         });
     }
-    
+
     /**
      * Delete Group
      * Delete a group (BO only).
@@ -7187,7 +7193,7 @@ export class GroupsService {
             }
         });
     }
-    
+
     /**
      * Assign Group Leader
      * Promote a group member to leader (BO admin only).
@@ -7215,7 +7221,7 @@ export class GroupsService {
             }
         });
     }
-    
+
     /**
      * Remove Group Leader
      * Demote a group leader back to a regular member (BO admin only).
@@ -7242,7 +7248,7 @@ export class GroupsService {
             }
         });
     }
-    
+
     /**
      * Remove Group Member Admin
      * Remove a current group member (BO admin only).
@@ -7269,7 +7275,7 @@ export class GroupsService {
             }
         });
     }
-    
+
     /**
      * List My Groups
      * List groups where current human is a leader or member (Portal).
@@ -7292,7 +7298,7 @@ export class GroupsService {
             }
         });
     }
-    
+
     /**
      * Get My Group
      * Get a group where current human is a leader or member (Portal, read-only for members).
@@ -7313,7 +7319,7 @@ export class GroupsService {
             }
         });
     }
-    
+
     /**
      * Update My Group
      * Update a group where current human is a leader (Portal - limited fields).
@@ -7337,7 +7343,7 @@ export class GroupsService {
             }
         });
     }
-    
+
     /**
      * Add Group Member
      * Add a member to a group by email (Portal - leader only).
@@ -7365,7 +7371,7 @@ export class GroupsService {
             }
         });
     }
-    
+
     /**
      * Add Group Members Batch
      * Add multiple members to a group (Portal - leader only).
@@ -7389,7 +7395,7 @@ export class GroupsService {
             }
         });
     }
-    
+
     /**
      * Update Group Member
      * Update a member in a group (Portal - leader only).
@@ -7415,7 +7421,7 @@ export class GroupsService {
             }
         });
     }
-    
+
     /**
      * Remove Group Member
      * Remove a member from a group (Portal - leader only).
@@ -7438,7 +7444,7 @@ export class GroupsService {
             }
         });
     }
-    
+
     /**
      * Add an approved human to a group by application (admin)
      * Add an existing approved human to a group without creating a duplicate application.
@@ -7470,7 +7476,7 @@ export class GroupsService {
             }
         });
     }
-    
+
     /**
      * Add an approved human to a group by application (leader)
      * Add an existing approved human to a group without creating a duplicate application.
@@ -7498,7 +7504,7 @@ export class GroupsService {
             }
         });
     }
-    
+
     /**
      * Get Group Public
      * Get a group by slug (public - for invite links).
@@ -7571,7 +7577,7 @@ export class HumansService {
             }
         });
     }
-    
+
     /**
      * Create Human
      * Create a human (superadmin only, for testing purposes).
@@ -7598,7 +7604,7 @@ export class HumansService {
             }
         });
     }
-    
+
     /**
      * Get your profile
      * @returns HumanPublic Successful Response
@@ -7610,7 +7616,7 @@ export class HumansService {
             url: '/api/v1/humans/me'
         });
     }
-    
+
     /**
      * Update your profile
      * Update the current authenticated human's profile.
@@ -7630,7 +7636,7 @@ export class HumansService {
             }
         });
     }
-    
+
     /**
      * Get your profile stats
      * Aggregate popup history and total days attended for the profile page.
@@ -7643,7 +7649,7 @@ export class HumansService {
             url: '/api/v1/humans/me/profile-stats'
         });
     }
-    
+
     /**
      * Search participants directory
      * Search a popup's attendees who share their name, for portal pickers.
@@ -7676,7 +7682,7 @@ export class HumansService {
             }
         });
     }
-    
+
     /**
      * Get Human
      * @param data The data for the request.
@@ -7700,7 +7706,7 @@ export class HumansService {
             }
         });
     }
-    
+
     /**
      * Update Human
      * @param data The data for the request.
@@ -7727,7 +7733,7 @@ export class HumansService {
             }
         });
     }
-    
+
     /**
      * Hard-delete a human and all related rows (admin or superadmin)
      * Permanently delete a Human with full cascade.
@@ -7756,7 +7762,7 @@ export class HumansService {
             }
         });
     }
-    
+
     /**
      * Revoke Human Api Keys
      * @param data The data for the request.
@@ -7780,7 +7786,7 @@ export class HumansService {
             }
         });
     }
-    
+
     /**
      * Get Human Activity
      * Aggregate a human's full activity timeline (admin-only).
@@ -7815,7 +7821,7 @@ export class HumansService {
             }
         });
     }
-    
+
     /**
      * Create Human Activity
      * Add a manual note to a human's timeline at an admin-chosen time.
@@ -7846,7 +7852,7 @@ export class HumansService {
             }
         });
     }
-    
+
     /**
      * List Human Api Keys
      * @param data The data for the request.
@@ -7870,7 +7876,7 @@ export class HumansService {
             }
         });
     }
-    
+
     /**
      * List Human Comments
      * List a human's comments, oldest first.
@@ -7895,7 +7901,7 @@ export class HumansService {
             }
         });
     }
-    
+
     /**
      * Create Human Comment
      * Add a comment to a human.
@@ -7923,7 +7929,7 @@ export class HumansService {
             }
         });
     }
-    
+
     /**
      * Update Human Comment
      * Edit your own comment.
@@ -7953,7 +7959,7 @@ export class HumansService {
             }
         });
     }
-    
+
     /**
      * Delete Human Comment
      * Soft-delete a comment: the author, or any superadmin. Row is preserved.
@@ -7980,7 +7986,7 @@ export class HumansService {
             }
         });
     }
-    
+
     /**
      * List Human Enrichment Facts
      * List a human's enrichment facts, newest first.
@@ -8001,7 +8007,7 @@ export class HumansService {
             }
         });
     }
-    
+
     /**
      * Create Human Enrichment Fact
      * Append one provenance fact extracted by the enrichment agent.
@@ -8055,7 +8061,7 @@ export class InvitesService {
             }
         });
     }
-    
+
     /**
      * Redeem invite (portal human)
      * Portal redemption endpoint — requires authenticated human.
@@ -8089,7 +8095,7 @@ export class InvitesService {
             }
         });
     }
-    
+
     /**
      * Preview any access link (unauthenticated)
      * Preview a link of either kind, resolved by token.
@@ -8118,7 +8124,7 @@ export class InvitesService {
             }
         });
     }
-    
+
     /**
      * List Invites
      * Admin: list access links, optionally filtered by popup or recipient.
@@ -8152,7 +8158,7 @@ export class InvitesService {
             }
         });
     }
-    
+
     /**
      * Create Invite
      * Admin: create an invite for a popup.
@@ -8176,7 +8182,7 @@ export class InvitesService {
             }
         });
     }
-    
+
     /**
      * Get Invite
      * Admin: get single invite by id.
@@ -8197,7 +8203,7 @@ export class InvitesService {
             }
         });
     }
-    
+
     /**
      * Update Invite
      * Admin: update mutable fields on invite.
@@ -8224,7 +8230,7 @@ export class InvitesService {
             }
         });
     }
-    
+
     /**
      * Delete Invite
      * Admin: delete invite. 409 if current_uses > 0.
@@ -8245,7 +8251,7 @@ export class InvitesService {
             }
         });
     }
-    
+
     /**
      * List My Links
      * Portal: list the links this attendee created for a popup.
@@ -8270,7 +8276,7 @@ export class InvitesService {
             }
         });
     }
-    
+
     /**
      * Create My Link
      * Portal: create this attendee's link for a popup.
@@ -8299,7 +8305,7 @@ export class InvitesService {
             }
         });
     }
-    
+
     /**
      * Get My Sharing Status
      * Portal: whether this attendee may create their own link from a popup.
@@ -8373,7 +8379,7 @@ export class InvitesService {
             }
         });
     }
-    
+
     /**
      * Delete My Link
      * Portal: delete own link. 409 if it has already been used.
@@ -8443,7 +8449,7 @@ export class PaymentsService {
             }
         });
     }
-    
+
     /**
      * Get Payment
      * Get a single payment (BO only).
@@ -8468,7 +8474,7 @@ export class PaymentsService {
             }
         });
     }
-    
+
     /**
      * Update Payment
      * Update a payment (BO only).
@@ -8496,7 +8502,7 @@ export class PaymentsService {
             }
         });
     }
-    
+
     /**
      * Get Payment Invoice
      * Download invoice PDF for a payment (BO only).
@@ -8523,7 +8529,7 @@ export class PaymentsService {
             }
         });
     }
-    
+
     /**
      * Create application fee payment
      * Create an application fee payment for current human's application (Portal).
@@ -8546,7 +8552,7 @@ export class PaymentsService {
             }
         });
     }
-    
+
     /**
      * Release My Pending Payment
      * Opportunistically release a buyer's own prior PENDING payment on checkout return (authenticated).
@@ -8582,7 +8588,7 @@ export class PaymentsService {
             }
         });
     }
-    
+
     /**
      * List your payments for a popup
      * List all payments owned by the current Human for a specific popup (Portal).
@@ -8615,7 +8621,7 @@ export class PaymentsService {
             }
         });
     }
-    
+
     /**
      * Get My Latest Payment
      * Get the latest payment status for an application owned by current human (Portal).
@@ -8636,7 +8642,7 @@ export class PaymentsService {
             }
         });
     }
-    
+
     /**
      * Get My Payment Status
      * Get the current status for an owned payment (Portal).
@@ -8657,7 +8663,7 @@ export class PaymentsService {
             }
         });
     }
-    
+
     /**
      * List My Payments
      * List payments for an application owned by current human (Portal).
@@ -8684,7 +8690,7 @@ export class PaymentsService {
             }
         });
     }
-    
+
     /**
      * Get My Invoice
      * Download invoice PDF for a payment owned by current human (Portal).
@@ -8707,7 +8713,7 @@ export class PaymentsService {
             }
         });
     }
-    
+
     /**
      * Preview My Payment
      * Preview a payment calculation without creating it (Portal).
@@ -8729,7 +8735,7 @@ export class PaymentsService {
             }
         });
     }
-    
+
     /**
      * Create My Payment
      * Create a payment for current human's application (Portal).
@@ -8756,7 +8762,7 @@ export class PaymentsService {
             }
         });
     }
-    
+
     /**
      * Simplefi Webhook
      * Webhook endpoint for SimpleFI payment notifications.
@@ -8813,7 +8819,7 @@ export class PopupReviewersService {
             }
         });
     }
-    
+
     /**
      * Add Reviewer
      * Add a reviewer to a popup, or to one specific sales flow of that
@@ -8842,7 +8848,7 @@ export class PopupReviewersService {
             }
         });
     }
-    
+
     /**
      * Update Reviewer
      * Update a reviewer's settings.
@@ -8880,7 +8886,7 @@ export class PopupReviewersService {
             }
         });
     }
-    
+
     /**
      * Remove Reviewer
      * Remove a reviewer from a popup.
@@ -8945,7 +8951,7 @@ export class PopupsService {
             }
         });
     }
-    
+
     /**
      * Create Popup
      * @param data The data for the request.
@@ -8968,7 +8974,7 @@ export class PopupsService {
             }
         });
     }
-    
+
     /**
      * List Public Popups
      * List active popups for a tenant (public, no auth required). Used by checkout flow.
@@ -8989,7 +8995,7 @@ export class PopupsService {
             }
         });
     }
-    
+
     /**
      * Get Popup
      * @param data The data for the request.
@@ -9013,7 +9019,7 @@ export class PopupsService {
             }
         });
     }
-    
+
     /**
      * Update Popup
      * @param data The data for the request.
@@ -9040,7 +9046,7 @@ export class PopupsService {
             }
         });
     }
-    
+
     /**
      * Delete Popup
      * @param data The data for the request.
@@ -9064,7 +9070,7 @@ export class PopupsService {
             }
         });
     }
-    
+
     /**
      * Get Popup Home
      * @param data The data for the request.
@@ -9088,7 +9094,7 @@ export class PopupsService {
             }
         });
     }
-    
+
     /**
      * Update Popup Home
      * @param data The data for the request.
@@ -9115,7 +9121,7 @@ export class PopupsService {
             }
         });
     }
-    
+
     /**
      * Create Checkout Preview Token
      * Mint a short-lived token that unlocks this popup's checkout runtime.
@@ -9145,7 +9151,7 @@ export class PopupsService {
             }
         });
     }
-    
+
     /**
      * List Portal Popups
      * List popups visible to the current human in the Portal.
@@ -9170,7 +9176,7 @@ export class PopupsService {
             }
         });
     }
-    
+
     /**
      * Get Portal Popup Home
      * Return only a published home document, never an admin draft.
@@ -9196,7 +9202,7 @@ export class PopupsService {
             }
         });
     }
-    
+
     /**
      * Get Portal Popup
      * Get a popup by slug (Portal). Ended popups are served only to participants.
@@ -9251,7 +9257,7 @@ export class PortalService {
             }
         });
     }
-    
+
     /**
      * Resolve group slug or invite token (URL compat layer)
      * Resolve /portal/groups/{slug} to either a group or an invite.
@@ -9286,7 +9292,7 @@ export class PortalService {
             }
         });
     }
-    
+
     /**
      * Canonical invite forward endpoint (redirect to redeem preview)
      * Canonical forward endpoint for invite URLs.
@@ -9314,7 +9320,7 @@ export class PortalService {
             }
         });
     }
-    
+
     /**
      * Resolve your access for a popup
      * Resolve access for the authenticated Human to a specific popup.
@@ -9343,7 +9349,7 @@ export class PortalService {
             }
         });
     }
-    
+
     /**
      * List your attendees for a popup
      * List all attendees owned by the current Human for a specific popup.
@@ -9374,7 +9380,7 @@ export class PortalService {
             }
         });
     }
-    
+
     /**
      * Create a companion attendee
      * Create a companion attendee (spouse/child) for the current Human's application.
@@ -9406,7 +9412,7 @@ export class PortalService {
             }
         });
     }
-    
+
     /**
      * Update your attendee
      * Update a self, explicitly managed, or legacy-owned Attendee.
@@ -9432,7 +9438,7 @@ export class PortalService {
             }
         });
     }
-    
+
     /**
      * Delete your attendee
      * Delete a companion attendee using the dual-path auth predicate.
@@ -9458,7 +9464,7 @@ export class PortalService {
             }
         });
     }
-    
+
     /**
      * Edit your meal-plan ticket choices
      * Edit a purchased meal-plan ticket's per-day choices (portal, no payment).
@@ -9520,7 +9526,7 @@ export class ProductsService {
             }
         });
     }
-    
+
     /**
      * List Products
      * List all products with optional filters.
@@ -9559,7 +9565,7 @@ export class ProductsService {
             }
         });
     }
-    
+
     /**
      * Create Product
      * Create a new product.
@@ -9583,7 +9589,7 @@ export class ProductsService {
             }
         });
     }
-    
+
     /**
      * @deprecated
      * Create Products Batch
@@ -9611,7 +9617,7 @@ export class ProductsService {
             }
         });
     }
-    
+
     /**
      * Get Product
      * Get a single product by ID.
@@ -9636,7 +9642,7 @@ export class ProductsService {
             }
         });
     }
-    
+
     /**
      * Update Product
      * Update a product.
@@ -9664,7 +9670,7 @@ export class ProductsService {
             }
         });
     }
-    
+
     /**
      * Delete Product
      * Delete a product.
@@ -9694,7 +9700,7 @@ export class ProductsService {
             }
         });
     }
-    
+
     /**
      * Set Product Sold Out
      * Mark a product as sold out, or put it back on sale.
@@ -9727,7 +9733,7 @@ export class ProductsService {
             }
         });
     }
-    
+
     /**
      * List Portal Products
      * List products visible to the current human (Portal).
@@ -9787,7 +9793,7 @@ export class PublishableKeysService {
             }
         });
     }
-    
+
     /**
      * List Publishable Keys
      * @param data The data for the request.
@@ -9807,7 +9813,7 @@ export class PublishableKeysService {
             }
         });
     }
-    
+
     /**
      * Revoke Publishable Key
      * @param data The data for the request.
@@ -9859,7 +9865,7 @@ export class SalesFlowsService {
             }
         });
     }
-    
+
     /**
      * List Portal Upsale Flows
      * List a popup's portal-listed upsale flows the current human is
@@ -9888,7 +9894,7 @@ export class SalesFlowsService {
             }
         });
     }
-    
+
     /**
      * List Portal Direct Sales Flows
      * List a popup's open, portal-listed direct sales options (Portal).
@@ -9909,7 +9915,7 @@ export class SalesFlowsService {
             }
         });
     }
-    
+
     /**
      * List Sales Flows
      * List sales flows for a popup (BO only).
@@ -9938,7 +9944,7 @@ export class SalesFlowsService {
             }
         });
     }
-    
+
     /**
      * Create Sales Flow
      * Create a sales flow (BO only). tenant_id is derived from the popup.
@@ -9962,7 +9968,7 @@ export class SalesFlowsService {
             }
         });
     }
-    
+
     /**
      * List Sales Flow Readiness
      * What each flow of a popup is missing before it can sell (BO only).
@@ -9991,7 +9997,7 @@ export class SalesFlowsService {
             }
         });
     }
-    
+
     /**
      * List Settings By Type
      * Which settings each kind of flow can use (BO only).
@@ -10019,7 +10025,7 @@ export class SalesFlowsService {
             }
         });
     }
-    
+
     /**
      * Preview Sales Flow Start
      * What a way in would begin with, before anyone opens it (BO only).
@@ -10056,7 +10062,7 @@ export class SalesFlowsService {
             }
         });
     }
-    
+
     /**
      * Get Sales Flow
      * Get a single sales flow (BO only).
@@ -10081,7 +10087,7 @@ export class SalesFlowsService {
             }
         });
     }
-    
+
     /**
      * Update Sales Flow
      * Update a sales flow (BO only).
@@ -10109,7 +10115,7 @@ export class SalesFlowsService {
             }
         });
     }
-    
+
     /**
      * Delete Sales Flow
      * Delete an unused sales flow and its owned configuration (BO only).
@@ -10163,7 +10169,7 @@ export class SavedViewsService {
             }
         });
     }
-    
+
     /**
      * Create Saved View
      * Create a saved view shared with the whole team.
@@ -10187,7 +10193,7 @@ export class SavedViewsService {
             }
         });
     }
-    
+
     /**
      * Update Saved View
      * Rename a saved view or replace its configuration.
@@ -10215,7 +10221,7 @@ export class SavedViewsService {
             }
         });
     }
-    
+
     /**
      * Delete Saved View
      * Delete a saved view.
@@ -10269,7 +10275,7 @@ export class TasksService {
             }
         });
     }
-    
+
     /**
      * List Tasks
      * List tasks the current user may see (filtered by visibility).
@@ -10315,7 +10321,7 @@ export class TasksService {
             }
         });
     }
-    
+
     /**
      * Create Task
      * Create a task (superadmin only).
@@ -10335,7 +10341,7 @@ export class TasksService {
             }
         });
     }
-    
+
     /**
      * Get Task
      * Get a single task with its attachments (visible to the user).
@@ -10356,7 +10362,7 @@ export class TasksService {
             }
         });
     }
-    
+
     /**
      * Update Task
      * Update a task (superadmin only).
@@ -10380,7 +10386,7 @@ export class TasksService {
             }
         });
     }
-    
+
     /**
      * Delete Task
      * Hard-delete a task and its comments/attachments (superadmin only).
@@ -10403,7 +10409,7 @@ export class TasksService {
             }
         });
     }
-    
+
     /**
      * Update Task Status
      * Move a card between Kanban columns (superadmin only).
@@ -10427,7 +10433,7 @@ export class TasksService {
             }
         });
     }
-    
+
     /**
      * Archive Published Tasks
      * Archive every published task that isn't already archived (superadmin).
@@ -10442,7 +10448,7 @@ export class TasksService {
             url: '/api/v1/tasks/archive-published'
         });
     }
-    
+
     /**
      * Archive Task
      * Archive a single task (superadmin). No-op if already archived.
@@ -10463,7 +10469,7 @@ export class TasksService {
             }
         });
     }
-    
+
     /**
      * Unarchive Task
      * Restore an archived task to the board (superadmin). No-op if active.
@@ -10484,7 +10490,7 @@ export class TasksService {
             }
         });
     }
-    
+
     /**
      * Add Attachment
      * Attach an already-uploaded S3 object to a task (superadmin only).
@@ -10508,7 +10514,7 @@ export class TasksService {
             }
         });
     }
-    
+
     /**
      * Delete Attachment
      * Remove an attachment from a task (superadmin only).
@@ -10531,7 +10537,7 @@ export class TasksService {
             }
         });
     }
-    
+
     /**
      * List Task Comments
      * List a task's comments, oldest first (any user who can view the task).
@@ -10552,7 +10558,7 @@ export class TasksService {
             }
         });
     }
-    
+
     /**
      * Create Task Comment
      * Add a comment to a task (any user who can view the task).
@@ -10576,7 +10582,7 @@ export class TasksService {
             }
         });
     }
-    
+
     /**
      * Update Task Comment
      * Edit your own comment (any user who can view the task).
@@ -10602,7 +10608,7 @@ export class TasksService {
             }
         });
     }
-    
+
     /**
      * Delete Task Comment
      * Soft-delete a comment: the author, or any superadmin. Row is preserved.
@@ -10656,7 +10662,7 @@ export class TenantsService {
             }
         });
     }
-    
+
     /**
      * Get Tenant By Slug
      * @param data The data for the request.
@@ -10676,7 +10682,7 @@ export class TenantsService {
             }
         });
     }
-    
+
     /**
      * List Tenants
      * @param data The data for the request.
@@ -10700,7 +10706,7 @@ export class TenantsService {
             }
         });
     }
-    
+
     /**
      * Create Tenant
      * @param data The data for the request.
@@ -10719,7 +10725,7 @@ export class TenantsService {
             }
         });
     }
-    
+
     /**
      * Get Tenant
      * @param data The data for the request.
@@ -10739,7 +10745,7 @@ export class TenantsService {
             }
         });
     }
-    
+
     /**
      * Update Tenant
      * @param data The data for the request.
@@ -10762,7 +10768,7 @@ export class TenantsService {
             }
         });
     }
-    
+
     /**
      * Delete Tenant
      * @param data The data for the request.
@@ -10782,7 +10788,7 @@ export class TenantsService {
             }
         });
     }
-    
+
     /**
      * Send Smtp Test Email
      * @param data The data for the request.
@@ -10805,7 +10811,7 @@ export class TenantsService {
             }
         });
     }
-    
+
     /**
      * Get Credentials
      * @param data The data for the request.
@@ -10825,7 +10831,7 @@ export class TenantsService {
             }
         });
     }
-    
+
     /**
      * Delete Credentials
      * @param data The data for the request.
@@ -10863,7 +10869,7 @@ export class ThirdPartyAppsService {
             url: '/api/v1/third-party-apps/available-scopes'
         });
     }
-    
+
     /**
      * Create Third Party App
      * Create a new third-party app and return its raw key (shown once).
@@ -10890,7 +10896,7 @@ export class ThirdPartyAppsService {
             }
         });
     }
-    
+
     /**
      * List Third Party Apps
      * List all apps (active + revoked) for the caller's tenant.
@@ -10911,7 +10917,7 @@ export class ThirdPartyAppsService {
             }
         });
     }
-    
+
     /**
      * Get Third Party App
      * Get a single app by id. 404 if not found or outside caller's tenant.
@@ -10936,7 +10942,7 @@ export class ThirdPartyAppsService {
             }
         });
     }
-    
+
     /**
      * Update Third Party App
      * Update name and/or scopes. Cannot edit a revoked app.
@@ -10964,7 +10970,7 @@ export class ThirdPartyAppsService {
             }
         });
     }
-    
+
     /**
      * Revoke Third Party App
      * Soft-revoke the app: set revoked_at = now(), active = False.
@@ -10991,7 +10997,7 @@ export class ThirdPartyAppsService {
             }
         });
     }
-    
+
     /**
      * Rotate Third Party App
      * Generate a new raw key for the app. The new key is returned once.
@@ -11045,7 +11051,7 @@ export class ThirdPartyDiscoveryService {
             }
         });
     }
-    
+
     /**
      * Get caller scope documentation
      * Return endpoint documentation for the caller's held scopes.
@@ -11073,7 +11079,7 @@ export class ThirdPartyDiscoveryService {
             }
         });
     }
-    
+
     /**
      * Filtered OpenAPI 3.x spec for the caller's third-party surface
      * Return a curated OpenAPI spec scoped to what the caller can use.
@@ -11138,7 +11144,7 @@ export class TicketingStepsService {
             }
         });
     }
-    
+
     /**
      * List Ticketing Steps
      * List ticketing steps.
@@ -11174,7 +11180,7 @@ export class TicketingStepsService {
             }
         });
     }
-    
+
     /**
      * Create Ticketing Step
      * @param data The data for the request.
@@ -11197,7 +11203,7 @@ export class TicketingStepsService {
             }
         });
     }
-    
+
     /**
      * Get Ticketing Step
      * @param data The data for the request.
@@ -11221,7 +11227,7 @@ export class TicketingStepsService {
             }
         });
     }
-    
+
     /**
      * Update Ticketing Step
      * @param data The data for the request.
@@ -11248,7 +11254,7 @@ export class TicketingStepsService {
             }
         });
     }
-    
+
     /**
      * Delete Ticketing Step
      * @param data The data for the request.
@@ -11272,7 +11278,7 @@ export class TicketingStepsService {
             }
         });
     }
-    
+
     /**
      * Copy Steps To Flow
      * Copy another flow's checkout steps into `target_flow_id`.
@@ -11338,7 +11344,7 @@ export class TracksService {
             }
         });
     }
-    
+
     /**
      * Create Track
      * @param data The data for the request.
@@ -11361,7 +11367,7 @@ export class TracksService {
             }
         });
     }
-    
+
     /**
      * Get Track
      * @param data The data for the request.
@@ -11385,7 +11391,7 @@ export class TracksService {
             }
         });
     }
-    
+
     /**
      * Update Track
      * @param data The data for the request.
@@ -11412,7 +11418,7 @@ export class TracksService {
             }
         });
     }
-    
+
     /**
      * Delete Track
      * @param data The data for the request.
@@ -11436,7 +11442,7 @@ export class TracksService {
             }
         });
     }
-    
+
     /**
      * List Track Events
      * @param data The data for the request.
@@ -11466,7 +11472,7 @@ export class TracksService {
             }
         });
     }
-    
+
     /**
      * List Portal Tracks
      * @param data The data for the request.
@@ -11492,7 +11498,7 @@ export class TracksService {
             }
         });
     }
-    
+
     /**
      * Get Portal Track
      * @param data The data for the request.
@@ -11512,7 +11518,7 @@ export class TracksService {
             }
         });
     }
-    
+
     /**
      * List Portal Track Events
      * @param data The data for the request.
@@ -11567,7 +11573,7 @@ export class TranslationsService {
             }
         });
     }
-    
+
     /**
      * Upsert Translation
      * Create or update a translation for an entity.
@@ -11591,7 +11597,7 @@ export class TranslationsService {
             }
         });
     }
-    
+
     /**
      * Ai Translate
      * Use AI to generate draft translations for an entity. Returns translated fields (not saved).
@@ -11615,7 +11621,7 @@ export class TranslationsService {
             }
         });
     }
-    
+
     /**
      * Delete Translation
      * Delete a translation.
@@ -11667,7 +11673,7 @@ export class TrialsService {
             }
         });
     }
-    
+
     /**
      * Verify Trial
      * Verify the emailed code and provision the trial workspace (public).
@@ -11718,7 +11724,7 @@ export class UploadsService {
             }
         });
     }
-    
+
     /**
      * Get Presigned Upload Url Portal
      * Generate a presigned URL for direct upload (portal humans).
@@ -11768,7 +11774,7 @@ export class UsersService {
             }
         });
     }
-    
+
     /**
      * Create User
      * @param data The data for the request.
@@ -11787,7 +11793,7 @@ export class UsersService {
             }
         });
     }
-    
+
     /**
      * Get Current User Info
      * @returns UserPublic Successful Response
@@ -11799,7 +11805,7 @@ export class UsersService {
             url: '/api/v1/users/me'
         });
     }
-    
+
     /**
      * Get User
      * @param data The data for the request.
@@ -11819,7 +11825,7 @@ export class UsersService {
             }
         });
     }
-    
+
     /**
      * Update User
      * @param data The data for the request.
@@ -11842,7 +11848,7 @@ export class UsersService {
             }
         });
     }
-    
+
     /**
      * Delete User
      * @param data The data for the request.
@@ -11907,7 +11913,7 @@ export class VenuePropertyTypesService {
             }
         });
     }
-    
+
     /**
      * Create Property Type
      * @param data The data for the request.
@@ -11930,7 +11936,7 @@ export class VenuePropertyTypesService {
             }
         });
     }
-    
+
     /**
      * Update Property Type
      * @param data The data for the request.
@@ -11957,7 +11963,7 @@ export class VenuePropertyTypesService {
             }
         });
     }
-    
+
     /**
      * Delete Property Type
      * @param data The data for the request.
@@ -11981,7 +11987,7 @@ export class VenuePropertyTypesService {
             }
         });
     }
-    
+
     /**
      * List Property Types Portal
      * @returns VenuePropertyTypePublic Successful Response

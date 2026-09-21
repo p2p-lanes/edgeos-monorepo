@@ -91,6 +91,8 @@
     "empty_description": "您的付款记录将显示在这里。",
     "total": "总计",
     "lines": "付款项目",
+    "application_fee": "申请费",
+    "application_fee_description": "您的活动申请费用。",
     "line_quantity": "数量：{{count}}",
     "legacy_purchase": "历史购买记录",
     "invoice": "发票",

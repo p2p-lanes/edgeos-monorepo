@@ -91,6 +91,8 @@
     "empty_description": "Greiðsluferillinn þinn birtist hér.",
     "total": "Samtals",
     "lines": "Greiðsluliðir",
+    "application_fee": "Umsóknargjald",
+    "application_fee_description": "Gjald fyrir umsókn þína um þátttöku í viðburðinum.",
     "line_quantity": "Magn: {{count}}",
     "legacy_purchase": "Eldri kaup",
     "invoice": "Reikningur",
