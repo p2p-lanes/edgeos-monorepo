@@ -105,6 +105,8 @@
     "empty_description": "Your payment history will appear here.",
     "total": "Total",
     "lines": "Payment items",
+    "application_fee": "Application fee",
+    "application_fee_description": "Fee for your event application.",
     "line_quantity": "Quantity: {{count}}",
     "legacy_purchase": "Legacy purchase",
     "invoice": "Invoice",

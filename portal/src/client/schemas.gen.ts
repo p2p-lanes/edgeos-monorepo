@@ -4319,7 +4319,7 @@ export const ApplicationReviewerOptionSchema = {
     type: 'object',
     required: ['id'],
     title: 'ApplicationReviewerOption',
-    description: 'A reviewer who has submitted at least one review for a popup.'
+    description: 'A configured reviewer or past review submitter for a popup.'
 } as const;
 
 export const ApplicationReviewerVoteSchema = {

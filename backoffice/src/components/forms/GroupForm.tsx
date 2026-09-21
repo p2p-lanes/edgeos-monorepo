@@ -10,7 +10,7 @@ import {
   ShieldCheck,
   Users,
 } from "lucide-react"
-import type { ReactNode } from "react"
+import { type ReactNode, useRef } from "react"
 import {
   type GroupAdminUpdate,
   type GroupCreate,
@@ -62,6 +62,7 @@ export function GroupForm({
   const { isOperatorOrAbove } = useAuth()
   const isEdit = !!defaultValues
   const readOnly = !isOperatorOrAbove
+  const skipBlockerRef = useRef(false)
 
   const { data: popupData } = useQuery({
     queryKey: ["popups", defaultValues?.popup_id ?? selectedPopupId],
@@ -82,6 +83,8 @@ export function GroupForm({
           navigate({ to: "/groups/$id/edit", params: { id: data.id } }),
       })
       queryClient.invalidateQueries({ queryKey: ["groups"] })
+      // FlowPicker restores its default after reset while navigation settles.
+      skipBlockerRef.current = true
       form.reset()
       onSuccess()
     },
@@ -176,7 +179,7 @@ export function GroupForm({
     },
   })
 
-  const blocker = useUnsavedChanges(form)
+  const blocker = useUnsavedChanges(form, skipBlockerRef)
 
   const isPending = createMutation.isPending || updateMutation.isPending
 
