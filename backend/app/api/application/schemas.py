@@ -169,7 +169,7 @@ class ApplicationReviewerVote(BaseModel):
 
 
 class ApplicationReviewerOption(BaseModel):
-    """A reviewer who has submitted at least one review for a popup."""
+    """A configured reviewer or past review submitter for a popup."""
 
     id: uuid.UUID
     full_name: str | None = None
@@ -537,6 +537,9 @@ APPLICATION_FILTER_FIELDS: dict[str, FilterField] = {
     "skipped_by_me": FilterField("boolean", frozenset({"eq"})),
     "reviewed_by_me": FilterField("boolean", frozenset({"eq"})),
     "reviewed_by": FilterField("uuid", frozenset({"eq", "neq"})),
+    "review_decision": FilterField(
+        "select", frozenset({"eq", "neq"}), frozenset(ReviewDecision)
+    ),
     "invite_id": FilterField("uuid", frozenset({"eq", "neq"})),
     "referral_id": FilterField("uuid", frozenset({"eq", "neq"})),
 }
