@@ -11,6 +11,7 @@ export type OrderStatus =
 export interface OrderProjection {
   id: string
   status: OrderStatus
+  isApplicationFee: boolean
   provenance: "known" | "legacy"
   total: string
   currency: string
@@ -58,6 +59,7 @@ export function projectOrders(
       order: {
         id: payment.id,
         status: projectStatus(payment.status),
+        isApplicationFee: payment.payment_type === "application_fee",
         provenance: payment.sales_flow_id ? "known" : "legacy",
         total: payment.amount ?? "0",
         currency: payment.currency ?? "USD",
