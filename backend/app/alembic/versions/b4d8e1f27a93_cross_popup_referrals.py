@@ -13,7 +13,7 @@ Nothing is copied: no flow accepted links from other popups before this, so
 NULL (off) is the honest starting point for every existing flow.
 
 Revision ID: b4d8e1f27a93
-Revises: e2c6a91b7d4f
+Revises: f4b7c9d2e6a1
 Create Date: 2026-09-16 00:00:00.000000
 
 """
@@ -24,7 +24,7 @@ from sqlalchemy.dialects import postgresql
 
 # revision identifiers, used by Alembic.
 revision = "b4d8e1f27a93"
-down_revision = "e2c6a91b7d4f"
+down_revision = "f4b7c9d2e6a1"
 branch_labels = None
 depends_on = None
 

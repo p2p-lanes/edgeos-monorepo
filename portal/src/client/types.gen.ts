@@ -4270,6 +4270,7 @@ export type PopupAdmin = {
     start_date?: (string | null);
     end_date?: (string | null);
     status?: PopupStatus;
+    visible_in_portal?: boolean;
     sale_type?: SaleType;
     checkout_mode?: CheckoutMode;
     allows_coupons?: (boolean | null);
@@ -4345,6 +4346,7 @@ export type PopupCreate = {
     start_date?: (string | null);
     end_date?: (string | null);
     status?: PopupStatus;
+    visible_in_portal?: boolean;
     sale_type?: SaleType;
     checkout_mode?: (CheckoutMode | null);
     allows_coupons?: (boolean | null);
@@ -4528,6 +4530,7 @@ export type PopupUpdate = {
     location?: (string | null);
     slug?: (string | null);
     status?: (PopupStatus | null);
+    visible_in_portal?: (boolean | null);
     sale_type?: (SaleType | null);
     checkout_mode?: (CheckoutMode | null);
     start_date?: (string | null);
@@ -4667,6 +4670,13 @@ export type PreviousApplicationSummary = {
     spend?: Array<PreviousApplicationSpend>;
     submitted_at?: (string | null);
     created_at?: (string | null);
+};
+
+/**
+ * Canonical URL slug for a popup's primary sales flow.
+ */
+export type PrimaryCheckoutFlow = {
+    flow_slug: string;
 };
 
 /**
@@ -7300,6 +7310,14 @@ export type CheckInListCheckInsData = {
 };
 
 export type CheckInListCheckInsResponse = (ListModel_CheckInListItem_);
+
+export type CheckoutGetPrimaryCheckoutFlowData = {
+    slug: string;
+    xEdgeOsPublishableKey?: (string | null);
+    xTenantId?: (string | null);
+};
+
+export type CheckoutGetPrimaryCheckoutFlowResponse = (PrimaryCheckoutFlow);
 
 export type CheckoutGetFlowRuntimeData = {
     acceptLanguage?: (string | null);

@@ -19651,6 +19651,11 @@ export const PopupAdminSchema = {
             '$ref': '#/components/schemas/PopupStatus',
             default: 'draft'
         },
+        visible_in_portal: {
+            type: 'boolean',
+            title: 'Visible In Portal',
+            default: true
+        },
         sale_type: {
             '$ref': '#/components/schemas/SaleType',
             default: 'application'
@@ -20258,6 +20263,11 @@ export const PopupCreateSchema = {
         status: {
             '$ref': '#/components/schemas/PopupStatus',
             default: 'draft'
+        },
+        visible_in_portal: {
+            type: 'boolean',
+            title: 'Visible In Portal',
+            default: true
         },
         sale_type: {
             '$ref': '#/components/schemas/SaleType',
@@ -21503,6 +21513,17 @@ export const PopupUpdateSchema = {
                 }
             ]
         },
+        visible_in_portal: {
+            anyOf: [
+                {
+                    type: 'boolean'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Visible In Portal'
+        },
         sale_type: {
             anyOf: [
                 {
@@ -22407,6 +22428,19 @@ export const PreviousApplicationSummarySchema = {
 Powers the "Previous applications" block of the BO application detail: it
 tells a reviewer whether this person already took part in other popups of
 the tenant, and how much they bought when they did.`
+} as const;
+
+export const PrimaryCheckoutFlowSchema = {
+    properties: {
+        flow_slug: {
+            type: 'string',
+            title: 'Flow Slug'
+        }
+    },
+    type: 'object',
+    required: ['flow_slug'],
+    title: 'PrimaryCheckoutFlow',
+    description: "Canonical URL slug for a popup's primary sales flow."
 } as const;
 
 export const ProductBatchSchema = {

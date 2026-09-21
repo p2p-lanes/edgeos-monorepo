@@ -21,6 +21,17 @@ from app.api.sales_flow.schemas import SelectedSalesFlow
 from app.api.ticketing_step.schemas import TicketingStepPublic
 
 # ---------------------------------------------------------------------------
+# Primary-flow resolution (GET /checkout/{slug}/primary)
+# ---------------------------------------------------------------------------
+
+
+class PrimaryCheckoutFlow(BaseModel):
+    """Canonical URL slug for a popup's primary sales flow."""
+
+    flow_slug: str
+
+
+# ---------------------------------------------------------------------------
 # Runtime schemas (GET /checkout/{slug}/{flow_slug}/runtime)
 # ---------------------------------------------------------------------------
 

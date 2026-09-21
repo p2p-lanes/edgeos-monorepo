@@ -215,6 +215,10 @@ class PopupBase(SQLModel):
     start_date: datetime | None = None
     end_date: datetime | None = None
     status: PopupStatus = PopupStatus.draft
+    visible_in_portal: bool = Field(
+        default=True,
+        sa_column=Column(Boolean, nullable=False, server_default="true"),
+    )
     sale_type: SaleType = Field(
         default=SaleType.application,
         sa_column=Column(String, nullable=False, server_default="application"),
@@ -397,6 +401,7 @@ class PopupCreate(SQLModel):
     start_date: datetime | None = None
     end_date: datetime | None = None
     status: PopupStatus = PopupStatus.draft
+    visible_in_portal: bool = True
     sale_type: SaleType = SaleType.application
     checkout_mode: CheckoutMode | None = None
     allows_coupons: bool | None = False
@@ -522,6 +527,7 @@ class PopupUpdate(SQLModel):
     location: str | None = None
     slug: str | None = None
     status: PopupStatus | None = None
+    visible_in_portal: bool | None = None
     sale_type: SaleType | None = None
     checkout_mode: CheckoutMode | None = None
     start_date: datetime | None = None
