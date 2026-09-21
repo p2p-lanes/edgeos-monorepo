@@ -7,6 +7,7 @@ Spec: REQ-GR-001 (create/list), REQ-GR-003 (redemption guard order),
 
 import uuid
 from datetime import UTC, datetime
+from typing import TYPE_CHECKING
 
 from fastapi import HTTPException, status
 from sqlmodel import Session, col, desc, func, select
@@ -19,7 +20,12 @@ from app.api.invite.schemas import (
     InviteUpdate,
     generate_invite_token,
 )
+from app.api.popup.models import Popups
 from app.api.shared.crud import BaseCRUD
+
+if TYPE_CHECKING:
+    from app.api.sales_flow.models import SalesFlows
+    from app.api.sales_flow.schemas import EffectiveFlowConfig
 
 
 class _UnsetType:
@@ -248,8 +254,14 @@ class InvitesCRUD(BaseCRUD[Invites, InviteCreate, InviteUpdate]):
         tenant_id: uuid.UUID,
         referrer_human_id: uuid.UUID,
         max_uses_override: int | None | type[_UNSET] = _UNSET,
+        sales_flow_id: uuid.UUID | None = None,
+        source_popup_id: uuid.UUID | None = None,
     ) -> Invites:
         """Create an attendee's own link, auto-generating a token when omitted.
+
+        ``sales_flow_id`` defaults to the door the attendee came through. A
+        cross-popup link passes the target popup's flow explicitly, together
+        with the ``source_popup_id`` whose access allowed the share.
 
         Raises 409 if (popup_id, token) already exists -- checked against ALL
         links, since the uniqueness constraint spans the table and an admin
@@ -274,10 +286,12 @@ class InvitesCRUD(BaseCRUD[Invites, InviteCreate, InviteUpdate]):
         link = Invites(
             tenant_id=tenant_id,
             popup_id=obj_in.popup_id,
-            sales_flow_id=self._flow_for_attendee_link(
+            sales_flow_id=sales_flow_id
+            or self._flow_for_attendee_link(
                 session, obj_in.popup_id, referrer_human_id
             ),
             referrer_human_id=referrer_human_id,
+            source_popup_id=source_popup_id,
             token=token,
             max_uses=effective_max_uses,
             expires_at=obj_in.expires_at,
@@ -322,6 +336,33 @@ class InvitesCRUD(BaseCRUD[Invites, InviteCreate, InviteUpdate]):
                 detail="Sales flow not found",
             )
         return default_flow.id
+
+    def cross_popup_target_flow(
+        self, session: Session, popup: Popups
+    ) -> "SalesFlows | None":
+        """The flow a link from another popup lands people in, if it accepts them.
+
+        The popup's default flow, which is where someone with no application
+        there would land anyway. It must be open, take applications (redeeming
+        a link creates one) and have opted in to links from other popups. The
+        popup itself must be active: a draft is not ready for guests and an
+        ended one invalidates its links.
+        """
+        from app.api.popup.schemas import PopupStatus
+        from app.api.sales_flow.crud import sales_flows_crud
+        from app.api.sales_flow.schemas import SalesFlowType
+
+        if popup.status != PopupStatus.active.value:
+            return None
+        flow = sales_flows_crud.get_default_flow(session, popup.id)
+        if (
+            flow is None
+            or flow.status is not None
+            or flow.type != SalesFlowType.application
+            or not flow.cross_popup_referrals_enabled
+        ):
+            return None
+        return flow
 
     def update_invite(
         self,
@@ -400,6 +441,26 @@ class InvitesCRUD(BaseCRUD[Invites, InviteCreate, InviteUpdate]):
                 headers=_no_store,
             )
 
+    def ensure_referrer_in_good_standing(self, session: Session, link: Invites) -> None:
+        """Stop an attendee link from working while its owner is red-flagged.
+
+        Checked on use rather than switched off when the flag is set, so the
+        link comes back on its own if the flag is lifted. Admin links have no
+        referrer and always pass. 410 like every other dead link, and without
+        saying why: the preview is public.
+        """
+        if link.referrer_human_id is None:
+            return
+        from app.api.human.models import Humans
+
+        referrer = session.get(Humans, link.referrer_human_id)
+        if referrer is not None and referrer.red_flag:
+            raise HTTPException(
+                status_code=status.HTTP_410_GONE,
+                detail="This link is no longer active",
+                headers={"Cache-Control": "no-store"},
+            )
+
     def increment_uses(
         self,
         session: Session,
@@ -439,6 +500,20 @@ class InvitesCRUD(BaseCRUD[Invites, InviteCreate, InviteUpdate]):
             Applications.human_id == human_id,
         )
         return session.exec(stmt).first() is not None
+
+
+def attendee_link_enabled(config: "EffectiveFlowConfig", link: Invites) -> bool:
+    """Whether the flow a link lands people in currently accepts it.
+
+    Each kind of link has its own switch on that flow: invites for admin
+    links, referrals for an attendee sharing their own popup, and cross-popup
+    referrals for an attendee sharing a popup they are not in.
+    """
+    if not link.is_portal_created:
+        return bool(config.invites_enabled)
+    if link.is_cross_popup:
+        return bool(config.cross_popup_referrals_enabled)
+    return bool(config.referrals_enabled)
 
 
 invites_crud = InvitesCRUD()

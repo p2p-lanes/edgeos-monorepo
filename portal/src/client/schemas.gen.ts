@@ -5734,6 +5734,23 @@ export const AttendeePurchasesSchema = {
     description: 'Purchased products grouped by attendee.'
 } as const;
 
+export const AttendeeSharingStatusSchema = {
+    properties: {
+        can_share: {
+            type: 'boolean',
+            title: 'Can Share'
+        }
+    },
+    type: 'object',
+    required: ['can_share'],
+    title: 'AttendeeSharingStatus',
+    description: `Whether the attendee may create their own link from a popup.
+
+The same answer POST /portal/invites gives, asked ahead of time so the
+portal can decide whether to offer the referrals screen at all. Never says
+why not: one of the reasons is a red flag.`
+} as const;
+
 export const AttendeeStatsSchema = {
     properties: {
         total: {
@@ -9448,6 +9465,42 @@ export const CredentialTypeSchema = {
     type: 'string',
     enum: ['crud', 'readonly'],
     title: 'CredentialType'
+} as const;
+
+export const CrossPopupReferralTargetSchema = {
+    properties: {
+        popup_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Popup Id'
+        },
+        name: {
+            type: 'string',
+            title: 'Name'
+        },
+        slug: {
+            type: 'string',
+            title: 'Slug'
+        },
+        link: {
+            anyOf: [
+                {
+                    '$ref': '#/components/schemas/InvitePublic'
+                },
+                {
+                    type: 'null'
+                }
+            ]
+        }
+    },
+    type: 'object',
+    required: ['popup_id', 'name', 'slug'],
+    title: 'CrossPopupReferralTarget',
+    description: `A popup an attendee may share from the popup they are in.
+
+\`\`link\`\` is the attendee's existing link into it, if they have one. It
+may predate the cross-popup share, since an attendee holds one link per
+popup whichever way it was created.`
 } as const;
 
 export const CumulativeTrendsSchema = {
@@ -16177,6 +16230,18 @@ export const InvitePortalCreateSchema = {
             format: 'uuid',
             title: 'Popup Id'
         },
+        source_popup_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Source Popup Id'
+        },
         token: {
             anyOf: [
                 {
@@ -16219,7 +16284,11 @@ export const InvitePortalCreateSchema = {
 
 An attendee sets far less than an admin: the policy fields (discount,
 auto_approve) stay admin-only, and max_uses is dictated by the popup's
-max_referrals_per_attendee quota.`
+max_referrals_per_attendee quota.
+
+\`\`source_popup_id\`\` names another popup of the same tenant whose access
+lets the attendee share \`\`popup_id\`\` without being in it. Omitted, or equal
+to \`\`popup_id\`\`, means the attendee shares their own popup.`
 } as const;
 
 export const InvitePortalUpdateSchema = {
@@ -16377,6 +16446,18 @@ export const InvitePublicSchema = {
                 }
             ],
             title: 'Referrer Human Id'
+        },
+        source_popup_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Source Popup Id'
         },
         created_at: {
             type: 'string',
@@ -24660,6 +24741,17 @@ export const SalesFlowCreateSchema = {
             ],
             title: 'Max Referrals Per Attendee'
         },
+        cross_popup_referrals_enabled: {
+            anyOf: [
+                {
+                    type: 'boolean'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Cross Popup Referrals Enabled'
+        },
         checkin_pass_lead_days: {
             anyOf: [
                 {
@@ -25358,6 +25450,17 @@ export const SalesFlowPublicSchema = {
             ],
             title: 'Max Referrals Per Attendee'
         },
+        cross_popup_referrals_enabled: {
+            anyOf: [
+                {
+                    type: 'boolean'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Cross Popup Referrals Enabled'
+        },
         checkin_pass_lead_days: {
             anyOf: [
                 {
@@ -25941,6 +26044,17 @@ export const SalesFlowUpdateSchema = {
                 }
             ],
             title: 'Max Referrals Per Attendee'
+        },
+        cross_popup_referrals_enabled: {
+            anyOf: [
+                {
+                    type: 'boolean'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Cross Popup Referrals Enabled'
         },
         checkin_pass_lead_days: {
             anyOf: [

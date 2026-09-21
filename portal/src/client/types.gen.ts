@@ -1200,6 +1200,17 @@ export type AttendeesDirectoryEntry = {
 };
 
 /**
+ * Whether the attendee may create their own link from a popup.
+ *
+ * The same answer POST /portal/invites gives, asked ahead of time so the
+ * portal can decide whether to offer the referrals screen at all. Never says
+ * why not: one of the reasons is a red flag.
+ */
+export type AttendeeSharingStatus = {
+    can_share: boolean;
+};
+
+/**
  * Statistics for attendees.
  */
 export type AttendeeStats = {
@@ -2072,6 +2083,20 @@ export type CredentialInfo = {
 };
 
 export type CredentialType = 'crud' | 'readonly';
+
+/**
+ * A popup an attendee may share from the popup they are in.
+ *
+ * ``link`` is the attendee's existing link into it, if they have one. It
+ * may predate the cross-popup share, since an attendee holds one link per
+ * popup whichever way it was created.
+ */
+export type CrossPopupReferralTarget = {
+    popup_id: string;
+    name: string;
+    slug: string;
+    link?: (InvitePublic | null);
+};
 
 /**
  * Time series for cumulative charts.
@@ -3455,9 +3480,14 @@ export type InviteCreate = {
  * An attendee sets far less than an admin: the policy fields (discount,
  * auto_approve) stay admin-only, and max_uses is dictated by the popup's
  * max_referrals_per_attendee quota.
+ *
+ * ``source_popup_id`` names another popup of the same tenant whose access
+ * lets the attendee share ``popup_id`` without being in it. Omitted, or equal
+ * to ``popup_id``, means the attendee shares their own popup.
  */
 export type InvitePortalCreate = {
     popup_id: string;
+    source_popup_id?: (string | null);
     token?: (string | null);
     max_uses?: (number | null);
     expires_at?: (string | null);
@@ -3497,6 +3527,7 @@ export type InvitePublic = {
     expires_at?: (string | null);
     created_by?: (string | null);
     referrer_human_id?: (string | null);
+    source_popup_id?: (string | null);
     created_at: string;
     updated_at: string;
 };
@@ -5075,6 +5106,7 @@ export type SalesFlowCreate = {
     invites_enabled?: (boolean | null);
     referrals_enabled?: (boolean | null);
     max_referrals_per_attendee?: (number | null);
+    cross_popup_referrals_enabled?: (boolean | null);
     checkin_pass_lead_days?: (number | null);
     open_checkout_success_url?: (string | null);
     open_checkout_cancel_url?: (string | null);
@@ -5222,6 +5254,7 @@ export type SalesFlowPublic = {
     invites_enabled?: (boolean | null);
     referrals_enabled?: (boolean | null);
     max_referrals_per_attendee?: (number | null);
+    cross_popup_referrals_enabled?: (boolean | null);
     checkin_pass_lead_days?: (number | null);
     open_checkout_success_url?: (string | null);
     open_checkout_cancel_url?: (string | null);
@@ -5314,6 +5347,7 @@ export type SalesFlowUpdate = {
     invites_enabled?: (boolean | null);
     referrals_enabled?: (boolean | null);
     max_referrals_per_attendee?: (number | null);
+    cross_popup_referrals_enabled?: (boolean | null);
     checkin_pass_lead_days?: (number | null);
     open_checkout_success_url?: (string | null);
     open_checkout_cancel_url?: (string | null);
@@ -8740,6 +8774,18 @@ export type InvitesCreateMyLinkData = {
 };
 
 export type InvitesCreateMyLinkResponse = (InvitePublic);
+
+export type InvitesGetMySharingStatusData = {
+    popupId: string;
+};
+
+export type InvitesGetMySharingStatusResponse = (AttendeeSharingStatus);
+
+export type InvitesListCrossPopupTargetsData = {
+    sourcePopupId: string;
+};
+
+export type InvitesListCrossPopupTargetsResponse = (Array<CrossPopupReferralTarget>);
 
 export type InvitesUpdateMyLinkData = {
     linkId: string;

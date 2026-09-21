@@ -770,7 +770,10 @@
     "preview_login_required_title": "Skráðu þig inn til að sækja um",
     "preview_login_required_description": "Þu þarft að vera skráð/ur inn til að sækja um í gegnum þennan tilmælatengil.",
     "one_link_notice": "Þú ert nú þegar með tilmælatengil. Hver gestur fær einn tengil — deildu honum til að bjóða öðrum.",
-    "disabled_badge": "Óvirkur"
+    "disabled_badge": "Óvirkur",
+    "cross_title": "Bjóddu einhverjum á annan viðburð",
+    "cross_description": "Deildu tengli á annan viðburð okkar, jafnvel þótt þú mætir ekki sjálf(ur).",
+    "cross_create": "Búa til tengil"
   },
   "invite": {
     "loading": "Loading invite...",

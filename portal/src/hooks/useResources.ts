@@ -15,6 +15,7 @@ import { useTranslation } from "react-i18next"
 import { OpenClaw } from "@/components/Icons/OpenClaw"
 import { buildEndedResources } from "@/hooks/endedResources"
 import useAuth from "@/hooks/useAuth"
+import { useCanShareReferrals } from "@/hooks/useCanShareReferrals"
 import { useGatheringDoors } from "@/hooks/useGatheringDoors"
 import { useHumanPopupAccess } from "@/hooks/useHumanPopupAccess"
 import { usePortalDirectSalesFlows } from "@/hooks/usePortalDirectSalesFlows"
@@ -52,8 +53,7 @@ export function buildDirectoryResource({
 const useResources = () => {
   const { t } = useTranslation()
   const { getCity } = useCityProvider()
-  const { getApplicationsForPopup, getRelevantApplication, participation } =
-    useApplication()
+  const { getApplicationsForPopup, participation } = useApplication()
   // Which door into the gathering the sidebar is describing. It is
   // always on screen, so with two applications and no door named it
   // would have to speak for both at once with one status
@@ -64,7 +64,6 @@ const useResources = () => {
   // Directory intentionally do not.
   const flowQuery = flowId ? `?flow=${flowId}` : ""
   const { user } = useAuth()
-  const application = getRelevantApplication(flowId)
   const city = getCity()
   const popupId = city?.id ? String(city.id) : undefined
   const applicationFlows = usePortalSalesFlows(popupId).data ?? []
@@ -80,6 +79,7 @@ const useResources = () => {
   const endedAccess = useHumanPopupAccess(
     city?.status === "ended" && city?.id ? String(city.id) : null,
   )
+  const canShareReferrals = useCanShareReferrals(popupId)
 
   if (!city) {
     return { resources: [], doorName: null }
@@ -117,10 +117,8 @@ const useResources = () => {
   const eventsEnabled = city?.events_enabled ?? true
   const attendeeDirectoryEnabled =
     !nobodyApplies && (city?.show_attendee_directory ?? false)
-  const referralsEnabled = city?.referrals_enabled === true
 
   const isCompanion = participation?.type === "companion"
-  const selectedApplicationAccepted = application?.status === "accepted"
   const companionApplicationAccepted =
     participation?.type === "companion" &&
     participation?.application_status === "accepted"
@@ -320,8 +318,9 @@ const useResources = () => {
     {
       name: t("sidebar.referrals"),
       icon: Link2,
-      status:
-        selectedApplicationAccepted && referralsEnabled ? "active" : "hidden",
+      // The backend decides, from the flow the attendee came through: the
+      // popup's own referrals_enabled no longer follows that switch.
+      status: canShareReferrals ? "active" : "hidden",
       path: `/portal/${city?.slug}/referrals${flowQuery}`,
       group: "community",
     },
