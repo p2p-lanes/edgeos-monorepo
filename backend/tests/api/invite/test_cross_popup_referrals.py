@@ -348,3 +348,68 @@ class TestTargets:
         )
         assert resp.status_code == 200, resp.json()
         assert resp.json() == []
+
+
+class TestSharingStatus:
+    """What the portal sidebar asks before offering the referrals screen."""
+
+    SHARING = "/api/v1/portal/invites/sharing"
+
+    def _ask(self, client: TestClient, human: Humans, popup: Popups) -> bool:
+        resp = client.get(
+            self.SHARING,
+            params={"popup_id": str(popup.id)},
+            headers=_auth(_human_token(human)),
+        )
+        assert resp.status_code == 200, resp.json()
+        return resp.json()["can_share"]
+
+    def test_follows_the_flow_not_the_popup_flag(
+        self, client: TestClient, db: Session, tenant_a: Tenants
+    ) -> None:
+        """The popup's own referrals_enabled is stale since the switch moved
+        to the flow; only the flow decides."""
+        human = _make_human(db, tenant_a)
+        popup = _make_popup(db, tenant_a, referrals_enabled=False)
+        set_link_policy(db, popup, referrals_enabled=True)
+        _give_ticket(db, popup, human)
+
+        assert self._ask(client, human, popup) is True
+
+        set_link_policy(db, popup, referrals_enabled=False)
+        assert self._ask(client, human, popup) is False
+
+    def test_needs_access_to_the_popup(
+        self, client: TestClient, db: Session, tenant_a: Tenants
+    ) -> None:
+        human = _make_human(db, tenant_a)
+        popup = _make_popup(db, tenant_a)
+        set_link_policy(db, popup, referrals_enabled=True)
+
+        assert self._ask(client, human, popup) is False
+
+    def test_false_for_a_red_flagged_attendee(
+        self, client: TestClient, db: Session, tenant_a: Tenants
+    ) -> None:
+        human = _make_human(db, tenant_a)
+        popup = _source(db, tenant_a, human)
+        _flag(db, human)
+
+        assert self._ask(client, human, popup) is False
+
+    def test_a_popup_of_another_tenant_reads_as_not_found(
+        self,
+        client: TestClient,
+        db: Session,
+        tenant_a: Tenants,
+        tenant_b: Tenants,
+    ) -> None:
+        human = _make_human(db, tenant_a)
+        foreign = _make_popup(db, tenant_b)
+
+        resp = client.get(
+            self.SHARING,
+            params={"popup_id": str(foreign.id)},
+            headers=_auth(_human_token(human)),
+        )
+        assert resp.status_code == 404, resp.json()

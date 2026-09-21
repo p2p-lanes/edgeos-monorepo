@@ -5734,6 +5734,23 @@ export const AttendeePurchasesSchema = {
     description: 'Purchased products grouped by attendee.'
 } as const;
 
+export const AttendeeSharingStatusSchema = {
+    properties: {
+        can_share: {
+            type: 'boolean',
+            title: 'Can Share'
+        }
+    },
+    type: 'object',
+    required: ['can_share'],
+    title: 'AttendeeSharingStatus',
+    description: `Whether the attendee may create their own link from a popup.
+
+The same answer POST /portal/invites gives, asked ahead of time so the
+portal can decide whether to offer the referrals screen at all. Never says
+why not: one of the reasons is a red flag.`
+} as const;
+
 export const AttendeeStatsSchema = {
     properties: {
         total: {

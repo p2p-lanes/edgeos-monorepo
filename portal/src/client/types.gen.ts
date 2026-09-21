@@ -1200,6 +1200,17 @@ export type AttendeesDirectoryEntry = {
 };
 
 /**
+ * Whether the attendee may create their own link from a popup.
+ *
+ * The same answer POST /portal/invites gives, asked ahead of time so the
+ * portal can decide whether to offer the referrals screen at all. Never says
+ * why not: one of the reasons is a red flag.
+ */
+export type AttendeeSharingStatus = {
+    can_share: boolean;
+};
+
+/**
  * Statistics for attendees.
  */
 export type AttendeeStats = {
@@ -8763,6 +8774,12 @@ export type InvitesCreateMyLinkData = {
 };
 
 export type InvitesCreateMyLinkResponse = (InvitePublic);
+
+export type InvitesGetMySharingStatusData = {
+    popupId: string;
+};
+
+export type InvitesGetMySharingStatusResponse = (AttendeeSharingStatus);
 
 export type InvitesListCrossPopupTargetsData = {
     sourcePopupId: string;

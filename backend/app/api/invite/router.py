@@ -16,6 +16,7 @@ from fastapi import APIRouter, HTTPException, Query, Response, status
 
 from app.api.invite.crud import attendee_link_enabled, invites_crud
 from app.api.invite.schemas import (
+    AttendeeSharingStatus,
     CrossPopupReferralTarget,
     InviteCreate,
     InvitePortalCreate,
@@ -638,6 +639,25 @@ def _tenant_popup_or_404(
             status_code=status.HTTP_404_NOT_FOUND, detail="Popup not found"
         )
     return popup
+
+
+@portal_router.get("/sharing", response_model=AttendeeSharingStatus)
+async def get_my_sharing_status(
+    db: SessionDep,
+    current_human: CurrentHuman,
+    popup_id: uuid.UUID,
+) -> AttendeeSharingStatus:
+    """Portal: whether this attendee may create their own link from a popup.
+
+    Backs the referrals entry in the portal sidebar. The switch lives on the
+    flow the attendee came through, which the popup-level flag no longer
+    reflects, so the portal asks here instead of reading the popup.
+    """
+    popup = _tenant_popup_or_404(db, popup_id, current_human.tenant_id)
+    if current_human.red_flag:
+        return AttendeeSharingStatus(can_share=False)
+    denial, _ = _share_denial(db, current_human.id, popup.id)
+    return AttendeeSharingStatus(can_share=denial is None)
 
 
 @portal_router.get(

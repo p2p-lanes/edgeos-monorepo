@@ -159,6 +159,17 @@ class InvitePublic(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
+class AttendeeSharingStatus(BaseModel):
+    """Whether the attendee may create their own link from a popup.
+
+    The same answer POST /portal/invites gives, asked ahead of time so the
+    portal can decide whether to offer the referrals screen at all. Never says
+    why not: one of the reasons is a red flag.
+    """
+
+    can_share: bool
+
+
 class CrossPopupReferralTarget(BaseModel):
     """A popup an attendee may share from the popup they are in.
 
