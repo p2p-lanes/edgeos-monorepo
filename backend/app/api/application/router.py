@@ -1132,9 +1132,15 @@ async def get_my_purchases(
 
     results = []
     for attendee in attendees:
-        # Each AttendeeProducts row is one ticket — group by product_id and count.
-        counts = Counter(ap.product_id for ap in attendee.attendee_products)
-        seen = {ap.product_id: ap.product for ap in attendee.attendee_products}
+        # Ownership is defined by active product units, independently of payment
+        # history. Keep this explicit even though the CRUD loader applies the same
+        # criterion, so a previously-loaded relationship cannot leak revoked units.
+        active_units = [
+            unit for unit in attendee.attendee_products if unit.revoked_at is None
+        ]
+        # Each AttendeeProducts row is one unit — group by product_id and count.
+        counts = Counter(unit.product_id for unit in active_units)
+        seen = {unit.product_id: unit.product for unit in active_units}
         products = []
         for pid, qty in counts.items():
             product = ProductWithQuantity.model_validate(seen[pid])
