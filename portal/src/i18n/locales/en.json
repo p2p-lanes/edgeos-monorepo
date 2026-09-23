@@ -170,6 +170,18 @@
     "network_error": "Network error. Please check your connection."
   },
   "form": {
+    "multiselect": {
+      "placeholder": "Select options...",
+      "selected_one": "{{count}} option selected",
+      "selected_other": "{{count}} options selected",
+      "search": "Search...",
+      "search_label": "Search options",
+      "empty": "No options found",
+      "remove": "Remove {{option}}",
+      "between": "Select between {{min}} and {{max}} options",
+      "at_least": "Select at least {{min}}",
+      "up_to": "Select up to {{max}}"
+    },
     "email": "Email",
     "first_name": "First Name",
     "first_name_placeholder": "Enter your first name",

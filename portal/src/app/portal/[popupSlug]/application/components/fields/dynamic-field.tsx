@@ -1,4 +1,5 @@
 import { type ErrorTone, SchemaField } from "@edgeos/shared-form-ui"
+import { useTranslation } from "react-i18next"
 import type { FormFieldSchema } from "@/types/form-schema"
 
 interface DynamicFieldProps {
@@ -12,6 +13,7 @@ interface DynamicFieldProps {
    *  (red); the open-ticketing buyer step opts into `warning` (amber)
    *  to match the CheckoutToast banner palette. */
   errorTone?: ErrorTone
+  portalContentClassName?: string
 }
 
 export function DynamicField({
@@ -22,7 +24,10 @@ export function DynamicField({
   onChange,
   hideLabelAndSubtitle = false,
   errorTone,
+  portalContentClassName,
 }: DynamicFieldProps) {
+  const { t } = useTranslation()
+
   return (
     <SchemaField
       name={name}
@@ -32,6 +37,18 @@ export function DynamicField({
       onChange={onChange}
       hideLabelAndSubtitle={hideLabelAndSubtitle}
       errorTone={errorTone}
+      portalContentClassName={portalContentClassName}
+      multiSelectDetailedLabels={{
+        placeholder: t("form.multiselect.placeholder"),
+        search: t("form.multiselect.search"),
+        searchLabel: t("form.multiselect.search_label"),
+        empty: t("form.multiselect.empty"),
+        selected: (count) => t("form.multiselect.selected", { count }),
+        remove: (option) => t("form.multiselect.remove", { option }),
+        between: (min, max) => t("form.multiselect.between", { min, max }),
+        atLeast: (min) => t("form.multiselect.at_least", { min }),
+        upTo: (max) => t("form.multiselect.up_to", { max }),
+      }}
     />
   )
 }
