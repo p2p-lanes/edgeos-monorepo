@@ -41,6 +41,7 @@ export function FormSection({
                 >
                   <div>
                     <DynamicField
+                      portalContentClassName="portal-chrome"
                       name={name}
                       field={field}
                       value={values[name]}
@@ -57,6 +58,7 @@ export function FormSection({
                 className={resolved === "full" ? "md:col-span-2" : ""}
               >
                 <DynamicField
+                  portalContentClassName="portal-chrome"
                   name={name}
                   field={field}
                   value={values[name]}

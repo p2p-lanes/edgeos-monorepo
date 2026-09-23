@@ -156,6 +156,17 @@
     "network_error": "网络错误，请检查您的连接。"
   },
   "form": {
+    "multiselect": {
+      "placeholder": "选择选项...",
+      "selected_other": "已选择 {{count}} 个选项",
+      "search": "搜索...",
+      "search_label": "搜索选项",
+      "empty": "未找到选项",
+      "remove": "移除{{option}}",
+      "between": "请选择 {{min}} 至 {{max}} 个选项",
+      "at_least": "请至少选择 {{min}} 个选项",
+      "up_to": "最多选择 {{max}} 个选项"
+    },
     "email": "电子邮件",
     "first_name": "名",
     "first_name_placeholder": "输入您的名字",

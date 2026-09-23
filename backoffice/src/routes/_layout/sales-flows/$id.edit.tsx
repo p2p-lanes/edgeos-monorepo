@@ -74,9 +74,8 @@ function EditSalesFlowContent({ flowId }: { flowId: string }) {
         as an identical copy until you look here.
 
         These live in their own sections; this points at them with the flow
-        already selected. Reviewers are not among them: they belong to the
-        gathering, and a flow opts out through `reviewers_mode` below, which
-        is a decision rather than a place to keep a list.
+        already selected. Reviewers are managed in the form below, where a
+        flow can inherit the event's list or have its own reviewers.
       */}
       <InlineSection title="What it sells">
         <FlowSectionLinks
