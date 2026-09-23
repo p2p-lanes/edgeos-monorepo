@@ -12,6 +12,7 @@
 
 import { useMemo } from "react"
 import { CHECKOUT_MODE } from "@/checkout/popupCheckoutPolicy"
+import { productComparePrice } from "@/lib/product-compare-price"
 import { deriveProductState, type ProductSaleState } from "@/lib/product-state"
 import { useCheckout } from "@/providers/checkoutProvider"
 import { useCityProvider } from "@/providers/cityProvider"
@@ -146,7 +147,7 @@ function buildRowVM(
     maxQuantity: resolveMaxQuantityLocal(product),
     usesStepper,
     price: product.price,
-    comparePrice: product.compare_price ?? null,
+    comparePrice: productComparePrice(product),
   }
 }
 
@@ -429,7 +430,7 @@ export function useTicketsStep({
             maxQuantity: resolveMaxQuantityLocal(p),
             usesStepper,
             price: p.price,
-            comparePrice: p.compare_price ?? null,
+            comparePrice: productComparePrice(p),
           }
         }),
       }),

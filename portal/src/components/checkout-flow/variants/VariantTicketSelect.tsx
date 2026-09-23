@@ -23,6 +23,7 @@ import {
   useTicketsStep,
 } from "@/hooks/checkout/useTicketsStep"
 import { useAttendeeCategories } from "@/hooks/useAttendeeCategories"
+import { productComparePrice } from "@/lib/product-compare-price"
 import { deriveProductState } from "@/lib/product-state"
 import { cn } from "@/lib/utils"
 import { useCheckout } from "@/providers/checkoutProvider"
@@ -426,7 +427,7 @@ function PassRow({
   const { t } = useTranslation()
   const { purchased, selected } = product
   const isEditedForCredit = purchased && product.edit
-  const comparePrice = product.compare_price ?? product.original_price
+  const comparePrice = productComparePrice(product)
   const hasDiscount = comparePrice && comparePrice > product.price
   const isSelected = selected && !purchased
   const saleState = deriveProductState(product)
@@ -713,7 +714,7 @@ function DayPassRow({
   const isEditedForCredit = purchased && product.edit
   const quantity = product.quantity ?? 0
   const originalQuantity = product.original_quantity ?? 0
-  const comparePrice = product.compare_price ?? product.price
+  const comparePrice = productComparePrice(product)
   const hasDiscount = comparePrice != null && comparePrice > product.price
   const hasQuantity = quantity > 0
   const saleState = deriveProductState(product)
@@ -1099,8 +1100,8 @@ function OpenCheckoutRow({
   const { t } = useTranslation()
   const { product, quantity, maxQuantity, selected, disabled } = row
   const isAdded = quantity > 0 || selected
-  const hasDiscount =
-    product.compare_price != null && product.compare_price > product.price
+  const comparePrice = productComparePrice(product)
+  const hasDiscount = comparePrice != null && comparePrice > product.price
   const total = product.price * (quantity > 0 ? quantity : 1)
 
   return (
@@ -1144,18 +1145,18 @@ function OpenCheckoutRow({
           {isAdded && quantity > 1 ? (
             <p className="text-xs text-muted-foreground">
               {quantity} ×{" "}
-              {hasDiscount && product.compare_price != null && (
+              {hasDiscount && comparePrice != null && (
                 <span className="line-through">
-                  {formatCurrency(product.compare_price)}
+                  {formatCurrency(comparePrice)}
                 </span>
               )}{" "}
               {formatCurrency(product.price)}
             </p>
           ) : (
             hasDiscount &&
-            product.compare_price != null && (
+            comparePrice != null && (
               <p className="text-xs text-muted-foreground line-through">
-                {formatCurrency(product.compare_price)}
+                {formatCurrency(comparePrice)}
               </p>
             )
           )}
