@@ -12,7 +12,7 @@
  * and saving sends that value straight through.
  */
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
-import { render, screen, waitFor } from "@testing-library/react"
+import { render, screen, waitFor, within } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import type { ReactNode } from "react"
 import { beforeEach, describe, expect, it, vi } from "vitest"
@@ -23,6 +23,12 @@ vi.mock("@/client", () => ({
     deleteSalesFlow: vi.fn(),
     listSettingsByType: vi.fn(),
   },
+  PopupReviewersService: {
+    listReviewers: vi.fn(),
+    addReviewer: vi.fn(),
+    removeReviewer: vi.fn(),
+  },
+  UsersService: { listUsers: vi.fn() },
 }))
 
 vi.mock("@tanstack/react-router", () => ({
@@ -45,11 +51,35 @@ vi.mock("@/hooks/useUnsavedChanges", () => ({
   UnsavedChangesDialog: () => null,
 }))
 
-import { SalesFlowsService } from "@/client"
+import {
+  type PopupReviewerPublic,
+  PopupReviewersService,
+  SalesFlowsService,
+  UsersService,
+} from "@/client"
 import { SalesFlowForm } from "./SalesFlowForm"
 
 const mockUpdateSalesFlow = vi.mocked(SalesFlowsService.updateSalesFlow)
 const mockSettingsByType = vi.mocked(SalesFlowsService.listSettingsByType)
+const mockListReviewers = vi.mocked(PopupReviewersService.listReviewers)
+const mockRemoveReviewer = vi.mocked(PopupReviewersService.removeReviewer)
+const mockAddReviewer = vi.mocked(PopupReviewersService.addReviewer)
+
+const FLOW_REVIEWER: PopupReviewerPublic = {
+  id: "reviewer-1",
+  popup_id: "popup-1",
+  tenant_id: "tenant-1",
+  sales_flow_id: "flow-1",
+  user_id: "user-1",
+  user_full_name: "Demo Admin",
+  user_email: "admin@example.com",
+  is_required: false,
+  weight_multiplier: 1,
+}
+
+function reviewerList(results: PopupReviewerPublic[]) {
+  return { results, paging: { offset: 0, limit: 100, total: results.length } }
+}
 
 /**
  * Which settings a kind of flow can use is the server's answer now, so the
@@ -124,7 +154,7 @@ function makeWrapper() {
   )
 }
 
-function renderForm(overrides: Partial<typeof FLOW_BASE> = {}) {
+function renderForm(overrides: Partial<FlowDefaults> = {}) {
   return render(
     <SalesFlowForm
       popupId="popup-1"
@@ -152,6 +182,21 @@ describe("SalesFlowForm - flow-owned settings", () => {
     vi.clearAllMocks()
     mockUpdateSalesFlow.mockResolvedValue(FLOW_BASE as FlowDefaults)
     mockSettingsByType.mockResolvedValue(SETTINGS_BY_TYPE as never)
+    mockListReviewers.mockResolvedValue(reviewerList([]))
+    mockRemoveReviewer.mockResolvedValue(undefined)
+    mockAddReviewer.mockResolvedValue(FLOW_REVIEWER)
+    vi.mocked(UsersService.listUsers).mockResolvedValue({
+      results: [
+        {
+          id: "user-1",
+          email: "admin@example.com",
+          full_name: "Demo Admin",
+          role: "admin",
+          tenant_id: "tenant-1",
+        },
+      ],
+      paging: { offset: 0, limit: 100, total: 1 },
+    })
   })
 
   it("uses primary terminology for the flow identity field", async () => {
@@ -184,10 +229,6 @@ describe("SalesFlowForm - flow-owned settings", () => {
     // The badge every Class-B field used to carry. Its absence is the whole
     // point of slice 7: the flow stores the value, so there is no event
     // value to fall back to and nothing to disclose.
-    //
-    // `reviewers_mode` still offers an inherit/override choice and is meant
-    // to. Reviewers stay at popup level by decision, and a flow opts out of
-    // them by hand — a stored answer, not a fallback.
     expect(screen.queryByText(/inherited from event/i)).not.toBeInTheDocument()
   })
 
@@ -215,6 +256,92 @@ describe("SalesFlowForm - flow-owned settings", () => {
       unknown
     >
     expect(payload.allows_scholarship).toBe(false)
+  })
+
+  it("removes a flow's last reviewer without deleting the event's reviewer or resaving override mode", async () => {
+    const user = userEvent.setup()
+    mockListReviewers.mockResolvedValue(reviewerList([FLOW_REVIEWER]))
+    renderForm({ reviewers_mode: "override" })
+
+    await user.click(
+      await screen.findByRole("button", {
+        name: "Remove reviewer",
+        exact: true,
+      }),
+    )
+    expect(mockListReviewers).toHaveBeenCalledWith({
+      popupId: "popup-1",
+      salesFlowId: "flow-1",
+    })
+    const dialog = screen.getByRole("dialog", { name: "Remove Reviewer" })
+    expect(dialog).toHaveTextContent(
+      "This flow will inherit the event's reviewers again.",
+    )
+    expect(mockRemoveReviewer).not.toHaveBeenCalled()
+
+    mockListReviewers.mockResolvedValue(
+      reviewerList([{ ...FLOW_REVIEWER, id: "shared-1", sales_flow_id: null }]),
+    )
+    await user.click(
+      within(dialog).getByRole("button", { name: "Remove Reviewer" }),
+    )
+    await waitFor(() => {
+      expect(mockRemoveReviewer).toHaveBeenCalledExactlyOnceWith({
+        popupId: "popup-1",
+        userId: "user-1",
+        salesFlowId: "flow-1",
+      })
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument()
+      expect(
+        screen.queryByRole("button", { name: "Remove reviewer", exact: true }),
+      ).not.toBeInTheDocument()
+    })
+    expect(screen.getByText("Demo Admin")).toBeInTheDocument()
+
+    await user.click(screen.getByRole("button", { name: "Save Changes" }))
+    await waitFor(() => expect(mockUpdateSalesFlow).toHaveBeenCalled())
+    expect(mockUpdateSalesFlow.mock.calls[0][0].requestBody).not.toHaveProperty(
+      "reviewers_mode",
+    )
+  })
+
+  it("allows an inherited reviewer to be assigned to the flow's own list", async () => {
+    const user = userEvent.setup()
+    mockListReviewers.mockResolvedValue(
+      reviewerList([{ ...FLOW_REVIEWER, id: "shared-1", sales_flow_id: null }]),
+    )
+    renderForm()
+
+    expect(await screen.findByText("Demo Admin")).toBeInTheDocument()
+    expect(
+      screen.queryByRole("button", { name: "Remove reviewer", exact: true }),
+    ).not.toBeInTheDocument()
+    await user.click(screen.getByRole("button", { name: "Add Reviewer" }))
+    const dialog = screen.getByRole("dialog", { name: "Add Reviewer" })
+    await user.click(within(dialog).getByRole("combobox", { name: "User" }))
+    await user.click(screen.getByRole("option", { name: "Demo Admin" }))
+    mockListReviewers.mockResolvedValue(reviewerList([FLOW_REVIEWER]))
+    await user.click(
+      within(dialog).getByRole("button", { name: "Add Reviewer" }),
+    )
+
+    await waitFor(() => {
+      expect(mockAddReviewer).toHaveBeenCalledExactlyOnceWith({
+        popupId: "popup-1",
+        requestBody: {
+          user_id: "user-1",
+          sales_flow_id: "flow-1",
+          is_required: false,
+          weight_multiplier: 1,
+        },
+      })
+    })
+    expect(
+      await screen.findByRole("button", {
+        name: "Remove reviewer",
+        exact: true,
+      }),
+    ).toBeInTheDocument()
   })
 
   it("preserves draft settings after a rename without sending the old name", async () => {

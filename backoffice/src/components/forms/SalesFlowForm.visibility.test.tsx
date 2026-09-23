@@ -33,6 +33,10 @@ vi.mock("@/hooks/useUnsavedChanges", () => ({
   UnsavedChangesDialog: () => null,
 }))
 
+vi.mock("@/components/forms/ReviewersManager", () => ({
+  ReviewersManager: () => null,
+}))
+
 import { type SalesFlowPublic, SalesFlowsService } from "@/client"
 import { SalesFlowForm } from "./SalesFlowForm"
 

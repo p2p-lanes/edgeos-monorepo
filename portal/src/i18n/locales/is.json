@@ -156,6 +156,18 @@
     "network_error": "Netvilla. Vinsamlegast athugaðu tenginguna þína."
   },
   "form": {
+    "multiselect": {
+      "placeholder": "Veldu valkosti...",
+      "selected_one": "{{count}} valkostur valinn",
+      "selected_other": "{{count}} valkostir valdir",
+      "search": "Leita...",
+      "search_label": "Leita að valkostum",
+      "empty": "Engir valkostir fundust",
+      "remove": "Fjarlægja {{option}}",
+      "between": "Veldu á milli {{min}} og {{max}} valkosti",
+      "at_least": "Veldu að minnsta kosti {{min}}",
+      "up_to": "Veldu allt að {{max}}"
+    },
     "email": "Netfang",
     "first_name": "Fornafn",
     "first_name_placeholder": "Sláðu inn fornafn þitt",

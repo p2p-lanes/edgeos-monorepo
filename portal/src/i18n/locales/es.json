@@ -170,6 +170,18 @@
     "network_error": "Error de red. Por favor, verificá tu conexión."
   },
   "form": {
+    "multiselect": {
+      "placeholder": "Seleccioná opciones...",
+      "selected_one": "{{count}} opción seleccionada",
+      "selected_other": "{{count}} opciones seleccionadas",
+      "search": "Buscar...",
+      "search_label": "Buscar opciones",
+      "empty": "No se encontraron opciones",
+      "remove": "Quitar {{option}}",
+      "between": "Seleccioná entre {{min}} y {{max}} opciones",
+      "at_least": "Seleccioná al menos {{min}}",
+      "up_to": "Seleccioná hasta {{max}}"
+    },
     "email": "Email",
     "first_name": "Nombre",
     "first_name_placeholder": "Ingresá tu nombre",
