@@ -1,14 +1,7 @@
 import { useForm } from "@tanstack/react-form"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { useNavigate } from "@tanstack/react-router"
-import {
-  Hash,
-  ListOrdered,
-  ShieldCheck,
-  Tag,
-  User,
-  Workflow,
-} from "lucide-react"
+import { Hash, ListOrdered, ShieldCheck, Tag, Workflow } from "lucide-react"
 import { useRef, useState } from "react"
 
 import {
@@ -27,6 +20,7 @@ import {
 } from "@/components/forms/ConfigFieldRow"
 import { ConfigSectionRow } from "@/components/forms/ConfigSectionRow"
 import { RestrictionRuleEditor } from "@/components/forms/RestrictionRuleEditor"
+import { ReviewersManager } from "@/components/forms/ReviewersManager"
 import { SalesFlowVisibilityNote } from "@/components/forms/SalesFlowVisibilityNote"
 import { Button } from "@/components/ui/button"
 import {
@@ -213,7 +207,6 @@ export function SalesFlowForm({
       visibility: defaultValues?.visibility ?? "portal_listed",
       is_default: defaultValues?.is_default ?? false,
       order: defaultValues?.order?.toString() ?? "0",
-      reviewers_mode: defaultValues?.reviewers_mode ?? "inherit",
       identity_mode: defaultValues?.identity_mode ?? "portal_auth",
       config: buildInitialConfig(defaultValues),
       restrictionRule: parseRestrictionRuleToDrafts(
@@ -239,7 +232,6 @@ export function SalesFlowForm({
         visibility: value.visibility,
         is_default: value.is_default,
         order: Number(value.order),
-        reviewers_mode: value.reviewers_mode,
         identity_mode: value.identity_mode,
         restriction_rule: value.restrictionRule.unsupported
           ? defaultValues?.restriction_rule
@@ -441,33 +433,27 @@ export function SalesFlowForm({
               </InlineRow>
             )}
           </form.Field>
-
-          <form.Field name="reviewers_mode">
-            {(field) => (
-              <InlineRow
-                icon={<User className="h-4 w-4 text-muted-foreground" />}
-                label="Reviewers"
-                description="Override replaces the event's reviewer list with a flow-specific one"
-              >
-                <Select
-                  value={field.state.value}
-                  onValueChange={(value) =>
-                    field.handleChange(value as typeof field.state.value)
-                  }
-                  disabled={readOnly}
-                >
-                  <SelectTrigger className="w-40 text-sm" size="sm">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="inherit">Inherit from event</SelectItem>
-                    <SelectItem value="override">Override</SelectItem>
-                  </SelectContent>
-                </Select>
-              </InlineRow>
-            )}
-          </form.Field>
         </InlineSection>
+
+        <Separator />
+
+        {defaultValues ? (
+          <ReviewersManager
+            popupId={popupId}
+            tenantId={defaultValues.tenant_id}
+            flowId={defaultValues.id}
+            reviewersMode={defaultValues.reviewers_mode}
+            readOnly={readOnly}
+            variant="inline"
+          />
+        ) : (
+          <InlineSection title="Reviewers">
+            <p className="text-sm text-muted-foreground">
+              New sales flows inherit the event's reviewers. You can assign
+              reviewers specific to this flow after creating it.
+            </p>
+          </InlineSection>
+        )}
 
         {isEdit && defaultValues && (
           <>

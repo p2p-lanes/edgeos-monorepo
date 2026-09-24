@@ -19,6 +19,7 @@ import type {
 } from "@/hooks/checkout/useTicketsStep"
 import { useTicketsStep } from "@/hooks/checkout/useTicketsStep"
 import { imageOptimization } from "@/lib/image-optimization"
+import { productComparePrice } from "@/lib/product-compare-price"
 import { stepCardSurfaceStyle } from "@/lib/stepCardSurface"
 import { cn } from "@/lib/utils"
 import { formatCurrency } from "@/types/checkout"
@@ -378,8 +379,8 @@ function OpenCheckoutProductRow({
     quantity,
     max,
   }).max
-  const hasDiscount =
-    product.compare_price != null && product.compare_price > product.price
+  const comparePrice = productComparePrice(product)
+  const hasDiscount = comparePrice != null && comparePrice > product.price
   const subtotal = product.price * quantity
   const showSubtotal = quantity > 1
 
@@ -431,7 +432,7 @@ function OpenCheckoutProductRow({
                   isAdded ? "text-foreground/60" : "text-muted-foreground",
                 )}
               >
-                {formatCurrency(product.compare_price ?? 0)}
+                {formatCurrency(comparePrice ?? 0)}
               </div>
             )}
             <div

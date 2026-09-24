@@ -4,7 +4,7 @@ import type { ColumnDef, PaginationState } from "@tanstack/react-table"
 import { Info, Link2, Plus } from "lucide-react"
 import { Suspense, useEffect, useState } from "react"
 
-import { type InvitePublic, InvitesService } from "@/client"
+import { type InvitePublic, InvitesService, PopupsService } from "@/client"
 import { CopyLinkButton } from "@/components/Common/CopyLinkButton"
 import { DataTable, SortableHeader } from "@/components/Common/DataTable"
 import { EmptyState } from "@/components/Common/EmptyState"
@@ -86,6 +86,29 @@ function InviteCopyLink({ invite }: { invite: InvitePublic }) {
   return <CopyLinkButton url={url} iconOnly />
 }
 
+/** An attendee link into this popup can come from an attendee of another
+ *  popup in the tenant. Naming that popup is how an organiser tells a guest
+ *  of their own attendees from one brought in by someone else's. */
+function IssuerCell({ invite }: { invite: InvitePublic }) {
+  const sourcePopupId = invite.source_popup_id ?? null
+  const { data: source } = useQuery({
+    queryKey: ["popups", sourcePopupId],
+    queryFn: () => PopupsService.getPopup({ popupId: sourcePopupId! }),
+    enabled: !!sourcePopupId,
+  })
+  if (!invite.referrer_human_id) return <span className="text-sm">Team</span>
+  return (
+    <span className="text-sm">
+      Attendee
+      {sourcePopupId && (
+        <span className="block text-xs text-muted-foreground">
+          Shared from {source?.name ?? "another popup"}
+        </span>
+      )}
+    </span>
+  )
+}
+
 function FlowCell({ invite }: { invite: InvitePublic }) {
   const { selectedPopupId } = useWorkspace()
   return (
@@ -117,11 +140,7 @@ const columns: ColumnDef<InvitePublic>[] = [
     // The one thing that used to justify a second screen for the same table.
     accessorKey: "referrer_human_id",
     header: "Issued by",
-    cell: ({ row }) => (
-      <span className="text-sm">
-        {row.original.referrer_human_id ? "Attendee" : "Team"}
-      </span>
-    ),
+    cell: ({ row }) => <IssuerCell invite={row.original} />,
   },
   {
     accessorKey: "recipient_email",

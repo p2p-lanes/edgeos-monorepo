@@ -2,7 +2,6 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { Copy, Link2, Loader2, Trash2 } from "lucide-react"
-import { useSearchParams } from "next/navigation"
 import { useState } from "react"
 import { useTranslation } from "react-i18next"
 import { toast } from "sonner"
@@ -17,12 +16,16 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog"
-import { useApplication } from "@/providers/applicationProvider"
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip"
 import { useCityProvider } from "@/providers/cityProvider"
 
 function ReferralRow({
   referral,
-  onDeleted,
+  onRefresh,
 }: {
   referral: {
     id: string
@@ -33,7 +36,7 @@ function ReferralRow({
     expires_at?: string | null
     is_disabled?: boolean
   }
-  onDeleted: () => void
+  onRefresh: () => void
 }) {
   const { t } = useTranslation()
   const [deleteOpen, setDeleteOpen] = useState(false)
@@ -43,9 +46,15 @@ function ReferralRow({
     onSuccess: () => {
       toast.success(t("referrals.delete_success"))
       setDeleteOpen(false)
-      onDeleted()
+      onRefresh()
     },
-    onError: () => {
+    onError: (err) => {
+      if (err instanceof ApiError && err.status === 409) {
+        toast.error(t("referrals.delete_used_explanation"))
+        setDeleteOpen(false)
+        onRefresh()
+        return
+      }
       toast.error(t("referrals.delete_error"))
     },
   })
@@ -62,7 +71,8 @@ function ReferralRow({
   }
 
   const discount = Number(referral.discount_percentage)
-  const discountLabel = discount > 0 ? `${discount}%` : t("referrals.no_expiry")
+  const discountLabel =
+    discount > 0 ? `${discount}%` : t("referrals.preview_no_discount")
 
   return (
     <div className="flex items-center justify-between rounded-lg border bg-card px-4 py-3 gap-4">
@@ -100,48 +110,198 @@ function ReferralRow({
         >
           <Copy className="h-4 w-4" />
         </Button>
-        <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>
-          <DialogTrigger asChild>
-            <Button
-              variant="ghost"
-              size="icon"
-              title={t("referrals.delete_referral")}
-              aria-label={t("referrals.delete_referral")}
-              className="text-destructive hover:text-destructive"
-            >
-              <Trash2 className="h-4 w-4" />
-            </Button>
-          </DialogTrigger>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>{t("referrals.delete_confirm_title")}</DialogTitle>
-              <DialogDescription>
-                {t("referrals.delete_confirm_description")}
-              </DialogDescription>
-            </DialogHeader>
-            <DialogFooter>
+        {referral.current_uses > 0 ? (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <span className="inline-flex cursor-not-allowed">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  disabled
+                  aria-label={t("referrals.delete_referral")}
+                  aria-describedby={`delete-used-${referral.id}`}
+                  className="pointer-events-none text-destructive"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+                <span id={`delete-used-${referral.id}`} className="sr-only">
+                  {t("referrals.delete_used_explanation")}
+                </span>
+              </span>
+            </TooltipTrigger>
+            <TooltipContent className="max-w-xs">
+              {t("referrals.delete_used_explanation")}
+            </TooltipContent>
+          </Tooltip>
+        ) : (
+          <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>
+            <DialogTrigger asChild>
               <Button
-                variant="outline"
-                onClick={() => setDeleteOpen(false)}
-                disabled={deleteMutation.isPending}
+                variant="ghost"
+                size="icon"
+                title={t("referrals.delete_referral")}
+                aria-label={t("referrals.delete_referral")}
+                className="text-destructive hover:text-destructive"
               >
-                {t("referrals.delete_cancel")}
+                <Trash2 className="h-4 w-4" />
               </Button>
-              <Button
-                variant="destructive"
-                onClick={() => deleteMutation.mutate()}
-                disabled={deleteMutation.isPending}
-              >
-                {deleteMutation.isPending ? (
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                ) : null}
-                {t("referrals.delete_confirm")}
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>{t("referrals.delete_confirm_title")}</DialogTitle>
+                <DialogDescription>
+                  {t("referrals.delete_confirm_description")}
+                </DialogDescription>
+              </DialogHeader>
+              <DialogFooter>
+                <Button
+                  variant="outline"
+                  onClick={() => setDeleteOpen(false)}
+                  disabled={deleteMutation.isPending}
+                >
+                  {t("referrals.delete_cancel")}
+                </Button>
+                <Button
+                  variant="destructive"
+                  onClick={() => deleteMutation.mutate()}
+                  disabled={deleteMutation.isPending}
+                >
+                  {deleteMutation.isPending ? (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  ) : null}
+                  {t("referrals.delete_confirm")}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+        )}
       </div>
     </div>
+  )
+}
+
+function apiErrorDetail(err: unknown): string | null {
+  return err instanceof ApiError &&
+    err.body &&
+    typeof err.body === "object" &&
+    typeof (err.body as { detail?: unknown }).detail === "string"
+    ? (err.body as { detail: string }).detail
+    : null
+}
+
+/**
+ * Links into other popups of this tenant, shared from this one.
+ *
+ * The backend decides who may share and which popups accept these links, so
+ * an empty answer (no targets, or someone who may not share) hides the
+ * section entirely rather than explaining why.
+ */
+function CrossPopupReferrals({ sourcePopupId }: { sourcePopupId: string }) {
+  const { t } = useTranslation()
+  const queryClient = useQueryClient()
+  const queryKey = ["referrals", "cross-targets", sourcePopupId]
+
+  const { data: targets } = useQuery({
+    queryKey,
+    queryFn: () => InvitesService.listCrossPopupTargets({ sourcePopupId }),
+  })
+
+  const createMutation = useMutation({
+    mutationFn: (target: { popup_id: string; sales_flow_id: string }) =>
+      InvitesService.createMyLink({
+        requestBody: {
+          popup_id: target.popup_id,
+          source_popup_id: sourcePopupId,
+          sales_flow_id: target.sales_flow_id,
+        },
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey })
+    },
+    onError: (err) => {
+      toast.error(apiErrorDetail(err) ?? t("referrals.create_error"))
+    },
+  })
+
+  if (!targets?.length) return null
+
+  const flowsByPopup = new Map<string, number>()
+  for (const target of targets) {
+    flowsByPopup.set(
+      target.popup_id,
+      (flowsByPopup.get(target.popup_id) ?? 0) + 1,
+    )
+  }
+
+  return (
+    <section className="space-y-3 pt-4">
+      <div>
+        <h2 className="text-lg font-semibold tracking-tight">
+          {t("referrals.cross_title")}
+        </h2>
+        <p className="text-sm text-muted-foreground mt-1">
+          {t("referrals.cross_description")}
+        </p>
+      </div>
+      <div className="space-y-3">
+        {targets.map((target) => {
+          const showFlowName = (flowsByPopup.get(target.popup_id) ?? 0) > 1
+          return (
+            <div key={target.sales_flow_id} className="space-y-2">
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
+                <p className="min-w-0 text-base leading-snug sm:flex-1">
+                  <span
+                    className={
+                      showFlowName
+                        ? "font-medium text-muted-foreground"
+                        : "font-semibold text-foreground"
+                    }
+                  >
+                    {target.name}
+                  </span>
+                  {showFlowName && (
+                    <>
+                      {" "}
+                      <span
+                        className="mx-1 text-muted-foreground/60"
+                        aria-hidden="true"
+                      >
+                        ·
+                      </span>{" "}
+                      <span className="font-semibold text-foreground">
+                        {target.flow_name}
+                      </span>
+                    </>
+                  )}
+                </p>
+                {!target.link && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="self-end sm:self-auto"
+                    onClick={() => createMutation.mutate(target)}
+                    disabled={createMutation.isPending}
+                  >
+                    {createMutation.isPending &&
+                    createMutation.variables?.sales_flow_id ===
+                      target.sales_flow_id ? (
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    ) : null}
+                    {t("referrals.cross_create")}
+                  </Button>
+                )}
+              </div>
+              {target.link && (
+                <ReferralRow
+                  referral={target.link}
+                  onRefresh={() => queryClient.invalidateQueries({ queryKey })}
+                />
+              )}
+            </div>
+          )
+        })}
+      </div>
+    </section>
   )
 }
 
@@ -150,24 +310,18 @@ const ReferralsPage = () => {
   const { getCity } = useCityProvider()
   const city = getCity()
   const queryClient = useQueryClient()
-  const { getRelevantApplication } = useApplication()
-  // The door this screen is about. Without it, someone holding two
-  // applications was answered with whichever came last
-  // (sdd/sales-flows-rediseno).
-  const flowId = useSearchParams().get("flow")
-  const application = getRelevantApplication(flowId)
-  // Only attendees who actually hold a ticket for this popup may create a
-  // referral link (anti-abuse — mirrors the backend gate). Acceptance alone is
-  // not enough: invite/referral arrivals are auto-accepted without committing.
-  const hasTicket = !!application?.attendees?.some(
-    (a) => ((a.products as unknown[] | undefined) ?? []).length > 0,
-  )
+  const { data: sharing, isLoading: sharingLoading } = useQuery({
+    queryKey: ["referrals", "sharing", city?.id ?? ""],
+    queryFn: () => InvitesService.getMySharingStatus({ popupId: city!.id }),
+    enabled: !!city?.id,
+  })
+  const canShare = sharing?.can_share === true
 
   const { data, isLoading } = useQuery({
     queryKey: ["referrals", "mine", city?.id ?? ""],
     queryFn: () =>
       InvitesService.listMyLinks({ popupId: city!.id, limit: 100 }),
-    enabled: !!city?.id && hasTicket,
+    enabled: !!city?.id && canShare,
   })
 
   const createMutation = useMutation({
@@ -181,30 +335,33 @@ const ReferralsPage = () => {
       })
     },
     onError: (err) => {
-      const detail =
-        err instanceof ApiError &&
-        err.body &&
-        typeof err.body === "object" &&
-        typeof (err.body as { detail?: unknown }).detail === "string"
-          ? (err.body as { detail: string }).detail
-          : t("referrals.create_error")
-      toast.error(detail)
+      toast.error(apiErrorDetail(err) ?? t("referrals.create_error"))
     },
   })
 
-  if (!hasTicket) {
+  if (sharingLoading) {
+    return (
+      <div className="flex justify-center py-10">
+        <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+      </div>
+    )
+  }
+  if (!canShare) {
     return (
       <div className="max-w-2xl mx-auto p-6">
         <p className="text-sm text-muted-foreground">
-          {t("referrals.needs_ticket")}
+          {t("referrals.sharing_unavailable")}
         </p>
       </div>
     )
   }
 
   const referrals = data?.results ?? []
-  // 1-link-per-attendee rule: hide Create once the human has a referral
-  const hasReferral = referrals.length > 0
+  // One link per destination flow. A link into another flow of this popup
+  // must not hide Create for the way in this attendee can share.
+  const hasReferral = referrals.some(
+    (ref) => ref.sales_flow_id === sharing?.sales_flow_id,
+  )
 
   return (
     <div className="max-w-2xl mx-auto p-6 space-y-6">
@@ -254,7 +411,7 @@ const ReferralsPage = () => {
               <ReferralRow
                 key={ref.id}
                 referral={ref}
-                onDeleted={() =>
+                onRefresh={() =>
                   queryClient.invalidateQueries({
                     queryKey: ["referrals", "mine", city?.id ?? ""],
                   })
@@ -264,6 +421,8 @@ const ReferralsPage = () => {
           </div>
         </>
       )}
+
+      {city?.id && <CrossPopupReferrals sourcePopupId={city.id} />}
     </div>
   )
 }

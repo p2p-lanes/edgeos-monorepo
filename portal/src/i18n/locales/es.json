@@ -95,6 +95,9 @@
     "approval_required_title": "Se requiere aprobación",
     "approval_required_description": "Su solicitud debe ser aprobada antes de poder comprar esta opción.",
     "approval_required_cta": "Ver solicitud",
+    "no_products_title": "Todavía no hay productos disponibles",
+    "no_products_description": "Esta vía de ingreso no tiene productos disponibles. Volvé a consultar más tarde.",
+    "back_to_passes": "Volver a entradas",
     "estimated_total": "Total estimado",
     "definitive_total": "Total"
   },
@@ -170,6 +173,18 @@
     "network_error": "Error de red. Por favor, verificá tu conexión."
   },
   "form": {
+    "multiselect": {
+      "placeholder": "Seleccioná opciones...",
+      "selected_one": "{{count}} opción seleccionada",
+      "selected_other": "{{count}} opciones seleccionadas",
+      "search": "Buscar...",
+      "search_label": "Buscar opciones",
+      "empty": "No se encontraron opciones",
+      "remove": "Quitar {{option}}",
+      "between": "Seleccioná entre {{min}} y {{max}} opciones",
+      "at_least": "Seleccioná al menos {{min}}",
+      "up_to": "Seleccioná hasta {{max}}"
+    },
     "email": "Email",
     "first_name": "Nombre",
     "first_name_placeholder": "Ingresá tu nombre",
@@ -865,7 +880,7 @@
     "title": "Referidos",
     "description": "Compartí tu enlace de referido y ganá recompensas cuando alguien se una a través de él.",
     "my_referrals": "Mis enlaces de referido",
-    "no_referrals": "Todavía no tenés enlaces de referido.",
+    "no_referrals": "Todavía no tenés enlaces de referido para este evento.",
     "create_referral": "Crear enlace de referido",
     "creating": "Creando...",
     "create_error": "No se pudo crear el enlace de referido. Por favor intentá de nuevo.",
@@ -875,6 +890,7 @@
     "delete_confirm": "Sí, eliminar",
     "delete_cancel": "Cancelar",
     "delete_error": "No se pudo eliminar el enlace de referido. Por favor intentá de nuevo.",
+    "delete_used_explanation": "Este enlace ya fue utilizado y no se puede eliminar.",
     "delete_success": "Enlace de referido eliminado.",
     "code_label": "Código",
     "discount_label": "Descuento",
@@ -887,6 +903,7 @@
     "referrals_disabled": "Los referidos no están habilitados para este popup.",
     "not_accepted": "Los enlaces de referido están disponibles una vez que tu solicitud sea aceptada.",
     "needs_ticket": "Los enlaces de referido están disponibles una vez que tengas una entrada para este evento.",
+    "sharing_unavailable": "No puedes compartir enlaces desde este evento en este momento.",
     "preview_loading": "Cargando referido...",
     "preview_not_found_title": "Referido no encontrado",
     "preview_not_found_description": "Este enlace de referido no es válido, ha vencido o ya no está disponible.",
@@ -901,8 +918,11 @@
     "preview_apply_button": "Aplicar ahora",
     "preview_login_required_title": "Ingresa para aplicar",
     "preview_login_required_description": "Necesitas iniciar sesión para aplicar a través de este enlace de referido.",
-    "one_link_notice": "Ya tienes un enlace de referido. Cada asistente obtiene un enlace: compártelo para invitar a otros.",
-    "disabled_badge": "Deshabilitado"
+    "one_link_notice": "Ya tenés un enlace para esta vía de ingreso. Compartilo para invitar a otros.",
+    "disabled_badge": "Deshabilitado",
+    "cross_title": "Invitá a alguien a otro evento",
+    "cross_description": "Compartí un enlace a otro de nuestros eventos, aunque vos no vayas.",
+    "cross_create": "Crear enlace"
   },
   "invite": {
     "loading": "Cargando invitación...",

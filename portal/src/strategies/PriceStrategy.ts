@@ -44,7 +44,13 @@ class DefaultPriceStrategy implements PriceStrategy {
       return 0
     }
 
-    if (product.category !== "patreon" && discount > 0) {
+    // Same eligibility as backend _calculate_amounts: patreon and any
+    // product with discountable=false keep their catalog price.
+    if (
+      product.category !== "patreon" &&
+      product.discountable !== false &&
+      discount > 0
+    ) {
       return originalPrice * (1 - discount / 100) * (product.quantity || 1)
       // if (discount.discount_type === 'percentage') {
       //   return originalPrice * (1 - discount.discount_value / 100);

@@ -147,6 +147,7 @@ export default function ReferralCodePage() {
         popup={popup}
         background={contentBackground}
         referralId={preview.id}
+        salesFlowId={preview.sales_flow_id}
         requiresManualApproval={!preview.auto_approve}
       />
     </>

@@ -130,7 +130,7 @@ class ProductCreate(BaseModel):
     description: str | None = None
     image_url: str | None = None
     images: list[str] = Field(default_factory=list)
-    category: str = "ticket"
+    category: str = Field(default="ticket", min_length=1)
     duration_type: TicketDuration | None = None
     sale_starts_at: datetime | None = None
     sale_ends_at: datetime | None = None
@@ -211,7 +211,7 @@ class ProductUpdate(BaseModel):
     description: str | None = None
     image_url: str | None = None
     images: list[str] | None = None
-    category: str | None = None
+    category: str | None = Field(default=None, min_length=1)
     duration_type: TicketDuration | None = None
     sale_starts_at: datetime | None = None
     sale_ends_at: datetime | None = None
@@ -279,7 +279,7 @@ class ProductBatchItem(BaseModel):
     description: str | None = None
     image_url: str | None = None
     images: list[str] = Field(default_factory=list)
-    category: str = "ticket"
+    category: str = Field(default="ticket", min_length=1)
     duration_type: TicketDuration | None = None
     sale_starts_at: datetime | None = None
     sale_ends_at: datetime | None = None

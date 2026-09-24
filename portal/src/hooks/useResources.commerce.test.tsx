@@ -15,6 +15,7 @@ const mocks = vi.hoisted(() => ({
   takesApplications: true,
   directoryEnabled: false,
   customHomeEnabled: false,
+  canShareReferrals: false,
 }))
 
 type Flow = {
@@ -45,6 +46,10 @@ vi.mock("@/hooks/useGatheringDoors", () => ({
 
 vi.mock("@/hooks/useHumanPopupAccess", () => ({
   useHumanPopupAccess: () => ({ state: "allowed" }),
+}))
+
+vi.mock("@/hooks/useCanShareReferrals", () => ({
+  useCanShareReferrals: () => mocks.canShareReferrals,
 }))
 
 vi.mock("@/hooks/usePortalSalesFlows", () => ({
@@ -135,6 +140,7 @@ describe("useResources Commerce navigation", () => {
     mocks.takesApplications = true
     mocks.directoryEnabled = false
     mocks.customHomeEnabled = false
+    mocks.canShareReferrals = false
   })
 
   it("adds Home and keeps Application on its own overview when a custom home is enabled", () => {
@@ -383,5 +389,22 @@ describe("useResources Commerce navigation", () => {
         (resource) => resource.name === "sidebar.passes",
       ),
     ).toMatchObject({ status: "active", path: "/portal/summit/passes" })
+  })
+
+  it("offers Referrals only when the backend says this attendee may share", () => {
+    const referrals = () =>
+      renderHook(() => useResources()).result.current.resources.find(
+        (resource) => resource.name === "sidebar.referrals",
+      )
+
+    // An accepted application is no longer enough on its own: the switch
+    // lives on the flow, and only the backend reads it.
+    expect(referrals()?.status).toBe("hidden")
+
+    mocks.canShareReferrals = true
+    expect(referrals()).toMatchObject({
+      status: "active",
+      path: "/portal/summit/referrals",
+    })
   })
 })

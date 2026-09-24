@@ -981,18 +981,8 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Invite-based applications are not enabled for this popup",
             )
-        if (
-            getattr(app_data, "referral_id", None)
-            and not config_for(
-                session,
-                sales_flow_id=getattr(app_data, "sales_flow_id", None),
-                popup_id=popup.id,
-            ).referrals_enabled
-        ):
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Referral-based applications are not enabled for this popup",
-            )
+        # The referral gate waits for the link itself, below: which switch
+        # applies depends on whether it was shared from another popup.
 
         # Drafts are partial saves: skip "required field is missing" checks but
         # still validate types/constraints on any values the user did provide.
@@ -1015,7 +1005,8 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
             from app.api.invite.crud import invites_crud as _invites_crud
 
             _invite = _invites_crud.get_admin_created(session, _invite_id)
-            if not _invite:
+            # An invite into another popup must not carry its policy here.
+            if not _invite or _invite.popup_id != app_data.popup_id:
                 raise HTTPException(
                     status_code=status.HTTP_404_NOT_FOUND,
                     detail="Invite not found",
@@ -1030,16 +1021,41 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
         _referral_id = getattr(app_data, "referral_id", None)
         _referral = None
         if _referral_id:
+            from app.api.invite.crud import attendee_link_enabled
             from app.api.invite.crud import invites_crud as _links_crud
 
             _referral = _links_crud.get_portal_created(session, _referral_id)
-            if not _referral:
+            # A referral auto-accepts, so one into another popup must not be
+            # usable here: that would skip this popup's own gate entirely.
+            if not _referral or _referral.popup_id != app_data.popup_id:
                 raise HTTPException(
                     status_code=status.HTTP_404_NOT_FOUND,
                     detail="Referral not found",
                 )
+            requested_referral_flow_id = getattr(app_data, "sales_flow_id", None)
+            if (
+                requested_referral_flow_id is not None
+                and requested_referral_flow_id != _referral.sales_flow_id
+            ):
+                raise HTTPException(
+                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                    detail="This referral opens a different sales flow",
+                )
+            if not attendee_link_enabled(
+                config_for(
+                    session,
+                    sales_flow_id=_referral.sales_flow_id,
+                    popup_id=popup.id,
+                ),
+                _referral,
+            ):
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="Referral-based applications are not enabled for this popup",
+                )
             # Validate the referral is still usable (disabled + expiry + limit)
             _links_crud.validate_for_redemption(_referral)
+            _links_crud.ensure_referrer_in_good_standing(session, _referral)
 
         # Express Checkout scope is a property of the ENTRY FLOW, not of the
         # link that opened it: the portal renders the reduced mini-form for
@@ -1056,6 +1072,11 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
         # checkout is moving to per-popup configuration, and that change decides
         # their fate.
         is_express_checkout = bool(_group or _invite or _referral)
+        effective_flow_id = (
+            _referral.sales_flow_id
+            if _referral
+            else getattr(app_data, "sales_flow_id", None)
+        )
 
         # Validate custom_fields against form field definitions. Non-draft
         # submissions must run even with empty/absent custom_fields so
@@ -1067,13 +1088,9 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
                 app_data.custom_fields or {},
                 skip_required=is_draft,
                 is_express_checkout=is_express_checkout,
-                # The same flow this application will be stamped with, so it
-                # is judged against the form it was shown and not against
-                # every flow's questions at once.
+                # The same flow this application will be stamped with.
                 sales_flow_id=self.resolve_target_flow_id(
-                    session,
-                    app_data.popup_id,
-                    getattr(app_data, "sales_flow_id", None),
+                    session, app_data.popup_id, effective_flow_id
                 ),
             )
             if not is_valid:
@@ -1182,7 +1199,7 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
         # Stamp the target flow on every new application — an explicit
         # `sales_flow_id` (e.g. from the portal FlowPicker) when given, else
         # the popup's default flow. Never absent (F4).
-        requested_flow_id = getattr(app_data, "sales_flow_id", None)
+        requested_flow_id = effective_flow_id
         data["sales_flow_id"] = self.resolve_target_flow_id(
             session, app_data.popup_id, requested_flow_id
         )

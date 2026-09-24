@@ -28,6 +28,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { Label } from "@/components/ui/label"
+import { LoadingButton } from "@/components/ui/loading-button"
 import {
   Select,
   SelectContent,
@@ -71,6 +72,8 @@ export function ReviewersManager({
   const queryClient = useQueryClient()
   const { showSuccessToast, showErrorToast } = useCustomToast()
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false)
+  const [reviewerToRemove, setReviewerToRemove] =
+    useState<PopupReviewerPublic | null>(null)
   const [selectedUserId, setSelectedUserId] = useState<string>("")
   const [isRequired, setIsRequired] = useState(false)
 
@@ -103,9 +106,14 @@ export function ReviewersManager({
   const reviewers = reviewersData?.results ?? []
   const users = usersData?.results ?? []
 
-  // Filter out users who are already reviewers
+  // Inherited reviewers can also be assigned to the flow's own list.
   const availableUsers = users.filter(
-    (user) => !reviewers.some((r) => r.user_id === user.id),
+    (user) =>
+      !reviewers.some(
+        (r) =>
+          r.user_id === user.id &&
+          (r.sales_flow_id ?? null) === (flowId ?? null),
+      ),
   )
 
   const addMutation = useMutation({
@@ -114,6 +122,9 @@ export function ReviewersManager({
     onSuccess: () => {
       showSuccessToast("Reviewer added")
       queryClient.invalidateQueries({ queryKey: ["popup-reviewers", popupId] })
+      if (flowId) {
+        queryClient.invalidateQueries({ queryKey: ["sales-flows"] })
+      }
       queryClient.invalidateQueries({
         queryKey: ["applications", popupId, "reviewers"],
       })
@@ -133,7 +144,11 @@ export function ReviewersManager({
       }),
     onSuccess: () => {
       showSuccessToast("Reviewer removed")
+      setReviewerToRemove(null)
       queryClient.invalidateQueries({ queryKey: ["popup-reviewers", popupId] })
+      if (flowId) {
+        queryClient.invalidateQueries({ queryKey: ["sales-flows"] })
+      }
       queryClient.invalidateQueries({
         queryKey: ["applications", popupId, "reviewers"],
       })
@@ -175,7 +190,7 @@ export function ReviewersManager({
           flowId && reviewersMode === "inherit"
             ? "Inherited from the event. Adding a reviewer here switches this flow to its own reviewer list."
             : flowId
-              ? "This flow's own reviewer list, independent of the event's."
+              ? "This flow's own reviewer list. Remove all reviewers to inherit from the event again."
               : "Users who can review and approve applications for this gathering"
         }
         action={
@@ -202,14 +217,61 @@ export function ReviewersManager({
               <ReviewerRow
                 key={reviewer.id}
                 reviewer={reviewer}
-                onRemove={() => removeMutation.mutate(reviewer.user_id)}
+                onRemove={() => setReviewerToRemove(reviewer)}
                 isRemoving={removeMutation.isPending}
-                readOnly={readOnly}
+                readOnly={
+                  readOnly || (!!flowId && reviewer.sales_flow_id !== flowId)
+                }
               />
             ))}
           </div>
         )}
       </SectionShell>
+
+      <Dialog
+        open={reviewerToRemove !== null}
+        onOpenChange={(open) => {
+          if (!open && !removeMutation.isPending) setReviewerToRemove(null)
+        }}
+      >
+        <DialogContent showCloseButton={!removeMutation.isPending}>
+          <DialogHeader>
+            <DialogTitle>Remove Reviewer</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to remove{" "}
+              {reviewerToRemove?.user_full_name ||
+                reviewerToRemove?.user_email ||
+                "this user"}{" "}
+              as a reviewer?
+              {flowId && reviewers.length === 1 && (
+                <> This flow will inherit the event's reviewers again.</>
+              )}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              disabled={removeMutation.isPending}
+              onClick={() => setReviewerToRemove(null)}
+            >
+              Cancel
+            </Button>
+            <LoadingButton
+              type="button"
+              variant="destructive"
+              loading={removeMutation.isPending}
+              onClick={() => {
+                if (reviewerToRemove) {
+                  removeMutation.mutate(reviewerToRemove.user_id)
+                }
+              }}
+            >
+              Remove Reviewer
+            </LoadingButton>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Add Reviewer Dialog */}
       <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
@@ -217,7 +279,9 @@ export function ReviewersManager({
           <DialogHeader>
             <DialogTitle>Add Reviewer</DialogTitle>
             <DialogDescription>
-              Select a user to designate as a reviewer for this popup.
+              {flowId
+                ? "Select a user to designate as a reviewer for this sales flow. Changes are saved immediately."
+                : "Select a user to designate as a reviewer for this popup."}
             </DialogDescription>
           </DialogHeader>
 
@@ -331,13 +395,8 @@ function ReviewerRow({
           variant="ghost"
           size="sm"
           className="text-destructive hover:text-destructive"
-          onClick={() => {
-            if (
-              window.confirm("Are you sure you want to remove this reviewer?")
-            ) {
-              onRemove()
-            }
-          }}
+          aria-label="Remove reviewer"
+          onClick={onRemove}
           disabled={isRemoving}
         >
           <Trash2 className="h-4 w-4" />

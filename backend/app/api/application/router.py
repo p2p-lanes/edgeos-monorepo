@@ -1323,6 +1323,25 @@ async def create_my_application(
     # — validated for ownership and type=application by
     # `resolve_target_flow_id`, which raises 404 for an invalid one. Omitted
     # means the popup's default flow.
+    if app_in.referral_id is not None:
+        from app.api.invite.crud import invites_crud
+
+        referral = invites_crud.get_portal_created(db, app_in.referral_id)
+        if referral is None or referral.popup_id != app_in.popup_id:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, detail="Referral not found"
+            )
+        if (
+            app_in.sales_flow_id is not None
+            and app_in.sales_flow_id != referral.sales_flow_id
+        ):
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="This referral opens a different sales flow",
+            )
+        # Omitted flow ids on older clients still land in the link's own flow.
+        app_in = app_in.model_copy(update={"sales_flow_id": referral.sales_flow_id})
+
     flow_id = crud.applications_crud.resolve_target_flow_id(
         db, app_in.popup_id, app_in.sales_flow_id
     )
