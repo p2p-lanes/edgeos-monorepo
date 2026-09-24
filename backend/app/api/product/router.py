@@ -61,6 +61,7 @@ async def list_product_categories(
             Products.popup_id == popup_id,
             Products.is_active == True,  # noqa: E712
             Products.deleted_at.is_(None),  # type: ignore[attr-defined]
+            Products.category.op("!~")(r"^[[:space:]]*$"),
         )
         .order_by(Products.category)
     )

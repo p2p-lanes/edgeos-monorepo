@@ -9,7 +9,7 @@ from decimal import Decimal
 import pytest
 from pydantic import ValidationError
 
-from app.api.product.schemas import ProductCreate, ProductUpdate
+from app.api.product.schemas import ProductBatchItem, ProductCreate, ProductUpdate
 
 
 @pytest.mark.parametrize(
@@ -23,6 +23,24 @@ def test_product_writes_reject_fulfillment_type(schema, payload) -> None:
     with pytest.raises(ValidationError) as error:
         schema(**payload, fulfillment_type="access")
     assert error.value.errors()[0]["type"] == "extra_forbidden"
+
+
+@pytest.mark.parametrize("category", ["", " ", "  \t  "])
+@pytest.mark.parametrize("schema", [ProductCreate, ProductUpdate, ProductBatchItem])
+def test_product_write_rejects_blank_category(schema, category: str) -> None:
+    payload = {"category": category}
+    if schema is not ProductUpdate:
+        payload.update(name="Lunch", price=Decimal("10"))
+    if schema is ProductCreate:
+        payload["popup_id"] = uuid.uuid4()
+    with pytest.raises(ValidationError) as exc_info:
+        schema(**payload)
+    assert any(error["loc"] == ("category",) for error in exc_info.value.errors())
+
+
+def test_product_update_allows_omitted_or_null_category() -> None:
+    assert "category" not in ProductUpdate(name="Lunch").model_fields_set
+    assert ProductUpdate(category=None).category is None
 
 
 class TestProductCreatePatreonPrice:
