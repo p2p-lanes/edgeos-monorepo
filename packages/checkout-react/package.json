@@ -1,6 +1,6 @@
 {
   "name": "@edgeos/checkout-react",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "type": "module",
   "description": "React adapter for the EdgeOS headless checkout SDK — a <CheckoutProvider> and hooks over @edgeos/checkout-core. Re-exports the core; the building-edgeos-checkout Claude Code skill ships in @edgeos/checkout-core.",
   "keywords": [

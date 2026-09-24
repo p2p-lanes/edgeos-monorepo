@@ -13,19 +13,16 @@ export function useCheckoutState(): CheckoutStoreState {
   return useSyncExternalStore(store.subscribe, store.getState, store.getState)
 }
 
-/** Steps, navigation, submit + top-level flow state. */
+/** Catalogue, buyer form and submit: the top-level checkout state. */
 export function useCheckout() {
   const store = useCheckoutStore()
   const state = useCheckoutState()
   return {
-    steps: state.steps,
-    currentStep: state.currentStep,
+    products: state.products,
+    formSchema: state.formSchema,
+    loaded: state.loaded,
     submitting: state.submitting,
     error: state.error,
-    runtime: state.runtime,
-    goToStep: store.goToStep,
-    nextStep: store.nextStep,
-    previousStep: store.previousStep,
     submit: store.submit,
   }
 }
@@ -48,19 +45,6 @@ export function useCart() {
   }
 }
 
-/** Available steps + navigation only. */
-export function useSteps() {
-  const store = useCheckoutStore()
-  const state = useCheckoutState()
-  return {
-    steps: state.steps,
-    currentStep: state.currentStep,
-    goToStep: store.goToStep,
-    nextStep: store.nextStep,
-    previousStep: store.previousStep,
-  }
-}
-
 /** The server-authoritative price breakdown + its load status. */
 export function usePreview() {
   const state = useCheckoutState()
@@ -78,6 +62,7 @@ export function useBuyerForm() {
   const state = useCheckoutState()
   return {
     values: state.buyer.values,
+    complete: state.buyerComplete,
     setBuyer: store.setBuyer,
     coupon: state.coupon,
     applyCoupon: store.applyCoupon,

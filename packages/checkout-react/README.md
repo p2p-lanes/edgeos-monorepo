@@ -16,11 +16,10 @@ npm install @edgeos/checkout-react
 
 ## What you need
 
-Three values, from your EdgeOS backoffice (**Organization → Checkout SDK Keys**):
+Two values, from your EdgeOS backoffice (**Organization → Checkout SDK Keys**):
 
 - a **publishable key** (`pk_live_…`)
 - your **popup slug**
-- a **canonical sales flow slug**
 
 The API URL defaults to the EdgeOS production API; pass `baseUrl` only to point at
 a non-prod backend.
@@ -32,17 +31,17 @@ import { CheckoutProvider, useCheckout, useCart, usePreview } from "@edgeos/chec
 
 function App() {
   return (
-    <CheckoutProvider slug="my-popup" flowSlug="checkout" publishableKey="pk_live_…">
+    <CheckoutProvider slug="my-popup" publishableKey="pk_live_…">
       <Checkout />
     </CheckoutProvider>
   )
 }
 
 function Checkout() {
-  const { runtime, submit } = useCheckout()
+  const { products, loaded, submit } = useCheckout()
   const { quantities, setQuantity } = useCart()
   const { total } = usePreview()          // server-authoritative, money as a string
-  // …render runtime.products, steppers, total, buyer form, then:
+  // …render products, your own screens, the total and the buyer form, then:
   // const { checkoutUrl } = await submit(); window.location.assign(checkoutUrl)
 }
 ```
@@ -50,8 +49,8 @@ function Checkout() {
 ## Build your checkout with Claude Code
 
 The SDK ships a **Claude Code skill** that scaffolds a correct, restyle-me
-checkout — it documents every hook, the API contract, and money/step/buyer-form
-rules, with a complete React example. It lives in the core package (installed here
+checkout. It documents every hook, the API contract, and the money and
+buyer-form rules, with a complete React example. It lives in the core package (installed here
 as a dependency), at
 `node_modules/@edgeos/checkout-core/skills/building-edgeos-checkout/`. Copy that
 folder into your project's `.claude/skills/` (or ask your Claude Code to do it).

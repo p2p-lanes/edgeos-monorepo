@@ -2,6 +2,8 @@
 
 Endpoints:
 - GET  /checkout/{slug}/primary
+- GET  /checkout/{slug}/products  — publishable key only (checkout SDK)
+- GET  /checkout/{slug}/form      — publishable key only (checkout SDK)
 - GET  /checkout/{slug}/{flow_slug}/runtime
 - GET  /checkout/{slug}/{flow_slug}/share
 - POST /checkout/{slug}/{flow_slug}/purchase
@@ -37,6 +39,8 @@ from app.api.cart.schemas import CartState, OpenCartPublic, OpenCartUpsert
 from app.api.checkout.crud import (
     get_open_ticketing_popup,
     runtime_for_slug,
+    sdk_form_for_slug,
+    sdk_products_for_slug,
     share_meta_for_slug,
 )
 from app.api.checkout.schemas import (
@@ -48,6 +52,8 @@ from app.api.checkout.schemas import (
     OpenTicketingPurchaseResponse,
     PendingReleaseOpenRequest,
     PrimaryCheckoutFlow,
+    SdkFormResponse,
+    SdkProductsResponse,
 )
 from app.api.human.crud import humans_crud
 from app.api.payment.crud import payments_crud
@@ -57,7 +63,7 @@ from app.api.payment.router import (
 )
 from app.api.payment.schemas import PaymentStatus, PendingReleaseResponse
 from app.api.translation.service import parse_accept_language
-from app.core.dependencies.tenants import PublicTenant
+from app.core.dependencies.tenants import PublicTenant, SdkRequest, require_sdk_request
 from app.core.dependencies.users import OptionalHuman, SessionDep
 from app.core.rate_limit import RateLimit
 from app.services.meta_capi import (
@@ -185,6 +191,57 @@ async def get_primary_checkout_flow(
 
 
 @router.get(
+    "/{slug}/products",
+    response_model=SdkProductsResponse,
+    dependencies=[
+        Depends(require_sdk_request),
+        Depends(RateLimit(limit=120, window_sec=60, key_prefix="rl:checkout-products")),
+    ],
+)
+async def list_sdk_products(
+    slug: str,
+    db: SessionDep,
+    tenant: PublicTenant,
+    accept_language: Annotated[str | None, Header(alias="Accept-Language")] = None,
+) -> SdkProductsResponse:
+    """The popup's whole active catalogue, for an SDK-built checkout.
+
+    Publishable key required. Unlike the runtime, this asks no sales flow what
+    its steps offer: an SDK client renders and gates its own checkout, and the
+    purchase path relaxes the same rule for key-authenticated callers, so
+    everything listed here can actually be bought. Rate-limited 120/min/IP.
+    """
+    return sdk_products_for_slug(
+        db, slug, tenant.id, parse_accept_language(accept_language)
+    )
+
+
+@router.get(
+    "/{slug}/form",
+    response_model=SdkFormResponse,
+    dependencies=[
+        Depends(require_sdk_request),
+        Depends(RateLimit(limit=120, window_sec=60, key_prefix="rl:checkout-form")),
+    ],
+)
+async def get_sdk_form(
+    slug: str,
+    db: SessionDep,
+    tenant: PublicTenant,
+    accept_language: Annotated[str | None, Header(alias="Accept-Language")] = None,
+) -> SdkFormResponse:
+    """The buyer form of the popup's primary flow, for an SDK-built checkout.
+
+    Publishable key required. Separate from the catalogue because a client
+    fetches them independently, but still required reading: /purchase rejects
+    a buyer missing a required field. Rate-limited 120/min/IP.
+    """
+    return sdk_form_for_slug(
+        db, slug, tenant.id, parse_accept_language(accept_language)
+    )
+
+
+@router.get(
     "/{slug}/{flow_slug}/runtime",
     response_model=CheckoutRuntimeResponse,
     dependencies=[
@@ -251,21 +308,21 @@ async def preview_open_ticketing(
     db: SessionDep,
     tenant: PublicTenant,
     current_human: OptionalHuman,
+    is_sdk: SdkRequest,
 ) -> CheckoutPreviewResponse:
     """Return a server-computed price breakdown for an anonymous cart.
 
     Authoritative for display; identical math to the named purchase endpoint. No side effects.
+    A publishable-key call on the primary flow quotes without the eligibility
+    and catalogue gates, matching what /purchase will then accept from it.
     Rate-limited 60/min/IP.
     """
-    from app.api.checkout.gate_quote import resolve_checkout_flow
-    from app.api.sales_flow.schemas import SalesFlowType
+    from app.api.checkout.gate_quote import resolve_sale_flow
 
     popup = get_open_ticketing_popup(db, slug, tenant.id)
-    flow = resolve_checkout_flow(
-        db, popup, flow_slug, require_types={SalesFlowType.direct, SalesFlowType.upsale}
-    )
+    flow, relaxed = resolve_sale_flow(db, popup, flow_slug, is_sdk=is_sdk)
     return payments_crud.preview_open_ticketing(
-        db, request_in, popup, flow, current_human=current_human
+        db, request_in, popup, flow, current_human=current_human, is_sdk=relaxed
     )
 
 
@@ -339,6 +396,7 @@ async def purchase_open_ticketing(
     db: SessionDep,
     tenant: PublicTenant,
     current_human: OptionalHuman,
+    is_sdk: SdkRequest,
 ) -> OpenTicketingPurchaseResponse:
     """Create an open-ticketing payment and return provider checkout data — public/anonymous for direct flows, sign-in and eligibility required for upsale flows.
 
@@ -346,6 +404,10 @@ async def purchase_open_ticketing(
     upsale-type, the same portal-auth + approved-payment gate as the runtime
     applies server-side (design D8) — UI-only gating is never sufficient,
     since this is the endpoint that actually creates the payment.
+
+    A publishable-key call (the checkout SDK) may only name the PRIMARY flow,
+    and buys without the eligibility, restriction-rule and step-catalogue
+    gates: that client renders its own checkout and owns who may reach it.
     """
     popup = get_open_ticketing_popup(db, slug, tenant.id)
 
@@ -361,6 +423,7 @@ async def purchase_open_ticketing(
         ),
         flow_slug=flow_slug,
         current_human=current_human,
+        is_sdk=is_sdk,
     )
 
     if checkout_url and payment.status == PaymentStatus.PENDING.value:

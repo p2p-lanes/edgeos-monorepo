@@ -66,6 +66,43 @@ def resolve_checkout_flow(
         raise HTTPException(status_code=exc.status_code, detail="Not found") from exc
 
 
+def resolve_sale_flow(
+    session: Session,
+    popup: "Popups",
+    flow_slug: str,
+    *,
+    is_sdk: bool,
+) -> tuple["SalesFlows", bool]:
+    """Resolve the flow a sale runs through, and whether its gates relax.
+
+    Returns ``(flow, relaxed)``. ``relaxed`` is True only for a publishable-key
+    call on the popup's PRIMARY flow: that is the SDK's storefront, whose
+    client owns its own gating, so it sells through whatever type the primary
+    flow happens to be and skips the eligibility and catalogue gates.
+
+    Every other call keeps today's contract exactly, and that includes a key
+    naming some other flow. Those used to work before the SDK moved to the
+    primary flow (SDK 0.1.0 clients name flows themselves), so they are served
+    as they always were, every gate intact, rather than turned away: a key
+    must never make a narrower flow an anonymous storefront, and it must not
+    break a checkout that was already selling through one either.
+    """
+    if is_sdk:
+        flow = resolve_checkout_flow(session, popup, flow_slug)
+        if flow.is_default:
+            return flow, True
+
+    return (
+        resolve_checkout_flow(
+            session,
+            popup,
+            flow_slug,
+            require_types={SalesFlowType.direct, SalesFlowType.upsale},
+        ),
+        False,
+    )
+
+
 def _unavailable(status_code: int = status.HTTP_422_UNPROCESSABLE_ENTITY) -> None:
     raise HTTPException(status_code=status_code, detail={"code": "quote_unavailable"})
 
@@ -139,20 +176,31 @@ def evaluate_gate_quote(
     current_human: "HumanPublic | None",
     lock_products: bool = False,
     require_complete: bool = False,
+    is_sdk: bool = False,
 ) -> GateQuote:
-    """Evaluate every mutable checkout rule once and produce one quote."""
-    assert_upsale_eligible(session, flow, popup.id, popup.tenant_id, current_human)
-    assert_application_flow_eligible(session, flow, popup.tenant_id, current_human)
-    context = build_context(
-        session,
-        popup,
-        flow,
-        human=current_human,
-        buyer_form_data=buyer.form_data if buyer else None,
-        buyer_email=buyer.email if buyer else None,
-    )
+    """Evaluate every mutable checkout rule once and produce one quote.
+
+    ``is_sdk`` (a publishable-key call on the primary flow) drops the three
+    gates that answer "may THIS buyer buy THIS product here": upsale and
+    application eligibility, and the flow's own restriction rule plus the
+    step-derived catalogue. An SDK client builds its own checkout and decides
+    who may buy; what it cannot decide is money, so everything below stays:
+    sale window, stock, max per order, required fields, and the amounts.
+    """
+    if not is_sdk:
+        assert_upsale_eligible(session, flow, popup.id, popup.tenant_id, current_human)
+        assert_application_flow_eligible(session, flow, popup.tenant_id, current_human)
     product_ids = [line.product_id for line in lines]
-    assert_products_allowed(session, flow, popup, product_ids, context)
+    if not is_sdk:
+        context = build_context(
+            session,
+            popup,
+            flow,
+            human=current_human,
+            buyer_form_data=buyer.form_data if buyer else None,
+            buyer_email=buyer.email if buyer else None,
+        )
+        assert_products_allowed(session, flow, popup, product_ids, context)
 
     statement = select(Products).where(
         Products.id.in_(product_ids),  # type: ignore[attr-defined]
@@ -160,6 +208,12 @@ def evaluate_gate_quote(
         Products.is_active == True,  # noqa: E712
         Products.deleted_at.is_(None),  # type: ignore[attr-defined]
     )
+    if is_sdk:
+        # Shadow products back an accommodation: they carry no dates, guests
+        # or availability check, so a bare product id can never be a valid
+        # booking. The SDK catalogue leaves them out; refuse them here too
+        # rather than selling a room nobody reserved.
+        statement = statement.where(Products.managed_by.is_(None))  # type: ignore[attr-defined]
     if lock_products:
         statement = statement.with_for_update()
     products = list(session.exec(statement).all())

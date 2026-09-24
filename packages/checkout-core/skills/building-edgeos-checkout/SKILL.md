@@ -8,10 +8,14 @@ description: Use when building a custom-styled checkout UI on top of the EdgeOS 
 ## Overview
 
 EdgeOS is **headless commerce**: all checkout logic (catalog, cart, pricing math,
-step flow, buyer-form validation, coupons, payment handoff) lives in the SDK. You
-build **only the UI** — your own components, your own styles, in **any framework
-or none**. You never touch card data, never compute prices, never talk to the
+buyer-form validation, coupons, payment handoff) lives in the SDK. You build
+**only the UI** — your own components, your own styles, in **any framework or
+none**. You never touch card data, never compute prices, never talk to the
 payment provider directly.
+
+**Screens and navigation are yours.** The SDK has no notion of steps: it answers
+what is for sale, what is selected, what it costs, and how to pay. Which screens
+exist and when the buyer moves between them is your app's own state.
 
 Two packages, one engine:
 
@@ -30,8 +34,8 @@ Two packages, one engine:
 | React | `@edgeos/checkout-react` | this file + **`hooks-reference.md`** | `<CheckoutProvider>` + hooks |
 | Vue / Svelte / vanilla / anything else | `@edgeos/checkout-core` | this file + **`core-store-reference.md`** | the `store` (subscribe/getState/actions) |
 
-Everything else in this skill — `api-contract.md`, the money/step/buyer rules
-below, the examples — applies **identically to both paths**. The React hooks are
+Everything else in this skill — `api-contract.md`, the money/buyer rules below,
+the examples — applies **identically to both paths**. The React hooks are
 just selectors over the same store; the contract is the same.
 
 **The one rule that governs everything: money is the API's job, orchestration is
@@ -46,7 +50,12 @@ To integrate you need just **two** things:
 |---|---|---|---|
 | Publishable key | `pk_live_xxxxxxxx` | sent as the `X-EdgeOS-Publishable-Key` header | You generate it in the EdgeOS backoffice → your Organization → *Checkout SDK Keys* |
 | Popup slug | `amanita` | identifies your popup/event | Visible in the backoffice |
-| Sales flow slug | `checkout` | identifies the checkout flow | Visible in the backoffice |
+
+You do **not** need a sales flow slug. Sales flows are an EdgeOS-internal
+concept: the client resolves the popup's **primary** flow once
+(`GET /checkout/{slug}/primary`, memoized) and spends it on preview, purchase and
+cart for you. Only that flow gets the SDK's relaxed rules: a call naming some
+other flow is served by that flow's normal rules, as it always was.
 
 You do **not** need an API URL: the SDK targets the EdgeOS production API by
 default (`DEFAULT_BASE_URL`). There is an optional `baseUrl`, but you only set it
@@ -67,15 +76,15 @@ framework: **`example-vanilla.ts`**.
 ```ts
 import { createCheckoutClient, createCheckoutStore } from "@edgeos/checkout-core"
 
-const client = createCheckoutClient({ slug: "amanita", flowSlug: "checkout", publishableKey: "pk_live_xxxxxxxx" })
+const client = createCheckoutClient({ slug: "amanita", publishableKey: "pk_live_xxxxxxxx" })
 const store = createCheckoutStore({ client })
 
 // 1. Subscribe — your render function runs on every state change.
 const unsubscribe = store.subscribe((state) => {
-  render(state)   // read state.runtime / selection / pricing / buyer / currentStep
+  render(state)   // read state.products / formSchema / selection / pricing / buyer
 })
 
-// 2. Load the catalog + form + steps.
+// 2. Load the catalogue + buyer form. Rejects on failure, so catch it.
 await store.load()
 
 // 3. Drive it from your UI event handlers:
@@ -88,6 +97,12 @@ unsubscribe()
 store.dispose()
 ```
 
+**You do not need to install `zod`.** `buildFormZodSchema()` returns a zod
+schema, but you never have to name its type: write
+`ReturnType<typeof buildFormZodSchema>` when you need to pass it around. Adding
+zod to your own dependencies just to spell a type is a second copy waiting to
+drift from the SDK's.
+
 ## Quick start — React (the adapter)
 
 This is the path for **React**. Full reference: **`hooks-reference.md`**. A
@@ -98,24 +113,26 @@ import { CheckoutProvider, useCheckout, useCart, usePreview } from "@edgeos/chec
 
 export function App() {
   return (
-    <CheckoutProvider slug="amanita" flowSlug="checkout" publishableKey="pk_live_xxxxxxxx">
+    <CheckoutProvider slug="amanita" publishableKey="pk_live_xxxxxxxx">
       <YourCheckout />
     </CheckoutProvider>
   )
 }
 
 function YourCheckout() {
-  const { runtime, submit } = useCheckout()
+  const { products, formSchema, loaded, submit } = useCheckout()
   const { quantities, setQuantity } = useCart()
   const { total } = usePreview()        // server-authoritative, money as a string
-  // …render runtime.products, steppers, total, buyer form, then:
+  const [screen, setScreen] = useState<"catalogue" | "buyer">("catalogue")  // your own
+  // …render products, steppers, total, the buyer form from formSchema, then:
   // const { checkoutUrl } = await submit(); window.location.assign(checkoutUrl)
 }
 ```
 
 `<CheckoutProvider>` builds the store once and, by default (`autoLoad`), calls
-`GET /checkout/{slug}/{flowSlug}/runtime` on mount. The hooks are thin live subscriptions
-over that store — components re-render on relevant state changes.
+`GET /checkout/{slug}/products` and `GET /checkout/{slug}/form` on mount. The
+hooks are thin live subscriptions over that store — components re-render on
+relevant state changes.
 
 ### Pointing at a different environment
 
@@ -125,9 +142,9 @@ domain. It must be the API root **including `/api/v1`** and **excluding the slug
 
 ```ts
 // core:
-createCheckoutClient({ slug: "amanita", flowSlug: "checkout", publishableKey: "pk_live_xxx", baseUrl: "http://localhost:8000/api/v1" })
+createCheckoutClient({ slug: "amanita", publishableKey: "pk_live_xxx", baseUrl: "http://localhost:8000/api/v1" })
 // react:
-// <CheckoutProvider slug="amanita" flowSlug="checkout" publishableKey="pk_live_xxx" baseUrl="http://localhost:8000/api/v1">
+// <CheckoutProvider slug="amanita" publishableKey="pk_live_xxx" baseUrl="http://localhost:8000/api/v1">
 ```
 
 ## The store surface (both paths)
@@ -137,19 +154,22 @@ state are the same. The store exposes `getState()`, `subscribe(listener)`, and:
 
 | Action | Does |
 |---|---|
-| `load()` | fetch runtime (catalog + form + steps) |
+| `load()` | fetch the catalogue + buyer form (rejects on failure) |
 | `setQuantity(id, n)` | set exact quantity (0 removes); steppers |
 | `selectProduct(id)` | TOGGLE 0↔1; pick-one cards |
 | `selectHousing(input)` / `setHousingQuantity(n)` / `clearHousing()` | housing (date ranges) |
 | `setInsurance(bool)` | insurance toggle |
 | `setBuyer(patch)` | shallow-merge buyer values (see `custom_` rule) |
 | `applyCoupon(code)` / `clearCoupon()` | coupon (reprices; resolves `false` if invalid, never throws) |
-| `goToStep(step)` / `nextStep()` / `previousStep()` | navigation (`goToStep` returns `false` if unreachable) |
 | `submit()` | create the payment → `SubmitResult` (see below) |
 | `dispose()` / `isDisposed()` | teardown; a disposed store must be rebuilt, not reused |
 
+There is **no step navigation in the store**: no `goToStep` / `nextStep` /
+`previousStep`, no `steps`, no `currentStep`. Keep the current screen in your own
+component state and read the store for data only.
+
 `getState()` returns `CheckoutStoreState`:
-`{ runtime, steps, currentStep, selection, buyer, coupon, pricing, cartMeta, submitting, error }`.
+`{ products, formSchema, loaded, selection, buyer, coupon, pricing, cartMeta, submitting, error }`.
 The React hooks just select slices of this.
 
 ## Critical contract facts (read before writing UI)
@@ -191,12 +211,23 @@ to **both paths**. Full detail in **`api-contract.md`**; the essentials:
    `total` is `null` when the cart is empty. Gate your "Pay/Continue" button on
    `preview.total !== null`.
 
-6. **Runtime load has no built-in error state.** `runtime === null` means
-   "loading **or** failed" — the store/provider swallows the fetch error. If you
-   need to distinguish (retry UI), **prefetch the runtime yourself** with
-   `client.getRuntime()` and seed it (`initialRuntime` in React, or just render
-   from your own fetch in core). Patterns in `core-store-reference.md` /
-   `hooks-reference.md`.
+6. **Every ticket must name somebody.** The API rejects a `ticket`-category line
+   with no recipient. The store handles the common case for you: on `submit()` it
+   stamps `recipient_key: "buyer"` on each ticket line and sends one matching
+   `recipients` entry (name, email, and the buyer's `profile_snapshot`).
+   Non-ticket lines carry no recipient and `recipients` is `[]`. Selling tickets
+   **for other people** means assembling your own `products` + `recipients` and
+   calling `client.purchase()` directly.
+
+7. **Load errors land in `state.error`.** `await store.load()` **rejects** if
+   the catalogue or form fetch fails, AND records the message in `state.error`
+   with `loaded` still `false`. In React the provider calls `load()` for you, so
+   read `useCheckout().error` to tell "failed" from "still loading" and drive a
+   retry. Never render an empty `products` as an empty catalogue without
+   checking `error` first: a sold-out event and a dead network look the same.
+   Prefetching and seeding (`initialProducts` / `initialFormSchema`,
+   `autoLoad={false}`) is still there when you want to own the fetch. Patterns
+   in `core-store-reference.md` / `hooks-reference.md`.
 
 ## Client-side buyer validation (optional but recommended)
 
@@ -207,7 +238,7 @@ validate before submit instead of round-tripping to a `422`:
 import { buildFormZodSchema, validateBuyerValues } from "@edgeos/checkout-core"
 // (also re-exported from @edgeos/checkout-react)
 
-const schema = buildFormZodSchema(runtime.form_schema)          // form_schema from runtime
+const schema = buildFormZodSchema(formSchema)                   // from useCheckout()/state
 const { valid, errors } = validateBuyerValues(schema, values)   // errors: field → message
 ```
 
@@ -220,10 +251,15 @@ const { valid, errors } = validateBuyerValues(schema, values)   // errors: field
 | Storing `phone` as `setBuyer({ phone })` | Custom fields need the prefix: `setBuyer({ custom_phone })` |
 | Treating `submit()` as "order done" | It returns a `checkoutUrl` — you must redirect to it |
 | Reusing a disposed store | After `dispose()`, `isDisposed()` is true — build a new store |
-| Spinner forever because `runtime` is null | A failed `/runtime` looks identical to loading — prefetch to detect errors |
+| Spinner forever because `loaded` is false | A failed load leaves `loaded` false; read `error` to show a retry instead |
+| Rendering only `base_fields` when it is empty | The three base fields are always required; render them yourself and gate on `buyerComplete` |
+| Passing `flowSlug` to the client or provider | Gone in 0.2.0: the client resolves the popup's primary flow itself |
+| Looking for `steps` / `currentStep` / `goToStep` | Gone in 0.2.0: screens are your app's own state |
+| Hand-rolling `purchase()` without `recipients` | A ticket line needs a recipient; use `store.submit()` or send recipients yourself |
 | Setting `baseUrl` when you don't need to | Leave it unset — it defaults to prod. Only override for dev/staging/proxy |
 | Overridden `baseUrl` includes the slug, or omits `/api/v1` | When you do override, it's the API root **with** `/api/v1`, **without** the slug |
 | Changing `slug`/`key` after load | The store binds them once; build a new store (React: remount with `key={slug}`) to switch popups |
+| Guessing what is in the catalogue | `/products` is the popup's whole active catalogue, ticketing steps ignored; filter and group it yourself |
 | `403` on every call in production | Your origin isn't on the key's allowlist — ask the operator to add it |
 
 ## Reference files in this folder
@@ -238,6 +274,7 @@ const { valid, errors } = validateBuyerValues(schema, values)   // errors: field
 
 This skill covers the common single-page ticket checkout (products + quantities +
 buyer + coupon + pay). The SDK also supports housing (date ranges), an insurance
-toggle, multi-step flows from `runtime.ticketing_steps`, cart persistence/restore,
-and analytics adapters (Meta Pixel / GA). Those are in the reference files —
-reach for them when the popup uses those features.
+toggle, cart persistence/restore, and analytics adapters (Meta Pixel / GA). Those
+are in the reference files — reach for them when the popup uses those features.
+Multi-screen flows are not an SDK feature: split the catalogue however you like
+and keep the current screen in your own state.

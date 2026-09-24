@@ -1,14 +1,17 @@
-// The orchestration brain: a minimal framework-agnostic store that wires steps +
-// selection + order assembly + pricing (server-authoritative) + cart persistence
-// + analytics into one subscribe/getState/action surface. The React adapter
-// (Plan 3) is a thin bridge over this; the portal's checkoutProvider collapses
-// into it. No React here.
+// The orchestration brain: a minimal framework-agnostic store that wires the
+// catalogue + selection + order assembly + pricing (server-authoritative) +
+// cart persistence + analytics into one subscribe/getState/action surface. The
+// React adapter is a thin bridge over this. No React here.
+//
+// Screens and navigation are deliberately absent: a client builds its own
+// checkout, so which screen it shows, and when, is its own business. The store
+// answers what is for sale, what is selected, what it costs, and how to pay.
 
 import type { AnalyticsBus } from "../analytics/bus"
 import type { AnalyticsPopup, AnalyticsProduct } from "../analytics/events"
 import type { CheckoutClient } from "../client"
 import { type CartDriver, type CartMeta, createCartDriver } from "../cart/driver"
-import { isBuyerComplete, toBuyerInfo } from "../form/buyer"
+import { isBuyerComplete, stripCustomPrefix, toBuyerInfo } from "../form/buyer"
 import { buildFormZodSchema } from "../form/schema"
 import { buildOrderLines } from "../order/buildOrderLines"
 import {
@@ -16,15 +19,6 @@ import {
   type PricingDriver,
   type PricingState,
 } from "../pricing/driver"
-import {
-  canProceedToStep,
-  nextStep as nextStepFn,
-  previousStep as previousStepFn,
-} from "../steps/navigation"
-import {
-  buildProductsByStepId,
-  deriveAvailableSteps,
-} from "../steps/derive"
 import {
   clearHousing as clearHousingFn,
   emptySelection,
@@ -35,13 +29,12 @@ import {
   setHousingQuantity as setHousingQuantityFn,
   setInsurance as setInsuranceFn,
   setQuantity as setQuantityFn,
-  totalSelectedQuantity,
 } from "../selection/state"
 import type {
-  CheckoutRuntimeProduct,
-  CheckoutRuntimeResponse,
+  CheckoutProduct,
+  PaymentRecipientRequest,
+  ProductLine,
 } from "../types/api"
-import type { CheckoutStep } from "../types/checkout"
 import type { ApplicationFormSchema } from "../types/form"
 
 export interface BuyerState {
@@ -55,9 +48,18 @@ export interface CouponState {
 }
 
 export interface CheckoutStoreState {
-  runtime: CheckoutRuntimeResponse | null
-  steps: CheckoutStep[]
-  currentStep: CheckoutStep
+  /** The popup's catalogue. Empty until `load()` resolves. */
+  products: CheckoutProduct[]
+  /** The buyer form to render and validate against. */
+  formSchema: ApplicationFormSchema | null
+  /** True once the catalogue and form have loaded at least once. */
+  loaded: boolean
+  /**
+   * Whether the buyer values satisfy the form. Enable your pay button on this:
+   * /purchase refuses a buyer missing a required field, and the SDK no longer
+   * gates that behind a step of its own.
+   */
+  buyerComplete: boolean
   selection: SelectionState
   buyer: BuyerState
   coupon: CouponState
@@ -78,8 +80,12 @@ export interface SubmitResult {
 
 export interface CheckoutStoreConfig {
   client: CheckoutClient
-  /** Seed runtime to avoid a double fetch (the portal already has it). */
-  runtime?: CheckoutRuntimeResponse
+  /** Seed the catalogue to avoid a fetch (SSR, an already-bootstrapped page). */
+  products?: CheckoutProduct[]
+  /** Seed the buyer form the same way. */
+  formSchema?: ApplicationFormSchema | null
+  /** Popup slug, used only to label analytics events. */
+  popupSlug?: string
   analytics?: AnalyticsBus
   pricingDebounceMs?: number
   cartDebounceMs?: number
@@ -88,7 +94,7 @@ export interface CheckoutStoreConfig {
 export interface CheckoutStore {
   getState(): CheckoutStoreState
   subscribe(listener: (state: CheckoutStoreState) => void): () => void
-  /** Fetch runtime (if not seeded), derive steps, emit ViewContent. */
+  /** Fetch catalogue + buyer form (unless seeded) and emit ViewContent. */
   load(): Promise<void>
   setQuantity(productId: string, quantity: number): void
   selectProduct(productId: string): void
@@ -99,25 +105,35 @@ export interface CheckoutStore {
   applyCoupon(code: string): Promise<boolean>
   clearCoupon(): void
   setBuyer(patch: Record<string, unknown>): void
-  goToStep(step: CheckoutStep): boolean
-  nextStep(): void
-  previousStep(): void
   submit(): Promise<SubmitResult>
   dispose(): void
   /** True once dispose() has run. A disposed store must be rebuilt, not reused. */
   isDisposed(): boolean
 }
 
-function toAnalyticsPopup(popup: Record<string, unknown>): AnalyticsPopup {
-  return {
-    id: String(popup.id ?? ""),
-    slug: String(popup.slug ?? ""),
-    name: (popup.name as string | null | undefined) ?? null,
-    currency: (popup.currency as string | null | undefined) ?? null,
-  }
+/**
+ * The recipient key the store buys under. Every ticket line needs one: the API
+ * refuses a ticket that names nobody, since a ticket is always somebody's. A
+ * checkout that sells tickets for other people sends its own recipients and
+ * uses the client directly.
+ */
+const BUYER_RECIPIENT_KEY = "buyer"
+
+/**
+ * The three fields /purchase always demands, whatever the form says.
+ *
+ * `form_schema.base_fields` is empty for a popup whose operator never
+ * configured the base questions, but `BuyerInfo` still requires these, so a
+ * checkout that trusted the schema alone would collect no email and fail at
+ * payment with a 422 it could not explain.
+ */
+const ALWAYS_REQUIRED_BASE = ["email", "first_name", "last_name"] as const
+
+function isTicket(product: CheckoutProduct | undefined): boolean {
+  return (product?.category ?? "").toLowerCase() === "ticket"
 }
 
-function toAnalyticsProduct(p: CheckoutRuntimeProduct): AnalyticsProduct {
+function toAnalyticsProduct(p: CheckoutProduct): AnalyticsProduct {
   return {
     id: p.id,
     name: p.name,
@@ -144,12 +160,11 @@ export function createCheckoutStore(
     debounceMs: config.cartDebounceMs,
   })
 
-  let formSchema: ApplicationFormSchema | null = null
-
   let state: CheckoutStoreState = {
-    runtime: config.runtime ?? null,
-    steps: [],
-    currentStep: "passes",
+    products: config.products ?? [],
+    formSchema: config.formSchema ?? null,
+    buyerComplete: false,
+    loaded: config.products !== undefined && config.formSchema !== undefined,
     selection: emptySelection(),
     buyer: { values: {} },
     coupon: { code: null, valid: false },
@@ -169,40 +184,41 @@ export function createCheckoutStore(
 
   pricing.subscribe((ps) => set({ pricing: ps }))
 
-  function productById(id: string): CheckoutRuntimeProduct | undefined {
-    return state.runtime?.products.find((p) => p.id === id)
+  function productById(id: string): CheckoutProduct | undefined {
+    return state.products.find((p) => p.id === id)
+  }
+
+  /** Who an analytics event is about. The catalogue carries the popup id. */
+  function analyticsPopup(): AnalyticsPopup {
+    const first = state.products[0]
+    return {
+      id: first?.popup_id ?? "",
+      slug: config.popupSlug ?? "",
+      name: null,
+      currency: first?.currency ?? null,
+    }
   }
 
   function buyerEmail(): string {
     return String(state.buyer.values.email ?? "")
   }
 
-  function buyerComplete(): boolean {
-    if (formSchema) return isBuyerComplete(buildFormZodSchema(formSchema), state.buyer.values)
+  function isBuyerFilled(): boolean {
     const v = state.buyer.values
-    return (
-      !!String(v.email ?? "") &&
-      !!String(v.first_name ?? "") &&
-      !!String(v.last_name ?? "")
+    const hasBase = ALWAYS_REQUIRED_BASE.every((name) =>
+      Boolean(String(v[name] ?? "").trim()),
     )
+    if (!hasBase) return false
+    if (state.formSchema)
+      return isBuyerComplete(buildFormZodSchema(state.formSchema), v)
+    return true
   }
 
-  function deriveSteps(runtime: CheckoutRuntimeResponse): CheckoutStep[] {
-    const byStep = buildProductsByStepId(runtime.ticketing_steps, runtime.products)
-    return deriveAvailableSteps(runtime.ticketing_steps, byStep)
-  }
-
-  function applyRuntime(runtime: CheckoutRuntimeResponse) {
-    const fs = runtime.form_schema as ApplicationFormSchema | null
-    formSchema = fs && typeof fs === "object" && "base_fields" in fs ? fs : null
-    const steps = deriveSteps(runtime)
-    set({ runtime, steps, currentStep: steps[0] ?? "passes" })
-    if (analytics) {
-      analytics.viewContent(
-        toAnalyticsPopup(runtime.popup),
-        runtime.products.map(toAnalyticsProduct),
-      )
-    }
+  /** A schema is only usable once it carries the fields the builder expects. */
+  function asFormSchema(raw: unknown): ApplicationFormSchema | null {
+    return raw && typeof raw === "object" && "base_fields" in raw
+      ? (raw as ApplicationFormSchema)
+      : null
   }
 
   // Re-price + persist whenever the selection or coupon or insurance changes.
@@ -213,7 +229,7 @@ export function createCheckoutStore(
       insurance: state.selection.insurance,
     })
     const email = buyerEmail()
-    if (email) cart.save(email, state.selection, { currentStep: state.currentStep })
+    if (email) cart.save(email, state.selection)
   }
 
   function commitSelection(next: SelectionState) {
@@ -225,28 +241,12 @@ export function createCheckoutStore(
     const prev = state.selection.quantities[productId] ?? 0
     commitSelection(setQuantityFn(state.selection, productId, quantity))
     const added = quantity - prev
-    if (added > 0 && analytics && state.runtime) {
+    if (added > 0 && analytics) {
       const product = productById(productId)
       if (product) {
-        analytics.addToCart(
-          toAnalyticsPopup(state.runtime.popup),
-          toAnalyticsProduct(product),
-          added,
-        )
+        analytics.addToCart(analyticsPopup(), toAnalyticsProduct(product), added)
       }
     }
-  }
-
-  function doGoToStep(step: CheckoutStep): boolean {
-    const ok = canProceedToStep(step, {
-      availableSteps: state.steps,
-      selectedPassesCount: 0,
-      dynamicItemsCount: totalSelectedQuantity(state.selection),
-      isEditing: false,
-      buyerInfoComplete: buyerComplete(),
-    })
-    if (ok) set({ currentStep: step })
-    return ok
   }
 
   return {
@@ -258,8 +258,28 @@ export function createCheckoutStore(
       return () => listeners.delete(listener)
     },
     async load() {
-      const runtime = state.runtime ?? (await client.getRuntime())
-      applyRuntime(runtime)
+      try {
+        // Two independent reads, so they go out together. A seeded half costs
+        // nothing; only the missing one is fetched.
+        const [products, formSchema] = await Promise.all([
+          config.products !== undefined
+            ? config.products
+            : client.getProducts().then((res) => res.products),
+          config.formSchema !== undefined
+            ? config.formSchema
+            : client.getForm().then((res) => asFormSchema(res.form_schema)),
+        ])
+        set({ products, formSchema, loaded: true, error: null })
+        set({ buyerComplete: isBuyerFilled() })
+        analytics?.viewContent(analyticsPopup(), products.map(toAnalyticsProduct))
+      } catch (err) {
+        // Report it BOTH ways: through state, so a UI that never awaited this
+        // (the React provider calls it for you) can still show a retry screen
+        // instead of an empty catalogue that looks like a sold-out event; and
+        // by rethrowing, so a caller that did await it is not left guessing.
+        set({ error: err instanceof Error ? err.message : "Checkout unavailable" })
+        throw err
+      }
     },
     setQuantity(productId, quantity) {
       doSetQuantity(productId, quantity)
@@ -299,40 +319,49 @@ export function createCheckoutStore(
     },
     setBuyer(patch) {
       set({ buyer: { values: { ...state.buyer.values, ...patch } } })
-    },
-    goToStep(step) {
-      return doGoToStep(step)
-    },
-    nextStep() {
-      doGoToStep(nextStepFn(state.steps, state.currentStep))
-    },
-    previousStep() {
-      // Backward navigation is always allowed.
-      set({ currentStep: previousStepFn(state.steps, state.currentStep) })
+      set({ buyerComplete: isBuyerFilled() })
     },
     async submit() {
       if (state.submitting) throw new Error("Payment already in progress")
-      const products = buildOrderLines(state.selection)
-      if (products.length === 0) throw new Error("Nothing selected")
+      const lines = buildOrderLines(state.selection)
+      if (lines.length === 0) throw new Error("Nothing selected")
       set({ submitting: true, error: null })
 
       try {
         const email = buyerEmail()
         // Flush the cart first so cid/sig continuity proof is fresh.
         const meta = email
-          ? await cart.flush(email, state.selection, {
-              currentStep: state.currentStep,
-            })
+          ? await cart.flush(email, state.selection)
           : cart.getMeta()
         set({ cartMeta: meta })
 
         const v = state.buyer.values
+        const firstName = String(v.first_name ?? "")
+        const lastName = String(v.last_name ?? "")
+        const products: ProductLine[] = lines.map((line) =>
+          isTicket(productById(line.product_id))
+            ? { ...line, recipient_key: BUYER_RECIPIENT_KEY }
+            : line,
+        )
+        const recipients: PaymentRecipientRequest[] = products.some(
+          (line) => line.recipient_key === BUYER_RECIPIENT_KEY,
+        )
+          ? [
+              {
+                recipient_key: BUYER_RECIPIENT_KEY,
+                name: `${firstName} ${lastName}`.trim() || email,
+                email,
+                profile_snapshot: stripCustomPrefix(v),
+              },
+            ]
+          : []
         const result = await client.purchase({
           products,
+          recipients,
           buyer: toBuyerInfo({
             email,
-            firstName: String(v.first_name ?? ""),
-            lastName: String(v.last_name ?? ""),
+            firstName,
+            lastName,
             formData: v,
           }),
           coupon_code: state.coupon.valid ? state.coupon.code : null,
@@ -341,10 +370,10 @@ export function createCheckoutStore(
           sig: meta.restoreToken,
         })
 
-        if (result.status === "approved" && analytics && state.runtime) {
+        if (result.status === "approved" && analytics) {
           analytics.purchase({
             paymentId: result.payment_id,
-            popup: toAnalyticsPopup(state.runtime.popup),
+            popup: analyticsPopup(),
             amount: result.amount,
             currency: result.currency,
             products,

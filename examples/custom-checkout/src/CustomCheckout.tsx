@@ -1,11 +1,15 @@
 // Reference custom checkout — the minimal shape a client hosts on their own
 // origin. It consumes ONLY the SDK hooks from @edgeos/checkout-react; all
-// business logic (steps, pricing, cart, order assembly, submit) lives in the
-// headless core. Copy this as a starting point and restyle freely — none of the
-// EdgeOS theme is imported here.
+// business logic (pricing, cart, order assembly, submit) lives in the headless
+// core. Copy this as a starting point and restyle freely — none of the EdgeOS
+// theme is imported here.
+//
+// Note there are no EdgeOS "steps" here: which screens exist, and when the
+// buyer moves between them, is this app's own decision (`screen` below). The
+// SDK supplies the catalogue, the price and the payment.
 //
 // The whole flow:
-//   1. render products from the runtime, adjust quantities  → useCart
+//   1. render the catalogue, adjust quantities              → useCheckout + useCart
 //   2. show the server-authoritative total                  → usePreview
 //   3. collect buyer info + coupon                          → useBuyerForm
 //   4. submit → get { checkoutUrl } → redirect to SimpleFi  → useCheckout().submit
@@ -25,20 +29,18 @@ export interface CustomCheckoutProps {
 }
 
 export function CustomCheckout({ onCheckoutUrl }: CustomCheckoutProps) {
-  const { currentStep, nextStep, previousStep, submit, submitting, runtime } =
-    useCheckout()
+  const { products, loaded, submit, submitting } = useCheckout()
   const { quantities, setQuantity } = useCart()
   const preview = usePreview()
+  const [screen, setScreen] = useState<"catalogue" | "buyer">("catalogue")
 
-  const products = runtime?.products ?? []
-
-  if (!runtime) return <p>Loading checkout…</p>
+  if (!loaded) return <p>Loading checkout…</p>
 
   return (
     <div style={{ maxWidth: 480, margin: "0 auto", fontFamily: "system-ui" }}>
-      <h1>{String((runtime.popup as { name?: string }).name ?? "Checkout")}</h1>
+      <h1>Checkout</h1>
 
-      {currentStep !== "buyer" ? (
+      {screen === "catalogue" ? (
         <section>
           <h2>Tickets</h2>
           <ul style={{ listStyle: "none", padding: 0 }}>
@@ -82,7 +84,7 @@ export function CustomCheckout({ onCheckoutUrl }: CustomCheckoutProps) {
           <button
             type="button"
             disabled={preview.total === null}
-            onClick={() => nextStep()}
+            onClick={() => setScreen("buyer")}
           >
             Continue
           </button>
@@ -91,7 +93,7 @@ export function CustomCheckout({ onCheckoutUrl }: CustomCheckoutProps) {
         <BuyerPanel
           preview={preview}
           submitting={submitting}
-          onBack={() => previousStep()}
+          onBack={() => setScreen("catalogue")}
           onPay={async () => {
             const result = await submit()
             if (result.checkoutUrl) {

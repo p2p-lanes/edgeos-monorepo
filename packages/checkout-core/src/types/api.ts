@@ -11,10 +11,10 @@
 /** ISO decimal string, e.g. "120.00". Never a JS number (float drift). */
 export type Money = string
 
-// --- GET /checkout/{slug}/{flowSlug}/runtime -------------------------------
+// --- GET /checkout/{slug}/products -----------------------------------------
 
-/** A product offered in the checkout runtime. */
-export interface CheckoutRuntimeProduct {
+/** A product the popup sells. */
+export interface CheckoutProduct {
   tenant_id: string
   popup_id: string
   id: string
@@ -42,49 +42,44 @@ export interface CheckoutRuntimeProduct {
   insurance_eligible?: boolean
 }
 
-/**
- * One configured checkout step (mirrors `TicketingStepPublic`). `step_type`
- * drives structural behavior; `product_category` maps products into the step;
- * `template` selects the renderer variant.
- */
-export interface TicketingStep {
-  id: string
-  tenant_id: string
-  popup_id: string
-  step_type: string
-  title: string
-  description?: string | null
-  order?: number
-  is_enabled?: boolean
-  protected?: boolean
-  product_category?: string | null
-  template?: string | null
-  template_config?: Record<string, unknown> | null
-  watermark?: string | null
-  show_title?: boolean
-  show_watermark?: boolean
-  show_in_navbar?: boolean
-  emoji?: string | null
+/** Response of `GET /checkout/{slug}/products`. */
+export interface CheckoutProductsResponse {
+  products: CheckoutProduct[]
 }
 
-// The popup / buyer_form shapes are large and only consumed by later tasks
-// (form building). They are kept as opaque records here and refined in
-// `src/form/` (Plan 2 Task 2.6) so the transport client stays decoupled.
-export interface CheckoutRuntimeResponse {
-  popup: Record<string, unknown>
-  products: CheckoutRuntimeProduct[]
-  buyer_form: Array<Record<string, unknown>>
-  ticketing_steps: TicketingStep[]
-  attendee_categories?: Array<Record<string, unknown>>
-  form_schema?: Record<string, unknown> | null
+/** Response of `GET /checkout/{slug}/form`. */
+export interface CheckoutFormResponse {
+  form_schema: Record<string, unknown>
 }
 
-// --- POST /checkout/{slug}/{flowSlug}/preview ------------------------------
+/** Response of `GET /checkout/{slug}/primary`. */
+export interface PrimaryCheckoutFlow {
+  flow_slug: string
+}
+
+// --- POST /checkout/{slug}/{primaryFlow}/preview ---------------------------
 
 /** One product + quantity line. Shared by preview and purchase. */
 export interface ProductLine {
   product_id: string
   quantity?: number
+  /**
+   * Who this line is for. Required by the API for every `ticket` product: a
+   * ticket is always somebody's. The store fills it in with the buyer.
+   */
+  recipient_key?: string | null
+}
+
+/**
+ * The person one or more lines are bought for. `recipient_key` is an arbitrary
+ * client-side id that ties a recipient to its lines within one request.
+ */
+export interface PaymentRecipientRequest {
+  recipient_key: string
+  name: string
+  email?: string | null
+  category_id?: string | null
+  profile_snapshot?: Record<string, unknown>
 }
 
 export interface CheckoutPreviewRequest {
@@ -127,7 +122,7 @@ export interface CheckoutPreviewResponse {
   currency: string
 }
 
-// --- POST /checkout/{slug}/{flowSlug}/purchase -----------------------------
+// --- POST /checkout/{slug}/{primaryFlow}/purchase --------------------------
 
 export interface BuyerInfo {
   email: string
@@ -148,6 +143,8 @@ export interface Attribution {
 
 export interface OpenTicketingPurchaseCreate {
   products: ProductLine[]
+  /** One entry per `recipient_key` referenced by `products`. */
+  recipients?: PaymentRecipientRequest[]
   buyer: BuyerInfo
   coupon_code?: string | null
   insurance?: boolean
@@ -179,7 +176,7 @@ export interface CouponValidatePublicResponse {
   valid: boolean
 }
 
-// --- PUT / GET /checkout/{slug}/{flowSlug}/cart ----------------------------
+// --- PUT / GET /checkout/{slug}/{primaryFlow}/cart -------------------------
 // The cart JSONB persisted by the anonymous cart endpoints. Mirrors
 // `backend/app/api/cart/schemas.py` (CartState).
 

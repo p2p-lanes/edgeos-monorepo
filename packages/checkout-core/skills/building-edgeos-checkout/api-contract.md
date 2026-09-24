@@ -13,13 +13,47 @@ with the backend Pydantic schemas — the SDK types mirror them 1:1.
 - The key resolves the **tenant** for your origin. It carries an **origin
   allowlist matched by host** (port ignored). Requests from a non-allowlisted
   origin → **HTTP 403**. Missing/invalid key → **401/403**.
+- `/products` and `/form` are **publishable-key only**: without the key they
+  answer **401** (`"Publishable key required"`), whichever origin they come from.
 - CORS: your exact origin must be allowed by the backend. `localhost` dev origins
   are generally fine; production origins must be configured by the operator.
 - `baseUrl` defaults to the EdgeOS **production** API and is optional. When you
   do override it (dev/staging/proxy) it is the **API root including the version
   prefix** (e.g. `https://api.example/api/v1`) and **must not** contain the slug.
-   The client appends `/checkout/{slug}/{flowSlug}/...`. The default is exported as
+   The client appends `/checkout/{slug}/...`. The default is exported as
   `DEFAULT_BASE_URL`.
+
+## Sales flows: resolved for you
+
+Sales flows are EdgeOS's own concept and no concern of a client building its own
+checkout, so **nothing in the SDK takes a flow slug**. The client calls
+`GET /checkout/{slug}/primary` **once** (the promise is memoized, and dropped
+again if it fails so a transient error doesn't poison the client) and spends that
+slug on `/preview`, `/purchase` and `/cart`.
+
+The relaxations below apply **only on that primary flow**. A key naming any
+other flow (something the SDK itself never does) is served by that flow's normal
+rules, every gate intact, exactly as it was before 0.2.0: a key never turns a
+flow configured for a narrower audience into an anonymous storefront.
+
+### What the key relaxes (and what it never does)
+
+On the primary flow, a publishable-key call **drops the gates that answer "may
+THIS buyer buy THIS product here"**, because an SDK client renders its own
+checkout and owns who reaches it:
+
+- the **step-derived catalogue** (a product no ticketing step offers is still
+  sellable; a disabled step no longer hides its products),
+- the flow's **restriction rule**,
+- **application / upsale eligibility** (an application-type primary flow still
+  sells to a key, while the portal refuses it),
+- **per-section recipient role limits** (declared on ticketing steps you don't
+  render).
+
+Everything about **money and data** is still enforced, for you exactly as for the
+portal: the **sale window**, **stock**, **max per order**, **required buyer form
+fields**, and the **amounts**. Inactive, deleted and accommodation shadow products
+are refused too (`422 quote_unavailable`).
 
 ## Money
 
@@ -34,25 +68,41 @@ with the backend Pydantic schemas — the SDK types mirror them 1:1.
 
 ---
 
-## GET `/checkout/{slug}/{flowSlug}/runtime` → `CheckoutRuntimeResponse`
-
-Loaded once on mount (`store.load()`), surfaced as `useCheckout().runtime`.
+## GET `/checkout/{slug}/primary` → `PrimaryCheckoutFlow`
 
 ```ts
-interface CheckoutRuntimeResponse {
-  popup: Record<string, unknown>          // opaque; read popup.name / popup.currency defensively
-  products: CheckoutRuntimeProduct[]
-  buyer_form: Array<Record<string, unknown>>
-  ticketing_steps: TicketingStep[]
-  attendee_categories?: Array<Record<string, unknown>>
-  form_schema?: Record<string, unknown> | null   // pass to buildFormZodSchema()
+interface PrimaryCheckoutFlow { flow_slug: string }
+```
+
+Called for you (memoized) by every client method that needs a flow, and exposed
+as `client.getPrimaryFlow()` if you want it. You never pass a flow slug in.
+
+---
+
+## GET `/checkout/{slug}/products` → `CheckoutProductsResponse`
+
+The popup's **whole active catalogue**. Loaded by `store.load()`, surfaced as
+`useCheckout().products` / `state.products`. **Publishable key required** (401
+without it).
+
+```ts
+interface CheckoutProductsResponse {
+  products: CheckoutProduct[]
 }
 ```
 
-### `CheckoutRuntimeProduct`
+Unlike the portal's flow-scoped payload, this asks no sales flow what its steps
+offer: a product no step sells is listed here, and the purchase path relaxes the
+same rule for a key, so everything listed can actually be bought. The server still
+leaves out inactive, deleted and **accommodation shadow products** (rooms backed by
+a booking, which a bare product id could never validly buy).
+
+### `CheckoutProduct`
 
 ```ts
-interface CheckoutRuntimeProduct {
+interface CheckoutProduct {
+  tenant_id: string
+  popup_id: string                      // the popup this catalogue belongs to
   id: string
   name: string
   slug: string
@@ -62,10 +112,11 @@ interface CheckoutRuntimeProduct {
   compare_price?: Money | null          // "was" price for a strikethrough
   image_url?: string | null
   images?: string[]
-  category?: string                     // maps a product into a step (product_category)
+  category?: string                     // "ticket" is load-bearing: see recipients below
   is_active?: boolean                   // treat undefined as active; false = hide
   exclusive?: boolean                   // selecting it should clear others (UI concern)
   max_per_order?: number | null         // UI clamp; server is authoritative
+  total_stock_cap?: number | null
   total_stock_remaining?: number | null // UI hint; server is authoritative
   sold_out_override?: boolean
   insurance_eligible?: boolean
@@ -73,7 +124,7 @@ interface CheckoutRuntimeProduct {
   duration_type?: string | null         // e.g. housing/per-night products
   sale_starts_at?: string | null
   sale_ends_at?: string | null
-  // ...plus tenant_id, popup_id, start_date/end_date (opaque)
+  // ...plus start_date/end_date (opaque)
 }
 ```
 
@@ -82,38 +133,34 @@ Product rules:
 - `max_per_order` / stock fields are **display hints only** — the server enforces
   limits at purchase. Clamp in the UI for UX, but expect the server to be the
   final word.
-
-### `TicketingStep`
-
-Only needed if you want a multi-step UI grouped exactly like the operator
-configured. For a flat one-page checkout you can ignore steps entirely and just
-render `runtime.products`.
-
-```ts
-interface TicketingStep {
-  id: string
-  step_type: string                 // structural behavior
-  title: string
-  order?: number
-  is_enabled?: boolean
-  product_category?: string | null  // join to product.category
-  template?: string | null          // renderer variant hint
-  template_config?: Record<string, unknown> | null
-  emoji?: string | null
-  show_in_navbar?: boolean
-  // ...
-}
-```
-
-The core derives the navigable steps for you (`useCheckout().steps`, a
-`CheckoutStep[]`). Internal `CheckoutStep` ids: `passes | tickets | buyer |
-housing | merch | patron | confirm | success`. **Note the API `step_type`
-`"tickets"` maps to the internal id `"passes"`** — don't be surprised by the dual
-name. `"success"` is a terminal UI state, not a configured step.
+- `category` is how you group the catalogue into your own screens, and
+  `category === "ticket"` is what makes a line need a recipient (see
+  */purchase* below).
 
 ---
 
-## POST `/checkout/{slug}/{flowSlug}/preview` → `CheckoutPreviewResponse`
+## GET `/checkout/{slug}/form` → `CheckoutFormResponse`
+
+The buyer form of the popup's **primary flow**: what to render and validate
+against. Loaded by `store.load()`, surfaced as `useCheckout().formSchema` /
+`state.formSchema`. **Publishable key required** (401 without it).
+
+```ts
+interface CheckoutFormResponse {
+  form_schema: Record<string, unknown>   // pass to buildFormZodSchema()
+}
+```
+
+Shape of `form_schema` (`ApplicationFormSchema`) is documented under *Buyer form*
+below. It is a separate call from `/products` because a client fetches them
+independently, but it is not optional reading: `/purchase` rejects a buyer missing
+a required field.
+
+A missing popup on any of these three is an opaque **404**.
+
+---
+
+## POST `/checkout/{slug}/{primaryFlow}/preview` → `CheckoutPreviewResponse`
 
 The **authoritative price**. The store calls this (debounced) whenever the cart,
 coupon, or insurance changes; you read the result via `usePreview()`. No side
@@ -121,7 +168,8 @@ effects — safe to call as often as needed.
 
 Request (`CheckoutPreviewRequest`):
 ```ts
-{ products: { product_id: string; quantity?: number }[], coupon_code?: string | null, insurance?: boolean }
+{ products: ProductLine[], coupon_code?: string | null, insurance?: boolean }
+// ProductLine = { product_id: string; quantity?: number; recipient_key?: string | null }
 ```
 
 Response:
@@ -160,7 +208,7 @@ Display guidance:
 
 ---
 
-## POST `/checkout/{slug}/{flowSlug}/purchase` → `OpenTicketingPurchaseResponse`
+## POST `/checkout/{slug}/{primaryFlow}/purchase` → `OpenTicketingPurchaseResponse`
 
 Called by `store.submit()`. Creates the payment and returns where to send the
 buyer. **This does not settle the payment** — that happens on the provider page
@@ -169,14 +217,41 @@ buyer. **This does not settle the payment** — that happens on the provider pag
 Request (`OpenTicketingPurchaseCreate`, assembled for you by the store):
 ```ts
 {
-  products: { product_id: string; quantity?: number }[]
+  products: ProductLine[]                    // { product_id, quantity?, recipient_key? }
+  recipients?: PaymentRecipientRequest[]     // one entry per recipient_key used above
   buyer: { email: string; first_name: string; last_name: string; form_data?: Record<string, unknown> }
   coupon_code?: string | null
   insurance?: boolean
   cid?: string | null; sig?: string | null   // cart-continuity proof (from cart persistence)
   attribution?: Attribution | null; fbc?/fbp?/locale?  // analytics/attribution, optional
 }
+
+interface PaymentRecipientRequest {
+  recipient_key: string                      // arbitrary client-side id, ties lines to a person
+  name: string
+  email?: string | null
+  category_id?: string | null
+  profile_snapshot?: Record<string, unknown> // the buyer's answers, custom_ prefix stripped
+}
 ```
+
+### Recipients: a ticket is always somebody's
+
+**Every line whose product `category` is `"ticket"` must carry a
+`recipient_key`**, and that key must appear in `recipients`. A ticket line that
+names nobody is a **422**. The store does this for you on `submit()`:
+
+- each ticket line gets `recipient_key: "buyer"`,
+- `recipients` gets exactly one entry: `{ recipient_key: "buyer", name:
+  "<first> <last>" (falling back to the email), email, profile_snapshot }` where
+  `profile_snapshot` is the buyer's values with the `custom_` prefix stripped,
+- non-ticket lines carry **no** recipient, and with no ticket in the cart
+  `recipients` is `[]`.
+
+That covers the common case of a buyer buying for themselves. A checkout that
+sells tickets **for other people** assembles its own `products` + `recipients`
+(one key per attendee) and calls `client.purchase()` directly instead of
+`store.submit()`.
 
 Response:
 ```ts
@@ -253,9 +328,15 @@ prefix**. `store.submit()` runs `stripCustomPrefix`, so `custom_phone` → sent 
 `form_data.phone`. **A field you store without the `custom_` prefix (and that
 isn't one of the three base fields) is dropped and never reaches the backend.**
 
-**`form_schema` is the source of truth for rendering and validation** — use it,
-not the sibling `buyer_form` array (a flatter, opaque legacy shape). `form_schema`
-drives which fields exist:
+**Render `email`, `first_name` and `last_name` ALWAYS.** `base_fields` is empty
+for a popup whose operator never configured the base questions, but `BuyerInfo`
+requires all three no matter what: a checkout that renders only what the schema
+lists collects no email and gets a 422 at payment. The store knows this, so
+`buyerComplete` stays `false` until all three are filled, whatever the schema
+says.
+
+**`form_schema` (from `GET /checkout/{slug}/form`) is the source of truth for
+everything else.** It drives which fields exist beyond those three:
 ```ts
 interface ApplicationFormSchema {
   base_fields: Record<string, FormFieldSchema>    // key by raw name
@@ -299,6 +380,9 @@ Rendering tips:
 - `client.upsertCart({ email, items })` — persist the anonymous cart (the store
   does this automatically once a buyer email is present).
 - `client.restoreCart(cid, sig)` — restore from a signed link (`?cid=&sig=`).
-- The persisted `CartState` only round-trips known keys (`passes`, `housing`,
-  `merch`, `patron`, `meal_plans`, `promo_code`, `insurance`, `current_step`);
-  unknown keys are dropped server-side.
+- Both run on the resolved primary flow (`/checkout/{slug}/{primaryFlow}/cart`);
+  you still pass no flow slug.
+- The persisted `CartState` is `{ lines, promo_code, insurance, current_step }`
+  (`lines` being the typed `CartLine` union: product / date_range /
+  custom_amount / meal_plan / accommodation). Unknown keys are rejected
+  server-side, so don't stash your own UI state in it.

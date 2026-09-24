@@ -6,57 +6,72 @@
 //   • the price comes only from usePreview() (server-authoritative)
 //   • buyer custom fields are stored with the `custom_` prefix
 //   • submit() returns a checkoutUrl you redirect to — it does not "finish" the order
-//   • a failed runtime load is distinguished from "still loading"
+//   • a failed load is distinguished from "still loading" (we prefetch)
 //   • buyer input is validated client-side with the SDK's own Zod builder
+//
+// Note there are no EdgeOS "steps" here: which screens exist, and when the buyer
+// moves between them, is this app's own decision (`screen` below). The SDK
+// supplies the catalogue, the buyer form, the price and the payment.
 //
 // Everything visual (inline styles, layout, copy) is a placeholder — replace it
 // with your own design system. The logic is what matters.
 
 import {
+  type ApplicationFormSchema,
   buildFormZodSchema,
+  type CheckoutProduct,
   CheckoutProvider,
   createCheckoutClient,
+  type FormFieldSchema,
   useBuyerForm,
   useCart,
   useCheckout,
   usePreview,
   validateBuyerValues,
-  type ApplicationFormSchema,
-  type CheckoutRuntimeResponse,
-  type FormFieldSchema,
 } from "@edgeos/checkout-react"
 import { useEffect, useMemo, useState } from "react"
 
 // ---- config ----------------------------------------------------------------
 // You only need your slug + publishable key (generate the key in the EdgeOS
-// backoffice → your Organization → Checkout SDK Keys). The API URL defaults to
-// EdgeOS production; add `baseUrl: "http://localhost:8000/api/v1"` below only if
-// EdgeOS tells you to point at a dev/staging backend.
+// backoffice → your Organization → Checkout SDK Keys). There is no sales-flow
+// slug: the client resolves the popup's primary flow itself. The API URL
+// defaults to EdgeOS production; add `baseUrl: "http://localhost:8000/api/v1"`
+// below only if EdgeOS tells you to point at a dev/staging backend.
 
 const SLUG = "amanita"
-const FLOW_SLUG = "checkout"
 const PUBLISHABLE_KEY = "pk_live_xxxxxxxxxxxxxxxx"
 
-// A shared client lets us prefetch the runtime so we can show a real error
-// screen (the provider alone swallows the load error).
+// A shared client lets us prefetch the catalogue + buyer form so we can show a
+// real error screen (the provider alone discards the load rejection).
 const client = createCheckoutClient({
   slug: SLUG,
-  flowSlug: FLOW_SLUG,
   publishableKey: PUBLISHABLE_KEY,
   // baseUrl: "http://localhost:8000/api/v1", // dev/staging override only
 })
 
-// ---- boot: prefetch runtime, then mount the provider -----------------------
+interface Boot {
+  products: CheckoutProduct[]
+  formSchema: ApplicationFormSchema | null
+}
+
+// ---- boot: prefetch, then mount the provider -------------------------------
 
 export function App() {
-  const [runtime, setRuntime] = useState<CheckoutRuntimeResponse | null>(null)
+  const [boot, setBoot] = useState<Boot | null>(null)
   const [failed, setFailed] = useState(false)
 
   useEffect(() => {
     let alive = true
-    client
-      .getRuntime()
-      .then((r) => alive && setRuntime(r))
+    // Both endpoints require the publishable key (401 without it). /products is
+    // the popup's WHOLE active catalogue; grouping it is our job, below.
+    Promise.all([client.getProducts(), client.getForm()])
+      .then(([catalogue, form]) => {
+        if (!alive) return
+        setBoot({
+          products: catalogue.products,
+          formSchema: form.form_schema as unknown as ApplicationFormSchema,
+        })
+      })
       .catch(() => alive && setFailed(true))
     return () => {
       alive = false
@@ -64,10 +79,15 @@ export function App() {
   }, [])
 
   if (failed) return <p>Couldn’t load the checkout. Please try again.</p>
-  if (!runtime) return <p>Loading…</p>
+  if (!boot) return <p>Loading…</p>
 
   return (
-    <CheckoutProvider client={client} initialRuntime={runtime} autoLoad={false}>
+    <CheckoutProvider
+      client={client}
+      initialProducts={boot.products}
+      initialFormSchema={boot.formSchema}
+      autoLoad={false}
+    >
       <Checkout />
     </CheckoutProvider>
   )
@@ -76,16 +96,20 @@ export function App() {
 // ---- the checkout ----------------------------------------------------------
 
 export function Checkout() {
-  const { runtime, submit, submitting, error } = useCheckout()
+  const { products, formSchema, loaded, submit, submitting, error } =
+    useCheckout()
+  // Screens are OUR state, not the SDK's. Add as many as your design needs.
+  const [screen, setScreen] = useState<"catalogue" | "buyer">("catalogue")
   const [paying, setPaying] = useState(false)
 
-  if (!runtime) return null
-  const products = (runtime.products ?? []).filter((p) => p.is_active !== false)
-  const popupName = String((runtime.popup as { name?: string }).name ?? "Checkout")
+  if (!loaded) return <p>Loading…</p>
+  const active = products.filter((p) => p.is_active !== false)
 
   async function handlePay() {
     setPaying(true)
     try {
+      // submit() stamps recipient_key "buyer" on every ticket line and sends the
+      // matching recipient, since the API refuses a ticket that names nobody.
       const result = await submit()
       // Paid order: redirect to the SimpleFi hosted pay page.
       if (result.checkoutUrl) {
@@ -106,22 +130,40 @@ export function Checkout() {
     }
   }
 
+  if (screen === "catalogue") {
+    return (
+      <main style={{ maxWidth: 520, margin: "0 auto", fontFamily: "system-ui" }}>
+        <h1>Checkout</h1>
+        <section>
+          <h2>Tickets</h2>
+          {active.map((p) => (
+            <ProductRow
+              key={p.id}
+              productId={p.id}
+              name={p.name}
+              price={p.price}
+              currency={p.currency}
+            />
+          ))}
+        </section>
+
+        <CouponField />
+        <PriceSummary />
+        <ContinueButton onContinue={() => setScreen("buyer")} />
+      </main>
+    )
+  }
+
   return (
     <main style={{ maxWidth: 520, margin: "0 auto", fontFamily: "system-ui" }}>
-      <h1>{popupName}</h1>
-
-      <section>
-        <h2>Tickets</h2>
-        {products.map((p) => (
-          <ProductRow key={p.id} productId={p.id} name={p.name} price={p.price} currency={p.currency} />
-        ))}
-      </section>
-
-      <CouponField />
+      <h1>Your information</h1>
+      <BuyerForm formSchema={formSchema} />
       <PriceSummary />
-      <BuyerForm formSchema={runtime.form_schema as ApplicationFormSchema | null} />
 
       {error && <p role="alert">{error}</p>}
+      <button type="button" onClick={() => setScreen("catalogue")}>
+        Back
+      </button>
       <PayButton onPay={handlePay} busy={submitting || paying} />
     </main>
   )
@@ -204,7 +246,7 @@ function PriceSummary() {
   )
 }
 
-// ---- buyer form (driven by runtime.form_schema) ----------------------------
+// ---- buyer form (driven by formSchema) -------------------------------------
 
 function BuyerForm({ formSchema }: { formSchema: ApplicationFormSchema | null }) {
   const { values, setBuyer } = useBuyerForm()
@@ -237,7 +279,6 @@ function BuyerForm({ formSchema }: { formSchema: ApplicationFormSchema | null })
 
   return (
     <section>
-      <h2>Your information</h2>
       {fields.map(({ key, field }) => (
         <Field
           key={key}
@@ -313,7 +354,16 @@ function Field(props: {
   )
 }
 
-// ---- pay button ------------------------------------------------------------
+// ---- buttons ---------------------------------------------------------------
+
+function ContinueButton({ onContinue }: { onContinue: () => void }) {
+  const { total } = usePreview()
+  return (
+    <button type="button" disabled={total === null} onClick={onContinue}>
+      Continue
+    </button>
+  )
+}
 
 function PayButton({ onPay, busy }: { onPay: () => void; busy: boolean }) {
   const { total } = usePreview()

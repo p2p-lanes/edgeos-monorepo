@@ -1016,6 +1016,7 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
         popup: "Popups",
         flow: "Any",
         current_human: "HumanPublic | None" = None,
+        is_sdk: bool = False,
     ) -> "CheckoutPreviewResponse":
         """Evaluate the shared checkout gate and return its quote."""
         from app.api.checkout.gate_quote import evaluate_gate_quote
@@ -1029,6 +1030,7 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
             insurance=obj.insurance,
             buyer=obj.buyer,
             current_human=current_human,
+            is_sdk=is_sdk,
         ).response
 
     def create_open_ticketing_payment(
@@ -1040,6 +1042,7 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
         flow_slug: str,
         attribution: dict[str, str | None] | None = None,
         current_human: "HumanPublic | None" = None,
+        is_sdk: bool = False,
     ) -> tuple[Payments, str, str | None]:
         """Create an anonymous open-ticketing payment with per-ticket attendees.
 
@@ -1057,11 +1060,10 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
         from app.api.checkout.gate_quote import (
             assert_quote_current,
             evaluate_gate_quote,
-            resolve_checkout_flow,
+            resolve_sale_flow,
         )
         from app.api.popup.schemas import PopupStatus
         from app.api.sales_flow.resolver import build_effective_config
-        from app.api.sales_flow.schemas import SalesFlowType
         from app.api.tenant.utils import get_portal_url
         from app.services.simplefi import get_simplefi_client
 
@@ -1072,11 +1074,8 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
             )
         # The flow decides. It is required at every anonymous checkout entry
         # point, so no popup-level fallback can price or charge another flow.
-        target_flow = resolve_checkout_flow(
-            session,
-            popup,
-            flow_slug,
-            require_types={SalesFlowType.direct, SalesFlowType.upsale},
+        target_flow, relaxed = resolve_sale_flow(
+            session, popup, flow_slug, is_sdk=is_sdk
         )
         gate = evaluate_gate_quote(
             session,
@@ -1089,6 +1088,7 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
             current_human=current_human,
             lock_products=True,
             require_complete=True,
+            is_sdk=relaxed,
         )
         if obj.quote_token:
             assert_quote_current(obj.quote_token, gate)
@@ -1138,6 +1138,7 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
             tenant_id=tenant.id,
             popup_id=popup.id,
             sales_flow_id=target_flow.id,
+            is_sdk=relaxed,
         )
         self._validate_open_attendee_lines(
             session,
@@ -2232,8 +2233,14 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
         popup_id: uuid.UUID,
         application_id: uuid.UUID | None = None,
         sales_flow_id: uuid.UUID | None = None,
+        is_sdk: bool = False,
     ) -> list[PaymentRecipientRequest]:
-        """Validate every referenced recipient and select recipient-owned snapshots."""
+        """Validate every referenced recipient and select recipient-owned snapshots.
+
+        ``is_sdk`` drops the per-section role constraints: they are declared on
+        ticketing steps, which an SDK-built checkout does not render and does
+        not gate on. Everything else about a recipient still holds.
+        """
         products_by_id = {product.id: product for product in products}
         recipients_by_key = {
             recipient.recipient_key: recipient for recipient in recipients
@@ -2251,10 +2258,14 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
         }
         product_role_eligibility = (
             flow_product_recipient_category_ids(session, sales_flow_id, popup_id)
-            if sales_flow_id is not None
+            if sales_flow_id is not None and not is_sdk
             else {}
         )
-        if sales_flow_id is not None:
+        # Both of these read the flow's ticket-select steps, so an SDK call
+        # drops them together. Dropping only the eligibility map would leave
+        # `has_ticket_recipient_config` demanding an entry that can no longer
+        # exist, turning every ticket into an invalid recipient.
+        if sales_flow_id is not None and not is_sdk:
             from app.api.ticketing_step.models import TicketingSteps
 
             has_ticket_recipient_config = (

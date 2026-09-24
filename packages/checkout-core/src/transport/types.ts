@@ -27,9 +27,11 @@ export interface CheckoutClientConfig {
   baseUrl?: string
   /** Popup slug — the checkout these calls target. */
   slug: string
-  /** Canonical sales-flow slug, such as `checkout` or `attendee`. */
-  flowSlug: string
-  /** Browser-safe per-popup publishable key (pk_live_…), sent as a header. */
+  /**
+   * Browser-safe tenant publishable key (pk_live_…), sent as a header. It is
+   * what marks a call as the SDK's, so the catalogue and purchase endpoints
+   * answer for a client-built checkout rather than the portal.
+   */
   publishableKey?: string
   /** Injectable fetch for SSR / tests. Defaults to globalThis.fetch. */
   fetch?: typeof fetch

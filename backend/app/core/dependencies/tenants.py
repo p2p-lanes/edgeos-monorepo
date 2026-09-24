@@ -128,6 +128,11 @@ def resolve_public_tenant(
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND, detail="Not found"
             )
+        # Record that THIS request proved a publishable key, so a handler can
+        # tell an SDK call from a portal one. It is written only after the key
+        # validates, never from the raw header: a caller can send any header
+        # it likes, so header presence proves nothing.
+        request.state.publishable_key_id = row.id
         return tenant
 
     for header_name in ("origin", "referer"):
@@ -160,3 +165,38 @@ def resolve_public_tenant(
 
 
 PublicTenant = Annotated[Tenants, Depends(resolve_public_tenant)]
+
+
+def is_sdk_request(
+    request: Request,
+    tenant: PublicTenant,  # noqa: ARG001 — ordering, not data: see below
+) -> bool:
+    """Whether this request authenticated with a publishable key.
+
+    True only for a call that reached `resolve_public_tenant` through the
+    key branch, so it is the checkout SDK talking rather than the portal
+    (which resolves its tenant by Origin/Referer).
+
+    `tenant` is taken and ignored on purpose: it makes the tenant resolver a
+    sub-dependency, which is what guarantees the flag has been written by the
+    time this reads it. Route-level `dependencies=[...]` are solved BEFORE the
+    handler's own parameters, so a version reading `request.state` on its own
+    would see nothing there and silently answer False.
+
+    Callers use it to relax flow rules an SDK client owns instead (see the
+    sdk-primary-flow-catalog plan) — never to grant access the key itself
+    does not already grant.
+    """
+    return getattr(request.state, "publishable_key_id", None) is not None
+
+
+SdkRequest = Annotated[bool, Depends(is_sdk_request)]
+
+
+def require_sdk_request(is_sdk: SdkRequest) -> None:
+    """Gate a route to publishable-key callers only."""
+    if not is_sdk:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Publishable key required",
+        )
