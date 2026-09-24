@@ -11,6 +11,8 @@ const mocks = vi.hoisted(() => ({
   crossLinkUses: 0,
   includeSingleFlowPopup: false,
   onlyOneFlow: false,
+  noTargets: false,
+  popupStatus: "active",
 }))
 
 vi.mock("@tanstack/react-query", () => ({
@@ -25,6 +27,7 @@ vi.mock("@tanstack/react-query", () => ({
     if (queryKey[1] === "mine") {
       return { data: { results: [] }, isLoading: false }
     }
+    if (mocks.noTargets) return { data: [], isLoading: false }
     return {
       data: [
         {
@@ -99,7 +102,9 @@ vi.mock("@/components/ui/tooltip", () => ({
   ),
 }))
 vi.mock("@/providers/cityProvider", () => ({
-  useCityProvider: () => ({ getCity: () => ({ id: "popup-a" }) }),
+  useCityProvider: () => ({
+    getCity: () => ({ id: "popup-a", status: mocks.popupStatus }),
+  }),
 }))
 vi.mock("sonner", () => ({
   toast: { success: vi.fn(), error: mocks.toastError },
@@ -135,6 +140,8 @@ describe("cross-popup referrals page", () => {
     mocks.crossLinkUses = 0
     mocks.includeSingleFlowPopup = false
     mocks.onlyOneFlow = false
+    mocks.noTargets = false
+    mocks.popupStatus = "active"
     mocks.createMyLink.mockReset()
     mocks.deleteMyLink.mockReset()
     mocks.toastError.mockReset()
@@ -255,5 +262,33 @@ describe("cross-popup referrals page", () => {
     render(<ReferralsPage />)
     expect(screen.getByText("referrals.sharing_unavailable")).toBeTruthy()
     expect(screen.queryByText("Volunteers")).toBeNull()
+  })
+
+  it("only offers links into other events once the popup has ended", () => {
+    mocks.popupStatus = "ended"
+    render(<ReferralsPage />)
+
+    expect(screen.getByText("referrals.ended_description")).toBeTruthy()
+    expect(
+      screen.queryByRole("button", { name: "referrals.create_referral" }),
+    ).toBeNull()
+    expect(screen.getByText("Volunteers")).toBeTruthy()
+    fireEvent.click(
+      screen.getAllByRole("button", { name: "referrals.cross_create" })[0],
+    )
+    expect(mocks.createMyLink).toHaveBeenCalledWith({
+      requestBody: {
+        popup_id: "popup-b",
+        source_popup_id: "popup-a",
+        sales_flow_id: "flow-general",
+      },
+    })
+  })
+
+  it("says so when an ended popup has no other event to share", () => {
+    mocks.popupStatus = "ended"
+    mocks.noTargets = true
+    render(<ReferralsPage />)
+    expect(screen.getByText("referrals.ended_no_targets")).toBeTruthy()
   })
 })
