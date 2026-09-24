@@ -1,16 +1,20 @@
-import { fireEvent, render, screen } from "@testing-library/react"
+import { fireEvent, render, screen, waitFor } from "@testing-library/react"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 
 const mocks = vi.hoisted(() => ({
   createMyLink: vi.fn(),
+  deleteMyLink: vi.fn(),
+  toastError: vi.fn(),
+  invalidateQueries: vi.fn(),
   canShare: true,
   hasCrossLink: false,
+  crossLinkUses: 0,
   includeSingleFlowPopup: false,
   onlyOneFlow: false,
 }))
 
 vi.mock("@tanstack/react-query", () => ({
-  useQueryClient: () => ({ invalidateQueries: vi.fn() }),
+  useQueryClient: () => ({ invalidateQueries: mocks.invalidateQueries }),
   useQuery: ({ queryKey }: { queryKey: string[] }) => {
     if (queryKey[1] === "sharing") {
       return {
@@ -42,7 +46,7 @@ vi.mock("@tanstack/react-query", () => ({
                 id: "link-volunteers",
                 token: "volunteers-code",
                 discount_percentage: "0",
-                current_uses: 0,
+                current_uses: mocks.crossLinkUses,
               }
             : null,
         },
@@ -68,37 +72,73 @@ vi.mock("@tanstack/react-query", () => ({
       isLoading: false,
     }
   },
-  useMutation: (options: { mutationFn: (arg: unknown) => unknown }) => ({
-    mutate: (arg: unknown) => options.mutationFn(arg),
+  useMutation: (options: {
+    mutationFn: (arg: unknown) => unknown
+    onSuccess?: () => void
+    onError?: (error: unknown) => void
+  }) => ({
+    mutate: (arg: unknown) => {
+      Promise.resolve(options.mutationFn(arg)).then(
+        () => options.onSuccess?.(),
+        (error) => options.onError?.(error),
+      )
+    },
     isPending: false,
   }),
 }))
 vi.mock("react-i18next", () => ({
   useTranslation: () => ({ t: (key: string) => key }),
 }))
+vi.mock("@/components/ui/tooltip", () => ({
+  Tooltip: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+  TooltipTrigger: ({ children }: { children: React.ReactNode }) => (
+    <>{children}</>
+  ),
+  TooltipContent: ({ children }: { children: React.ReactNode }) => (
+    <span role="tooltip">{children}</span>
+  ),
+}))
 vi.mock("@/providers/cityProvider", () => ({
   useCityProvider: () => ({ getCity: () => ({ id: "popup-a" }) }),
 }))
+vi.mock("sonner", () => ({
+  toast: { success: vi.fn(), error: mocks.toastError },
+}))
 vi.mock("@/client", () => ({
-  ApiError: class ApiError extends Error {},
+  ApiError: class ApiError extends Error {
+    status: number
+    constructor(
+      _request: unknown,
+      response: { status: number },
+      message: string,
+    ) {
+      super(message)
+      this.status = response.status
+    }
+  },
   InvitesService: {
     getMySharingStatus: vi.fn(),
     listMyLinks: vi.fn(),
     listCrossPopupTargets: vi.fn(),
     createMyLink: mocks.createMyLink,
-    deleteMyLink: vi.fn(),
+    deleteMyLink: mocks.deleteMyLink,
   },
 }))
 
+import { ApiError } from "@/client"
 import ReferralsPage from "./page"
 
 describe("cross-popup referrals page", () => {
   beforeEach(() => {
     mocks.canShare = true
     mocks.hasCrossLink = false
+    mocks.crossLinkUses = 0
     mocks.includeSingleFlowPopup = false
     mocks.onlyOneFlow = false
     mocks.createMyLink.mockReset()
+    mocks.deleteMyLink.mockReset()
+    mocks.toastError.mockReset()
+    mocks.invalidateQueries.mockReset()
   })
 
   it("offers every eligible destination flow even without a purchased product", () => {
@@ -154,6 +194,60 @@ describe("cross-popup referrals page", () => {
     expect(
       screen.getAllByRole("button", { name: "referrals.cross_create" }),
     ).toHaveLength(1)
+  })
+
+  it("disables deletion and explains why when a referral link has been used", () => {
+    mocks.hasCrossLink = true
+    mocks.crossLinkUses = 2
+    render(<ReferralsPage />)
+
+    const deleteButton = screen.getByRole("button", {
+      name: "referrals.delete_referral",
+    }) as HTMLButtonElement
+    expect(deleteButton.disabled).toBe(true)
+    expect(
+      document.getElementById(
+        deleteButton.getAttribute("aria-describedby") ?? "",
+      )?.textContent,
+    ).toBe("referrals.delete_used_explanation")
+    expect(screen.getByRole("tooltip").textContent).toBe(
+      "referrals.delete_used_explanation",
+    )
+    expect(screen.queryByText("referrals.delete_confirm_title")).toBeNull()
+  })
+
+  it("still allows deleting a referral link with no uses", () => {
+    mocks.hasCrossLink = true
+    render(<ReferralsPage />)
+    const deleteButton = screen.getByRole("button", {
+      name: "referrals.delete_referral",
+    }) as HTMLButtonElement
+    expect(deleteButton.disabled).toBe(false)
+  })
+
+  it("explains a 409 and refreshes the link if it was used after loading", async () => {
+    mocks.hasCrossLink = true
+    mocks.deleteMyLink.mockRejectedValueOnce(
+      new ApiError({} as never, { status: 409 } as never, "used"),
+    )
+    render(<ReferralsPage />)
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "referrals.delete_referral" }),
+    )
+    fireEvent.click(
+      screen.getByRole("button", { name: "referrals.delete_confirm" }),
+    )
+
+    await waitFor(() => {
+      expect(mocks.toastError).toHaveBeenCalledWith(
+        "referrals.delete_used_explanation",
+      )
+    })
+    expect(mocks.invalidateQueries).toHaveBeenCalledWith({
+      queryKey: ["referrals", "cross-targets", "popup-a"],
+    })
+    expect(screen.queryByText("referrals.delete_confirm_title")).toBeNull()
   })
 
   it("does not offer links when the backend denies sharing", () => {

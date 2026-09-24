@@ -758,6 +758,7 @@
     "delete_confirm": "Yes, delete",
     "delete_cancel": "Cancel",
     "delete_error": "Failed to delete referral link. Please try again.",
+    "delete_used_explanation": "Þessi tengill hefur þegar verið notaður og því er ekki hægt að eyða honum.",
     "delete_success": "Referral link deleted.",
     "code_label": "Code",
     "discount_label": "Discount",
