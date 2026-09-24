@@ -44,6 +44,13 @@ class Invites(SQLModel, table=True):
         Index("ix_invites_tenant_id", "tenant_id"),
         Index("ix_invites_popup_recipient_email", "popup_id", "recipient_email"),
         Index("ix_invites_referrer_human_id", "referrer_human_id"),
+        Index(
+            "uq_invites_referrer_flow",
+            "referrer_human_id",
+            "sales_flow_id",
+            unique=True,
+            postgresql_where=text("referrer_human_id IS NOT NULL"),
+        ),
         CheckConstraint(
             "source_popup_id IS NULL OR referrer_human_id IS NOT NULL",
             name="ck_invites_source_popup_portal_only",

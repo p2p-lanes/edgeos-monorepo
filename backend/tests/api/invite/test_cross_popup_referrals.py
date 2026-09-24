@@ -20,6 +20,7 @@ from app.api.human.models import Humans
 from app.api.invite.models import Invites
 from app.api.popup.models import Popups
 from app.api.popup.schemas import PopupStatus
+from app.api.sales_flow.models import SalesFlows
 from app.api.shared.enums import HumanRating
 from app.api.tenant.models import Tenants
 from tests._flow_helpers import set_link_policy
@@ -64,6 +65,21 @@ def _target(
     return popup
 
 
+def _secondary(db: Session, popup: Popups, *, accepts: bool = True) -> SalesFlows:
+    flow = SalesFlows(
+        tenant_id=popup.tenant_id,
+        popup_id=popup.id,
+        type="application",
+        slug=f"volunteers-{uuid.uuid4().hex[:8]}",
+        name="Volunteers",
+        cross_popup_referrals_enabled=accepts,
+    )
+    db.add(flow)
+    db.commit()
+    db.refresh(flow)
+    return flow
+
+
 def _flag(db: Session, human: Humans) -> None:
     human.rating = HumanRating.RED_FLAG
     db.add(human)
@@ -71,17 +87,31 @@ def _flag(db: Session, human: Humans) -> None:
 
 
 def _share(
-    client: TestClient, human: Humans, target: Popups, source: Popups
+    client: TestClient,
+    human: Humans,
+    target: Popups,
+    source: Popups,
+    sales_flow_id: uuid.UUID | None = None,
 ) -> tuple[int, dict]:
     resp = client.post(
         LINKS,
-        json={"popup_id": str(target.id), "source_popup_id": str(source.id)},
+        json={
+            "popup_id": str(target.id),
+            "source_popup_id": str(source.id),
+            **({"sales_flow_id": str(sales_flow_id)} if sales_flow_id else {}),
+        },
         headers=_auth(_human_token(human)),
     )
     return resp.status_code, resp.json()
 
 
-def _apply(client: TestClient, human: Humans, popup: Popups, link_id: str):
+def _apply(
+    client: TestClient,
+    human: Humans,
+    popup: Popups,
+    link_id: str,
+    sales_flow_id: uuid.UUID | None = None,
+):
     return client.post(
         "/api/v1/applications/my",
         json={
@@ -90,6 +120,7 @@ def _apply(client: TestClient, human: Humans, popup: Popups, link_id: str):
             "last_name": human.last_name,
             "email": human.email,
             "referral_id": link_id,
+            **({"sales_flow_id": str(sales_flow_id)} if sales_flow_id else {}),
         },
         headers=_auth(_human_token(human)),
     )
@@ -348,6 +379,144 @@ class TestTargets:
         )
         assert resp.status_code == 200, resp.json()
         assert resp.json() == []
+
+
+class TestMultipleTargetFlows:
+    def test_each_accepting_flow_can_have_its_own_link(
+        self, client: TestClient, db: Session, tenant_a: Tenants
+    ) -> None:
+        sharer = _make_human(db, tenant_a)
+        source = _source(db, tenant_a, sharer)
+        target = _target(db, tenant_a)
+        secondary = _secondary(db, target)
+        default_flow = set_link_policy(db, target)
+        headers = _auth(_human_token(sharer))
+
+        listed = client.get(
+            TARGETS, params={"source_popup_id": str(source.id)}, headers=headers
+        )
+        entries = {row["sales_flow_id"]: row for row in listed.json()}
+        assert entries[str(default_flow.id)]["flow_name"] == default_flow.name
+        assert entries[str(secondary.id)]["flow_name"] == "Volunteers"
+
+        code, default_link = _share(client, sharer, target, source)
+        assert code == 201, default_link
+        code, second_link = _share(client, sharer, target, source, secondary.id)
+        assert code == 201, second_link
+        assert second_link["sales_flow_id"] == str(secondary.id)
+        assert second_link["id"] != default_link["id"]
+        assert _share(client, sharer, target, source, secondary.id)[0] == 409
+        owned = client.get(LINKS, params={"popup_id": str(target.id)}, headers=headers)
+        assert owned.status_code == 200
+        assert {row["id"] for row in owned.json()["results"]} == {
+            default_link["id"],
+            second_link["id"],
+        }
+
+        listed = client.get(
+            TARGETS, params={"source_popup_id": str(source.id)}, headers=headers
+        )
+        entries = {row["sales_flow_id"]: row for row in listed.json()}
+        assert entries[str(default_flow.id)]["link"]["id"] == default_link["id"]
+        assert entries[str(secondary.id)]["link"]["id"] == second_link["id"]
+
+    def test_secondary_flow_is_available_even_if_default_is_off(
+        self, client: TestClient, db: Session, tenant_a: Tenants
+    ) -> None:
+        sharer = _make_human(db, tenant_a)
+        source = _source(db, tenant_a, sharer)
+        target = _target(db, tenant_a, accepts=False)
+        secondary = _secondary(db, target)
+        headers = _auth(_human_token(sharer))
+        listed = client.get(
+            TARGETS, params={"source_popup_id": str(source.id)}, headers=headers
+        )
+        entries = [row for row in listed.json() if row["popup_id"] == str(target.id)]
+        assert [row["sales_flow_id"] for row in entries] == [str(secondary.id)]
+        # Backward-compatible omission still means default, not an arbitrary flow.
+        assert _share(client, sharer, target, source)[0] == 403
+        code, link = _share(client, sharer, target, source, secondary.id)
+        assert code == 201, link
+
+        preview = client.get(f"/api/v1/invites/preview/{link['token']}")
+        assert preview.status_code == 200
+        assert preview.json()["sales_flow_id"] == str(secondary.id)
+        recipient = _make_human(db, tenant_a)
+        application = _apply(client, recipient, target, link["id"])
+        assert application.status_code == 201, application.json()
+        assert application.json()["sales_flow_id"] == str(secondary.id)
+
+    def test_preview_of_other_flow_is_not_already_redeemed(
+        self, client: TestClient, db: Session, tenant_a: Tenants
+    ) -> None:
+        sharer = _make_human(db, tenant_a)
+        source = _source(db, tenant_a, sharer)
+        target = _target(db, tenant_a)
+        secondary = _secondary(db, target)
+        _, default_link = _share(client, sharer, target, source)
+        _, other_link = _share(client, sharer, target, source, secondary.id)
+        recipient = _make_human(db, tenant_a)
+        assert _apply(client, recipient, target, default_link["id"]).status_code == 201
+
+        headers = _auth(_human_token(recipient))
+        preview = client.get(
+            f"/api/v1/invites/preview/{other_link['token']}", headers=headers
+        )
+        assert preview.status_code == 200
+        assert preview.json()["already_redeemed"] is False
+        assert _apply(client, recipient, target, other_link["id"]).status_code == 201
+        preview = client.get(
+            f"/api/v1/invites/preview/{other_link['token']}", headers=headers
+        )
+        assert preview.json()["already_redeemed"] is True
+
+    def test_client_cannot_redeem_a_link_into_a_different_flow(
+        self, client: TestClient, db: Session, tenant_a: Tenants
+    ) -> None:
+        sharer = _make_human(db, tenant_a)
+        source = _source(db, tenant_a, sharer)
+        target = _target(db, tenant_a)
+        secondary = _secondary(db, target)
+        _, link = _share(client, sharer, target, source)
+        recipient = _make_human(db, tenant_a)
+
+        response = _apply(client, recipient, target, link["id"], secondary.id)
+        assert response.status_code == 422, response.json()
+        assert db.get(Invites, uuid.UUID(link["id"])).current_uses == 0
+        assert (
+            db.exec(
+                select(Applications).where(Applications.human_id == recipient.id)
+            ).first()
+            is None
+        )
+
+    def test_closing_the_link_flow_invalidates_its_preview(
+        self, client: TestClient, db: Session, tenant_a: Tenants
+    ) -> None:
+        sharer = _make_human(db, tenant_a)
+        source = _source(db, tenant_a, sharer)
+        target = _target(db, tenant_a, accepts=False)
+        secondary = _secondary(db, target)
+        code, link = _share(client, sharer, target, source, secondary.id)
+        assert code == 201, link
+        secondary.status = "closed"
+        db.add(secondary)
+        db.commit()
+        assert client.get(f"/api/v1/invites/preview/{link['token']}").status_code == 410
+
+    def test_closed_or_disabled_secondary_flow_cannot_be_shared(
+        self, client: TestClient, db: Session, tenant_a: Tenants
+    ) -> None:
+        sharer = _make_human(db, tenant_a)
+        source = _source(db, tenant_a, sharer)
+        target = _target(db, tenant_a, accepts=False)
+        secondary = _secondary(db, target, accepts=False)
+        assert _share(client, sharer, target, source, secondary.id)[0] == 403
+        secondary.cross_popup_referrals_enabled = True
+        secondary.status = "closed"
+        db.add(secondary)
+        db.commit()
+        assert _share(client, sharer, target, source, secondary.id)[0] == 403
 
 
 class TestSharingStatus:

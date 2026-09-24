@@ -2,7 +2,6 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { Copy, Link2, Loader2, Trash2 } from "lucide-react"
-import { useSearchParams } from "next/navigation"
 import { useState } from "react"
 import { useTranslation } from "react-i18next"
 import { toast } from "sonner"
@@ -17,7 +16,6 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog"
-import { useApplication } from "@/providers/applicationProvider"
 import { useCityProvider } from "@/providers/cityProvider"
 
 function ReferralRow({
@@ -62,7 +60,8 @@ function ReferralRow({
   }
 
   const discount = Number(referral.discount_percentage)
-  const discountLabel = discount > 0 ? `${discount}%` : t("referrals.no_expiry")
+  const discountLabel =
+    discount > 0 ? `${discount}%` : t("referrals.preview_no_discount")
 
   return (
     <div className="flex items-center justify-between rounded-lg border bg-card px-4 py-3 gap-4">
@@ -172,11 +171,12 @@ function CrossPopupReferrals({ sourcePopupId }: { sourcePopupId: string }) {
   })
 
   const createMutation = useMutation({
-    mutationFn: (targetPopupId: string) =>
+    mutationFn: (target: { popup_id: string; sales_flow_id: string }) =>
       InvitesService.createMyLink({
         requestBody: {
-          popup_id: targetPopupId,
+          popup_id: target.popup_id,
           source_popup_id: sourcePopupId,
+          sales_flow_id: target.sales_flow_id,
         },
       }),
     onSuccess: () => {
@@ -201,18 +201,24 @@ function CrossPopupReferrals({ sourcePopupId }: { sourcePopupId: string }) {
       </div>
       <div className="space-y-3">
         {targets.map((target) => (
-          <div key={target.popup_id} className="space-y-2">
+          <div key={target.sales_flow_id} className="space-y-2">
             <div className="flex items-center justify-between gap-4">
-              <p className="text-sm font-medium truncate">{target.name}</p>
+              <div className="min-w-0">
+                <p className="text-sm font-medium truncate">{target.name}</p>
+                <p className="text-xs text-muted-foreground truncate">
+                  {target.flow_name}
+                </p>
+              </div>
               {!target.link && (
                 <Button
                   size="sm"
                   variant="outline"
-                  onClick={() => createMutation.mutate(target.popup_id)}
+                  onClick={() => createMutation.mutate(target)}
                   disabled={createMutation.isPending}
                 >
                   {createMutation.isPending &&
-                  createMutation.variables === target.popup_id ? (
+                  createMutation.variables?.sales_flow_id ===
+                    target.sales_flow_id ? (
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                   ) : null}
                   {t("referrals.cross_create")}
@@ -237,24 +243,18 @@ const ReferralsPage = () => {
   const { getCity } = useCityProvider()
   const city = getCity()
   const queryClient = useQueryClient()
-  const { getRelevantApplication } = useApplication()
-  // The door this screen is about. Without it, someone holding two
-  // applications was answered with whichever came last
-  // (sdd/sales-flows-rediseno).
-  const flowId = useSearchParams().get("flow")
-  const application = getRelevantApplication(flowId)
-  // Only attendees who actually hold a ticket for this popup may create a
-  // referral link (anti-abuse — mirrors the backend gate). Acceptance alone is
-  // not enough: invite/referral arrivals are auto-accepted without committing.
-  const hasTicket = !!application?.attendees?.some(
-    (a) => ((a.products as unknown[] | undefined) ?? []).length > 0,
-  )
+  const { data: sharing, isLoading: sharingLoading } = useQuery({
+    queryKey: ["referrals", "sharing", city?.id ?? ""],
+    queryFn: () => InvitesService.getMySharingStatus({ popupId: city!.id }),
+    enabled: !!city?.id,
+  })
+  const canShare = sharing?.can_share === true
 
   const { data, isLoading } = useQuery({
     queryKey: ["referrals", "mine", city?.id ?? ""],
     queryFn: () =>
       InvitesService.listMyLinks({ popupId: city!.id, limit: 100 }),
-    enabled: !!city?.id && hasTicket,
+    enabled: !!city?.id && canShare,
   })
 
   const createMutation = useMutation({
@@ -272,19 +272,29 @@ const ReferralsPage = () => {
     },
   })
 
-  if (!hasTicket) {
+  if (sharingLoading) {
+    return (
+      <div className="flex justify-center py-10">
+        <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+      </div>
+    )
+  }
+  if (!canShare) {
     return (
       <div className="max-w-2xl mx-auto p-6">
         <p className="text-sm text-muted-foreground">
-          {t("referrals.needs_ticket")}
+          {t("referrals.sharing_unavailable")}
         </p>
       </div>
     )
   }
 
   const referrals = data?.results ?? []
-  // 1-link-per-attendee rule: hide Create once the human has a referral
-  const hasReferral = referrals.length > 0
+  // One link per destination flow. A link into another flow of this popup
+  // must not hide Create for the way in this attendee can share.
+  const hasReferral = referrals.some(
+    (ref) => ref.sales_flow_id === sharing?.sales_flow_id,
+  )
 
   return (
     <div className="max-w-2xl mx-auto p-6 space-y-6">

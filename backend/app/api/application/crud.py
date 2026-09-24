@@ -1032,10 +1032,19 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
                     status_code=status.HTTP_404_NOT_FOUND,
                     detail="Referral not found",
                 )
+            requested_referral_flow_id = getattr(app_data, "sales_flow_id", None)
+            if (
+                requested_referral_flow_id is not None
+                and requested_referral_flow_id != _referral.sales_flow_id
+            ):
+                raise HTTPException(
+                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                    detail="This referral opens a different sales flow",
+                )
             if not attendee_link_enabled(
                 config_for(
                     session,
-                    sales_flow_id=getattr(app_data, "sales_flow_id", None),
+                    sales_flow_id=_referral.sales_flow_id,
                     popup_id=popup.id,
                 ),
                 _referral,
@@ -1063,6 +1072,11 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
         # checkout is moving to per-popup configuration, and that change decides
         # their fate.
         is_express_checkout = bool(_group or _invite or _referral)
+        effective_flow_id = (
+            _referral.sales_flow_id
+            if _referral
+            else getattr(app_data, "sales_flow_id", None)
+        )
 
         # Validate custom_fields against form field definitions. Non-draft
         # submissions must run even with empty/absent custom_fields so
@@ -1074,13 +1088,9 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
                 app_data.custom_fields or {},
                 skip_required=is_draft,
                 is_express_checkout=is_express_checkout,
-                # The same flow this application will be stamped with, so it
-                # is judged against the form it was shown and not against
-                # every flow's questions at once.
+                # The same flow this application will be stamped with.
                 sales_flow_id=self.resolve_target_flow_id(
-                    session,
-                    app_data.popup_id,
-                    getattr(app_data, "sales_flow_id", None),
+                    session, app_data.popup_id, effective_flow_id
                 ),
             )
             if not is_valid:
@@ -1189,7 +1199,7 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
         # Stamp the target flow on every new application — an explicit
         # `sales_flow_id` (e.g. from the portal FlowPicker) when given, else
         # the popup's default flow. Never absent (F4).
-        requested_flow_id = getattr(app_data, "sales_flow_id", None)
+        requested_flow_id = effective_flow_id
         data["sales_flow_id"] = self.resolve_target_flow_id(
             session, app_data.popup_id, requested_flow_id
         )
