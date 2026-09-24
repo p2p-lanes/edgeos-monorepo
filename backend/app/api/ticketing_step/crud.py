@@ -1,8 +1,10 @@
 import uuid
+from copy import deepcopy
 
 from fastapi import HTTPException, status
 from sqlmodel import Session, func, select
 
+from app.api.attendee_category.crud import attendee_categories_crud
 from app.api.shared.crud import BaseCRUD
 from app.api.ticketing_step.models import TicketingSteps
 from app.api.ticketing_step.schemas import TicketingStepCreate, TicketingStepUpdate
@@ -132,7 +134,34 @@ class TicketingStepsCRUD(
         session.flush()
 
         source, _ = self.find_by_flow(session, source_flow_id, limit=1000)
+        target_categories = {
+            category.key: str(category.id)
+            for category in attendee_categories_crud.list_by_flow(
+                session, target_flow_id
+            )
+        }
+        category_id_map = {
+            str(category.id): target_categories[category.key]
+            for category in attendee_categories_crud.list_by_flow(
+                session, source_flow_id
+            )
+            if category.key in target_categories
+        }
         for step in source:
+            template_config = deepcopy(step.template_config)
+            if step.template == "ticket-select" and template_config:
+                for section in template_config.get("sections") or []:
+                    if not isinstance(section, dict):
+                        continue
+                    category_ids = section.get("attendee_categories")
+                    if isinstance(category_ids, list):
+                        # Keys survive cloning; UUIDs belong to a single flow.
+                        # Drop unmapped IDs, keeping [] distinct from unrestricted None.
+                        section["attendee_categories"] = [
+                            category_id_map[str(category_id)]
+                            for category_id in category_ids
+                            if str(category_id) in category_id_map
+                        ]
             session.add(
                 TicketingSteps(
                     tenant_id=tenant_id,
@@ -146,7 +175,7 @@ class TicketingStepsCRUD(
                     protected=step.protected,
                     product_category=step.product_category,
                     template=step.template,
-                    template_config=step.template_config,
+                    template_config=template_config,
                     watermark=step.watermark,
                     show_title=step.show_title,
                     show_watermark=step.show_watermark,
