@@ -189,6 +189,14 @@ function CrossPopupReferrals({ sourcePopupId }: { sourcePopupId: string }) {
 
   if (!targets?.length) return null
 
+  const flowsByPopup = new Map<string, number>()
+  for (const target of targets) {
+    flowsByPopup.set(
+      target.popup_id,
+      (flowsByPopup.get(target.popup_id) ?? 0) + 1,
+    )
+  }
+
   return (
     <section className="space-y-3 pt-4">
       <div>
@@ -200,39 +208,62 @@ function CrossPopupReferrals({ sourcePopupId }: { sourcePopupId: string }) {
         </p>
       </div>
       <div className="space-y-3">
-        {targets.map((target) => (
-          <div key={target.sales_flow_id} className="space-y-2">
-            <div className="flex items-center justify-between gap-4">
-              <div className="min-w-0">
-                <p className="text-sm font-medium truncate">{target.name}</p>
-                <p className="text-xs text-muted-foreground truncate">
-                  {target.flow_name}
+        {targets.map((target) => {
+          const showFlowName = (flowsByPopup.get(target.popup_id) ?? 0) > 1
+          return (
+            <div key={target.sales_flow_id} className="space-y-2">
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
+                <p className="min-w-0 text-base leading-snug sm:flex-1">
+                  <span
+                    className={
+                      showFlowName
+                        ? "font-medium text-muted-foreground"
+                        : "font-semibold text-foreground"
+                    }
+                  >
+                    {target.name}
+                  </span>
+                  {showFlowName && (
+                    <>
+                      {" "}
+                      <span
+                        className="mx-1 text-muted-foreground/60"
+                        aria-hidden="true"
+                      >
+                        ·
+                      </span>{" "}
+                      <span className="font-semibold text-foreground">
+                        {target.flow_name}
+                      </span>
+                    </>
+                  )}
                 </p>
+                {!target.link && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="self-end sm:self-auto"
+                    onClick={() => createMutation.mutate(target)}
+                    disabled={createMutation.isPending}
+                  >
+                    {createMutation.isPending &&
+                    createMutation.variables?.sales_flow_id ===
+                      target.sales_flow_id ? (
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    ) : null}
+                    {t("referrals.cross_create")}
+                  </Button>
+                )}
               </div>
-              {!target.link && (
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => createMutation.mutate(target)}
-                  disabled={createMutation.isPending}
-                >
-                  {createMutation.isPending &&
-                  createMutation.variables?.sales_flow_id ===
-                    target.sales_flow_id ? (
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  ) : null}
-                  {t("referrals.cross_create")}
-                </Button>
+              {target.link && (
+                <ReferralRow
+                  referral={target.link}
+                  onDeleted={() => queryClient.invalidateQueries({ queryKey })}
+                />
               )}
             </div>
-            {target.link && (
-              <ReferralRow
-                referral={target.link}
-                onDeleted={() => queryClient.invalidateQueries({ queryKey })}
-              />
-            )}
-          </div>
-        ))}
+          )
+        })}
       </div>
     </section>
   )
