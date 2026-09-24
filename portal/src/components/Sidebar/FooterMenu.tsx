@@ -9,12 +9,13 @@ import {
   SidebarMenuItem,
 } from "./SidebarComponents"
 
-const REPO_URL = "https://github.com/p2p-lanes/EdgeOS"
+const REPO_URL_SUFFIX = "p2p-lanes/edgeos-monorepo"
+const REPO_URL = "https://github.com/" + REPO_URL_SUFFIX
 
 async function getGitHubStars() {
   try {
     const response = await fetch(
-      "https://api.github.com/repos/p2p-lanes/EdgeOS",
+      "https://api.github.com/repos/" + REPO_URL_SUFFIX,
     )
     const data = await response.json()
     return data.stargazers_count as number
