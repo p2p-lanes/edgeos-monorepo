@@ -5739,6 +5739,18 @@ export const AttendeeSharingStatusSchema = {
         can_share: {
             type: 'boolean',
             title: 'Can Share'
+        },
+        sales_flow_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Sales Flow Id'
         }
     },
     type: 'object',
@@ -9482,6 +9494,15 @@ export const CrossPopupReferralTargetSchema = {
             type: 'string',
             title: 'Slug'
         },
+        sales_flow_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Sales Flow Id'
+        },
+        flow_name: {
+            type: 'string',
+            title: 'Flow Name'
+        },
         link: {
             anyOf: [
                 {
@@ -9494,13 +9515,9 @@ export const CrossPopupReferralTargetSchema = {
         }
     },
     type: 'object',
-    required: ['popup_id', 'name', 'slug'],
+    required: ['popup_id', 'name', 'slug', 'sales_flow_id', 'flow_name'],
     title: 'CrossPopupReferralTarget',
-    description: `A popup an attendee may share from the popup they are in.
-
-\`\`link\`\` is the attendee's existing link into it, if they have one. It
-may predate the cross-popup share, since an attendee holds one link per
-popup whichever way it was created.`
+    description: 'One accepting application flow of another popup, with its own link.'
 } as const;
 
 export const CumulativeTrendsSchema = {
@@ -16242,6 +16259,18 @@ export const InvitePortalCreateSchema = {
             ],
             title: 'Source Popup Id'
         },
+        sales_flow_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Sales Flow Id'
+        },
         token: {
             anyOf: [
                 {
@@ -16493,6 +16522,18 @@ export const InvitePublicPreviewSchema = {
             type: 'string',
             format: 'uuid',
             title: 'Popup Id'
+        },
+        sales_flow_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Sales Flow Id'
         },
         token: {
             type: 'string',

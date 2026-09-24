@@ -96,6 +96,9 @@ class InvitePortalCreate(BaseModel):
 
     popup_id: uuid.UUID
     source_popup_id: uuid.UUID | None = None
+    # Cross-popup links may name any open application flow accepting them.
+    # Omitted for existing clients: use the target popup's default flow.
+    sales_flow_id: uuid.UUID | None = None
     token: str | None = None
     max_uses: int | None = None
     expires_at: datetime | None = None
@@ -168,19 +171,18 @@ class AttendeeSharingStatus(BaseModel):
     """
 
     can_share: bool
+    # The flow a same-popup link would land people in, when sharing is allowed.
+    sales_flow_id: uuid.UUID | None = None
 
 
 class CrossPopupReferralTarget(BaseModel):
-    """A popup an attendee may share from the popup they are in.
-
-    ``link`` is the attendee's existing link into it, if they have one. It
-    may predate the cross-popup share, since an attendee holds one link per
-    popup whichever way it was created.
-    """
+    """One accepting application flow of another popup, with its own link."""
 
     popup_id: uuid.UUID
     name: str
     slug: str
+    sales_flow_id: uuid.UUID
+    flow_name: str
     link: InvitePublic | None = None
 
 
@@ -195,6 +197,8 @@ class InvitePublicPreview(BaseModel):
 
     id: uuid.UUID
     popup_id: uuid.UUID
+    # The form and checkout must use the link's flow, not the popup default.
+    sales_flow_id: uuid.UUID | None = None
     token: str
     inviter_name: str | None = None
     is_email_restricted: bool

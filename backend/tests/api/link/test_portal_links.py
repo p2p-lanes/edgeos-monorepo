@@ -325,7 +325,6 @@ class TestReferralPortalCRUD:
         popup = _make_popup(db, tenant_a)
         human = _make_human(db, tenant_a)
         _make_referral(db, popup, human, code=f"list-{uuid.uuid4().hex[:8]}")
-        _make_referral(db, popup, human, code=f"list-{uuid.uuid4().hex[:8]}")
         htok = _human_token(human)
 
         resp = client.get(
@@ -335,7 +334,7 @@ class TestReferralPortalCRUD:
         assert resp.status_code == 200, resp.json()
         body = resp.json()
         assert "results" in body
-        assert body["paging"]["total"] >= 2
+        assert body["paging"]["total"] == 1
 
     def test_human_can_patch_own_referral(
         self,
@@ -523,9 +522,10 @@ class TestReferralAdminCRUD:
     ) -> None:
         """Admin GET /admin/referrals?popup_id=... returns all popup referrals."""
         popup = _make_popup(db, tenant_a)
-        human = _make_human(db, tenant_a)
-        _make_referral(db, popup, human, code=f"adm-{uuid.uuid4().hex[:8]}")
-        _make_referral(db, popup, human, code=f"adm-{uuid.uuid4().hex[:8]}")
+        first_human = _make_human(db, tenant_a)
+        second_human = _make_human(db, tenant_a)
+        _make_referral(db, popup, first_human, code=f"adm-{uuid.uuid4().hex[:8]}")
+        _make_referral(db, popup, second_human, code=f"adm-{uuid.uuid4().hex[:8]}")
         atk = _admin_token(admin_user_tenant_a)
 
         resp = client.get(

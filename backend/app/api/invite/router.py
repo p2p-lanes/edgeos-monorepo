@@ -139,6 +139,7 @@ async def preview_invite(
     return InvitePublicPreview(
         id=invite.id,
         popup_id=invite.popup_id,
+        sales_flow_id=invite.sales_flow_id,
         token=invite.token,
         inviter_name=inviter_name,
         is_email_restricted=invite.recipient_email is not None,
@@ -190,7 +191,9 @@ async def preview_link(
         from app.api.application.crud import applications_crud
 
         already_redeemed = (
-            applications_crud.get_by_human_popup(db, current_human.id, link.popup_id)
+            applications_crud.get_by_human_flow(
+                db, human_id=current_human.id, sales_flow_id=link.sales_flow_id
+            )
             is not None
         )
 
@@ -200,6 +203,15 @@ async def preview_link(
 
         popup = popups_crud.get(db, link.popup_id)
         ensure_popup_link_active(popup)
+        from app.api.sales_flow.crud import sales_flows_crud
+
+        link_flow = sales_flows_crud.get(db, link.sales_flow_id)
+        if link_flow is None or link_flow.status is not None:
+            raise HTTPException(
+                status_code=status.HTTP_410_GONE,
+                detail="This way in is closed",
+                headers=_no_store,
+            )
         if popup is not None:
             # Both flags belong to the flow this link lands people in, not to
             # the event: a door can share while another does not.
@@ -228,6 +240,7 @@ async def preview_link(
     return InvitePublicPreview(
         id=link.id,
         popup_id=link.popup_id,
+        sales_flow_id=link.sales_flow_id,
         token=link.token,
         inviter_name=inviter_name,
         is_email_restricted=link.recipient_email is not None,
@@ -656,8 +669,11 @@ async def get_my_sharing_status(
     popup = _tenant_popup_or_404(db, popup_id, current_human.tenant_id)
     if current_human.red_flag:
         return AttendeeSharingStatus(can_share=False)
-    denial, _ = _share_denial(db, current_human.id, popup.id)
-    return AttendeeSharingStatus(can_share=denial is None)
+    denial, flow_id = _share_denial(db, current_human.id, popup.id)
+    return AttendeeSharingStatus(
+        can_share=denial is None,
+        sales_flow_id=flow_id if denial is None else None,
+    )
 
 
 @portal_router.get(
@@ -668,7 +684,7 @@ async def list_cross_popup_targets(
     current_human: CurrentHuman,
     source_popup_id: uuid.UUID,
 ) -> list[CrossPopupReferralTarget]:
-    """Portal: the other popups of this tenant the attendee may share.
+    """Portal: each accepting way into the tenant's other active popups.
 
     Empty, rather than an error, when the attendee may not share from
     ``source_popup_id`` at all: this backs a section of the referrals screen
@@ -676,6 +692,7 @@ async def list_cross_popup_targets(
     """
     from sqlmodel import select
 
+    from app.api.invite.models import Invites
     from app.api.popup.models import Popups
     from app.api.popup.schemas import PopupStatus
 
@@ -701,17 +718,28 @@ async def list_cross_popup_targets(
 
     targets: list[CrossPopupReferralTarget] = []
     for popup in popups:
-        if invites_crud.cross_popup_target_flow(db, popup) is None:
+        flows = invites_crud.cross_popup_target_flows(db, popup)
+        if not flows:
             continue
-        links, _ = invites_crud.find_by_human(db, current_human.id, popup.id, limit=1)
-        targets.append(
-            CrossPopupReferralTarget(
-                popup_id=popup.id,
-                name=popup.name,
-                slug=popup.slug,
-                link=InvitePublic.model_validate(links[0]) if links else None,
+        links = db.exec(
+            select(Invites).where(
+                Invites.referrer_human_id == current_human.id,
+                Invites.popup_id == popup.id,
             )
-        )
+        ).all()
+        links_by_flow = {link.sales_flow_id: link for link in links}
+        for flow in flows:
+            link = links_by_flow.get(flow.id)
+            targets.append(
+                CrossPopupReferralTarget(
+                    popup_id=popup.id,
+                    name=popup.name,
+                    slug=popup.slug,
+                    sales_flow_id=flow.id,
+                    flow_name=flow.name,
+                    link=InvitePublic.model_validate(link) if link else None,
+                )
+            )
     return targets
 
 
@@ -731,8 +759,9 @@ async def create_my_link(
 
     With a ``source_popup_id`` other than ``popup_id`` the attendee shares a
     popup of their tenant they are not in. They must be allowed to share from
-    the source popup, and the target popup's flow must accept links from
-    other popups; that flow also sets the link's use limit.
+    the source popup, and the selected open application flow must accept links
+    from other popups; that flow also sets the link's use limit. An omitted
+    sales_flow_id retains the old default-flow behavior.
     """
     from app.api.sales_flow.resolver import config_for  # noqa: PLC0415
 
@@ -751,28 +780,52 @@ async def create_my_link(
         denial, link_flow_id = _share_denial(db, current_human.id, popup.id)
         if denial is not None:
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=denial)
+        if body.sales_flow_id is not None and body.sales_flow_id != link_flow_id:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="Your link must use the way in you came through.",
+            )
     else:
         source = _tenant_popup_or_404(db, source_popup_id, current_human.tenant_id)
         denial, _ = _share_denial(db, current_human.id, source.id)
         if denial is not None:
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=denial)
-        target_flow = invites_crud.cross_popup_target_flow(db, popup)
+        target_flow = (
+            next(
+                (
+                    flow
+                    for flow in invites_crud.cross_popup_target_flows(db, popup)
+                    if flow.id == body.sales_flow_id
+                ),
+                None,
+            )
+            if body.sales_flow_id is not None
+            else invites_crud.cross_popup_target_flow(db, popup)
+        )
         if target_flow is None:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail="This popup does not accept links from other popups.",
+                detail="This popup does not accept links into this sales flow.",
             )
         link_flow_id = target_flow.id
     link_config = config_for(db, sales_flow_id=link_flow_id, popup_id=popup.id)
 
-    # One link per attendee per popup, whichever way it was created.
-    _, existing_count = invites_crud.find_by_human(
-        db, current_human.id, body.popup_id, limit=1
-    )
-    if existing_count >= 1:
+    # One link per attendee per destination flow. An existing link into one
+    # flow must not prevent sharing another way into the same popup.
+    from sqlmodel import select
+
+    from app.api.invite.models import Invites
+
+    existing = db.exec(
+        select(Invites).where(
+            Invites.referrer_human_id == current_human.id,
+            Invites.sales_flow_id == link_flow_id,
+        )
+    ).first()
+    if existing is not None:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail="You already have a link for this popup.",
+            detail="You already have a link for this sales flow.",
         )
 
     # The flow the link lands people in always dictates max_uses, even when

@@ -1208,6 +1208,7 @@ export type AttendeesDirectoryEntry = {
  */
 export type AttendeeSharingStatus = {
     can_share: boolean;
+    sales_flow_id?: (string | null);
 };
 
 /**
@@ -2085,16 +2086,14 @@ export type CredentialInfo = {
 export type CredentialType = 'crud' | 'readonly';
 
 /**
- * A popup an attendee may share from the popup they are in.
- *
- * ``link`` is the attendee's existing link into it, if they have one. It
- * may predate the cross-popup share, since an attendee holds one link per
- * popup whichever way it was created.
+ * One accepting application flow of another popup, with its own link.
  */
 export type CrossPopupReferralTarget = {
     popup_id: string;
     name: string;
     slug: string;
+    sales_flow_id: string;
+    flow_name: string;
     link?: (InvitePublic | null);
 };
 
@@ -3488,6 +3487,7 @@ export type InviteCreate = {
 export type InvitePortalCreate = {
     popup_id: string;
     source_popup_id?: (string | null);
+    sales_flow_id?: (string | null);
     token?: (string | null);
     max_uses?: (number | null);
     expires_at?: (string | null);
@@ -3543,6 +3543,7 @@ export type InvitePublic = {
 export type InvitePublicPreview = {
     id: string;
     popup_id: string;
+    sales_flow_id?: (string | null);
     token: string;
     inviter_name?: (string | null);
     is_email_restricted: boolean;

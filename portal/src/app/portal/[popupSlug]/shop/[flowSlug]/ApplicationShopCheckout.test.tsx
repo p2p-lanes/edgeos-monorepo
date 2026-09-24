@@ -6,7 +6,11 @@ const passesProviderProps = vi.hoisted(() => vi.fn())
 const useResolvedAttendees = vi.hoisted(() => vi.fn())
 const push = vi.hoisted(() => vi.fn())
 const replace = vi.hoisted(() => vi.fn())
+const productState = vi.hoisted(() => ({ available: true, loading: false }))
 
+vi.mock("react-i18next", () => ({
+  useTranslation: () => ({ t: (key: string) => key }),
+}))
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ push, replace }),
   useSearchParams: () => new URLSearchParams(),
@@ -18,6 +22,7 @@ vi.mock("@/hooks/useResolvedAttendees", () => ({
 const PassesContext = createContext({
   attendeePasses: [] as Array<{ id: string; products: unknown[] }>,
   products: [] as Array<{ id: string }>,
+  productsLoading: false,
 })
 
 vi.mock("@/providers/passesProvider", () => ({
@@ -40,7 +45,10 @@ vi.mock("@/providers/passesProvider", () => ({
             ...attendee,
             products: [{ id: `ticket-${props.salesFlowId}` }],
           })),
-          products: [{ id: `ticket-${props.salesFlowId}` }],
+          products: productState.available
+            ? [{ id: `ticket-${props.salesFlowId}` }]
+            : [],
+          productsLoading: productState.loading,
         }}
       >
         {children}
@@ -101,6 +109,36 @@ describe("ApplicationShopCheckout", () => {
     useResolvedAttendees.mockReset()
     push.mockClear()
     replace.mockClear()
+    productState.available = true
+    productState.loading = false
+  })
+
+  it("shows an empty state instead of an endless spinner when the flow has no products", () => {
+    useResolvedAttendees.mockReturnValue([{ id: "human-1", products: [] }])
+    productState.available = false
+    const { rerender } = render(
+      <ApplicationShopCheckout
+        flowId="flow-attendee"
+        flowSlug="attendee"
+        popupSlug="festival-2026"
+      />,
+    )
+    expect(screen.getByText("shop.no_products_title")).toBeTruthy()
+    expect(
+      screen
+        .getByRole("link", { name: "shop.back_to_passes" })
+        .getAttribute("href"),
+    ).toBe("/portal/festival-2026/passes?flow=attendee")
+
+    productState.loading = true
+    rerender(
+      <ApplicationShopCheckout
+        flowId="flow-attendee"
+        flowSlug="attendee"
+        popupSlug="festival-2026"
+      />,
+    )
+    expect(screen.queryByText("shop.no_products_title")).toBeNull()
   })
 
   it.each([

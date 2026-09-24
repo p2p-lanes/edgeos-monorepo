@@ -10,6 +10,7 @@ from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
 from fastapi import HTTPException, status
+from sqlalchemy.exc import IntegrityError
 from sqlmodel import Session, col, desc, func, select
 
 from app.api.invite.models import Invites
@@ -300,7 +301,19 @@ class InvitesCRUD(BaseCRUD[Invites, InviteCreate, InviteUpdate]):
             auto_approve=True,
         )
         session.add(link)
-        session.commit()
+        try:
+            session.commit()
+        except IntegrityError as exc:
+            session.rollback()
+            constraint = getattr(
+                getattr(exc.orig, "diag", None), "constraint_name", None
+            )
+            if constraint in {"uq_invites_referrer_flow", "uq_invites_popup_token"}:
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail="A link already exists for this sales flow or code",
+                ) from exc
+            raise
         session.refresh(link)
         return link
 
@@ -337,32 +350,41 @@ class InvitesCRUD(BaseCRUD[Invites, InviteCreate, InviteUpdate]):
             )
         return default_flow.id
 
-    def cross_popup_target_flow(
+    def cross_popup_target_flows(
         self, session: Session, popup: Popups
-    ) -> "SalesFlows | None":
-        """The flow a link from another popup lands people in, if it accepts them.
-
-        The popup's default flow, which is where someone with no application
-        there would land anyway. It must be open, take applications (redeeming
-        a link creates one) and have opted in to links from other popups. The
-        popup itself must be active: a draft is not ready for guests and an
-        ended one invalidates its links.
-        """
+    ) -> list["SalesFlows"]:
+        """Open application flows explicitly accepting links from other popups."""
         from app.api.popup.schemas import PopupStatus
-        from app.api.sales_flow.crud import sales_flows_crud
+        from app.api.sales_flow.models import SalesFlows
         from app.api.sales_flow.schemas import SalesFlowType
 
         if popup.status != PopupStatus.active.value:
-            return None
-        flow = sales_flows_crud.get_default_flow(session, popup.id)
-        if (
-            flow is None
-            or flow.status is not None
-            or flow.type != SalesFlowType.application
-            or not flow.cross_popup_referrals_enabled
-        ):
-            return None
-        return flow
+            return []
+        return list(
+            session.exec(
+                select(SalesFlows)
+                .where(
+                    SalesFlows.popup_id == popup.id,
+                    SalesFlows.type == SalesFlowType.application,
+                    col(SalesFlows.status).is_(None),
+                    SalesFlows.cross_popup_referrals_enabled == True,  # noqa: E712
+                )
+                .order_by(desc(SalesFlows.is_default), SalesFlows.order, SalesFlows.id)
+            ).all()
+        )
+
+    def cross_popup_target_flow(
+        self, session: Session, popup: Popups
+    ) -> "SalesFlows | None":
+        """Compatibility default for existing clients that omit sales_flow_id."""
+        return next(
+            (
+                flow
+                for flow in self.cross_popup_target_flows(session, popup)
+                if flow.is_default
+            ),
+            None,
+        )
 
     def update_invite(
         self,
