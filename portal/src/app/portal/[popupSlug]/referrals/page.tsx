@@ -16,11 +16,16 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog"
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip"
 import { useCityProvider } from "@/providers/cityProvider"
 
 function ReferralRow({
   referral,
-  onDeleted,
+  onRefresh,
 }: {
   referral: {
     id: string
@@ -31,7 +36,7 @@ function ReferralRow({
     expires_at?: string | null
     is_disabled?: boolean
   }
-  onDeleted: () => void
+  onRefresh: () => void
 }) {
   const { t } = useTranslation()
   const [deleteOpen, setDeleteOpen] = useState(false)
@@ -41,9 +46,15 @@ function ReferralRow({
     onSuccess: () => {
       toast.success(t("referrals.delete_success"))
       setDeleteOpen(false)
-      onDeleted()
+      onRefresh()
     },
-    onError: () => {
+    onError: (err) => {
+      if (err instanceof ApiError && err.status === 409) {
+        toast.error(t("referrals.delete_used_explanation"))
+        setDeleteOpen(false)
+        onRefresh()
+        return
+      }
       toast.error(t("referrals.delete_error"))
     },
   })
@@ -99,46 +110,71 @@ function ReferralRow({
         >
           <Copy className="h-4 w-4" />
         </Button>
-        <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>
-          <DialogTrigger asChild>
-            <Button
-              variant="ghost"
-              size="icon"
-              title={t("referrals.delete_referral")}
-              aria-label={t("referrals.delete_referral")}
-              className="text-destructive hover:text-destructive"
-            >
-              <Trash2 className="h-4 w-4" />
-            </Button>
-          </DialogTrigger>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>{t("referrals.delete_confirm_title")}</DialogTitle>
-              <DialogDescription>
-                {t("referrals.delete_confirm_description")}
-              </DialogDescription>
-            </DialogHeader>
-            <DialogFooter>
+        {referral.current_uses > 0 ? (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <span className="inline-flex cursor-not-allowed">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  disabled
+                  aria-label={t("referrals.delete_referral")}
+                  aria-describedby={`delete-used-${referral.id}`}
+                  className="pointer-events-none text-destructive"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+                <span id={`delete-used-${referral.id}`} className="sr-only">
+                  {t("referrals.delete_used_explanation")}
+                </span>
+              </span>
+            </TooltipTrigger>
+            <TooltipContent className="max-w-xs">
+              {t("referrals.delete_used_explanation")}
+            </TooltipContent>
+          </Tooltip>
+        ) : (
+          <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>
+            <DialogTrigger asChild>
               <Button
-                variant="outline"
-                onClick={() => setDeleteOpen(false)}
-                disabled={deleteMutation.isPending}
+                variant="ghost"
+                size="icon"
+                title={t("referrals.delete_referral")}
+                aria-label={t("referrals.delete_referral")}
+                className="text-destructive hover:text-destructive"
               >
-                {t("referrals.delete_cancel")}
+                <Trash2 className="h-4 w-4" />
               </Button>
-              <Button
-                variant="destructive"
-                onClick={() => deleteMutation.mutate()}
-                disabled={deleteMutation.isPending}
-              >
-                {deleteMutation.isPending ? (
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                ) : null}
-                {t("referrals.delete_confirm")}
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>{t("referrals.delete_confirm_title")}</DialogTitle>
+                <DialogDescription>
+                  {t("referrals.delete_confirm_description")}
+                </DialogDescription>
+              </DialogHeader>
+              <DialogFooter>
+                <Button
+                  variant="outline"
+                  onClick={() => setDeleteOpen(false)}
+                  disabled={deleteMutation.isPending}
+                >
+                  {t("referrals.delete_cancel")}
+                </Button>
+                <Button
+                  variant="destructive"
+                  onClick={() => deleteMutation.mutate()}
+                  disabled={deleteMutation.isPending}
+                >
+                  {deleteMutation.isPending ? (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  ) : null}
+                  {t("referrals.delete_confirm")}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+        )}
       </div>
     </div>
   )
@@ -258,7 +294,7 @@ function CrossPopupReferrals({ sourcePopupId }: { sourcePopupId: string }) {
               {target.link && (
                 <ReferralRow
                   referral={target.link}
-                  onDeleted={() => queryClient.invalidateQueries({ queryKey })}
+                  onRefresh={() => queryClient.invalidateQueries({ queryKey })}
                 />
               )}
             </div>
@@ -375,7 +411,7 @@ const ReferralsPage = () => {
               <ReferralRow
                 key={ref.id}
                 referral={ref}
-                onDeleted={() =>
+                onRefresh={() =>
                   queryClient.invalidateQueries({
                     queryKey: ["referrals", "mine", city?.id ?? ""],
                   })
