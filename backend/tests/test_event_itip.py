@@ -345,6 +345,39 @@ class TestBuildEventIcs:
         assert "RRULE:" not in occ
         assert "RECURRENCE-ID:" in occ
 
+    def test_recurring_master_emits_exdate_from_stored_strings(self) -> None:
+        """recurrence_exdates is JSONB, so values arrive as ISO strings.
+
+        Regression: ``_fmt_utc`` reads ``.tzinfo`` and raised AttributeError on
+        a str, which the iTIP send path swallowed in a try/except — silently
+        dropping the calendar invite from series-update/cancel emails for any
+        recurring event that had a cancelled/detached occurrence. The strings
+        must be parsed so a valid EXDATE line is emitted.
+        """
+        start = datetime(2026, 5, 5, 14, 0, tzinfo=UTC)
+        event = self._minimal_event(start=start, end=start + timedelta(hours=1))
+        event.rrule = "FREQ=WEEKLY;BYDAY=MO"
+        # As persisted in JSONB: ISO strings, not datetimes.
+        event.recurrence_exdates = [
+            "2026-05-12T14:00:00Z",
+            "2026-05-19T14:00:00+00:00",
+        ]
+
+        master = build_event_ics(
+            event, recipient_email="alice@example.com", method="REQUEST", sequence=2
+        )
+
+        assert "EXDATE:20260512T140000Z,20260519T140000Z" in master
+        # A single-occurrence (RECURRENCE-ID) message must still omit EXDATE.
+        occ = build_event_ics(
+            event,
+            recipient_email="alice@example.com",
+            method="REQUEST",
+            sequence=2,
+            occurrence_start=start + timedelta(days=7),
+        )
+        assert "EXDATE:" not in occ
+
     def test_add_to_calendar_export_uid_matches_itip_uid(self) -> None:
         """The "Add to calendar" .ics download and the emailed invite/cancel
         must share the SAME UID. Calendars key entries on UID, so a mismatch
