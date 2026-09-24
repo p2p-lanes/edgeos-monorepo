@@ -5,6 +5,8 @@ const mocks = vi.hoisted(() => ({
   createMyLink: vi.fn(),
   canShare: true,
   hasCrossLink: false,
+  includeSingleFlowPopup: false,
+  onlyOneFlow: false,
 }))
 
 vi.mock("@tanstack/react-query", () => ({
@@ -44,7 +46,25 @@ vi.mock("@tanstack/react-query", () => ({
               }
             : null,
         },
-      ],
+      ]
+        .filter(
+          (target) =>
+            !mocks.onlyOneFlow || target.sales_flow_id === "flow-general",
+        )
+        .concat(
+          mocks.includeSingleFlowPopup
+            ? [
+                {
+                  popup_id: "popup-c",
+                  sales_flow_id: "flow-only",
+                  flow_name: "Only door",
+                  name: "A solo event",
+                  slug: "a-solo-event",
+                  link: null,
+                },
+              ]
+            : [],
+        ),
       isLoading: false,
     }
   },
@@ -76,13 +96,19 @@ describe("cross-popup referrals page", () => {
   beforeEach(() => {
     mocks.canShare = true
     mocks.hasCrossLink = false
+    mocks.includeSingleFlowPopup = false
+    mocks.onlyOneFlow = false
     mocks.createMyLink.mockReset()
   })
 
   it("offers every eligible destination flow even without a purchased product", () => {
     render(<ReferralsPage />)
     expect(screen.getByText("General")).toBeTruthy()
-    expect(screen.getByText("Volunteers")).toBeTruthy()
+    const flowName = screen.getByText("Volunteers")
+    expect(flowName.parentElement?.textContent).toContain(
+      "Another event · Volunteers",
+    )
+    expect(flowName.classList.contains("font-semibold")).toBe(true)
 
     fireEvent.click(
       screen.getAllByRole("button", { name: "referrals.cross_create" })[1],
@@ -94,6 +120,26 @@ describe("cross-popup referrals page", () => {
         sales_flow_id: "flow-volunteers",
       },
     })
+  })
+
+  it("shows the flow only for gatherings with multiple eligible options", () => {
+    mocks.includeSingleFlowPopup = true
+    render(<ReferralsPage />)
+
+    const singleName = screen.getByText("A solo event")
+    expect(singleName.parentElement?.textContent).toBe("A solo event")
+    expect(screen.queryByText("Only door")).toBeNull()
+    expect(singleName.classList.contains("font-semibold")).toBe(true)
+    expect(screen.getByText("Volunteers")).toBeTruthy()
+  })
+
+  it("omits the flow when it is the only eligible option overall", () => {
+    mocks.onlyOneFlow = true
+    render(<ReferralsPage />)
+    expect(screen.getByText("Another event").parentElement?.textContent).toBe(
+      "Another event",
+    )
+    expect(screen.queryByText("General")).toBeNull()
   })
 
   it("labels a cross-popup link with no discount correctly", () => {
