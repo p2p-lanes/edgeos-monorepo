@@ -790,7 +790,9 @@
     "disabled_badge": "Óvirkur",
     "cross_title": "Bjóddu einhverjum á annan viðburð",
     "cross_description": "Deildu tengli á annan viðburð okkar, jafnvel þótt þú mætir ekki sjálf(ur).",
-    "cross_create": "Búa til tengil"
+    "cross_create": "Búa til tengil",
+    "ended_description": "Þessum viðburði er lokið. Þú getur samt boðið fólki á aðra viðburði okkar.",
+    "ended_no_targets": "Engir aðrir viðburðir taka við tenglum eins og er."
   },
   "invite": {
     "loading": "Loading invite...",

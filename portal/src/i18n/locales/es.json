@@ -922,7 +922,9 @@
     "disabled_badge": "Deshabilitado",
     "cross_title": "Invitá a alguien a otro evento",
     "cross_description": "Compartí un enlace a otro de nuestros eventos, aunque vos no vayas.",
-    "cross_create": "Crear enlace"
+    "cross_create": "Crear enlace",
+    "ended_description": "Este evento terminó. Todavía podés invitar gente a nuestros otros eventos.",
+    "ended_no_targets": "Por ahora no hay otros eventos que acepten enlaces."
   },
   "invite": {
     "loading": "Cargando invitación...",
