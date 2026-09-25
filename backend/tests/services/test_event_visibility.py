@@ -21,8 +21,28 @@ from __future__ import annotations
 import uuid
 from unittest.mock import MagicMock
 
+import pytest
+
 from app.api.event.schemas import EventOpaque, EventPublic, EventVisibility
 from app.services.event_visibility import project_event_for
+
+
+@pytest.mark.parametrize("group_member", [True, False])
+def test_invitation_or_group_membership_does_not_expose_pending_event(group_member):
+    group_id = uuid.uuid4() if group_member else None
+    event = _make_event(visibility=EventVisibility.PRIVATE, group_id=group_id)
+    event.status = "pending_approval"
+    viewer = _make_viewer()
+    assert (
+        project_event_for(
+            viewer=viewer,
+            event=event,
+            viewer_group_ids={group_id} if group_id else set(),
+            invitee_ids={viewer.id},
+            is_admin_in_popup=False,
+        )
+        is None
+    )
 
 
 def _make_event(

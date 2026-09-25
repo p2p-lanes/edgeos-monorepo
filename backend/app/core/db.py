@@ -89,6 +89,7 @@ def _seed_users(session: Session, seed_data: dict, tenant_id) -> None:
 
 
 def _seed_popups(session: Session, seed_data: dict, tenant_id) -> dict:
+    from app.api.event_settings.crud import event_settings_crud
     from app.api.sales_flow.crud import sales_flows_crud
     from app.models import Popups
 
@@ -125,6 +126,10 @@ def _seed_popups(session: Session, seed_data: dict, tenant_id) -> dict:
             )
             session.add(popup)
             session.flush()  # get the popup id without committing
+
+            event_settings_crud.create_for_popup(
+                session, popup_id=popup.id, tenant_id=tenant_id
+            )
 
             # Dev-seeded popups receive the same compatibility default as
             # popups created through the API. This seed bypasses

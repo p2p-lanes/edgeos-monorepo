@@ -960,6 +960,26 @@
     "error": "Error"
   },
   "events": {
+    "messages": {
+      "heading": "Contact attendees",
+      "message": "Message",
+      "audience_all": "Send an email to all active RSVPs who still have access to this gathering.",
+      "audience_occurrence": "Send an email to active RSVPs for this occurrence who still have access to this gathering.",
+      "send": "Send message",
+      "sending": "Sending…",
+      "sent": "Message sent to {{count}} attendees.",
+      "send_error": "Could not send the message. Check that the event has eligible attendees and try again.",
+      "history": "Message history",
+      "refresh": "Refresh",
+      "loading": "Loading messages…",
+      "history_error": "Could not load message history.",
+      "empty": "No messages yet.",
+      "result": "Sent: {{sent}}. Failed: {{failed}}.",
+      "incomplete": "Delivery has not finished. Refresh the history to check its progress.",
+      "occurrence": "Occurrence: {{date}}",
+      "previous": "Previous",
+      "next": "Next"
+    },
     "common": {
       "back_to_events": "Back to events",
       "no_open_hours": "No open hours",

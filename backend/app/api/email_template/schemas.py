@@ -24,6 +24,7 @@ class EmailTemplateType(StrEnum):
     ABANDONED_APPLICATION = "abandoned_application"
     EDIT_PASSES_CONFIRMED = "edit_passes_confirmed"
     EVENT_INVITATION = "event_invitation"
+    EVENT_HOST_MESSAGE = "event_host_message"
     EVENT_UPDATED = "event_updated"
     EVENT_CANCELLED = "event_cancelled"
     EVENT_RSVP_CANCELLED = "event_rsvp_cancelled"

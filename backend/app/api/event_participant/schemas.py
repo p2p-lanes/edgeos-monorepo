@@ -1,6 +1,7 @@
 import uuid
 from datetime import UTC, datetime
 from enum import Enum
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict
 from sqlalchemy import Text
@@ -101,3 +102,8 @@ class AttendeeEmailsResponse(BaseModel):
 
     emails: list[str]
     count: int
+
+
+class RsvpEligibility(BaseModel):
+    allowed: bool
+    reason: Literal["rejected", "no_tickets"] | None = None

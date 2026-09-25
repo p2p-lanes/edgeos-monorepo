@@ -835,6 +835,26 @@
     "error": "错误"
   },
   "events": {
+    "messages": {
+      "heading": "联系参与者",
+      "message": "消息",
+      "audience_all": "向仍有本次聚会访问权限且报名有效的参与者发送电子邮件。",
+      "audience_occurrence": "向仍有本次聚会访问权限且已报名本场活动的参与者发送电子邮件。",
+      "send": "发送消息",
+      "sending": "发送中…",
+      "sent": "已向 {{count}} 位参与者发送消息。",
+      "send_error": "无法发送消息。请确认活动有具备有效访问权限的参与者，然后重试。",
+      "history": "消息历史",
+      "refresh": "刷新",
+      "loading": "正在加载消息…",
+      "history_error": "无法加载消息历史。",
+      "empty": "暂无消息。",
+      "result": "已发送：{{sent}}。失败：{{failed}}。",
+      "incomplete": "发送尚未完成。请刷新历史记录以查看进度。",
+      "occurrence": "活动场次：{{date}}",
+      "previous": "上一页",
+      "next": "下一页"
+    },
     "common": {
       "back_to_events": "返回活动列表",
       "no_open_hours": "无营业时间",

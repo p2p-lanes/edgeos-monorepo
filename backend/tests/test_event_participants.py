@@ -629,7 +629,7 @@ class TestPortalRegisterEligibility:
         assert response.status_code == 403, response.text
         assert _fetch_participant(db, event.id, human.id) is None
 
-    def test_register_with_access_and_rejected_application_succeeds(
+    def test_register_with_ticket_and_rejected_main_application_is_forbidden(
         self,
         client: TestClient,
         db: Session,
@@ -657,10 +657,10 @@ class TestPortalRegisterEligibility:
                 headers=_human_headers(human),
             )
 
-        assert resp.status_code == 200, resp.text
-        assert resp.json()["status"] == ParticipantStatus.REGISTERED.value
+        assert resp.status_code == 403, resp.text
+        assert _fetch_participant(db, event.id, human.id) is None
 
-    def test_register_with_attendee_less_accepted_application_succeeds(
+    def test_register_with_accepted_application_without_ticket_is_forbidden(
         self,
         client: TestClient,
         db: Session,
@@ -687,8 +687,8 @@ class TestPortalRegisterEligibility:
                 headers=_human_headers(human),
             )
 
-        assert resp.status_code == 200, resp.text
-        assert resp.json()["status"] == ParticipantStatus.REGISTERED.value
+        assert resp.status_code == 403, resp.text
+        assert _fetch_participant(db, event.id, human.id) is None
 
 
 # ---------------------------------------------------------------------------

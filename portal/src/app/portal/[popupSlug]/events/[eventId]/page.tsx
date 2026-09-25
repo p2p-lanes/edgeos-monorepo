@@ -67,6 +67,7 @@ import { cn } from "@/lib/utils"
 import { useCityProvider } from "@/providers/cityProvider"
 import { AddToCalendarModal } from "../lib/AddToCalendarModal"
 import { CoverImage } from "../lib/CoverImage"
+import { EventMessages } from "../lib/EventMessages"
 import { canManageEvent } from "../lib/eventPermissions"
 import { summarizeRrule } from "../lib/summarizeRrule"
 import { useCalendarAddedFlag } from "../lib/useCalendarAddedFlag"
@@ -1104,6 +1105,16 @@ export default function EventDetailPage() {
       )}
 
       <AdminNotesSection eventId={event.id} />
+
+      {canManage && (
+        <EventMessages
+          key={`${event.id}:${occParam ?? "all"}`}
+          eventId={event.id}
+          occurrenceStart={occParam}
+          timezone={timezone}
+          canSend={!isEnded && event.status === "published"}
+        />
+      )}
 
       {/* Participants */}
       <div className="rounded-xl border bg-card p-4">

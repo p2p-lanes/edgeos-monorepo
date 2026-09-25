@@ -2215,7 +2215,7 @@ export type EmailTemplatePublic = {
     updated_at?: (string | null);
 };
 
-export type EmailTemplateType = 'login_code_user' | 'login_code_human' | 'application_received' | 'application_accepted' | 'application_rejected' | 'application_accepted_with_discount' | 'application_accepted_with_incentive' | 'application_accepted_scholarship_rejected' | 'payment_confirmed' | 'abandoned_cart' | 'purchase_reminder' | 'abandoned_application' | 'edit_passes_confirmed' | 'event_invitation' | 'event_updated' | 'event_cancelled' | 'event_rsvp_cancelled' | 'event_approval_approved' | 'event_approval_rejected' | 'check_in_pass';
+export type EmailTemplateType = 'login_code_user' | 'login_code_human' | 'application_received' | 'application_accepted' | 'application_rejected' | 'application_accepted_with_discount' | 'application_accepted_with_incentive' | 'application_accepted_scholarship_rejected' | 'payment_confirmed' | 'abandoned_cart' | 'purchase_reminder' | 'abandoned_application' | 'edit_passes_confirmed' | 'event_invitation' | 'event_host_message' | 'event_updated' | 'event_cancelled' | 'event_rsvp_cancelled' | 'event_approval_approved' | 'event_approval_rejected' | 'check_in_pass';
 
 export type EmailTemplateUpdate = {
     subject?: (string | null);
@@ -2381,6 +2381,28 @@ export type EventInvitationPublic = {
     first_name?: (string | null);
     last_name?: (string | null);
     created_at: string;
+};
+
+export type EventMessageCreate = {
+    /**
+     * Reuse this ID when retrying the same send.
+     */
+    id: string;
+    body: string;
+    occurrence_start?: (string | null);
+};
+
+export type EventMessagePublic = {
+    id: string;
+    event_id: string;
+    author_name: string;
+    body: string;
+    occurrence_start: (string | null);
+    recipient_count: number;
+    sent_count: number;
+    failed_count: number;
+    created_at: string;
+    completed_at: (string | null);
 };
 
 /**
@@ -3697,6 +3719,11 @@ export type ListModel_EmailLogPublic_ = {
 
 export type ListModel_EmailTemplatePublic_ = {
     results: Array<EmailTemplatePublic>;
+    paging: Paging;
+};
+
+export type ListModel_EventMessagePublic_ = {
+    results: Array<EventMessagePublic>;
     paging: Paging;
 };
 
@@ -5071,6 +5098,11 @@ export type ReviewSummary = {
     strong_no_count: number;
     weighted_score?: (number | null);
     reviews: Array<ApplicationReviewPublic>;
+};
+
+export type RsvpEligibility = {
+    allowed: boolean;
+    reason?: ('rejected' | 'no_tickets' | null);
 };
 
 /**
@@ -7609,6 +7641,27 @@ export type EmailTemplatesDeleteEmailTemplateData = {
 
 export type EmailTemplatesDeleteEmailTemplateResponse = (void);
 
+export type EventMessagesListEventMessagesData = {
+    eventId: string;
+    /**
+     * Maximum number of items to return
+     */
+    limit?: number;
+    /**
+     * Number of items to skip
+     */
+    skip?: number;
+};
+
+export type EventMessagesListEventMessagesResponse = (ListModel_EventMessagePublic_);
+
+export type EventMessagesSendEventMessageData = {
+    eventId: string;
+    requestBody: EventMessageCreate;
+};
+
+export type EventMessagesSendEventMessageResponse = (EventMessagePublic);
+
 export type EventParticipantsListParticipantsData = {
     eventId?: (string | null);
     /**
@@ -7652,6 +7705,12 @@ export type EventParticipantsDeleteParticipantData = {
 };
 
 export type EventParticipantsDeleteParticipantResponse = (void);
+
+export type EventParticipantsGetPortalRsvpEligibilityData = {
+    popupId: string;
+};
+
+export type EventParticipantsGetPortalRsvpEligibilityResponse = (RsvpEligibility);
 
 export type EventParticipantsListPortalParticipantsData = {
     eventId: string;

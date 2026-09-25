@@ -378,7 +378,15 @@ class TestTrackEventCounts:
     def test_counts_distinct_published_events_per_track(
         self, client: TestClient, db: Session, tenant_a: Tenants
     ) -> None:
+        from app.api.event_settings.models import EventSettings
+
         popup = _make_popup(db, tenant_a)
+        db.add(
+            EventSettings(
+                tenant_id=tenant_a.id, popup_id=popup.id, events_require_approval=False
+            )
+        )
+        db.commit()
         owner = _make_human(db, tenant_a, first="Owner")
         track = Tracks(tenant_id=tenant_a.id, popup_id=popup.id, name="Track A")
         db.add(track)

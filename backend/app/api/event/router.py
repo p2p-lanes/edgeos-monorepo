@@ -2428,9 +2428,9 @@ def _human_id_manages_event(event, human_id: uuid.UUID) -> bool:
     though they didn't create it. ``host_id`` is NULL when no directory human
     was assigned; ``collaborator_ids`` is empty when none were added.
     """
-    if human_id in (event.owner_id, event.host_id):
-        return True
-    return human_id in _event_collaborator_ids(event)
+    from app.services.event_visibility import human_manages_event
+
+    return human_manages_event(event, human_id)
 
 
 def _human_manages_event(event, current_human) -> bool:
@@ -3029,7 +3029,7 @@ async def list_portal_events(
     # manages, which are by definition visible to them — skip the owner/invite
     # visibility filter so a managed private/unlisted event is never dropped.
     if managed_only:
-        visible = events
+        visible = [e for e in events if _human_id_manages_event(e, current_human.id)]
     else:
         visible = _portal_visibility_filter(
             db, events, current_human.id, popup_id=popup_id
@@ -3317,8 +3317,6 @@ async def get_portal_event(
     """
     from sqlmodel import select
 
-    from app.api.event.models import EventInvitations
-
     event = crud.events_crud.get(db, event_id)
     if not event:
         raise HTTPException(
@@ -3326,44 +3324,9 @@ async def get_portal_event(
         )
     ensure_api_key_popup(token_payload, event.popup_id)
 
-    if event.visibility == EventVisibility.PRIVATE:
-        from app.api.group.crud import groups_crud
-        from app.services.event_visibility import project_event_for
+    from app.services.event_visibility import ensure_event_visible_to_human
 
-        # Pre-compute group membership for this viewer.
-        viewer_group_ids = groups_crud.get_human_group_ids(
-            db, current_human.id, event.popup_id
-        )
-
-        # Build invitee set for invitation-based PRIVATE events.
-        invitee_ids: set[uuid.UUID] = set()
-        if event.group_id is None:
-            inv = db.exec(
-                select(EventInvitations)
-                .where(EventInvitations.event_id == event_id)
-                .where(EventInvitations.human_id == current_human.id)
-            ).first()
-            if inv:
-                invitee_ids = {current_human.id}
-
-        class _Viewer:
-            id = current_human.id
-
-        result = project_event_for(
-            viewer=_Viewer(),
-            event=event,
-            viewer_group_ids=viewer_group_ids,
-            is_admin_in_popup=False,
-            mode="listing",
-            invitee_ids=invitee_ids,
-        )
-        # Managers (owner / host / collaborators) always have access; otherwise
-        # fall back to the opacity chokepoint (group member / invitee).
-        if result is None and not _human_manages_event(event, current_human):
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND, detail="Event not found"
-            )
-    # Public + unlisted are accessible via direct ID.
+    ensure_event_visible_to_human(db, event, current_human)
 
     from app.api.event_participant.models import EventParticipants
 
@@ -3607,7 +3570,7 @@ async def create_portal_event(
     # applies so admins keep moderation control over off-site portal events.
     requires_approval = False
     approval_reason = ""
-    if settings and settings.events_require_approval:
+    if settings is None or settings.events_require_approval:
         requires_approval = True
         approval_reason = "Event submissions require admin approval."
     venue = None
@@ -3689,6 +3652,12 @@ async def update_portal_event(
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Only the event owner or host can edit",
+        )
+
+    if "status" in event_in.model_fields_set and event_in.status != event.status:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Event status can only be changed through approval or cancellation.",
         )
 
     from app.api.popup.crud import popups_crud
@@ -3904,21 +3873,9 @@ async def export_portal_event_ics(
     if not event:
         raise HTTPException(status_code=404, detail="Event not found")
     ensure_api_key_popup(token_payload, event.popup_id)
-    # Re-use the same visibility gate as the detail endpoint.
-    if event.visibility == EventVisibility.PRIVATE and not _human_manages_event(
-        event, current_human
-    ):
-        from sqlmodel import select
+    from app.services.event_visibility import ensure_event_visible_to_human
 
-        from app.api.event.models import EventInvitations
-
-        invited = db.exec(
-            select(EventInvitations)
-            .where(EventInvitations.event_id == event_id)
-            .where(EventInvitations.human_id == current_human.id)
-        ).first()
-        if not invited:
-            raise HTTPException(status_code=404, detail="Event not found")
+    ensure_event_visible_to_human(db, event, current_human)
 
     body = _render_ics(event)
     return Response(

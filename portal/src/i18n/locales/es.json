@@ -958,6 +958,26 @@
     "error": "Error"
   },
   "events": {
+    "messages": {
+      "heading": "Contactar asistentes",
+      "message": "Mensaje",
+      "audience_all": "Envía un email a los RSVPs activos que conservan acceso a este encuentro.",
+      "audience_occurrence": "Envía un email a los RSVPs activos de esta fecha que conservan acceso a este encuentro.",
+      "send": "Enviar mensaje",
+      "sending": "Enviando…",
+      "sent": "Mensaje enviado a {{count}} asistentes.",
+      "send_error": "No se pudo enviar el mensaje. Comprueba que el evento tenga asistentes con acceso vigente e inténtalo de nuevo.",
+      "history": "Historial de mensajes",
+      "refresh": "Actualizar",
+      "loading": "Cargando mensajes…",
+      "history_error": "No se pudo cargar el historial de mensajes.",
+      "empty": "Todavía no hay mensajes.",
+      "result": "Enviados: {{sent}}. Fallidos: {{failed}}.",
+      "incomplete": "El envío no ha finalizado. Actualiza el historial para consultar su progreso.",
+      "occurrence": "Fecha del evento: {{date}}",
+      "previous": "Anterior",
+      "next": "Siguiente"
+    },
     "common": {
       "back_to_events": "Volver a eventos",
       "no_open_hours": "Sin horarios de apertura",
