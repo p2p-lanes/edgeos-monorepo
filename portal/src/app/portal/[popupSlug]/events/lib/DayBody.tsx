@@ -36,6 +36,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover"
 import { cn } from "@/lib/utils"
+import { todayInTimezone } from "./calendarDate"
 import type { EventsScrollSnapshot } from "./eventsViewState"
 import { fetchAllPortalEvents } from "./fetchAllPortalEvents"
 import { buildPortalEventHref } from "./portalEventHref"
@@ -184,17 +185,6 @@ export function DayBody({
   const isAuthed = mode === "authed"
   const useOverride = eventsOverride !== undefined
   const { t } = useTranslation()
-  // Fall back to the popup's first booking day (or today, before the
-  // popup record loads) when the parent hasn't set a date yet — no
-  // `?date=` in the URL on first visit.
-  const selectedDate = useMemo(
-    () => selectedDateProp ?? defaultDate ?? startOfDay(new Date()),
-    [selectedDateProp, defaultDate],
-  )
-  const setSelectedDate = (next: Date | ((prev: Date) => Date)) => {
-    const resolved = typeof next === "function" ? next(selectedDate) : next
-    onSelectedDateChange(resolved)
-  }
   const {
     timezone,
     locale,
@@ -202,6 +192,14 @@ export function DayBody({
     formatDayKey,
     isLoading: tzLoading,
   } = useEventTimezone(popupId, timezoneOverride)
+  const selectedDate = useMemo(
+    () => selectedDateProp ?? defaultDate ?? todayInTimezone(timezone),
+    [selectedDateProp, defaultDate, timezone],
+  )
+  const setSelectedDate = (next: Date | ((prev: Date) => Date)) => {
+    const resolved = typeof next === "function" ? next(selectedDate) : next
+    onSelectedDateChange(resolved)
+  }
 
   // Localized "Monday, June 4, 2026" for the date picker trigger. Uses the
   // selected day's nominal local date (no TZ conversion needed — selectedDate

@@ -33,7 +33,9 @@ class EventSettingsBase(SQLModel):
     """Base event settings schema."""
 
     tenant_id: uuid.UUID = Field(foreign_key="tenants.id", index=True)
-    popup_id: uuid.UUID = Field(foreign_key="popups.id", unique=True, index=True)
+    popup_id: uuid.UUID = Field(
+        foreign_key="popups.id", ondelete="CASCADE", unique=True, index=True
+    )
     can_publish_event: PublishPermission = Field(default=PublishPermission.EVERYONE)
     event_enabled: bool = Field(default=True)
     humans_can_create_venues: bool = Field(default=False)

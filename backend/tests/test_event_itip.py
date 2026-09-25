@@ -118,6 +118,11 @@ def _register(
     *,
     status: ParticipantStatus = ParticipantStatus.REGISTERED,
 ) -> EventParticipants:
+    from tests.test_event_participants import _give_ticket
+
+    _give_ticket(
+        db, db.get(Tenants, event.tenant_id), db.get(Popups, event.popup_id), human
+    )
     p = EventParticipants(
         tenant_id=event.tenant_id,
         event_id=event.id,
@@ -1044,6 +1049,9 @@ class TestRecurrenceMutationsDispatch:
         db.commit()
         db.refresh(event)
         rsvper = _make_human(db, tenant_a, email="rsvper@test.com")
+        from tests.test_event_participants import _give_ticket
+
+        _give_ticket(db, tenant_a, popup, rsvper)
         # Participant for the second occurrence.
         target_occurrence = start + timedelta(weeks=1)
         p = EventParticipants(

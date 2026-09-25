@@ -63,6 +63,24 @@ def _gather_from_group_members(db, event) -> list[dict[str, Any]]:
     return rows
 
 
+def _filter_ineligible_rsvpers(
+    db, event, recipients: list[dict[str, Any]]
+) -> list[dict[str, Any]]:
+    """Recheck RSVPs without turning an initial invitation into a ticket gate."""
+    from app.api.event_participant.crud import event_participants_crud
+
+    rsvpers = event_participants_crud.active_profile_ids(db, event.id)
+    audience = {r["human_id"] for r in recipients} & rsvpers
+    eligibility = event_participants_crud.eligibility_by_human(
+        db, event.popup_id, audience
+    )
+    return [
+        r
+        for r in recipients
+        if r["human_id"] not in eligibility or eligibility[r["human_id"]].allowed
+    ]
+
+
 def gather_event_recipients(
     db,
     event,
@@ -110,7 +128,9 @@ def gather_event_recipients(
 
         if event_visibility == EventVisibility.PRIVATE and event_group_id is not None:
             # Group-scoped PRIVATE: iTIP goes to group members.
-            return _gather_from_group_members(db, event)
+            return _filter_ineligible_rsvpers(
+                db, event, _gather_from_group_members(db, event)
+            )
 
         # Invitation-based PRIVATE or non-PRIVATE: use EventInvitations.
         invited_rows = list(
@@ -163,7 +183,7 @@ def gather_event_recipients(
             }
         )
 
-    return rows
+    return _filter_ineligible_rsvpers(db, event, rows)
 
 
 async def send_event_itip(

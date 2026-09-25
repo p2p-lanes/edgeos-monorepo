@@ -15,6 +15,15 @@ class EventSettingsCRUD(
     def __init__(self) -> None:
         super().__init__(EventSettings)
 
+    def create_for_popup(
+        self, session: Session, *, popup_id: uuid.UUID, tenant_id: uuid.UUID
+    ) -> EventSettings:
+        """Seed a new popup's settings; the popup creation transaction commits."""
+        settings = EventSettings(popup_id=popup_id, tenant_id=tenant_id)
+        session.add(settings)
+        session.flush()
+        return settings
+
     def get_by_popup_id(
         self, session: Session, popup_id: uuid.UUID
     ) -> EventSettings | None:

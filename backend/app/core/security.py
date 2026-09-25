@@ -196,6 +196,7 @@ _PAT_ROUTE_POLICIES: dict[
     "GET": (
         ("/api/v1/events/portal/events", False, ("events:read",)),
         ("/api/v1/event-participants/portal/participants", False, ("events:read",)),
+        ("/api/v1/event-participants/portal/eligibility/", False, ("events:read",)),
         ("/api/v1/event-venues/portal/venues", False, ("events:read", "venues:read")),
         ("/api/v1/event-settings/portal/settings", False, ("events:read",)),
         ("/api/v1/tracks/portal/tracks", False, ("events:read",)),
@@ -203,9 +204,7 @@ _PAT_ROUTE_POLICIES: dict[
         ("/api/v1/popups/portal/", False, ("events:read",)),
     ),
     "POST": (
-        # Edge City: POST /events disabled for API keys until week 2.
-        # Restore the line below to re-enable agentic event creation:
-        # ("/api/v1/events/portal/events", True, ("events:write",)),
+        ("/api/v1/events/portal/events", True, ("events:write",)),
         ("/api/v1/events/portal/events/", False, ("events:write",)),
         ("/api/v1/event-venues/portal/venues", True, ("venues:write",)),
         ("/api/v1/event-participants/portal/register/", False, ("rsvp:write",)),

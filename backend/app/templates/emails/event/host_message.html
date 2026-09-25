@@ -1,0 +1,10 @@
+{% extends "base.html" %}
+{% block title %}Message from your host: {{ event_title }}{% endblock %}
+{% block content %}
+<h1>A message from {{ host_name }}</h1>
+<p>Hi {{ first_name or "there" }},</p>
+<h2>{{ event_title }}</h2>
+<p>{{ event_when }}{% if venue_title %}<br>{{ venue_title }}{% endif %}</p>
+<div style="white-space: pre-wrap; margin: 20px 0;">{{ host_message }}</div>
+{% if event_url %}<p><a href="{{ event_url }}" class="button">View event details</a></p>{% endif %}
+{% endblock %}

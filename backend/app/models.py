@@ -84,6 +84,7 @@ from app.api.email_template.schemas import (
 # Events module
 from app.api.event.models import EventHiddenByHuman, EventInvitations, Events
 from app.api.event.schemas import EventCreate, EventPublic, EventUpdate
+from app.api.event_message.models import EventMessages
 from app.api.event_participant.models import EventParticipants
 from app.api.event_participant.schemas import (
     EventParticipantCreate,
@@ -190,6 +191,7 @@ from app.api.user.models import Users
 from app.api.user.schemas import UserCreate, UserPublic, UserUpdate
 
 __all__ = [
+    "EventMessages",
     "SQLModel",
     # Accommodations
     "AccommodationProperties",

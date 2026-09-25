@@ -828,6 +828,26 @@
     "error": "Villa"
   },
   "events": {
+    "messages": {
+      "heading": "Hafa samband við þátttakendur",
+      "message": "Skilaboð",
+      "audience_all": "Sendu tölvupóst til skráðra þátttakenda sem hafa enn aðgang að samkomunni.",
+      "audience_occurrence": "Sendu tölvupóst til þátttakenda sem eru skráðir á þennan viðburðardag og hafa enn aðgang að samkomunni.",
+      "send": "Senda skilaboð",
+      "sending": "Sendi…",
+      "sent": "Skilaboð send til {{count}} þátttakenda.",
+      "send_error": "Ekki tókst að senda skilaboðin. Athugaðu hvort þátttakendur hafi gildan aðgang og reyndu aftur.",
+      "history": "Skilaboðasaga",
+      "refresh": "Endurnýja",
+      "loading": "Hleð skilaboðum…",
+      "history_error": "Ekki tókst að hlaða skilaboðasögu.",
+      "empty": "Engin skilaboð enn.",
+      "result": "Sent: {{sent}}. Mistókst: {{failed}}.",
+      "incomplete": "Sendingu er ekki lokið. Endurnýjaðu söguna til að sjá framvinduna.",
+      "occurrence": "Viðburðardagur: {{date}}",
+      "previous": "Fyrri",
+      "next": "Næsta"
+    },
     "common": {
       "back_to_events": "Til baka á viðburði",
       "no_open_hours": "Engir opnunartímar",

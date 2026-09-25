@@ -9,7 +9,6 @@ import {
   endOfWeek,
   format,
   isSameMonth,
-  isToday,
   startOfDay,
   startOfMonth,
   startOfWeek,
@@ -31,13 +30,14 @@ import {
   Users,
 } from "lucide-react"
 import Link from "next/link"
-import { useEffect, useMemo, useRef, useState } from "react"
+import { useMemo, useState } from "react"
 import { useTranslation } from "react-i18next"
 
 import { type EventPublic, EventsService, HumansService } from "@/client"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 import { CoverImage } from "./CoverImage"
+import { todayInTimezone } from "./calendarDate"
 import type { EventsScrollSnapshot } from "./eventsViewState"
 import { fetchAllPortalEvents } from "./fetchAllPortalEvents"
 import { buildPortalEventHref } from "./portalEventHref"
@@ -138,23 +138,6 @@ export function CalendarBody({
   const isAuthed = mode === "authed"
   const useOverride = eventsOverride !== undefined
   const { t } = useTranslation()
-  const [currentMonth, setCurrentMonth] = useState(
-    () => defaultDate ?? new Date(),
-  )
-  const [selectedDate, setSelectedDate] = useState<Date | null>(
-    () => defaultDate ?? new Date(),
-  )
-
-  // The popup record loads asynchronously, so `defaultDate` may arrive
-  // after mount. One-shot snap: when it first becomes known, jump the
-  // calendar there. After the user navigates we leave their state alone.
-  const didSnapToDefaultRef = useRef(defaultDate != null)
-  useEffect(() => {
-    if (didSnapToDefaultRef.current || !defaultDate) return
-    didSnapToDefaultRef.current = true
-    setCurrentMonth(defaultDate)
-    setSelectedDate(defaultDate)
-  }, [defaultDate])
   const {
     formatTime,
     formatDayKey,
@@ -165,6 +148,18 @@ export function CalendarBody({
     timezone,
     isLoading: tzLoading,
   } = useEventTimezone(popupId, timezoneOverride)
+
+  const today = useMemo(() => todayInTimezone(timezone), [timezone])
+  const [chosenMonth, setCurrentMonth] = useState<Date | null>(null)
+  const [chosenDate, setSelectedDate] = useState<Date | null>(null)
+  // Until navigation, the default follows asynchronously loaded settings.
+  // After navigation, neither a settings refresh nor its fallback resets it.
+  const currentMonth = chosenMonth ?? defaultDate ?? today
+  const selectedDate = chosenDate ?? defaultDate ?? today
+  const navigateMonth = (date: Date) => {
+    setSelectedDate(selectedDate)
+    setCurrentMonth(date)
+  }
 
   const formatSelectedDateHeader = (d: Date) =>
     new Intl.DateTimeFormat(locale, {
@@ -375,7 +370,7 @@ export function CalendarBody({
             variant="ghost"
             size="icon"
             className="h-7 w-7"
-            onClick={() => setCurrentMonth(subMonths(currentMonth, 1))}
+            onClick={() => navigateMonth(subMonths(currentMonth, 1))}
           >
             <ChevronLeft className="h-4 w-4" />
           </Button>
@@ -386,7 +381,7 @@ export function CalendarBody({
             variant="ghost"
             size="icon"
             className="h-7 w-7"
-            onClick={() => setCurrentMonth(addMonths(currentMonth, 1))}
+            onClick={() => navigateMonth(addMonths(currentMonth, 1))}
           >
             <ChevronRight className="h-4 w-4" />
           </Button>
@@ -419,12 +414,16 @@ export function CalendarBody({
               <button
                 key={i}
                 type="button"
-                onClick={() => setSelectedDate(d)}
+                onClick={() => {
+                  setCurrentMonth(currentMonth)
+                  setSelectedDate(d)
+                }}
                 className={cn(
                   "relative aspect-square flex flex-col items-center justify-center rounded-lg text-xs transition-colors",
                   !isCurrentMonth && "text-muted-foreground/30",
                   isCurrentMonth && "hover:bg-muted",
-                  isToday(d) && "font-bold text-primary",
+                  formatGridDayKey(d) === formatGridDayKey(today) &&
+                    "font-bold text-primary",
                   isSelected && "bg-primary/10 ring-2 ring-primary",
                 )}
               >

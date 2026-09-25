@@ -22,13 +22,6 @@ from app.api.shared.enums import HumanRating
 from app.api.tenant.models import Tenants
 from tests._flow_helpers import application_flow_id
 
-# POST /api/v1/events/portal/events is temporarily disabled for API keys
-# (see ``_PAT_ROUTE_POLICIES`` in ``app/core/security.py``). When the route
-# is restored, remove this marker from the affected tests.
-_post_events_disabled = pytest.mark.skip(
-    reason="POST /events disabled for API keys until week 2 of Edge City rollout",
-)
-
 
 def _pat_auth(raw_key: str) -> dict[str, str]:
     return {"Authorization": f"Bearer {raw_key}"}
@@ -180,6 +173,8 @@ def _event_payload(popup: Popups) -> dict[str, str]:
     return {
         "popup_id": str(popup.id),
         "title": "PAT Event",
+        "custom_location_name": "Community garden",
+        "custom_location_url": "https://example.com/garden",
         "start_time": start.isoformat(),
         "end_time": end.isoformat(),
         "timezone": "UTC",
@@ -224,7 +219,6 @@ class TestApiKeyPolicy:
         assert resp.status_code == 403, resp.text
         assert "restricted to approved event automation routes" in resp.json()["detail"]
 
-    @_post_events_disabled
     def test_pat_event_respects_event_settings_approval(
         self,
         client: TestClient,
@@ -251,15 +245,22 @@ class TestApiKeyPolicy:
         assert resp.status_code == 201, resp.text
         body = resp.json()
         assert body["status"] == EventStatus.PENDING_APPROVAL.value
-        assert body["visibility"] == EventVisibility.UNLISTED.value
+        assert body["visibility"] == EventVisibility.PUBLIC.value
+        assert body["owner_id"] == str(human.id)
+
+        publish = client.patch(
+            f"/api/v1/events/portal/events/{body['id']}",
+            headers=_pat_auth(raw_key),
+            json={"status": "published"},
+        )
+        assert publish.status_code == 403
 
         db.expire_all()
         row = db.get(Events, uuid.UUID(body["id"]))
         assert row is not None
         assert row.status == EventStatus.PENDING_APPROVAL
-        assert row.visibility == EventVisibility.UNLISTED
+        assert row.visibility == EventVisibility.PUBLIC
 
-    @_post_events_disabled
     def test_pat_event_does_not_require_approval_when_settings_disabled(
         self,
         client: TestClient,
@@ -294,7 +295,6 @@ class TestApiKeyPolicy:
         assert row.status == EventStatus.PUBLISHED
         assert row.visibility == EventVisibility.PUBLIC
 
-    @_post_events_disabled
     def test_pat_without_write_scope_cannot_create_event(
         self,
         client: TestClient,
@@ -314,6 +314,34 @@ class TestApiKeyPolicy:
 
         assert resp.status_code == 403, resp.text
         assert resp.json()["detail"] == "API key lacks required scope: events:write"
+
+    @pytest.mark.parametrize(
+        "restriction", ["missing_settings", "disabled", "admin_only", "other_popup"]
+    )
+    def test_pat_creation_respects_popup_policy(
+        self, client, db, tenant_a, restriction
+    ):
+        popup = _make_popup(db, tenant_a)
+        human = _make_human(db, tenant_a)
+        key = _make_pat(db, tenant_a, human, popup, scopes=["events:write"])
+        if restriction == "disabled":
+            _set_event_settings(db, tenant_a, popup, event_enabled=False)
+        elif restriction == "admin_only":
+            _set_event_settings(
+                db, tenant_a, popup, can_publish_event=PublishPermission.ADMIN_ONLY
+            )
+        elif restriction == "other_popup":
+            popup = _make_popup(db, tenant_a)
+        response = client.post(
+            "/api/v1/events/portal/events",
+            headers=_pat_auth(key),
+            json=_event_payload(popup),
+        )
+        assert response.status_code == (
+            201 if restriction == "missing_settings" else 403
+        ), response.text
+        if restriction == "missing_settings":
+            assert response.json()["status"] == "pending_approval"
 
     def test_pat_with_rsvp_scope_can_register(
         self,

@@ -12,6 +12,7 @@ from app.api.event_participant.schemas import (
     EventParticipantUpdate,
     ParticipantStatus,
     RegisterRequest,
+    RsvpEligibility,
 )
 from app.api.popup.guards import (
     CallerToken,
@@ -265,10 +266,23 @@ def _is_scheduled_occurrence(event, occurrence_start: datetime) -> bool:
     )
 
 
+@router.get("/portal/eligibility/{popup_id}", response_model=RsvpEligibility)
+async def get_portal_rsvp_eligibility(
+    popup_id: uuid.UUID,
+    db: HumanTenantSession,
+    current_human: CurrentHuman,
+    token_payload: CallerToken,
+) -> RsvpEligibility:
+    ensure_api_key_popup(token_payload, popup_id)
+    return crud.event_participants_crud.eligibility_by_human(
+        db, popup_id, {current_human.id}
+    )[current_human.id]
+
+
 @router.get("/portal/participants", response_model=ListModel[EventParticipantPublic])
 async def list_portal_participants(
     db: HumanTenantSession,
-    _: CurrentHuman,
+    current_human: CurrentHuman,
     token_payload: CallerToken,
     event_id: uuid.UUID,
     skip: PaginationSkip = 0,
@@ -288,6 +302,11 @@ async def list_portal_participants(
     # events. Resolved up-front so an unknown event fails closed for keys.
     event = events_crud.get(db, event_id)
     ensure_api_key_popup(token_payload, event.popup_id if event else None)
+    if not event:
+        raise HTTPException(status_code=404, detail="Event not found")
+    from app.services.event_visibility import ensure_event_visible_to_human
+
+    ensure_event_visible_to_human(db, event, current_human)
 
     participants, total = crud.event_participants_crud.find_by_event(
         db,
@@ -394,7 +413,6 @@ async def register_for_event(
     body: RegisterRequest | None = None,
 ) -> EventParticipantPublic:
     """Register current human for an event (portal)."""
-    from app.api.application.crud import applications_crud
     from app.api.event.crud import events_crud
     from app.api.event.schemas import EventStatus
     from app.api.event_participant.models import EventParticipants
@@ -412,13 +430,13 @@ async def register_for_event(
             status_code=status.HTTP_400_BAD_REQUEST, detail="Event is not published"
         )
 
-    access = applications_crud.resolve_popup_access(
-        db, current_human.id, event.popup_id
-    )
+    access = crud.event_participants_crud.eligibility_by_human(
+        db, event.popup_id, {current_human.id}
+    )[current_human.id]
     if not access.allowed:
         detail = (
             "Your application was not accepted, so you can't RSVP to events."
-            if access.reason == "application_rejected"
+            if access.reason == "rejected"
             else "You need a purchased ticket for this popup to RSVP."
         )
         raise HTTPException(
