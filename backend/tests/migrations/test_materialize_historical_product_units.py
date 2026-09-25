@@ -13,7 +13,7 @@ from sqlalchemy import text
 
 REVISION = "f4b8c2d7e1a9"
 PREVIOUS_REVISION = "c9a4e7b2d1f8"
-HEAD_REVISION = "a9d3e7f2b6c4"
+HEAD_REVISION = "c6f1a8e4d2b7"
 MIGRATION_FILENAME = f"{REVISION}_materialize_historical_product_units.py"
 
 

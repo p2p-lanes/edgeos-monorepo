@@ -133,3 +133,39 @@ def test_demo_seed_creates_settings_and_preserves_edits_when_repeated(db, tenant
     db.refresh(settings)
     assert settings.id == settings_id
     assert settings.events_require_approval is False
+
+
+@pytest.mark.parametrize("sale_type", ["application", "direct"])
+def test_deleting_popup_removes_its_event_settings(
+    client, db, admin_token_tenant_a, sale_type
+):
+    headers = {"Authorization": f"Bearer {admin_token_tenant_a}"}
+    popup_ids = []
+    for _ in range(2):
+        created = client.post(
+            "/api/v1/popups",
+            headers=headers,
+            json={
+                "name": f"Delete Settings {uuid.uuid4().hex[:8]}",
+                "sale_type": sale_type,
+            },
+        )
+        assert created.status_code == 201, created.text
+        popup_ids.append(uuid.UUID(created.json()["id"]))
+
+    target, retained = popup_ids
+    customized = client.patch(
+        f"/api/v1/event-settings/{target}",
+        headers=headers,
+        json={"events_require_approval": False, "timezone": "Europe/Madrid"},
+    )
+    assert customized.status_code == 200, customized.text
+    assert event_settings_crud.get_by_popup_id(db, target) is not None
+
+    deleted = client.delete(f"/api/v1/popups/{target}", headers=headers)
+    assert deleted.status_code == 204, deleted.text
+    db.expire_all()
+    assert db.get(Popups, target) is None
+    assert event_settings_crud.get_by_popup_id(db, target) is None
+    assert db.get(Popups, retained) is not None
+    assert event_settings_crud.get_by_popup_id(db, retained) is not None
