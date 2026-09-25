@@ -2,6 +2,7 @@ import {
   CalendarDays,
   FileText,
   Layers,
+  Link2,
   MapPin,
   ReceiptText,
   Ticket,
@@ -17,16 +18,20 @@ type Translator = (key: string, opts?: Record<string, unknown>) => string
  * Sidebar resources for an ended popup. Application points at the home card
  * (root) and stays active; authorized participants retain read-only attendee
  * passes and payment history. Events and the attendee directory honor the popup's
- * events/directory feature flags.
+ * events/directory feature flags. Referrals stay reachable when the backend
+ * says this attendee may share, because an ended popup is still a place to
+ * send people on to the tenant's other events from.
  */
 export function buildEndedResources({
   t,
   city,
   participated,
+  canShareReferrals = false,
 }: {
   t: Translator
   city: PopupPublic
   participated: boolean
+  canShareReferrals?: boolean
 }): Resource[] {
   const eventsEnabled = city?.events_enabled ?? true
   const directoryEnabled =
@@ -91,6 +96,13 @@ export function buildEndedResources({
           path: "/portal/agentic-access",
         },
       ],
+    },
+    {
+      name: t("sidebar.referrals"),
+      icon: Link2,
+      status: canShareReferrals ? "active" : "hidden",
+      path: `/portal/${city?.slug}/referrals`,
+      group: "community",
     },
   ]
 }

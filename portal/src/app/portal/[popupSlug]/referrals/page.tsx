@@ -194,14 +194,21 @@ function apiErrorDetail(err: unknown): string | null {
  *
  * The backend decides who may share and which popups accept these links, so
  * an empty answer (no targets, or someone who may not share) hides the
- * section entirely rather than explaining why.
+ * section entirely rather than explaining why. Where this section is all the
+ * page has to offer, `emptyMessage` says so instead of leaving it blank.
  */
-function CrossPopupReferrals({ sourcePopupId }: { sourcePopupId: string }) {
+function CrossPopupReferrals({
+  sourcePopupId,
+  emptyMessage,
+}: {
+  sourcePopupId: string
+  emptyMessage?: string
+}) {
   const { t } = useTranslation()
   const queryClient = useQueryClient()
   const queryKey = ["referrals", "cross-targets", sourcePopupId]
 
-  const { data: targets } = useQuery({
+  const { data: targets, isLoading } = useQuery({
     queryKey,
     queryFn: () => InvitesService.listCrossPopupTargets({ sourcePopupId }),
   })
@@ -223,7 +230,14 @@ function CrossPopupReferrals({ sourcePopupId }: { sourcePopupId: string }) {
     },
   })
 
-  if (!targets?.length) return null
+  if (!targets?.length) {
+    if (!emptyMessage || isLoading) return null
+    return (
+      <div className="rounded-lg border border-dashed p-8 text-center">
+        <p className="text-sm text-muted-foreground">{emptyMessage}</p>
+      </div>
+    )
+  }
 
   const flowsByPopup = new Map<string, number>()
   for (const target of targets) {
@@ -316,12 +330,15 @@ const ReferralsPage = () => {
     enabled: !!city?.id,
   })
   const canShare = sharing?.can_share === true
+  // A link into an ended popup can no longer be redeemed, so there the page
+  // only shares links into the tenant's other events.
+  const ended = city?.status === "ended"
 
   const { data, isLoading } = useQuery({
     queryKey: ["referrals", "mine", city?.id ?? ""],
     queryFn: () =>
       InvitesService.listMyLinks({ popupId: city!.id, limit: 100 }),
-    enabled: !!city?.id && canShare,
+    enabled: !!city?.id && canShare && !ended,
   })
 
   const createMutation = useMutation({
@@ -352,6 +369,27 @@ const ReferralsPage = () => {
         <p className="text-sm text-muted-foreground">
           {t("referrals.sharing_unavailable")}
         </p>
+      </div>
+    )
+  }
+
+  if (ended) {
+    return (
+      <div className="max-w-2xl mx-auto p-6 space-y-6">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight">
+            {t("referrals.title")}
+          </h1>
+          <p className="text-sm text-muted-foreground mt-1">
+            {t("referrals.ended_description")}
+          </p>
+        </div>
+        {city?.id && (
+          <CrossPopupReferrals
+            sourcePopupId={city.id}
+            emptyMessage={t("referrals.ended_no_targets")}
+          />
+        )}
       </div>
     )
   }

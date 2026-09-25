@@ -103,4 +103,22 @@ describe("buildEndedResources", () => {
     )
     expect(rs["sidebar.attendee_directory"]).toBe("active")
   })
+
+  it("shows referrals only when the backend lets the attendee share", () => {
+    const shared = buildEndedResources({
+      t,
+      city: city({}),
+      participated: true,
+      canShareReferrals: true,
+    })
+    expect(byName(shared)["sidebar.referrals"]).toBe("active")
+    expect(
+      shared.find((resource) => resource.name === "sidebar.referrals")?.path,
+    ).toBe("/portal/p/referrals")
+
+    const rs = byName(
+      buildEndedResources({ t, city: city({}), participated: true }),
+    )
+    expect(rs["sidebar.referrals"]).toBe("hidden")
+  })
 })
