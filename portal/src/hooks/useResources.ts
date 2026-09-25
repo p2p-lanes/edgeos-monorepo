@@ -105,6 +105,7 @@ const useResources = () => {
       t,
       city,
       participated: endedAccess.state === "allowed",
+      canShareReferrals,
     })
     resources[0].path = overviewPath
     if (hasCustomHome) resources.unshift(homeResource)

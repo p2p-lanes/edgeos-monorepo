@@ -799,7 +799,9 @@
     "disabled_badge": "已停用",
     "cross_title": "邀请他人参加其他活动",
     "cross_description": "分享我们其他活动的链接，即使你本人不参加。",
-    "cross_create": "创建链接"
+    "cross_create": "创建链接",
+    "ended_description": "此活动已结束。你仍然可以邀请他人参加我们的其他活动。",
+    "ended_no_targets": "目前没有其他活动接受链接。"
   },
   "invite": {
     "loading": "Loading invite...",

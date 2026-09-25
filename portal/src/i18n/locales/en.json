@@ -924,7 +924,9 @@
     "disabled_badge": "Disabled",
     "cross_title": "Invite someone to another event",
     "cross_description": "Share a link to one of our other events, even if you are not going yourself.",
-    "cross_create": "Create link"
+    "cross_create": "Create link",
+    "ended_description": "This event has ended. You can still invite people to our other events.",
+    "ended_no_targets": "There are no other events accepting links right now."
   },
   "invite": {
     "loading": "Loading invite...",
