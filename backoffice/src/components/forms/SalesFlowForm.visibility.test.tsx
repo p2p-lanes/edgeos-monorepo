@@ -34,7 +34,11 @@ vi.mock("@/hooks/useUnsavedChanges", () => ({
 }))
 
 vi.mock("@/components/forms/ReviewersManager", () => ({
-  ReviewersManager: () => null,
+  ReviewersManager: () => <div>reviewers-manager</div>,
+}))
+
+vi.mock("@/components/attendee-categories/AttendeeCategoriesEditor", () => ({
+  AttendeeCategoriesEditor: () => <div>companions-editor</div>,
 }))
 
 import { type SalesFlowPublic, SalesFlowsService } from "@/client"
@@ -107,6 +111,18 @@ describe("SalesFlowForm visibility defaults", () => {
 
     await choose("Flow type", "Upsale")
     expect(visibilitySelect()).toHaveTextContent("Portal Listed")
+  })
+
+  it("shows reviewers and companions only for application flows", async () => {
+    renderForm({ ...EDIT_FLOW, type: "direct" } as SalesFlowPublic)
+
+    expect(screen.queryByText("reviewers-manager")).not.toBeInTheDocument()
+    expect(screen.queryByText("companions-editor")).not.toBeInTheDocument()
+
+    await choose("Flow type", "Application")
+
+    expect(screen.getByText("reviewers-manager")).toBeInTheDocument()
+    expect(screen.getByText("companions-editor")).toBeInTheDocument()
   })
 
   it("preserves a manual visibility choice across later type changes", async () => {

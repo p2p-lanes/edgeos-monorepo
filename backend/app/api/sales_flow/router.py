@@ -26,7 +26,7 @@ from app.api.sales_flow.schemas import (
     parse_portal_theme_config,
 )
 from app.api.shared.response import ListModel, PaginationLimit, PaginationSkip, Paging
-from app.api.ticketing_step.constants import seed_ticketing_steps_for_popup
+from app.api.ticketing_step.constants import seed_confirm_step_for_flow
 from app.core.dependencies.users import (
     CurrentHuman,
     CurrentOperator,
@@ -295,16 +295,13 @@ async def create_sales_flow(
         if flow_in.start_from is None or flow_in.start_from == START_FRESH:
             seed_application_defaults(db, popup=popup, flow=flow)
 
-        # Omitted/null callers retain the legacy checkout baseline. The
-        # Backoffice sends "fresh" explicitly so its Ticketing Steps stage
-        # starts empty, while flow-copy paths continue copying their source.
-        if flow_in.start_from is None:
-            seed_ticketing_steps_for_popup(
+        # Omitted start_from and explicit "fresh" both start from scratch.
+        if flow_in.start_from is None or flow_in.start_from == START_FRESH:
+            seed_confirm_step_for_flow(
                 db,
                 popup_id=flow.popup_id,
                 tenant_id=flow.tenant_id,
                 sales_flow_id=flow.id,
-                flow_type=flow.type,
                 commit=False,
             )
 

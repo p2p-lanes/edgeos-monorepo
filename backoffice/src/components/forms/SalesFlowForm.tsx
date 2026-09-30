@@ -435,36 +435,43 @@ export function SalesFlowForm({
           </form.Field>
         </InlineSection>
 
-        <Separator />
+        <form.Subscribe selector={(state) => state.values.type}>
+          {(flowType) =>
+            flowType === "application" ? (
+              <>
+                <Separator />
+                {defaultValues ? (
+                  <ReviewersManager
+                    popupId={popupId}
+                    tenantId={defaultValues.tenant_id}
+                    flowId={defaultValues.id}
+                    reviewersMode={defaultValues.reviewers_mode}
+                    readOnly={readOnly}
+                    variant="inline"
+                  />
+                ) : (
+                  <InlineSection title="Reviewers">
+                    <p className="text-sm text-muted-foreground">
+                      New sales flows inherit the event's reviewers. You can
+                      assign reviewers specific to this flow after creating it.
+                    </p>
+                  </InlineSection>
+                )}
 
-        {defaultValues ? (
-          <ReviewersManager
-            popupId={popupId}
-            tenantId={defaultValues.tenant_id}
-            flowId={defaultValues.id}
-            reviewersMode={defaultValues.reviewers_mode}
-            readOnly={readOnly}
-            variant="inline"
-          />
-        ) : (
-          <InlineSection title="Reviewers">
-            <p className="text-sm text-muted-foreground">
-              New sales flows inherit the event's reviewers. You can assign
-              reviewers specific to this flow after creating it.
-            </p>
-          </InlineSection>
-        )}
-
-        {isEdit && defaultValues && (
-          <>
-            <Separator />
-            <AttendeeCategoriesEditor
-              popupId={popupId}
-              flowId={defaultValues.id}
-              readOnly={readOnly}
-            />
-          </>
-        )}
+                {isEdit && defaultValues && (
+                  <>
+                    <Separator />
+                    <AttendeeCategoriesEditor
+                      popupId={popupId}
+                      flowId={defaultValues.id}
+                      readOnly={readOnly}
+                    />
+                  </>
+                )}
+              </>
+            ) : null
+          }
+        </form.Subscribe>
 
         <Separator />
 
