@@ -1656,25 +1656,10 @@ export class ApplicationsService {
 
     /**
      * Admin bulk-grant of free tickets
-     * Atomically grant free tickets to a batch of people for a popup.
+     * Assign products directly to people, without payments or applications.
      *
-     * For each person:
-     * - Get-or-create the Human (fill-blanks on first_name/last_name; never
-     * overwrites existing values).
-     * - Get-or-create the Application; if it exists in a non-accepted state,
-     * promote it to ACCEPTED.
-     * - Create a $0 Payment (APPROVED, source=NULL, granted_by_user_id=admin)
-     * with product snapshots, then materialize tickets via the shared
-     * zero-amount finalizer.
-     *
-     * The whole batch lives in one transaction — a sold-out failure mid-batch
-     * rolls back every Human / Application / Attendee / Payment row created in
-     * this run. Stock is decremented up-front for all (person × product) lines
-     * via the atomic `products_crud.decrement_total_stock` UPDATE; a race-loss
-     * surfaces as HTTP 409 with a structured `stock_exhausted` payload.
-     *
-     * Confirmation emails are dispatched best-effort post-commit (one per
-     * person); a mail failure is logged but does NOT undo the grant.
+     * The batch, stock changes and audit entries are committed atomically.
+     * Manual assignments have no sales-flow provenance.
      * @param data The data for the request.
      * @param data.requestBody
      * @param data.xTenantId

@@ -1,11 +1,9 @@
-"""Integration tests for _maybe_grant_fee_credit wiring across all 6 accept paths.
+"""Integration tests for _maybe_grant_fee_credit wiring across acceptance paths.
 
 One test per path asserts that accepting an application with an approved fee payment
 grants the fee as credit and sets fee_credit_granted=True.
 
 Path 1: _apply_approval_strategy (AUTO_ACCEPT strategy)
-Path 2: promote_to_accepted (admin bulk-grant — existing app flip)
-Path 3: create_for_admin_grant (admin bulk-grant — new app)
 Path 4: accept() (group admin member add — via group/router.py)
 Path 5: review_scholarship (scholarship calculator → ACCEPTED)
 Path 6: group-join accept in application/router.py (portal user joining group)
@@ -21,7 +19,6 @@ from sqlmodel import Session, select
 
 from app.api.application.models import Applications
 from app.api.application.schemas import ApplicationStatus, ScholarshipStatus
-from app.api.attendee_category.models import AttendeeCategories
 from app.api.audit_log.constants import AuditAction, AuditEntityType
 from app.api.audit_log.models import AuditLog
 from app.api.group.models import Groups
@@ -66,26 +63,6 @@ def _make_fee_popup(
     db.flush()
     provision_default_flow(db, popup)
     return popup
-
-
-def _ensure_primary_category(db: Session, popup: Popups) -> AttendeeCategories:
-    from app.api.attendee_category.crud import attendee_categories_crud
-    from app.api.sales_flow.models import SalesFlows
-
-    flow_id = application_flow_id(db, popup.id)
-    cat = db.exec(
-        select(AttendeeCategories).where(
-            AttendeeCategories.sales_flow_id == flow_id,
-            AttendeeCategories.is_primary == True,  # noqa: E712
-            AttendeeCategories.deleted_at.is_(None),  # type: ignore[union-attr]
-        )
-    ).first()
-    if cat is None:
-        flow = db.get(SalesFlows, flow_id)
-        assert flow is not None
-        cat = attendee_categories_crud.seed_main_for_flow(db, flow)
-        db.flush()
-    return cat
 
 
 def _make_human(db: Session, tenant: Tenants, suffix: str | None = None) -> Humans:
@@ -181,7 +158,7 @@ def _assert_credit_granted(
 
 
 class TestFeeCreditPaths:
-    """Verify _maybe_grant_fee_credit is wired into all 6 accept paths."""
+    """Verify _maybe_grant_fee_credit is wired into application acceptance."""
 
     def test_path1_apply_approval_strategy(
         self, db: Session, tenant_a: Tenants
@@ -198,58 +175,6 @@ class TestFeeCreditPaths:
         # _apply_approval_strategy is called inline — no approval strategy
         # means AUTO_ACCEPT; popup has no red_flag on human
         applications_crud._apply_approval_strategy(db, application, human)
-        db.commit()
-
-        _assert_credit_granted(db, application, human, Decimal("75.00"))
-
-    def test_path2_promote_to_accepted(self, db: Session, tenant_a: Tenants) -> None:
-        """Path 2: promote_to_accepted — admin bulk-grant flip."""
-        from app.api.application.crud import applications_crud
-
-        popup = _make_fee_popup(db, tenant_a)
-        human = _make_human(db, tenant_a)
-        application = _make_application(
-            db, tenant_a, popup, human, status=ApplicationStatus.IN_REVIEW.value
-        )
-        _make_approved_fee_payment(db, tenant_a, popup, application)
-        db.flush()
-
-        applications_crud.promote_to_accepted(db, application)
-        db.commit()
-
-        _assert_credit_granted(db, application, human, Decimal("75.00"))
-
-    def test_path3_create_for_admin_grant(self, db: Session, tenant_a: Tenants) -> None:
-        """Path 3: create_for_admin_grant — new ACCEPTED app, fee payment added after.
-
-        create_for_admin_grant flushes internally and returns the new application.
-        We add the fee payment immediately after (application.id is known) then
-        call _maybe_grant_fee_credit manually to verify the wiring is present and
-        works correctly once the fee payment exists on this application.
-        """
-        from app.api.application.crud import _maybe_grant_fee_credit, applications_crud
-
-        popup = _make_fee_popup(db, tenant_a)
-        _ensure_primary_category(db, popup)
-        human = _make_human(db, tenant_a)
-        db.flush()
-
-        # create_for_admin_grant creates the application with ACCEPTED status and flushes.
-        application = applications_crud.create_for_admin_grant(
-            db, tenant_id=tenant_a.id, popup_id=popup.id, human=human
-        )
-        # At this point: application is ACCEPTED but has no fee payment →
-        # the internal _maybe_grant_fee_credit call was a no-op.
-        assert application.fee_credit_granted is False
-
-        # Now add the fee payment (simulating the scenario where the fee was paid
-        # before the admin grant call, but the payment row arrives in the same tx).
-        _make_approved_fee_payment(db, tenant_a, popup, application)
-        db.flush()
-
-        # Call _maybe_grant_fee_credit again (idempotent second call is safe).
-        # This verifies the function correctly grants when the fee payment exists.
-        _maybe_grant_fee_credit(db, application)
         db.commit()
 
         _assert_credit_granted(db, application, human, Decimal("75.00"))
