@@ -24,7 +24,6 @@ from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from unittest.mock import AsyncMock, MagicMock, PropertyMock, patch
 
-import pytest
 from fastapi.testclient import TestClient
 from sqlmodel import Session, select
 
@@ -32,7 +31,7 @@ from app.api.application.models import Applications
 from app.api.application.schemas import ApplicationStatus
 from app.api.attendee.models import AttendeeProducts, Attendees
 from app.api.event.models import Events
-from app.api.event.schemas import EventStatus, EventVisibility
+from app.api.event.schemas import AttendanceMode, EventStatus, EventVisibility
 from app.api.event_participant.models import EventParticipants
 from app.api.event_participant.schemas import ParticipantRole, ParticipantStatus
 from app.api.human.models import Humans
@@ -67,12 +66,14 @@ def _make_event(
     status: EventStatus = EventStatus.PUBLISHED,
     max_participant: int | None = None,
     start_offset_days: int = 7,
+    host_id: uuid.UUID | None = None,
 ) -> Events:
     start = datetime.now(UTC) + timedelta(days=start_offset_days)
     event = Events(
         tenant_id=tenant.id,
         popup_id=popup.id,
         owner_id=uuid.uuid4(),
+        host_id=host_id,
         title="Participant State Machine Test",
         start_time=start,
         end_time=start + timedelta(hours=1),
@@ -248,6 +249,50 @@ class TestPortalAttendeeCount:
         assert str(visible.id) in profile_ids
         assert len(results) == 1
 
+    def test_event_host_is_not_counted_or_listed_as_participant(
+        self,
+        client: TestClient,
+        db: Session,
+        tenant_a: Tenants,
+    ) -> None:
+        popup = _make_popup(db, tenant_a)
+        host = _make_human(db, tenant_a)
+        attendee = _make_human(db, tenant_a)
+        event = _make_event(db, tenant_a, popup, host_id=host.id)
+        db.add_all(
+            [
+                EventParticipants(
+                    tenant_id=tenant_a.id,
+                    event_id=event.id,
+                    profile_id=host.id,
+                    status=ParticipantStatus.CHECKED_IN,
+                ),
+                EventParticipants(
+                    tenant_id=tenant_a.id,
+                    event_id=event.id,
+                    profile_id=attendee.id,
+                    status=ParticipantStatus.REGISTERED,
+                ),
+            ]
+        )
+        db.commit()
+
+        detail = client.get(
+            f"/api/v1/events/portal/events/{event.id}",
+            headers=_human_headers(host),
+        )
+        assert detail.status_code == 200, detail.text
+        assert detail.json()["attendee_count"] == 1
+
+        listing = client.get(
+            f"/api/v1/event-participants/portal/participants?event_id={event.id}",
+            headers=_human_headers(host),
+        )
+        assert listing.status_code == 200, listing.text
+        assert [row["profile_id"] for row in listing.json()["results"]] == [
+            str(attendee.id)
+        ]
+
 
 # ---------------------------------------------------------------------------
 # Portal: copy attendee emails (managers only)
@@ -394,6 +439,25 @@ class TestPortalRegister:
         assert kwargs["method"] == "REQUEST"
         assert kwargs["email"] == human.email
         assert kwargs["human_id"] == human.id
+
+    def test_event_host_cannot_register_as_a_participant(
+        self,
+        client: TestClient,
+        db: Session,
+        tenant_a: Tenants,
+    ) -> None:
+        popup = _make_popup(db, tenant_a)
+        host = _make_human(db, tenant_a)
+        event = _make_event(db, tenant_a, popup, host_id=host.id)
+
+        response = client.post(
+            f"/api/v1/event-participants/portal/register/{event.id}",
+            headers=_human_headers(host),
+        )
+
+        assert response.status_code == 409, response.text
+        assert "host" in response.json()["detail"].lower()
+        assert _fetch_participant(db, event.id, host.id) is None
 
     def test_register_on_draft_event_rejected(
         self,
@@ -741,6 +805,45 @@ class TestPortalCancelRegistration:
         # email instead of the organiser "event cancelled" notice.
         assert itip_mock.await_args.kwargs["is_self_rsvp"] is True
 
+    def test_checked_in_rsvp_cannot_be_cancelled(
+        self,
+        client: TestClient,
+        db: Session,
+        tenant_a: Tenants,
+    ) -> None:
+        popup = _make_popup(db, tenant_a)
+        event = _make_event(db, tenant_a, popup, start_offset_days=0)
+        event.attendance_mode = AttendanceMode.SELF_CHECKIN
+        db.add(event)
+        db.commit()
+        human = _make_human(db, tenant_a)
+        _give_ticket(db, tenant_a, popup, human)
+
+        with patch(_ITIP_TARGET, new=AsyncMock(return_value=None)) as itip_mock:
+            registered = client.post(
+                f"/api/v1/event-participants/portal/register/{event.id}",
+                headers=_human_headers(human),
+            )
+            assert registered.status_code == 200, registered.text
+
+            checked_in = client.post(
+                f"/api/v1/event-participants/portal/check-in/{event.id}",
+                headers=_human_headers(human),
+            )
+            assert checked_in.status_code == 200, checked_in.text
+
+            response = client.post(
+                f"/api/v1/event-participants/portal/cancel-registration/{event.id}",
+                headers=_human_headers(human),
+            )
+
+        assert response.status_code == 409, response.text
+        db.expire_all()
+        row = _fetch_participant(db, event.id, human.id)
+        assert row is not None
+        assert row.status == ParticipantStatus.CHECKED_IN
+        assert itip_mock.await_count == 1
+
     def test_cancel_routes_to_rsvp_cancelled_not_event_cancelled(
         self,
         client: TestClient,
@@ -842,119 +945,12 @@ class TestPortalCancelRegistration:
 
 # ---------------------------------------------------------------------------
 # Portal: check-in
+#
+# Lives in tests/test_event_qr_check_in.py. Check-in is no longer a
+# follow-up to an RSVP: it is the QR flow's single write, it can create
+# the participation, and it carries its own eligibility, visibility,
+# capacity and time-window rules (SIM-103).
 # ---------------------------------------------------------------------------
-
-
-class TestPortalCheckIn:
-    """POST /event-participants/portal/check-in/{event_id}."""
-
-    def test_check_in_transitions_registered_to_checked_in(
-        self,
-        client: TestClient,
-        db: Session,
-        tenant_a: Tenants,
-    ) -> None:
-        popup = _make_popup(db, tenant_a)
-        event = _make_event(db, tenant_a, popup)
-        human = _make_human(db, tenant_a)
-        _give_ticket(db, tenant_a, popup, human)
-
-        with patch(_ITIP_TARGET, new=AsyncMock(return_value=None)):
-            client.post(
-                f"/api/v1/event-participants/portal/register/{event.id}",
-                headers=_human_headers(human),
-            )
-
-        before = datetime.now(UTC)
-        resp = client.post(
-            f"/api/v1/event-participants/portal/check-in/{event.id}",
-            headers=_human_headers(human),
-        )
-
-        assert resp.status_code == 200, resp.text
-        body = resp.json()
-        assert body["status"] == ParticipantStatus.CHECKED_IN.value
-        assert body["check_time"] is not None
-
-        db.expire_all()
-        row = _fetch_participant(db, event.id, human.id)
-        assert row is not None
-        assert row.status == ParticipantStatus.CHECKED_IN
-        assert row.check_time is not None
-        assert row.check_time >= before - timedelta(seconds=5)
-
-    def test_check_in_without_registration_returns_404(
-        self,
-        client: TestClient,
-        db: Session,
-        tenant_a: Tenants,
-    ) -> None:
-        popup = _make_popup(db, tenant_a)
-        event = _make_event(db, tenant_a, popup)
-        human = _make_human(db, tenant_a)
-
-        resp = client.post(
-            f"/api/v1/event-participants/portal/check-in/{event.id}",
-            headers=_human_headers(human),
-        )
-
-        assert resp.status_code == 404, resp.text
-
-    def test_check_in_on_cancelled_registration_returns_404(
-        self,
-        client: TestClient,
-        db: Session,
-        tenant_a: Tenants,
-    ) -> None:
-        popup = _make_popup(db, tenant_a)
-        event = _make_event(db, tenant_a, popup)
-        human = _make_human(db, tenant_a)
-        _give_ticket(db, tenant_a, popup, human)
-
-        with patch(_ITIP_TARGET, new=AsyncMock(return_value=None)):
-            client.post(
-                f"/api/v1/event-participants/portal/register/{event.id}",
-                headers=_human_headers(human),
-            )
-            client.post(
-                f"/api/v1/event-participants/portal/cancel-registration/{event.id}",
-                headers=_human_headers(human),
-            )
-
-        resp = client.post(
-            f"/api/v1/event-participants/portal/check-in/{event.id}",
-            headers=_human_headers(human),
-        )
-
-        assert resp.status_code == 404, resp.text
-
-    def test_double_check_in_rejected(
-        self,
-        client: TestClient,
-        db: Session,
-        tenant_a: Tenants,
-    ) -> None:
-        popup = _make_popup(db, tenant_a)
-        event = _make_event(db, tenant_a, popup)
-        human = _make_human(db, tenant_a)
-        _give_ticket(db, tenant_a, popup, human)
-
-        with patch(_ITIP_TARGET, new=AsyncMock(return_value=None)):
-            client.post(
-                f"/api/v1/event-participants/portal/register/{event.id}",
-                headers=_human_headers(human),
-            )
-        first = client.post(
-            f"/api/v1/event-participants/portal/check-in/{event.id}",
-            headers=_human_headers(human),
-        )
-        assert first.status_code == 200
-
-        second = client.post(
-            f"/api/v1/event-participants/portal/check-in/{event.id}",
-            headers=_human_headers(human),
-        )
-        assert second.status_code == 400, second.text
 
 
 # ---------------------------------------------------------------------------
@@ -1124,16 +1120,60 @@ class TestAdminParticipantCrud:
 
 
 # ---------------------------------------------------------------------------
-# Concurrency — not covered here
+# Concurrency — capacity
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.skip(
-    reason=(
-        "Concurrent-registration race needs true parallel clients and a "
-        "stricter SELECT ... FOR UPDATE guard in register_for_event. "
-        "Covered as a follow-up once the write path is locked."
-    )
-)
-def test_concurrent_registrations_respect_max_participant() -> None:
-    """Placeholder for the max_participant race-condition test."""
+class TestRegistrationCapacityLock:
+    """``register_for_event`` must serialise its count-then-insert.
+
+    Registering read ``count_active_for_event`` and then inserted, so two
+    callers could both see the last seat free and both take it. The guard is
+    a ``SELECT ... FOR UPDATE`` on the event row held for the rest of the
+    transaction, shared with the QR check-in path.
+
+    The race itself is exercised end-to-end in
+    ``tests/test_event_qr_check_in.py`` against two real Postgres sessions;
+    both paths take the same lock through the same helper, so here we only
+    pin that registration actually takes it.
+    """
+
+    def test_register_locks_the_event_row(
+        self,
+        client: TestClient,
+        db: Session,
+        tenant_a: Tenants,
+    ) -> None:
+        from app.api.event_participant import check_in as check_in_module
+
+        popup = _make_popup(db, tenant_a)
+        event = _make_event(db, tenant_a, popup, max_participant=1)
+        human = _make_human(db, tenant_a)
+        _give_ticket(db, tenant_a, popup, human)
+
+        with (
+            patch(_ITIP_TARGET, new=AsyncMock(return_value=None)),
+            patch(
+                "app.api.event_participant.router.lock_event_for_capacity",
+                side_effect=check_in_module.lock_event_for_capacity,
+            ) as lock,
+        ):
+            resp = client.post(
+                f"/api/v1/event-participants/portal/register/{event.id}",
+                headers=_human_headers(human),
+            )
+
+        assert resp.status_code == 200, resp.text
+        lock.assert_called_once()
+        assert lock.call_args[0][1] == event.id
+
+    def test_lock_helper_emits_for_update(self, db: Session) -> None:
+        """The statement really carries FOR UPDATE, not just a plain SELECT."""
+        from sqlalchemy.dialects import postgresql
+        from sqlmodel import select
+
+        from app.api.event.models import Events
+
+        statement = select(Events).where(Events.id == uuid.uuid4()).with_for_update()
+        sql = str(statement.compile(dialect=postgresql.dialect()))
+        assert "FOR UPDATE" in sql

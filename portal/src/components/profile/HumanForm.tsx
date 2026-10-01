@@ -44,6 +44,9 @@ const HumanForm = ({
   const [showLinkedEmails, setShowLinkedEmails] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
+  const profileFieldLabel = (field: "gender" | "age" | "residence") =>
+    field === "gender" ? t("form.gender") : t(`profile.${field}`)
+
   // LEGACY: linked_emails removed from API – review for deletion
   const filteredLinkedEmails: string[] = []
 
@@ -228,15 +231,19 @@ const HumanForm = ({
                 </div>
               </div>
             )}
-            {/* {userData?.gender && (
-            <div className="flex items-center gap-3">
-              <User className="w-5 h-5 text-gray-400" />
-              <div>
-                <p className="text-sm text-gray-600">Gender</p>
-                <p className="text-gray-900">{userData?.gender}</p>
-              </div>
-            </div>
-          )} */}
+            {(["gender", "age", "residence"] as const).map((field) =>
+              userData?.[field] ? (
+                <div key={field} className="flex items-center gap-3">
+                  <User className="w-5 h-5 text-muted-foreground" />
+                  <div>
+                    <p className="text-sm text-muted-foreground">
+                      {profileFieldLabel(field)}
+                    </p>
+                    <p className="text-foreground">{userData[field]}</p>
+                  </div>
+                </div>
+              ) : null,
+            )}
             {/* LEGACY: x_user removed from API – review for deletion */}
             {userData?.telegram && (
               <div className="flex items-center gap-3">
@@ -287,6 +294,24 @@ const HumanForm = ({
                   className="mt-1"
                 />
               </div>
+              {(["gender", "age", "residence"] as const).map((field) => (
+                <div key={field}>
+                  <Label
+                    htmlFor={field}
+                    className="text-sm font-medium text-foreground"
+                  >
+                    {profileFieldLabel(field)}
+                  </Label>
+                  <Input
+                    id={field}
+                    value={editForm[field] ?? ""}
+                    onChange={(e) =>
+                      setEditForm({ ...editForm, [field]: e.target.value })
+                    }
+                    className="mt-1"
+                  />
+                </div>
+              ))}
             </div>
             <div className="space-y-4">
               {/* LEGACY: x_user removed from API – review for deletion */}

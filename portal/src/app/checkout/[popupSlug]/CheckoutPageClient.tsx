@@ -1,6 +1,7 @@
 "use client"
 
 import Link from "next/link"
+import { usePathname } from "next/navigation"
 import { useEffect, useState } from "react"
 import { useTranslation } from "react-i18next"
 import { ApiError, type CheckoutRuntimeResponse } from "@/client"
@@ -17,6 +18,7 @@ import ThemeProvider, { type ThemeConfig } from "@/providers/themeProvider"
 import { ApplicationCheckoutRedirect } from "./ApplicationCheckoutRedirect"
 import { CheckoutShell } from "./CheckoutShell"
 import { useCheckoutRuntime } from "./hooks/useCheckoutRuntime"
+import { UpsaleCheckoutRedirect } from "./UpsaleCheckoutRedirect"
 
 interface CheckoutPageClientProps {
   popupSlug: string
@@ -73,6 +75,7 @@ export default function CheckoutPageClient({
     initialDataUpdatedAt: initialMatchesLanguage ? initialDataUpdatedAt : 0,
   })
   const { user } = useAuth()
+  const pathname = usePathname()
 
   const prefilledBuyer = user
     ? {
@@ -138,6 +141,18 @@ export default function CheckoutPageClient({
         popupSlug={popupSlug}
         flowId={runtime.selected_flow.id}
         returnContext={returnContext}
+      />
+    )
+  }
+
+  // Upsales are entered from the authenticated portal shop, not through a
+  // standalone checkout URL. Keep the shop's embedded checkout in place while
+  // redirecting direct /checkout/{popup}/{flow} visits into that portal path.
+  if (runtime.flow_type === "upsale" && pathname.startsWith("/checkout/")) {
+    return (
+      <UpsaleCheckoutRedirect
+        popupSlug={popupSlug}
+        flowSlug={runtime.selected_flow.slug}
       />
     )
   }

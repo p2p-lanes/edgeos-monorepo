@@ -10,6 +10,7 @@ from app.api.event_message.models import EventMessages
 from app.api.event_message.schemas import EventMessageCreate, EventMessagePublic
 from app.api.event_participant.crud import event_participants_crud
 from app.api.event_participant.router import _resolve_occurrence_start
+from app.api.event_settings.crud import event_settings_crud
 from app.api.popup.crud import popups_crud
 from app.api.popup.guards import (
     CallerToken,
@@ -108,6 +109,8 @@ async def send_event_message(
     assert message is not None
     start = body.occurrence_start or event.start_time
     end = start + (event.end_time - event.start_time)
+    settings = event_settings_crud.get_by_popup_id(db, event.popup_id)
+    timezone = settings.timezone if settings else event.timezone
     tenant = popup.tenant
     event_url = (
         f"{get_portal_url(tenant).rstrip('/')}/portal/{popup.slug}/events/{event.id}"
@@ -126,7 +129,7 @@ async def send_event_message(
                     first_name=recipient.first_name or "",
                     event_title=event.title,
                     popup_name=popup.name,
-                    event_when=format_event_when_range(start, end, event.timezone),
+                    event_when=format_event_when_range(start, end, timezone),
                     venue_title=event.venue.title
                     if event.venue
                     else event.custom_location_name or "",

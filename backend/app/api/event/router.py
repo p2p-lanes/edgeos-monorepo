@@ -2,6 +2,7 @@ import re
 import uuid
 from collections.abc import Iterable
 from datetime import UTC, datetime, timedelta
+from urllib.parse import quote
 from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
@@ -19,12 +20,15 @@ from app.api.event.recurrence import (
     parse_rrule,
 )
 from app.api.event.schemas import (
+    AttendanceMode,
     DayEventCount,
     EventAdminNotes,
+    EventAttendanceModeUpdate,
     EventAvailabilityCheck,
     EventAvailabilityResult,
     EventCalendarMeta,
     EventCalendarTrack,
+    EventCheckInLink,
     EventCollaboratorPublic,
     EventCreate,
     EventHostOption,
@@ -67,6 +71,7 @@ from app.core.dependencies.users import (
     HumanTenantSession,
     SessionDep,
     TenantSession,
+    needs,
 )
 from app.core.rate_limit import RateLimit
 from app.services.event_datetime import format_event_when
@@ -1167,6 +1172,7 @@ async def list_events(
     owner_id: uuid.UUID | None = None,
     start_after: datetime | None = None,
     start_before: datetime | None = None,
+    include_outside_window: bool = False,
     search: str | None = None,
     skip: PaginationSkip = 0,
     limit: PaginationLimit = 100,
@@ -1198,6 +1204,7 @@ async def list_events(
             owner_id=owner_id,
             start_after=start_after,
             start_before=start_before,
+            include_outside_window=include_outside_window,
             search=search,
         )
     else:
@@ -1292,6 +1299,22 @@ async def update_event_admin_notes(
     db.commit()
     db.refresh(event)
     return EventAdminNotes(notes=event.admin_notes)
+
+
+@router.put("/{event_id}/attendance-mode", response_model=EventPublic)
+async def update_event_attendance_mode(
+    event_id: uuid.UUID,
+    body: EventAttendanceModeUpdate,
+    db: AdminOrApiKeySession_EventsWrite,
+    current_user: AdminOrApiKey_EventsWrite,
+) -> EventPublic:
+    """Choose how attendance is taken (backoffice); see ``set_attendance_mode``."""
+    event = crud.events_crud.get(db, event_id)
+    if not event:
+        raise HTTPException(status_code=404, detail="Event not found")
+    return _apply_attendance_mode(
+        db, event, body.attendance_mode, actor_from_user(current_user)
+    )
 
 
 @router.post("", response_model=EventPublic, status_code=status.HTTP_201_CREATED)
@@ -1732,6 +1755,7 @@ async def detach_occurrence(
         host_display_name=master.host_display_name,
         collaborator_ids=list(master.collaborator_ids or []),
         highlighted=master.highlighted,
+        attendance_mode=master.attendance_mode,
         status=master.status,
         rrule=None,
         recurrence_master_id=master.id,
@@ -1783,6 +1807,10 @@ async def detach_occurrence(
     event_participants_crud.repoint_occurrence_to_event(
         db, master.id, occ_start, child.id
     )
+    # Attendance history follows the rows it describes.
+    from app.api.event_participant.check_in_crud import event_check_ins_crud
+
+    event_check_ins_crud.repoint_occurrence_to_event(db, master.id, occ_start, child.id)
     db.commit()
     db.refresh(child)
 
@@ -3851,6 +3879,129 @@ async def cancel_portal_event(
         actor=actor_from_human(current_human),
     )
     return _to_public(updated)
+
+
+@router.get(
+    "/portal/events/{event_id}/check-in-link",
+    response_model=EventCheckInLink,
+    summary="Portal URL an organizer shows as a QR for event check-in",
+)
+async def get_portal_event_check_in_link(
+    event_id: uuid.UUID,
+    db: HumanTenantSession,
+    current_human: CurrentHuman,
+    token_payload: CallerToken,
+    occurrence_start: datetime | None = None,
+) -> EventCheckInLink:
+    """Build the check-in URL for an event, for its managers only.
+
+    The event's owner, its assigned host and its collaborators all get it,
+    with or without an RSVP — they are running the event, not attending it.
+    Everyone else gets 403, which is what the portal's QR panel keys on: it
+    renders only when this call succeeds, so the gate is a server decision
+    rather than a hidden div.
+
+    ``host_display_name`` is a label shown to attendees and grants nothing.
+
+    Not to be confused with the gathering's ticket self check-in QR
+    (``/portal/{slug}/check-in``) — that one says "this person arrived at
+    the popup", this one says "this person attended this event".
+    """
+    event = crud.events_crud.get(db, event_id)
+    if not event:
+        raise HTTPException(status_code=404, detail="Event not found")
+    ensure_api_key_popup(token_payload, event.popup_id)
+    from app.services.event_visibility import ensure_event_visible_to_human
+
+    ensure_event_visible_to_human(db, event, current_human)
+
+    if not _human_id_manages_event(event, current_human.id):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only the event's host or collaborators can view the check-in QR",
+        )
+    # No QR outside self_checkin: the check-in endpoint would refuse it anyway,
+    # so handing out the URL would only print a code that cannot work.
+    if event.attendance_mode != AttendanceMode.SELF_CHECKIN:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={
+                "code": "qr_check_in_disabled",
+                "message": "This event doesn't take check-in by QR.",
+            },
+        )
+
+    from app.api.popup.crud import popups_crud
+    from app.api.tenant.utils import get_portal_url
+
+    popup = popups_crud.get(db, event.popup_id)
+    if popup is None or popup.tenant is None:
+        raise HTTPException(status_code=404, detail="Event not found")
+
+    # Recurring series need the occurrence baked into the QR, otherwise the
+    # scan would land on the master and record attendance for the wrong date.
+    # A master reached without ?occ= is its own first occurrence.
+    occ = occurrence_start
+    if event.rrule and occ is None:
+        occ = event.start_time
+
+    base = get_portal_url(popup.tenant).rstrip("/")
+    url = f"{base}/portal/{popup.slug}/events/{event.id}/check-in"
+    if occ is not None:
+        url = f"{url}?occ={quote(occ.isoformat(), safe='')}"
+    return EventCheckInLink(url=url, occurrence_start=occ)
+
+
+def _apply_attendance_mode(db, event, mode: AttendanceMode, actor) -> EventPublic:
+    """Shared by the portal and backoffice attendance-mode endpoints."""
+    from app.api.event_participant.attendance import set_attendance_mode
+
+    before = event.attendance_mode
+    if set_attendance_mode(db, event, mode):
+        record_event_audit(
+            db,
+            event=event,
+            action=EventAuditAction.UPDATED,
+            actor=actor,
+            changes={"attendance_mode": {"old": before.value, "new": mode.value}},
+        )
+    return _to_public(event)
+
+
+@router.put(
+    "/portal/events/{event_id}/attendance-mode",
+    response_model=EventPublic,
+    summary="Choose how attendance is taken for an event",
+    # Portal sessions only: a third-party JWT must not reconfigure attendance.
+    dependencies=[needs("portal:*")],
+)
+async def update_portal_event_attendance_mode(
+    event_id: uuid.UUID,
+    body: EventAttendanceModeUpdate,
+    db: HumanTenantSession,
+    current_human: CurrentHuman,
+    token_payload: CallerToken,
+) -> EventPublic:
+    """Owner, assigned host or collaborators only; see ``set_attendance_mode``."""
+    event = crud.events_crud.get(db, event_id)
+    if not event:
+        raise HTTPException(status_code=404, detail="Event not found")
+    ensure_api_key_popup(token_payload, event.popup_id)
+    if not _human_manages_event(event, current_human):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only the event owner or host can change attendance",
+        )
+    from app.api.popup.crud import popups_crud
+
+    ensure_popup_writable(popups_crud.get(db, event.popup_id))
+    return _with_collaborators(
+        db,
+        _apply_attendance_mode(
+            db, event, body.attendance_mode, actor_from_human(current_human)
+        ),
+        event,
+    )
 
 
 @router.get(

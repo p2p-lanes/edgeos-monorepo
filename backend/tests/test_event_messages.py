@@ -6,6 +6,7 @@ import pytest
 
 from app.api.email_template.models import EmailTemplates
 from app.api.event_participant.models import EventParticipants
+from app.api.event_settings.models import EventSettings
 from app.services.email.service import EmailService
 from tests.test_event_participants import (
     _give_ticket,
@@ -175,3 +176,31 @@ def test_occurrence_message_targets_only_that_day(client, db, tenant_a):
     assert (
         "occ=" in service.send_event_host_message.await_args.kwargs["context"].event_url
     )
+
+
+def test_message_event_when_uses_popup_event_settings_timezone(client, db, tenant_a):
+    popup, event, owner = _setup(db, tenant_a)
+    _rsvper(db, tenant_a, popup, event)
+    event.start_time = datetime(2026, 6, 7, 1, tzinfo=UTC)
+    event.end_time = datetime(2026, 6, 7, 2, tzinfo=UTC)
+    db.add(event)
+    db.add(
+        EventSettings(
+            tenant_id=tenant_a.id,
+            popup_id=popup.id,
+            timezone="America/Los_Angeles",
+        )
+    )
+    db.commit()
+
+    service = MagicMock(send_event_host_message=AsyncMock(return_value=True))
+    with patch("app.api.event_message.router.get_email_service", return_value=service):
+        response = client.post(
+            f"/api/v1/event-messages/portal/events/{event.id}",
+            headers=_human_headers(owner),
+            json={"id": str(uuid.uuid4()), "body": "See you there"},
+        )
+
+    assert response.status_code == 200, response.text
+    context = service.send_event_host_message.await_args.kwargs["context"]
+    assert context.event_when == "Jun 06, 2026 at 18:00 PDT – 19:00"

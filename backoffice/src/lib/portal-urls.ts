@@ -73,6 +73,30 @@ export function getSelfCheckInUrl(baseUrl: string, popupSlug: string) {
   return url.toString()
 }
 
+/**
+ * The URL an event's check-in QR encodes.
+ *
+ * Scanning it records the scanner's attendance at this one event — not at
+ * the gathering, which is what `getSelfCheckInUrl` above is for. For a
+ * recurring series `occurrenceStart` pins the instance, otherwise the scan
+ * would land on the master and could register the wrong date.
+ */
+export function getEventCheckInUrl(
+  baseUrl: string,
+  popupSlug: string,
+  eventId: string,
+  occurrenceStart?: string | null,
+) {
+  const url = new URL(
+    `${baseUrl}/portal/${popupSlug}/events/${eventId}/check-in`,
+  )
+  if (occurrenceStart) url.searchParams.set("occ", occurrenceStart)
+  if (url.hostname === "localhost" || url.hostname.endsWith(".localhost")) {
+    url.protocol = "http:"
+  }
+  return url.toString()
+}
+
 export function getGroupPortalUrl(baseUrl: string, groupSlug: string) {
   return `${baseUrl}/groups/${groupSlug}`
 }

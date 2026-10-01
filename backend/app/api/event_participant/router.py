@@ -4,15 +4,35 @@ from datetime import UTC, datetime
 from fastapi import APIRouter, HTTPException, status
 from loguru import logger
 
-from app.api.event_participant import crud
+from app.api.event_participant import attendance, crud
+from app.api.event_participant.check_in import (
+    ensure_attendance_mode,
+    ensure_check_in_window_open,
+    human_display_name,
+    is_scheduled_occurrence,
+    lock_event_for_capacity,
+    perform_check_in,
+    reject,
+    resolve_occurrence_window,
+    user_display_name,
+)
 from app.api.event_participant.schemas import (
+    AttendanceEntry,
+    AttendanceLookupResult,
+    AttendanceRoster,
     AttendeeEmailsResponse,
+    CheckInMethod,
+    EventCheckInEvent,
+    EventCheckInResult,
     EventParticipantCreate,
     EventParticipantPublic,
     EventParticipantUpdate,
+    ManualCheckInRequest,
+    ManualCheckInResult,
     ParticipantStatus,
     RegisterRequest,
     RsvpEligibility,
+    VoidCheckInRequest,
 )
 from app.api.popup.guards import (
     CallerToken,
@@ -129,6 +149,11 @@ async def admin_add_participant(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Event not found"
         )
+    if participant_in.profile_id == event.host_id:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="The event host cannot be added as a participant",
+        )
 
     existing = crud.event_participants_crud.get_by_event_and_profile(
         db, participant_in.event_id, participant_in.profile_id
@@ -230,40 +255,13 @@ def _resolve_occurrence_start(
     if (
         require_scheduled
         and occurrence_start is not None
-        and not _is_scheduled_occurrence(event, occurrence_start)
+        and not is_scheduled_occurrence(event, occurrence_start)
     ):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="occurrence_start does not match a scheduled occurrence",
         )
     return occurrence_start
-
-
-def _is_scheduled_occurrence(event, occurrence_start: datetime) -> bool:
-    from app.api.event.recurrence import expand, parse_rrule
-
-    try:
-        rule = parse_rrule(event.rrule)
-    except ValueError:
-        return False
-    if rule is None:
-        return False
-    occ = (
-        occurrence_start
-        if occurrence_start.tzinfo is not None
-        else occurrence_start.replace(tzinfo=UTC)
-    )
-    return bool(
-        expand(
-            dtstart=event.start_time,
-            rule=rule,
-            window_start=occ,
-            window_end=occ,
-            exdates=list(event.recurrence_exdates or []),
-            max_occurrences=1,
-            timezone=event.timezone,
-        )
-    )
 
 
 @router.get("/portal/eligibility/{popup_id}", response_model=RsvpEligibility)
@@ -315,6 +313,7 @@ async def list_portal_participants(
         limit=limit,
         occurrence_start=occurrence_start,
         scope_to_occurrence=occurrence_start is not None,
+        exclude_profile_id=event.host_id,
     )
 
     # Privacy: drop participants who hid their name (info_not_shared) on their
@@ -377,7 +376,11 @@ async def list_portal_attendee_emails(
         occurrence_start=occurrence_start,
         scope_to_occurrence=occurrence_start is not None,
     )
-    active = [p for p in participants if p.status != ParticipantStatus.CANCELLED]
+    active = [
+        p
+        for p in participants
+        if p.status != ParticipantStatus.CANCELLED and p.profile_id != event.host_id
+    ]
     if not active:
         return AttendeeEmailsResponse(emails=[], count=0)
 
@@ -429,6 +432,11 @@ async def register_for_event(
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST, detail="Event is not published"
         )
+    if event.host_id == current_human.id:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="The event host cannot RSVP as a participant",
+        )
 
     access = crud.event_participants_crud.eligibility_by_human(
         db, event.popup_id, {current_human.id}
@@ -447,6 +455,12 @@ async def register_for_event(
     occ_start = _resolve_occurrence_start(
         event, body.occurrence_start if body else None, require_scheduled=True
     )
+
+    # Serialize the read-modify-write below against every other seat-taking
+    # write for this event (another RSVP, or a QR check-in that creates the
+    # participation). Without it the count-then-insert can interleave and
+    # two callers both take the last seat. See lock_event_for_capacity.
+    lock_event_for_capacity(db, event_id)
 
     existing = crud.event_participants_crud.get_by_event_and_profile(
         db, event_id, current_human.id, occurrence_start=occ_start
@@ -581,6 +595,11 @@ async def cancel_registration(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="No active registration found"
         )
+    if existing.status == ParticipantStatus.CHECKED_IN:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="An RSVP cannot be cancelled after check-in",
+        )
 
     existing.status = ParticipantStatus.CANCELLED
     db.add(existing)
@@ -594,42 +613,332 @@ async def cancel_registration(
     return EventParticipantPublic.model_validate(existing)
 
 
-@router.post("/portal/check-in/{event_id}", response_model=EventParticipantPublic)
+@router.post(
+    "/portal/check-in/{event_id}",
+    response_model=EventCheckInResult,
+    summary="Check in to an event by scanning the organizer's QR",
+    # JWT path: only the portal:* wildcard (regular portal users) passes, so
+    # a third-party JWT cannot mark attendance. API keys never reach here at
+    # all — the route is absent from _PAT_ROUTE_POLICIES, which fails closed.
+    dependencies=[needs("portal:*")],
+)
 async def check_in(
     event_id: uuid.UUID,
     db: HumanTenantSession,
     current_human: CurrentHuman,
+    token_payload: CallerToken,
     body: RegisterRequest | None = None,
-) -> EventParticipantPublic:
-    """Check in current human for an event (portal)."""
+) -> EventCheckInResult:
+    """Register the caller's attendance at an event (portal).
+
+    The single write behind the organizer's QR. Reached by scanning a fixed
+    portal URL, so it cannot assume a prior RSVP: when there is no
+    participation it creates one directly as ``checked_in``.
+
+    Every failure carries a ``{"code", "message"}`` detail so the landing
+    page can show the right sentence without matching English strings.
+    """
     from app.api.event.crud import events_crud
+    from app.api.event.schemas import EventStatus
+    from app.api.event_settings.crud import event_settings_crud
     from app.api.popup.crud import popups_crud
+    from app.services.event_visibility import ensure_event_visible_to_human
 
     event = events_crud.get(db, event_id)
     if not event:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Event not found"
         )
-    ensure_popup_writable(popups_crud.get(db, event.popup_id))
-    occ_start = _resolve_occurrence_start(
-        event, body.occurrence_start if body else None
-    )
+    ensure_api_key_popup(token_payload, event.popup_id)
 
-    existing = crud.event_participants_crud.get_by_event_and_profile(
-        db, event_id, current_human.id, occurrence_start=occ_start
-    )
-    if not existing or existing.status == ParticipantStatus.CANCELLED:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="No active registration found"
-        )
-    if existing.status == ParticipantStatus.CHECKED_IN:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST, detail="Already checked in"
+    popup = popups_crud.get(db, event.popup_id)
+    ensure_popup_writable(popup)
+
+    settings = event_settings_crud.get_by_popup_id(db, event.popup_id)
+    if settings and not settings.event_enabled:
+        raise reject(
+            status.HTTP_403_FORBIDDEN,
+            "events_disabled",
+            "Events are disabled for this popup.",
         )
 
-    existing.status = ParticipantStatus.CHECKED_IN
-    existing.check_time = datetime.now(UTC)
-    db.add(existing)
-    db.commit()
-    db.refresh(existing)
-    return EventParticipantPublic.model_validate(existing)
+    if event.status != EventStatus.PUBLISHED:
+        raise reject(
+            status.HTTP_400_BAD_REQUEST,
+            "event_not_published",
+            "This event is not published.",
+        )
+    # The QR only works in self_checkin. Checked on the server because the
+    # URL outlives the panel that showed it: switching the event to
+    # host_rollcall or none must stop a copied link from working.
+    ensure_attendance_mode(event, CheckInMethod.QR)
+    if event.host_id == current_human.id:
+        raise reject(
+            status.HTTP_409_CONFLICT,
+            "event_host_cannot_attend",
+            "Event hosts cannot check in as participants.",
+        )
+
+    # 404s for a private event the caller was never invited to, so the QR
+    # leaks nothing to someone who was merely forwarded the link.
+    ensure_event_visible_to_human(db, event, current_human)
+
+    # The shared resolver answers with plain developer strings ("occurrence_start
+    # is required for recurring events"). Every other caller is a UI acting on
+    # its own data; here the detail reaches whoever just pointed a phone at a
+    # QR, so mismatches are re-raised under the code the landing page localizes.
+    try:
+        occ_start = _resolve_occurrence_start(
+            event, body.occurrence_start if body else None
+        )
+    except HTTPException as exc:
+        if exc.status_code != status.HTTP_400_BAD_REQUEST:
+            raise
+        raise reject(
+            status.HTTP_400_BAD_REQUEST,
+            "occurrence_not_scheduled",
+            "This link does not point at a scheduled date of this event.",
+        ) from exc
+
+    window_start, window_end = resolve_occurrence_window(event, occ_start)
+    ensure_check_in_window_open(window_start, window_end)
+
+    participant, already_checked_in, created = perform_check_in(
+        db, event, current_human, occ_start
+    )
+
+    return EventCheckInResult(
+        participant=EventParticipantPublic.model_validate(participant),
+        already_checked_in=already_checked_in,
+        created=created,
+        event=EventCheckInEvent(
+            id=event.id,
+            title=event.title,
+            cover_url=_check_in_cover_url(event, settings),
+            host_display_name=event.host_display_name,
+            start_time=window_start,
+            end_time=window_end,
+            timezone=event.timezone,
+            venue_title=event.venue.title if event.venue else None,
+            occurrence_start=occ_start,
+            popup_slug=popup.slug if popup else "",
+        ),
+    )
+
+
+def _check_in_cover_url(event, settings) -> str | None:
+    """The image the success screen shows.
+
+    Same fallback chain the portal's event detail applies (own cover, then
+    the venue photo, then the popup-wide placeholder), resolved here so the
+    landing page needs no second request to render.
+    """
+    if event.cover_url:
+        return event.cover_url
+    if event.venue is not None and event.venue.image_url:
+        return event.venue.image_url
+    return settings.placeholder_url if settings else None
+
+
+# ---------------------------------------------------------------------------
+# Attendance roll call (SIM-106)
+#
+# Portal: the event's owner, assigned host and collaborators. Backoffice:
+# operators. host_display_name is a label and grants nothing. Every rule
+# beyond "who is calling" lives in attendance.py, so both surfaces behave
+# the same as the QR.
+# ---------------------------------------------------------------------------
+
+
+def _managed_event_for_human(db, event_id: uuid.UUID, current_human, token_payload):
+    from app.api.event.crud import events_crud
+    from app.services.event_visibility import human_manages_event
+
+    event = events_crud.get(db, event_id)
+    if not event:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Event not found"
+        )
+    ensure_api_key_popup(token_payload, event.popup_id)
+    if not human_manages_event(event, current_human.id):
+        raise reject(
+            status.HTTP_403_FORBIDDEN,
+            "not_event_manager",
+            "Only the event's creator, host or collaborators can take attendance.",
+        )
+    return event
+
+
+def _event_for_admin(db, event_id: uuid.UUID):
+    from app.api.event.crud import events_crud
+
+    event = events_crud.get(db, event_id)
+    if not event:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Event not found"
+        )
+    return event
+
+
+@router.get(
+    "/portal/attendance/{event_id}",
+    response_model=AttendanceRoster,
+    summary="Private roll call of an event occurrence, for its managers",
+    dependencies=[needs("portal:*")],
+)
+async def get_portal_attendance(
+    event_id: uuid.UUID,
+    db: HumanTenantSession,
+    current_human: CurrentHuman,
+    token_payload: CallerToken,
+    occurrence_start: datetime | None = None,
+) -> AttendanceRoster:
+    event = _managed_event_for_human(db, event_id, current_human, token_payload)
+    occ = attendance.resolve_attendance_occurrence(event, occurrence_start)
+    return attendance.build_roster(db, event, occ)
+
+
+@router.get(
+    "/portal/attendance/{event_id}/lookup",
+    response_model=AttendanceLookupResult,
+    summary="Find a walk-in by exact email, for the event's managers",
+    dependencies=[needs("portal:*")],
+)
+async def lookup_portal_attendee(
+    event_id: uuid.UUID,
+    email: str,
+    db: HumanTenantSession,
+    current_human: CurrentHuman,
+    token_payload: CallerToken,
+    occurrence_start: datetime | None = None,
+) -> AttendanceLookupResult:
+    event = _managed_event_for_human(db, event_id, current_human, token_payload)
+    occ = attendance.resolve_attendance_occurrence(event, occurrence_start)
+    return attendance.lookup_by_email(db, event, occ, email)
+
+
+@router.post(
+    "/portal/attendance/{event_id}/check-in",
+    response_model=ManualCheckInResult,
+    summary="Mark someone present from the roll call",
+    dependencies=[needs("portal:*")],
+)
+async def portal_manual_check_in(
+    event_id: uuid.UUID,
+    body: ManualCheckInRequest,
+    db: HumanTenantSession,
+    current_human: CurrentHuman,
+    token_payload: CallerToken,
+) -> ManualCheckInResult:
+    event = _managed_event_for_human(db, event_id, current_human, token_payload)
+    return attendance.manual_check_in(
+        db,
+        event,
+        body.profile_id,
+        body.occurrence_start,
+        actor_human_id=current_human.id,
+        actor_name=human_display_name(current_human),
+    )
+
+
+@router.post(
+    "/portal/attendance/{event_id}/void",
+    response_model=AttendanceEntry,
+    summary="Void someone's check-in, keeping the record",
+    dependencies=[needs("portal:*")],
+)
+async def portal_void_check_in(
+    event_id: uuid.UUID,
+    body: VoidCheckInRequest,
+    db: HumanTenantSession,
+    current_human: CurrentHuman,
+    token_payload: CallerToken,
+) -> AttendanceEntry:
+    event = _managed_event_for_human(db, event_id, current_human, token_payload)
+    return attendance.manual_void(
+        db,
+        event,
+        body.profile_id,
+        body.occurrence_start,
+        body.reason,
+        actor_human_id=current_human.id,
+        actor_name=human_display_name(current_human),
+    )
+
+
+@router.get(
+    "/attendance/{event_id}",
+    response_model=AttendanceRoster,
+    summary="Roll call of an event occurrence (backoffice)",
+)
+async def get_attendance(
+    event_id: uuid.UUID,
+    db: AdminOrApiKeySession_EventsRead,
+    _: AdminOrApiKey_EventsRead,
+    occurrence_start: datetime | None = None,
+) -> AttendanceRoster:
+    event = _event_for_admin(db, event_id)
+    occ = attendance.resolve_attendance_occurrence(event, occurrence_start)
+    return attendance.build_roster(db, event, occ)
+
+
+@router.get(
+    "/attendance/{event_id}/lookup",
+    response_model=AttendanceLookupResult,
+    summary="Find a walk-in by exact email (backoffice)",
+)
+async def lookup_attendee(
+    event_id: uuid.UUID,
+    email: str,
+    db: AdminOrApiKeySession_EventsRead,
+    _: AdminOrApiKey_EventsRead,
+    occurrence_start: datetime | None = None,
+) -> AttendanceLookupResult:
+    event = _event_for_admin(db, event_id)
+    occ = attendance.resolve_attendance_occurrence(event, occurrence_start)
+    return attendance.lookup_by_email(db, event, occ, email)
+
+
+@router.post(
+    "/attendance/{event_id}/check-in",
+    response_model=ManualCheckInResult,
+    summary="Mark someone present (backoffice)",
+)
+async def admin_manual_check_in(
+    event_id: uuid.UUID,
+    body: ManualCheckInRequest,
+    db: AdminOrApiKeySession_RsvpWrite,
+    current_user: AdminOrApiKey_RsvpWrite,
+) -> ManualCheckInResult:
+    event = _event_for_admin(db, event_id)
+    return attendance.manual_check_in(
+        db,
+        event,
+        body.profile_id,
+        body.occurrence_start,
+        actor_user_id=current_user.id,
+        actor_name=user_display_name(current_user),
+    )
+
+
+@router.post(
+    "/attendance/{event_id}/void",
+    response_model=AttendanceEntry,
+    summary="Void someone's check-in, keeping the record (backoffice)",
+)
+async def admin_void_check_in(
+    event_id: uuid.UUID,
+    body: VoidCheckInRequest,
+    db: AdminOrApiKeySession_RsvpWrite,
+    current_user: AdminOrApiKey_RsvpWrite,
+) -> AttendanceEntry:
+    event = _event_for_admin(db, event_id)
+    return attendance.manual_void(
+        db,
+        event,
+        body.profile_id,
+        body.occurrence_start,
+        body.reason,
+        actor_user_id=current_user.id,
+        actor_name=user_display_name(current_user),
+    )

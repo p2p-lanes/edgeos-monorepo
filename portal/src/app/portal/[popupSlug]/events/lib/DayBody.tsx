@@ -848,6 +848,7 @@ export function DayBody({
                               showRsvp &&
                               !isShort &&
                               fullEvent.status === "published" &&
+                              fullEvent.host_id !== currentHuman?.id &&
                               (() => {
                                 const rsvpKey = `${fullEvent.id}:${fullEvent.start_time}`
                                 const isRsvpPending = pendingRsvpKey === rsvpKey
@@ -856,7 +857,19 @@ export function DayBody({
                                     {isRsvpd ? (
                                       <RsvpStatusAction
                                         size="mini"
+                                        label={
+                                          fullEvent.my_rsvp_status ===
+                                          "checked_in"
+                                            ? (t(
+                                                "events.rsvp.checked_in",
+                                              ) as string)
+                                            : undefined
+                                        }
                                         isPending={isRsvpPending}
+                                        showCancel={
+                                          fullEvent.my_rsvp_status ===
+                                          "registered"
+                                        }
                                         onCancelRsvp={() =>
                                           cancelRsvpMutation.mutate(fullEvent)
                                         }

@@ -1,4 +1,5 @@
 import uuid
+from collections import Counter
 from typing import TypedDict
 
 from loguru import logger
@@ -14,7 +15,9 @@ from app.api.human.schemas import (
     HumanFilterCondition,
     HumanFilters,
     HumanProfileStats,
+    HumanProfileStatsPerson,
     HumanProfileStatsPopup,
+    HumanProfileStatsSharedEvent,
     HumanUpdate,
 )
 from app.api.product.schemas import CATEGORY_TICKET, TicketDuration
@@ -371,6 +374,10 @@ class HumansCRUD(BaseCRUD[Humans, HumanCreate, HumanUpdate]):
         duration when known.
         """
         from app.api.attendee.models import AttendeeProducts, Attendees
+        from app.api.event.models import Events
+        from app.api.event.schemas import EventStatus
+        from app.api.event_participant.models import EventParticipants
+        from app.api.event_participant.schemas import ParticipantStatus
         from app.api.popup.models import Popups
 
         main_attendees = list(
@@ -407,7 +414,135 @@ class HumansCRUD(BaseCRUD[Humans, HumanCreate, HumanUpdate]):
 
         popups = list(per_popup.values())
         total_days = sum(p.total_days for p in popups)
-        return HumanProfileStats(popups=popups, total_days=total_days)
+
+        own_checkins = list(
+            session.exec(
+                select(EventParticipants, Events)
+                .join(Events, Events.id == EventParticipants.event_id)
+                .where(
+                    EventParticipants.profile_id == human_id,
+                    EventParticipants.status == ParticipantStatus.CHECKED_IN,
+                    Events.status == EventStatus.PUBLISHED,
+                    or_(Events.host_id.is_(None), Events.host_id != human_id),
+                )
+            ).all()
+        )
+        own_occurrences = {
+            (participant.event_id, participant.occurrence_start)
+            for participant, _event in own_checkins
+        }
+        own_event_details = {
+            (participant.event_id, participant.occurrence_start): (
+                HumanProfileStatsSharedEvent(
+                    event_id=event.id,
+                    title=event.title,
+                    start_time=participant.occurrence_start or event.start_time,
+                    timezone=event.timezone,
+                )
+            )
+            for participant, event in own_checkins
+        }
+        theme_counts = Counter(
+            tag for _participant, event in own_checkins for tag in set(event.tags or [])
+        )
+        top_event_theme = (
+            min(theme_counts, key=lambda tag: (-theme_counts[tag], tag.casefold()))
+            if theme_counts
+            else None
+        )
+        hosted_events = list(
+            session.exec(
+                select(Events).where(
+                    Events.host_id == human_id,
+                    Events.status == EventStatus.PUBLISHED,
+                )
+            ).all()
+        )
+        shared_counts: dict[uuid.UUID, set[tuple]] = {}
+        hosted_attendance_counts: dict[uuid.UUID, set[tuple]] = {}
+        event_ids = {participant.event_id for participant, _event in own_checkins}
+        hosted_event_ids = {event.id for event in hosted_events}
+        candidate_ids = event_ids | hosted_event_ids
+        if candidate_ids:
+            participants = session.exec(
+                select(EventParticipants)
+                .join(Events, Events.id == EventParticipants.event_id)
+                .where(
+                    EventParticipants.event_id.in_(candidate_ids),
+                    EventParticipants.status == ParticipantStatus.CHECKED_IN,
+                    EventParticipants.profile_id != human_id,
+                    or_(
+                        Events.host_id.is_(None),
+                        EventParticipants.profile_id != Events.host_id,
+                    ),
+                )
+            ).all()
+            for participant in participants:
+                occurrence_key = (participant.event_id, participant.occurrence_start)
+                if occurrence_key in own_occurrences:
+                    shared_counts.setdefault(participant.profile_id, set()).add(
+                        occurrence_key
+                    )
+                if participant.event_id in hosted_event_ids:
+                    hosted_attendance_counts.setdefault(
+                        participant.profile_id, set()
+                    ).add(occurrence_key)
+
+        ranked_ids = set(shared_counts) | set(hosted_attendance_counts)
+        people = (
+            session.exec(select(Humans).where(Humans.id.in_(ranked_ids))).all()
+            if ranked_ids
+            else []
+        )
+        names = {
+            person.id: " ".join(
+                part for part in (person.first_name, person.last_name) if part
+            )
+            for person in people
+        }
+        picture_urls = {person.id: person.picture_url for person in people}
+
+        def ranked_people(
+            counts: dict[uuid.UUID, set[tuple]],
+            *,
+            include_shared_events: bool = False,
+        ) -> list[HumanProfileStatsPerson]:
+            return [
+                HumanProfileStatsPerson(
+                    human_id=person_id,
+                    name=names[person_id] or "Unknown",
+                    picture_url=picture_urls[person_id],
+                    event_count=len(occurrences),
+                    shared_events=(
+                        sorted(
+                            (own_event_details[key] for key in occurrences),
+                            key=lambda item: (item.start_time, item.title),
+                            reverse=True,
+                        )
+                        if include_shared_events
+                        else []
+                    ),
+                )
+                for person_id, occurrences in sorted(
+                    counts.items(), key=lambda item: (-len(item[1]), str(item[0]))
+                )[:5]
+                if person_id in names
+            ]
+
+        return HumanProfileStats(
+            popups=popups,
+            total_days=total_days,
+            events_attended=len(own_occurrences),
+            events_hosted=len({event.id for event in hosted_events}),
+            hosted_attendees_count=len(hosted_attendance_counts),
+            top_event_theme=top_event_theme,
+            most_shared_attendees=ranked_people(
+                shared_counts, include_shared_events=True
+            ),
+            most_active_attendees_of_hosted_events=ranked_people(
+                hosted_attendance_counts
+            ),
+        )
 
     def hard_delete_cascade(
         self, session: Session, human_id: uuid.UUID

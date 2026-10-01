@@ -9,6 +9,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
+import { downloadQrPng } from "@/lib/qr-download"
 import { formatRelative } from "@/lib/relativeTime"
 
 const QRcode = ({
@@ -33,51 +34,13 @@ const QRcode = ({
   }, [check_in_code])
 
   const handleDownload = () => {
-    if (!qrCodeRef.current) return
-
-    const canvas = document.createElement("canvas")
-    const svg = qrCodeRef.current.querySelector("svg")
-
-    if (!svg) return
-
-    const svgData = new XMLSerializer().serializeToString(svg)
-    const svgBlob = new Blob([svgData], { type: "image/svg+xml;charset=utf-8" })
-    const DOMURL = window.URL || window.webkitURL || window
-    const svgUrl = DOMURL.createObjectURL(svgBlob)
-
-    const img = new Image()
-    img.onload = () => {
-      // Scale factor to enlarge the image
-      const scaleFactor = 3
-
-      // Enlarge the canvas according to the scale factor
-      canvas.width = img.width * scaleFactor
-      canvas.height = img.height * scaleFactor
-
-      const ctx = canvas.getContext("2d")
-      if (!ctx) return
-
-      // Configure rendering quality
-      ctx.imageSmoothingEnabled = true
-      ctx.imageSmoothingQuality = "high"
-
-      // Draw the scaled image (the last 4 parameters are: x, y, width, height)
-      ctx.drawImage(img, 0, 0, canvas.width, canvas.height)
-
-      DOMURL.revokeObjectURL(svgUrl)
-
-      const imgURI = canvas
-        .toDataURL("image/png")
-        .replace("image/png", "image/octet-stream")
-
-      const downloadLink = document.createElement("a")
-      downloadLink.href = imgURI
-      downloadLink.download = `check-in-code-${check_in_code}.png`
-      document.body.appendChild(downloadLink)
-      downloadLink.click()
-      document.body.removeChild(downloadLink)
-    }
-    img.src = svgUrl
+    downloadQrPng(
+      qrCodeRef.current,
+      `check-in-code-${check_in_code}.png`,
+    ).catch(() => {
+      // The code is on screen and can be shown directly; a failed save is
+      // not worth interrupting someone at a door over.
+    })
   }
 
   return (

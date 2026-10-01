@@ -629,6 +629,7 @@ export function CalendarBody({
                       {isAuthed &&
                         showRsvp &&
                         event.status === "published" &&
+                        event.host_id !== currentHuman?.id &&
                         (() => {
                           const rsvpKey = `${event.id}:${event.start_time}`
                           const isRsvpPending = pendingRsvpKey === rsvpKey
@@ -640,7 +641,15 @@ export function CalendarBody({
                               {isRsvped ? (
                                 <RsvpStatusAction
                                   size="compact"
+                                  label={
+                                    event.my_rsvp_status === "checked_in"
+                                      ? (t("events.rsvp.checked_in") as string)
+                                      : undefined
+                                  }
                                   isPending={isRsvpPending}
+                                  showCancel={
+                                    event.my_rsvp_status === "registered"
+                                  }
                                   onCancelRsvp={() =>
                                     cancelRsvpMutation.mutate(event)
                                   }

@@ -13,6 +13,7 @@ export interface FetchAllEventsParams {
   locationKind?: "custom" | "meeting"
   startAfter?: string
   startBefore?: string
+  includeOutsideWindow?: boolean
   search?: string
 }
 
@@ -46,6 +47,7 @@ export async function fetchAllEvents(
       locationKind: params.locationKind,
       startAfter: params.startAfter,
       startBefore: params.startBefore,
+      includeOutsideWindow: params.includeOutsideWindow,
       search: params.search,
       limit: PAGE,
       skip,

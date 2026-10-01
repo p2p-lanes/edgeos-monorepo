@@ -28,6 +28,24 @@ class EventVisibility(str, Enum):
     UNLISTED = "unlisted"
 
 
+class AttendanceMode(str, Enum):
+    """How attendance is taken for an event (SIM-106).
+
+    * ``none``: no attendance is taken; the QR and the roll call are off.
+    * ``host_rollcall``: the organizer marks people present by hand; the QR
+      is neither shown nor accepted.
+    * ``self_checkin``: the QR is on AND the organizer can still mark people
+      by hand. Both write the same attendance.
+
+    Once an event has any check-in it can no longer go back to ``none``;
+    switching between the other two keeps every record.
+    """
+
+    NONE = "none"
+    HOST_ROLLCALL = "host_rollcall"
+    SELF_CHECKIN = "self_checkin"
+
+
 # ---------------------------------------------------------------------------
 # Recurrence (RRULE subset)
 # ---------------------------------------------------------------------------
@@ -116,6 +134,14 @@ class EventBase(SQLModel):
     # (badge, accent border) so it stands out in the list/day/calendar views.
     highlighted: bool = Field(
         default=False, sa_column_kwargs={"server_default": "false"}
+    )
+    # How attendance is taken. Not on EventCreate/EventUpdate: it is changed
+    # only through the dedicated attendance-mode endpoints, which enforce
+    # "no way back to none after the first check-in" in one place.
+    attendance_mode: AttendanceMode = Field(
+        default=AttendanceMode.NONE,
+        max_length=20,
+        sa_column_kwargs={"server_default": "NONE"},
     )
     # Admin-provided reason captured when an event is rejected. Persisted so
     # the owner can see why their request was denied in the portal.
@@ -328,6 +354,28 @@ class EventHostOption(BaseModel):
     id: uuid.UUID
     name: str | None = None
     email: str
+
+
+class EventCheckInLink(BaseModel):
+    """The portal URL an event's organizer shows as a QR for attendees to scan.
+
+    Served only to the event's managers, so the portal can gate the QR panel
+    on a real server-side permission check instead of hiding a UI element.
+    The URL itself is not a secret — it carries no token and is deliberately
+    fixed and shareable (see the product limitation in SIM-103) — but who
+    gets handed it is still a decision the backend makes.
+    """
+
+    url: str
+    # Echoed back so the caller can confirm which instance of a recurring
+    # series this QR points at.
+    occurrence_start: datetime | None = None
+
+
+class EventAttendanceModeUpdate(BaseModel):
+    """Body of the attendance-mode endpoints (portal and backoffice)."""
+
+    attendance_mode: AttendanceMode
 
 
 class EventAdminNotes(BaseModel):

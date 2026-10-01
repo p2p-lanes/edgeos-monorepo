@@ -3,20 +3,24 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { createFileRoute, useNavigate } from "@tanstack/react-router"
 import {
   Check,
+  Clipboard,
   Clock,
+  Download,
   ExternalLink,
   Globe,
   Home,
   Layers,
   MapPin,
   Pencil,
+  QrCode,
   Repeat,
   Share2,
   Tag,
   Users,
   Video,
 } from "lucide-react"
-import { useState } from "react"
+import { useRef, useState } from "react"
+import QRCode from "react-qr-code"
 
 import {
   type EventParticipantPublic,
@@ -30,6 +34,7 @@ import { FormPageLayout } from "@/components/Common/FormPageLayout"
 import { QueryErrorBoundary } from "@/components/Common/QueryErrorBoundary"
 import { StatusBadge } from "@/components/Common/StatusBadge"
 import { CoverImage } from "@/components/events/CoverImage"
+import { EventAttendanceCard } from "@/components/events/EventAttendanceCard"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import {
@@ -45,7 +50,12 @@ import { LoadingButton } from "@/components/ui/loading-button"
 import { Skeleton } from "@/components/ui/skeleton"
 import { useWorkspace } from "@/contexts/WorkspaceContext"
 import useCustomToast from "@/hooks/useCustomToast"
-import { getPopupPortalUrl, getPortalBaseUrl } from "@/lib/portal-urls"
+import {
+  getEventCheckInUrl,
+  getPopupPortalUrl,
+  getPortalBaseUrl,
+} from "@/lib/portal-urls"
+import { downloadQrPng } from "@/lib/qr-download"
 import { createErrorHandler } from "@/utils"
 
 type EventViewSearch = { occ?: string }
@@ -110,6 +120,8 @@ function EventViewContent() {
   const { showSuccessToast, showErrorToast } = useCustomToast()
   const { effectiveTenantId } = useWorkspace()
   const [copied, setCopied] = useState(false)
+  const [checkInCopied, setCheckInCopied] = useState(false)
+  const qrRef = useRef<HTMLDivElement>(null)
   const [editChoiceOpen, setEditChoiceOpen] = useState(false)
 
   const { data: event } = useQuery({
@@ -170,6 +182,33 @@ function EventViewContent() {
           occ ? `?occ=${encodeURIComponent(occ)}` : ""
         }`
       : null
+
+  // A recurring master viewed without ?occ= is its own first occurrence, so
+  // the QR still pins a single date rather than the whole series.
+  const checkInOcc = event.rrule ? (occ ?? event.start_time) : null
+  const checkInUrl =
+    portalBase && popup?.slug
+      ? getEventCheckInUrl(portalBase, popup.slug, event.id, checkInOcc)
+      : null
+
+  const handleCopyCheckInUrl = async () => {
+    if (!checkInUrl) return
+    try {
+      await navigator.clipboard.writeText(checkInUrl)
+      setCheckInCopied(true)
+      setTimeout(() => setCheckInCopied(false), 2000)
+    } catch {
+      showErrorToast("Couldn't copy link")
+    }
+  }
+
+  const handleDownloadQr = async () => {
+    try {
+      await downloadQrPng(qrRef.current, `event-check-in-${event.id}.png`)
+    } catch {
+      showErrorToast("Couldn't download the QR code")
+    }
+  }
 
   const handleShare = async () => {
     if (!portalUrl) {
@@ -347,6 +386,87 @@ function EventViewContent() {
             />
           </div>
         )}
+
+        {event.status === "published" && (
+          <EventAttendanceCard
+            eventId={event.id}
+            occurrenceStart={checkInOcc}
+            timezone={event.timezone ?? "UTC"}
+          />
+        )}
+
+        {/* Only in self check-in: in any other mode the check-in endpoint
+            refuses the scan, so a printed QR would not work. */}
+        {event.status === "published" &&
+          event.attendance_mode === "self_checkin" && (
+            <div className="rounded-xl border bg-card p-4">
+              <div className="mb-1 flex items-center gap-2">
+                <QrCode className="h-4 w-4 text-muted-foreground" />
+                <h3 className="text-sm font-semibold">Check-in QR</h3>
+              </div>
+              <p className="mb-3 text-sm text-muted-foreground">
+                Show this to attendees. Scanning it checks them into this event.
+                Not the same as the gathering's ticket check-in.
+              </p>
+              {!checkInUrl ? (
+                // No portal domain means no URL we could encode. Say so instead
+                // of rendering a QR that resolves nowhere.
+                <p className="rounded-md border border-dashed px-3 py-2 text-sm text-muted-foreground">
+                  Set a portal domain for this organization to generate the
+                  check-in QR.
+                </p>
+              ) : (
+                <div className="space-y-4">
+                  {/* One line, ellipsised. The QR is what attendees use; the
+                    URL is only here to be copied elsewhere, so it costs the
+                    card nothing to keep it to a single row. Full value stays
+                    reachable through the tooltip and the copy button. */}
+                  <div className="flex items-center gap-1 rounded-lg border bg-muted/40 py-1 pr-1 pl-3">
+                    <span
+                      title={checkInUrl}
+                      className="min-w-0 flex-1 truncate font-mono text-xs text-muted-foreground"
+                    >
+                      {checkInUrl}
+                    </span>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon-sm"
+                      className="shrink-0"
+                      onClick={handleCopyCheckInUrl}
+                      title={checkInCopied ? "Copied" : "Copy URL"}
+                      aria-label="Copy check-in URL"
+                    >
+                      {checkInCopied ? (
+                        <Check className="h-4 w-4 text-success" />
+                      ) : (
+                        <Clipboard className="h-4 w-4" />
+                      )}
+                    </Button>
+                  </div>
+
+                  <div className="flex flex-col items-center gap-3">
+                    {/* White plate in both themes: a dark-on-dark QR won't scan. */}
+                    <div
+                      ref={qrRef}
+                      className="rounded-xl border bg-white p-4 shadow-sm"
+                    >
+                      <QRCode value={checkInUrl} size={176} level="M" />
+                    </div>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={handleDownloadQr}
+                    >
+                      <Download className="mr-2 h-4 w-4" />
+                      Download QR
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
 
         <div className="rounded-xl border bg-card p-4">
           <div className="mb-3 flex items-center justify-between">

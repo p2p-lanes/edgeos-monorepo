@@ -396,9 +396,9 @@ function OpenCheckoutProductRow({
     "inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold tracking-wide shrink-0 transition-all whitespace-nowrap",
     "shadow-sm border border-[color:var(--primary,transparent)]",
     isAdded
-      ? "bg-[color:var(--accent,theme(colors.foreground))] text-[color:var(--primary-foreground,theme(colors.background))]"
+      ? "border-teal-800 bg-teal-800 text-white hover:bg-teal-900"
       : "bg-[color:var(--primary,theme(colors.foreground))] text-[color:var(--primary-foreground,theme(colors.background))] hover:brightness-110 active:scale-[0.98]",
-    rowDisabled && "cursor-not-allowed opacity-50",
+    rowDisabled && !isAdded && "cursor-not-allowed opacity-50",
   )
 
   return (
