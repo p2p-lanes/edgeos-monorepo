@@ -74,7 +74,6 @@ def grant_popup(db: Session, tenant_a: Tenants) -> Popups:
         tenant_id=tenant_a.id,
         name="Manual assignments",
         slug=f"manual-{uuid.uuid4().hex}",
-        visible_in_portal=True,
     )
     db.add(popup)
     db.commit()
@@ -179,9 +178,6 @@ def test_new_bulk_invitee_can_log_in_and_read_ticket_with_only_application_flow(
     monkeypatch,
 ) -> None:
     grant_popup.status = "active"
-    # Keep this popup inside the endpoint's 100-item, newest-first portal list
-    # even though the session-scoped test database contains many active popups.
-    grant_popup.start_date = datetime(9999, 12, 31)
     db.add(grant_popup)
     provision_default_flow(db, grant_popup, sale_type="application")
     flows = db.exec(
@@ -220,9 +216,11 @@ def test_new_bulk_invitee_can_log_in_and_read_ticket_with_only_application_flow(
     assert profile.status_code == 200
     assert profile.json()["id"] == recipient["human_id"]
 
-    popups = client.get("/api/v1/popups/portal/list", headers=headers)
-    assert popups.status_code == 200
-    popup = next(p for p in popups.json() if p["id"] == str(grant_popup.id))
+    popup_response = client.get(
+        f"/api/v1/popups/portal/{grant_popup.slug}", headers=headers
+    )
+    assert popup_response.status_code == 200
+    popup = popup_response.json()
     assert popup["takes_applications"] is True
     assert popup["sells_directly"] is False
     access_url = f"/api/v1/portal/popup/{grant_popup.id}/access"
