@@ -58,6 +58,15 @@ class PaymentStatus(str, Enum):
 _PAYMENT_AMOUNT_OPS = frozenset({"eq", "gt", "gte", "lt", "lte"})
 
 PAYMENT_FILTER_FIELDS: dict[str, FilterField] = {
+    "sales_flow_id": FilterField(
+        "uuid", frozenset({"eq", "neq", "is_empty", "not_empty"})
+    ),
+    "product_id": FilterField("uuid", frozenset({"eq", "neq"})),
+    "product_category": FilterField(
+        "select",
+        frozenset({"eq"}),
+        frozenset({"ticket", "housing", "merch", "patreon", "other"}),
+    ),
     "status": FilterField(
         "select",
         frozenset({"eq", "neq"}),
