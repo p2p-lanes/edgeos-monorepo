@@ -1,10 +1,16 @@
-"""QR check-in for events — window, capacity lock and the write itself.
+"""Event check-in, by QR and by the organizer's roll call: mode, window,
+capacity lock, the write itself and its annulment.
 
 The organizer shows a QR that encodes a portal URL for one event (and one
 occurrence, for a recurring series). Scanning it lands the attendee on a
 portal page that performs a single POST. That POST may *create* the
 participation, so everything the RSVP path validates has to be validated
 here too — plus a time window, which until now only existed in the UI.
+
+SIM-106 adds the roll call on top: the same write, made by a manager for
+someone else (``method=manual``), gated by the event's ``attendance_mode``
+and recorded in ``event_check_ins`` so a void keeps who marked, who voided,
+when, how and why.
 
 Kept out of ``router.py`` so the endpoint stays a thin sequence of guards
 and the transactional core can be unit-tested on its own.
@@ -18,9 +24,11 @@ from datetime import UTC, datetime, timedelta
 from fastapi import HTTPException, status
 from sqlmodel import Session, select
 
+from app.api.event.schemas import AttendanceMode
 from app.api.event_participant import crud
-from app.api.event_participant.models import EventParticipants
-from app.api.event_participant.schemas import ParticipantStatus
+from app.api.event_participant.check_in_crud import event_check_ins_crud
+from app.api.event_participant.models import EventCheckIns, EventParticipants
+from app.api.event_participant.schemas import CheckInMethod, ParticipantStatus
 
 # Check-in window, relative to the *occurrence* being checked into (not the
 # series master). Opens early enough for the queue that forms before the
@@ -92,20 +100,30 @@ def resolve_occurrence_window(
     return occ, occ + (end - start)
 
 
+def check_in_bounds(
+    window_start: datetime, window_end: datetime
+) -> tuple[datetime, datetime]:
+    """When marking (and voiding) opens and closes for one occurrence."""
+    return (
+        window_start - timedelta(minutes=CHECK_IN_OPENS_MINUTES_BEFORE),
+        window_end + timedelta(minutes=CHECK_IN_CLOSES_MINUTES_AFTER),
+    )
+
+
 def ensure_check_in_window_open(
     window_start: datetime,
     window_end: datetime,
     *,
     now: datetime | None = None,
 ) -> None:
-    """Reject a scan that is too early or too late.
+    """Reject a mark or a void that is too early or too late.
 
     Enforced here and not only in the UI: the QR URL is shareable, so the
     window is the only thing keeping a link from being usable weeks later.
+    The roll call shares it, so attendance cannot be rewritten afterwards.
     """
     moment = now or datetime.now(UTC)
-    opens_at = window_start - timedelta(minutes=CHECK_IN_OPENS_MINUTES_BEFORE)
-    closes_at = window_end + timedelta(minutes=CHECK_IN_CLOSES_MINUTES_AFTER)
+    opens_at, closes_at = check_in_bounds(window_start, window_end)
     if moment < opens_at:
         raise reject(
             status.HTTP_403_FORBIDDEN,
@@ -117,6 +135,39 @@ def ensure_check_in_window_open(
             status.HTTP_403_FORBIDDEN,
             "check_in_closed",
             "Check-in for this event is closed.",
+        )
+
+
+def human_display_name(human) -> str | None:
+    """How a portal human is named in attendance history."""
+    name = " ".join(filter(None, [human.first_name, human.last_name]))
+    return name or human.email
+
+
+def user_display_name(user) -> str | None:
+    """How a backoffice user is named in attendance history."""
+    return user.full_name or user.email
+
+
+def ensure_attendance_mode(event, method: CheckInMethod) -> None:
+    """Reject a mark the event's attendance mode does not allow.
+
+    The QR works only in ``self_checkin``; hiding it in the UI is not
+    enough, because a copied URL keeps working. The roll call works in
+    ``host_rollcall`` and ``self_checkin``. ``none`` takes no attendance.
+    """
+    mode = event.attendance_mode or AttendanceMode.NONE
+    if method == CheckInMethod.QR and mode != AttendanceMode.SELF_CHECKIN:
+        raise reject(
+            status.HTTP_403_FORBIDDEN,
+            "qr_check_in_disabled",
+            "This event doesn't take check-in by QR.",
+        )
+    if mode == AttendanceMode.NONE:
+        raise reject(
+            status.HTTP_403_FORBIDDEN,
+            "attendance_disabled",
+            "This event doesn't take attendance.",
         )
 
 
@@ -142,11 +193,18 @@ def lock_event_for_capacity(db: Session, event_id: uuid.UUID) -> None:
     ).first()
 
 
-def ensure_rsvp_eligible(db: Session, popup_id: uuid.UUID, human_id: uuid.UUID) -> None:
+def ensure_rsvp_eligible(
+    db: Session,
+    popup_id: uuid.UUID,
+    human_id: uuid.UUID,
+    *,
+    by_organizer: bool = False,
+) -> None:
     """Same gate as RSVP: an allocated ticket and no rejected application.
 
     Holding the QR URL is not access. Someone who could not RSVP to this
-    event cannot check into it either.
+    event cannot check into it either, and an organizer cannot mark them.
+    ``by_organizer`` only rewords the fallback message; the codes match.
     """
     access = crud.event_participants_crud.eligibility_by_human(
         db, popup_id, {human_id}
@@ -157,12 +215,16 @@ def ensure_rsvp_eligible(db: Session, popup_id: uuid.UUID, human_id: uuid.UUID) 
         raise reject(
             status.HTTP_403_FORBIDDEN,
             "application_rejected",
-            "Your application was not accepted, so you can't check in to events.",
+            "This person's application was not accepted, so they can't be checked in."
+            if by_organizer
+            else "Your application was not accepted, so you can't check in to events.",
         )
     raise reject(
         status.HTTP_403_FORBIDDEN,
         "ticket_required",
-        "You need a purchased ticket for this popup to check in.",
+        "This person needs a purchased ticket for this popup to be checked in."
+        if by_organizer
+        else "You need a purchased ticket for this popup to check in.",
     )
 
 
@@ -171,6 +233,11 @@ def perform_check_in(
     event,
     human,
     occurrence_start: datetime | None,
+    *,
+    method: CheckInMethod = CheckInMethod.QR,
+    actor_human_id: uuid.UUID | None = None,
+    actor_user_id: uuid.UUID | None = None,
+    actor_name: str | None = None,
 ) -> tuple[EventParticipants, bool, bool]:
     """Check ``human`` into ``event``, creating the participation if needed.
 
@@ -179,12 +246,15 @@ def perform_check_in(
     Four cases, in the order the issue spells them out:
 
     * already ``checked_in`` — informational success, nothing is written and
-      ``check_time`` keeps its original value. Re-scanning is harmless.
+      ``check_time`` keeps its original value. Marking twice is harmless.
     * ``registered`` — flipped to ``checked_in``. No capacity check: the seat
       was already theirs, so a now-full event must not turn them away.
     * cancelled — treated as a fresh entry, subject to eligibility and
       capacity, reusing the row (the partial unique indexes allow only one).
     * missing — created directly as ``checked_in``. No RSVP required.
+
+    Every mark also adds an ``event_check_ins`` row in the same transaction.
+    A QR scan with no explicit actor is the attendee marking themselves.
 
     Never sends the iTIP message the RSVP path sends: a direct check-in is
     not an invitation, and the event has already started by definition.
@@ -199,19 +269,42 @@ def perform_check_in(
         return existing, True, False
 
     now = datetime.now(UTC)
+    if method == CheckInMethod.QR and actor_human_id is None and actor_user_id is None:
+        actor_human_id = human.id
+        actor_name = human_display_name(human)
+
+    def log(participant: EventParticipants, *, had_rsvp: bool) -> None:
+        db.add(
+            EventCheckIns(
+                tenant_id=participant.tenant_id,
+                event_id=participant.event_id,
+                participant_id=participant.id,
+                profile_id=participant.profile_id,
+                occurrence_start=participant.occurrence_start,
+                method=method,
+                had_rsvp=had_rsvp,
+                checked_in_at=now,
+                checked_in_by_human_id=actor_human_id,
+                checked_in_by_user_id=actor_user_id,
+                checked_in_by_name=actor_name,
+            )
+        )
 
     if existing is not None and existing.status == ParticipantStatus.REGISTERED:
         existing.status = ParticipantStatus.CHECKED_IN
         existing.check_time = now
         existing.updated_at = now
         db.add(existing)
+        log(existing, had_rsvp=True)
         db.commit()
         db.refresh(existing)
         return existing, False, False
 
-    # No active participation: this scan is taking a seat, so it has to pass
+    # No active participation: this mark is taking a seat, so it has to pass
     # everything a fresh RSVP would.
-    ensure_rsvp_eligible(db, event.popup_id, human.id)
+    ensure_rsvp_eligible(
+        db, event.popup_id, human.id, by_organizer=method == CheckInMethod.MANUAL
+    )
 
     if occurrence_start is not None and not is_scheduled_occurrence(
         event, occurrence_start
@@ -241,6 +334,7 @@ def perform_check_in(
         existing.registered_at = now
         existing.updated_at = now
         db.add(existing)
+        log(existing, had_rsvp=False)
         db.commit()
         db.refresh(existing)
         return existing, False, False
@@ -255,6 +349,74 @@ def perform_check_in(
         registered_at=now,
     )
     db.add(participant)
+    # The history row points at the participation, so it needs its id.
+    db.flush()
+    log(participant, had_rsvp=False)
     db.commit()
     db.refresh(participant)
     return participant, False, True
+
+
+def void_check_in(
+    db: Session,
+    event,
+    participant: EventParticipants,
+    *,
+    reason: str,
+    actor_human_id: uuid.UUID | None = None,
+    actor_user_id: uuid.UUID | None = None,
+    actor_name: str | None = None,
+) -> EventParticipants:
+    """Annul someone's current check-in without erasing it.
+
+    The history row is stamped with who voided it, when and why; nothing is
+    deleted. The participation goes back to what it was before the mark:
+    ``registered`` when they held an RSVP, ``cancelled`` for a walk-in, so
+    the seat the walk-in took is freed.
+
+    A ``checked_in`` participation with no history row (marked before the
+    table existed, or through a backoffice status edit) gets one first, so
+    the void has something to stamp. Its origin is unknown, so it is kept
+    as a manual mark by nobody and treated as holding an RSVP: freeing a
+    seat that may have been reserved is the worse mistake.
+    """
+    lock_event_for_capacity(db, event.id)
+    db.refresh(participant)
+
+    if participant.status != ParticipantStatus.CHECKED_IN:
+        raise reject(
+            status.HTTP_409_CONFLICT,
+            "not_checked_in",
+            "This person is not checked in.",
+        )
+
+    now = datetime.now(UTC)
+    record = event_check_ins_crud.active_for_participant(db, participant.id)
+    if record is None:
+        record = EventCheckIns(
+            tenant_id=participant.tenant_id,
+            event_id=participant.event_id,
+            participant_id=participant.id,
+            profile_id=participant.profile_id,
+            occurrence_start=participant.occurrence_start,
+            method=CheckInMethod.MANUAL,
+            had_rsvp=True,
+            checked_in_at=participant.check_time or participant.updated_at,
+        )
+
+    record.voided_at = now
+    record.voided_by_human_id = actor_human_id
+    record.voided_by_user_id = actor_user_id
+    record.voided_by_name = actor_name
+    record.void_reason = reason.strip()
+    db.add(record)
+
+    participant.status = (
+        ParticipantStatus.REGISTERED if record.had_rsvp else ParticipantStatus.CANCELLED
+    )
+    participant.check_time = None
+    participant.updated_at = now
+    db.add(participant)
+    db.commit()
+    db.refresh(participant)
+    return participant

@@ -4,25 +4,35 @@ from datetime import UTC, datetime
 from fastapi import APIRouter, HTTPException, status
 from loguru import logger
 
-from app.api.event_participant import crud
+from app.api.event_participant import attendance, crud
 from app.api.event_participant.check_in import (
+    ensure_attendance_mode,
     ensure_check_in_window_open,
+    human_display_name,
     is_scheduled_occurrence,
     lock_event_for_capacity,
     perform_check_in,
     reject,
     resolve_occurrence_window,
+    user_display_name,
 )
 from app.api.event_participant.schemas import (
+    AttendanceEntry,
+    AttendanceLookupResult,
+    AttendanceRoster,
     AttendeeEmailsResponse,
+    CheckInMethod,
     EventCheckInEvent,
     EventCheckInResult,
     EventParticipantCreate,
     EventParticipantPublic,
     EventParticipantUpdate,
+    ManualCheckInRequest,
+    ManualCheckInResult,
     ParticipantStatus,
     RegisterRequest,
     RsvpEligibility,
+    VoidCheckInRequest,
 )
 from app.api.popup.guards import (
     CallerToken,
@@ -658,6 +668,10 @@ async def check_in(
             "event_not_published",
             "This event is not published.",
         )
+    # The QR only works in self_checkin. Checked on the server because the
+    # URL outlives the panel that showed it: switching the event to
+    # host_rollcall or none must stop a copied link from working.
+    ensure_attendance_mode(event, CheckInMethod.QR)
     if event.host_id == current_human.id:
         raise reject(
             status.HTTP_409_CONFLICT,
@@ -724,3 +738,207 @@ def _check_in_cover_url(event, settings) -> str | None:
     if event.venue is not None and event.venue.image_url:
         return event.venue.image_url
     return settings.placeholder_url if settings else None
+
+
+# ---------------------------------------------------------------------------
+# Attendance roll call (SIM-106)
+#
+# Portal: the event's owner, assigned host and collaborators. Backoffice:
+# operators. host_display_name is a label and grants nothing. Every rule
+# beyond "who is calling" lives in attendance.py, so both surfaces behave
+# the same as the QR.
+# ---------------------------------------------------------------------------
+
+
+def _managed_event_for_human(db, event_id: uuid.UUID, current_human, token_payload):
+    from app.api.event.crud import events_crud
+    from app.services.event_visibility import human_manages_event
+
+    event = events_crud.get(db, event_id)
+    if not event:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Event not found"
+        )
+    ensure_api_key_popup(token_payload, event.popup_id)
+    if not human_manages_event(event, current_human.id):
+        raise reject(
+            status.HTTP_403_FORBIDDEN,
+            "not_event_manager",
+            "Only the event's creator, host or collaborators can take attendance.",
+        )
+    return event
+
+
+def _event_for_admin(db, event_id: uuid.UUID):
+    from app.api.event.crud import events_crud
+
+    event = events_crud.get(db, event_id)
+    if not event:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Event not found"
+        )
+    return event
+
+
+@router.get(
+    "/portal/attendance/{event_id}",
+    response_model=AttendanceRoster,
+    summary="Private roll call of an event occurrence, for its managers",
+    dependencies=[needs("portal:*")],
+)
+async def get_portal_attendance(
+    event_id: uuid.UUID,
+    db: HumanTenantSession,
+    current_human: CurrentHuman,
+    token_payload: CallerToken,
+    occurrence_start: datetime | None = None,
+) -> AttendanceRoster:
+    event = _managed_event_for_human(db, event_id, current_human, token_payload)
+    occ = attendance.resolve_attendance_occurrence(event, occurrence_start)
+    return attendance.build_roster(db, event, occ)
+
+
+@router.get(
+    "/portal/attendance/{event_id}/lookup",
+    response_model=AttendanceLookupResult,
+    summary="Find a walk-in by exact email, for the event's managers",
+    dependencies=[needs("portal:*")],
+)
+async def lookup_portal_attendee(
+    event_id: uuid.UUID,
+    email: str,
+    db: HumanTenantSession,
+    current_human: CurrentHuman,
+    token_payload: CallerToken,
+    occurrence_start: datetime | None = None,
+) -> AttendanceLookupResult:
+    event = _managed_event_for_human(db, event_id, current_human, token_payload)
+    occ = attendance.resolve_attendance_occurrence(event, occurrence_start)
+    return attendance.lookup_by_email(db, event, occ, email)
+
+
+@router.post(
+    "/portal/attendance/{event_id}/check-in",
+    response_model=ManualCheckInResult,
+    summary="Mark someone present from the roll call",
+    dependencies=[needs("portal:*")],
+)
+async def portal_manual_check_in(
+    event_id: uuid.UUID,
+    body: ManualCheckInRequest,
+    db: HumanTenantSession,
+    current_human: CurrentHuman,
+    token_payload: CallerToken,
+) -> ManualCheckInResult:
+    event = _managed_event_for_human(db, event_id, current_human, token_payload)
+    return attendance.manual_check_in(
+        db,
+        event,
+        body.profile_id,
+        body.occurrence_start,
+        actor_human_id=current_human.id,
+        actor_name=human_display_name(current_human),
+    )
+
+
+@router.post(
+    "/portal/attendance/{event_id}/void",
+    response_model=AttendanceEntry,
+    summary="Void someone's check-in, keeping the record",
+    dependencies=[needs("portal:*")],
+)
+async def portal_void_check_in(
+    event_id: uuid.UUID,
+    body: VoidCheckInRequest,
+    db: HumanTenantSession,
+    current_human: CurrentHuman,
+    token_payload: CallerToken,
+) -> AttendanceEntry:
+    event = _managed_event_for_human(db, event_id, current_human, token_payload)
+    return attendance.manual_void(
+        db,
+        event,
+        body.profile_id,
+        body.occurrence_start,
+        body.reason,
+        actor_human_id=current_human.id,
+        actor_name=human_display_name(current_human),
+    )
+
+
+@router.get(
+    "/attendance/{event_id}",
+    response_model=AttendanceRoster,
+    summary="Roll call of an event occurrence (backoffice)",
+)
+async def get_attendance(
+    event_id: uuid.UUID,
+    db: AdminOrApiKeySession_EventsRead,
+    _: AdminOrApiKey_EventsRead,
+    occurrence_start: datetime | None = None,
+) -> AttendanceRoster:
+    event = _event_for_admin(db, event_id)
+    occ = attendance.resolve_attendance_occurrence(event, occurrence_start)
+    return attendance.build_roster(db, event, occ)
+
+
+@router.get(
+    "/attendance/{event_id}/lookup",
+    response_model=AttendanceLookupResult,
+    summary="Find a walk-in by exact email (backoffice)",
+)
+async def lookup_attendee(
+    event_id: uuid.UUID,
+    email: str,
+    db: AdminOrApiKeySession_EventsRead,
+    _: AdminOrApiKey_EventsRead,
+    occurrence_start: datetime | None = None,
+) -> AttendanceLookupResult:
+    event = _event_for_admin(db, event_id)
+    occ = attendance.resolve_attendance_occurrence(event, occurrence_start)
+    return attendance.lookup_by_email(db, event, occ, email)
+
+
+@router.post(
+    "/attendance/{event_id}/check-in",
+    response_model=ManualCheckInResult,
+    summary="Mark someone present (backoffice)",
+)
+async def admin_manual_check_in(
+    event_id: uuid.UUID,
+    body: ManualCheckInRequest,
+    db: AdminOrApiKeySession_RsvpWrite,
+    current_user: AdminOrApiKey_RsvpWrite,
+) -> ManualCheckInResult:
+    event = _event_for_admin(db, event_id)
+    return attendance.manual_check_in(
+        db,
+        event,
+        body.profile_id,
+        body.occurrence_start,
+        actor_user_id=current_user.id,
+        actor_name=user_display_name(current_user),
+    )
+
+
+@router.post(
+    "/attendance/{event_id}/void",
+    response_model=AttendanceEntry,
+    summary="Void someone's check-in, keeping the record (backoffice)",
+)
+async def admin_void_check_in(
+    event_id: uuid.UUID,
+    body: VoidCheckInRequest,
+    db: AdminOrApiKeySession_RsvpWrite,
+    current_user: AdminOrApiKey_RsvpWrite,
+) -> AttendanceEntry:
+    event = _event_for_admin(db, event_id)
+    return attendance.manual_void(
+        db,
+        event,
+        body.profile_id,
+        body.occurrence_start,
+        body.reason,
+        actor_user_id=current_user.id,
+        actor_name=user_display_name(current_user),
+    )

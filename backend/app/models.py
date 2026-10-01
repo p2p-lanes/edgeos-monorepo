@@ -85,7 +85,7 @@ from app.api.email_template.schemas import (
 from app.api.event.models import EventHiddenByHuman, EventInvitations, Events
 from app.api.event.schemas import EventCreate, EventPublic, EventUpdate
 from app.api.event_message.models import EventMessages
-from app.api.event_participant.models import EventParticipants
+from app.api.event_participant.models import EventCheckIns, EventParticipants
 from app.api.event_participant.schemas import (
     EventParticipantCreate,
     EventParticipantPublic,
@@ -350,6 +350,7 @@ __all__ = [
     "EventCreate",
     "EventPublic",
     "EventUpdate",
+    "EventCheckIns",
     "EventParticipants",
     "EventParticipantCreate",
     "EventParticipantPublic",

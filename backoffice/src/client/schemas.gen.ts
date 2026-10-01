@@ -4894,6 +4894,331 @@ export const AttachRateItemSchema = {
     description: 'Accommodation attach rate per ticket type.'
 } as const;
 
+export const AttendanceActorSchema = {
+    properties: {
+        kind: {
+            type: 'string',
+            enum: ['human', 'user', 'unknown'],
+            title: 'Kind'
+        },
+        id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Id'
+        },
+        name: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Name'
+        }
+    },
+    type: 'object',
+    required: ['kind'],
+    title: 'AttendanceActor',
+    description: `Who made or voided a mark, resolved to a display name.
+
+\`\`kind\`\` is \`\`human\`\` for a portal person (an attendee scanning, or an
+organizer on the roll call), \`\`user\`\` for a backoffice operator, and
+\`\`unknown\`\` for marks that predate the history table.`
+} as const;
+
+export const AttendanceCheckInRecordSchema = {
+    properties: {
+        id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Id'
+        },
+        method: {
+            '$ref': '#/components/schemas/CheckInMethod'
+        },
+        had_rsvp: {
+            type: 'boolean',
+            title: 'Had Rsvp'
+        },
+        checked_in_at: {
+            type: 'string',
+            format: 'date-time',
+            title: 'Checked In At'
+        },
+        checked_in_by: {
+            '$ref': '#/components/schemas/AttendanceActor'
+        },
+        voided_at: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Voided At'
+        },
+        voided_by: {
+            anyOf: [
+                {
+                    '$ref': '#/components/schemas/AttendanceActor'
+                },
+                {
+                    type: 'null'
+                }
+            ]
+        },
+        void_reason: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Void Reason'
+        }
+    },
+    type: 'object',
+    required: ['id', 'method', 'had_rsvp', 'checked_in_at', 'checked_in_by'],
+    title: 'AttendanceCheckInRecord',
+    description: "One mark in someone's attendance history, voided or not."
+} as const;
+
+export const AttendanceEntrySchema = {
+    properties: {
+        participant_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Participant Id'
+        },
+        profile_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Profile Id'
+        },
+        first_name: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'First Name'
+        },
+        last_name: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Last Name'
+        },
+        email: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Email'
+        },
+        status: {
+            '$ref': '#/components/schemas/ParticipantStatus'
+        },
+        check_time: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Check Time'
+        },
+        history: {
+            items: {
+                '$ref': '#/components/schemas/AttendanceCheckInRecord'
+            },
+            type: 'array',
+            title: 'History',
+            default: []
+        }
+    },
+    type: 'object',
+    required: ['participant_id', 'profile_id', 'status'],
+    title: 'AttendanceEntry',
+    description: 'One person on the roster of an occurrence.'
+} as const;
+
+export const AttendanceLookupResultSchema = {
+    properties: {
+        profile_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Profile Id'
+        },
+        first_name: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'First Name'
+        },
+        last_name: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Last Name'
+        },
+        email: {
+            type: 'string',
+            title: 'Email'
+        },
+        status: {
+            anyOf: [
+                {
+                    '$ref': '#/components/schemas/ParticipantStatus'
+                },
+                {
+                    type: 'null'
+                }
+            ]
+        }
+    },
+    type: 'object',
+    required: ['profile_id', 'email'],
+    title: 'AttendanceLookupResult',
+    description: 'A person found by exact email, for a walk-in check-in.'
+} as const;
+
+export const AttendanceModeSchema = {
+    type: 'string',
+    enum: ['none', 'host_rollcall', 'self_checkin'],
+    title: 'AttendanceMode',
+    description: `How attendance is taken for an event (SIM-106).
+
+* \`\`none\`\`: no attendance is taken; the QR and the roll call are off.
+* \`\`host_rollcall\`\`: the organizer marks people present by hand; the QR
+  is neither shown nor accepted.
+* \`\`self_checkin\`\`: the QR is on AND the organizer can still mark people
+  by hand. Both write the same attendance.
+
+Once an event has any check-in it can no longer go back to \`\`none\`\`;
+switching between the other two keeps every record.`
+} as const;
+
+export const AttendanceRosterSchema = {
+    properties: {
+        event_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Event Id'
+        },
+        occurrence_start: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Occurrence Start'
+        },
+        attendance_mode: {
+            '$ref': '#/components/schemas/AttendanceMode'
+        },
+        window: {
+            '$ref': '#/components/schemas/AttendanceWindow'
+        },
+        max_participant: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Max Participant'
+        },
+        seats_taken: {
+            type: 'integer',
+            title: 'Seats Taken'
+        },
+        checked_in_count: {
+            type: 'integer',
+            title: 'Checked In Count'
+        },
+        entries: {
+            items: {
+                '$ref': '#/components/schemas/AttendanceEntry'
+            },
+            type: 'array',
+            title: 'Entries'
+        }
+    },
+    type: 'object',
+    required: ['event_id', 'attendance_mode', 'window', 'seats_taken', 'checked_in_count', 'entries'],
+    title: 'AttendanceRoster',
+    description: 'Private roll call of one occurrence, for its managers only.'
+} as const;
+
+export const AttendanceWindowSchema = {
+    properties: {
+        opens_at: {
+            type: 'string',
+            format: 'date-time',
+            title: 'Opens At'
+        },
+        closes_at: {
+            type: 'string',
+            format: 'date-time',
+            title: 'Closes At'
+        },
+        is_open: {
+            type: 'boolean',
+            title: 'Is Open'
+        }
+    },
+    type: 'object',
+    required: ['opens_at', 'closes_at', 'is_open'],
+    title: 'AttendanceWindow',
+    description: 'When marking and voiding are allowed for this occurrence.'
+} as const;
+
 export const AttendeeCategoryCreateSchema = {
     properties: {
         popup_id: {
@@ -8273,6 +8598,13 @@ Eager-loads attendee + product data so the table renders without N+1
 fetches. \`source\` is extracted from payload["source"].`
 } as const;
 
+export const CheckInMethodSchema = {
+    type: 'string',
+    enum: ['qr', 'manual'],
+    title: 'CheckInMethod',
+    description: 'How an attendance mark was made.'
+} as const;
+
 export const CheckInPayloadSchema = {
     properties: {
         source: {
@@ -10153,6 +10485,18 @@ export const EventApprovalPayloadSchema = {
     title: 'EventApprovalPayload'
 } as const;
 
+export const EventAttendanceModeUpdateSchema = {
+    properties: {
+        attendance_mode: {
+            '$ref': '#/components/schemas/AttendanceMode'
+        }
+    },
+    type: 'object',
+    required: ['attendance_mode'],
+    title: 'EventAttendanceModeUpdate',
+    description: 'Body of the attendance-mode endpoints (portal and backoffice).'
+} as const;
+
 export const EventAvailabilityCheckSchema = {
     properties: {
         venue_id: {
@@ -11419,6 +11763,11 @@ export const EventPublicSchema = {
             type: 'boolean',
             title: 'Highlighted',
             default: false
+        },
+        attendance_mode: {
+            '$ref': '#/components/schemas/AttendanceMode',
+            maxLength: 20,
+            default: 'none'
         },
         rejection_reason: {
             anyOf: [
@@ -17962,6 +18311,52 @@ export const ListModel_UserPublic_Schema = {
     type: 'object',
     required: ['results', 'paging'],
     title: 'ListModel[UserPublic]'
+} as const;
+
+export const ManualCheckInRequestSchema = {
+    properties: {
+        profile_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Profile Id'
+        },
+        occurrence_start: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Occurrence Start'
+        }
+    },
+    type: 'object',
+    required: ['profile_id'],
+    title: 'ManualCheckInRequest'
+} as const;
+
+export const ManualCheckInResultSchema = {
+    properties: {
+        entry: {
+            '$ref': '#/components/schemas/AttendanceEntry'
+        },
+        already_checked_in: {
+            type: 'boolean',
+            title: 'Already Checked In',
+            default: false
+        },
+        created: {
+            type: 'boolean',
+            title: 'Created',
+            default: false
+        }
+    },
+    type: 'object',
+    required: ['entry'],
+    title: 'ManualCheckInResult'
 } as const;
 
 export const MeAccessSchema = {
@@ -31284,4 +31679,35 @@ export const VenueWeeklyHoursUpdateSchema = {
     type: 'object',
     required: ['hours'],
     title: 'VenueWeeklyHoursUpdate'
+} as const;
+
+export const VoidCheckInRequestSchema = {
+    properties: {
+        profile_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Profile Id'
+        },
+        occurrence_start: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Occurrence Start'
+        },
+        reason: {
+            type: 'string',
+            maxLength: 500,
+            minLength: 1,
+            title: 'Reason'
+        }
+    },
+    type: 'object',
+    required: ['profile_id', 'reason'],
+    title: 'VoidCheckInRequest'
 } as const;

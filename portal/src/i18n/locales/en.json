@@ -1142,7 +1142,8 @@
       "qr_help": "Show this to attendees. Scanning it checks them into this event.",
       "copy_url": "Copy URL",
       "download_qr": "Download QR",
-      "url_copied": "Copied"
+      "url_copied": "Copied",
+      "error_qr_disabled": "This event isn't taking check-in by QR."
     },
     "recurrence": {
       "daily_one": "Repeats daily",
@@ -1444,6 +1445,52 @@
         "approval_required_banner_message": "Events at this venue need admin approval. When you book this venue, your event will be pending review and won't be visible to others until it's approved.",
         "edit_button": "Edit venue"
       }
+    },
+    "attendance": {
+      "heading": "Attendance",
+      "help": "Only you and the other organizers see this list.",
+      "mode_label": "How attendance is taken",
+      "mode_none": "Off",
+      "mode_none_help": "No attendance is taken.",
+      "mode_host_rollcall": "Roll call",
+      "mode_host_rollcall_help": "You mark who's here. No QR.",
+      "mode_self_checkin": "QR + roll call",
+      "mode_self_checkin_help": "Attendees scan the QR, and you can still mark them.",
+      "count": "{{checked}} of {{seats}} checked in",
+      "capacity": "Capacity {{max}}",
+      "window_opens": "Check-in opens {{when}}.",
+      "window_closed": "Check-in closed {{when}}.",
+      "empty": "No one has RSVPed or checked in yet.",
+      "search_label": "Find someone by email",
+      "search_placeholder": "Exact email of someone without an RSVP",
+      "search_button": "Find",
+      "mark_present": "Mark present",
+      "void": "Undo",
+      "void_reason_label": "Why are you undoing this check-in?",
+      "void_reason_placeholder": "Reason (required)",
+      "void_confirm": "Undo check-in",
+      "cancel": "Cancel",
+      "status_registered": "RSVPed",
+      "status_checked_in": "Checked in",
+      "status_cancelled": "Not attending",
+      "someone": "someone",
+      "history_qr": "Scanned the QR ({{by}}, {{when}})",
+      "history_manual": "Marked by {{by}}, {{when}}",
+      "history_voided": "undone by {{by}}, {{when}}: {{reason}}",
+      "history_show": "Show {{count}} earlier",
+      "history_hide": "Hide earlier",
+      "error_generic": "Something went wrong. Please try again.",
+      "error_event_full": "The event is full. There are no seats left for a walk-in.",
+      "error_ticket_required": "This person needs a ticket for this popup.",
+      "error_application_rejected": "This person's application wasn't accepted.",
+      "error_not_open": "Check-in hasn't opened yet.",
+      "error_closed": "Check-in for this date is closed.",
+      "error_disabled": "Turn attendance on to mark people.",
+      "error_mode_locked": "This event already has check-ins, so attendance can't be turned off.",
+      "error_not_found": "No one who can attend matches that email.",
+      "error_not_invited": "This person isn't invited to this private event.",
+      "error_host": "The event host can't be checked in as an attendee.",
+      "error_not_checked_in": "This person isn't checked in."
     }
   }
 }

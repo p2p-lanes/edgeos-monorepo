@@ -1140,7 +1140,8 @@
       "qr_help": "Mostralo a los asistentes. Al escanearlo registran su asistencia a este evento.",
       "copy_url": "Copiar URL",
       "download_qr": "Descargar QR",
-      "url_copied": "Copiado"
+      "url_copied": "Copiado",
+      "error_qr_disabled": "Este evento no toma asistencia por QR."
     },
     "recurrence": {
       "daily_one": "Se repite diariamente",
@@ -1420,6 +1421,52 @@
         "approval_required_banner_message": "Los eventos en este lugar necesitan aprobación del admin. Cuando reserves este lugar, tu evento quedará pendiente de revisión y no será visible para otros hasta que sea aprobado.",
         "edit_button": "Editar lugar"
       }
+    },
+    "attendance": {
+      "heading": "Asistencia",
+      "help": "Solo tú y los demás organizadores ven esta lista.",
+      "mode_label": "Cómo se toma la asistencia",
+      "mode_none": "Desactivada",
+      "mode_none_help": "No se toma asistencia.",
+      "mode_host_rollcall": "Pasar lista",
+      "mode_host_rollcall_help": "Marcas tú quién está. Sin QR.",
+      "mode_self_checkin": "QR + lista",
+      "mode_self_checkin_help": "Los asistentes escanean el QR y tú también puedes marcarlos.",
+      "count": "{{checked}} de {{seats}} presentes",
+      "capacity": "Capacidad {{max}}",
+      "window_opens": "El check-in abre el {{when}}.",
+      "window_closed": "El check-in cerró el {{when}}.",
+      "empty": "Todavía nadie confirmó asistencia ni hizo check-in.",
+      "search_label": "Buscar a alguien por email",
+      "search_placeholder": "Email exacto de alguien sin RSVP",
+      "search_button": "Buscar",
+      "mark_present": "Marcar presente",
+      "void": "Anular",
+      "void_reason_label": "¿Por qué anulas este check-in?",
+      "void_reason_placeholder": "Motivo (obligatorio)",
+      "void_confirm": "Anular check-in",
+      "cancel": "Cancelar",
+      "status_registered": "Confirmó",
+      "status_checked_in": "Presente",
+      "status_cancelled": "No asiste",
+      "someone": "alguien",
+      "history_qr": "Escaneó el QR ({{by}}, {{when}})",
+      "history_manual": "Marcado por {{by}}, {{when}}",
+      "history_voided": "anulado por {{by}}, {{when}}: {{reason}}",
+      "history_show": "Ver {{count}} anteriores",
+      "history_hide": "Ocultar anteriores",
+      "error_generic": "Algo salió mal. Vuelve a intentarlo.",
+      "error_event_full": "El evento está completo. No quedan lugares para alguien sin RSVP.",
+      "error_ticket_required": "Esta persona necesita un ticket para este popup.",
+      "error_application_rejected": "La aplicación de esta persona no fue aceptada.",
+      "error_not_open": "El check-in todavía no abrió.",
+      "error_closed": "El check-in de esta fecha está cerrado.",
+      "error_disabled": "Activa la asistencia para marcar personas.",
+      "error_mode_locked": "Este evento ya tiene check-ins, así que no se puede desactivar la asistencia.",
+      "error_not_found": "Nadie que pueda asistir coincide con ese email.",
+      "error_not_invited": "Esta persona no está invitada a este evento privado.",
+      "error_host": "El host del evento no puede hacer check-in como asistente.",
+      "error_not_checked_in": "Esta persona no tiene check-in."
     }
   }
 }

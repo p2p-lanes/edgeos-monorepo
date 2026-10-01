@@ -66,7 +66,7 @@ import { cn } from "@/lib/utils"
 import { useCityProvider } from "@/providers/cityProvider"
 import { AddToCalendarModal } from "../lib/AddToCalendarModal"
 import { CoverImage } from "../lib/CoverImage"
-import { EventCheckInQr } from "../lib/EventCheckInQr"
+import { EventAttendance } from "../lib/EventAttendance"
 import { EventMessages } from "../lib/EventMessages"
 import { canManageEvent } from "../lib/eventPermissions"
 import { RsvpBlockedCta } from "../lib/RsvpBlockedCta"
@@ -1004,14 +1004,15 @@ export default function EventDetailPage() {
         </div>
       )}
 
-      {/* Managers only (owner / host / collaborators): the QR attendees scan
-          to check themselves in. Gated server-side — the panel renders only
-          when the check-in-link endpoint answers. */}
+      {/* Managers only (owner / host / collaborators): attendance mode, the
+          check-in QR and the roll call. Gated server-side: the panel renders
+          only when the roster endpoint answers. */}
       {event.status === "published" && !isEnded && (
-        <EventCheckInQr
+        <EventAttendance
           eventId={params.eventId}
           occurrenceStart={event.rrule ? effectiveStartTime : null}
           canManage={canManage}
+          timezone={timezone}
         />
       )}
 

@@ -1008,7 +1008,8 @@
       "qr_help": "Sýndu þátttakendum þetta. Skönnun skráir þá inn á viðburðinn.",
       "copy_url": "Afrita slóð",
       "download_qr": "Sækja QR",
-      "url_copied": "Afritað"
+      "url_copied": "Afritað",
+      "error_qr_disabled": "Þessi viðburður tekur ekki við innritun með QR-kóða."
     },
     "login_required": {
       "title": "Skráðu þig inn til að sjá þennan viðburð",
@@ -1255,6 +1256,52 @@
         "approval_required_banner_message": "Viðburðir á þessum stað þurfa samþykki stjórnanda. Þegar þú bókar þennan stað mun viðburðurinn þinn bíða yfirferðar og verður ekki sýnilegur öðrum fyrr en hann er samþykktur.",
         "edit_button": "Breyta stað"
       }
+    },
+    "attendance": {
+      "heading": "Mæting",
+      "help": "Aðeins þú og hinir skipuleggjendurnir sjá þennan lista.",
+      "mode_label": "Hvernig mæting er skráð",
+      "mode_none": "Slökkt",
+      "mode_none_help": "Mæting er ekki skráð.",
+      "mode_host_rollcall": "Nafnakall",
+      "mode_host_rollcall_help": "Þú merkir hverjir eru mættir. Enginn QR-kóði.",
+      "mode_self_checkin": "QR + nafnakall",
+      "mode_self_checkin_help": "Gestir skanna QR-kóðann og þú getur líka merkt þá.",
+      "count": "{{checked}} af {{seats}} mætt",
+      "capacity": "Hámark {{max}}",
+      "window_opens": "Innritun opnar {{when}}.",
+      "window_closed": "Innritun lokaði {{when}}.",
+      "empty": "Enginn hefur skráð sig eða mætt enn.",
+      "search_label": "Finna einhvern eftir netfangi",
+      "search_placeholder": "Nákvæmt netfang einhvers án skráningar",
+      "search_button": "Finna",
+      "mark_present": "Merkja mætt",
+      "void": "Afturkalla",
+      "void_reason_label": "Af hverju afturkallar þú þessa innritun?",
+      "void_reason_placeholder": "Ástæða (nauðsynleg)",
+      "void_confirm": "Afturkalla innritun",
+      "cancel": "Hætta við",
+      "status_registered": "Skráð",
+      "status_checked_in": "Mætt",
+      "status_cancelled": "Mætir ekki",
+      "someone": "einhver",
+      "history_qr": "Skannaði QR-kóðann ({{by}}, {{when}})",
+      "history_manual": "Merkt af {{by}}, {{when}}",
+      "history_voided": "afturkallað af {{by}}, {{when}}: {{reason}}",
+      "history_show": "Sýna {{count}} eldri",
+      "history_hide": "Fela eldri",
+      "error_generic": "Eitthvað fór úrskeiðis. Reyndu aftur.",
+      "error_event_full": "Viðburðurinn er fullur. Engin sæti eru laus.",
+      "error_ticket_required": "Þessi manneskja þarf miða á þennan viðburð.",
+      "error_application_rejected": "Umsókn þessarar manneskju var ekki samþykkt.",
+      "error_not_open": "Innritun er ekki opin enn.",
+      "error_closed": "Innritun fyrir þessa dagsetningu er lokuð.",
+      "error_disabled": "Kveiktu á mætingu til að merkja fólk.",
+      "error_mode_locked": "Þessi viðburður hefur þegar innritanir, svo ekki er hægt að slökkva á mætingu.",
+      "error_not_found": "Enginn sem getur mætt passar við þetta netfang.",
+      "error_not_invited": "Þessari manneskju er ekki boðið á þennan lokaða viðburð.",
+      "error_host": "Gestgjafi viðburðarins getur ekki innritað sig sem gestur.",
+      "error_not_checked_in": "Þessi manneskja er ekki innrituð."
     }
   }
 }
