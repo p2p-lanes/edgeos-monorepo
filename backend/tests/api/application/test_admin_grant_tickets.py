@@ -179,6 +179,9 @@ def test_new_bulk_invitee_can_log_in_and_read_ticket_with_only_application_flow(
     monkeypatch,
 ) -> None:
     grant_popup.status = "active"
+    # Keep this popup inside the endpoint's 100-item, newest-first portal list
+    # even though the session-scoped test database contains many active popups.
+    grant_popup.start_date = datetime(9999, 12, 31)
     db.add(grant_popup)
     provision_default_flow(db, grant_popup, sale_type="application")
     flows = db.exec(
