@@ -1013,7 +1013,8 @@
       "qr_help": "向参加者展示，扫码即可完成本活动签到。",
       "copy_url": "复制链接",
       "download_qr": "下载二维码",
-      "url_copied": "已复制"
+      "url_copied": "已复制",
+      "error_qr_disabled": "此活动不支持扫码签到。"
     },
     "login_required": {
       "title": "登录以查看此活动",
@@ -1260,6 +1261,52 @@
         "approval_required_banner_message": "在此场地举办的活动需要管理员审核。预订此场地后,你的活动将处于待审核状态,在获得批准前其他人无法查看。",
         "edit_button": "编辑场地"
       }
+    },
+    "attendance": {
+      "heading": "出席",
+      "help": "只有你和其他组织者能看到这份名单。",
+      "mode_label": "出席记录方式",
+      "mode_none": "关闭",
+      "mode_none_help": "不记录出席。",
+      "mode_host_rollcall": "点名",
+      "mode_host_rollcall_help": "由你标记谁到场，不使用二维码。",
+      "mode_self_checkin": "二维码 + 点名",
+      "mode_self_checkin_help": "参与者扫码签到，你也可以手动标记。",
+      "count": "已签到 {{checked}} / {{seats}}",
+      "capacity": "容量 {{max}}",
+      "window_opens": "签到将于 {{when}} 开放。",
+      "window_closed": "签到已于 {{when}} 关闭。",
+      "empty": "还没有人报名或签到。",
+      "search_label": "按邮箱查找",
+      "search_placeholder": "未报名者的完整邮箱",
+      "search_button": "查找",
+      "mark_present": "标记到场",
+      "void": "撤销",
+      "void_reason_label": "为什么撤销这次签到？",
+      "void_reason_placeholder": "原因（必填）",
+      "void_confirm": "撤销签到",
+      "cancel": "取消",
+      "status_registered": "已报名",
+      "status_checked_in": "已签到",
+      "status_cancelled": "不参加",
+      "someone": "某人",
+      "history_qr": "扫码签到（{{by}}，{{when}}）",
+      "history_manual": "由 {{by}} 标记，{{when}}",
+      "history_voided": "由 {{by}} 于 {{when}} 撤销：{{reason}}",
+      "history_show": "显示更早的 {{count}} 条",
+      "history_hide": "隐藏更早记录",
+      "error_generic": "出了点问题，请重试。",
+      "error_event_full": "活动已满，没有空位了。",
+      "error_ticket_required": "此人需要持有本活动的门票。",
+      "error_application_rejected": "此人的申请未被接受。",
+      "error_not_open": "签到尚未开放。",
+      "error_closed": "该日期的签到已关闭。",
+      "error_disabled": "请先开启出席记录再标记。",
+      "error_mode_locked": "此活动已有签到记录，无法关闭出席记录。",
+      "error_not_found": "没有可参加的人匹配该邮箱。",
+      "error_not_invited": "此人未受邀参加这个私密活动。",
+      "error_host": "活动主持人不能作为参与者签到。",
+      "error_not_checked_in": "此人尚未签到。"
     }
   }
 }

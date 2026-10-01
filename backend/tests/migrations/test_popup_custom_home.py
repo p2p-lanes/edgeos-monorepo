@@ -7,7 +7,7 @@ REVISION = "d9e4c2a7b6f1"
 PREVIOUS_REVISION = "a4f1c8b2e7d3"
 RESOURCE_REVISION = "e2c6a91b7d4f"
 RESOURCE_PREVIOUS_REVISION = "a7c9e2f4b6d8"
-HEAD_REVISION = "c4e81a2d7f90"
+HEAD_REVISION = "e3b7a91c5d20"
 
 
 def test_custom_home_migration_precedes_the_dedicated_resource():

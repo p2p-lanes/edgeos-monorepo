@@ -20,8 +20,10 @@ from app.api.event.recurrence import (
     parse_rrule,
 )
 from app.api.event.schemas import (
+    AttendanceMode,
     DayEventCount,
     EventAdminNotes,
+    EventAttendanceModeUpdate,
     EventAvailabilityCheck,
     EventAvailabilityResult,
     EventCalendarMeta,
@@ -69,6 +71,7 @@ from app.core.dependencies.users import (
     HumanTenantSession,
     SessionDep,
     TenantSession,
+    needs,
 )
 from app.core.rate_limit import RateLimit
 from app.services.event_datetime import format_event_when
@@ -1298,6 +1301,22 @@ async def update_event_admin_notes(
     return EventAdminNotes(notes=event.admin_notes)
 
 
+@router.put("/{event_id}/attendance-mode", response_model=EventPublic)
+async def update_event_attendance_mode(
+    event_id: uuid.UUID,
+    body: EventAttendanceModeUpdate,
+    db: AdminOrApiKeySession_EventsWrite,
+    current_user: AdminOrApiKey_EventsWrite,
+) -> EventPublic:
+    """Choose how attendance is taken (backoffice); see ``set_attendance_mode``."""
+    event = crud.events_crud.get(db, event_id)
+    if not event:
+        raise HTTPException(status_code=404, detail="Event not found")
+    return _apply_attendance_mode(
+        db, event, body.attendance_mode, actor_from_user(current_user)
+    )
+
+
 @router.post("", response_model=EventPublic, status_code=status.HTTP_201_CREATED)
 async def create_event(
     event_in: EventCreate,
@@ -1736,6 +1755,7 @@ async def detach_occurrence(
         host_display_name=master.host_display_name,
         collaborator_ids=list(master.collaborator_ids or []),
         highlighted=master.highlighted,
+        attendance_mode=master.attendance_mode,
         status=master.status,
         rrule=None,
         recurrence_master_id=master.id,
@@ -1787,6 +1807,10 @@ async def detach_occurrence(
     event_participants_crud.repoint_occurrence_to_event(
         db, master.id, occ_start, child.id
     )
+    # Attendance history follows the rows it describes.
+    from app.api.event_participant.check_in_crud import event_check_ins_crud
+
+    event_check_ins_crud.repoint_occurrence_to_event(db, master.id, occ_start, child.id)
     db.commit()
     db.refresh(child)
 
@@ -3896,6 +3920,16 @@ async def get_portal_event_check_in_link(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Only the event's host or collaborators can view the check-in QR",
         )
+    # No QR outside self_checkin: the check-in endpoint would refuse it anyway,
+    # so handing out the URL would only print a code that cannot work.
+    if event.attendance_mode != AttendanceMode.SELF_CHECKIN:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={
+                "code": "qr_check_in_disabled",
+                "message": "This event doesn't take check-in by QR.",
+            },
+        )
 
     from app.api.popup.crud import popups_crud
     from app.api.tenant.utils import get_portal_url
@@ -3916,6 +3950,58 @@ async def get_portal_event_check_in_link(
     if occ is not None:
         url = f"{url}?occ={quote(occ.isoformat(), safe='')}"
     return EventCheckInLink(url=url, occurrence_start=occ)
+
+
+def _apply_attendance_mode(db, event, mode: AttendanceMode, actor) -> EventPublic:
+    """Shared by the portal and backoffice attendance-mode endpoints."""
+    from app.api.event_participant.attendance import set_attendance_mode
+
+    before = event.attendance_mode
+    if set_attendance_mode(db, event, mode):
+        record_event_audit(
+            db,
+            event=event,
+            action=EventAuditAction.UPDATED,
+            actor=actor,
+            changes={"attendance_mode": {"old": before.value, "new": mode.value}},
+        )
+    return _to_public(event)
+
+
+@router.put(
+    "/portal/events/{event_id}/attendance-mode",
+    response_model=EventPublic,
+    summary="Choose how attendance is taken for an event",
+    # Portal sessions only: a third-party JWT must not reconfigure attendance.
+    dependencies=[needs("portal:*")],
+)
+async def update_portal_event_attendance_mode(
+    event_id: uuid.UUID,
+    body: EventAttendanceModeUpdate,
+    db: HumanTenantSession,
+    current_human: CurrentHuman,
+    token_payload: CallerToken,
+) -> EventPublic:
+    """Owner, assigned host or collaborators only; see ``set_attendance_mode``."""
+    event = crud.events_crud.get(db, event_id)
+    if not event:
+        raise HTTPException(status_code=404, detail="Event not found")
+    ensure_api_key_popup(token_payload, event.popup_id)
+    if not _human_manages_event(event, current_human):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only the event owner or host can change attendance",
+        )
+    from app.api.popup.crud import popups_crud
+
+    ensure_popup_writable(popups_crud.get(db, event.popup_id))
+    return _with_collaborators(
+        db,
+        _apply_attendance_mode(
+            db, event, body.attendance_mode, actor_from_human(current_human)
+        ),
+        event,
+    )
 
 
 @router.get(

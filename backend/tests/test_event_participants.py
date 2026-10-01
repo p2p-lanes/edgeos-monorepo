@@ -31,7 +31,7 @@ from app.api.application.models import Applications
 from app.api.application.schemas import ApplicationStatus
 from app.api.attendee.models import AttendeeProducts, Attendees
 from app.api.event.models import Events
-from app.api.event.schemas import EventStatus, EventVisibility
+from app.api.event.schemas import AttendanceMode, EventStatus, EventVisibility
 from app.api.event_participant.models import EventParticipants
 from app.api.event_participant.schemas import ParticipantRole, ParticipantStatus
 from app.api.human.models import Humans
@@ -813,6 +813,9 @@ class TestPortalCancelRegistration:
     ) -> None:
         popup = _make_popup(db, tenant_a)
         event = _make_event(db, tenant_a, popup, start_offset_days=0)
+        event.attendance_mode = AttendanceMode.SELF_CHECKIN
+        db.add(event)
+        db.commit()
         human = _make_human(db, tenant_a)
         _give_ticket(db, tenant_a, popup, human)
 

@@ -978,6 +978,97 @@ export type AttachRateItem = {
 };
 
 /**
+ * Who made or voided a mark, resolved to a display name.
+ *
+ * ``kind`` is ``human`` for a portal person (an attendee scanning, or an
+ * organizer on the roll call), ``user`` for a backoffice operator, and
+ * ``unknown`` for marks that predate the history table.
+ */
+export type AttendanceActor = {
+    kind: 'human' | 'user' | 'unknown';
+    id?: (string | null);
+    name?: (string | null);
+};
+
+export type kind2 = 'human' | 'user' | 'unknown';
+
+/**
+ * One mark in someone's attendance history, voided or not.
+ */
+export type AttendanceCheckInRecord = {
+    id: string;
+    method: CheckInMethod;
+    had_rsvp: boolean;
+    checked_in_at: string;
+    checked_in_by: AttendanceActor;
+    voided_at?: (string | null);
+    voided_by?: (AttendanceActor | null);
+    void_reason?: (string | null);
+};
+
+/**
+ * One person on the roster of an occurrence.
+ */
+export type AttendanceEntry = {
+    participant_id: string;
+    profile_id: string;
+    first_name?: (string | null);
+    last_name?: (string | null);
+    email?: (string | null);
+    status: ParticipantStatus;
+    check_time?: (string | null);
+    history?: Array<AttendanceCheckInRecord>;
+};
+
+/**
+ * A person found by exact email, for a walk-in check-in.
+ */
+export type AttendanceLookupResult = {
+    profile_id: string;
+    first_name?: (string | null);
+    last_name?: (string | null);
+    email: string;
+    status?: (ParticipantStatus | null);
+};
+
+/**
+ * How attendance is taken for an event (SIM-106).
+ *
+ * * ``none``: no attendance is taken; the QR and the roll call are off.
+ * * ``host_rollcall``: the organizer marks people present by hand; the QR
+ * is neither shown nor accepted.
+ * * ``self_checkin``: the QR is on AND the organizer can still mark people
+ * by hand. Both write the same attendance.
+ *
+ * Once an event has any check-in it can no longer go back to ``none``;
+ * switching between the other two keeps every record.
+ */
+export type AttendanceMode = 'none' | 'host_rollcall' | 'self_checkin';
+
+/**
+ * Private roll call of one occurrence, for its managers only.
+ */
+export type AttendanceRoster = {
+    event_id: string;
+    occurrence_start?: (string | null);
+    attendance_mode: AttendanceMode;
+    window: AttendanceWindow;
+    max_participant?: (number | null);
+    seats_taken: number;
+    checked_in_count: number;
+    entries: Array<AttendanceEntry>;
+};
+
+/**
+ * When marking and voiding are allowed for this occurrence.
+ */
+export type AttendanceWindow = {
+    opens_at: string;
+    closes_at: string;
+    is_open: boolean;
+};
+
+/**
  * Schema for creating an attendee category.
  */
 export type AttendeeCategoryCreate = {
@@ -1804,6 +1895,11 @@ export type CheckInListItem = {
 };
 
 /**
+ * How an attendance mark was made.
+ */
+export type CheckInMethod = 'qr' | 'manual';
+
+/**
  * Typed payload stored in the check_ins.payload JSONB column.
  *
  * `source` discriminates how the scan occurred. `notes` is an optional
@@ -1891,7 +1987,7 @@ export type CheckoutPreviewResponse = {
     quote_expires_at?: (string | null);
 };
 
-export type kind2 = 'estimate' | 'definitive';
+export type kind3 = 'estimate' | 'definitive';
 
 /**
  * Short-lived token that unlocks the checkout runtime for a live preview.
@@ -2261,6 +2357,13 @@ export type EventApprovalPayload = {
     reason?: (string | null);
 };
 
+/**
+ * Body of the attendance-mode endpoints (portal and backoffice).
+ */
+export type EventAttendanceModeUpdate = {
+    attendance_mode: AttendanceMode;
+};
+
 export type EventAvailabilityCheck = {
     venue_id: string;
     start_time: string;
@@ -2536,6 +2639,7 @@ export type EventPublic = {
     collaborator_ids?: Array<(string)>;
     status?: EventStatus;
     highlighted?: boolean;
+    attendance_mode?: AttendanceMode;
     rejection_reason?: (string | null);
     rrule?: (string | null);
     recurrence_master_id?: (string | null);
@@ -3931,6 +4035,17 @@ export type ListModel_TrackPublic_ = {
 export type ListModel_UserPublic_ = {
     results: Array<UserPublic>;
     paging: Paging;
+};
+
+export type ManualCheckInRequest = {
+    profile_id: string;
+    occurrence_start?: (string | null);
+};
+
+export type ManualCheckInResult = {
+    entry: AttendanceEntry;
+    already_checked_in?: boolean;
+    created?: boolean;
 };
 
 /**
@@ -6401,6 +6516,12 @@ export type VenueWeeklyHoursUpdate = {
     hours: Array<VenueWeeklyHourInput>;
 };
 
+export type VoidCheckInRequest = {
+    profile_id: string;
+    occurrence_start?: (string | null);
+    reason: string;
+};
+
 export type AccommodationsListPropertiesData = {
     activeOnly?: boolean;
     popupId: string;
@@ -7829,6 +7950,68 @@ export type EventParticipantsCheckInData = {
 
 export type EventParticipantsCheckInResponse = (EventCheckInResult);
 
+export type EventParticipantsGetPortalAttendanceData = {
+    eventId: string;
+    occurrenceStart?: (string | null);
+};
+
+export type EventParticipantsGetPortalAttendanceResponse = (AttendanceRoster);
+
+export type EventParticipantsLookupPortalAttendeeData = {
+    email: string;
+    eventId: string;
+    occurrenceStart?: (string | null);
+};
+
+export type EventParticipantsLookupPortalAttendeeResponse = (AttendanceLookupResult);
+
+export type EventParticipantsPortalManualCheckInData = {
+    eventId: string;
+    requestBody: ManualCheckInRequest;
+};
+
+export type EventParticipantsPortalManualCheckInResponse = (ManualCheckInResult);
+
+export type EventParticipantsPortalVoidCheckInData = {
+    eventId: string;
+    requestBody: VoidCheckInRequest;
+};
+
+export type EventParticipantsPortalVoidCheckInResponse = (AttendanceEntry);
+
+export type EventParticipantsGetAttendanceData = {
+    eventId: string;
+    occurrenceStart?: (string | null);
+    xTenantId?: (string | null);
+};
+
+export type EventParticipantsGetAttendanceResponse = (AttendanceRoster);
+
+export type EventParticipantsLookupAttendeeData = {
+    email: string;
+    eventId: string;
+    occurrenceStart?: (string | null);
+    xTenantId?: (string | null);
+};
+
+export type EventParticipantsLookupAttendeeResponse = (AttendanceLookupResult);
+
+export type EventParticipantsAdminManualCheckInData = {
+    eventId: string;
+    requestBody: ManualCheckInRequest;
+    xTenantId?: (string | null);
+};
+
+export type EventParticipantsAdminManualCheckInResponse = (ManualCheckInResult);
+
+export type EventParticipantsAdminVoidCheckInData = {
+    eventId: string;
+    requestBody: VoidCheckInRequest;
+    xTenantId?: (string | null);
+};
+
+export type EventParticipantsAdminVoidCheckInResponse = (AttendanceEntry);
+
 export type EventsListPublicCalendarData = {
     /**
      * Maximum number of items to return
@@ -7937,6 +8120,14 @@ export type EventsUpdateEventAdminNotesData = {
 };
 
 export type EventsUpdateEventAdminNotesResponse = (EventAdminNotes);
+
+export type EventsUpdateEventAttendanceModeData = {
+    eventId: string;
+    requestBody: EventAttendanceModeUpdate;
+    xTenantId?: (string | null);
+};
+
+export type EventsUpdateEventAttendanceModeResponse = (EventPublic);
 
 export type EventsCancelEventData = {
     eventId: string;
@@ -8177,6 +8368,13 @@ export type EventsGetPortalEventCheckInLinkData = {
 };
 
 export type EventsGetPortalEventCheckInLinkResponse = (EventCheckInLink);
+
+export type EventsUpdatePortalEventAttendanceModeData = {
+    eventId: string;
+    requestBody: EventAttendanceModeUpdate;
+};
+
+export type EventsUpdatePortalEventAttendanceModeResponse = (EventPublic);
 
 export type EventsExportPortalEventIcsData = {
     eventId: string;

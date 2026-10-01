@@ -37,7 +37,7 @@ from app.api.application.models import Applications
 from app.api.application.schemas import ApplicationStatus
 from app.api.attendee.models import AttendeeProducts, Attendees
 from app.api.event.models import EventInvitations, Events
-from app.api.event.schemas import EventStatus, EventVisibility
+from app.api.event.schemas import AttendanceMode, EventStatus, EventVisibility
 from app.api.event_participant.check_in import (
     CHECK_IN_CLOSES_MINUTES_AFTER,
     CHECK_IN_OPENS_MINUTES_BEFORE,
@@ -99,6 +99,9 @@ def _make_event(
     collaborator_ids: list[uuid.UUID] | None = None,
     host_display_name: str | None = None,
     cover_url: str | None = None,
+    # The QR only works in self_checkin (SIM-106), which is what every test
+    # here exercises unless it says otherwise.
+    attendance_mode: AttendanceMode = AttendanceMode.SELF_CHECKIN,
 ) -> Events:
     start = datetime.now(UTC) + starts_in
     event = Events(
@@ -117,6 +120,7 @@ def _make_event(
         max_participant=max_participant,
         rrule=rrule,
         cover_url=cover_url,
+        attendance_mode=attendance_mode,
     )
     db.add(event)
     db.commit()

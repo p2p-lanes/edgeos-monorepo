@@ -12,15 +12,12 @@ import Link from "next/link"
 import { useParams, useSearchParams } from "next/navigation"
 import { useEffect, useRef } from "react"
 import { useTranslation } from "react-i18next"
-import {
-  ApiError,
-  type EventCheckInResult,
-  EventParticipantsService,
-} from "@/client"
+import { type EventCheckInResult, EventParticipantsService } from "@/client"
 import { Button } from "@/components/ui/button"
 import { Loader } from "@/components/ui/Loader"
 import { useCityProvider } from "@/providers/cityProvider"
 import { CoverImage } from "../../lib/CoverImage"
+import { readApiError } from "../../lib/readApiError"
 import { useEventTimezone } from "../../lib/useEventTimezone"
 
 /** Error codes the check-in endpoint answers with, mapped to i18n keys. */
@@ -33,32 +30,7 @@ const ERROR_KEYS: Record<string, string> = {
   event_not_published: "events.check_in.error_not_published",
   events_disabled: "events.check_in.error_events_disabled",
   occurrence_not_scheduled: "events.check_in.error_bad_occurrence",
-}
-
-/**
- * Pull the server's error code out of a failed check-in.
- *
- * The endpoint's own rejections carry `{code, message}`; the guards it
- * shares with the rest of the portal (ended popup, private event) still
- * answer with a plain string, so both shapes are handled.
- */
-function readError(error: unknown): {
-  code: string | null
-  message: string | null
-} {
-  if (!(error instanceof ApiError) || !error.body) {
-    return { code: null, message: null }
-  }
-  const detail = (error.body as { detail?: unknown }).detail
-  if (typeof detail === "string") return { code: null, message: detail }
-  if (detail && typeof detail === "object") {
-    const shaped = detail as { code?: unknown; message?: unknown }
-    return {
-      code: typeof shaped.code === "string" ? shaped.code : null,
-      message: typeof shaped.message === "string" ? shaped.message : null,
-    }
-  }
-  return { code: null, message: null }
+  qr_check_in_disabled: "events.check_in.error_qr_disabled",
 }
 
 /**
@@ -123,7 +95,7 @@ export default function EventCheckInPage() {
   }
 
   if (mutation.isError) {
-    const { code, message } = readError(mutation.error)
+    const { code, message } = readApiError(mutation.error)
     const text =
       code && ERROR_KEYS[code]
         ? (t(ERROR_KEYS[code]) as string)
