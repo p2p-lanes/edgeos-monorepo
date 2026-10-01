@@ -20,6 +20,8 @@ import {
   type PaymentStatus,
   PaymentsService,
   PopupsService,
+  ProductsService,
+  SalesFlowsService,
 } from "@/client"
 import { DataTable, SortableHeader } from "@/components/Common/DataTable"
 import { EmptyState } from "@/components/Common/EmptyState"
@@ -134,6 +136,34 @@ const PAYMENT_FIELD_DEFS: FilterFieldDef[] = [
     ops: [...AMOUNT_OPS, "is_empty", "not_empty"],
   },
   { key: "created_at", label: "Date", kind: "date", ops: PAYMENT_DATE_OPS },
+  {
+    key: "sales_flow_id",
+    label: "Sales flow",
+    kind: "select",
+    ops: ["eq", "neq", "is_empty", "not_empty"],
+    group: "Products and sales",
+  },
+  {
+    key: "product_id",
+    label: "Product",
+    kind: "select",
+    ops: ["eq", "neq"],
+    group: "Products and sales",
+  },
+  {
+    key: "product_category",
+    label: "Product type",
+    kind: "select",
+    ops: ["eq"],
+    options: [
+      { value: "ticket", label: "Pass" },
+      { value: "housing", label: "Housing" },
+      { value: "merch", label: "Merch" },
+      { value: "patreon", label: "Patron" },
+      { value: "other", label: "Other" },
+    ],
+    group: "Products and sales",
+  },
 ]
 
 const VALID_PAYMENT_STATUSES: Set<string> = new Set([
@@ -278,6 +308,7 @@ function getColumns(hasInvoice: boolean): ColumnDef<PaymentPublic>[] {
     {
       id: "buyer",
       header: "Buyer",
+      meta: { label: "Buyer", toggleable: false, sticky: "left" },
       cell: ({ row }) => {
         const email = row.original.buyer_email
         const name = row.original.buyer_name
@@ -296,6 +327,7 @@ function getColumns(hasInvoice: boolean): ColumnDef<PaymentPublic>[] {
     {
       accessorKey: "amount",
       header: ({ column }) => <SortableHeader label="Amount" column={column} />,
+      meta: { label: "Amount", toggleable: true },
       cell: ({ row }) => (
         <span className="font-mono">
           ${row.original.amount} {row.original.currency}
@@ -307,6 +339,7 @@ function getColumns(hasInvoice: boolean): ColumnDef<PaymentPublic>[] {
       header: ({ column }) => (
         <SortableHeader label="Charged" column={column} />
       ),
+      meta: { label: "Charged", toggleable: true },
       cell: ({ row }) => {
         // Settled total from SimpleFi — differs from Amount when the merchant
         // applies a per-rail (card/crypto) discount or surcharge. NULL until
@@ -345,11 +378,13 @@ function getColumns(hasInvoice: boolean): ColumnDef<PaymentPublic>[] {
     {
       accessorKey: "status",
       header: ({ column }) => <SortableHeader label="Status" column={column} />,
+      meta: { label: "Status", toggleable: true },
       cell: ({ row }) => <StatusBadge status={row.original.status ?? ""} />,
     },
     {
       accessorKey: "source",
       header: "Source",
+      meta: { label: "Source", toggleable: true },
       cell: ({ row }) => (
         <span className="text-muted-foreground">
           {row.original.source || "N/A"}
@@ -359,6 +394,7 @@ function getColumns(hasInvoice: boolean): ColumnDef<PaymentPublic>[] {
     {
       id: "installments",
       header: "Installments",
+      meta: { label: "Installments", toggleable: true },
       cell: ({ row }) => {
         // Render the badge only once SimpleFi's installment_plan_activated
         // webhook has filled in installments_total. While the plan is still
@@ -381,6 +417,7 @@ function getColumns(hasInvoice: boolean): ColumnDef<PaymentPublic>[] {
     {
       accessorKey: "insurance_amount",
       header: "Insurance",
+      meta: { label: "Insurance", toggleable: true },
       cell: ({ row }) => {
         const val = row.original.insurance_amount
         const num = Number(val)
@@ -394,6 +431,7 @@ function getColumns(hasInvoice: boolean): ColumnDef<PaymentPublic>[] {
     {
       accessorKey: "contribution_amount",
       header: "Contribution",
+      meta: { label: "Contribution", toggleable: true },
       cell: ({ row }) => {
         const val = row.original.contribution_amount
         const num = Number(val)
@@ -407,6 +445,7 @@ function getColumns(hasInvoice: boolean): ColumnDef<PaymentPublic>[] {
     {
       accessorKey: "coupon_code",
       header: "Coupon",
+      meta: { label: "Coupon", toggleable: true },
       cell: ({ row }) =>
         row.original.coupon_code ? (
           <Badge variant="outline">{row.original.coupon_code}</Badge>
@@ -417,6 +456,7 @@ function getColumns(hasInvoice: boolean): ColumnDef<PaymentPublic>[] {
     {
       accessorKey: "created_at",
       header: ({ column }) => <SortableHeader label="Date" column={column} />,
+      meta: { label: "Date", toggleable: true },
       cell: ({ row }) => {
         const date = row.original.created_at
         if (!date) return <span className="text-muted-foreground">N/A</span>
@@ -433,6 +473,7 @@ function getColumns(hasInvoice: boolean): ColumnDef<PaymentPublic>[] {
     {
       id: "products",
       header: "Products",
+      meta: { label: "Products", toggleable: true },
       cell: ({ row }) => {
         const products = row.original.products_snapshot
         if (!products || products.length === 0)
@@ -465,6 +506,7 @@ function getColumns(hasInvoice: boolean): ColumnDef<PaymentPublic>[] {
     cols.push({
       id: "invoice",
       header: "Invoice",
+      meta: { label: "Invoice", toggleable: true },
       cell: ({ row }) => {
         if (row.original.status !== "approved") return null
         if (Number(row.original.amount) <= 0) return null
@@ -809,6 +851,49 @@ function PaymentsTableContent() {
     enabled: !!selectedPopupId,
   })
 
+  const { data: salesFlows } = useQuery({
+    queryKey: ["sales-flows", selectedPopupId],
+    queryFn: () =>
+      SalesFlowsService.listSalesFlows({ popupId: selectedPopupId as string }),
+    enabled: !!selectedPopupId,
+  })
+
+  const { data: products } = useQuery({
+    queryKey: ["products", selectedPopupId, "payments-filter"],
+    queryFn: () =>
+      ProductsService.listProducts({
+        popupId: selectedPopupId as string,
+        limit: 1000,
+      }),
+    enabled: !!selectedPopupId,
+  })
+
+  const paymentFilterFields = useMemo<FilterFieldDef[]>(
+    () =>
+      PAYMENT_FIELD_DEFS.map((field) => {
+        if (field.key === "sales_flow_id") {
+          return {
+            ...field,
+            options: (salesFlows?.results ?? []).map((flow) => ({
+              value: flow.id,
+              label: flow.name,
+            })),
+          }
+        }
+        if (field.key === "product_id") {
+          return {
+            ...field,
+            options: (products?.results ?? []).map((product) => ({
+              value: product.id,
+              label: product.name,
+            })),
+          }
+        }
+        return field
+      }),
+    [products?.results, salesFlows?.results],
+  )
+
   const hasInvoice = !!(
     popup?.invoice_company_name &&
     popup?.invoice_company_address &&
@@ -825,18 +910,8 @@ function PaymentsTableContent() {
     <DataTable
       columns={columns}
       data={tableState.data}
-      searchPlaceholder="Search by external ID, attendee email, or attendee name..."
-      hiddenOnMobile={[
-        "source",
-        "amount_charged",
-        "installments",
-        "insurance_amount",
-        "contribution_amount",
-        "coupon_code",
-        "created_at",
-        "products",
-        "invoice",
-      ]}
+      tableId="payments"
+      searchPlaceholder="Search by ID, email, or name..."
       searchValue={search}
       onSearchChange={setSearch}
       serverSorting={{
@@ -850,7 +925,7 @@ function PaymentsTableContent() {
       filterBar={
         <div className="flex flex-wrap items-center gap-2">
           <FilterBuilder
-            fields={PAYMENT_FIELD_DEFS}
+            fields={paymentFilterFields}
             match={filterMatch}
             conditions={filterConditions}
             onChange={setFilters}
@@ -939,10 +1014,33 @@ function Payments() {
             : undefined,
         }),
       )
+      const flows = await SalesFlowsService.listSalesFlows({
+        popupId: selectedPopupId,
+        limit: 1000,
+      })
+      const flowNames = new Map(
+        flows.results.map((flow) => [flow.id, flow.name]),
+      )
+      const exportRows = results.map((payment) => ({
+        ...payment,
+        sales_flow_name: payment.sales_flow_id
+          ? (flowNames.get(payment.sales_flow_id) ?? "")
+          : "",
+        purchased_products: (payment.products_snapshot ?? [])
+          .map(
+            (product) =>
+              `${product.product_name} (${categoryLabels[product.product_category] ?? "Other"}), qty ${product.quantity}`,
+          )
+          .join("; "),
+      }))
       exportToCsv(
         isExportFiltered ? "payments-filtered" : "payments",
-        results as unknown as Record<string, unknown>[],
+        exportRows as unknown as Record<string, unknown>[],
         [
+          { key: "buyer_name", label: "Buyer name" },
+          { key: "buyer_email", label: "Buyer email" },
+          { key: "sales_flow_name", label: "Sales Flow" },
+          { key: "purchased_products", label: "Products" },
           { key: "amount", label: "Amount" },
           { key: "currency", label: "Currency" },
           { key: "status", label: "Status" },
@@ -962,7 +1060,13 @@ function Payments() {
   }
 
   return (
-    <div className="flex flex-col gap-6">
+    <div
+      className={`flex flex-col gap-6 ${
+        isContextReady
+          ? "relative left-1/2 w-[calc(100vw-18rem)] -translate-x-1/2"
+          : ""
+      }`}
+    >
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Payments</h1>
