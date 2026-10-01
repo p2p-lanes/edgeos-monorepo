@@ -9,7 +9,6 @@ import {
   endOfWeek,
   format,
   isSameMonth,
-  isToday,
   startOfDay,
   startOfMonth,
   startOfWeek,
@@ -18,7 +17,6 @@ import {
 } from "date-fns"
 import {
   Calendar as CalendarIcon,
-  CheckCircle,
   ChevronLeft,
   ChevronRight,
   Clock,
@@ -31,19 +29,26 @@ import {
   Users,
 } from "lucide-react"
 import Link from "next/link"
-import { useEffect, useMemo, useRef, useState } from "react"
+import { useMemo, useState } from "react"
 import { useTranslation } from "react-i18next"
 
 import { type EventPublic, EventsService, HumansService } from "@/client"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 import { CoverImage } from "./CoverImage"
+import { todayInTimezone } from "./calendarDate"
+import { isEventLive } from "./eventLiveState"
 import type { EventsScrollSnapshot } from "./eventsViewState"
 import { fetchAllPortalEvents } from "./fetchAllPortalEvents"
+import { LiveBadge } from "./LiveBadge"
 import { buildPortalEventHref } from "./portalEventHref"
+import { RsvpBlockedCta } from "./RsvpBlockedCta"
+import { RsvpStatusAction } from "./RsvpStatusAction"
 import { summarizeRrule } from "./summarizeRrule"
+import type { RsvpBlockReason } from "./useCanRsvp"
 import { useEventRsvp } from "./useEventRsvp"
 import { useEventTimezone } from "./useEventTimezone"
+import { useNowTick } from "./useNowTick"
 
 interface CalendarBodyProps {
   popupId: string | undefined
@@ -103,6 +108,11 @@ interface CalendarBodyProps {
   /** Tooltip text shown on the disabled RSVP button explaining why. */
   rsvpDisabledReason?: string
   /**
+   * Why RSVP is blocked. `no_tickets` swaps the dead disabled button for a
+   * tappable popover offering the popup's purchase flow.
+   */
+  rsvpBlockReason?: RsvpBlockReason
+  /**
    * When false, the RSVP and "Going"/cancel buttons are hidden entirely —
    * used for ended (read-only) popups. Defaults to true.
    */
@@ -133,28 +143,12 @@ export function CalendarBody({
   placeholderUrl,
   canRsvp = true,
   rsvpDisabledReason,
+  rsvpBlockReason,
   showRsvp = true,
 }: CalendarBodyProps) {
   const isAuthed = mode === "authed"
   const useOverride = eventsOverride !== undefined
   const { t } = useTranslation()
-  const [currentMonth, setCurrentMonth] = useState(
-    () => defaultDate ?? new Date(),
-  )
-  const [selectedDate, setSelectedDate] = useState<Date | null>(
-    () => defaultDate ?? new Date(),
-  )
-
-  // The popup record loads asynchronously, so `defaultDate` may arrive
-  // after mount. One-shot snap: when it first becomes known, jump the
-  // calendar there. After the user navigates we leave their state alone.
-  const didSnapToDefaultRef = useRef(defaultDate != null)
-  useEffect(() => {
-    if (didSnapToDefaultRef.current || !defaultDate) return
-    didSnapToDefaultRef.current = true
-    setCurrentMonth(defaultDate)
-    setSelectedDate(defaultDate)
-  }, [defaultDate])
   const {
     formatTime,
     formatDayKey,
@@ -165,6 +159,18 @@ export function CalendarBody({
     timezone,
     isLoading: tzLoading,
   } = useEventTimezone(popupId, timezoneOverride)
+
+  const today = useMemo(() => todayInTimezone(timezone), [timezone])
+  const [chosenMonth, setCurrentMonth] = useState<Date | null>(null)
+  const [chosenDate, setSelectedDate] = useState<Date | null>(null)
+  // Until navigation, the default follows asynchronously loaded settings.
+  // After navigation, neither a settings refresh nor its fallback resets it.
+  const currentMonth = chosenMonth ?? defaultDate ?? today
+  const selectedDate = chosenDate ?? defaultDate ?? today
+  const navigateMonth = (date: Date) => {
+    setSelectedDate(selectedDate)
+    setCurrentMonth(date)
+  }
 
   const formatSelectedDateHeader = (d: Date) =>
     new Intl.DateTimeFormat(locale, {
@@ -316,6 +322,13 @@ export function CalendarBody({
   ])
   const selectedPanelLoading = !useOverride && selectedDayLoading
 
+  // "Now" reference for the LIVE badges in the selected-day panel. Ticks once
+  // a minute so a card picks the badge up when its event starts and drops it
+  // when the event ends, without the user reloading. Independent of which day
+  // is selected: `isEventLive` compares absolute instants, so a past or
+  // future day simply has no live events.
+  const nowMs = useNowTick().getTime()
+
   // `from` rebuilds the events-page URL state (view + selected day) so
   // the detail page's "Back to events" link returns the user here.
   const from = selectedDayKey ? `view=calendar&date=${selectedDayKey}` : null
@@ -375,7 +388,7 @@ export function CalendarBody({
             variant="ghost"
             size="icon"
             className="h-7 w-7"
-            onClick={() => setCurrentMonth(subMonths(currentMonth, 1))}
+            onClick={() => navigateMonth(subMonths(currentMonth, 1))}
           >
             <ChevronLeft className="h-4 w-4" />
           </Button>
@@ -386,7 +399,7 @@ export function CalendarBody({
             variant="ghost"
             size="icon"
             className="h-7 w-7"
-            onClick={() => setCurrentMonth(addMonths(currentMonth, 1))}
+            onClick={() => navigateMonth(addMonths(currentMonth, 1))}
           >
             <ChevronRight className="h-4 w-4" />
           </Button>
@@ -419,12 +432,16 @@ export function CalendarBody({
               <button
                 key={i}
                 type="button"
-                onClick={() => setSelectedDate(d)}
+                onClick={() => {
+                  setCurrentMonth(currentMonth)
+                  setSelectedDate(d)
+                }}
                 className={cn(
                   "relative aspect-square flex flex-col items-center justify-center rounded-lg text-xs transition-colors",
                   !isCurrentMonth && "text-muted-foreground/30",
                   isCurrentMonth && "hover:bg-muted",
-                  isToday(d) && "font-bold text-primary",
+                  formatGridDayKey(d) === formatGridDayKey(today) &&
+                    "font-bold text-primary",
                   isSelected && "bg-primary/10 ring-2 ring-primary",
                 )}
               >
@@ -480,6 +497,11 @@ export function CalendarBody({
                       ? t("events.list.part_of_recurring_series")
                       : null)
                   const isHighlighted = event.highlighted === true
+                  const isLive = isEventLive(
+                    event.start_time,
+                    event.end_time,
+                    nowMs,
+                  )
                   const isOwner =
                     currentHuman != null && event.owner_id === currentHuman.id
                   return (
@@ -492,6 +514,11 @@ export function CalendarBody({
                       }
                       className={cn(
                         "relative rounded-xl border bg-card hover:shadow-md transition-shadow overflow-hidden",
+                        // Listed before highlighted so the organiser's amber
+                        // treatment still wins through tailwind-merge; a live
+                        // featured event keeps its badge either way.
+                        isLive &&
+                          "border-red-500/30 bg-red-50 dark:bg-red-950/20",
                         isHighlighted &&
                           "border-2 border-amber-400 bg-amber-50 dark:bg-amber-950/30",
                       )}
@@ -524,15 +551,18 @@ export function CalendarBody({
                             )
                           })()}
                           <div className="min-w-0 flex-1">
-                            <h4 className="text-sm font-medium truncate flex items-center gap-1.5">
-                              {isOwner && (
-                                <Crown
-                                  className="h-3.5 w-3.5 shrink-0 text-amber-500"
-                                  aria-label={t("events.list.owned_title")}
-                                />
-                              )}
-                              <span className="truncate">{event.title}</span>
-                            </h4>
+                            <div className="flex items-start justify-between gap-2">
+                              <h4 className="min-w-0 text-sm font-medium truncate flex items-center gap-1.5">
+                                {isOwner && (
+                                  <Crown
+                                    className="h-3.5 w-3.5 shrink-0 text-amber-500"
+                                    aria-label={t("events.list.owned_title")}
+                                  />
+                                )}
+                                <span className="truncate">{event.title}</span>
+                              </h4>
+                              {isLive && <LiveBadge />}
+                            </div>
                             {event.kind && (
                               <p className="text-[11px] uppercase tracking-wide text-muted-foreground mt-0.5 truncate">
                                 {event.kind}
@@ -599,6 +629,7 @@ export function CalendarBody({
                       {isAuthed &&
                         showRsvp &&
                         event.status === "published" &&
+                        event.host_id !== currentHuman?.id &&
                         (() => {
                           const rsvpKey = `${event.id}:${event.start_time}`
                           const isRsvpPending = pendingRsvpKey === rsvpKey
@@ -608,36 +639,41 @@ export function CalendarBody({
                           return (
                             <div className="absolute top-2 right-2">
                               {isRsvped ? (
-                                <button
-                                  type="button"
-                                  disabled={isRsvpPending}
-                                  onClick={() =>
+                                <RsvpStatusAction
+                                  size="compact"
+                                  label={
+                                    event.my_rsvp_status === "checked_in"
+                                      ? (t("events.rsvp.checked_in") as string)
+                                      : undefined
+                                  }
+                                  isPending={isRsvpPending}
+                                  showCancel={
+                                    event.my_rsvp_status === "registered"
+                                  }
+                                  onCancelRsvp={() =>
                                     cancelRsvpMutation.mutate(event)
                                   }
-                                  className="inline-flex items-center gap-1 rounded-md border border-emerald-300 bg-emerald-50 px-2 py-1 text-xs font-medium text-emerald-700 hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-60 dark:border-emerald-500/40 dark:bg-emerald-950/40 dark:text-emerald-300 dark:hover:bg-emerald-950/60"
-                                >
-                                  {isRsvpPending ? (
-                                    <Loader2 className="h-3 w-3 animate-spin" />
-                                  ) : (
-                                    <CheckCircle className="h-3 w-3" />
-                                  )}
-                                  {t("events.rsvp.going")}
-                                </button>
+                                />
                               ) : (
-                                <button
-                                  type="button"
-                                  disabled={isRsvpPending || !canRsvp}
-                                  title={
-                                    !canRsvp ? rsvpDisabledReason : undefined
-                                  }
-                                  onClick={() => rsvpMutation.mutate(event)}
-                                  className="inline-flex items-center gap-1 rounded-md border bg-background px-2 py-1 text-xs font-medium hover:bg-muted disabled:cursor-not-allowed disabled:opacity-60"
+                                <RsvpBlockedCta
+                                  reason={rsvpBlockReason}
+                                  message={rsvpDisabledReason}
                                 >
-                                  {isRsvpPending && (
-                                    <Loader2 className="h-3 w-3 animate-spin" />
-                                  )}
-                                  {t("events.rsvp.rsvp")}
-                                </button>
+                                  <button
+                                    type="button"
+                                    disabled={isRsvpPending || !canRsvp}
+                                    title={
+                                      !canRsvp ? rsvpDisabledReason : undefined
+                                    }
+                                    onClick={() => rsvpMutation.mutate(event)}
+                                    className="inline-flex items-center gap-1 rounded-md border bg-background px-2 py-1 text-xs font-medium hover:bg-muted disabled:cursor-not-allowed disabled:opacity-60"
+                                  >
+                                    {isRsvpPending && (
+                                      <Loader2 className="h-3 w-3 animate-spin" />
+                                    )}
+                                    {t("events.rsvp.rsvp")}
+                                  </button>
+                                </RsvpBlockedCta>
                               )}
                             </div>
                           )

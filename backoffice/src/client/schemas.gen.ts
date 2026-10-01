@@ -4319,7 +4319,7 @@ export const ApplicationReviewerOptionSchema = {
     type: 'object',
     required: ['id'],
     title: 'ApplicationReviewerOption',
-    description: 'A reviewer who has submitted at least one review for a popup.'
+    description: 'A configured reviewer or past review submitter for a popup.'
 } as const;
 
 export const ApplicationReviewerVoteSchema = {
@@ -4892,6 +4892,331 @@ export const AttachRateItemSchema = {
     required: ['ticket_type'],
     title: 'AttachRateItem',
     description: 'Accommodation attach rate per ticket type.'
+} as const;
+
+export const AttendanceActorSchema = {
+    properties: {
+        kind: {
+            type: 'string',
+            enum: ['human', 'user', 'unknown'],
+            title: 'Kind'
+        },
+        id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Id'
+        },
+        name: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Name'
+        }
+    },
+    type: 'object',
+    required: ['kind'],
+    title: 'AttendanceActor',
+    description: `Who made or voided a mark, resolved to a display name.
+
+\`\`kind\`\` is \`\`human\`\` for a portal person (an attendee scanning, or an
+organizer on the roll call), \`\`user\`\` for a backoffice operator, and
+\`\`unknown\`\` for marks that predate the history table.`
+} as const;
+
+export const AttendanceCheckInRecordSchema = {
+    properties: {
+        id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Id'
+        },
+        method: {
+            '$ref': '#/components/schemas/CheckInMethod'
+        },
+        had_rsvp: {
+            type: 'boolean',
+            title: 'Had Rsvp'
+        },
+        checked_in_at: {
+            type: 'string',
+            format: 'date-time',
+            title: 'Checked In At'
+        },
+        checked_in_by: {
+            '$ref': '#/components/schemas/AttendanceActor'
+        },
+        voided_at: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Voided At'
+        },
+        voided_by: {
+            anyOf: [
+                {
+                    '$ref': '#/components/schemas/AttendanceActor'
+                },
+                {
+                    type: 'null'
+                }
+            ]
+        },
+        void_reason: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Void Reason'
+        }
+    },
+    type: 'object',
+    required: ['id', 'method', 'had_rsvp', 'checked_in_at', 'checked_in_by'],
+    title: 'AttendanceCheckInRecord',
+    description: "One mark in someone's attendance history, voided or not."
+} as const;
+
+export const AttendanceEntrySchema = {
+    properties: {
+        participant_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Participant Id'
+        },
+        profile_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Profile Id'
+        },
+        first_name: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'First Name'
+        },
+        last_name: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Last Name'
+        },
+        email: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Email'
+        },
+        status: {
+            '$ref': '#/components/schemas/ParticipantStatus'
+        },
+        check_time: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Check Time'
+        },
+        history: {
+            items: {
+                '$ref': '#/components/schemas/AttendanceCheckInRecord'
+            },
+            type: 'array',
+            title: 'History',
+            default: []
+        }
+    },
+    type: 'object',
+    required: ['participant_id', 'profile_id', 'status'],
+    title: 'AttendanceEntry',
+    description: 'One person on the roster of an occurrence.'
+} as const;
+
+export const AttendanceLookupResultSchema = {
+    properties: {
+        profile_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Profile Id'
+        },
+        first_name: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'First Name'
+        },
+        last_name: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Last Name'
+        },
+        email: {
+            type: 'string',
+            title: 'Email'
+        },
+        status: {
+            anyOf: [
+                {
+                    '$ref': '#/components/schemas/ParticipantStatus'
+                },
+                {
+                    type: 'null'
+                }
+            ]
+        }
+    },
+    type: 'object',
+    required: ['profile_id', 'email'],
+    title: 'AttendanceLookupResult',
+    description: 'A person found by exact email, for a walk-in check-in.'
+} as const;
+
+export const AttendanceModeSchema = {
+    type: 'string',
+    enum: ['none', 'host_rollcall', 'self_checkin'],
+    title: 'AttendanceMode',
+    description: `How attendance is taken for an event (SIM-106).
+
+* \`\`none\`\`: no attendance is taken; the QR and the roll call are off.
+* \`\`host_rollcall\`\`: the organizer marks people present by hand; the QR
+  is neither shown nor accepted.
+* \`\`self_checkin\`\`: the QR is on AND the organizer can still mark people
+  by hand. Both write the same attendance.
+
+Once an event has any check-in it can no longer go back to \`\`none\`\`;
+switching between the other two keeps every record.`
+} as const;
+
+export const AttendanceRosterSchema = {
+    properties: {
+        event_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Event Id'
+        },
+        occurrence_start: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Occurrence Start'
+        },
+        attendance_mode: {
+            '$ref': '#/components/schemas/AttendanceMode'
+        },
+        window: {
+            '$ref': '#/components/schemas/AttendanceWindow'
+        },
+        max_participant: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Max Participant'
+        },
+        seats_taken: {
+            type: 'integer',
+            title: 'Seats Taken'
+        },
+        checked_in_count: {
+            type: 'integer',
+            title: 'Checked In Count'
+        },
+        entries: {
+            items: {
+                '$ref': '#/components/schemas/AttendanceEntry'
+            },
+            type: 'array',
+            title: 'Entries'
+        }
+    },
+    type: 'object',
+    required: ['event_id', 'attendance_mode', 'window', 'seats_taken', 'checked_in_count', 'entries'],
+    title: 'AttendanceRoster',
+    description: 'Private roll call of one occurrence, for its managers only.'
+} as const;
+
+export const AttendanceWindowSchema = {
+    properties: {
+        opens_at: {
+            type: 'string',
+            format: 'date-time',
+            title: 'Opens At'
+        },
+        closes_at: {
+            type: 'string',
+            format: 'date-time',
+            title: 'Closes At'
+        },
+        is_open: {
+            type: 'boolean',
+            title: 'Is Open'
+        }
+    },
+    type: 'object',
+    required: ['opens_at', 'closes_at', 'is_open'],
+    title: 'AttendanceWindow',
+    description: 'When marking and voiding are allowed for this occurrence.'
 } as const;
 
 export const AttendeeCategoryCreateSchema = {
@@ -5732,6 +6057,35 @@ export const AttendeePurchasesSchema = {
     required: ['attendee_id', 'attendee_name', 'attendee_category'],
     title: 'AttendeePurchases',
     description: 'Purchased products grouped by attendee.'
+} as const;
+
+export const AttendeeSharingStatusSchema = {
+    properties: {
+        can_share: {
+            type: 'boolean',
+            title: 'Can Share'
+        },
+        sales_flow_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Sales Flow Id'
+        }
+    },
+    type: 'object',
+    required: ['can_share'],
+    title: 'AttendeeSharingStatus',
+    description: `Whether the attendee may create their own link from a popup.
+
+The same answer POST /portal/invites gives, asked ahead of time so the
+portal can decide whether to offer the referrals screen at all. Never says
+why not: one of the reasons is a red flag.`
 } as const;
 
 export const AttendeeStatsSchema = {
@@ -8244,6 +8598,13 @@ Eager-loads attendee + product data so the table renders without N+1
 fetches. \`source\` is extracted from payload["source"].`
 } as const;
 
+export const CheckInMethodSchema = {
+    type: 'string',
+    enum: ['qr', 'manual'],
+    title: 'CheckInMethod',
+    description: 'How an attendance mark was made.'
+} as const;
+
 export const CheckInPayloadSchema = {
     properties: {
         source: {
@@ -9450,6 +9811,47 @@ export const CredentialTypeSchema = {
     title: 'CredentialType'
 } as const;
 
+export const CrossPopupReferralTargetSchema = {
+    properties: {
+        popup_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Popup Id'
+        },
+        name: {
+            type: 'string',
+            title: 'Name'
+        },
+        slug: {
+            type: 'string',
+            title: 'Slug'
+        },
+        sales_flow_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Sales Flow Id'
+        },
+        flow_name: {
+            type: 'string',
+            title: 'Flow Name'
+        },
+        link: {
+            anyOf: [
+                {
+                    '$ref': '#/components/schemas/InvitePublic'
+                },
+                {
+                    type: 'null'
+                }
+            ]
+        }
+    },
+    type: 'object',
+    required: ['popup_id', 'name', 'slug', 'sales_flow_id', 'flow_name'],
+    title: 'CrossPopupReferralTarget',
+    description: 'One accepting application flow of another popup, with its own link.'
+} as const;
+
 export const CumulativeTrendsSchema = {
     properties: {
         tickets: {
@@ -9954,7 +10356,7 @@ export const EmailTemplatePublicSchema = {
 
 export const EmailTemplateTypeSchema = {
     type: 'string',
-    enum: ['login_code_user', 'login_code_human', 'application_received', 'application_accepted', 'application_rejected', 'application_accepted_with_discount', 'application_accepted_with_incentive', 'application_accepted_scholarship_rejected', 'payment_confirmed', 'abandoned_cart', 'purchase_reminder', 'abandoned_application', 'edit_passes_confirmed', 'event_invitation', 'event_updated', 'event_cancelled', 'event_rsvp_cancelled', 'event_approval_approved', 'event_approval_rejected', 'check_in_pass'],
+    enum: ['login_code_user', 'login_code_human', 'application_received', 'application_accepted', 'application_rejected', 'application_accepted_with_discount', 'application_accepted_with_incentive', 'application_accepted_scholarship_rejected', 'payment_confirmed', 'abandoned_cart', 'purchase_reminder', 'abandoned_application', 'edit_passes_confirmed', 'event_invitation', 'event_host_message', 'event_updated', 'event_cancelled', 'event_rsvp_cancelled', 'event_approval_approved', 'event_approval_rejected', 'check_in_pass'],
     title: 'EmailTemplateType'
 } as const;
 
@@ -10081,6 +10483,18 @@ export const EventApprovalPayloadSchema = {
     },
     type: 'object',
     title: 'EventApprovalPayload'
+} as const;
+
+export const EventAttendanceModeUpdateSchema = {
+    properties: {
+        attendance_mode: {
+            '$ref': '#/components/schemas/AttendanceMode'
+        }
+    },
+    type: 'object',
+    required: ['attendance_mode'],
+    title: 'EventAttendanceModeUpdate',
+    description: 'Body of the attendance-mode endpoints (portal and backoffice).'
 } as const;
 
 export const EventAvailabilityCheckSchema = {
@@ -10239,6 +10653,147 @@ export const EventCalendarTrackSchema = {
     required: ['id', 'name'],
     title: 'EventCalendarTrack',
     description: 'Minimal track projection for the public calendar toolbar.'
+} as const;
+
+export const EventCheckInEventSchema = {
+    properties: {
+        id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Id'
+        },
+        title: {
+            type: 'string',
+            title: 'Title'
+        },
+        cover_url: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Cover Url'
+        },
+        host_display_name: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Host Display Name'
+        },
+        start_time: {
+            type: 'string',
+            format: 'date-time',
+            title: 'Start Time'
+        },
+        end_time: {
+            type: 'string',
+            format: 'date-time',
+            title: 'End Time'
+        },
+        timezone: {
+            type: 'string',
+            title: 'Timezone'
+        },
+        venue_title: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Venue Title'
+        },
+        occurrence_start: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Occurrence Start'
+        },
+        popup_slug: {
+            type: 'string',
+            title: 'Popup Slug'
+        }
+    },
+    type: 'object',
+    required: ['id', 'title', 'start_time', 'end_time', 'timezone', 'popup_slug'],
+    title: 'EventCheckInEvent',
+    description: `Everything the QR success screen renders, resolved server-side.
+
+Lets the portal paint the result from the check-in response alone: the
+landing page performs one POST and no follow-up GET, so a scan is a
+single round trip even on a phone on venue wifi.`
+} as const;
+
+export const EventCheckInLinkSchema = {
+    properties: {
+        url: {
+            type: 'string',
+            title: 'Url'
+        },
+        occurrence_start: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Occurrence Start'
+        }
+    },
+    type: 'object',
+    required: ['url'],
+    title: 'EventCheckInLink',
+    description: `The portal URL an event's organizer shows as a QR for attendees to scan.
+
+Served only to the event's managers, so the portal can gate the QR panel
+on a real server-side permission check instead of hiding a UI element.
+The URL itself is not a secret — it carries no token and is deliberately
+fixed and shareable (see the product limitation in SIM-103) — but who
+gets handed it is still a decision the backend makes.`
+} as const;
+
+export const EventCheckInResultSchema = {
+    properties: {
+        participant: {
+            '$ref': '#/components/schemas/EventParticipantPublic'
+        },
+        already_checked_in: {
+            type: 'boolean',
+            title: 'Already Checked In',
+            default: false
+        },
+        created: {
+            type: 'boolean',
+            title: 'Created',
+            default: false
+        },
+        event: {
+            '$ref': '#/components/schemas/EventCheckInEvent'
+        }
+    },
+    type: 'object',
+    required: ['participant', 'event'],
+    title: 'EventCheckInResult',
+    description: 'Outcome of a QR check-in.'
 } as const;
 
 export const EventCollaboratorPublicSchema = {
@@ -10654,6 +11209,105 @@ export const EventInvitationPublicSchema = {
     type: 'object',
     required: ['id', 'event_id', 'human_id', 'email', 'created_at'],
     title: 'EventInvitationPublic'
+} as const;
+
+export const EventMessageCreateSchema = {
+    properties: {
+        id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Id',
+            description: 'Reuse this ID when retrying the same send.'
+        },
+        body: {
+            type: 'string',
+            maxLength: 10000,
+            minLength: 1,
+            title: 'Body'
+        },
+        occurrence_start: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Occurrence Start'
+        }
+    },
+    type: 'object',
+    required: ['id', 'body'],
+    title: 'EventMessageCreate'
+} as const;
+
+export const EventMessagePublicSchema = {
+    properties: {
+        id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Id'
+        },
+        event_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Event Id'
+        },
+        author_name: {
+            type: 'string',
+            title: 'Author Name'
+        },
+        body: {
+            type: 'string',
+            title: 'Body'
+        },
+        occurrence_start: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Occurrence Start'
+        },
+        recipient_count: {
+            type: 'integer',
+            title: 'Recipient Count'
+        },
+        sent_count: {
+            type: 'integer',
+            title: 'Sent Count'
+        },
+        failed_count: {
+            type: 'integer',
+            title: 'Failed Count'
+        },
+        created_at: {
+            type: 'string',
+            format: 'date-time',
+            title: 'Created At'
+        },
+        completed_at: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Completed At'
+        }
+    },
+    type: 'object',
+    required: ['id', 'event_id', 'author_name', 'body', 'occurrence_start', 'recipient_count', 'sent_count', 'failed_count', 'created_at', 'completed_at'],
+    title: 'EventMessagePublic'
 } as const;
 
 export const EventOpaqueSchema = {
@@ -11109,6 +11763,11 @@ export const EventPublicSchema = {
             type: 'boolean',
             title: 'Highlighted',
             default: false
+        },
+        attendance_mode: {
+            '$ref': '#/components/schemas/AttendanceMode',
+            maxLength: 20,
+            default: 'none'
         },
         rejection_reason: {
             anyOf: [
@@ -15640,12 +16299,92 @@ export const HumanProfileStatsSchema = {
         total_days: {
             type: 'integer',
             title: 'Total Days'
+        },
+        events_attended: {
+            type: 'integer',
+            title: 'Events Attended',
+            default: 0
+        },
+        events_hosted: {
+            type: 'integer',
+            title: 'Events Hosted',
+            default: 0
+        },
+        hosted_attendees_count: {
+            type: 'integer',
+            title: 'Hosted Attendees Count',
+            default: 0
+        },
+        top_event_theme: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Top Event Theme'
+        },
+        most_shared_attendees: {
+            items: {
+                '$ref': '#/components/schemas/HumanProfileStatsPerson'
+            },
+            type: 'array',
+            title: 'Most Shared Attendees'
+        },
+        most_active_attendees_of_hosted_events: {
+            items: {
+                '$ref': '#/components/schemas/HumanProfileStatsPerson'
+            },
+            type: 'array',
+            title: 'Most Active Attendees Of Hosted Events'
         }
     },
     type: 'object',
     required: ['popups', 'total_days'],
     title: 'HumanProfileStats',
     description: "Aggregate stats for the current human's profile page."
+} as const;
+
+export const HumanProfileStatsPersonSchema = {
+    properties: {
+        human_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Human Id'
+        },
+        name: {
+            type: 'string',
+            title: 'Name'
+        },
+        picture_url: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Picture Url'
+        },
+        event_count: {
+            type: 'integer',
+            title: 'Event Count'
+        },
+        shared_events: {
+            items: {
+                '$ref': '#/components/schemas/HumanProfileStatsSharedEvent'
+            },
+            type: 'array',
+            title: 'Shared Events'
+        }
+    },
+    type: 'object',
+    required: ['human_id', 'name', 'event_count'],
+    title: 'HumanProfileStatsPerson',
+    description: 'A human ranked in an event attendance profile statistic.'
 } as const;
 
 export const HumanProfileStatsPopupSchema = {
@@ -15714,6 +16453,33 @@ export const HumanProfileStatsPopupSchema = {
     required: ['popup_id', 'popup_name', 'total_days'],
     title: 'HumanProfileStatsPopup',
     description: "Single popup entry in a human's profile stats."
+} as const;
+
+export const HumanProfileStatsSharedEventSchema = {
+    properties: {
+        event_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Event Id'
+        },
+        title: {
+            type: 'string',
+            title: 'Title'
+        },
+        start_time: {
+            type: 'string',
+            format: 'date-time',
+            title: 'Start Time'
+        },
+        timezone: {
+            type: 'string',
+            title: 'Timezone'
+        }
+    },
+    type: 'object',
+    required: ['event_id', 'title', 'start_time', 'timezone'],
+    title: 'HumanProfileStatsSharedEvent',
+    description: 'An event instance shared with another human.'
 } as const;
 
 export const HumanProfileUpdateSchema = {
@@ -16165,6 +16931,30 @@ export const InvitePortalCreateSchema = {
             format: 'uuid',
             title: 'Popup Id'
         },
+        source_popup_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Source Popup Id'
+        },
+        sales_flow_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Sales Flow Id'
+        },
         token: {
             anyOf: [
                 {
@@ -16207,7 +16997,11 @@ export const InvitePortalCreateSchema = {
 
 An attendee sets far less than an admin: the policy fields (discount,
 auto_approve) stay admin-only, and max_uses is dictated by the popup's
-max_referrals_per_attendee quota.`
+max_referrals_per_attendee quota.
+
+\`\`source_popup_id\`\` names another popup of the same tenant whose access
+lets the attendee share \`\`popup_id\`\` without being in it. Omitted, or equal
+to \`\`popup_id\`\`, means the attendee shares their own popup.`
 } as const;
 
 export const InvitePortalUpdateSchema = {
@@ -16366,6 +17160,18 @@ export const InvitePublicSchema = {
             ],
             title: 'Referrer Human Id'
         },
+        source_popup_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Source Popup Id'
+        },
         created_at: {
             type: 'string',
             format: 'date-time',
@@ -16400,6 +17206,18 @@ export const InvitePublicPreviewSchema = {
             type: 'string',
             format: 'uuid',
             title: 'Popup Id'
+        },
+        sales_flow_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Sales Flow Id'
         },
         token: {
             type: 'string',
@@ -16979,6 +17797,24 @@ export const ListModel_EmailTemplatePublic_Schema = {
     title: 'ListModel[EmailTemplatePublic]'
 } as const;
 
+export const ListModel_EventMessagePublic_Schema = {
+    properties: {
+        results: {
+            items: {
+                '$ref': '#/components/schemas/EventMessagePublic'
+            },
+            type: 'array',
+            title: 'Results'
+        },
+        paging: {
+            '$ref': '#/components/schemas/Paging'
+        }
+    },
+    type: 'object',
+    required: ['results', 'paging'],
+    title: 'ListModel[EventMessagePublic]'
+} as const;
+
 export const ListModel_EventParticipantPublic_Schema = {
     properties: {
         results: {
@@ -17463,6 +18299,52 @@ export const ListModel_UserPublic_Schema = {
     type: 'object',
     required: ['results', 'paging'],
     title: 'ListModel[UserPublic]'
+} as const;
+
+export const ManualCheckInRequestSchema = {
+    properties: {
+        profile_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Profile Id'
+        },
+        occurrence_start: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Occurrence Start'
+        }
+    },
+    type: 'object',
+    required: ['profile_id'],
+    title: 'ManualCheckInRequest'
+} as const;
+
+export const ManualCheckInResultSchema = {
+    properties: {
+        entry: {
+            '$ref': '#/components/schemas/AttendanceEntry'
+        },
+        already_checked_in: {
+            type: 'boolean',
+            title: 'Already Checked In',
+            default: false
+        },
+        created: {
+            type: 'boolean',
+            title: 'Created',
+            default: false
+        }
+    },
+    type: 'object',
+    required: ['entry'],
+    title: 'ManualCheckInResult'
 } as const;
 
 export const MeAccessSchema = {
@@ -22465,6 +23347,7 @@ export const ProductBatchItemSchema = {
         },
         category: {
             type: 'string',
+            minLength: 1,
             title: 'Category',
             default: 'ticket'
         },
@@ -22907,6 +23790,7 @@ export const ProductCreateSchema = {
         },
         category: {
             type: 'string',
+            minLength: 1,
             title: 'Category',
             default: 'ticket'
         },
@@ -23386,7 +24270,8 @@ export const ProductUpdateSchema = {
         category: {
             anyOf: [
                 {
-                    type: 'string'
+                    type: 'string',
+                    minLength: 1
                 },
                 {
                     type: 'null'
@@ -24354,6 +25239,30 @@ export const ReviewSummarySchema = {
     description: 'Summary of reviews for an application.'
 } as const;
 
+export const RsvpEligibilitySchema = {
+    properties: {
+        allowed: {
+            type: 'boolean',
+            title: 'Allowed'
+        },
+        reason: {
+            anyOf: [
+                {
+                    type: 'string',
+                    enum: ['rejected', 'no_tickets']
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Reason'
+        }
+    },
+    type: 'object',
+    required: ['allowed'],
+    title: 'RsvpEligibility'
+} as const;
+
 export const SaleTypeSchema = {
     type: 'string',
     enum: ['application', 'direct'],
@@ -24648,6 +25557,17 @@ export const SalesFlowCreateSchema = {
             ],
             title: 'Max Referrals Per Attendee'
         },
+        cross_popup_referrals_enabled: {
+            anyOf: [
+                {
+                    type: 'boolean'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Cross Popup Referrals Enabled'
+        },
         checkin_pass_lead_days: {
             anyOf: [
                 {
@@ -24691,6 +25611,17 @@ export const SalesFlowCreateSchema = {
                 }
             ],
             title: 'Open Checkout Signing Secret'
+        },
+        simplefi_api_key: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Simplefi Api Key'
         },
         abandoned_cart_delay_days: {
             anyOf: [
@@ -25346,6 +26277,17 @@ export const SalesFlowPublicSchema = {
             ],
             title: 'Max Referrals Per Attendee'
         },
+        cross_popup_referrals_enabled: {
+            anyOf: [
+                {
+                    type: 'boolean'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Cross Popup Referrals Enabled'
+        },
         checkin_pass_lead_days: {
             anyOf: [
                 {
@@ -25389,6 +26331,17 @@ export const SalesFlowPublicSchema = {
                 }
             ],
             title: 'Open Checkout Signing Secret'
+        },
+        simplefi_api_key: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Simplefi Api Key'
         },
         abandoned_cart_delay_days: {
             anyOf: [
@@ -25930,6 +26883,17 @@ export const SalesFlowUpdateSchema = {
             ],
             title: 'Max Referrals Per Attendee'
         },
+        cross_popup_referrals_enabled: {
+            anyOf: [
+                {
+                    type: 'boolean'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Cross Popup Referrals Enabled'
+        },
         checkin_pass_lead_days: {
             anyOf: [
                 {
@@ -25973,6 +26937,17 @@ export const SalesFlowUpdateSchema = {
                 }
             ],
             title: 'Open Checkout Signing Secret'
+        },
+        simplefi_api_key: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Simplefi Api Key'
         },
         abandoned_cart_delay_days: {
             anyOf: [
@@ -30692,4 +31667,35 @@ export const VenueWeeklyHoursUpdateSchema = {
     type: 'object',
     required: ['hours'],
     title: 'VenueWeeklyHoursUpdate'
+} as const;
+
+export const VoidCheckInRequestSchema = {
+    properties: {
+        profile_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Profile Id'
+        },
+        occurrence_start: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Occurrence Start'
+        },
+        reason: {
+            type: 'string',
+            maxLength: 500,
+            minLength: 1,
+            title: 'Reason'
+        }
+    },
+    type: 'object',
+    required: ['profile_id', 'reason'],
+    title: 'VoidCheckInRequest'
 } as const;

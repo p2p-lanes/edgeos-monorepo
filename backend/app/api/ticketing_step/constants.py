@@ -150,3 +150,38 @@ def seed_ticketing_steps_for_popup(
 
     if commit:
         db.commit()
+
+
+def seed_confirm_step_for_flow(
+    db: Session,
+    *,
+    popup_id: uuid.UUID,
+    tenant_id: uuid.UUID,
+    sales_flow_id: uuid.UUID,
+    commit: bool = True,
+) -> None:
+    """Seed the required final checkout step for a flow started from scratch."""
+    from app.api.ticketing_step.models import TicketingSteps
+
+    step_def = next(
+        step for step in DEFAULT_TICKETING_STEPS if step["step_type"] == "confirm"
+    )
+    db.add(
+        TicketingSteps(
+            tenant_id=tenant_id,
+            popup_id=popup_id,
+            sales_flow_id=sales_flow_id,
+            step_type=step_def["step_type"],
+            title=step_def["title"],
+            description=step_def.get("description"),
+            watermark=step_def.get("watermark"),
+            template=step_def.get("template"),
+            template_config=step_def.get("template_config"),
+            order=step_def["order"],
+            is_enabled=step_def["is_enabled"],
+            protected=step_def["protected"],
+            product_category=step_def.get("product_category"),
+        )
+    )
+    if commit:
+        db.commit()

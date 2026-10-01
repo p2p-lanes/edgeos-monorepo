@@ -1,10 +1,9 @@
 "use client"
 
-import { ChevronDown, Search, X } from "lucide-react"
+import { Check, ChevronDown, Search, X } from "lucide-react"
 import { useMemo, useState } from "react"
 import type { MultiSelectDetailedConfig } from "../../types"
 import { cn } from "../../utils"
-import { Checkbox } from "../Checkbox"
 import { FormInputWrapper } from "../FormInputWrapper"
 import { LabelRequired } from "../Label"
 import { Popover, PopoverContent, PopoverTrigger } from "../Popover"
@@ -21,6 +20,18 @@ export interface MultiSelectDetailedFormProps {
   placeholder?: string
   disabled?: boolean
   error?: string
+  portalContentClassName?: string
+  labels?: {
+    placeholder: string
+    search: string
+    searchLabel: string
+    empty: string
+    selected?: (count: number) => string
+    remove: (option: string) => string
+    between: (min: number, max: number) => string
+    atLeast: (min: number) => string
+    upTo: (max: number) => string
+  }
 }
 
 export function MultiSelectDetailedForm({
@@ -32,15 +43,19 @@ export function MultiSelectDetailedForm({
   config,
   isRequired = false,
   subtitle,
-  placeholder = "Select options...",
+  placeholder,
   disabled = false,
   error,
+  portalContentClassName,
+  labels,
 }: MultiSelectDetailedFormProps) {
   const [open, setOpen] = useState(false)
   const [query, setQuery] = useState("")
   const subtitles = config?.subtitles ?? {}
   const minSel = config?.min_selections ?? undefined
   const maxSel = config?.max_selections ?? undefined
+  const placeholderText =
+    placeholder ?? labels?.placeholder ?? "Select options..."
 
   const selected = Array.isArray(value) ? value : []
 
@@ -49,9 +64,7 @@ export function MultiSelectDetailedForm({
     if (!q) return options
     return options.filter((opt) => {
       const sub = subtitles[opt] ?? ""
-      return (
-        opt.toLowerCase().includes(q) || sub.toLowerCase().includes(q)
-      )
+      return opt.toLowerCase().includes(q) || sub.toLowerCase().includes(q)
     })
   }, [options, query, subtitles])
 
@@ -73,9 +86,13 @@ export function MultiSelectDetailedForm({
   const helperText = (() => {
     const hasMin = typeof minSel === "number" && minSel > 0
     const hasMax = typeof maxSel === "number" && maxSel > 0
-    if (hasMin && hasMax) return `Select between ${minSel} and ${maxSel} options`
-    if (hasMin) return `Select at least ${minSel}`
-    if (hasMax) return `Select up to ${maxSel}`
+    if (hasMin && hasMax)
+      return (
+        labels?.between(minSel, maxSel) ??
+        `Select between ${minSel} and ${maxSel} options`
+      )
+    if (hasMin) return labels?.atLeast(minSel) ?? `Select at least ${minSel}`
+    if (hasMax) return labels?.upTo(maxSel) ?? `Select up to ${maxSel}`
     return null
   })()
 
@@ -87,7 +104,9 @@ export function MultiSelectDetailedForm({
       {(label || subtitle) && (
         <>
           {label && (
-            <LabelRequired isRequired={isRequired}>{label}</LabelRequired>
+            <LabelRequired htmlFor={id} isRequired={isRequired}>
+              {label}
+            </LabelRequired>
           )}
           {subtitle && (
             <p className="text-sm text-muted-foreground">{subtitle}</p>
@@ -100,71 +119,57 @@ export function MultiSelectDetailedForm({
             type="button"
             id={id}
             disabled={disabled}
-            aria-haspopup="listbox"
+            aria-haspopup="dialog"
             aria-expanded={open}
             className={cn(
-              "flex w-full min-h-9 items-center justify-between gap-2 rounded-md border border-input bg-transparent px-3 py-1.5 text-sm shadow-sm ring-offset-background focus:outline-none focus:ring-1 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50",
+              "flex w-full min-h-9 items-center justify-between gap-2 rounded-md border border-input bg-transparent px-3 py-1.5 text-left text-sm shadow-sm ring-offset-background transition-colors hover:border-ring/40 focus:outline-none focus:ring-1 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50",
               error && "border-red-500",
             )}
           >
-            <div className="flex flex-1 flex-wrap items-center gap-1.5">
-              {selected.length === 0 && (
-                <span className="text-muted-foreground">{placeholder}</span>
+            <span
+              className={cn(
+                "min-w-0 flex-1 truncate",
+                selected.length === 0 && "text-muted-foreground",
               )}
-              {selected.map((opt) => (
-                <span
-                  key={opt}
-                  className="inline-flex items-center gap-1 rounded-full border border-primary bg-primary px-2 py-0.5 text-xs font-medium text-primary-foreground"
-                >
-                  <span>{opt}</span>
-                  <span
-                    role="button"
-                    aria-label={`Remove ${opt}`}
-                    tabIndex={0}
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      remove(opt)
-                    }}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter" || e.key === " ") {
-                        e.preventDefault()
-                        e.stopPropagation()
-                        remove(opt)
-                      }
-                    }}
-                    className="inline-flex h-3.5 w-3.5 cursor-pointer items-center justify-center rounded-full hover:bg-primary-foreground/20"
-                  >
-                    <X className="h-3 w-3" aria-hidden />
-                  </span>
-                </span>
-              ))}
-            </div>
+            >
+              {selected.length === 0
+                ? placeholderText
+                : (labels?.selected?.(selected.length) ??
+                  `${selected.length} selected`)}
+            </span>
             <ChevronDown className="h-4 w-4 shrink-0 opacity-50" aria-hidden />
           </button>
         </PopoverTrigger>
         <PopoverContent
-          className="flex w-[--radix-popover-trigger-width] flex-col overflow-hidden p-0"
+          className={cn(
+            "flex w-[var(--radix-popover-trigger-width)] max-w-[calc(100vw-2rem)] flex-col overflow-hidden rounded-lg border-border p-0 shadow-lg",
+            portalContentClassName,
+          )}
           style={{
             maxHeight:
               "min(var(--radix-popover-content-available-height), 20rem)",
           }}
           align="start"
+          aria-label={label || placeholderText}
         >
-          <div className="flex shrink-0 items-center gap-2 border-b px-3 py-2">
-            <Search className="h-4 w-4 text-muted-foreground" aria-hidden />
+          <div className="flex shrink-0 items-center gap-2 border-b border-border px-3 py-3">
+            <Search
+              className="h-4 w-4 shrink-0 text-muted-foreground"
+              aria-hidden
+            />
             <input
               type="text"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="Search..."
-              className="flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
-              aria-label="Search options"
+              placeholder={labels?.search ?? "Search..."}
+              className="min-w-0 flex-1 bg-transparent text-sm text-popover-foreground outline-none placeholder:text-muted-foreground"
+              aria-label={labels?.searchLabel ?? "Search options"}
             />
           </div>
-          <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-1">
+          <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-1.5 [scrollbar-width:thin] [scrollbar-color:var(--border)_transparent]">
             {filtered.length === 0 && (
               <div className="px-3 py-2 text-sm text-muted-foreground">
-                No options found
+                {labels?.empty ?? "No options found"}
               </div>
             )}
             {filtered.map((option) => {
@@ -180,32 +185,60 @@ export function MultiSelectDetailedForm({
                   disabled={isDisabled}
                   aria-pressed={isSelected}
                   className={cn(
-                    "flex w-full items-start gap-3 rounded-sm px-2 py-2 text-left text-sm hover:bg-accent",
-                    isDisabled && "cursor-not-allowed opacity-50 hover:bg-transparent",
+                    "flex w-full cursor-pointer items-start gap-3 rounded-md px-3 py-2.5 text-left text-sm transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:bg-accent focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-ring",
+                    isSelected && "bg-accent text-accent-foreground",
+                    isDisabled &&
+                      "cursor-not-allowed opacity-50 hover:bg-transparent",
                   )}
                 >
-                  <Checkbox
-                    checked={isSelected}
-                    tabIndex={-1}
+                  <span
                     aria-hidden
-                    className="mt-0.5 pointer-events-none"
-                  />
-                  <div className="flex min-w-0 flex-1 flex-col">
-                    <span className="font-semibold leading-tight break-words">
+                    className={cn(
+                      "mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded border",
+                      isSelected
+                        ? "border-primary bg-primary text-primary-foreground"
+                        : "border-input bg-popover",
+                    )}
+                  >
+                    {isSelected && <Check className="h-3 w-3" />}
+                  </span>
+                  <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+                    <span className="font-medium leading-5 break-words">
                       {option}
                     </span>
                     {subtitles[option] && (
-                      <span className="text-xs text-muted-foreground break-words">
+                      <span className="text-xs leading-relaxed text-muted-foreground break-words">
                         {subtitles[option]}
                       </span>
                     )}
-                  </div>
+                  </span>
                 </button>
               )
             })}
           </div>
         </PopoverContent>
       </Popover>
+      {selected.length > 0 && (
+        <div className="flex flex-wrap gap-1.5">
+          {selected.map((option) => (
+            <span
+              key={option}
+              className="inline-flex max-w-full items-center gap-1.5 rounded-full border border-input bg-muted/50 py-1 pl-2.5 pr-1.5 text-xs font-medium text-foreground"
+            >
+              <span className="min-w-0 break-words">{option}</span>
+              <button
+                type="button"
+                aria-label={labels?.remove(option) ?? `Remove ${option}`}
+                disabled={disabled}
+                onClick={() => remove(option)}
+                className="inline-flex h-5 w-5 shrink-0 cursor-pointer items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                <X className="h-3 w-3" aria-hidden />
+              </button>
+            </span>
+          ))}
+        </div>
+      )}
       {helperText && (
         <p
           className={cn(

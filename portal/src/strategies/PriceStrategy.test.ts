@@ -21,6 +21,7 @@ function createProduct(overrides: Partial<ProductsPass>): ProductsPass {
     purchased: overrides.purchased,
     max_per_order: overrides.max_per_order ?? 1,
     compare_price: overrides.compare_price ?? null,
+    discountable: overrides.discountable ?? true,
   } as ProductsPass
 }
 
@@ -73,5 +74,27 @@ describe("DefaultPriceStrategy.calculatePrice — patreon waiver ticket-scoping"
       original_price: 200,
     })
     expect(strategy.calculatePrice(housing, true, 0)).toBe(200)
+  })
+
+  it("takes the scholarship off the current catalog price, not compare_price", () => {
+    const strategy = getPriceStrategy(CHECKOUT_MODE.PASS_SYSTEM)
+    expect(
+      strategy.calculatePrice(
+        createProduct({ price: 925, original_price: 925, compare_price: 1000 }),
+        false,
+        30,
+      ),
+    ).toBe(647.5)
+  })
+
+  it("keeps non-discountable products at their catalog price", () => {
+    const strategy = getPriceStrategy(CHECKOUT_MODE.PASS_SYSTEM)
+    expect(
+      strategy.calculatePrice(
+        createProduct({ price: 925, discountable: false }),
+        false,
+        30,
+      ),
+    ).toBe(925)
   })
 })

@@ -2,7 +2,6 @@
 
 import {
   CalendarDays,
-  CheckCircle,
   ChevronDown,
   Clock,
   Crown,
@@ -29,10 +28,16 @@ import {
 } from "@/components/ui/collapsible"
 import { cn } from "@/lib/utils"
 import { CoverImage } from "./CoverImage"
+import { isEventLive } from "./eventLiveState"
 import { canManageEvent } from "./eventPermissions"
 import type { EventsScrollSnapshot } from "./eventsViewState"
+import { LiveBadge } from "./LiveBadge"
 import { buildPortalEventHref } from "./portalEventHref"
+import { RsvpBlockedCta } from "./RsvpBlockedCta"
+import { RsvpStatusAction } from "./RsvpStatusAction"
 import { summarizeRrule } from "./summarizeRrule"
+import type { RsvpBlockReason } from "./useCanRsvp"
+import { useNowTick } from "./useNowTick"
 
 const statusColors: Record<string, string> = {
   published: "bg-primary/10 text-primary",
@@ -41,6 +46,39 @@ const statusColors: Record<string, string> = {
   pending_approval:
     "bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-200",
   rejected: "bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-200",
+}
+
+// A published event's badge reports who can see it, not its status: the
+// status alone read "Public" on private and unlisted events too.
+const visibilityBadge: Record<string, { labelKey: string; className: string }> =
+  {
+    public: {
+      labelKey: "events.form.visibility_public",
+      className: statusColors.published,
+    },
+    private: {
+      labelKey: "events.form.visibility_private_short",
+      className:
+        "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300",
+    },
+    unlisted: {
+      labelKey: "events.form.visibility_unlisted_short",
+      className: "bg-muted text-muted-foreground",
+    },
+  }
+
+function eventBadge(event: EventPublic): {
+  labelKey: string
+  className: string
+} {
+  if (event.status === "published") {
+    const badge = visibilityBadge[event.visibility ?? "public"]
+    if (badge) return badge
+  }
+  return {
+    labelKey: `events.status.${event.status}`,
+    className: statusColors[event.status as string] ?? "",
+  }
 }
 
 function groupByDate(
@@ -122,6 +160,11 @@ interface ListBodyProps {
   /** Tooltip text shown on the disabled RSVP button explaining why. */
   rsvpDisabledReason?: string
   /**
+   * Why RSVP is blocked. `no_tickets` swaps the dead disabled button for a
+   * tappable popover offering the popup's purchase flow.
+   */
+  rsvpBlockReason?: RsvpBlockReason
+  /**
    * When false, the RSVP and "Going"/cancel buttons are hidden entirely —
    * used for ended (read-only) popups. Defaults to true.
    */
@@ -169,6 +212,7 @@ export function ListBody({
   pendingRsvpKey,
   canRsvp = true,
   rsvpDisabledReason,
+  rsvpBlockReason,
   showRsvp = true,
   onHide,
   onUnhide,
@@ -183,16 +227,13 @@ export function ListBody({
   // next still-open day's header to the top of the viewport.
   const dayHeaderRefs = useRef<Map<string, HTMLElement>>(new Map())
 
-  // "Now" reference for the today divider + auto-scroll. Ticks once a
-  // minute so the divider creeps down as events start, without re-rendering
-  // every frame. Times are absolute instants, so the comparison is
-  // timezone-agnostic; `formatDayKey` (popup tz) decides which group is
+  // "Now" reference for the today divider, the LIVE badges and the
+  // auto-scroll. Ticks once a minute so the divider creeps down as events
+  // start and a card drops its badge when its event ends, without
+  // re-rendering every frame. Times are absolute instants, so the comparison
+  // is timezone-agnostic; `formatDayKey` (popup tz) decides which group is
   // "today".
-  const [now, setNow] = useState(() => new Date())
-  useEffect(() => {
-    const id = setInterval(() => setNow(new Date()), 60_000)
-    return () => clearInterval(id)
-  }, [])
+  const now = useNowTick()
   const nowMs = now.getTime()
   const todayKey = formatDayKey(now.toISOString())
   // First event (globally, list is start-sorted) that hasn't started yet —
@@ -375,11 +416,21 @@ export function ListBody({
                     !firstUpcomingIsToday && domId === firstUpcomingDomId
                   const isHidden = isAuthed && event.hidden === true
                   const isHighlighted = event.highlighted === true
+                  const isLive = isEventLive(
+                    event.start_time,
+                    event.end_time,
+                    nowMs,
+                  )
+                  // Live sits below highlighted on purpose: the amber
+                  // treatment is an editorial choice the organiser made, and
+                  // a live featured event still reads as live from its badge.
                   const cardClass = isHidden
                     ? "relative rounded-xl border bg-card opacity-60 hover:opacity-100 transition-opacity"
                     : isHighlighted
                       ? "relative rounded-xl border-2 border-amber-400 bg-amber-50 dark:bg-amber-950/30 hover:shadow-md transition-shadow"
-                      : "relative rounded-xl border bg-card hover:shadow-md transition-shadow"
+                      : isLive
+                        ? "relative rounded-xl border border-red-500/30 bg-red-50 dark:bg-red-950/20 hover:shadow-md transition-shadow"
+                        : "relative rounded-xl border bg-card hover:shadow-md transition-shadow"
                   const href = buildPortalEventHref({
                     slug,
                     eventId: event.id,
@@ -450,7 +501,7 @@ export function ListBody({
                             </div>
                             <div className="flex-1 min-w-0">
                               <div className="flex items-start justify-between gap-2 mb-1">
-                                <h3 className="font-medium text-sm sm:text-base flex items-center gap-1.5">
+                                <h3 className="min-w-0 font-medium text-sm sm:text-base flex items-center gap-1.5">
                                   {isOwner && (
                                     <Crown
                                       className="h-3.5 w-3.5 shrink-0 text-amber-500"
@@ -459,15 +510,18 @@ export function ListBody({
                                   )}
                                   <span>{event.title}</span>
                                 </h3>
-                                {isAuthed && (
-                                  <Badge
-                                    variant="secondary"
-                                    className={
-                                      statusColors[event.status as string] ?? ""
-                                    }
-                                  >
-                                    {t(`events.status.${event.status}`)}
-                                  </Badge>
+                                {(isLive || isAuthed) && (
+                                  <div className="flex shrink-0 items-center gap-1.5">
+                                    {isLive && <LiveBadge />}
+                                    {isAuthed && (
+                                      <Badge
+                                        variant="secondary"
+                                        className={eventBadge(event).className}
+                                      >
+                                        {t(eventBadge(event).labelKey)}
+                                      </Badge>
+                                    )}
+                                  </div>
                                 )}
                               </div>
                               <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
@@ -525,6 +579,7 @@ export function ListBody({
                           <div className="absolute bottom-2 right-2 flex items-center gap-1.5">
                             {showRsvp &&
                               event.status === "published" &&
+                              event.host_id !== currentHumanId &&
                               (() => {
                                 const rsvpKey = `${event.id}:${event.start_time}`
                                 const isRsvpPending = pendingRsvpKey === rsvpKey
@@ -532,42 +587,47 @@ export function ListBody({
                                   event.my_rsvp_status &&
                                   event.my_rsvp_status !== "cancelled"
                                 return isRsvped ? (
-                                  <button
-                                    type="button"
-                                    disabled={isRsvpPending}
-                                    onClick={(e) => {
-                                      e.preventDefault()
-                                      e.stopPropagation()
-                                      onCancelRsvp?.(event)
-                                    }}
-                                    className="inline-flex h-7 items-center gap-1 rounded-md border border-emerald-300 bg-emerald-50 px-2 text-xs font-medium text-emerald-700 hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-60 dark:border-emerald-500/40 dark:bg-emerald-950/40 dark:text-emerald-300 dark:hover:bg-emerald-950/60"
-                                  >
-                                    {isRsvpPending ? (
-                                      <Loader2 className="h-3 w-3 animate-spin" />
-                                    ) : (
-                                      <CheckCircle className="h-3 w-3" />
-                                    )}
-                                    {t("events.rsvp.going")}
-                                  </button>
-                                ) : (
-                                  <button
-                                    type="button"
-                                    disabled={isRsvpPending || !canRsvp}
-                                    title={
-                                      !canRsvp ? rsvpDisabledReason : undefined
+                                  <RsvpStatusAction
+                                    size="compact"
+                                    label={
+                                      event.my_rsvp_status === "checked_in"
+                                        ? (t(
+                                            "events.rsvp.checked_in",
+                                          ) as string)
+                                        : undefined
                                     }
-                                    onClick={(e) => {
-                                      e.preventDefault()
-                                      e.stopPropagation()
-                                      onRsvp?.(event)
-                                    }}
-                                    className="inline-flex h-7 items-center gap-1 rounded-md border bg-background px-2 text-xs font-medium shadow-sm hover:bg-muted disabled:cursor-not-allowed disabled:opacity-60"
+                                    isPending={isRsvpPending}
+                                    showCancel={
+                                      event.my_rsvp_status === "registered"
+                                    }
+                                    onCancelRsvp={() => onCancelRsvp?.(event)}
+                                  />
+                                ) : (
+                                  <RsvpBlockedCta
+                                    reason={rsvpBlockReason}
+                                    message={rsvpDisabledReason}
                                   >
-                                    {isRsvpPending && (
-                                      <Loader2 className="h-3 w-3 animate-spin" />
-                                    )}
-                                    {t("events.rsvp.rsvp")}
-                                  </button>
+                                    <button
+                                      type="button"
+                                      disabled={isRsvpPending || !canRsvp}
+                                      title={
+                                        !canRsvp
+                                          ? rsvpDisabledReason
+                                          : undefined
+                                      }
+                                      onClick={(e) => {
+                                        e.preventDefault()
+                                        e.stopPropagation()
+                                        onRsvp?.(event)
+                                      }}
+                                      className="inline-flex h-7 items-center gap-1 rounded-md border bg-background px-2 text-xs font-medium shadow-sm hover:bg-muted disabled:cursor-not-allowed disabled:opacity-60"
+                                    >
+                                      {isRsvpPending && (
+                                        <Loader2 className="h-3 w-3 animate-spin" />
+                                      )}
+                                      {t("events.rsvp.rsvp")}
+                                    </button>
+                                  </RsvpBlockedCta>
                                 )
                               })()}
                             <button

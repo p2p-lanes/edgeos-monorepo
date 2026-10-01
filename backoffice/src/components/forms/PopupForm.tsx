@@ -60,6 +60,7 @@ import {
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { LoadingButton } from "@/components/ui/loading-button"
+import { PasswordInput } from "@/components/ui/password-input"
 import {
   Select,
   SelectContent,
@@ -791,9 +792,8 @@ export function PopupForm({
                     label="SimpleFi"
                     description="Payment integration API key"
                   >
-                    <Input
+                    <PasswordInput
                       id="simplefi_api_key"
-                      type="password"
                       placeholder="Enter API key"
                       value={field.state.value}
                       onChange={(e) => field.handleChange(e.target.value)}

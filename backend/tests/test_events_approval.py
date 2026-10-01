@@ -295,6 +295,36 @@ class TestPortalVenueListHidesPending:
 class TestEventCreationGate:
     """POST /events/portal/events respects event settings."""
 
+    @pytest.mark.parametrize("approval", [None, True, False])
+    @pytest.mark.parametrize("custom_location", [False, True])
+    def test_approval_defaults_and_explicit_opt_out(
+        self, client, db, tenant_a, approval, custom_location
+    ):
+        popup = _make_popup(db, tenant_a)
+        if approval is not None:
+            settings = _set_event_settings(db, tenant_a, popup)
+            settings.events_require_approval = approval
+            db.add(settings)
+            db.commit()
+        owner = _make_human(db, tenant_a)
+        venue = None if custom_location else _make_venue(db, tenant_a, popup)
+        payload = _event_payload(
+            popup, venue_id=venue.id if venue else None, status=EventStatus.PUBLISHED
+        )
+        if custom_location:
+            payload.update(
+                custom_location_name="Community garden",
+                custom_location_url="https://example.com/garden",
+            )
+        response = client.post(
+            "/api/v1/events/portal/events", headers=_human_auth(owner), json=payload
+        )
+        assert response.status_code == 201, response.text
+        assert response.json()["status"] == (
+            "published" if approval is False else "pending_approval"
+        )
+        assert response.json()["visibility"] == "public"
+
     def test_portal_create_blocked_when_events_disabled(
         self,
         client: TestClient,
@@ -715,6 +745,86 @@ class TestEndToEndVisibilityConsistency:
         assert event_id in self._list_ids(client, popup, creator)
 
 
+@pytest.mark.parametrize("event_status", ["draft", "pending_approval", "rejected"])
+@pytest.mark.parametrize("visibility", ["public", "unlisted", "private"])
+def test_unapproved_event_resources_are_manager_only(
+    client, db, tenant_a, event_status, visibility
+):
+    popup = _make_popup(db, tenant_a)
+    owner, host, collaborator, outsider = [_make_human(db, tenant_a) for _ in range(4)]
+    event = Events(
+        tenant_id=tenant_a.id,
+        popup_id=popup.id,
+        owner_id=owner.id,
+        host_id=host.id,
+        collaborator_ids=[collaborator.id],
+        **{k: v for k, v in _event_payload(popup).items() if k != "popup_id"},
+    )
+    event.status = EventStatus(event_status)
+    event.visibility = EventVisibility(visibility)
+    db.add(event)
+    db.commit()
+    for viewer, expected in [
+        (owner, 200),
+        (host, 200),
+        (collaborator, 200),
+        (outsider, 404),
+    ]:
+        for path in [
+            f"/api/v1/events/portal/events/{event.id}",
+            f"/api/v1/events/portal/events/{event.id}/ics",
+            f"/api/v1/event-participants/portal/participants?event_id={event.id}",
+        ]:
+            response = client.get(path, headers=_human_auth(viewer))
+            assert response.status_code == expected, response.text
+
+
+def test_pending_availability_is_opaque_but_still_occupied(client, db, tenant_a):
+    popup = _make_popup(db, tenant_a)
+    _set_event_settings(db, tenant_a, popup)
+    venue = _make_venue(db, tenant_a, popup)
+    owner, outsider = [_make_human(db, tenant_a) for _ in range(2)]
+    response = client.post(
+        "/api/v1/events/portal/events",
+        headers=_human_auth(owner),
+        json=_event_payload(popup, venue_id=venue.id, status=EventStatus.PUBLISHED),
+    )
+    assert response.status_code == 201, response.text
+    event_id = response.json()["id"]
+    for viewer, label in [(owner, "Portal Approval Event"), (outsider, None)]:
+        availability = client.get(
+            f"/api/v1/event-venues/portal/venues/{venue.id}/availability",
+            headers=_human_auth(viewer),
+            params={"start": "2026-05-05T00:00:00Z", "end": "2026-05-06T00:00:00Z"},
+        )
+        assert availability.status_code == 200, availability.text
+        slots = [
+            s for s in availability.json()["busy"] if s.get("event_id") == event_id
+        ]
+        assert slots
+        assert all(s["label"] == label for s in slots)
+    conflicts = client.post(
+        "/api/v1/events/portal/events/check-availability",
+        headers=_human_auth(outsider),
+        json={
+            "venue_id": str(venue.id),
+            "start_time": "2026-05-05T14:00:00Z",
+            "end_time": "2026-05-05T15:00:00Z",
+        },
+    )
+    assert conflicts.status_code == 200, conflicts.text
+    assert conflicts.json()["available"] is False
+    assert conflicts.json()["conflicts"] == []
+    assert len(conflicts.json()["opaque_conflicts"]) == 1
+    listing = client.get(
+        "/api/v1/events/portal/events",
+        headers=_human_auth(outsider),
+        params={"managed_only": True},
+    )
+    assert listing.status_code == 200, listing.text
+    assert event_id not in {e["id"] for e in listing.json()["results"]}
+
+
 class TestEventEditReapproval:
     """PATCH /events/portal/events/{id} re-triggers approval only when a
     sensitive field (date/time/venue) changes AND the resulting venue requires
@@ -762,6 +872,22 @@ class TestEventEditReapproval:
             headers=_human_auth(owner),
             json=body,
         )
+
+    @pytest.mark.parametrize(
+        "initial", [EventStatus.PENDING_APPROVAL, EventStatus.REJECTED]
+    )
+    def test_owner_cannot_publish_unapproved_event(self, client, db, tenant_a, initial):
+        popup = _make_popup(db, tenant_a)
+        owner = _make_human(db, tenant_a)
+        event = self._published_event(db, tenant_a, popup, owner)
+        event.status = initial
+        db.add(event)
+        db.commit()
+
+        response = self._patch(client, event.id, owner, {"status": "published"})
+        assert response.status_code == 403, response.text
+        db.refresh(event)
+        assert event.status == initial
 
     def test_edit_time_in_approval_venue_reapproves(
         self,

@@ -11,7 +11,10 @@ import { CheckboxForm } from "./Form/CheckboxForm"
 import { CountrySelectForm } from "./Form/CountrySelectForm"
 import { ImageUploadForm } from "./Form/ImageUploadForm"
 import { InputForm } from "./Form/InputForm"
-import { MultiSelectDetailedForm } from "./Form/MultiSelectDetailedForm"
+import {
+  MultiSelectDetailedForm,
+  type MultiSelectDetailedFormProps,
+} from "./Form/MultiSelectDetailedForm"
 import { PhoneInputForm } from "./Form/PhoneInputForm"
 import { RadioListForm } from "./Form/RadioListForm"
 import { RichTextForm } from "./Form/RichTextForm"
@@ -54,6 +57,9 @@ export interface SchemaFieldProps {
    *  per-type Form components that have the prop. Types that don't
    *  (RichTextForm, PhoneInputForm, etc.) keep their built-in tone. */
   errorTone?: ErrorTone
+  /** Theme class for the detailed multiselect's portaled menu. */
+  portalContentClassName?: string
+  multiSelectDetailedLabels?: MultiSelectDetailedFormProps["labels"]
 }
 
 export function SchemaField({
@@ -66,6 +72,8 @@ export function SchemaField({
   readOnly = false,
   disabled = false,
   errorTone = "destructive",
+  portalContentClassName,
+  multiSelectDetailedLabels,
 }: SchemaFieldProps) {
   const displayLabel = hideLabelAndSubtitle ? "" : field.label
   const displayHelpText = hideLabelAndSubtitle ? undefined : field.help_text
@@ -225,9 +233,7 @@ export function SchemaField({
                   className={cn(
                     "flex cursor-pointer items-center gap-3 rounded-lg border p-2 transition-colors",
                     "hover:border-muted-foreground/30",
-                    isSelected
-                      ? "border-primary/50 bg-muted"
-                      : "border-input",
+                    isSelected ? "border-primary/50 bg-muted" : "border-input",
                     isDisabled && "cursor-not-allowed opacity-60",
                   )}
                   htmlFor={optionId}
@@ -303,6 +309,8 @@ export function SchemaField({
     case "multiselect_detailed":
       return (
         <MultiSelectDetailedForm
+          portalContentClassName={portalContentClassName}
+          labels={multiSelectDetailedLabels}
           label={displayLabel}
           id={name}
           value={(value as string[]) ?? []}

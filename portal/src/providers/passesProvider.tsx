@@ -41,6 +41,7 @@ interface PassesContext_interface {
     attendeeVisibleProductIds?: string[],
   ) => void
   products: ProductsPass[]
+  productsLoading: boolean
   isEditing: boolean
   toggleEditing: (editing?: boolean) => void
   clearSelections: () => void
@@ -510,10 +511,8 @@ const PassesProvider = ({
   >([])
 
   const [isEditing, setIsEditing] = useState(false)
-  const { products: queriedProducts } = useGetPassesData(
-    salesFlowId,
-    productsOverride === undefined,
-  )
+  const { products: queriedProducts, loading: productsLoading } =
+    useGetPassesData(salesFlowId, productsOverride === undefined)
   const products = productsOverride ?? queriedProducts
   const { getCity } = useCityProvider()
   const city = getCity()
@@ -531,7 +530,6 @@ const PassesProvider = ({
   // Dedicated purchases query — granular invalidation after payment
   const { data: queriedPurchasesData } = usePurchasesQuery(
     cityId,
-    attendees,
     purchasesOverride === undefined,
   )
   const purchasesData = purchasesOverride ?? queriedPurchasesData
@@ -801,6 +799,7 @@ const PassesProvider = ({
       attendeePasses,
       toggleProduct,
       products,
+      productsLoading: productsOverride === undefined && productsLoading,
       isEditing,
       toggleEditing,
       clearSelections,
@@ -811,6 +810,8 @@ const PassesProvider = ({
       attendeePasses,
       toggleProduct,
       products,
+      productsLoading,
+      productsOverride,
       isEditing,
       toggleEditing,
       clearSelections,

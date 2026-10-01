@@ -32,10 +32,7 @@ import type {
   SelectedPassItem,
   SelectedPatronItem,
 } from "@/types/checkout"
-import {
-  buildPaymentProducts,
-  MissingTicketBuyerError,
-} from "./buildPaymentProducts"
+import { buildPaymentProducts } from "./buildPaymentProducts"
 import {
   dispatchPaymentError,
   extractCartMeta,
@@ -226,6 +223,25 @@ export function usePaymentSubmit({
       return { success: false, error: "Buyer information not available" }
     }
 
+    if (
+      submitMode === "open-ticketing" &&
+      Object.values(dynamicItems).some((items) =>
+        items.some(
+          (item) =>
+            item.quantity > 0 &&
+            item.product.category?.toLowerCase() === "ticket" &&
+            !selectedPasses.some((pass) => pass.productId === item.productId),
+        ),
+      ) &&
+      (!buyerData?.email.trim() ||
+        ![buyerData.firstName, buyerData.lastName].join(" ").trim())
+    ) {
+      const message = t("checkout.toast_buyer_incomplete_pay")
+      setCurrentStep("buyer")
+      toast.error(message)
+      return { success: false, error: message }
+    }
+
     // Mirror CartFooter.canContinue: any cart selection counts as "has something
     // to buy", not just selectedPasses. Tickets selected via DynamicProductStep
     // land in dynamicItems (not selectedPasses), so a passes-only guard would
@@ -286,7 +302,6 @@ export function usePaymentSubmit({
         checkoutMode,
         editPassesEnabled,
         submitMode,
-        openTicketBuyer: buyerData,
       })
 
       const result =
@@ -445,13 +460,6 @@ export function usePaymentSubmit({
       setIsSubmitting(false)
       return { success: true }
     } catch (err: unknown) {
-      if (err instanceof MissingTicketBuyerError) {
-        const message = t("checkout.toast_buyer_incomplete_pay")
-        setCurrentStep("buyer")
-        toast.error(message)
-        setIsSubmitting(false)
-        return { success: false, error: message }
-      }
       console.error("Payment failed:", err)
       trackPortalTelemetry("checkout_failed")
 

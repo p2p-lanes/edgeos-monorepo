@@ -809,7 +809,7 @@ export type ApplicationReviewCreate = {
 };
 
 /**
- * A reviewer who has submitted at least one review for a popup.
+ * A configured reviewer or past review submitter for a popup.
  */
 export type ApplicationReviewerOption = {
     id: string;
@@ -975,6 +975,97 @@ export type AttachRateItem = {
     total_attendees?: number;
     with_accommodation?: number;
     rate?: string;
+};
+
+/**
+ * Who made or voided a mark, resolved to a display name.
+ *
+ * ``kind`` is ``human`` for a portal person (an attendee scanning, or an
+ * organizer on the roll call), ``user`` for a backoffice operator, and
+ * ``unknown`` for marks that predate the history table.
+ */
+export type AttendanceActor = {
+    kind: 'human' | 'user' | 'unknown';
+    id?: (string | null);
+    name?: (string | null);
+};
+
+export type kind2 = 'human' | 'user' | 'unknown';
+
+/**
+ * One mark in someone's attendance history, voided or not.
+ */
+export type AttendanceCheckInRecord = {
+    id: string;
+    method: CheckInMethod;
+    had_rsvp: boolean;
+    checked_in_at: string;
+    checked_in_by: AttendanceActor;
+    voided_at?: (string | null);
+    voided_by?: (AttendanceActor | null);
+    void_reason?: (string | null);
+};
+
+/**
+ * One person on the roster of an occurrence.
+ */
+export type AttendanceEntry = {
+    participant_id: string;
+    profile_id: string;
+    first_name?: (string | null);
+    last_name?: (string | null);
+    email?: (string | null);
+    status: ParticipantStatus;
+    check_time?: (string | null);
+    history?: Array<AttendanceCheckInRecord>;
+};
+
+/**
+ * A person found by exact email, for a walk-in check-in.
+ */
+export type AttendanceLookupResult = {
+    profile_id: string;
+    first_name?: (string | null);
+    last_name?: (string | null);
+    email: string;
+    status?: (ParticipantStatus | null);
+};
+
+/**
+ * How attendance is taken for an event (SIM-106).
+ *
+ * * ``none``: no attendance is taken; the QR and the roll call are off.
+ * * ``host_rollcall``: the organizer marks people present by hand; the QR
+ * is neither shown nor accepted.
+ * * ``self_checkin``: the QR is on AND the organizer can still mark people
+ * by hand. Both write the same attendance.
+ *
+ * Once an event has any check-in it can no longer go back to ``none``;
+ * switching between the other two keeps every record.
+ */
+export type AttendanceMode = 'none' | 'host_rollcall' | 'self_checkin';
+
+/**
+ * Private roll call of one occurrence, for its managers only.
+ */
+export type AttendanceRoster = {
+    event_id: string;
+    occurrence_start?: (string | null);
+    attendance_mode: AttendanceMode;
+    window: AttendanceWindow;
+    max_participant?: (number | null);
+    seats_taken: number;
+    checked_in_count: number;
+    entries: Array<AttendanceEntry>;
+};
+
+/**
+ * When marking and voiding are allowed for this occurrence.
+ */
+export type AttendanceWindow = {
+    opens_at: string;
+    closes_at: string;
+    is_open: boolean;
 };
 
 /**
@@ -1197,6 +1288,18 @@ export type AttendeesDirectoryEntry = {
     category?: (string | null);
     participation?: Array<DirectoryProduct>;
     associated_attendees?: Array<AssociatedAttendee>;
+};
+
+/**
+ * Whether the attendee may create their own link from a popup.
+ *
+ * The same answer POST /portal/invites gives, asked ahead of time so the
+ * portal can decide whether to offer the referrals screen at all. Never says
+ * why not: one of the reasons is a red flag.
+ */
+export type AttendeeSharingStatus = {
+    can_share: boolean;
+    sales_flow_id?: (string | null);
 };
 
 /**
@@ -1792,6 +1895,11 @@ export type CheckInListItem = {
 };
 
 /**
+ * How an attendance mark was made.
+ */
+export type CheckInMethod = 'qr' | 'manual';
+
+/**
  * Typed payload stored in the check_ins.payload JSONB column.
  *
  * `source` discriminates how the scan occurred. `notes` is an optional
@@ -1879,7 +1987,7 @@ export type CheckoutPreviewResponse = {
     quote_expires_at?: (string | null);
 };
 
-export type kind2 = 'estimate' | 'definitive';
+export type kind3 = 'estimate' | 'definitive';
 
 /**
  * Short-lived token that unlocks the checkout runtime for a live preview.
@@ -2074,6 +2182,18 @@ export type CredentialInfo = {
 export type CredentialType = 'crud' | 'readonly';
 
 /**
+ * One accepting application flow of another popup, with its own link.
+ */
+export type CrossPopupReferralTarget = {
+    popup_id: string;
+    name: string;
+    slug: string;
+    sales_flow_id: string;
+    flow_name: string;
+    link?: (InvitePublic | null);
+};
+
+/**
  * Time series for cumulative charts.
  */
 export type CumulativeTrends = {
@@ -2191,7 +2311,7 @@ export type EmailTemplatePublic = {
     updated_at?: (string | null);
 };
 
-export type EmailTemplateType = 'login_code_user' | 'login_code_human' | 'application_received' | 'application_accepted' | 'application_rejected' | 'application_accepted_with_discount' | 'application_accepted_with_incentive' | 'application_accepted_scholarship_rejected' | 'payment_confirmed' | 'abandoned_cart' | 'purchase_reminder' | 'abandoned_application' | 'edit_passes_confirmed' | 'event_invitation' | 'event_updated' | 'event_cancelled' | 'event_rsvp_cancelled' | 'event_approval_approved' | 'event_approval_rejected' | 'check_in_pass';
+export type EmailTemplateType = 'login_code_user' | 'login_code_human' | 'application_received' | 'application_accepted' | 'application_rejected' | 'application_accepted_with_discount' | 'application_accepted_with_incentive' | 'application_accepted_scholarship_rejected' | 'payment_confirmed' | 'abandoned_cart' | 'purchase_reminder' | 'abandoned_application' | 'edit_passes_confirmed' | 'event_invitation' | 'event_host_message' | 'event_updated' | 'event_cancelled' | 'event_rsvp_cancelled' | 'event_approval_approved' | 'event_approval_rejected' | 'check_in_pass';
 
 export type EmailTemplateUpdate = {
     subject?: (string | null);
@@ -2237,6 +2357,13 @@ export type EventApprovalPayload = {
     reason?: (string | null);
 };
 
+/**
+ * Body of the attendance-mode endpoints (portal and backoffice).
+ */
+export type EventAttendanceModeUpdate = {
+    attendance_mode: AttendanceMode;
+};
+
 export type EventAvailabilityCheck = {
     venue_id: string;
     start_time: string;
@@ -2271,6 +2398,50 @@ export type EventCalendarMeta = {
 export type EventCalendarTrack = {
     id: string;
     name: string;
+};
+
+/**
+ * Everything the QR success screen renders, resolved server-side.
+ *
+ * Lets the portal paint the result from the check-in response alone: the
+ * landing page performs one POST and no follow-up GET, so a scan is a
+ * single round trip even on a phone on venue wifi.
+ */
+export type EventCheckInEvent = {
+    id: string;
+    title: string;
+    cover_url?: (string | null);
+    host_display_name?: (string | null);
+    start_time: string;
+    end_time: string;
+    timezone: string;
+    venue_title?: (string | null);
+    occurrence_start?: (string | null);
+    popup_slug: string;
+};
+
+/**
+ * The portal URL an event's organizer shows as a QR for attendees to scan.
+ *
+ * Served only to the event's managers, so the portal can gate the QR panel
+ * on a real server-side permission check instead of hiding a UI element.
+ * The URL itself is not a secret — it carries no token and is deliberately
+ * fixed and shareable (see the product limitation in SIM-103) — but who
+ * gets handed it is still a decision the backend makes.
+ */
+export type EventCheckInLink = {
+    url: string;
+    occurrence_start?: (string | null);
+};
+
+/**
+ * Outcome of a QR check-in.
+ */
+export type EventCheckInResult = {
+    participant: EventParticipantPublic;
+    already_checked_in?: boolean;
+    created?: boolean;
+    event: EventCheckInEvent;
 };
 
 /**
@@ -2357,6 +2528,28 @@ export type EventInvitationPublic = {
     first_name?: (string | null);
     last_name?: (string | null);
     created_at: string;
+};
+
+export type EventMessageCreate = {
+    /**
+     * Reuse this ID when retrying the same send.
+     */
+    id: string;
+    body: string;
+    occurrence_start?: (string | null);
+};
+
+export type EventMessagePublic = {
+    id: string;
+    event_id: string;
+    author_name: string;
+    body: string;
+    occurrence_start: (string | null);
+    recipient_count: number;
+    sent_count: number;
+    failed_count: number;
+    created_at: string;
+    completed_at: (string | null);
 };
 
 /**
@@ -2446,6 +2639,7 @@ export type EventPublic = {
     collaborator_ids?: Array<(string)>;
     status?: EventStatus;
     highlighted?: boolean;
+    attendance_mode?: AttendanceMode;
     rejection_reason?: (string | null);
     rrule?: (string | null);
     recurrence_master_id?: (string | null);
@@ -3342,6 +3536,23 @@ export type HumanPortalPublic = {
 export type HumanProfileStats = {
     popups: Array<HumanProfileStatsPopup>;
     total_days: number;
+    events_attended?: number;
+    events_hosted?: number;
+    hosted_attendees_count?: number;
+    top_event_theme?: (string | null);
+    most_shared_attendees?: Array<HumanProfileStatsPerson>;
+    most_active_attendees_of_hosted_events?: Array<HumanProfileStatsPerson>;
+};
+
+/**
+ * A human ranked in an event attendance profile statistic.
+ */
+export type HumanProfileStatsPerson = {
+    human_id: string;
+    name: string;
+    picture_url?: (string | null);
+    event_count: number;
+    shared_events?: Array<HumanProfileStatsSharedEvent>;
 };
 
 /**
@@ -3355,6 +3566,16 @@ export type HumanProfileStatsPopup = {
     location?: (string | null);
     image_url?: (string | null);
     total_days: number;
+};
+
+/**
+ * An event instance shared with another human.
+ */
+export type HumanProfileStatsSharedEvent = {
+    event_id: string;
+    title: string;
+    start_time: string;
+    timezone: string;
 };
 
 /**
@@ -3454,9 +3675,15 @@ export type InviteCreate = {
  * An attendee sets far less than an admin: the policy fields (discount,
  * auto_approve) stay admin-only, and max_uses is dictated by the popup's
  * max_referrals_per_attendee quota.
+ *
+ * ``source_popup_id`` names another popup of the same tenant whose access
+ * lets the attendee share ``popup_id`` without being in it. Omitted, or equal
+ * to ``popup_id``, means the attendee shares their own popup.
  */
 export type InvitePortalCreate = {
     popup_id: string;
+    source_popup_id?: (string | null);
+    sales_flow_id?: (string | null);
     token?: (string | null);
     max_uses?: (number | null);
     expires_at?: (string | null);
@@ -3496,6 +3723,7 @@ export type InvitePublic = {
     expires_at?: (string | null);
     created_by?: (string | null);
     referrer_human_id?: (string | null);
+    source_popup_id?: (string | null);
     created_at: string;
     updated_at: string;
 };
@@ -3511,6 +3739,7 @@ export type InvitePublic = {
 export type InvitePublicPreview = {
     id: string;
     popup_id: string;
+    sales_flow_id?: (string | null);
     token: string;
     inviter_name?: (string | null);
     is_email_restricted: boolean;
@@ -3667,6 +3896,11 @@ export type ListModel_EmailTemplatePublic_ = {
     paging: Paging;
 };
 
+export type ListModel_EventMessagePublic_ = {
+    results: Array<EventMessagePublic>;
+    paging: Paging;
+};
+
 export type ListModel_EventParticipantPublic_ = {
     results: Array<EventParticipantPublic>;
     paging: Paging;
@@ -3800,6 +4034,17 @@ export type ListModel_TrackPublic_ = {
 export type ListModel_UserPublic_ = {
     results: Array<UserPublic>;
     paging: Paging;
+};
+
+export type ManualCheckInRequest = {
+    profile_id: string;
+    occurrence_start?: (string | null);
+};
+
+export type ManualCheckInResult = {
+    entry: AttendanceEntry;
+    already_checked_in?: boolean;
+    created?: boolean;
 };
 
 /**
@@ -5040,6 +5285,11 @@ export type ReviewSummary = {
     reviews: Array<ApplicationReviewPublic>;
 };
 
+export type RsvpEligibility = {
+    allowed: boolean;
+    reason?: ('rejected' | 'no_tickets' | null);
+};
+
 /**
  * Sales flow creation payload (BO). tenant_id is derived server-side.
  */
@@ -5074,10 +5324,12 @@ export type SalesFlowCreate = {
     invites_enabled?: (boolean | null);
     referrals_enabled?: (boolean | null);
     max_referrals_per_attendee?: (number | null);
+    cross_popup_referrals_enabled?: (boolean | null);
     checkin_pass_lead_days?: (number | null);
     open_checkout_success_url?: (string | null);
     open_checkout_cancel_url?: (string | null);
     open_checkout_signing_secret?: (string | null);
+    simplefi_api_key?: (string | null);
     abandoned_cart_delay_days?: (number | null);
     abandoned_cart_repeat_days?: (number | null);
     abandoned_cart_max_count?: (number | null);
@@ -5221,10 +5473,12 @@ export type SalesFlowPublic = {
     invites_enabled?: (boolean | null);
     referrals_enabled?: (boolean | null);
     max_referrals_per_attendee?: (number | null);
+    cross_popup_referrals_enabled?: (boolean | null);
     checkin_pass_lead_days?: (number | null);
     open_checkout_success_url?: (string | null);
     open_checkout_cancel_url?: (string | null);
     open_checkout_signing_secret?: (string | null);
+    simplefi_api_key?: (string | null);
     abandoned_cart_delay_days?: (number | null);
     abandoned_cart_repeat_days?: (number | null);
     abandoned_cart_max_count?: (number | null);
@@ -5313,10 +5567,12 @@ export type SalesFlowUpdate = {
     invites_enabled?: (boolean | null);
     referrals_enabled?: (boolean | null);
     max_referrals_per_attendee?: (number | null);
+    cross_popup_referrals_enabled?: (boolean | null);
     checkin_pass_lead_days?: (number | null);
     open_checkout_success_url?: (string | null);
     open_checkout_cancel_url?: (string | null);
     open_checkout_signing_secret?: (string | null);
+    simplefi_api_key?: (string | null);
     abandoned_cart_delay_days?: (number | null);
     abandoned_cart_repeat_days?: (number | null);
     abandoned_cart_max_count?: (number | null);
@@ -6257,6 +6513,12 @@ export type VenueWeeklyHourRef = {
 
 export type VenueWeeklyHoursUpdate = {
     hours: Array<VenueWeeklyHourInput>;
+};
+
+export type VoidCheckInRequest = {
+    profile_id: string;
+    occurrence_start?: (string | null);
+    reason: string;
 };
 
 export type AccommodationsListPropertiesData = {
@@ -7573,6 +7835,27 @@ export type EmailTemplatesDeleteEmailTemplateData = {
 
 export type EmailTemplatesDeleteEmailTemplateResponse = (void);
 
+export type EventMessagesListEventMessagesData = {
+    eventId: string;
+    /**
+     * Maximum number of items to return
+     */
+    limit?: number;
+    /**
+     * Number of items to skip
+     */
+    skip?: number;
+};
+
+export type EventMessagesListEventMessagesResponse = (ListModel_EventMessagePublic_);
+
+export type EventMessagesSendEventMessageData = {
+    eventId: string;
+    requestBody: EventMessageCreate;
+};
+
+export type EventMessagesSendEventMessageResponse = (EventMessagePublic);
+
 export type EventParticipantsListParticipantsData = {
     eventId?: (string | null);
     /**
@@ -7617,6 +7900,12 @@ export type EventParticipantsDeleteParticipantData = {
 
 export type EventParticipantsDeleteParticipantResponse = (void);
 
+export type EventParticipantsGetPortalRsvpEligibilityData = {
+    popupId: string;
+};
+
+export type EventParticipantsGetPortalRsvpEligibilityResponse = (RsvpEligibility);
+
 export type EventParticipantsListPortalParticipantsData = {
     eventId: string;
     /**
@@ -7658,7 +7947,69 @@ export type EventParticipantsCheckInData = {
     requestBody?: (RegisterRequest | null);
 };
 
-export type EventParticipantsCheckInResponse = (EventParticipantPublic);
+export type EventParticipantsCheckInResponse = (EventCheckInResult);
+
+export type EventParticipantsGetPortalAttendanceData = {
+    eventId: string;
+    occurrenceStart?: (string | null);
+};
+
+export type EventParticipantsGetPortalAttendanceResponse = (AttendanceRoster);
+
+export type EventParticipantsLookupPortalAttendeeData = {
+    email: string;
+    eventId: string;
+    occurrenceStart?: (string | null);
+};
+
+export type EventParticipantsLookupPortalAttendeeResponse = (AttendanceLookupResult);
+
+export type EventParticipantsPortalManualCheckInData = {
+    eventId: string;
+    requestBody: ManualCheckInRequest;
+};
+
+export type EventParticipantsPortalManualCheckInResponse = (ManualCheckInResult);
+
+export type EventParticipantsPortalVoidCheckInData = {
+    eventId: string;
+    requestBody: VoidCheckInRequest;
+};
+
+export type EventParticipantsPortalVoidCheckInResponse = (AttendanceEntry);
+
+export type EventParticipantsGetAttendanceData = {
+    eventId: string;
+    occurrenceStart?: (string | null);
+    xTenantId?: (string | null);
+};
+
+export type EventParticipantsGetAttendanceResponse = (AttendanceRoster);
+
+export type EventParticipantsLookupAttendeeData = {
+    email: string;
+    eventId: string;
+    occurrenceStart?: (string | null);
+    xTenantId?: (string | null);
+};
+
+export type EventParticipantsLookupAttendeeResponse = (AttendanceLookupResult);
+
+export type EventParticipantsAdminManualCheckInData = {
+    eventId: string;
+    requestBody: ManualCheckInRequest;
+    xTenantId?: (string | null);
+};
+
+export type EventParticipantsAdminManualCheckInResponse = (ManualCheckInResult);
+
+export type EventParticipantsAdminVoidCheckInData = {
+    eventId: string;
+    requestBody: VoidCheckInRequest;
+    xTenantId?: (string | null);
+};
+
+export type EventParticipantsAdminVoidCheckInResponse = (AttendanceEntry);
 
 export type EventsListPublicCalendarData = {
     /**
@@ -7694,6 +8045,7 @@ export type EventsPublicCalendarIcsResponse = (string);
 export type EventsListEventsData = {
     eventStatus?: (EventStatus | null);
     excludeStatuses?: (Array<EventStatus> | null);
+    includeOutsideWindow?: boolean;
     kind?: (string | null);
     /**
      * Maximum number of items to return
@@ -7767,6 +8119,14 @@ export type EventsUpdateEventAdminNotesData = {
 };
 
 export type EventsUpdateEventAdminNotesResponse = (EventAdminNotes);
+
+export type EventsUpdateEventAttendanceModeData = {
+    eventId: string;
+    requestBody: EventAttendanceModeUpdate;
+    xTenantId?: (string | null);
+};
+
+export type EventsUpdateEventAttendanceModeResponse = (EventPublic);
 
 export type EventsCancelEventData = {
     eventId: string;
@@ -8000,6 +8360,20 @@ export type EventsCancelPortalEventData = {
 };
 
 export type EventsCancelPortalEventResponse = (EventPublic);
+
+export type EventsGetPortalEventCheckInLinkData = {
+    eventId: string;
+    occurrenceStart?: (string | null);
+};
+
+export type EventsGetPortalEventCheckInLinkResponse = (EventCheckInLink);
+
+export type EventsUpdatePortalEventAttendanceModeData = {
+    eventId: string;
+    requestBody: EventAttendanceModeUpdate;
+};
+
+export type EventsUpdatePortalEventAttendanceModeResponse = (EventPublic);
 
 export type EventsExportPortalEventIcsData = {
     eventId: string;
@@ -8739,6 +9113,18 @@ export type InvitesCreateMyLinkData = {
 };
 
 export type InvitesCreateMyLinkResponse = (InvitePublic);
+
+export type InvitesGetMySharingStatusData = {
+    popupId: string;
+};
+
+export type InvitesGetMySharingStatusResponse = (AttendeeSharingStatus);
+
+export type InvitesListCrossPopupTargetsData = {
+    sourcePopupId: string;
+};
+
+export type InvitesListCrossPopupTargetsResponse = (Array<CrossPopupReferralTarget>);
 
 export type InvitesUpdateMyLinkData = {
     linkId: string;

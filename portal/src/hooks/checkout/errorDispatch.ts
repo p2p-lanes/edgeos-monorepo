@@ -78,12 +78,17 @@ export function dispatchPaymentError(
     }
   }
 
-  if (
-    detail.code === "payment_cancel_failed" ||
-    detail.code === "concurrent_payment_in_progress"
-  ) {
-    // Transient / retryable: the prior payment cancel failed or a sibling
-    // checkout raced this one.  Do NOT block resubmission.
+  if (detail.code === "concurrent_payment_in_progress") {
+    return {
+      messageKey: `${prefix}.concurrent_payment_in_progress`,
+      blockResubmit: false,
+      setPersistentError: true,
+      navigate: null,
+    }
+  }
+
+  if (detail.code === "payment_cancel_failed") {
+    // A failed cancellation is retryable and must not block resubmission.
     return {
       messageKey: `${prefix}.payment_cancel_failed`,
       blockResubmit: false,

@@ -786,6 +786,46 @@ class TestConcurrentCreateSameBuyer:
         assert isinstance(exc.detail, dict)
         assert exc.detail["code"] == "concurrent_payment_in_progress"
 
+    @pytest.mark.parametrize("open_checkout", [False, True])
+    @pytest.mark.parametrize("source", [None, "stripe", "simplefi"])
+    def test_guard_ignores_payments_outside_the_supersede_lifecycle(
+        self, db, tenant_a, open_checkout, source
+    ):
+        popup = _make_popup(db, tenant_a)
+        buyer = _make_human(db, tenant_a)
+        application = _make_application(db, tenant_a, popup, buyer)
+        prior = _make_pending_payment(
+            db,
+            tenant_a,
+            popup,
+            application_id=None if open_checkout else application.id,
+            buyer_email=buyer.email if open_checkout else None,
+        )
+        prior.source = source
+        # A SimpleFi row without a provider request is not a live checkout.
+        if source == "simplefi":
+            prior.external_id = None
+        db.add(prior)
+        db.commit()
+        with patch("app.services.simplefi.get_simplefi_client") as provider:
+            if open_checkout:
+                payments_crud.supersede_pending_payments(
+                    db, email=buyer.email, popup_id=popup.id
+                )
+                payments_crud._check_no_pending_sibling_by_email_popup(
+                    db, buyer.email, popup.id
+                )
+            else:
+                payments_crud.supersede_pending_payments(
+                    db, application_id=application.id
+                )
+                payments_crud._check_no_pending_sibling_by_application(
+                    db, application.id
+                )
+        provider.assert_not_called()
+        db.refresh(prior)
+        assert prior.status == PaymentStatus.PENDING.value
+
     def test_sibling_recheck_is_noop_when_no_sibling(
         self,
         db: Session,

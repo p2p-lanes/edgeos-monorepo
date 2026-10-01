@@ -1,96 +1,68 @@
-import { describe, expect, it } from "vitest"
-import { purchasesFromPayments } from "./useGetPurchases"
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
+import { renderHook, waitFor } from "@testing-library/react"
+import type { ReactNode } from "react"
+import { createElement } from "react"
+import { beforeEach, describe, expect, it, vi } from "vitest"
+import { ApplicationsService } from "@/client"
+import { usePurchasesQuery } from "./useGetPurchases"
 
-describe("purchasesFromPayments", () => {
-  it("keeps a direct purchase attached to its real attendee", () => {
-    const purchases = purchasesFromPayments(
-      [
-        {
-          products_snapshot: [
-            {
-              attendee_id: "attendee-1",
-              product_id: "product-1",
-              product_name: "Weekend pass",
-              product_price: "99.00",
-              product_category: "ticket",
-              product_currency: "USD",
-              quantity: 1,
-              created_at: "2026-08-21T00:00:00Z",
-            },
-          ],
-        },
-      ],
-      [
-        {
-          id: "attendee-1",
-          name: "Taylor Buyer",
-          category: "main",
-        },
-      ],
-    )
+vi.mock("@/client", () => ({
+  ApplicationsService: {
+    getMyPurchases: vi.fn(),
+  },
+}))
 
-    expect(purchases).toEqual([
+vi.mock("@/hooks/useIsAuthenticated", () => ({
+  useIsAuthenticated: () => true,
+}))
+
+function wrapper({ children }: { children: ReactNode }) {
+  const queryClient = new QueryClient({
+    defaultOptions: { queries: { retry: false } },
+  })
+  return createElement(QueryClientProvider, { client: queryClient }, children)
+}
+
+describe("usePurchasesQuery", () => {
+  beforeEach(() => vi.clearAllMocks())
+
+  it("loads active entitlements instead of projecting payment history", async () => {
+    const purchases = [
       {
         attendee_id: "attendee-1",
         attendee_name: "Taylor Buyer",
         attendee_category: "main",
         products: [
-          expect.objectContaining({
+          {
             id: "product-1",
+            tenant_id: "tenant-1",
+            popup_id: "popup-1",
             name: "Weekend pass",
+            slug: "weekend-pass",
             price: "99.00",
+            category: "ticket",
             quantity: 1,
-          }),
+          },
         ],
       },
-    ])
+    ]
+    vi.mocked(ApplicationsService.getMyPurchases).mockResolvedValue(purchases)
+
+    const { result } = renderHook(() => usePurchasesQuery("popup-1"), {
+      wrapper,
+    })
+
+    await waitFor(() => expect(result.current.isSuccess).toBe(true))
+
+    expect(ApplicationsService.getMyPurchases).toHaveBeenCalledWith({
+      popupId: "popup-1",
+    })
+    expect(result.current.data).toEqual(purchases)
   })
 
-  it("does not invent a synthetic attendee for unknown payment snapshots", () => {
-    expect(
-      purchasesFromPayments(
-        [
-          {
-            products_snapshot: [
-              {
-                attendee_id: "unknown-attendee",
-                product_id: "product-1",
-                product_name: "Weekend pass",
-                product_price: "99.00",
-                product_category: "ticket",
-                product_currency: "USD",
-                quantity: 1,
-                created_at: "2026-08-21T00:00:00Z",
-              },
-            ],
-          },
-        ],
-        [],
-      ),
-    ).toEqual([])
-  })
+  it("does not query without a popup", () => {
+    renderHook(() => usePurchasesQuery(null), { wrapper })
 
-  it("does not project a pending recipient before attendee materialization", () => {
-    expect(
-      purchasesFromPayments(
-        [
-          {
-            products_snapshot: [
-              {
-                attendee_id: null,
-                product_id: "product-1",
-                product_name: "Weekend pass",
-                product_price: "99.00",
-                product_category: "ticket",
-                product_currency: "USD",
-                quantity: 1,
-                created_at: "2026-08-21T00:00:00Z",
-              },
-            ],
-          },
-        ],
-        [],
-      ),
-    ).toEqual([])
+    expect(ApplicationsService.getMyPurchases).not.toHaveBeenCalled()
   })
 })

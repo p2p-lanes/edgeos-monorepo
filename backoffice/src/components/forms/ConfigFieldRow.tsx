@@ -1,4 +1,5 @@
 import { Input } from "@/components/ui/input"
+import { PasswordInput } from "@/components/ui/password-input"
 import {
   Select,
   SelectContent,
@@ -102,9 +103,8 @@ export function ConfigFieldRow({
           />
         )}
         {kind === "secret" && (
-          <Input
+          <PasswordInput
             id={controlId}
-            type="password"
             value={value}
             onChange={(e) => onValueChange(e.target.value)}
             disabled={readOnly}

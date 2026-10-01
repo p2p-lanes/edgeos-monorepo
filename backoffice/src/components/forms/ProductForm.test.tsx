@@ -173,6 +173,24 @@ describe("ProductForm — ticket-as-first-class-entity (Phase 8.2)", () => {
     )
   })
 
+  it("does not submit a product with an empty category", async () => {
+    const user = userEvent.setup()
+    render(
+      <ProductForm
+        defaultValues={{ ...editProduct()!, category: "" }}
+        onSuccess={vi.fn()}
+      />,
+      { wrapper: makeWrapper() },
+    )
+
+    await user.click(
+      await screen.findByRole("button", { name: /save changes/i }),
+    )
+
+    expect(await screen.findByText("Category is required")).toBeInTheDocument()
+    expect(mockUpdateProduct).not.toHaveBeenCalled()
+  })
+
   it("does NOT render an Attendee Type / attendee_category input for ticket products", async () => {
     render(<ProductForm onSuccess={vi.fn()} />, { wrapper: makeWrapper() })
 

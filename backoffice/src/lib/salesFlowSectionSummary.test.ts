@@ -174,6 +174,9 @@ describe("the smaller groups", () => {
         max_referrals_per_attendee: 10,
       }),
     ).toBe("Invitations on · attendees can share, 10 uses each")
+    expect(say("Ways In", { cross_popup_referrals_enabled: true })).toBe(
+      "open to links from other popups",
+    )
   })
 
   it("says when no check-in pass goes out at all", () => {

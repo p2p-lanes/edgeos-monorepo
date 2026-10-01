@@ -67,10 +67,19 @@ async def _reconcile_candidate(session: Session, payment: Payments) -> str:
     ``update_status`` / ``_reconcile_approved``.
     """
     from app.api.popup.models import Popups
+    from app.api.sales_flow.models import SalesFlows
 
     popup = session.get(Popups, payment.popup_id)
+    flow = (
+        session.get(SalesFlows, payment.sales_flow_id)
+        if payment.sales_flow_id
+        else None
+    )
+    api_key = (flow.simplefi_api_key if flow else None) or (
+        popup.simplefi_api_key if popup else None
+    )
 
-    if popup is None or not popup.simplefi_api_key:
+    if popup is None or not api_key:
         # Orphaned payment: no live SimpleFi link to protect.  Expire locally
         # and release holds — same policy as supersede for orphaned payments.
         # Counted as "expired_orphaned", NOT as plain "expired", so the
@@ -91,7 +100,7 @@ async def _reconcile_candidate(session: Session, payment: Payments) -> str:
         )
         return "expired_orphaned"
 
-    simplefi_client = get_simplefi_client(popup.simplefi_api_key)
+    simplefi_client = get_simplefi_client(api_key)
 
     # Fetch current status from SimpleFi OUTSIDE any DB lock (ADR-5).
     try:

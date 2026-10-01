@@ -7,9 +7,9 @@ EventPublic | EventOpaque | None decision is made. Every event-returning
 endpoint MUST route through this function.
 
 Decision order (first match wins):
-  1. visibility != PRIVATE -> EventPublic (PUBLIC / UNLISTED unchanged)
-  2. is_admin_in_popup -> EventPublic
-  3. viewer is event owner -> EventPublic
+  1. admin or event manager -> EventPublic
+  2. draft / pending / rejected -> None or opaque availability
+  3. visibility != PRIVATE -> EventPublic
   4. group_id IS NOT NULL AND group_id IN viewer_group_ids -> EventPublic
   5. group_id IS NULL AND viewer is in invitee_ids -> EventPublic (invitation-based PRIVATE)
   6. Otherwise:
@@ -25,12 +25,49 @@ listing endpoints that already have invitation data in scope.
 from __future__ import annotations
 
 import uuid
-from typing import TYPE_CHECKING, Literal
+from typing import Literal
 
-from app.api.event.schemas import EventOpaque, EventPublic, EventVisibility
+from fastapi import HTTPException
 
-if TYPE_CHECKING:
-    pass
+from app.api.event.schemas import EventOpaque, EventPublic, EventStatus, EventVisibility
+
+
+def human_manages_event(event, human_id: uuid.UUID) -> bool:
+    """Owners, designated hosts and collaborators share management rights."""
+    if human_id in (event.owner_id, getattr(event, "host_id", None)):
+        return True
+    return str(human_id) in {
+        str(value) for value in (getattr(event, "collaborator_ids", None) or [])
+    }
+
+
+def ensure_event_visible_to_human(db, event, human) -> None:
+    """Apply the same access policy to direct detail, ICS and related resources."""
+    from app.api.event.crud import invitations_crud
+    from app.api.group.crud import groups_crud
+
+    private = event.visibility == EventVisibility.PRIVATE
+    group_ids = (
+        groups_crud.get_human_group_ids(db, human.id, event.popup_id)
+        if private and event.group_id is not None
+        else set()
+    )
+    invitees = (
+        invitations_crud.list_existing_human_ids(db, event.id)
+        if private and event.group_id is None
+        else set()
+    )
+    if (
+        project_event_for(
+            viewer=human,
+            event=event,
+            viewer_group_ids=group_ids,
+            is_admin_in_popup=False,
+            invitee_ids=invitees,
+        )
+        is None
+    ):
+        raise HTTPException(status_code=404, detail="Event not found")
 
 
 def project_event_for(
@@ -63,16 +100,17 @@ def project_event_for(
         EventOpaque  — conflict skeleton (mode='availability' only)
         None         — event should be omitted (mode='listing' only)
     """
-    # 1. Non-PRIVATE: always full detail
+    if is_admin_in_popup or human_manages_event(event, viewer.id):
+        return EventPublic.model_validate(event)
+
+    if event.status in (
+        EventStatus.DRAFT,
+        EventStatus.PENDING_APPROVAL,
+        EventStatus.REJECTED,
+    ):
+        return _opaque_or_none(event, mode)
+
     if event.visibility != EventVisibility.PRIVATE:
-        return EventPublic.model_validate(event)
-
-    # 2. Admin bypass
-    if is_admin_in_popup:
-        return EventPublic.model_validate(event)
-
-    # 3. Owner bypass
-    if event.owner_id == viewer.id:
         return EventPublic.model_validate(event)
 
     # 4. Group-scoped PRIVATE: membership check

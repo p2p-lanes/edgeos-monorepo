@@ -1,13 +1,15 @@
 import uuid
 from datetime import datetime
 
-from sqlmodel import Session, func, select
+from sqlalchemy import or_
+from sqlmodel import Session, col, func, select
 
 from app.api.event_participant.models import EventParticipants
 from app.api.event_participant.schemas import (
     EventParticipantCreate,
     EventParticipantUpdate,
     ParticipantStatus,
+    RsvpEligibility,
 )
 from app.api.shared.crud import BaseCRUD
 
@@ -19,6 +21,103 @@ class EventParticipantsCRUD(
 
     def __init__(self) -> None:
         super().__init__(EventParticipants)
+
+    def eligibility_by_human(
+        self, session: Session, popup_id: uuid.UUID, human_ids: set[uuid.UUID]
+    ) -> dict[uuid.UUID, RsvpEligibility]:
+        """Live RSVP access: an allocated ticket and no rejected main application.
+
+        Auxiliary application flows (volunteers, artists, etc.) do not decide
+        participation in the gathering. Two batched queries serve both a single
+        RSVP and an entire notification audience.
+        """
+        from app.api.application.models import Applications
+        from app.api.application.schemas import ApplicationStatus
+        from app.api.attendee.models import AttendeeProducts, Attendees
+        from app.api.sales_flow.models import SalesFlows
+
+        if not human_ids:
+            return {}
+        ticket_holders = set(
+            session.exec(
+                select(Attendees.human_id)
+                .join(AttendeeProducts, AttendeeProducts.attendee_id == Attendees.id)
+                .where(
+                    Attendees.popup_id == popup_id,
+                    col(Attendees.human_id).in_(human_ids),
+                    col(AttendeeProducts.revoked_at).is_(None),
+                    AttendeeProducts.product_category_snapshot == "ticket",
+                )
+                .distinct()
+            ).all()
+        )
+        rejected = set(
+            session.exec(
+                select(Applications.human_id)
+                .join(SalesFlows, Applications.sales_flow_id == SalesFlows.id)
+                .where(
+                    Applications.popup_id == popup_id,
+                    col(Applications.human_id).in_(human_ids),
+                    Applications.status == ApplicationStatus.REJECTED.value,
+                    SalesFlows.is_default == True,  # noqa: E712
+                )
+            ).all()
+        )
+        return {
+            human_id: RsvpEligibility(
+                allowed=human_id in ticket_holders and human_id not in rejected,
+                reason="rejected"
+                if human_id in rejected
+                else ("no_tickets" if human_id not in ticket_holders else None),
+            )
+            for human_id in human_ids
+        }
+
+    def active_profile_ids(
+        self, session: Session, event_id: uuid.UUID
+    ) -> set[uuid.UUID]:
+        from app.api.event.models import Events
+
+        return set(
+            session.exec(
+                select(EventParticipants.profile_id)
+                .join(Events, Events.id == EventParticipants.event_id)
+                .where(
+                    EventParticipants.event_id == event_id,
+                    EventParticipants.status != ParticipantStatus.CANCELLED,
+                    or_(
+                        Events.host_id.is_(None),
+                        EventParticipants.profile_id != Events.host_id,
+                    ),
+                )
+            ).all()
+        )
+
+    def eligible_recipients(
+        self, session: Session, event, occurrence_start: datetime | None = None
+    ):
+        from app.api.event.models import Events
+        from app.api.human.models import Humans
+
+        query = (
+            select(Humans)
+            .join(EventParticipants, EventParticipants.profile_id == Humans.id)
+            .join(Events, Events.id == EventParticipants.event_id)
+            .where(
+                EventParticipants.event_id == event.id,
+                EventParticipants.status != ParticipantStatus.CANCELLED,
+            )
+        )
+        if event.host_id is not None:
+            query = query.where(EventParticipants.profile_id != event.host_id)
+        if occurrence_start is not None:
+            query = query.where(EventParticipants.occurrence_start == occurrence_start)
+        humans = list(session.exec(query.distinct()).all())
+        eligibility = self.eligibility_by_human(
+            session, event.popup_id, {h.id for h in humans}
+        )
+        by_email = {h.email: h for h in humans if h.email and eligibility[h.id].allowed}
+        return list(by_email.values())
 
     def get_by_event_and_profile(
         self,
@@ -55,6 +154,7 @@ class EventParticipantsCRUD(
         limit: int = 100,
         occurrence_start: datetime | None = None,
         scope_to_occurrence: bool = False,
+        exclude_profile_id: uuid.UUID | None = None,
     ) -> tuple[list[EventParticipants], int]:
         """List participants for an event.
 
@@ -62,11 +162,15 @@ class EventParticipantsCRUD(
         ``occurrence_start`` matches exactly (or IS NULL for one-offs).
         Otherwise all rows for the event are returned (legacy behavior).
         """
-        if not scope_to_occurrence:
+        if not scope_to_occurrence and exclude_profile_id is None:
             return self.find(session, skip=skip, limit=limit, event_id=event_id)
         statement = select(EventParticipants).where(
             EventParticipants.event_id == event_id,
         )
+        if exclude_profile_id is not None:
+            statement = statement.where(
+                EventParticipants.profile_id != exclude_profile_id
+            )
         if occurrence_start is None:
             statement = statement.where(
                 EventParticipants.occurrence_start.is_(None)  # type: ignore[union-attr]
@@ -87,12 +191,19 @@ class EventParticipantsCRUD(
         event_id: uuid.UUID,
         occurrence_start: datetime | None = None,
     ) -> int:
+        from app.api.event.models import Events
+
         statement = (
             select(func.count())
             .select_from(EventParticipants)
+            .join(Events, Events.id == EventParticipants.event_id)
             .where(
                 EventParticipants.event_id == event_id,
                 EventParticipants.status != ParticipantStatus.CANCELLED,
+                or_(
+                    Events.host_id.is_(None),
+                    EventParticipants.profile_id != Events.host_id,
+                ),
             )
         )
         if occurrence_start is not None:
@@ -113,6 +224,8 @@ class EventParticipantsCRUD(
         Used by the backoffice event list so operators can see RSVP counts
         without opening each event, avoiding an N+1 of ``count_active_for_event``.
         """
+        from app.api.event.models import Events
+
         if not event_ids:
             return {}
         statement = (
@@ -120,9 +233,14 @@ class EventParticipantsCRUD(
                 EventParticipants.event_id,
                 func.count().label("count"),
             )
+            .join(Events, Events.id == EventParticipants.event_id)
             .where(
                 EventParticipants.event_id.in_(event_ids),  # type: ignore[attr-defined]
                 EventParticipants.status != ParticipantStatus.CANCELLED,
+                or_(
+                    Events.host_id.is_(None),
+                    EventParticipants.profile_id != Events.host_id,
+                ),
             )
             .group_by(EventParticipants.event_id)
         )

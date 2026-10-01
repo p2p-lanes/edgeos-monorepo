@@ -23,6 +23,7 @@ from app.api import (
     email_log,
     email_template,
     event,
+    event_message,
     event_participant,
     event_settings,
     event_venue,
@@ -121,6 +122,7 @@ api_router.include_router(google_fonts.router)
 
 # Events module
 api_router.include_router(event.router)
+api_router.include_router(event_message.router)
 api_router.include_router(event_participant.router)
 api_router.include_router(event_venue.router)
 api_router.include_router(event_venue.utils_router)

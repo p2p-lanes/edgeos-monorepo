@@ -373,7 +373,12 @@ const useCheckoutState = ({
   const handleSubmit = async (
     formData: DefaultCheckoutFormData | CheckoutApplicationValues,
   ): Promise<void> => {
-    await submitMutation.mutateAsync({ formData })
+    try {
+      await submitMutation.mutateAsync({ formData })
+    } catch {
+      // onError already sets the checkout message and state. Propagating the
+      // rejection makes UserInfoForm display a second, generic error.
+    }
   }
 
   return {

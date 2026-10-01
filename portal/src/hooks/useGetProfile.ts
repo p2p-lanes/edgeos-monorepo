@@ -8,7 +8,13 @@ import { queryKeys } from "@/lib/query-keys"
 export type UpdateProfilePayload = Partial<
   Pick<
     HumanProfileUpdate,
-    "first_name" | "last_name" | "telegram" | "gender" | "picture_url"
+    | "first_name"
+    | "last_name"
+    | "telegram"
+    | "gender"
+    | "age"
+    | "residence"
+    | "picture_url"
   >
 >
 

@@ -131,6 +131,55 @@ def test_admin_list_pages_expanded_occurrences(
     assert starts == sorted(starts)
 
 
+def test_admin_list_can_expand_series_without_hiding_out_of_window_events(
+    client: TestClient,
+    db: Session,
+    tenant_a: Tenants,
+    admin_token_tenant_a: str,
+) -> None:
+    popup = _make_popup(db, tenant_a)
+    past = _make_event(
+        db,
+        tenant_a,
+        popup,
+        datetime(2031, 3, 3, 10, tzinfo=UTC),
+        title="past one-off",
+    )
+    old_series = _make_event(
+        db,
+        tenant_a,
+        popup,
+        datetime(2030, 3, 3, 10, tzinfo=UTC),
+        title="old recurring series",
+        rrule="FREQ=WEEKLY;COUNT=2",
+    )
+    start_after = datetime(2032, 3, 1, tzinfo=UTC)
+    start_before = datetime(2032, 3, 31, tzinfo=UTC)
+
+    params = {
+        "popup_id": str(popup.id),
+        "start_after": start_after.isoformat(),
+        "start_before": start_before.isoformat(),
+    }
+    headers = _auth(admin_token_tenant_a)
+
+    filtered = client.get("/api/v1/events", params=params, headers=headers)
+    assert filtered.status_code == 200, filtered.text
+    filtered_ids = {row["id"] for row in filtered.json()["results"]}
+    assert str(past.id) not in filtered_ids
+    assert str(old_series.id) not in filtered_ids
+
+    list_view = client.get(
+        "/api/v1/events",
+        params={**params, "include_outside_window": "true"},
+        headers=headers,
+    )
+    assert list_view.status_code == 200, list_view.text
+    list_ids = {row["id"] for row in list_view.json()["results"]}
+    assert str(past.id) in list_ids
+    assert str(old_series.id) in list_ids
+
+
 def test_calendar_summary_counts_group_private_events_for_members(
     client: TestClient,
     db: Session,

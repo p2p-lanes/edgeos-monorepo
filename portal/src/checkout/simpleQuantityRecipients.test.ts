@@ -1,8 +1,5 @@
 import { describe, expect, it, vi } from "vitest"
-import {
-  buildPaymentProducts,
-  MissingTicketBuyerError,
-} from "@/hooks/checkout/buildPaymentProducts"
+import { buildPaymentProducts } from "@/hooks/checkout/buildPaymentProducts"
 import { buildPersistedCartState } from "@/hooks/checkout/useCartPersistence"
 import {
   hydrateFromSnapshot,
@@ -22,11 +19,6 @@ const ticket: ProductsPass = {
   category: "ticket",
   is_active: true,
 }
-const buyer = {
-  email: "taylor@example.com",
-  firstName: "Taylor",
-  lastName: "Buyer",
-}
 const item = (product = ticket, quantity = 1): SelectedDynamicItem => ({
   productId: product.id,
   product,
@@ -44,87 +36,53 @@ const base = {
   appCredit: 0,
   submitMode: "open-ticketing" as const,
   checkoutMode: "simple_quantity" as const,
-  openTicketBuyer: buyer,
 }
 const build = (items = [item()]) =>
   buildPaymentProducts({ ...base, dynamicItems: { tickets: items } })
 
-describe("simple-quantity ticket recipient normalization", () => {
-  it("fixes the exact unassigned Luxor ticket without using a virtual attendee id", () => {
+describe("simple-quantity buyer-owned tickets", () => {
+  it("leaves ticket holder resolution to the backend without inventing a person", () => {
     const result = build()
     expect(result.products).toEqual([
       {
         product_id: ticket.id,
-        recipient_key: `open-ticket:${ticket.id}:0`,
         quantity: 1,
       },
     ])
-    expect(result.recipients).toEqual([
-      {
-        recipient_key: `open-ticket:${ticket.id}:0`,
-        name: "Taylor Buyer",
-        email: buyer.email,
-        category_id: null,
-      },
-    ])
+    expect(result.recipients).toEqual([])
     expect(build()).toEqual(result)
   })
 
-  it("keeps one distinct draft per unit, even when a ticket appears in two steps", () => {
+  it("preserves quantities across steps without creating recipient drafts", () => {
     const result = buildPaymentProducts({
       ...base,
       dynamicItems: { tickets: [item(ticket, 2)], extras: [item(ticket, 1)] },
     })
-    expect(result.products).toHaveLength(3)
-    expect(
-      new Set(result.products.map((line) => line.recipient_key)).size,
-    ).toBe(3)
-    expect(result.recipients).toHaveLength(3)
-    expect(result.products.every((line) => line.quantity === 1)).toBe(true)
-    expect(
-      result.recipients.every(
-        (recipient) => !recipient.human_id && !recipient.existing_attendee_id,
-      ),
-    ).toBe(true)
+    expect(result.products).toEqual([
+      { product_id: ticket.id, quantity: 2 },
+      { product_id: ticket.id, quantity: 1 },
+    ])
+    expect(result.recipients).toEqual([])
   })
 
-  it("uses the current buyer form without inventing a role from the product", () => {
+  it("does not infer recipient roles from the product's legacy category", () => {
     const categorized = { ...ticket, attendee_category_id: "guest-category" }
     const result = buildPaymentProducts({
       ...base,
-      openTicketBuyer: {
-        email: " new@example.com ",
-        firstName: "New",
-        lastName: "Buyer",
-      },
       dynamicItems: { tickets: [item(categorized)] },
     })
-    expect(result.recipients[0]).toMatchObject({
-      name: "New Buyer",
-      email: "new@example.com",
-      category_id: null,
-    })
+    expect(result.products).toEqual([{ product_id: ticket.id, quantity: 1 }])
+    expect(result.recipients).toEqual([])
   })
 
-  it("leaves non-ticket quantities ownerless and does not require buyer data for them", () => {
+  it("preserves non-ticket quantities without assigning recipients", () => {
     const merch = { ...ticket, category: "merch" }
     const result = buildPaymentProducts({
       ...base,
-      openTicketBuyer: null,
       dynamicItems: { merch: [item(merch, 3)] },
     })
     expect(result.products).toEqual([{ product_id: ticket.id, quantity: 3 }])
     expect(result.recipients).toEqual([])
-  })
-
-  it("blocks ticket normalization without buyer contact data", () => {
-    expect(() =>
-      buildPaymentProducts({
-        ...base,
-        openTicketBuyer: null,
-        dynamicItems: { tickets: [item()] },
-      }),
-    ).toThrow(MissingTicketBuyerError)
   })
 
   it("does not replace an explicitly selected guest with the buyer", () => {
@@ -171,7 +129,7 @@ describe("simple-quantity ticket recipient normalization", () => {
   it.each([
     "canonical",
     "legacy",
-  ])("repairs a %s unassigned cart through the real restore and submit paths", (format) => {
+  ])("preserves a %s quantity cart through the real restore and submit paths", (format) => {
     const state = {
       selectedPasses: [],
       housing: null,

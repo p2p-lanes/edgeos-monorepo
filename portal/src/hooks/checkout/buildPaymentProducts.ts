@@ -23,18 +23,6 @@ import type {
   SelectedPatronItem,
 } from "@/types/checkout"
 
-export interface OpenTicketBuyer {
-  email: string
-  firstName: string
-  lastName: string
-}
-
-export class MissingTicketBuyerError extends Error {
-  constructor() {
-    super("Complete the buyer information before paying for tickets")
-  }
-}
-
 interface BuildPaymentProductsParams {
   attendeePasses: AttendeePassState[]
   selectedPasses: SelectedPassItem[]
@@ -52,7 +40,6 @@ interface BuildPaymentProductsParams {
   checkoutMode?: CheckoutMode
   editPassesEnabled?: boolean
   submitMode?: "application" | "open-ticketing"
-  openTicketBuyer?: OpenTicketBuyer | null
 }
 
 interface BuildPaymentProductsResult {
@@ -113,7 +100,6 @@ export function buildPaymentProducts({
   checkoutMode = CHECKOUT_MODE.PASS_SYSTEM,
   editPassesEnabled = false,
   submitMode = "application",
-  openTicketBuyer,
 }: BuildPaymentProductsParams): BuildPaymentProductsResult {
   const isMonthUpgrade =
     editPassesEnabled &&
@@ -274,58 +260,14 @@ export function buildPaymentProducts({
       })
     }
 
-    // Simple-quantity tickets have no attendee selector. Materialize one
-    // attempt-local recipient per unit from the buyer form, not from a human
-    // id inferred from email. Distinct keys keep guest tickets from collapsing
-    // onto one attendee at fulfillment. Rebuilt at submit time for BOTH fresh
-    // and restored carts so old unassigned carts and edited buyer details work.
-    // Keys are stable across retries, and counters span steps containing the
-    // same product. Explicit selected-pass identities above are left intact.
-    const ticketUnitCounts = new Map<string, number>()
-    const addOpenTicket = (item: SelectedDynamicItem) => {
-      const email = openTicketBuyer?.email.trim()
-      const name = [openTicketBuyer?.firstName, openTicketBuyer?.lastName]
-        .filter(Boolean)
-        .join(" ")
-        .trim()
-      if (!email || !name) throw new MissingTicketBuyerError()
-      for (let unit = 0; unit < item.quantity; unit++) {
-        let index = ticketUnitCounts.get(item.productId) ?? 0
-        let key: string
-        do {
-          key = `open-ticket:${item.productId}:${index++}`
-        } while (recipients.has(key))
-        ticketUnitCounts.set(item.productId, index)
-        // The quantity UI does not collect guest profiles. Preserve the buyer
-        // contact snapshot per unit, as anonymous checkout does, without
-        // claiming these drafts are an existing human or attendee.
-        recipients.set(key, {
-          recipient_key: key,
-          name,
-          email,
-          category_id: null,
-        })
-        products.push({
-          product_id: item.productId,
-          recipient_key: key,
-          quantity: 1,
-        })
-      }
-    }
-
     // Add dynamic step items
     for (const items of Object.values(dynamicItems)) {
       for (const item of items) {
         // A restored legacy cart can contain the same ticket in dynamicItems
         // and selectedPasses. Keep the attendee-scoped representation.
         if (item.quantity > 0 && !selectedPassProductIds.has(item.productId)) {
-          if (
-            submitMode === "open-ticketing" &&
-            item.product.category?.toLowerCase() === "ticket"
-          ) {
-            addOpenTicket(item)
-            continue
-          }
+          // Open checkout assigns tickets without an explicit holder to the
+          // buyer. Extra units do not identify additional people.
           products.push({
             product_id: item.productId,
             quantity: item.quantity,

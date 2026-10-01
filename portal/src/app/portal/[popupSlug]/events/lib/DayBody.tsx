@@ -36,10 +36,14 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover"
 import { cn } from "@/lib/utils"
+import { todayInTimezone } from "./calendarDate"
 import type { EventsScrollSnapshot } from "./eventsViewState"
 import { fetchAllPortalEvents } from "./fetchAllPortalEvents"
 import { buildPortalEventHref } from "./portalEventHref"
+import { RsvpBlockedCta } from "./RsvpBlockedCta"
+import { RsvpStatusAction } from "./RsvpStatusAction"
 import { summarizeRrule } from "./summarizeRrule"
+import type { RsvpBlockReason } from "./useCanRsvp"
 import { useEventRsvp } from "./useEventRsvp"
 import { useEventTimezone } from "./useEventTimezone"
 
@@ -108,6 +112,11 @@ interface DayBodyProps {
   canRsvp?: boolean
   /** Tooltip text shown on the disabled RSVP button explaining why. */
   rsvpDisabledReason?: string
+  /**
+   * Why RSVP is blocked. `no_tickets` swaps the dead disabled button for a
+   * tappable popover offering the popup's purchase flow.
+   */
+  rsvpBlockReason?: RsvpBlockReason
   /**
    * When false, the RSVP and "Going"/cancel buttons are hidden entirely —
    * used for ended (read-only) popups. Defaults to true.
@@ -179,22 +188,12 @@ export function DayBody({
   timezoneOverride,
   canRsvp = true,
   rsvpDisabledReason,
+  rsvpBlockReason,
   showRsvp = true,
 }: DayBodyProps) {
   const isAuthed = mode === "authed"
   const useOverride = eventsOverride !== undefined
   const { t } = useTranslation()
-  // Fall back to the popup's first booking day (or today, before the
-  // popup record loads) when the parent hasn't set a date yet — no
-  // `?date=` in the URL on first visit.
-  const selectedDate = useMemo(
-    () => selectedDateProp ?? defaultDate ?? startOfDay(new Date()),
-    [selectedDateProp, defaultDate],
-  )
-  const setSelectedDate = (next: Date | ((prev: Date) => Date)) => {
-    const resolved = typeof next === "function" ? next(selectedDate) : next
-    onSelectedDateChange(resolved)
-  }
   const {
     timezone,
     locale,
@@ -202,6 +201,14 @@ export function DayBody({
     formatDayKey,
     isLoading: tzLoading,
   } = useEventTimezone(popupId, timezoneOverride)
+  const selectedDate = useMemo(
+    () => selectedDateProp ?? defaultDate ?? todayInTimezone(timezone),
+    [selectedDateProp, defaultDate, timezone],
+  )
+  const setSelectedDate = (next: Date | ((prev: Date) => Date)) => {
+    const resolved = typeof next === "function" ? next(selectedDate) : next
+    onSelectedDateChange(resolved)
+  }
 
   // Localized "Monday, June 4, 2026" for the date picker trigger. Uses the
   // selected day's nominal local date (no TZ conversion needed — selectedDate
@@ -841,50 +848,58 @@ export function DayBody({
                               showRsvp &&
                               !isShort &&
                               fullEvent.status === "published" &&
+                              fullEvent.host_id !== currentHuman?.id &&
                               (() => {
                                 const rsvpKey = `${fullEvent.id}:${fullEvent.start_time}`
                                 const isRsvpPending = pendingRsvpKey === rsvpKey
                                 return (
                                   <div className="absolute bottom-1 right-1">
                                     {isRsvpd ? (
-                                      <button
-                                        type="button"
-                                        disabled={isRsvpPending}
-                                        onClick={(e) => {
-                                          e.preventDefault()
-                                          e.stopPropagation()
-                                          cancelRsvpMutation.mutate(fullEvent)
-                                        }}
-                                        className="inline-flex items-center gap-0.5 rounded border border-emerald-300 bg-emerald-50 px-1 py-0.5 text-[9px] font-medium text-emerald-700 hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-60 dark:border-emerald-500/40 dark:bg-emerald-950/40 dark:text-emerald-300 dark:hover:bg-emerald-950/60"
-                                      >
-                                        {isRsvpPending ? (
-                                          <Loader2 className="h-2.5 w-2.5 animate-spin" />
-                                        ) : (
-                                          <CheckCircle className="h-2.5 w-2.5" />
-                                        )}
-                                        {t("events.rsvp.going")}
-                                      </button>
-                                    ) : (
-                                      <button
-                                        type="button"
-                                        disabled={isRsvpPending || !canRsvp}
-                                        title={
-                                          !canRsvp
-                                            ? rsvpDisabledReason
+                                      <RsvpStatusAction
+                                        size="mini"
+                                        label={
+                                          fullEvent.my_rsvp_status ===
+                                          "checked_in"
+                                            ? (t(
+                                                "events.rsvp.checked_in",
+                                              ) as string)
                                             : undefined
                                         }
-                                        onClick={(e) => {
-                                          e.preventDefault()
-                                          e.stopPropagation()
-                                          rsvpMutation.mutate(fullEvent)
-                                        }}
-                                        className="inline-flex items-center gap-0.5 rounded border bg-background px-1 py-0.5 text-[9px] font-medium hover:bg-muted disabled:cursor-not-allowed disabled:opacity-60"
+                                        isPending={isRsvpPending}
+                                        showCancel={
+                                          fullEvent.my_rsvp_status ===
+                                          "registered"
+                                        }
+                                        onCancelRsvp={() =>
+                                          cancelRsvpMutation.mutate(fullEvent)
+                                        }
+                                      />
+                                    ) : (
+                                      <RsvpBlockedCta
+                                        reason={rsvpBlockReason}
+                                        message={rsvpDisabledReason}
                                       >
-                                        {isRsvpPending && (
-                                          <Loader2 className="h-2.5 w-2.5 animate-spin" />
-                                        )}
-                                        {t("events.rsvp.rsvp")}
-                                      </button>
+                                        <button
+                                          type="button"
+                                          disabled={isRsvpPending || !canRsvp}
+                                          title={
+                                            !canRsvp
+                                              ? rsvpDisabledReason
+                                              : undefined
+                                          }
+                                          onClick={(e) => {
+                                            e.preventDefault()
+                                            e.stopPropagation()
+                                            rsvpMutation.mutate(fullEvent)
+                                          }}
+                                          className="inline-flex items-center gap-0.5 rounded border bg-background px-1 py-0.5 text-[9px] font-medium hover:bg-muted disabled:cursor-not-allowed disabled:opacity-60"
+                                        >
+                                          {isRsvpPending && (
+                                            <Loader2 className="h-2.5 w-2.5 animate-spin" />
+                                          )}
+                                          {t("events.rsvp.rsvp")}
+                                        </button>
+                                      </RsvpBlockedCta>
                                     )}
                                   </div>
                                 )

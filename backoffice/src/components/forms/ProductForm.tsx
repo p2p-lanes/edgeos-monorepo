@@ -368,59 +368,68 @@ export function ProductForm({ defaultValues, onSuccess }: ProductFormProps) {
                 )}
               </form.Field>
 
-              <form.Field name="category">
+              <form.Field
+                name="category"
+                validators={{
+                  onSubmit: ({ value }) =>
+                    value.trim() ? undefined : "Category is required",
+                }}
+              >
                 {(field) => (
-                  <div className="flex items-center gap-2">
-                    <Select
-                      value={field.state.value}
-                      onValueChange={(val) => {
-                        if (val === "__add_new__") {
-                          setNewCategoryName("")
-                          setAddCategoryOpen(true)
-                          return
-                        }
-                        field.handleChange(val as ProductCategory)
-                      }}
-                      disabled={readOnly}
-                    >
-                      <SelectTrigger className="w-auto border-0 bg-transparent p-0 shadow-none focus:ring-0">
-                        <Badge variant="secondary">
-                          <SelectValue />
-                        </Badge>
-                      </SelectTrigger>
-                      <SelectContent>
-                        {allCategories.map((cat) => {
-                          const known = PRODUCT_CATEGORIES.find(
-                            (c) => c.value === cat,
-                          )
-                          const isDisabled =
-                            cat === "patreon" && hasActivePatreonProduct
-                          return (
-                            <SelectItem
-                              key={cat}
-                              value={cat}
-                              disabled={isDisabled}
-                              title={
-                                isDisabled
-                                  ? "This gathering already has a Patron product"
-                                  : undefined
-                              }
-                            >
-                              {known?.label ?? cat}
-                            </SelectItem>
-                          )
-                        })}
-                        <SelectItem
-                          value="__add_new__"
-                          className="text-primary"
-                        >
-                          <span className="flex items-center gap-1.5">
-                            <Plus className="h-3.5 w-3.5" />
-                            Add category
-                          </span>
-                        </SelectItem>
-                      </SelectContent>
-                    </Select>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <Select
+                        value={field.state.value}
+                        onValueChange={(val) => {
+                          if (val === "__add_new__") {
+                            setNewCategoryName("")
+                            setAddCategoryOpen(true)
+                            return
+                          }
+                          field.handleChange(val as ProductCategory)
+                        }}
+                        disabled={readOnly}
+                      >
+                        <SelectTrigger className="w-auto border-0 bg-transparent p-0 shadow-none focus:ring-0">
+                          <Badge variant="secondary">
+                            <SelectValue />
+                          </Badge>
+                        </SelectTrigger>
+                        <SelectContent>
+                          {allCategories.map((cat) => {
+                            const known = PRODUCT_CATEGORIES.find(
+                              (c) => c.value === cat,
+                            )
+                            const isDisabled =
+                              cat === "patreon" && hasActivePatreonProduct
+                            return (
+                              <SelectItem
+                                key={cat}
+                                value={cat}
+                                disabled={isDisabled}
+                                title={
+                                  isDisabled
+                                    ? "This gathering already has a Patron product"
+                                    : undefined
+                                }
+                              >
+                                {known?.label ?? cat}
+                              </SelectItem>
+                            )
+                          })}
+                          <SelectItem
+                            value="__add_new__"
+                            className="text-primary"
+                          >
+                            <span className="flex items-center gap-1.5">
+                              <Plus className="h-3.5 w-3.5" />
+                              Add category
+                            </span>
+                          </SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <FieldError errors={field.state.meta.errors} />
                   </div>
                 )}
               </form.Field>

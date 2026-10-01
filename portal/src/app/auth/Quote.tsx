@@ -27,6 +27,9 @@ export default function Quote() {
             alt={tenant.name ?? "Icon"}
             width={100}
             height={40}
+            // The 100x40 box is fixed, so without `object-contain` the browser
+            // stretches whatever the tenant uploaded to exactly that ratio.
+            className="h-10 w-[100px] object-contain"
             priority
             {...imageOptimization(tenant.icon_url)}
           />

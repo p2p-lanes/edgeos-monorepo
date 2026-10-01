@@ -7,6 +7,15 @@ import {
 import CheckoutPageClient from "./CheckoutPageClient"
 
 const mockUseCheckoutRuntime = vi.fn()
+const mockNavigation = vi.hoisted(() => ({
+  pathname: "/checkout/festival-2026/checkout",
+  replace: vi.fn(),
+}))
+
+vi.mock("next/navigation", () => ({
+  usePathname: () => mockNavigation.pathname,
+  useRouter: () => ({ replace: mockNavigation.replace }),
+}))
 
 vi.mock("./hooks/useCheckoutRuntime", () => ({
   useCheckoutRuntime: (_slug: string, opts?: unknown) =>
@@ -68,6 +77,8 @@ describe("CheckoutPageClient", () => {
     localStorage.clear()
     setActiveRequestLanguage(null)
     mockUseCheckoutRuntime.mockClear()
+    mockNavigation.pathname = "/checkout/festival-2026/checkout"
+    mockNavigation.replace.mockClear()
     mockUseCheckoutRuntime.mockReturnValue({
       data: runtimeData,
       isLoading: false,
@@ -151,6 +162,28 @@ describe("CheckoutPageClient", () => {
     render(<CheckoutPageClient popupSlug="festival-2026" flowSlug="checkout" />)
 
     expect(screen.getByText("runtime:festival-2026")).toBeTruthy()
+  })
+
+  it("redirects upsale checkouts to the portal shop", async () => {
+    mockUseCheckoutRuntime.mockReturnValue({
+      data: {
+        ...runtimeData,
+        flow_type: "upsale",
+        selected_flow: { ...runtimeData.selected_flow, slug: "lunch-tickets" },
+      },
+      isLoading: false,
+      isError: false,
+    })
+
+    await act(async () => {
+      render(
+        <CheckoutPageClient popupSlug="edge-india" flowSlug="lunch-tickets" />,
+      )
+    })
+
+    expect(mockNavigation.replace).toHaveBeenCalledWith(
+      "/portal/edge-india/shop/lunch-tickets",
+    )
   })
 
   // --- New test cases ---

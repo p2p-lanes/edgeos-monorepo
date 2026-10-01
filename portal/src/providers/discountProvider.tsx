@@ -37,42 +37,45 @@ const DiscountProvider = ({ children }: { children: ReactNode }) => {
   const application = getRelevantApplication(flowId)
   const { data: groups = [] } = useGroupsQuery()
 
-  const [discountApplied, setDiscountApplied] = useState<DiscountProps>({
+  // Only manually entered discounts (coupons) belong in state. Group and
+  // scholarship awards are derived from the current flow's application: they
+  // must disappear immediately when its award changes or the flow changes.
+  const [manualDiscount, setManualDiscount] = useState<DiscountProps>({
     discount_value: 0,
     discount_type: "percentage",
     discount_code: null,
   })
 
   useEffect(() => {
-    if (city?.id && discountApplied.city_id !== city?.id) {
-      setDiscountApplied({
+    if (city?.id && manualDiscount.city_id !== city.id) {
+      setManualDiscount({
         discount_value: 0,
         discount_type: "percentage",
         discount_code: null,
         city_id: city.id,
       })
     }
-  }, [city?.id, discountApplied.city_id])
+  }, [city?.id, manualDiscount.city_id])
 
-  useEffect(() => {
-    if (application?.group_id && groups.length > 0) {
-      const group = groups.find((g) => g.id === application.group_id)
-      const groupDiscount = Number(group?.discount_percentage ?? 0)
-      if (
-        group?.discount_percentage &&
-        groupDiscount > discountApplied.discount_value
-      ) {
-        setDiscountApplied({
-          discount_value: groupDiscount,
+  const group = groups.find((g) => g.id === application?.group_id)
+  const groupDiscount = Number(group?.discount_percentage ?? 0)
+  const scholarshipDiscount =
+    application?.scholarship_status === "approved"
+      ? Number(application.discount_percentage ?? 0)
+      : 0
+  // The backend chooses the lowest final amount among percentage discounts,
+  // rather than stacking them. On the same discountable subtotal (and credit),
+  // that is the largest percentage. Scholarship wins ties, like payment/crud.py.
+  const automaticDiscount = Math.max(groupDiscount, scholarshipDiscount)
+  const discountApplied: DiscountProps =
+    automaticDiscount >= manualDiscount.discount_value && automaticDiscount > 0
+      ? {
+          discount_value: automaticDiscount,
           discount_type: "percentage",
           discount_code: null,
-          // Keep the popup scope or the reset effect above removes this
-          // discount, causing both effects to alternate indefinitely.
           city_id: city?.id,
-        })
-      }
-    }
-  }, [application?.group_id, groups, discountApplied.discount_value, city?.id])
+        }
+      : manualDiscount
 
   const discountRef = useRef(discountApplied)
   discountRef.current = discountApplied
@@ -82,11 +85,11 @@ const DiscountProvider = ({ children }: { children: ReactNode }) => {
     // overwrite metadata like discount_code / city_id, which the backend
     // needs to record the conversion even when the percentage is unchanged.
     if (discount.discount_value < discountRef.current.discount_value) return
-    setDiscountApplied(discount)
+    setManualDiscount(discount)
   }, [])
 
   const resetDiscount = useCallback(() => {
-    setDiscountApplied({
+    setManualDiscount({
       discount_value: 0,
       discount_type: "percentage",
       discount_code: null,

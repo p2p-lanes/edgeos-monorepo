@@ -158,6 +158,9 @@ const SUMMARIES: Record<string, (v: ConfigValues) => SectionSummary> = {
           : `attendees can share, ${plural(uses, "use")} each`,
       )
     }
+    if (on(v.cross_popup_referrals_enabled)) {
+      bits.push("open to links from other popups")
+    }
     return bits.length
       ? { answer: bits.join(" · "), active: true }
       : { answer: "People arrive on their own", active: false }

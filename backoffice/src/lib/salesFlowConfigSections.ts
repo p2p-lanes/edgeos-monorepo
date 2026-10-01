@@ -10,18 +10,36 @@ import type { ConfigFieldKind } from "@/components/forms/ConfigFieldRow"
  * description beats three screens agreeing by hand.
  */
 export interface ConfigFieldConfig {
-  key: keyof SalesFlowCreate & keyof PopupAdmin
+  // Most settings were seeded from the popup's own copy, but a setting born
+  // on the flow has no popup column to mirror.
+  key: keyof SalesFlowCreate & (keyof PopupAdmin | FlowOnlyConfigKey)
   label: string
   description?: string
   kind: ConfigFieldKind
   options?: { value: string; label: string }[]
 }
 
+type FlowOnlyConfigKey = "cross_popup_referrals_enabled" | "simplefi_api_key"
+
 export const CONFIG_SECTIONS: {
   title: string
   description?: string
   fields: ConfigFieldConfig[]
 }[] = [
+  {
+    title: "Payment Provider",
+    description:
+      "Leave empty to use the SimpleFi API key configured on the popup.",
+    fields: [
+      {
+        key: "simplefi_api_key",
+        label: "SimpleFi API Key",
+        description:
+          "Overrides the popup's SimpleFi account for purchases and payment operations through this flow.",
+        kind: "secret",
+      },
+    ],
+  },
   {
     title: "Application Settings",
     fields: [
@@ -227,6 +245,13 @@ export const CONFIG_SECTIONS: {
         description:
           "How many people one attendee's link may bring in. Empty means no limit.",
         kind: "number",
+      },
+      {
+        key: "cross_popup_referrals_enabled",
+        label: "Accept Links From Other Popups",
+        description:
+          "Let attendees of your other popups share this flow, even if they are not coming here. Each of those links gets the uses per shared link set above.",
+        kind: "boolean",
       },
     ],
   },

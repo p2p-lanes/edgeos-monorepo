@@ -19,6 +19,7 @@ import type {
 } from "@/hooks/checkout/useTicketsStep"
 import { useTicketsStep } from "@/hooks/checkout/useTicketsStep"
 import { imageOptimization } from "@/lib/image-optimization"
+import { productComparePrice } from "@/lib/product-compare-price"
 import { stepCardSurfaceStyle } from "@/lib/stepCardSurface"
 import { cn } from "@/lib/utils"
 import { formatCurrency } from "@/types/checkout"
@@ -378,8 +379,8 @@ function OpenCheckoutProductRow({
     quantity,
     max,
   }).max
-  const hasDiscount =
-    product.compare_price != null && product.compare_price > product.price
+  const comparePrice = productComparePrice(product)
+  const hasDiscount = comparePrice != null && comparePrice > product.price
   const subtotal = product.price * quantity
   const showSubtotal = quantity > 1
 
@@ -395,9 +396,9 @@ function OpenCheckoutProductRow({
     "inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold tracking-wide shrink-0 transition-all whitespace-nowrap",
     "shadow-sm border border-[color:var(--primary,transparent)]",
     isAdded
-      ? "bg-[color:var(--accent,theme(colors.foreground))] text-[color:var(--primary-foreground,theme(colors.background))]"
+      ? "border-teal-800 bg-teal-800 text-white hover:bg-teal-900"
       : "bg-[color:var(--primary,theme(colors.foreground))] text-[color:var(--primary-foreground,theme(colors.background))] hover:brightness-110 active:scale-[0.98]",
-    rowDisabled && "cursor-not-allowed opacity-50",
+    rowDisabled && !isAdded && "cursor-not-allowed opacity-50",
   )
 
   return (
@@ -431,7 +432,7 @@ function OpenCheckoutProductRow({
                   isAdded ? "text-foreground/60" : "text-muted-foreground",
                 )}
               >
-                {formatCurrency(product.compare_price ?? 0)}
+                {formatCurrency(comparePrice ?? 0)}
               </div>
             )}
             <div

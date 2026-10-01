@@ -46,7 +46,7 @@ export function usePortalEventSettings(popupId: string | undefined) {
 
 /**
  * Returns a popup's configured timezone along with reusable formatters.
- * Falls back to the browser timezone when settings are missing.
+ * Falls back to UTC when settings are missing.
  *
  * ``timezoneOverride`` skips the authenticated event-settings query and
  * uses the provided value verbatim — used by the public calendar where

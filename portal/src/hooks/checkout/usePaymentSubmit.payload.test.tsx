@@ -169,7 +169,7 @@ describe("usePaymentSubmit public purchase payload", () => {
     }
     const merch = {
       ...product,
-      id: simpleQuantityPurchase.products[2].product_id,
+      id: simpleQuantityPurchase.products[1].product_id,
       category: "merch",
     }
     const { result } = renderPaymentSubmit("direct-sale", {
@@ -184,6 +184,15 @@ describe("usePaymentSubmit public purchase payload", () => {
             quantity: 2,
             price: 198,
             stepType: "tickets",
+          },
+        ],
+        extras: [
+          {
+            productId: ticket.id,
+            product: ticket,
+            quantity: 1,
+            price: 99,
+            stepType: "extras",
           },
         ],
         merch: [

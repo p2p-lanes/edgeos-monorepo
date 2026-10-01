@@ -34,6 +34,7 @@ from app.services.email.templates import (
     EventApprovalApprovedContext,
     EventApprovalRejectedContext,
     EventCancelledContext,
+    EventHostMessageContext,
     EventInvitationContext,
     EventRsvpCancelledContext,
     EventUpdatedContext,
@@ -1061,6 +1062,33 @@ class EmailService:
             popup_id=popup_id,
             sales_flow_id=sales_flow_id,
             db_session=db_session,
+        )
+
+    async def send_event_host_message(
+        self,
+        to: str,
+        subject: str,
+        context: EventHostMessageContext,
+        from_address: str | None = None,
+        from_name: str | None = None,
+        popup_id: uuid.UUID | None = None,
+        db_session: Session | None = None,
+    ) -> bool:
+        from markupsafe import escape
+
+        # Custom templates do not autoescape. Markup avoids double-escaping in
+        # the default template while keeping host-controlled text inert in both.
+        values = {key: escape(value) for key, value in context.model_dump().items()}
+        return await self._send_with_fallback(
+            to=to,
+            subject=subject,
+            template_type=EmailTemplateType.EVENT_HOST_MESSAGE,
+            template_name=EmailTemplates.EVENT_HOST_MESSAGE,
+            context=values,
+            popup_id=popup_id,
+            db_session=db_session,
+            from_address=from_address,
+            from_name=from_name,
         )
 
     async def send_event_invitation(

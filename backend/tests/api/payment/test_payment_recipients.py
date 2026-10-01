@@ -22,6 +22,7 @@ from app.api.payment.schemas import (
     PaymentProductRequest,
     PaymentProductResponse,
     PaymentPublic,
+    PaymentRecipientRequest,
     PaymentStatus,
 )
 from app.api.popup.models import Popups
@@ -1036,7 +1037,7 @@ def test_zero_total_cumulative_limit_dedupes_existing_companion_and_blocks_new_o
     companion = db.get(Attendees, first_recipient.attendee_id)
     assert companion is not None
     assert companion.managed_by_human_id == buyer.id
-    assert companion.category_id is None
+    assert companion.category_id == category.id
 
     same_person = _request(
         application,
@@ -1224,6 +1225,80 @@ def test_application_fee_snapshots_buyer_but_accepts_no_recipients(
         )
 
 
+@pytest.mark.parametrize("role", ["spouse", "kid"])
+@pytest.mark.parametrize("free", [False, True])
+def test_purchase_preserves_companion_category_and_buyer_main(
+    client, db, tenant_a, superadmin_token, role, free
+):
+    popup, _, buyer, category, application, product = _payment_context(db, tenant_a)
+    category.key = role
+    if free:
+        product.price = Decimal("0")
+    db.add_all([category, product])
+    db.commit()
+    request = _request(application, product, category, recipient_name="Named Companion")
+    request.recipients.append(
+        PaymentRecipientRequest(recipient_key="buyer", human_id=buyer.id, name="Buyer")
+    )
+    request.products.append(
+        PaymentProductRequest(product_id=product.id, recipient_key="buyer")
+    )
+    with patch("app.services.simplefi.get_simplefi_client") as provider:
+        provider.return_value.create_payment.return_value = _provider_response("roles")
+        payment, _ = payments_crud.create_payment(db, request)
+    payments_crud.approve_payment(db, payment.id)
+    payments_crud.approve_payment(db, payment.id)
+    attendees = db.exec(select(Attendees).where(Attendees.popup_id == popup.id)).all()
+    assert len(attendees) == 2
+    own = next(a for a in attendees if a.human_id == buyer.id)
+    companion = next(a for a in attendees if a.managed_by_human_id == buyer.id)
+    assert own.category == "main"
+    assert companion.human_id is None
+    assert companion.category_id == category.id
+    headers = {
+        "Authorization": f"Bearer {superadmin_token}",
+        "X-Tenant-Id": str(tenant_a.id),
+    }
+    detail = client.get(f"/api/v1/attendees/{companion.id}", headers=headers)
+    assert detail.status_code == 200, detail.text
+    assert detail.json()["category"] == role
+    assert detail.json()["category_id"] == str(category.id)
+
+
+@pytest.mark.parametrize("source", [None, "stripe"])
+@pytest.mark.parametrize("free", [False, True])
+def test_new_checkout_is_not_blocked_by_imported_pending_payment(
+    db, tenant_a, source, free
+):
+    popup, flow, buyer, category, application, product = _payment_context(db, tenant_a)
+    prior = Payments(
+        tenant_id=tenant_a.id,
+        popup_id=popup.id,
+        sales_flow_id=flow.id,
+        application_id=application.id,
+        buyer_human_id=buyer.id,
+        source=source,
+        external_id=f"import-{uuid.uuid4()}",
+        status="pending",
+        amount=250,
+    )
+    if free:
+        product.price = Decimal("0")
+    db.add_all([prior, product])
+    db.commit()
+    with patch("app.services.simplefi.get_simplefi_client") as provider:
+        provider.return_value.create_payment.return_value = _provider_response("new")
+        payment, _ = payments_crud.create_payment(
+            db, _request(application, product, category)
+        )
+    assert payment.id != prior.id
+    assert payment.status == ("approved" if free else "pending")
+    provider.return_value.cancel_payment_request.assert_not_called()
+    db.refresh(prior)
+    assert prior.status == "pending"
+    assert prior.amount == 250
+
+
 def test_open_checkout_buyer_receives_the_current_flow_primary_role(
     db: Session, tenant_a: Tenants
 ) -> None:
@@ -1253,14 +1328,7 @@ def test_open_checkout_buyer_receives_the_current_flow_primary_role(
         buyer=BuyerInfo(
             email="open-recipient@test.com", first_name="Open", last_name="Buyer"
         ),
-        recipients=[
-            {
-                "recipient_key": "guest",
-                "name": "Guest Recipient",
-                "profile_snapshot": {"accessibility": "aisle"},
-            }
-        ],
-        products=[ProductLine(product_id=product.id, recipient_key="guest")],
+        products=[ProductLine(product_id=product.id)],
     )
 
     with patch("app.services.simplefi.get_simplefi_client") as get_client:
@@ -1285,9 +1353,9 @@ def test_open_checkout_buyer_receives_the_current_flow_primary_role(
         select(PaymentProducts).where(PaymentProducts.payment_id == payment.id)
     ).one()
     assert payment.buyer_human_id is not None
-    assert recipient.recipient_key == "guest"
     assert recipient.human_id == payment.buyer_human_id
-    assert recipient.profile_snapshot == {"accessibility": "aisle"}
+    assert request.products[0].recipient_key is None
+    assert request.recipients == []
     assert recipient.category_id is not None
     assert line.payment_recipient_id == recipient.id
     assert line.attendee_id is None
@@ -1296,6 +1364,6 @@ def test_open_checkout_buyer_receives_the_current_flow_primary_role(
     payments_crud.approve_payment(db, payment.id)
 
     attendee = db.exec(select(Attendees).where(Attendees.popup_id == popup.id)).one()
-    assert attendee.name == "Guest Recipient"
+    assert attendee.name == "Open Buyer"
     assert attendee.human_id == payment.buyer_human_id
     assert attendee.category_id is None

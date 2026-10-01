@@ -11,6 +11,36 @@ from app.api.payment.crud import (
 from app.api.sales_flow.models import SalesFlows
 from app.api.shared.enums import LandingMode
 from app.api.tenant.utils import get_portal_url
+from app.core.config import settings
+
+
+@pytest.mark.parametrize(
+    ("configured", "expected"),
+    [
+        ("http://localhost:3000", "http://test.localhost:3000"),
+        ("http://localhost:3000/", "http://test.localhost:3000"),
+        ("https://portal.example.com", "https://test.portal.example.com"),
+        ("https://portal.example.com/", "https://test.portal.example.com"),
+        ("portal.example.com", "https://test.portal.example.com"),
+    ],
+)
+def test_tenant_redirects_preserve_configured_portal_origin(
+    monkeypatch, configured, expected
+):
+    monkeypatch.setattr(settings, "PORTAL_URL", configured)
+    tenant = _make_tenant(custom_domain_active=False)
+    assert get_portal_url(tenant) == expected
+    assert (
+        _internal_open_checkout_thank_you_url(
+            get_portal_url(tenant), False, MagicMock(slug="event"), MagicMock(id="42")
+        )
+        == f"{expected}/checkout/event/thank-you?payment_id=42"
+    )
+
+
+def test_active_custom_domain_keeps_https_with_http_platform_url(monkeypatch):
+    monkeypatch.setattr(settings, "PORTAL_URL", "http://localhost:3000")
+    assert get_portal_url(_make_tenant()) == "https://tickets.example.com"
 
 
 def _make_tenant(

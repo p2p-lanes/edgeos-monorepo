@@ -1,7 +1,9 @@
 "use client"
 
+import Link from "next/link"
 import { useRouter } from "next/navigation"
 import type { CSSProperties } from "react"
+import { useTranslation } from "react-i18next"
 import type { SalesFlowPortalThemeConfig } from "@/client/types.gen"
 import { CheckoutBackgroundImage } from "@/components/CheckoutBackgroundImage"
 import { CheckoutBackgroundVideo } from "@/components/CheckoutBackgroundVideo"
@@ -87,12 +89,31 @@ function FlowScopedCheckout({
   returnContext = "portal",
 }: ApplicationShopCheckoutProps) {
   const router = useRouter()
-  const { attendeePasses, products } = usePassesProvider()
+  const { t } = useTranslation()
+  const { attendeePasses, products, productsLoading } = usePassesProvider()
   const { getCity } = useCityProvider()
   const city = getCity()
   const background = getCheckoutBackground(city, "passes")
 
-  if (!attendeePasses.length || !products.length) return <Loader />
+  if (productsLoading || !attendeePasses.length) return <Loader />
+  if (!products.length) {
+    return (
+      <section className="mx-auto max-w-5xl p-6">
+        <h1 className="text-2xl font-semibold">
+          {t("shop.no_products_title")}
+        </h1>
+        <p className="mt-2 text-sm text-muted-foreground">
+          {t("shop.no_products_description")}
+        </p>
+        <Link
+          href={`/portal/${popupSlug}/passes?flow=${flowSlug}`}
+          className="mt-6 inline-flex text-sm font-medium text-primary hover:underline"
+        >
+          {t("shop.back_to_passes")}
+        </Link>
+      </section>
+    )
+  }
 
   return (
     <CheckoutProvider

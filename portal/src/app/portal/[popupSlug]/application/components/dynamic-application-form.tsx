@@ -112,6 +112,7 @@ const BaseField = memo(function BaseField({
       <div className="md:col-span-2 md:grid md:grid-cols-2 md:gap-4">
         <div>
           <DynamicField
+            portalContentClassName="portal-chrome"
             name={name}
             field={field}
             value={value}
@@ -125,6 +126,7 @@ const BaseField = memo(function BaseField({
   return (
     <div className={resolved === "full" ? "md:col-span-2" : ""}>
       <DynamicField
+        portalContentClassName="portal-chrome"
         name={name}
         field={field}
         value={value}
@@ -411,6 +413,7 @@ export function DynamicApplicationForm({
                         >
                           <div>
                             <DynamicField
+                              portalContentClassName="portal-chrome"
                               name={name}
                               field={field}
                               value={values[name]}
@@ -427,6 +430,7 @@ export function DynamicApplicationForm({
                         className={resolved === "full" ? "md:col-span-2" : ""}
                       >
                         <DynamicField
+                          portalContentClassName="portal-chrome"
                           name={name}
                           field={field}
                           value={values[name]}

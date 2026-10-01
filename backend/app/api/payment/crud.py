@@ -1024,6 +1024,54 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
             current_human=current_human,
         ).response
 
+    @staticmethod
+    def _assign_unassigned_tickets_to_buyer(
+        obj: "OpenTicketingPurchaseCreate",
+        products: list[Products],
+        buyer_human_id: uuid.UUID,
+    ) -> "OpenTicketingPurchaseCreate":
+        """Open checkout assigns unspecified ticket holders to the buyer.
+
+        Quantity represents ticket units, not new people. Explicit recipients
+        retain their identity; all other ticket lines share one buyer snapshot.
+        """
+        ticket_ids = {
+            product.id
+            for product in products
+            if (product.category or "").lower() == "ticket"
+        }
+        obj = obj.model_copy(deep=True)
+        unassigned = [
+            line
+            for line in obj.products
+            if line.product_id in ticket_ids
+            and line.attendee_id is None
+            and line.recipient_key is None
+        ]
+        if not unassigned:
+            return obj
+
+        buyer_recipient = next(
+            (r for r in obj.recipients if r.human_id == buyer_human_id), None
+        )
+        if buyer_recipient is None:
+            keys = {r.recipient_key for r in obj.recipients}
+            key = str(uuid.uuid4())
+            while key in keys:
+                key = str(uuid.uuid4())
+            buyer_recipient = PaymentRecipientRequest(
+                recipient_key=key,
+                human_id=buyer_human_id,
+                name=f"{obj.buyer.first_name} {obj.buyer.last_name}".strip()
+                or obj.buyer.email,
+                email=obj.buyer.email,
+                profile_snapshot=obj.buyer.form_data.copy(),
+            )
+            obj.recipients.append(buyer_recipient)
+        for line in unassigned:
+            line.recipient_key = buyer_recipient.recipient_key
+        return obj
+
     def create_open_ticketing_payment(
         self,
         session: Session,
@@ -1034,7 +1082,7 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
         attribution: dict[str, str | None] | None = None,
         current_human: "HumanPublic | None" = None,
     ) -> tuple[Payments, str, str | None]:
-        """Create an anonymous open-ticketing payment with per-ticket attendees.
+        """Create an open-ticketing payment, defaulting ticket holders to the buyer.
 
         Returns ``(payment, checkout_url, redirect_url)``. ``checkout_url`` is the
         SimpleFi-hosted payment page (empty for a zero-amount bypass).
@@ -1122,6 +1170,7 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
 
         valid_products = gate.products
         products_map = {product.id: product for product in valid_products}
+        obj = self._assign_unassigned_tickets_to_buyer(obj, valid_products, buyer.id)
         selected_recipients = self._validate_recipient_requests(
             session,
             obj.recipients,
@@ -1453,13 +1502,14 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
                 # carrying the order data. The portal redirects the buyer there.
                 return payment, "", success_redirect
 
-            if not popup.simplefi_api_key:
+            simplefi_api_key = target_flow.simplefi_api_key or popup.simplefi_api_key
+            if not simplefi_api_key:
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
                     detail="Payment provider not configured for this popup",
                 )
 
-            simplefi_client = get_simplefi_client(popup.simplefi_api_key)
+            simplefi_client = get_simplefi_client(simplefi_api_key)
 
             # SimpleFi performs the redirect, so hand it the resolved success URL
             # (custom-signed, or the portal thank-you with the order data). The
@@ -1757,6 +1807,7 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
         """
         from app.api.application.schemas import ApplicationStatus
         from app.api.payment.schemas import PaymentStatus, PaymentType
+        from app.api.sales_flow.models import SalesFlows  # noqa: PLC0415
         from app.api.sales_flow.resolver import config_for  # noqa: PLC0415
         from app.api.tenant.utils import get_portal_url
 
@@ -1773,6 +1824,14 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
             sales_flow_id=application.sales_flow_id,
             popup_id=application.popup_id,
         )
+        payment_flow = (
+            session.get(SalesFlows, application.sales_flow_id)
+            if application.sales_flow_id
+            else None
+        )
+        simplefi_api_key = (
+            payment_flow.simplefi_api_key if payment_flow else None
+        ) or popup.simplefi_api_key
         application_fee_amount = fee_config.application_fee_amount
         if (
             not fee_config.requires_application_fee
@@ -1787,7 +1846,6 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
         # 3. Check for existing pending fee payment
         existing = self.get_latest_fee_payment(session, application.id)
         if existing and existing.status == PaymentStatus.PENDING.value:
-            simplefi_api_key = popup.simplefi_api_key
             if not simplefi_api_key:
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
@@ -1841,7 +1899,6 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
         fee_amount = Decimal(str(application_fee_amount))
 
         # 5. Validate SimpleFI is configured
-        simplefi_api_key = popup.simplefi_api_key
         if not simplefi_api_key:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
@@ -2235,13 +2292,6 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
             raise self._recipient_error()
         referenced: set[str] = set()
         snapshot_keys: set[str] = set()
-        ticket_recipient_keys = {
-            line.recipient_key
-            for line in lines
-            if line.recipient_key is not None
-            and line.product_id in products_by_id
-            and (products_by_id[line.product_id].category or "").lower() == "ticket"
-        }
         product_role_eligibility = (
             flow_product_recipient_category_ids(session, sales_flow_id, popup_id)
             if sales_flow_id is not None
@@ -2387,27 +2437,7 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
             if recipient.human_id is not None and recipient.existing_attendee_id:
                 raise self._recipient_error()
             legacy_self = recipient.existing_attendee_id in legacy_self_attendee_ids
-            # Simple-quantity checkout intentionally creates one attempt-local
-            # draft per ticket unit. Those ``open-ticket:`` recipients must stay
-            # distinct: promoting every draft to the buyer gives them the same
-            # human identity and the duplicate-person guard below rejects carts
-            # with more than one ticket. Explicit/legacy self recipients retain
-            # the primary-role inference.
-            is_open_ticket_draft = recipient.recipient_key.startswith("open-ticket:")
-            direct_self = (
-                application_id is None
-                and recipient.recipient_key in ticket_recipient_keys
-                and not is_open_ticket_draft
-                and primary_category_id is not None
-                and recipient.human_id is None
-                and recipient.existing_attendee_id is None
-                and recipient.category_id in (None, primary_category_id)
-            )
-            uses_primary_role = (
-                recipient.human_id == buyer_human_id or legacy_self or direct_self
-            )
-            if direct_self:
-                recipient.human_id = buyer_human_id
+            uses_primary_role = recipient.human_id == buyer_human_id or legacy_self
             if uses_primary_role:
                 primary_role_recipient_keys.add(recipient.recipient_key)
                 if recipient.category_id is None:
@@ -2738,23 +2768,32 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
             return None
         if recipient is not None and recipient.human_id is not None:
             if (
-                selected_id is not None
+                recipient.existing_attendee_id is not None
                 or payment.buyer_human_id is None
                 or recipient.human_id != payment.buyer_human_id
             ):
                 raise self._recipient_error()
-            attendee = session.exec(
-                select(Attendees)
-                .where(
-                    Attendees.tenant_id == payment.tenant_id,
-                    Attendees.popup_id == payment.popup_id,
-                    Attendees.human_id == recipient.human_id,
-                )
-                .order_by(Attendees.created_at, Attendees.id)
-            ).first()
-            if attendee is None:
-                return None
-            selected_id = attendee.id
+            if selected_id is not None:
+                # Approval stores the resolved attendee on both the snapshot
+                # and its lines. Reconciliation may reuse only that binding.
+                if (
+                    not isinstance(recipient, PaymentRecipients)
+                    or selected_id != recipient.attendee_id
+                ):
+                    raise self._recipient_error()
+            else:
+                attendee = session.exec(
+                    select(Attendees)
+                    .where(
+                        Attendees.tenant_id == payment.tenant_id,
+                        Attendees.popup_id == payment.popup_id,
+                        Attendees.human_id == recipient.human_id,
+                    )
+                    .order_by(Attendees.created_at, Attendees.id)
+                ).first()
+                if attendee is None:
+                    return None
+                selected_id = attendee.id
         if selected_id is None:
             return None
 
@@ -3710,8 +3749,18 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
             preview.status = PaymentStatus.APPROVED.value
             return payment, preview
 
-        # Validate popup has SimpleFI API key configured
-        if not application.popup or not application.popup.simplefi_api_key:
+        # Use the flow override when present, otherwise inherit the popup key.
+        from app.api.sales_flow.models import SalesFlows
+
+        application_flow = (
+            session.get(SalesFlows, application.sales_flow_id)
+            if application.sales_flow_id
+            else None
+        )
+        simplefi_api_key = (
+            application_flow.simplefi_api_key if application_flow else None
+        ) or (application.popup.simplefi_api_key if application.popup else None)
+        if not simplefi_api_key:
             logger.error(
                 "Popup %s does not have SimpleFI API key configured",
                 application.popup_id,
@@ -3732,7 +3781,7 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
         # Create SimpleFI payment request
         from app.services.simplefi import get_simplefi_client
 
-        simplefi_client = get_simplefi_client(application.popup.simplefi_api_key)
+        simplefi_client = get_simplefi_client(simplefi_api_key)
 
         # Build reference for SimpleFI (useful for debugging/tracking)
         reference = {
@@ -4174,6 +4223,7 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
             is None
         ):
             raise self._fulfillment_error()
+        companion_category_id = None
         if recipient.category_id is not None:
             category = session.exec(
                 select(AttendeeCategories).where(
@@ -4188,6 +4238,8 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
                 and category.sales_flow_id != payment.sales_flow_id
             ):
                 raise self._fulfillment_error()
+            if recipient.human_id is None and not category.is_primary:
+                companion_category_id = category.id
 
         if (
             recipient.attendee_id is not None
@@ -4263,7 +4315,10 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
                 ),
                 name=recipient.name,
                 email=recipient.email,
-                category_id=None,
+                # Establish a new companion's category from the validated
+                # recipient. Buyers remain Main; existing attendees retain
+                # their category even when purchasing through another flow.
+                category_id=companion_category_id,
                 additional_data=recipient.profile_snapshot,
             )
             session.add(attendee)
@@ -4654,6 +4709,19 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
             )
         return self.approve_payment(session, payment.id)
 
+    def _find_pending_by_application(
+        self, session: Session, application_id: uuid.UUID
+    ) -> Payments | None:
+        """Pending provider checkout managed by supersede and its race guard."""
+        return session.exec(
+            select(Payments).where(
+                Payments.application_id == application_id,
+                Payments.status == PaymentStatus.PENDING.value,
+                Payments.source == PaymentSource.SIMPLEFI.value,
+                Payments.external_id.is_not(None),  # type: ignore[union-attr]
+            )
+        ).first()
+
     def _check_no_pending_sibling_by_application(
         self,
         session: Session,
@@ -4662,7 +4730,7 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
         """Post-lock guard (authenticated): abort when a concurrent sibling PENDING payment exists.
 
         Called AFTER the ``applications FOR UPDATE`` lock is acquired in
-        create_payment.  A sibling is any PENDING payment already linked to
+        create_payment. A sibling is a PENDING provider checkout linked to
         this application_id — meaning a concurrent create_payment call already
         passed the supersede pre-step and started a new payment.  The slower
         caller should abort so there is exactly ONE new PENDING payment per
@@ -4671,12 +4739,9 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
         Raises HTTP 409 ``concurrent_payment_in_progress``.  NO SimpleFi call
         is made under this lock (ADR-2 invariant).
         """
-        sibling = session.exec(
-            select(Payments).where(
-                Payments.application_id == application_id,
-                Payments.status == PaymentStatus.PENDING.value,  # type: ignore[arg-type]
-            )
-        ).first()
+        # Match supersede's scope. Imported/manual payments cannot be cancelled
+        # by this checkout and must not be mistaken for a concurrent request.
+        sibling = self._find_pending_by_application(session, application_id)
         if sibling is not None:
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
@@ -4800,16 +4865,7 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
         Raises HTTP 409 ``concurrent_payment_in_progress``.  NO SimpleFi call
         is made under this lock (ADR-2 invariant).
         """
-        sibling = session.exec(
-            select(Payments)
-            .where(
-                Payments.popup_id == popup_id,
-                Payments.status == PaymentStatus.PENDING.value,  # type: ignore[arg-type]
-                Payments.application_id.is_(None),  # type: ignore[union-attr]
-            )
-            .where(text("buyer_snapshot->>'buyer_email' = :email"))
-            .params(email=email.lower())
-        ).first()
+        sibling = self._find_pending_by_email_popup(session, email, popup_id)
         if sibling is not None:
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
@@ -4904,14 +4960,7 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
         prior: Payments | None = None
 
         if application_id is not None:
-            prior = session.exec(
-                select(Payments).where(
-                    Payments.application_id == application_id,
-                    Payments.status == PaymentStatus.PENDING.value,  # type: ignore[arg-type]
-                    Payments.source == PaymentSource.SIMPLEFI.value,  # type: ignore[arg-type]
-                    Payments.external_id.is_not(None),  # type: ignore[union-attr]
-                )
-            ).first()
+            prior = self._find_pending_by_application(session, application_id)
         elif email is not None and popup_id is not None:
             prior = self._find_pending_by_email_popup(session, email, popup_id)
 
@@ -4981,9 +5030,17 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
             CancelOutcomeAmbiguousError,
         )
 
-        # Resolve the SimpleFi API key from the payment's popup
+        # Resolve the flow override first, then inherit the popup key.
         _popup = session.get(_Popups, prior.popup_id)
-        if _popup is None or not _popup.simplefi_api_key:
+        _flow = (
+            session.get(_SalesFlows, prior.sales_flow_id)
+            if prior.sales_flow_id
+            else None
+        )
+        simplefi_api_key = (_flow.simplefi_api_key if _flow else None) or (
+            _popup.simplefi_api_key if _popup else None
+        )
+        if _popup is None or not simplefi_api_key:
             # No API key: the payment was never sent to SimpleFi (orphaned).
             # Release holds anyway since there is no live link to protect.
             logger.warning(
@@ -4995,7 +5052,7 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
             self.update_status(session, prior.id, PaymentStatus.CANCELLED)
             return
 
-        simplefi_client = get_simplefi_client(_popup.simplefi_api_key)
+        simplefi_client = get_simplefi_client(simplefi_api_key)
 
         # Call SimpleFi cancel OUTSIDE any DB lock (ADR-2, ADR-3)
         try:

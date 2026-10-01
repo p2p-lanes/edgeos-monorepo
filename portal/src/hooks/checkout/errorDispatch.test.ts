@@ -156,14 +156,16 @@ describe("dispatchPaymentError — payment_cancel_failed / concurrent_payment_in
     expect(result!.navigate).toBeNull()
   })
 
-  it("concurrent_payment_in_progress (open-ticketing) → same retryable treatment as cancel_failed", () => {
+  it("concurrent_payment_in_progress (open-ticketing) explains the pending checkout", () => {
     const result = dispatchPaymentError(
       { code: "concurrent_payment_in_progress" },
       "open-ticketing",
       "slug",
     )
     expect(result).not.toBeNull()
-    expect(result!.messageKey).toBe("openCheckout.payment_cancel_failed")
+    expect(result!.messageKey).toBe(
+      "openCheckout.concurrent_payment_in_progress",
+    )
     expect(result!.blockResubmit).toBe(false)
     expect(result!.setPersistentError).toBe(true)
     expect(result!.navigate).toBeNull()
@@ -187,7 +189,7 @@ describe("dispatchPaymentError — payment_cancel_failed / concurrent_payment_in
       "slug",
     )
     expect(result).not.toBeNull()
-    expect(result!.messageKey).toBe("checkout.payment_cancel_failed")
+    expect(result!.messageKey).toBe("checkout.concurrent_payment_in_progress")
     expect(result!.blockResubmit).toBe(false)
   })
 

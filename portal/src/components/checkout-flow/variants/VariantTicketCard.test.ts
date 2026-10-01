@@ -229,4 +229,51 @@ describe("VariantTicketCard section layout", () => {
     expect(setRowQuantity).toHaveBeenCalledWith("attendee-1", product, 1)
     expect(toggleRow).not.toHaveBeenCalled()
   })
+
+  it("shows a high-contrast added state for open-checkout products", () => {
+    const product = {
+      id: "lunch-ticket",
+      name: "Lunch Ticket",
+      price: 0,
+    } as unknown as ProductsPass
+    useTicketsStep.mockReturnValue({
+      mode: "simple_quantity",
+      attendees: [],
+      sections: [
+        {
+          key: "lunch",
+          label: "Lunch",
+          rows: [
+            {
+              product,
+              quantity: 1,
+              selected: true,
+              purchased: false,
+              usesStepper: false,
+              disabled: true,
+              maxQuantity: 1,
+              saleState: "on_sale",
+            },
+          ],
+        },
+      ],
+      toggleRow: vi.fn(),
+      setRowQuantity: vi.fn(),
+      isEditing: false,
+    })
+
+    render(
+      createElement(VariantTicketCard, {
+        products: [product],
+        stepType: "tickets",
+      }),
+    )
+
+    const addedControl = screen.getByRole("button", {
+      name: "Remove from cart",
+    })
+    expect(addedControl.textContent).toContain("Added")
+    expect(addedControl.className).toContain("bg-teal-800")
+    expect(addedControl.className).not.toContain("opacity-50")
+  })
 })

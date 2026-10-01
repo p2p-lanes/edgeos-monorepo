@@ -229,6 +229,11 @@ class EventInvitationContext(BaseModel):
     event_url: str = ""
 
 
+class EventHostMessageContext(EventInvitationContext):
+    host_name: str
+    host_message: str
+
+
 class EventChangeRow(BaseModel):
     """Before/after pair surfaced as an inline diff in update emails."""
 
@@ -395,6 +400,7 @@ class EmailTemplates:
 
     # Event
     EVENT_INVITATION = "event/invitation.html"
+    EVENT_HOST_MESSAGE = "event/host_message.html"
     EVENT_UPDATED = "event/updated.html"
     EVENT_CANCELLED = "event/cancelled.html"
     EVENT_RSVP_CANCELLED = "event/rsvp_cancelled.html"
@@ -420,6 +426,7 @@ TEMPLATE_TYPE_TO_FILE: dict[EmailTemplateType, str] = {
     EmailTemplateType.ABANDONED_CART: "payment/abandoned_cart.html",
     EmailTemplateType.EDIT_PASSES_CONFIRMED: "payment/edit_passes_confirmed.html",
     EmailTemplateType.EVENT_INVITATION: "event/invitation.html",
+    EmailTemplateType.EVENT_HOST_MESSAGE: "event/host_message.html",
     EmailTemplateType.EVENT_UPDATED: "event/updated.html",
     EmailTemplateType.EVENT_CANCELLED: "event/cancelled.html",
     EmailTemplateType.EVENT_RSVP_CANCELLED: "event/rsvp_cancelled.html",
@@ -1176,6 +1183,33 @@ POPUP_TEMPLATE_METADATA: list[dict[str, Any]] = [
             },
             *_POPUP_EVENT_VARIABLES,
         ],
+    },
+    {
+        "type": EmailTemplateType.EVENT_HOST_MESSAGE,
+        "label": "Message from event host",
+        "description": "A message from an event manager to eligible RSVPs.",
+        "category": "Event",
+        "default_subject": "Message from your host: {{ event_title }}",
+        "variables": [
+            {
+                "name": name,
+                "label": label,
+                "type": "string",
+                "description": label,
+                "required": required,
+                "group": "Event",
+            }
+            for name, label, required in [
+                ("host_message", "Host message", True),
+                ("host_name", "Host name", True),
+                ("first_name", "Recipient first name", False),
+                ("event_title", "Event title", True),
+                ("event_when", "Event date and time", False),
+                ("venue_title", "Location", False),
+                ("event_url", "Event URL", False),
+            ]
+        ]
+        + _POPUP_EVENT_VARIABLES,
     },
     {
         "type": EmailTemplateType.EVENT_INVITATION,

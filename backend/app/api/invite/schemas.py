@@ -88,9 +88,17 @@ class InvitePortalCreate(BaseModel):
     An attendee sets far less than an admin: the policy fields (discount,
     auto_approve) stay admin-only, and max_uses is dictated by the popup's
     max_referrals_per_attendee quota.
+
+    ``source_popup_id`` names another popup of the same tenant whose access
+    lets the attendee share ``popup_id`` without being in it. Omitted, or equal
+    to ``popup_id``, means the attendee shares their own popup.
     """
 
     popup_id: uuid.UUID
+    source_popup_id: uuid.UUID | None = None
+    # Cross-popup links may name any open application flow accepting them.
+    # Omitted for existing clients: use the target popup's default flow.
+    sales_flow_id: uuid.UUID | None = None
     token: str | None = None
     max_uses: int | None = None
     expires_at: datetime | None = None
@@ -145,10 +153,37 @@ class InvitePublic(BaseModel):
     expires_at: datetime | None = None
     created_by: uuid.UUID | None = None
     referrer_human_id: uuid.UUID | None = None
+    # Set on an attendee link into a popup its owner is not in: the popup
+    # whose access let them share it.
+    source_popup_id: uuid.UUID | None = None
     created_at: datetime
     updated_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class AttendeeSharingStatus(BaseModel):
+    """Whether the attendee may create their own link from a popup.
+
+    The same answer POST /portal/invites gives, asked ahead of time so the
+    portal can decide whether to offer the referrals screen at all. Never says
+    why not: one of the reasons is a red flag.
+    """
+
+    can_share: bool
+    # The flow a same-popup link would land people in, when sharing is allowed.
+    sales_flow_id: uuid.UUID | None = None
+
+
+class CrossPopupReferralTarget(BaseModel):
+    """One accepting application flow of another popup, with its own link."""
+
+    popup_id: uuid.UUID
+    name: str
+    slug: str
+    sales_flow_id: uuid.UUID
+    flow_name: str
+    link: InvitePublic | None = None
 
 
 class InvitePublicPreview(BaseModel):
@@ -162,6 +197,8 @@ class InvitePublicPreview(BaseModel):
 
     id: uuid.UUID
     popup_id: uuid.UUID
+    # The form and checkout must use the link's flow, not the popup default.
+    sales_flow_id: uuid.UUID | None = None
     token: str
     inviter_name: str | None = None
     is_email_restricted: bool

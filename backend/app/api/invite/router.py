@@ -10,12 +10,14 @@ belongs to the sales flow an invite lands its recipient in).
 """
 
 import uuid
-from typing import Annotated, Literal
+from typing import TYPE_CHECKING, Annotated, Literal
 
 from fastapi import APIRouter, HTTPException, Query, Response, status
 
-from app.api.invite.crud import invites_crud
+from app.api.invite.crud import attendee_link_enabled, invites_crud
 from app.api.invite.schemas import (
+    AttendeeSharingStatus,
+    CrossPopupReferralTarget,
     InviteCreate,
     InvitePortalCreate,
     InvitePortalUpdate,
@@ -32,6 +34,9 @@ from app.core.dependencies.users import (
     OptionalHuman,
     SessionDep,
 )
+
+if TYPE_CHECKING:
+    from app.api.popup.models import Popups
 
 IssuerFilter = Annotated[
     Literal["all", "admin", "portal"],
@@ -134,6 +139,7 @@ async def preview_invite(
     return InvitePublicPreview(
         id=invite.id,
         popup_id=invite.popup_id,
+        sales_flow_id=invite.sales_flow_id,
         token=invite.token,
         inviter_name=inviter_name,
         is_email_restricted=invite.recipient_email is not None,
@@ -159,9 +165,9 @@ async def preview_link(
 ) -> InvitePublicPreview:
     """Preview a link of either kind, resolved by token.
 
-    Same guard order as the invite-only preview, but the popup feature flag
-    checked depends on who issued the link: invites_enabled for a backoffice
-    link, referrals_enabled for an attendee one.
+    Same guard order as the invite-only preview, but the flow switch checked
+    depends on the kind of link (see ``attendee_link_enabled``), and an
+    attendee link stops resolving while its owner is red-flagged.
 
     ``inviter_name`` is filled only for backoffice links. An attendee link
     never names its owner: it is a public URL and the owner is a private
@@ -185,7 +191,9 @@ async def preview_link(
         from app.api.application.crud import applications_crud
 
         already_redeemed = (
-            applications_crud.get_by_human_popup(db, current_human.id, link.popup_id)
+            applications_crud.get_by_human_flow(
+                db, human_id=current_human.id, sales_flow_id=link.sales_flow_id
+            )
             is not None
         )
 
@@ -195,24 +203,29 @@ async def preview_link(
 
         popup = popups_crud.get(db, link.popup_id)
         ensure_popup_link_active(popup)
+        from app.api.sales_flow.crud import sales_flows_crud
+
+        link_flow = sales_flows_crud.get(db, link.sales_flow_id)
+        if link_flow is None or link_flow.status is not None:
+            raise HTTPException(
+                status_code=status.HTTP_410_GONE,
+                detail="This way in is closed",
+                headers=_no_store,
+            )
         if popup is not None:
             # Both flags belong to the flow this link lands people in, not to
             # the event: a door can share while another does not.
             config = config_for(
                 db, sales_flow_id=link.sales_flow_id, popup_id=link.popup_id
             )
-            enabled = (
-                config.referrals_enabled
-                if link.is_portal_created
-                else config.invites_enabled
-            )
-            if not enabled:
+            if not attendee_link_enabled(config, link):
                 raise HTTPException(
                     status_code=status.HTTP_410_GONE,
                     detail="This kind of link is not enabled for this event",
                     headers=_no_store,
                 )
         invites_crud.validate_for_redemption(link)
+        invites_crud.ensure_referrer_in_good_standing(db, link)
 
     inviter_name: str | None = None
     if not link.is_portal_created:
@@ -227,6 +240,7 @@ async def preview_link(
     return InvitePublicPreview(
         id=link.id,
         popup_id=link.popup_id,
+        sales_flow_id=link.sales_flow_id,
         token=link.token,
         inviter_name=inviter_name,
         is_email_restricted=link.recipient_email is not None,
@@ -597,6 +611,138 @@ async def list_my_links(
     )
 
 
+def _share_denial(
+    db: SessionDep, human_id: uuid.UUID, popup_id: uuid.UUID
+) -> tuple[str | None, uuid.UUID]:
+    """Why this attendee may not share from ``popup_id``, if they may not.
+
+    Returns the refusal (None when allowed) and the door they came through,
+    which is the flow their own link into this popup lands people in.
+    """
+    from app.api.application.crud import applications_crud
+    from app.api.sales_flow.resolver import config_for  # noqa: PLC0415
+
+    # The door this attendee came through is the one they would be sharing,
+    # so it is the one that decides whether they may, and at what rate.
+    flow_id = invites_crud._flow_for_attendee_link(db, popup_id, human_id)
+    if not config_for(db, sales_flow_id=flow_id, popup_id=popup_id).referrals_enabled:
+        return "Attendee links are not enabled for this way in", flow_id
+
+    # Reuse the popup access gate so accepted applicants and self/managed access
+    # holders qualify, while participant/order holdings and bare attendees do not.
+    if not applications_crud.resolve_popup_access(db, human_id, popup_id).allowed:
+        return "You need a ticket for this popup to create a link.", flow_id
+
+    return None, flow_id
+
+
+def _tenant_popup_or_404(
+    db: SessionDep, popup_id: uuid.UUID, tenant_id: uuid.UUID
+) -> "Popups":
+    """A popup of the caller's tenant.
+
+    The portal session has no RLS, so a popup of another tenant has to be
+    refused here, and it reads as not found.
+    """
+    from app.api.popup.crud import popups_crud
+
+    popup = popups_crud.get(db, popup_id)
+    if not popup or popup.tenant_id != tenant_id:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Popup not found"
+        )
+    return popup
+
+
+@portal_router.get("/sharing", response_model=AttendeeSharingStatus)
+async def get_my_sharing_status(
+    db: SessionDep,
+    current_human: CurrentHuman,
+    popup_id: uuid.UUID,
+) -> AttendeeSharingStatus:
+    """Portal: whether this attendee may create their own link from a popup.
+
+    Backs the referrals entry in the portal sidebar. The switch lives on the
+    flow the attendee came through, which the popup-level flag no longer
+    reflects, so the portal asks here instead of reading the popup.
+    """
+    popup = _tenant_popup_or_404(db, popup_id, current_human.tenant_id)
+    if current_human.red_flag:
+        return AttendeeSharingStatus(can_share=False)
+    denial, flow_id = _share_denial(db, current_human.id, popup.id)
+    return AttendeeSharingStatus(
+        can_share=denial is None,
+        sales_flow_id=flow_id if denial is None else None,
+    )
+
+
+@portal_router.get(
+    "/cross-popup-targets", response_model=list[CrossPopupReferralTarget]
+)
+async def list_cross_popup_targets(
+    db: SessionDep,
+    current_human: CurrentHuman,
+    source_popup_id: uuid.UUID,
+) -> list[CrossPopupReferralTarget]:
+    """Portal: each accepting way into the tenant's other active popups.
+
+    Empty, rather than an error, when the attendee may not share from
+    ``source_popup_id`` at all: this backs a section of the referrals screen
+    that simply does not show, and a red flag is never named to its holder.
+    """
+    from sqlmodel import select
+
+    from app.api.invite.models import Invites
+    from app.api.popup.models import Popups
+    from app.api.popup.schemas import PopupStatus
+
+    source = _tenant_popup_or_404(db, source_popup_id, current_human.tenant_id)
+    if current_human.red_flag:
+        return []
+    denial, _ = _share_denial(db, current_human.id, source.id)
+    if denial is not None:
+        return []
+
+    popups = db.exec(
+        select(Popups)
+        .where(
+            Popups.tenant_id == current_human.tenant_id,
+            Popups.status == PopupStatus.active.value,
+            Popups.id != source.id,
+        )
+        .order_by(
+            Popups.start_date.asc().nulls_last(),  # type: ignore[union-attr]
+            Popups.name.asc(),  # type: ignore[attr-defined]
+        )
+    ).all()
+
+    targets: list[CrossPopupReferralTarget] = []
+    for popup in popups:
+        flows = invites_crud.cross_popup_target_flows(db, popup)
+        if not flows:
+            continue
+        links = db.exec(
+            select(Invites).where(
+                Invites.referrer_human_id == current_human.id,
+                Invites.popup_id == popup.id,
+            )
+        ).all()
+        links_by_flow = {link.sales_flow_id: link for link in links}
+        for flow in flows:
+            link = links_by_flow.get(flow.id)
+            targets.append(
+                CrossPopupReferralTarget(
+                    popup_id=popup.id,
+                    name=popup.name,
+                    slug=popup.slug,
+                    sales_flow_id=flow.id,
+                    flow_name=flow.name,
+                    link=InvitePublic.model_validate(link) if link else None,
+                )
+            )
+    return targets
+
+
 @portal_router.post(
     "", response_model=InvitePublic, status_code=status.HTTP_201_CREATED
 )
@@ -610,56 +756,88 @@ async def create_my_link(
     Spec: REQ-GR-008 (entity), REQ-GR-026 (the attendee-links gate,
     which belongs to the flow the sharer came through).
     Token auto-generated when omitted. 409 if (popup_id, token) collides.
+
+    With a ``source_popup_id`` other than ``popup_id`` the attendee shares a
+    popup of their tenant they are not in. They must be allowed to share from
+    the source popup, and the selected open application flow must accept links
+    from other popups; that flow also sets the link's use limit. An omitted
+    sales_flow_id retains the old default-flow behavior.
     """
-    from app.api.application.crud import applications_crud
-    from app.api.popup.crud import popups_crud
     from app.api.sales_flow.resolver import config_for  # noqa: PLC0415
 
-    popup = popups_crud.get(db, body.popup_id)
-    if not popup:
+    popup = _tenant_popup_or_404(db, body.popup_id, current_human.tenant_id)
+
+    if current_human.red_flag:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Popup not found"
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You can't create links for this popup.",
         )
 
-    # The door this attendee came through is the one they would be sharing,
-    # so it is the one that decides whether they may — and at what rate.
-    link_flow_id = invites_crud._flow_for_attendee_link(
-        db, body.popup_id, current_human.id
+    source_popup_id = (
+        body.source_popup_id if body.source_popup_id != body.popup_id else None
     )
+    if source_popup_id is None:
+        denial, link_flow_id = _share_denial(db, current_human.id, popup.id)
+        if denial is not None:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=denial)
+        if body.sales_flow_id is not None and body.sales_flow_id != link_flow_id:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="Your link must use the way in you came through.",
+            )
+    else:
+        source = _tenant_popup_or_404(db, source_popup_id, current_human.tenant_id)
+        denial, _ = _share_denial(db, current_human.id, source.id)
+        if denial is not None:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=denial)
+        target_flow = (
+            next(
+                (
+                    flow
+                    for flow in invites_crud.cross_popup_target_flows(db, popup)
+                    if flow.id == body.sales_flow_id
+                ),
+                None,
+            )
+            if body.sales_flow_id is not None
+            else invites_crud.cross_popup_target_flow(db, popup)
+        )
+        if target_flow is None:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="This popup does not accept links into this sales flow.",
+            )
+        link_flow_id = target_flow.id
     link_config = config_for(db, sales_flow_id=link_flow_id, popup_id=popup.id)
-    if not link_config.referrals_enabled:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Attendee links are not enabled for this way in",
-        )
 
-    # Reuse the popup access gate so accepted applicants and self/managed access
-    # holders qualify, while participant/order holdings and bare attendees do not.
-    if not applications_crud.resolve_popup_access(
-        db, current_human.id, body.popup_id
-    ).allowed:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="You need a ticket for this popup to create a link.",
-        )
+    # One link per attendee per destination flow. An existing link into one
+    # flow must not prevent sharing another way into the same popup.
+    from sqlmodel import select
 
-    # One link per attendee per popup.
-    _, existing_count = invites_crud.find_by_human(
-        db, current_human.id, body.popup_id, limit=1
-    )
-    if existing_count >= 1:
+    from app.api.invite.models import Invites
+
+    existing = db.exec(
+        select(Invites).where(
+            Invites.referrer_human_id == current_human.id,
+            Invites.sales_flow_id == link_flow_id,
+        )
+    ).first()
+    if existing is not None:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail="You already have a link for this popup.",
+            detail="You already have a link for this sales flow.",
         )
 
-    # Popup config always dictates max_uses, even when it says unlimited.
+    # The flow the link lands people in always dictates max_uses, even when
+    # it says unlimited.
     link = invites_crud.create_portal_link(
         db,
         body,
         tenant_id=popup.tenant_id,
         referrer_human_id=current_human.id,
         max_uses_override=link_config.max_referrals_per_attendee,
+        sales_flow_id=link_flow_id,
+        source_popup_id=source_popup_id,
     )
     return InvitePublic.model_validate(link)
 

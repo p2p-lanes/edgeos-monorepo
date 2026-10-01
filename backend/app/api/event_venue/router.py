@@ -889,21 +889,7 @@ async def get_portal_availability(
             filtered_busy.append(slot)
             continue
 
-        if ev.visibility != _EventVisibility.PRIVATE:
-            filtered_busy.append(slot)
-            continue
-
-        # Managers (owner/host/collaborators) always see the label — mirrors
-        # `_human_id_manages_event` (event/router.py). Taking the chokepoint
-        # alone would regress the host/collaborator visibility added on dev.
-        is_manager = current_human.id in (ev.owner_id, ev.host_id) or (
-            current_human.id in (ev.collaborator_ids or [])
-        )
-        if is_manager:
-            filtered_busy.append(slot)
-            continue
-
-        # Apply the chokepoint for this PRIVATE event.
+        # State and privacy are checked together, including public pending events.
         result = project_event_for(
             viewer=viewer,
             event=ev,

@@ -30,6 +30,8 @@ export default function ProfileContent() {
     last_name: userData?.last_name,
     telegram: userData?.telegram,
     gender: userData?.gender,
+    age: userData?.age,
+    residence: userData?.residence,
     picture_url: userData?.picture_url,
   })
 
@@ -41,6 +43,8 @@ export default function ProfileContent() {
       last_name: profile.last_name,
       telegram: profile.telegram,
       gender: profile.gender,
+      age: profile.age,
+      residence: profile.residence,
       picture_url: profile.picture_url,
     })
   }, [profile])
@@ -64,6 +68,8 @@ export default function ProfileContent() {
       last_name: editForm.last_name ?? undefined,
       telegram: editForm.telegram ?? undefined,
       gender: editForm.gender ?? undefined,
+      age: editForm.age ?? undefined,
+      residence: editForm.residence ?? undefined,
       picture_url: editForm.picture_url ?? undefined,
     })
     if (updated) {
@@ -79,6 +85,8 @@ export default function ProfileContent() {
       last_name: userData.last_name,
       telegram: userData.telegram,
       gender: userData.gender,
+      age: userData.age,
+      residence: userData.residence,
       picture_url: userData.picture_url,
     })
     setIsEditing(false)

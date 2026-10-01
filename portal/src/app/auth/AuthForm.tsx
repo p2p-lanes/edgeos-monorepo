@@ -184,15 +184,21 @@ export default function AuthForm() {
           // will-change promotes the layer up front instead of mid-animation.
           transformTemplate={(_, generated) => `${generated} translateZ(0)`}
           style={{ willChange: "transform", backfaceVisibility: "hidden" }}
-          className="relative aspect-square w-[180px] mx-auto mb-8"
+          // Fixed box so the reserved space never depends on the logo that
+          // loads (no layout shift), but wider than it is tall and paired with
+          // `object-contain`: tenant logos are usually wide wordmarks, and a
+          // square box with `object-cover` sliced their left and right edges
+          // off. Contain letterboxes instead, so tall, square and wide logos
+          // all render whole at the largest size that fits.
+          className="relative h-[140px] w-full max-w-[220px] mx-auto mb-8"
         >
           {tenant?.logo_url ? (
             <Image
               src={tenant.logo_url}
               alt={tenant.name ?? "Logo"}
-              className="size-full rounded-lg object-cover"
+              className="object-contain"
               fill
-              sizes="180px"
+              sizes="220px"
               {...imageOptimization(tenant.logo_url)}
             />
           ) : (

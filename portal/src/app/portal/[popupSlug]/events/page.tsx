@@ -813,6 +813,7 @@ export default function EventsPage() {
             placeholderUrl={eventSettings?.placeholder_url}
             canRsvp={canRsvp}
             rsvpDisabledReason={rsvpDisabledReason}
+            rsvpBlockReason={rsvpBlockReason}
             showRsvp={!isEnded}
           />
         ) : view === "day" ? (
@@ -835,6 +836,7 @@ export default function EventsPage() {
               onToggleFullscreen={toggleDayFullscreen}
               canRsvp={canRsvp}
               rsvpDisabledReason={rsvpDisabledReason}
+              rsvpBlockReason={rsvpBlockReason}
               showRsvp={!isEnded}
             />
           )
@@ -855,6 +857,7 @@ export default function EventsPage() {
             pendingRsvpKey={pendingRsvpKey}
             canRsvp={canRsvp}
             rsvpDisabledReason={rsvpDisabledReason}
+            rsvpBlockReason={rsvpBlockReason}
             showRsvp={!isEnded}
             onHide={(id) => hideMutation.mutate(id)}
             onUnhide={(id) => unhideMutation.mutate(id)}
@@ -916,6 +919,7 @@ export default function EventsPage() {
               onToggleFullscreen={toggleDayFullscreen}
               canRsvp={canRsvp}
               rsvpDisabledReason={rsvpDisabledReason}
+              rsvpBlockReason={rsvpBlockReason}
               showRsvp={!isEnded}
             />
           </div>,

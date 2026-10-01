@@ -294,7 +294,7 @@ def test_same_access_product_keeps_recipient_price_category_and_qr_lines_separat
         (
             "discount-child",
             child_category.id,
-            None,
+            child_category.id,
             Decimal("15.00"),
             child_line.id,
         ),
@@ -458,16 +458,23 @@ def test_historical_payment_does_not_override_existing_manager(
     assert _tickets(db, payment.id) == []
 
 
+@pytest.mark.parametrize("buyer_recipient", [False, True])
 def test_concurrent_approval_and_legacy_or_fee_compatibility(
     db: Session,
     test_engine,
     tenant_a: Tenants,
     popup_tenant_a: Popups,
+    buyer_recipient: bool,
 ) -> None:
     buyer = _human(db, tenant_a, "Concurrent")
     product = _product(db, popup_tenant_a, "ticket")
     payment, recipient, access_line = _payment(
-        db, popup_tenant_a, buyer, product, quantity=2
+        db,
+        popup_tenant_a,
+        buyer,
+        product,
+        quantity=2,
+        human=buyer if buyer_recipient else None,
     )
     participant_line = _line(
         db,
@@ -526,7 +533,7 @@ def test_concurrent_approval_and_legacy_or_fee_compatibility(
     legacy_attendee = Attendees(
         tenant_id=tenant_a.id,
         popup_id=popup_tenant_a.id,
-        human_id=buyer.id,
+        human_id=_human(db, tenant_a, "LegacyBuyer").id,
         name="Legacy attendee",
         category_id=_category(db, popup_tenant_a).id,
     )
@@ -884,6 +891,35 @@ def test_approval_rejects_cross_scope_snapshot_data(
 
     assert error.value.status_code == 422
     assert _tickets(db, payment.id) == []
+
+
+def test_buyer_reconciliation_rejects_a_rebound_line(
+    db: Session, tenant_a: Tenants, popup_tenant_a: Popups
+) -> None:
+    buyer = _human(db, tenant_a, "Buyer")
+    product = _product(db, popup_tenant_a)
+    payment, recipient, line = _payment(db, popup_tenant_a, buyer, product, human=buyer)
+    payments_crud.approve_payment(db, payment.id)
+    db.refresh(recipient)
+    original_attendee_id = recipient.attendee_id
+    other_attendee = Attendees(
+        tenant_id=tenant_a.id,
+        popup_id=popup_tenant_a.id,
+        managed_by_human_id=buyer.id,
+        name="Other Person",
+    )
+    db.add(other_attendee)
+    db.flush()
+    line.attendee_id = other_attendee.id
+    db.add(line)
+    db.commit()
+
+    with pytest.raises(HTTPException) as error:
+        payments_crud.approve_payment(db, payment.id)
+    assert error.value.status_code == 422
+    assert {ticket.attendee_id for ticket in _tickets(db, payment.id)} == {
+        original_attendee_id
+    }
 
 
 def test_sweeper_repairs_approved_payment_and_terminal_state_blocks_reapproval(

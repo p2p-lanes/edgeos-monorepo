@@ -67,6 +67,7 @@ class EventsCRUD(BaseCRUD[Events, EventCreate, EventUpdate]):
         exclude_visibility: list[EventVisibility] | None = None,
         exclude_statuses: list[EventStatus] | None = None,
         expand_occurrences: bool | None = None,
+        include_outside_window: bool = False,
     ) -> tuple[list[Events], int]:
         """Return events for a popup.
 
@@ -130,14 +131,14 @@ class EventsCRUD(BaseCRUD[Events, EventCreate, EventUpdate]):
         # window filter: a series whose master row starts before the window
         # can still have occurrences inside it. ``_expand_rows_in_window``
         # narrows them down in memory after expansion.
-        if start_after is not None:
+        if start_after is not None and not include_outside_window:
             statement = statement.where(
                 or_(
                     Events.rrule.is_not(None),  # type: ignore[union-attr]
                     Events.start_time >= start_after,
                 )
             )
-        if start_before is not None:
+        if start_before is not None and not include_outside_window:
             statement = statement.where(
                 or_(
                     Events.rrule.is_not(None),  # type: ignore[union-attr]
@@ -169,6 +170,7 @@ class EventsCRUD(BaseCRUD[Events, EventCreate, EventUpdate]):
                 list(session.exec(statement).all()),
                 window_start=start_after,
                 window_end=start_before,
+                include_outside_window=include_outside_window,
             )
             expanded.sort(key=lambda e: (e.start_time, str(e.id)))
             total = len(expanded)
@@ -463,6 +465,7 @@ def _expand_rows_in_window(
     *,
     window_start: datetime | None,
     window_end: datetime | None,
+    include_outside_window: bool = False,
 ) -> list[Events]:
     """Return ``rows`` with series masters expanded to occurrences.
 
@@ -471,6 +474,8 @@ def _expand_rows_in_window(
     - For each recurring master: the master itself PLUS one pseudo-row per
       occurrence in ``[window_start, window_end]`` (exclusive of the
       master's own start_time, which is already returned as the master).
+      When ``include_outside_window`` is true, masters outside the window are
+      retained too, for backoffice list views that represent all event dates.
 
     Pseudo-rows are NOT SQLAlchemy-attached: they are detached copies with
     ``occurrence_id`` set and ``start_time``/``end_time`` overridden.
@@ -501,7 +506,7 @@ def _expand_rows_in_window(
         # Recurring master: only include the row itself if its own start
         # falls in the window — otherwise we'd show a stale "first instance"
         # marker for a series whose visible occurrences are all pseudo-rows.
-        if ev_in_window:
+        if ev_in_window or include_outside_window:
             result.append(ev)
         try:
             rule = parse_rrule(ev.rrule)

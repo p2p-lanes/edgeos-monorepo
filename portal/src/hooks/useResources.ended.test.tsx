@@ -38,6 +38,10 @@ vi.mock("@/hooks/useHumanPopupAccess", () => ({
   useHumanPopupAccess: () => ({ state: "allowed", source: "payment" }),
 }))
 
+vi.mock("@/hooks/useCanShareReferrals", () => ({
+  useCanShareReferrals: () => false,
+}))
+
 vi.mock("@/hooks/usePortalSalesFlows", () => ({
   usePortalSalesFlows: () => ({ data: [] }),
 }))

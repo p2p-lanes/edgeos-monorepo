@@ -234,6 +234,12 @@ async def list_applications(
     resolve against the calling user's own skips and reviews. The
     ``reviewed_by`` field (ops ``eq``/``neq``, reviewer user id as UUID
     string) matches applications reviewed (or not) by that reviewer.
+    ``review_decision`` (ops ``eq``/``neq``) matches at least one review
+    with the selected vote: ``strong_yes``, ``yes``, ``no``, or ``strong_no``.
+    Under ``match=all``, positive ``reviewed_by``/``reviewed_by_me`` filters
+    scope votes to each selected reviewer, matching the same review row.
+    Otherwise votes may come from any reviewer. ``neq`` excludes matching
+    votes within that scope. Under ``match=any``, conditions are independent.
 
     ``group_by``/``group_value`` scope the list to one bucket of a grouped
     view (same whitelist and NULL/empty collapsing as the group-counts
@@ -407,7 +413,7 @@ async def list_application_reviewers(
     _: AdminOrApiKey_ApplicationsRead,
     control_db: SessionDep,
 ) -> list[ApplicationReviewerOption]:
-    """List users who have submitted at least one review for a popup."""
+    """List configured reviewers (popup and flow tiers) and past review submitters."""
     reviewer_ids = crud.applications_crud.reviewer_ids_by_popup(db, popup_id)
     identities = _get_reviewer_identities(control_db, reviewer_ids)
     return sorted(
@@ -855,9 +861,15 @@ async def get_my_purchases(
 
     results = []
     for attendee in attendees:
-        # Each AttendeeProducts row is one ticket — group by product_id and count.
-        counts = Counter(ap.product_id for ap in attendee.attendee_products)
-        seen = {ap.product_id: ap.product for ap in attendee.attendee_products}
+        # Ownership is defined by active product units, independently of payment
+        # history. Keep this explicit even though the CRUD loader applies the same
+        # criterion, so a previously-loaded relationship cannot leak revoked units.
+        active_units = [
+            unit for unit in attendee.attendee_products if unit.revoked_at is None
+        ]
+        # Each AttendeeProducts row is one unit — group by product_id and count.
+        counts = Counter(unit.product_id for unit in active_units)
+        seen = {unit.product_id: unit.product for unit in active_units}
         products = []
         for pid, qty in counts.items():
             product = ProductWithQuantity.model_validate(seen[pid])
@@ -1034,6 +1046,25 @@ async def create_my_application(
     # — validated for ownership and type=application by
     # `resolve_target_flow_id`, which raises 404 for an invalid one. Omitted
     # means the popup's default flow.
+    if app_in.referral_id is not None:
+        from app.api.invite.crud import invites_crud
+
+        referral = invites_crud.get_portal_created(db, app_in.referral_id)
+        if referral is None or referral.popup_id != app_in.popup_id:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, detail="Referral not found"
+            )
+        if (
+            app_in.sales_flow_id is not None
+            and app_in.sales_flow_id != referral.sales_flow_id
+        ):
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="This referral opens a different sales flow",
+            )
+        # Omitted flow ids on older clients still land in the link's own flow.
+        app_in = app_in.model_copy(update={"sales_flow_id": referral.sales_flow_id})
+
     flow_id = crud.applications_crud.resolve_target_flow_id(
         db, app_in.popup_id, app_in.sales_flow_id
     )

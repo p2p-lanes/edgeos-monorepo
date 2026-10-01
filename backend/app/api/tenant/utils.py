@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from typing import TYPE_CHECKING
+from urllib.parse import urlsplit, urlunsplit
 
 from app.core.config import settings
 
@@ -15,13 +16,19 @@ def get_portal_url(tenant: Tenants) -> str:
 
     If the tenant has an active custom domain, returns
     ``https://{custom_domain}``.  Otherwise falls back to the subdomain
-    pattern ``https://{slug}.{portal_host}`` derived from ``settings.PORTAL_URL``.
+    pattern ``{scheme}://{slug}.{portal_host}`` from ``settings.PORTAL_URL``.
     """
     if tenant.custom_domain_active and tenant.custom_domain:
         return f"https://{tenant.custom_domain}"
 
-    # Strip scheme from PORTAL_URL and use as the base domain.
-    portal_host = (
-        settings.PORTAL_URL.replace("https://", "").replace("http://", "").rstrip("/")
+    base = settings.PORTAL_URL
+    portal = urlsplit(base if "://" in base else f"https://{base}")
+    return urlunsplit(
+        (
+            portal.scheme,
+            f"{tenant.slug}.{portal.netloc}",
+            portal.path.rstrip("/"),
+            "",
+            "",
+        )
     )
-    return f"https://{tenant.slug}.{portal_host}"

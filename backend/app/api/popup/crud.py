@@ -19,9 +19,10 @@ class PopupsCRUD(BaseCRUD[Popups, PopupCreate, PopupUpdate]):
         return self.get_by_field(session, "slug", slug)
 
     def create(self, session: Session, obj_in: PopupCreate) -> Popups:
-        """Create a popup and its default sales flow in one transaction."""
+        """Create a popup, event settings and sales defaults in one transaction."""
         from app.api.approval_strategy.crud import approval_strategies_crud
         from app.api.approval_strategy.schemas import ApprovalStrategyCreate
+        from app.api.event_settings.crud import event_settings_crud
         from app.api.sales_flow.crud import sales_flows_crud
 
         popup = self.model(**obj_in.model_dump())
@@ -35,6 +36,10 @@ class PopupsCRUD(BaseCRUD[Popups, PopupCreate, PopupUpdate]):
 
         session.add(popup)
         session.flush()  # Get the popup id without committing
+
+        event_settings_crud.create_for_popup(
+            session, popup_id=popup.id, tenant_id=popup.tenant_id
+        )
 
         # sdd/sales-flows task 5.0: new popups receive a compatibility default
         # sales flow. Mirrors the slice-2 backfill behavior for pre-existing

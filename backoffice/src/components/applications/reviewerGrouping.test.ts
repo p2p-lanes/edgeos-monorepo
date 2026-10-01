@@ -26,16 +26,10 @@ describe("reviewer filter and grouping", () => {
     ).not.toContainEqual({ value: "reviewed_by", label: "Reviewed by" })
   })
 
-  it("hides Reviewed by from the filter field selector while reviewer grouping is active", () => {
-    const fields = buildApplicationFilterFieldDefs(
-      [],
-      [],
-      [{ value: "reviewer-1", label: "Reviewer" }],
-      {},
-      true,
-    )
+  it("keeps Reviewed by visible before reviewer options have loaded", () => {
+    const fields = buildApplicationFilterFieldDefs([], [])
 
-    expect(fields.some((field) => field.key === "reviewed_by")).toBe(false)
+    expect(fields.some((field) => field.key === "reviewed_by")).toBe(true)
   })
 
   it("normalizes a conflicting URL state by removing reviewer primary grouping", () => {

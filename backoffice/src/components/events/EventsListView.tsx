@@ -71,10 +71,9 @@ export function EventsListView({
     isLoading: tzLoading,
   } = useEventTimezone(popupId)
 
-  // Bound to the popup's date range (in its timezone). A window makes the
-  // backend expand recurring series into concrete occurrences — matching the
-  // day/calendar views — instead of showing each series once at its master.
-  // Falls back to no window (no expansion) when the popup has no dates.
+  // The popup date range is used to expand recurring series, but this list
+  // still includes one-off events outside that range. That keeps the list
+  // consistent with the backoffice table's "Any date" filter.
   const listWindow = useMemo(() => {
     const startYmd = popupStart?.slice(0, 10)
     const endYmd = popupEnd?.slice(0, 10)
@@ -112,6 +111,7 @@ export function EventsListView({
         search: search || undefined,
         startAfter: listWindow?.startAfter,
         startBefore: listWindow?.startBefore,
+        includeOutsideWindow: true,
       }),
     enabled: !!popupId && !tzLoading,
   })

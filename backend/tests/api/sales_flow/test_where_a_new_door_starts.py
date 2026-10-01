@@ -513,7 +513,7 @@ class TestCreatingThroughTheApi:
         assert body["contribution_enabled"] is None
         assert body["installments_enabled"] is None
 
-    def test_explicit_scratch_starts_with_no_ticketing_steps(
+    def test_explicit_scratch_starts_with_review_and_confirm_step(
         self,
         client: TestClient,
         db: Session,
@@ -541,16 +541,18 @@ class TestCreatingThroughTheApi:
                 TicketingSteps.sales_flow_id == uuid.UUID(resp.json()["id"])
             )
         ).all()
-        assert steps == []
+        assert len(steps) == 1
+        assert steps[0].step_type == "confirm"
+        assert steps[0].title == "Review & Confirm"
 
-    def test_an_omitted_start_from_still_has_a_checkout(
+    def test_omitted_start_from_matches_explicit_fresh(
         self,
         client: TestClient,
         db: Session,
         tenant_a: Tenants,
         admin_token_tenant_a: str,
     ) -> None:
-        """Omitted `start_from` normalizes to fresh, including its baseline."""
+        """Omitted `start_from` normalizes to fresh with the same final step."""
         from app.api.ticketing_step.models import TicketingSteps
 
         popup = _popup(db, tenant_a)
@@ -562,8 +564,8 @@ class TestCreatingThroughTheApi:
             json={
                 "popup_id": str(popup.id),
                 "type": "direct",
-                "slug": f"legacy-{uuid.uuid4().hex[:6]}",
-                "name": "Legacy",
+                "slug": f"fresh-{uuid.uuid4().hex[:6]}",
+                "name": "Fresh",
             },
         )
 
@@ -573,7 +575,9 @@ class TestCreatingThroughTheApi:
                 TicketingSteps.sales_flow_id == uuid.UUID(resp.json()["id"])
             )
         ).all()
-        assert steps
+        assert len(steps) == 1
+        assert steps[0].step_type == "confirm"
+        assert steps[0].title == "Review & Confirm"
 
     @pytest.mark.parametrize("flow_type", ["application", "direct", "upsale"])
     @pytest.mark.parametrize("source", ["fresh", "flow"])
@@ -631,12 +635,12 @@ class TestWhatEachKindOfFlowOffers:
     def test_it_matches_what_seeding_uses(
         self, client: TestClient, admin_token_tenant_a: str
     ) -> None:
-        """Served from `fields_for`, not from a second list beside it."""
+        """Include seeded settings plus the flow-only payment credential."""
         from app.api.sales_flow.schemas import fields_for
 
         settings = self._ask(client, admin_token_tenant_a)
         for flow_type, names in settings.items():
-            assert names == list(fields_for(flow_type))
+            assert names == [*fields_for(flow_type), "simplefi_api_key"]
 
     def test_a_flow_nobody_applies_to_is_not_asked_about_applications(
         self, client: TestClient, admin_token_tenant_a: str

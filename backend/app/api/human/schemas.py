@@ -225,11 +225,38 @@ class HumanProfileStatsPopup(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
+class HumanProfileStatsSharedEvent(BaseModel):
+    """An event instance shared with another human."""
+
+    event_id: uuid.UUID
+    title: str
+    start_time: datetime
+    timezone: str
+
+
+class HumanProfileStatsPerson(BaseModel):
+    """A human ranked in an event attendance profile statistic."""
+
+    human_id: uuid.UUID
+    name: str
+    picture_url: str | None = None
+    event_count: int
+    shared_events: list[HumanProfileStatsSharedEvent] = Field(default_factory=list)
+
+
 class HumanProfileStats(BaseModel):
     """Aggregate stats for the current human's profile page."""
 
     popups: list[HumanProfileStatsPopup]
     total_days: int
+    events_attended: int = 0
+    events_hosted: int = 0
+    hosted_attendees_count: int = 0
+    top_event_theme: str | None = None
+    most_shared_attendees: list[HumanProfileStatsPerson] = Field(default_factory=list)
+    most_active_attendees_of_hosted_events: list[HumanProfileStatsPerson] = Field(
+        default_factory=list
+    )
 
 
 # --------------------------------------------------------------------------- #
