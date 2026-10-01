@@ -93,6 +93,9 @@ def _build_attendee_with_origin(
 
     ticket_products = []
     for ap in attendee.attendee_products:
+        # Revoked units remain stored for history, but are no longer assigned products.
+        if ap.revoked_at is not None:
+            continue
         snapshot = (
             snapshot_by_pair.get((ap.payment_id, ap.product_id))
             if ap.payment_id is not None
@@ -585,6 +588,8 @@ async def list_attendees(
         # Build product list — one row per ticket, quantity=1 per ticket
         products = []
         for ap in a.attendee_products:
+            if ap.revoked_at is not None:
+                continue
             from app.api.product.schemas import ProductWithQuantity
 
             product = ProductWithQuantity.model_validate(ap.product)
@@ -645,7 +650,9 @@ async def export_attendees_csv(
             age_group = (
                 additional_data.get("age_group") or additional_data.get("age") or ""
             )
-            tickets = attendee.attendee_products or [None]
+            tickets = [
+                ap for ap in attendee.attendee_products if ap.revoked_at is None
+            ] or [None]
             for ticket in tickets:
                 writer.writerow(
                     [
@@ -946,7 +953,10 @@ async def get_tickets_by_email(
 
     results = []
     for attendee in attendees:
-        if not attendee.attendee_products:
+        active_tickets = [
+            ap for ap in attendee.attendee_products if ap.revoked_at is None
+        ]
+        if not active_tickets:
             continue
 
         # Resolve popup — direct-sale attendees have attendee.popup directly
@@ -959,7 +969,7 @@ async def get_tickets_by_email(
 
         # Per-ticket entries — one TicketProduct per AttendeeProducts row
         ticket_products = []
-        for ap in attendee.attendee_products:
+        for ap in active_tickets:
             ticket_products.append(
                 TicketProduct(
                     name=ap.product.name,

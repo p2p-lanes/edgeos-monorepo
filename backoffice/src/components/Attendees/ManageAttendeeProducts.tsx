@@ -309,7 +309,7 @@ export function ManageAttendeeProducts({
           <p className="text-sm font-medium">Add tickets</p>
           {products.length === 0 ? (
             <p className="text-sm text-muted-foreground">
-              No products available for this attendee's category.
+              No active products available for this event.
             </p>
           ) : (
             <>

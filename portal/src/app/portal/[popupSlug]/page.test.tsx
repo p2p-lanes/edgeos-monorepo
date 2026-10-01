@@ -4,6 +4,10 @@ import { beforeEach, describe, expect, it, vi } from "vitest"
 import Home from "./page"
 
 const mocks = vi.hoisted(() => ({
+  access: { state: "denied" } as {
+    state: "allowed" | "denied"
+    source?: "attendee"
+  },
   city: {
     id: "popup-1",
     slug: "my-event",
@@ -57,6 +61,10 @@ vi.mock("@/hooks/useGatheringDoors", () => ({
 
 vi.mock("@/hooks/usePortalDirectSalesFlows", () => ({
   usePortalDirectSalesFlows: () => ({ data: mocks.directFlows }),
+}))
+
+vi.mock("@/hooks/useHumanPopupAccess", () => ({
+  useHumanPopupAccess: () => mocks.access,
 }))
 
 vi.mock("@/components/Card/EventCard", () => {
@@ -116,6 +124,7 @@ vi.mock("@/components/ui/Loader", () => ({
 
 describe("portal event overview", () => {
   beforeEach(() => {
+    mocks.access = { state: "denied" }
     mocks.city = {
       id: "popup-1",
       slug: "my-event",
@@ -132,6 +141,37 @@ describe("portal event overview", () => {
     mocks.search = ""
     mocks.getRelevantApplication.mockReset().mockReturnValue(null)
     mocks.feeBanner.mockClear()
+  })
+
+  it.each([
+    1, 2,
+  ])("links assigned ticket holders to passes without an application across %i flows", (flowCount) => {
+    if (mocks.city) mocks.city.takes_applications = true
+    mocks.doors = Array.from({ length: flowCount }, (_, index) => ({
+      flowId: `application-${index}`,
+    }))
+    mocks.access = { state: "allowed", source: "attendee" }
+
+    render(<Home />)
+
+    fireEvent.click(screen.getByRole("button", { name: "cta.accepted" }))
+    expect(mocks.push).toHaveBeenCalledWith("/portal/my-event/passes")
+    expect(screen.queryByTestId("application-progress")).toBeNull()
+  })
+
+  it.each([
+    "loading",
+    "error",
+  ])("keeps assigned tickets reachable when flow discovery is %s", (state) => {
+    if (mocks.city) mocks.city.takes_applications = true
+    mocks.access = { state: "allowed", source: "attendee" }
+    mocks.doorsLoading = state === "loading"
+    mocks.doorsError = state === "error"
+
+    render(<Home />)
+
+    fireEvent.click(screen.getByRole("button", { name: "cta.accepted" }))
+    expect(mocks.push).toHaveBeenCalledWith("/portal/my-event/passes")
   })
 
   it("shows the existing Buy Tickets CTA for a portal-listed direct flow", () => {
