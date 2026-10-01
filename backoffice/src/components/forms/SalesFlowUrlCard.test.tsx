@@ -13,13 +13,13 @@ describe("getSalesFlowUrl", () => {
     ).toBe("https://demo.edgeos.world/checkout/spring-fest/vip-pass")
   })
 
-  it("builds the checkout path for an upsale flow", () => {
+  it("does not create a standalone URL for an upsale flow", () => {
     expect(
       getSalesFlowUrl("https://demo.edgeos.world", "spring-fest", {
         type: "upsale",
         slug: "add-workshop",
       }),
-    ).toBe("https://demo.edgeos.world/checkout/spring-fest/add-workshop")
+    ).toBeNull()
   })
 
   it("builds the portal application entry path with the application's flow slug", () => {
@@ -74,6 +74,25 @@ describe("SalesFlowUrlCard", () => {
       ),
     ).toBeInTheDocument()
     expect(screen.getByText(/opens this application flow/i)).toBeInTheDocument()
+  })
+
+  it("shows portal listing status without a standalone URL for upsales", () => {
+    render(
+      <SalesFlowUrlCard
+        portalBaseUrl="https://demo.edgeos.world"
+        popupSlug="spring-fest"
+        flow={{ type: "upsale", slug: "add-workshop" }}
+      />,
+    )
+
+    expect(screen.getByText("Portal listing")).toBeInTheDocument()
+    expect(
+      screen.getByText(
+        "Listed in the portal shop. No standalone checkout URL.",
+      ),
+    ).toBeInTheDocument()
+    expect(screen.queryByRole("button", { name: /copy link/i })).toBeNull()
+    expect(screen.queryByRole("link", { name: /open link/i })).toBeNull()
   })
 
   it("disables the actions and explains the missing link when there is no portal domain", () => {
