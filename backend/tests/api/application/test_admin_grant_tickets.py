@@ -74,6 +74,7 @@ def grant_popup(db: Session, tenant_a: Tenants) -> Popups:
         tenant_id=tenant_a.id,
         name="Manual assignments",
         slug=f"manual-{uuid.uuid4().hex}",
+        visible_in_portal=True,
     )
     db.add(popup)
     db.commit()
@@ -178,7 +179,6 @@ def test_new_bulk_invitee_can_log_in_and_read_ticket_with_only_application_flow(
     monkeypatch,
 ) -> None:
     grant_popup.status = "active"
-    grant_popup.visible_in_portal = True
     db.add(grant_popup)
     provision_default_flow(db, grant_popup, sale_type="application")
     flows = db.exec(
