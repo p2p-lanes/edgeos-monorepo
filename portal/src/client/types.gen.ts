@@ -8330,6 +8330,13 @@ export type EventsUpdatePortalEventData = {
 
 export type EventsUpdatePortalEventResponse = (EventPublic);
 
+export type EventsDetachPortalOccurrenceData = {
+    eventId: string;
+    requestBody: OccurrenceRef;
+};
+
+export type EventsDetachPortalOccurrenceResponse = (EventPublic);
+
 export type EventsGetPortalEventAdminNotesData = {
     eventId: string;
 };
