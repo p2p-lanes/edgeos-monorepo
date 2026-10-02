@@ -726,7 +726,7 @@
     "privacy_save": "Guardar preferencias",
     "privacy_saved": "Se guardaron tus preferencias de privacidad.",
     "privacy_error": "No se pudieron guardar tus preferencias.",
-    "privacy_no_application": "Completá una aplicación para administrar tus datos del directorio.",
+    "privacy_no_application": "Completá una aplicación en el sales flow principal de este encuentro para administrar tus datos del directorio.",
     "fields": {
       "first_name": "Nombre",
       "last_name": "Apellido",

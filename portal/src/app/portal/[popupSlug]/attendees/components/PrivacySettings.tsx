@@ -5,7 +5,7 @@ import { Loader2, SlidersHorizontal } from "lucide-react"
 import { useEffect, useState } from "react"
 import { useTranslation } from "react-i18next"
 import { toast } from "sonner"
-import { ApplicationsService } from "@/client"
+import { type ApplicationPublic, ApplicationsService } from "@/client"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
 import {
@@ -30,6 +30,9 @@ const SHAREABLE_FIELDS = [
   "organization",
 ] as const
 
+const isFieldHidden = (fields: string[], field: string) =>
+  fields.some((item) => item.trim().toLowerCase() === field)
+
 const PrivacySettings = () => {
   const { t } = useTranslation()
   const { getCity } = useCityProvider()
@@ -37,9 +40,19 @@ const PrivacySettings = () => {
   const queryClient = useQueryClient()
   const [open, setOpen] = useState(false)
   const [hiddenFields, setHiddenFields] = useState<string[]>([])
+  const applicationQueryKey = [
+    ...queryKeys.applications.mine(),
+    "popup",
+    city?.id,
+    "primary",
+  ] as const
   const applicationQuery = useQuery({
-    queryKey: [...queryKeys.applications.mine(), "popup", city?.id],
-    queryFn: () => ApplicationsService.getMyApplication({ popupId: city!.id }),
+    queryKey: applicationQueryKey,
+    queryFn: () =>
+      ApplicationsService.getMyApplication({
+        popupId: city!.id,
+        primaryFlowOnly: true,
+      }),
     enabled: !!city?.id && open,
   })
 
@@ -56,9 +69,17 @@ const PrivacySettings = () => {
       })
     },
     onSuccess: async (application) => {
+      queryClient.setQueryData(applicationQueryKey, application)
+      queryClient.setQueryData<ApplicationPublic[]>(
+        queryKeys.applications.mine(),
+        (current) =>
+          current?.map((item) =>
+            item.id === application.id ? application : item,
+          ),
+      )
       setHiddenFields(application.info_not_shared ?? [])
       await queryClient.invalidateQueries({
-        queryKey: queryKeys.attendees.directory(city?.id ?? ""),
+        queryKey: queryKeys.attendees.directory(application.popup_id),
       })
       toast.success(t("attendees.privacy_saved"))
       setOpen(false)
@@ -105,12 +126,14 @@ const PrivacySettings = () => {
               <div key={field} className="flex items-center gap-3">
                 <Checkbox
                   id={`share-${field}`}
-                  checked={!hiddenFields.includes(field)}
+                  checked={!isFieldHidden(hiddenFields, field)}
                   onCheckedChange={(checked) =>
                     setHiddenFields((current) =>
                       checked
-                        ? current.filter((item) => item !== field)
-                        : current.includes(field)
+                        ? current.filter(
+                            (item) => item.trim().toLowerCase() !== field,
+                          )
+                        : isFieldHidden(current, field)
                           ? current
                           : [...current, field],
                     )
