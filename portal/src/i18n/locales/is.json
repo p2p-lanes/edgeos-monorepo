@@ -598,7 +598,7 @@
     "privacy_save": "Vista stillingar",
     "privacy_saved": "Stillingar þínar voru vistaðar.",
     "privacy_error": "Ekki tókst að vista stillingarnar þínar.",
-    "privacy_no_application": "Sendu inn umsókn til að stjórna upplýsingum þínum í skránni.",
+    "privacy_no_application": "Sendu inn umsókn í gegnum aðalsöluferli þessa viðburðar til að stjórna upplýsingum þínum í skránni.",
     "fields": {
       "first_name": "Fornafn",
       "last_name": "Eftirnafn",

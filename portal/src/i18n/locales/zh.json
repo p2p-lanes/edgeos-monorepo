@@ -607,7 +607,7 @@
     "privacy_save": "保存设置",
     "privacy_saved": "共享设置已保存。",
     "privacy_error": "无法保存共享设置。",
-    "privacy_no_application": "提交申请后即可管理您在名录中的信息。",
+    "privacy_no_application": "通过此活动的主要销售流程提交申请后，即可管理您在名录中的信息。",
     "fields": {
       "first_name": "名字",
       "last_name": "姓氏",
