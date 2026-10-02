@@ -54,6 +54,15 @@ if TYPE_CHECKING:
 DIRECTORY_VISIBLE_CATEGORY_KEYS = ("main", "spouse")
 
 
+# PostgreSQL's locale-dependent [:space:] is not identical to Python str.strip().
+# Use its full whitespace set for both privacy options and custom text.
+_DIRECTORY_WHITESPACE = (
+    " \t\n\r\v\f\x1c\x1d\x1e\x1f\u0085\u00a0\u1680"
+    "\u2000\u2001\u2002\u2003\u2004\u2005\u2006\u2007\u2008\u2009\u200a"
+    "\u2028\u2029\u202f\u205f\u3000"
+)
+
+
 def _directory_field_is_shared(field: str) -> ColumnElement[bool]:
     """SQL visibility predicate matching main-applicant directory masking."""
     hidden_options = (
@@ -64,9 +73,7 @@ def _directory_field_is_shared(field: str) -> ColumnElement[bool]:
     # Form options are ASCII field labels; normalize case and surrounding
     # whitespace, including tabs/newlines, just as the serializer does.
     normalized_option = func.lower(
-        func.regexp_replace(
-            hidden_options.c.value, r"^[[:space:]]+|[[:space:]]+$", "", "g"
-        )
+        func.btrim(hidden_options.c.value, _DIRECTORY_WHITESPACE)
     )
     hides_field = exists(
         select(1)
@@ -76,6 +83,68 @@ def _directory_field_is_shared(field: str) -> ColumnElement[bool]:
     )
     # Companions share their own profile, not the applicant's preferences.
     return or_(col(AttendeeCategories.key) != "main", ~hides_field)
+
+
+def _directory_has_text(value: ColumnElement[str]) -> ColumnElement[bool]:
+    return func.btrim(value, _DIRECTORY_WHITESPACE) != ""
+
+
+def _directory_custom_text(*keys: str) -> ColumnElement[str]:
+    """Resolve canonical/alias text with the serializer's type and priority rules."""
+    custom = col(Applications.custom_fields)
+    return func.coalesce(
+        *(
+            case(
+                (
+                    and_(
+                        func.jsonb_typeof(custom[key]) == "string",
+                        _directory_has_text(custom[key].astext),
+                    ),
+                    custom[key].astext,
+                ),
+                else_=None,
+            )
+            for key in keys
+        )
+    )
+
+
+def _directory_has_visible_portal_fields() -> ColumnElement[bool]:
+    """At least one of the six values rendered in the portal table is visible."""
+    is_main = col(AttendeeCategories.key) == "main"
+    values = {
+        # Fall back to snapshots ONLY for unlinked attendees, as in the serializer.
+        "first_name": case(
+            (col(Humans.id).is_(None), col(Attendees.name)),
+            else_=col(Humans.first_name),
+        ),
+        "last_name": col(Humans.last_name),
+        "email": case(
+            (col(Humans.id).is_(None), col(Attendees.email)), else_=col(Humans.email)
+        ),
+        "telegram": col(Humans.telegram),
+        "role": case(
+            (is_main, _directory_custom_text("role", "role_in_the_organization")),
+            else_=None,
+        ),
+        "organization": case(
+            (
+                is_main,
+                _directory_custom_text("organization", "organization_you_represent"),
+            ),
+            else_=None,
+        ),
+    }
+    return or_(
+        *(
+            and_(
+                _directory_field_is_shared(field),
+                _directory_has_text(value),
+                value != "*",  # The UI renders this reserved value as an EyeOff icon.
+            )
+            for field, value in values.items()
+        )
+    )
 
 
 def _is_draft_status(status_value: object) -> bool:
@@ -768,6 +837,7 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
         skip: int = 0,
         limit: int = 100,
         q: str | None = None,
+        hide_empty_rows: bool = False,
     ) -> tuple[list[Attendees], int]:
         """Find attendees for the attendees directory.
 
@@ -800,6 +870,14 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
             .where(col(AttendeeCategories.key).in_(DIRECTORY_VISIBLE_CATEGORY_KEYS))
         )
 
+        if hide_empty_rows:
+            # This opt-in filter reflects the portal's columns, not all API fields.
+            # Retain unlinked attendees whose own name/email snapshot is visible.
+            base_statement = base_statement.outerjoin(
+                Humans,
+                Attendees.human_id == Humans.id,  # type: ignore[arg-type]
+            ).where(_directory_has_visible_portal_fields())
+
         # Search only shared fields from the attendee's OWN human record.
         # Apply privacy in SQL before counting/paginating, not to fetched rows.
         if q:
@@ -819,10 +897,12 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
                 ),
                 "",
             )
-            base_statement = base_statement.join(
-                Humans,
-                Attendees.human_id == Humans.id,  # type: ignore[arg-type]
-            ).where(
+            if not hide_empty_rows:
+                base_statement = base_statement.join(
+                    Humans,
+                    Attendees.human_id == Humans.id,  # type: ignore[arg-type]
+                )
+            base_statement = base_statement.where(
                 or_(
                     *(value.ilike(search_term) for value in visible_fields.values()),
                     visible_full_name.ilike(search_term),

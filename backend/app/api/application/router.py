@@ -1481,11 +1481,15 @@ async def list_attendees_directory(
     skip: PaginationSkip = 0,
     limit: PaginationLimit = 100,
     q: str | None = None,
+    hide_empty_rows: bool = False,
 ) -> ListModel[AttendeesDirectoryEntry]:
     """List attendees directory for a popup (Portal).
 
     Returns accepted applications with at least one product.
-    Respects info_not_shared masking.
+    Respects info_not_shared masking. When hide_empty_rows is true, excludes
+    entries without shared, nonblank name, email, Telegram, role or organization.
+    Residence, age and gender remain in the response but do not determine
+    portal row visibility. The default listing and CSV export are unchanged.
     """
     _ensure_attendee_directory_enabled(db, popup_id)
 
@@ -1495,6 +1499,7 @@ async def list_attendees_directory(
         skip=skip,
         limit=limit,
         q=q,
+        hide_empty_rows=hide_empty_rows,
     )
 
     results = [_build_directory_entry(a) for a in attendees]

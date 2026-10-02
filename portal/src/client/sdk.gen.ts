@@ -1965,12 +1965,16 @@ export class ApplicationsService {
      * List attendees directory for a popup (Portal).
      *
      * Returns accepted applications with at least one product.
-     * Respects info_not_shared masking.
+     * Respects info_not_shared masking. When hide_empty_rows is true, excludes
+     * entries without shared, nonblank name, email, Telegram, role or organization.
+     * Residence, age and gender remain in the response but do not determine
+     * portal row visibility. The default listing and CSV export are unchanged.
      * @param data The data for the request.
      * @param data.popupId
      * @param data.skip Number of items to skip
      * @param data.limit Maximum number of items to return
      * @param data.q
+     * @param data.hideEmptyRows
      * @returns ListModel_AttendeesDirectoryEntry_ Successful Response
      * @throws ApiError
      */
@@ -1984,7 +1988,8 @@ export class ApplicationsService {
             query: {
                 skip: data.skip,
                 limit: data.limit,
-                q: data.q
+                q: data.q,
+                hide_empty_rows: data.hideEmptyRows
             },
             errors: {
                 422: 'Validation Error'
