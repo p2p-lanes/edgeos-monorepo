@@ -63,6 +63,11 @@ _DIRECTORY_WHITESPACE = (
 )
 
 
+def _directory_category_key() -> ColumnElement[str]:
+    """Normalize legacy category labels for directory reads, not stored values."""
+    return func.lower(func.btrim(col(AttendeeCategories.key), _DIRECTORY_WHITESPACE))
+
+
 def _directory_field_is_shared(field: str) -> ColumnElement[bool]:
     """SQL visibility predicate matching main-applicant directory masking."""
     hidden_options = (
@@ -82,7 +87,7 @@ def _directory_field_is_shared(field: str) -> ColumnElement[bool]:
         .correlate(Applications)
     )
     # Companions share their own profile, not the applicant's preferences.
-    return or_(col(AttendeeCategories.key) != "main", ~hides_field)
+    return or_(_directory_category_key() != "main", ~hides_field)
 
 
 def _directory_has_text(value: ColumnElement[str]) -> ColumnElement[bool]:
@@ -111,7 +116,7 @@ def _directory_custom_text(*keys: str) -> ColumnElement[str]:
 
 def _directory_has_visible_portal_fields() -> ColumnElement[bool]:
     """At least one of the six values rendered in the portal table is visible."""
-    is_main = col(AttendeeCategories.key) == "main"
+    is_main = _directory_category_key() == "main"
     values = {
         # Fall back to snapshots ONLY for unlinked attendees, as in the serializer.
         "first_name": case(
@@ -867,7 +872,7 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
             .where(Attendees.popup_id == popup_id)
             .where(Applications.status == ApplicationStatus.ACCEPTED.value)
             .where(has_products)
-            .where(col(AttendeeCategories.key).in_(DIRECTORY_VISIBLE_CATEGORY_KEYS))
+            .where(_directory_category_key().in_(DIRECTORY_VISIBLE_CATEGORY_KEYS))
         )
 
         if hide_empty_rows:
@@ -949,9 +954,10 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
         the event host picker: a creator may only pick a host who actually
         attends this popup AND has not hidden their name for it.
 
-        Applications that listed "first_name" or "last_name" in
+        Main applicants that listed "first_name" or "last_name" in
         ``info_not_shared`` are excluded — picking them would surface a name the
-        attendee chose to hide. Humans with no usable name are also excluded so
+        attendee chose to hide. Companions share their own names independently
+        of the applicant's preferences. Humans with no usable name are excluded so
         the picker never renders a blank entry. Optional ``q`` does an ilike
         match on the human's first/last name.
         """
@@ -960,13 +966,6 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
             AttendeeProducts.attendee_id == Attendees.id,
             AttendeeProducts.revoked_at.is_(None),
             AttendeeProducts.product_category_snapshot == "ticket",
-        )
-        # info_not_shared is a Postgres text[] column, so name-hiding is detected
-        # with the array-overlap operator (&&): true when the list shares any
-        # element with {first_name, last_name}. (?| is a JSONB operator and does
-        # NOT apply to a real array column.) Negated to EXCLUDE those rows.
-        hides_name = col(Applications.info_not_shared).op("&&")(
-            postgresql.array(("first_name", "last_name"))
         )
         has_name = or_(
             func.trim(func.coalesce(col(Humans.first_name), "")) != "",
@@ -984,8 +983,9 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
             .where(Attendees.popup_id == popup_id)
             .where(Applications.status == ApplicationStatus.ACCEPTED.value)
             .where(has_products)
-            .where(col(AttendeeCategories.key).in_(DIRECTORY_VISIBLE_CATEGORY_KEYS))
-            .where(~hides_name)
+            .where(_directory_category_key().in_(DIRECTORY_VISIBLE_CATEGORY_KEYS))
+            .where(_directory_field_is_shared("first_name"))
+            .where(_directory_field_is_shared("last_name"))
             .where(has_name)
         )
 
