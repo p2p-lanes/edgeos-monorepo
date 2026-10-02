@@ -591,7 +591,22 @@
     "export_csv": "Flytja þátttakendur út sem CSV",
     "no_attendees": "Engir þátttakendur fundust",
     "per_page_label": "Á síðu",
-    "showing_range": "Sýni {{from}}–{{to}} af {{total}}"
+    "showing_range": "Sýni {{from}}–{{to}} af {{total}}",
+    "privacy_button": "Stillingar miðlunar",
+    "privacy_title": "Veldu hvað þú deilir",
+    "privacy_description": "Veldu hvaða upplýsingar aðrir þátttakendur geta séð í skránni.",
+    "privacy_save": "Vista stillingar",
+    "privacy_saved": "Stillingar þínar voru vistaðar.",
+    "privacy_error": "Ekki tókst að vista stillingarnar þínar.",
+    "privacy_no_application": "Sendu inn umsókn til að stjórna upplýsingum þínum í skránni.",
+    "fields": {
+      "first_name": "Fornafn",
+      "last_name": "Eftirnafn",
+      "email": "Netfang",
+      "telegram": "Telegram",
+      "role": "Hlutverk",
+      "organization": "Samtök"
+    }
   },
   "checkin": {
     "title": "Innritun á netinu fyrir {{eventName}}",

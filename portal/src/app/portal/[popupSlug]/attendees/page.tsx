@@ -12,6 +12,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip"
 import AttendeesTable from "./components/AttendeesTable"
+import PrivacySettings from "./components/PrivacySettings"
 import useExportCsv from "./hooks/useExportCsv"
 import useGetData from "./hooks/useGetData"
 
@@ -56,6 +57,7 @@ const Page = () => {
               onChange={(e) => setSearchQuery(e.target.value)}
               className="bg-card"
             />
+            <PrivacySettings />
 
             <Tooltip>
               <TooltipTrigger asChild>

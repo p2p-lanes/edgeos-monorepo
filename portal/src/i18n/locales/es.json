@@ -719,7 +719,22 @@
     "export_csv": "Exportar asistentes como CSV",
     "no_attendees": "No se encontraron asistentes",
     "per_page_label": "Por página",
-    "showing_range": "Mostrando {{from}}–{{to}} de {{total}}"
+    "showing_range": "Mostrando {{from}}–{{to}} de {{total}}",
+    "privacy_button": "Configurar datos compartidos",
+    "privacy_title": "Elegí qué datos compartir",
+    "privacy_description": "Elegí qué información pueden ver otros asistentes en el directorio.",
+    "privacy_save": "Guardar preferencias",
+    "privacy_saved": "Se guardaron tus preferencias de privacidad.",
+    "privacy_error": "No se pudieron guardar tus preferencias.",
+    "privacy_no_application": "Completá una aplicación para administrar tus datos del directorio.",
+    "fields": {
+      "first_name": "Nombre",
+      "last_name": "Apellido",
+      "email": "Correo electrónico",
+      "telegram": "Telegram",
+      "role": "Rol",
+      "organization": "Organización"
+    }
   },
   "checkin": {
     "title": "Check-in online para {{eventName}}",
