@@ -1,6 +1,6 @@
 "use client"
 
-import type { ApplicationPublic } from "@/client"
+import type { ApplicationPortalPublic } from "@/client"
 import { useApplicationsQuery } from "@/hooks/useGetApplications"
 import { useParticipationQuery } from "@/hooks/useParticipationQuery"
 import { usePortalSalesFlows } from "@/hooks/usePortalSalesFlows"
@@ -25,12 +25,12 @@ export interface GatheringDoor {
   name: string
   slug: string
   /** Absent when the person has not applied through this door yet. */
-  application: ApplicationPublic | null
+  application: ApplicationPortalPublic | null
   status: "none" | "draft" | "in review" | "accepted" | "rejected"
 }
 
 function statusOf(
-  application: ApplicationPublic | null,
+  application: ApplicationPortalPublic | null,
 ): GatheringDoor["status"] {
   if (!application) return "none"
   const raw = application.status

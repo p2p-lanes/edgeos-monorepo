@@ -43,7 +43,7 @@ def _require_human_can_manage_api_keys(current_human: CurrentHuman) -> None:
     if current_human.red_flag:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Blocked humans cannot create or manage API keys.",
+            detail="API keys are not available for this account.",
         )
 
 

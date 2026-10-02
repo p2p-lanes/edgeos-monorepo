@@ -1,4 +1,7 @@
-import type { AttendeeWithOriginPublic, PaymentPublic } from "@/client"
+import type {
+  AttendeeWithOriginPortalPublic,
+  PaymentPortalPublic,
+} from "@/client"
 
 export interface AccessTicket {
   id: string
@@ -17,8 +20,8 @@ export interface AccessHolder {
 }
 
 export function projectTicketAccess(
-  attendees: AttendeeWithOriginPublic[],
-  payments: PaymentPublic[] = [],
+  attendees: AttendeeWithOriginPortalPublic[],
+  payments: PaymentPortalPublic[] = [],
 ): AccessHolder[] {
   const access: AccessHolder[] = []
   const holders = new Map<string, AccessHolder>()
@@ -27,7 +30,7 @@ export function projectTicketAccess(
   )
   const seenUnitIds = new Set<string>()
 
-  const holderFor = (attendee: AttendeeWithOriginPublic) => {
+  const holderFor = (attendee: AttendeeWithOriginPortalPublic) => {
     const existing = holders.get(attendee.id)
     if (existing) return existing
 

@@ -32,7 +32,6 @@ class HumanAuth(BaseModel):
     tenant_id: uuid.UUID
     email: str
     picture_url: str | None = None
-    red_flag: bool = False
 
     _normalize_email = field_validator("email", mode="after")(_normalize_email)
 

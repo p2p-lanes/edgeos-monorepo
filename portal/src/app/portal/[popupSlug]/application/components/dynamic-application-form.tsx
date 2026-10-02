@@ -5,7 +5,7 @@ import { AnimatePresence, motion } from "framer-motion"
 import { ChevronLeft, ChevronRight } from "lucide-react"
 import { memo, useCallback, useMemo, useState } from "react"
 import { useTranslation } from "react-i18next"
-import type { ApplicationPublic, PopupPublic } from "@/client"
+import type { ApplicationPortalPublic, PopupPublic } from "@/client"
 import { ButtonAnimated } from "@/components/ui/button"
 import InputForm, { AddonInputForm } from "@/components/ui/Form/Input"
 import SelectForm from "@/components/ui/Form/Select"
@@ -139,7 +139,7 @@ const BaseField = memo(function BaseField({
 
 interface DynamicApplicationFormProps {
   schema: ApplicationFormSchema
-  existingApplication?: ApplicationPublic | null
+  existingApplication?: ApplicationPortalPublic | null
   popup: PopupPublic
   /** Referral UUID carried from /r/{code} — attributed on application create (REQ-GR-009). */
   referralId?: string | null

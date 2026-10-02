@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import type { PaymentPublic } from "@/client"
+import type { PaymentPortalPublic } from "@/client"
 import { projectOrders } from "./ordersProjection"
 
 describe("projectOrders", () => {
@@ -28,7 +28,7 @@ describe("projectOrders", () => {
               created_at: "2026-08-21T12:00:00Z",
             },
           ],
-        } as PaymentPublic,
+        } as PaymentPortalPublic,
       ],
       true,
     )
@@ -81,7 +81,7 @@ describe("projectOrders", () => {
           },
         ],
       },
-    ] as PaymentPublic[]
+    ] as PaymentPortalPublic[]
 
     expect(projectOrders(payments, false)[0]?.lines[0]?.units).toEqual([
       { id: "parking-unit", checkInCode: "PARK1234" },
@@ -101,7 +101,7 @@ describe("projectOrders", () => {
           sales_flow_id: null,
           created_at: "2023-01-01T00:00:00Z",
           products_snapshot: [],
-        } as PaymentPublic,
+        } as PaymentPortalPublic,
       ],
       false,
     )
@@ -180,7 +180,7 @@ describe("projectOrders", () => {
           sales_flow_id: "flow-1",
           created_at: "also-not-a-date",
         },
-      ] as PaymentPublic[],
+      ] as PaymentPortalPublic[],
       false,
     )
 

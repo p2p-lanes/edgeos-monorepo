@@ -4,13 +4,21 @@ from decimal import Decimal
 from enum import Enum
 from typing import ClassVar, Literal
 
-from pydantic import BaseModel, ConfigDict, EmailStr, field_validator, model_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    EmailStr,
+    field_serializer,
+    field_validator,
+    model_validator,
+)
 from pydantic import Field as PydanticField
 from sqlalchemy import Integer, Numeric, String, Text
 from sqlalchemy.dialects import postgresql as pg
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlmodel import Column, Field, SQLModel
 
+from app.api.human.privacy import public_profile_metadata
 from app.core.filters import (
     FilterCondition,
     FilterField,
@@ -176,7 +184,7 @@ class PaymentRecipientBase(SQLModel):
     )
 
 
-class PaymentRecipientRequest(BaseModel):
+class PaymentRecipientProfile(BaseModel):
     """Stable recipient identity and profile supplied for one payment attempt."""
 
     recipient_key: str = PydanticField(min_length=1, max_length=255)
@@ -190,12 +198,29 @@ class PaymentRecipientRequest(BaseModel):
     model_config = ConfigDict(str_strip_whitespace=True)
 
 
-class PaymentRecipientResponse(PaymentRecipientRequest):
+class PaymentRecipientRequest(PaymentRecipientProfile):
+    """Untrusted checkout input; old clients may send reserved keys, which are ignored."""
+
+    @field_validator("profile_snapshot")
+    @classmethod
+    def public_snapshot(cls, value: dict) -> dict:
+        return public_profile_metadata(value)
+
+
+class PaymentRecipientResponse(PaymentRecipientProfile):
     id: uuid.UUID
     attendee_id: uuid.UUID | None = None
     created_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class PaymentRecipientPortalResponse(PaymentRecipientResponse):
+    """Public projection of a stored recipient; leaves historical data untouched."""
+
+    @field_serializer("profile_snapshot")
+    def public_snapshot(self, value: dict) -> dict:
+        return public_profile_metadata(value)
 
 
 class PaymentBase(SQLModel):
@@ -440,6 +465,14 @@ class PaymentPublic(PaymentBase):
     updated_at: datetime | None = None
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class PaymentPortalPublic(PaymentPublic):
+    """Human-facing payment response without internal recipient metadata."""
+
+    recipients: list[PaymentRecipientPortalResponse] = PydanticField(
+        default_factory=list
+    )
 
 
 class PaymentUpdate(BaseModel):

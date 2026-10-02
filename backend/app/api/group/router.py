@@ -512,7 +512,7 @@ async def add_group_member(
     if human.red_flag:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Cannot add red-flagged human to group. They are automatically rejected.",
+            detail="This person cannot be added to the group.",
         )
 
     # Check for existing application
@@ -546,7 +546,7 @@ async def add_group_member(
         except Exception:
             raise HTTPException(
                 status_code=400,
-                detail="Cannot accept application from a red-flagged human.",
+                detail="This application cannot be accepted.",
             )
 
     # Add to group members

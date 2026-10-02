@@ -13,6 +13,7 @@ from app.api.application.models import Applications
 from app.api.attendee_category.models import AttendeeCategories
 from app.api.sales_flow.crud import sales_flows_crud
 from app.api.sales_flow.models import SalesFlows
+from app.api.shared.enums import HumanRating
 from app.api.tenant.models import Tenants
 from app.core.security import create_access_token
 from tests.api.application.test_attendee_directory import (
@@ -191,6 +192,66 @@ def test_primary_application_lookup_does_not_choose_newer_accepted_sibling(
     assert response.status_code == 200, response.text
     assert response.json()["id"] == str(world["primary_app"].id)
     assert response.json()["sales_flow_id"] == str(world["primary"].id)
+
+
+@pytest.mark.parametrize("primary_flow_only", (False, True))
+@pytest.mark.parametrize("partner", (False, True))
+def test_primary_flow_lookup_keeps_assessments_private(
+    client: TestClient,
+    db: Session,
+    primary_flow_world,
+    primary_flow_only: bool,
+    partner: bool,
+) -> None:
+    world = primary_flow_world
+    person = world["person"]
+    person.rating = HumanRating.RED_FLAG
+    person.enriched_profile = {"bio": "Internal assessment"}
+    db.add(person)
+    for key in ("primary_attendee", "sibling_attendee"):
+        attendee = world[key]
+        attendee.additional_data = {
+            "rating": "red_flag",
+            "red_flag": True,
+            "enriched_profile": person.enriched_profile,
+            "dietary_notes": "vegetarian",
+        }
+        db.add(attendee)
+    db.commit()
+    headers = {
+        "Authorization": "Bearer "
+        + create_access_token(
+            subject=person.id,
+            token_type="human",
+            issued_via="third_party" if partner else "portal",
+            scopes=["portal:applications:read"],
+        )
+    }
+    response = client.get(
+        f"/api/v1/applications/my/{world['popup'].id}",
+        params={"primary_flow_only": primary_flow_only},
+        headers=headers,
+    )
+    assert response.status_code == 200, response.text
+    data = response.json()
+    expected = world["primary_app" if primary_flow_only else "sibling_app"]
+    assert data["id"] == str(expected.id)
+    private_keys = {"rating", "red_flag", "enriched_profile"}
+    assert private_keys.isdisjoint(data)
+    assert private_keys.isdisjoint(data["human"])
+    assert data["attendees"]
+    for attendee in data["attendees"]:
+        # The existing application builder omits attendee metadata entirely;
+        # neither lookup mode may introduce assessment fields into the response.
+        assert private_keys.isdisjoint(attendee["additional_data"])
+    db.refresh(person)
+    assert person.rating == HumanRating.RED_FLAG
+    assert person.enriched_profile == {"bio": "Internal assessment"}
+    for key in ("primary_attendee", "sibling_attendee"):
+        attendee = world[key]
+        db.refresh(attendee)
+        assert attendee.additional_data["red_flag"] is True
+        assert attendee.additional_data["dietary_notes"] == "vegetarian"
 
 
 def test_sharing_settings_update_only_the_primary_application(

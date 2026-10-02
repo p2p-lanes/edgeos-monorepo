@@ -15,6 +15,7 @@ from pydantic import (
 )
 
 from app.api.attendee_category.schemas import AttendeeCategoryPublic
+from app.api.human.privacy import public_profile_metadata
 from app.api.payment.schemas import PaymentRecipientRequest
 from app.api.popup.schemas import PopupPublic
 from app.api.sales_flow.schemas import SelectedSalesFlow
@@ -181,6 +182,11 @@ class BuyerInfo(BaseModel):
     first_name: str
     last_name: str
     form_data: dict[str, Any] = {}
+
+    @field_validator("form_data")
+    @classmethod
+    def public_form_data(cls, value: dict) -> dict:
+        return public_profile_metadata(value)
 
     @field_validator("email", mode="after")
     @classmethod

@@ -2,7 +2,7 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import type { HumanProfileUpdate } from "@/client"
-import { type HumanPublic, HumansService } from "@/client"
+import { type HumanSelfPublic, HumansService } from "@/client"
 import { queryKeys } from "@/lib/query-keys"
 
 export type UpdateProfilePayload = Partial<
@@ -19,13 +19,15 @@ export type UpdateProfilePayload = Partial<
 >
 
 interface UseGetProfileReturn {
-  profile: HumanPublic | null
+  profile: HumanSelfPublic | null
   isLoading: boolean
   error: string | null
   refresh: () => Promise<void>
   isUpdating: boolean
   updateError: string | null
-  updateProfile: (payload: UpdateProfilePayload) => Promise<HumanPublic | null>
+  updateProfile: (
+    payload: UpdateProfilePayload,
+  ) => Promise<HumanSelfPublic | null>
 }
 
 const useGetProfile = (): UseGetProfileReturn => {
@@ -52,14 +54,15 @@ const useGetProfile = (): UseGetProfileReturn => {
     onSuccess: (updated) => {
       queryClient.setQueryData(
         queryKeys.profile.current,
-        (old: HumanPublic | null) => (old ? { ...old, ...updated } : updated),
+        (old: HumanSelfPublic | null) =>
+          old ? { ...old, ...updated } : updated,
       )
     },
   })
 
   const updateProfile = async (
     payload: UpdateProfilePayload,
-  ): Promise<HumanPublic | null> => {
+  ): Promise<HumanSelfPublic | null> => {
     try {
       return await updateMutation.mutateAsync(payload)
     } catch {

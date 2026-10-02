@@ -1,4 +1,4 @@
-import type { PaymentPublic } from "@/client"
+import type { PaymentPortalPublic } from "@/client"
 
 export interface OtherPurchasedProduct {
   id: string
@@ -13,7 +13,7 @@ export interface VisiblePassReference {
 }
 
 export function projectOtherPurchasedProducts(
-  payments: PaymentPublic[],
+  payments: PaymentPortalPublic[],
   applicationFlowIds: ReadonlySet<string>,
   visiblePasses: VisiblePassReference[],
 ): OtherPurchasedProduct[] {
