@@ -7,6 +7,7 @@ from fastapi import HTTPException, status
 from sqlalchemy import and_, case, desc, exists, nullslast, or_
 from sqlalchemy.dialects import postgresql
 from sqlalchemy.orm import selectinload
+from sqlalchemy.sql.elements import ColumnElement
 from sqlmodel import Session, col, func, select
 
 from app.api.application.models import (
@@ -51,6 +52,30 @@ if TYPE_CHECKING:
 # other non-adult categories) are intentionally excluded — only the main
 # applicant and their spouse appear.
 DIRECTORY_VISIBLE_CATEGORY_KEYS = ("main", "spouse")
+
+
+def _directory_field_is_shared(field: str) -> ColumnElement[bool]:
+    """SQL visibility predicate matching main-applicant directory masking."""
+    hidden_options = (
+        func.unnest(col(Applications.info_not_shared))
+        .table_valued("value")
+        .render_derived(name="directory_hidden_options")
+    )
+    # Form options are ASCII field labels; normalize case and surrounding
+    # whitespace, including tabs/newlines, just as the serializer does.
+    normalized_option = func.lower(
+        func.regexp_replace(
+            hidden_options.c.value, r"^[[:space:]]+|[[:space:]]+$", "", "g"
+        )
+    )
+    hides_field = exists(
+        select(1)
+        .select_from(hidden_options)
+        .where(normalized_option == field)
+        .correlate(Applications)
+    )
+    # Companions share their own profile, not the applicant's preferences.
+    return or_(col(AttendeeCategories.key) != "main", ~hides_field)
 
 
 def _is_draft_status(status_value: object) -> bool:
@@ -775,25 +800,32 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
             .where(col(AttendeeCategories.key).in_(DIRECTORY_VISIBLE_CATEGORY_KEYS))
         )
 
-        # Text search across the attendee's OWN human fields, so companions are
-        # searchable by their own name/email — not the main applicant's.
+        # Search only shared fields from the attendee's OWN human record.
+        # Apply privacy in SQL before counting/paginating, not to fetched rows.
         if q:
             search_term = f"%{q}%"
+            visible_fields = {
+                field: case(
+                    (_directory_field_is_shared(field), col(getattr(Humans, field))),
+                    else_=None,
+                )
+                for field in ("first_name", "last_name", "email", "telegram")
+            }
+            # Concatenate only visible name parts. NULLIF prevents an empty
+            # fully-hidden name from matching wildcard-only queries like "%".
+            visible_full_name = func.nullif(
+                func.concat_ws(
+                    " ", visible_fields["first_name"], visible_fields["last_name"]
+                ),
+                "",
+            )
             base_statement = base_statement.join(
                 Humans,
                 Attendees.human_id == Humans.id,  # type: ignore[arg-type]
             ).where(
                 or_(
-                    col(Humans.first_name).ilike(search_term),
-                    col(Humans.last_name).ilike(search_term),
-                    # Full name ("first last") so a query spanning both fields —
-                    # e.g. "eva shang" — matches; the per-field checks above only
-                    # catch a term that fits within a single column.
-                    func.concat_ws(" ", Humans.first_name, Humans.last_name).ilike(
-                        search_term
-                    ),
-                    col(Humans.email).ilike(search_term),
-                    col(Humans.telegram).ilike(search_term),
+                    *(value.ilike(search_term) for value in visible_fields.values()),
+                    visible_full_name.ilike(search_term),
                 )
             )
 
