@@ -7270,6 +7270,7 @@ export type ApplicationsGetMyPurchasesResponse = (Array<AttendeePurchases>);
 
 export type ApplicationsGetMyApplicationData = {
     popupId: string;
+    primaryFlowOnly?: boolean;
 };
 
 export type ApplicationsGetMyApplicationResponse = (ApplicationPortalPublic);

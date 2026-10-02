@@ -908,11 +908,21 @@ async def get_my_application(
     popup_id: uuid.UUID,
     db: HumanTenantSession,
     current_human: CurrentHuman,
+    primary_flow_only: bool = False,
 ) -> ApplicationPortalPublic:
-    """Get current human's application for a popup (Portal)."""
-    application = crud.applications_crud.get_by_human_popup(
-        db, human_id=current_human.id, popup_id=popup_id
-    )
+    """Get current human's application for a popup (Portal).
+
+    With primary_flow_only, return only the application in the popup's primary
+    sales flow. Missing primary applications return 404, never another flow.
+    """
+    if primary_flow_only:
+        application = crud.applications_crud.get_by_human_primary_flow(
+            db, human_id=current_human.id, popup_id=popup_id
+        )
+    else:
+        application = crud.applications_crud.get_by_human_popup(
+            db, human_id=current_human.id, popup_id=popup_id
+        )
 
     if not application:
         raise HTTPException(
@@ -1496,11 +1506,12 @@ async def list_attendees_directory(
 ) -> ListModel[AttendeesDirectoryEntry]:
     """List attendees directory for a popup (Portal).
 
-    Returns accepted applications with at least one product.
-    Respects info_not_shared masking. When hide_empty_rows is true, excludes
-    entries without shared, nonblank name, email, Telegram, role or organization.
-    Residence, age and gender remain in the response but do not determine
-    portal row visibility. The default listing and CSV export are unchanged.
+    Returns ticket-holding attendees of accepted applications in the popup's
+    primary sales flow only. Respects that application's info_not_shared masking.
+    When hide_empty_rows is true, excludes entries without shared, nonblank
+    name, email, Telegram, role or organization. Residence, age and gender remain
+    in the response but do not determine portal row visibility. The default
+    listing and CSV export do not apply the empty-row filter.
     """
     _ensure_attendee_directory_enabled(db, popup_id)
 
@@ -1541,7 +1552,7 @@ async def export_attendees_directory_csv(
 ) -> Response:
     """Export attendees directory as CSV (Portal).
 
-    No pagination — fetches all matching entries.
+    No pagination — fetches all matching primary-flow entries.
     """
     _ensure_attendee_directory_enabled(db, popup_id)
 

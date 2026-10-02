@@ -68,6 +68,22 @@ def _directory_category_key() -> ColumnElement[str]:
     return func.lower(func.btrim(col(AttendeeCategories.key), _DIRECTORY_WHITESPACE))
 
 
+def _application_is_in_primary_flow(popup_id: uuid.UUID) -> ColumnElement[bool]:
+    """Use only the popup's explicitly designated primary flow, never a fallback."""
+    from app.api.sales_flow.models import SalesFlows
+
+    return exists(
+        select(1)
+        .select_from(SalesFlows)
+        .where(
+            SalesFlows.id == Applications.sales_flow_id,
+            SalesFlows.popup_id == popup_id,
+            SalesFlows.is_default == True,  # noqa: E712
+        )
+        .correlate(Applications)
+    )
+
+
 def _directory_field_is_shared(field: str) -> ColumnElement[bool]:
     """SQL visibility predicate matching main-applicant directory masking."""
     hidden_options = (
@@ -381,6 +397,17 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
                 nullslast(desc(Applications.submitted_at)),
                 desc(Applications.id),
             )
+        )
+        return session.exec(statement).first()
+
+    def get_by_human_primary_flow(
+        self, session: Session, human_id: uuid.UUID, popup_id: uuid.UUID
+    ) -> Applications | None:
+        """Get the human's application in the popup's primary flow only."""
+        statement = select(Applications).where(
+            Applications.human_id == human_id,
+            Applications.popup_id == popup_id,
+            _application_is_in_primary_flow(popup_id),
         )
         return session.exec(statement).first()
 
@@ -846,8 +873,9 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
     ) -> tuple[list[Attendees], int]:
         """Find attendees for the attendees directory.
 
-        Returns ticket-holding attendees whose parent application is accepted —
-        one entry per person, sourced from that attendee's own Human record.
+        Returns ticket-holding attendees whose parent application is accepted
+        and belongs to the popup's primary flow — one entry per attendee,
+        sourced from that attendee's own Human record.
         Only the main applicant and spouse categories are listed; kids (and any
         other categories) are excluded. Supports text search across the
         attendee's own human fields.
@@ -870,6 +898,7 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
                 Attendees.category_id == AttendeeCategories.id,  # type: ignore[arg-type]
             )
             .where(Attendees.popup_id == popup_id)
+            .where(_application_is_in_primary_flow(popup_id))
             .where(Applications.status == ApplicationStatus.ACCEPTED.value)
             .where(has_products)
             .where(_directory_category_key().in_(DIRECTORY_VISIBLE_CATEGORY_KEYS))
@@ -948,8 +977,8 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
     ) -> tuple[list["Humans"], int]:
         """Find humans in the Portal attendee directory who share their name.
 
-        Same population as ``find_directory`` (accepted application, the attendee
-        holds at least one product, directory-visible main/spouse category) but
+        Same population as ``find_directory`` (accepted primary-flow application,
+        the attendee holds at least one product, main/spouse category) but
         returns the distinct underlying Humans instead of Attendee rows. Powers
         the event host picker: a creator may only pick a host who actually
         attends this popup AND has not hidden their name for it.
@@ -981,6 +1010,7 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
                 Attendees.category_id == AttendeeCategories.id,  # type: ignore[arg-type]
             )
             .where(Attendees.popup_id == popup_id)
+            .where(_application_is_in_primary_flow(popup_id))
             .where(Applications.status == ApplicationStatus.ACCEPTED.value)
             .where(has_products)
             .where(_directory_category_key().in_(DIRECTORY_VISIBLE_CATEGORY_KEYS))

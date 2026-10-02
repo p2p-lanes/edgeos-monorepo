@@ -1861,8 +1861,12 @@ export class ApplicationsService {
     /**
      * Get your application for a popup
      * Get current human's application for a popup (Portal).
+     *
+     * With primary_flow_only, return only the application in the popup's primary
+     * sales flow. Missing primary applications return 404, never another flow.
      * @param data The data for the request.
      * @param data.popupId
+     * @param data.primaryFlowOnly
      * @returns ApplicationPortalPublic Successful Response
      * @throws ApiError
      */
@@ -1872,6 +1876,9 @@ export class ApplicationsService {
             url: '/api/v1/applications/my/{popup_id}',
             path: {
                 popup_id: data.popupId
+            },
+            query: {
+                primary_flow_only: data.primaryFlowOnly
             },
             errors: {
                 422: 'Validation Error'
@@ -1964,11 +1971,12 @@ export class ApplicationsService {
      * List the attendees directory for a popup
      * List attendees directory for a popup (Portal).
      *
-     * Returns accepted applications with at least one product.
-     * Respects info_not_shared masking. When hide_empty_rows is true, excludes
-     * entries without shared, nonblank name, email, Telegram, role or organization.
-     * Residence, age and gender remain in the response but do not determine
-     * portal row visibility. The default listing and CSV export are unchanged.
+     * Returns ticket-holding attendees of accepted applications in the popup's
+     * primary sales flow only. Respects that application's info_not_shared masking.
+     * When hide_empty_rows is true, excludes entries without shared, nonblank
+     * name, email, Telegram, role or organization. Residence, age and gender remain
+     * in the response but do not determine portal row visibility. The default
+     * listing and CSV export do not apply the empty-row filter.
      * @param data The data for the request.
      * @param data.popupId
      * @param data.skip Number of items to skip
@@ -2001,7 +2009,7 @@ export class ApplicationsService {
      * Export the attendees directory for a popup as CSV
      * Export attendees directory as CSV (Portal).
      *
-     * No pagination — fetches all matching entries.
+     * No pagination — fetches all matching primary-flow entries.
      * @param data The data for the request.
      * @param data.popupId
      * @param data.q

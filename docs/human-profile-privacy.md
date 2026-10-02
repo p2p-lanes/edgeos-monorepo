@@ -13,6 +13,9 @@ assessment data, not user-owned profile fields.
 - All applicant-facing application routes use `ApplicationPortalPublic`, with
   `HumanSelfPublic` and `AttendeePortalPublic` nested responses. Administrative
   applications retain `ApplicationPublic`, including review information.
+  The same safe projection applies with or without `primary_flow_only` on
+  `GET /applications/my/{popup_id}`; primary-only lookups never fall back to a
+  sibling flow when the primary application is missing.
 - Portal payment recipients, attendees and cart recipients project stored
   profile metadata through `public_profile_metadata`. This strips reserved
   assessment keys from the **root of a profile snapshot**, not arbitrary nested
@@ -50,4 +53,5 @@ old cached checkout drafts from re-submitting the assessment keys.
 Regression coverage lives in:
 - `backend/tests/api/human/test_profile_privacy.py`
 - `backend/tests/api/human/test_profile_privacy_api.py`
+- `backend/tests/api/application/test_attendee_directory_primary_flow.py`
 - `portal/src/lib/public-profile-metadata.test.ts`
