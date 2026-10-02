@@ -3398,6 +3398,108 @@ async def get_portal_event(
     return _with_collaborators(db, pub, event)
 
 
+@router.post("/portal/events/{event_id}/detach-occurrence", response_model=EventPublic)
+async def detach_portal_occurrence(
+    event_id: uuid.UUID,
+    payload: OccurrenceRef,
+    db: HumanTenantSession,
+    current_human: CurrentHuman,
+    token_payload: CallerToken,
+) -> EventPublic:
+    """Materialize one managed recurring occurrence for an isolated edit."""
+    from app.api.event.models import Events
+
+    master = crud.events_crud.get(db, event_id)
+    if not master:
+        raise HTTPException(status_code=404, detail="Event not found")
+    ensure_api_key_popup(token_payload, master.popup_id)
+    if not _human_manages_event(master, current_human):
+        raise HTTPException(
+            status_code=403, detail="Only the event owner or host can edit"
+        )
+    if not master.rrule:
+        raise HTTPException(status_code=400, detail="Event is not a recurring series")
+
+    occ_start = payload.occurrence_start
+    existing = crud.events_crud.get_detached_child(db, master.id, occ_start)
+    if existing is not None:
+        return _with_collaborators(db, _to_public(existing), existing)
+
+    rule = parse_rrule(master.rrule)
+    occurrences = (
+        expand(
+            dtstart=master.start_time,
+            rule=rule,
+            window_start=occ_start,
+            window_end=occ_start,
+            exdates=list(master.recurrence_exdates or []),
+            max_occurrences=1,
+            timezone=master.timezone,
+        )
+        if rule
+        else []
+    )
+    if not any(occ == occ_start for occ in occurrences):
+        raise HTTPException(
+            status_code=400, detail="This is not a scheduled occurrence"
+        )
+
+    duration = master.end_time - master.start_time
+    excluded = list(master.recurrence_exdates or [])
+    if occ_start.isoformat() not in excluded:
+        excluded.append(occ_start.isoformat())
+    master.recurrence_exdates = excluded
+    child = Events(
+        **{
+            column.name: getattr(master, column.name)
+            for column in master.__table__.columns
+            if column.name
+            not in {
+                "id",
+                "created_at",
+                "updated_at",
+                "start_time",
+                "end_time",
+                "rrule",
+                "recurrence_master_id",
+                "recurrence_exdates",
+            }
+        },
+        start_time=occ_start,
+        end_time=occ_start + duration,
+        rrule=None,
+        recurrence_master_id=master.id,
+        recurrence_exdates=[],
+    )
+    db.add(master)
+    db.add(child)
+    db.commit()
+    db.refresh(child)
+
+    from app.api.event_participant.crud import event_participants_crud
+
+    event_participants_crud.repoint_occurrence_to_event(
+        db, master.id, occ_start, child.id
+    )
+    from app.api.event_participant.check_in_crud import event_check_ins_crud
+
+    event_check_ins_crud.repoint_occurrence_to_event(db, master.id, occ_start, child.id)
+    db.commit()
+    db.refresh(child)
+
+    snapshot = build_event_snapshot(db, master)
+    snapshot["occurrence_start"] = occ_start.isoformat()
+    snapshot["detached_child_id"] = str(child.id)
+    record_event_audit(
+        db,
+        event=master,
+        action=EventAuditAction.OCCURRENCE_DETACHED,
+        actor=actor_from_human(current_human),
+        snapshot=snapshot,
+    )
+    return _with_collaborators(db, _to_public(child), child)
+
+
 # ---------------------------------------------------------------------------
 # Portal admin notes — same staff-only notes as the backoffice endpoints,
 # reachable from the portal. Gated by CurrentPortalStaff (the logged-in human's
