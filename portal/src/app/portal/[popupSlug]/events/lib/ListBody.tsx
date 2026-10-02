@@ -666,6 +666,10 @@ export function ListBody({
                                   slug,
                                   eventId: event.id,
                                   flowId,
+                                  occurrenceStart:
+                                    event.occurrence_id || event.rrule
+                                      ? event.start_time
+                                      : null,
                                   suffix: "/edit",
                                 })}
                                 onClick={(e) => e.stopPropagation()}
