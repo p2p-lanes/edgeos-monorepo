@@ -716,7 +716,7 @@
   "attendees": {
     "title": "Directory",
     "description": "Reach out to your friends to plan dates, find shared housing, or organize activities together. *This directory includes only the information of those who have voluntarily opted in to share their details.",
-    "search_placeholder": "Search by name, email, organization...",
+    "search_placeholder": "Search by name, email, or Telegram...",
     "export_csv": "Export attendees as CSV",
     "no_attendees": "No attendees found",
     "per_page_label": "Per page",
