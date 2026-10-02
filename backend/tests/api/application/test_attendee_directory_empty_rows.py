@@ -39,14 +39,18 @@ def empty_row_world(db: Session, search_world):
 
 
 @pytest.mark.parametrize(
-    "style", ("lowercase", "capitalized", "mixed_case", "whitespace")
+    "style",
+    ("lowercase", "capitalized", "mixed_case", "whitespace", "unicode_whitespace"),
 )
 def test_directory_api_empty_row_filter_is_opt_in_and_csv_is_unchanged(
     db: Session, client: TestClient, empty_row_world, style: str
 ) -> None:
     hidden = empty_row_world["private"]
     hidden.application.info_not_shared = [
-        _privacy_option(field, style) for field in PORTAL_FIELDS
+        f"\u00a0{field.upper()}\u3000"
+        if style == "unicode_whitespace"
+        else _privacy_option(field, style)
+        for field in PORTAL_FIELDS
     ]
     db.add(hidden.application)
     db.commit()
@@ -78,6 +82,16 @@ def test_directory_api_empty_row_filter_is_opt_in_and_csv_is_unchanged(
     }
     for row in response.json()["results"]:
         assert all(field in row for field in ("residence", "age", "gender"))
+
+    for filter_value in ("false", "true"):
+        response = client.get(
+            url,
+            params={"q": hidden.human.telegram, "hide_empty_rows": filter_value},
+            headers=headers,
+        )
+        assert response.status_code == 200, response.text
+        assert response.json()["paging"]["total"] == 0
+        assert response.json()["results"] == []
 
     response = client.get(f"{url}/csv", headers=headers)
     assert response.status_code == 200, response.text

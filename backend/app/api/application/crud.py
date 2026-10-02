@@ -54,6 +54,15 @@ if TYPE_CHECKING:
 DIRECTORY_VISIBLE_CATEGORY_KEYS = ("main", "spouse")
 
 
+# PostgreSQL's locale-dependent [:space:] is not identical to Python str.strip().
+# Use its full whitespace set for both privacy options and custom text.
+_DIRECTORY_WHITESPACE = (
+    " \t\n\r\v\f\x1c\x1d\x1e\x1f\u0085\u00a0\u1680"
+    "\u2000\u2001\u2002\u2003\u2004\u2005\u2006\u2007\u2008\u2009\u200a"
+    "\u2028\u2029\u202f\u205f\u3000"
+)
+
+
 def _directory_field_is_shared(field: str) -> ColumnElement[bool]:
     """SQL visibility predicate matching main-applicant directory masking."""
     hidden_options = (
@@ -64,9 +73,7 @@ def _directory_field_is_shared(field: str) -> ColumnElement[bool]:
     # Form options are ASCII field labels; normalize case and surrounding
     # whitespace, including tabs/newlines, just as the serializer does.
     normalized_option = func.lower(
-        func.regexp_replace(
-            hidden_options.c.value, r"^[[:space:]]+|[[:space:]]+$", "", "g"
-        )
+        func.btrim(hidden_options.c.value, _DIRECTORY_WHITESPACE)
     )
     hides_field = exists(
         select(1)
@@ -76,15 +83,6 @@ def _directory_field_is_shared(field: str) -> ColumnElement[bool]:
     )
     # Companions share their own profile, not the applicant's preferences.
     return or_(col(AttendeeCategories.key) != "main", ~hides_field)
-
-
-# PostgreSQL's locale-dependent [:space:] is not identical to Python str.strip().
-# Use its full whitespace set so SQL alias resolution matches the serializer.
-_DIRECTORY_WHITESPACE = (
-    " \t\n\r\v\f\x1c\x1d\x1e\x1f\u0085\u00a0\u1680"
-    "\u2000\u2001\u2002\u2003\u2004\u2005\u2006\u2007\u2008\u2009\u200a"
-    "\u2028\u2029\u202f\u205f\u3000"
-)
 
 
 def _directory_has_text(value: ColumnElement[str]) -> ColumnElement[bool]:
