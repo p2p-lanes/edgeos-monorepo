@@ -1366,7 +1366,8 @@ def _build_directory_entry(attendee) -> AttendeesDirectoryEntry:
     """
     human = attendee.human
     application = attendee.application
-    is_main = attendee.category == "main"
+    # Match SQL category normalization while preserving the response's raw key.
+    is_main = (attendee.category or "").strip().lower() == "main"
 
     # info_not_shared masking belongs to the main applicant's own application.
     # Forms store labels like "Email", while directory keys are lowercase.
