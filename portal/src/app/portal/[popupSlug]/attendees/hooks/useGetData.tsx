@@ -31,6 +31,7 @@ const useGetData = () => {
   const { data, isLoading: loading } = useQuery({
     queryKey: [
       ...queryKeys.attendees.directory(city?.id ?? ""),
+      { hideEmptyRows: true },
       currentPage,
       pageSize,
       activeSearch,
@@ -41,6 +42,7 @@ const useGetData = () => {
         skip: (currentPage - 1) * pageSize,
         limit: pageSize,
         q: activeSearch || undefined,
+        hideEmptyRows: true,
       })
       return {
         items: result.results as AttendeeDirectory[],

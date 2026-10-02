@@ -7083,6 +7083,7 @@ export type ApplicationsCreateMyApplicationData = {
 export type ApplicationsCreateMyApplicationResponse = (ApplicationPublic);
 
 export type ApplicationsListAttendeesDirectoryData = {
+    hideEmptyRows?: boolean;
     /**
      * Maximum number of items to return
      */
