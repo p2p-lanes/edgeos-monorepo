@@ -1344,6 +1344,17 @@ async def update_my_application(
     return _build_application_public(application)
 
 
+def _resolve_directory_custom_field(
+    custom: dict[str, object], *keys: str
+) -> str | None:
+    """Return the first nonblank text value, preserving its original content."""
+    for key in keys:
+        value = custom.get(key)
+        if isinstance(value, str) and value.strip():
+            return value
+    return None
+
+
 def _build_directory_entry(attendee) -> AttendeesDirectoryEntry:
     """Build a single directory entry from a ticket-holding attendee.
 
@@ -1396,7 +1407,8 @@ def _build_directory_entry(attendee) -> AttendeesDirectoryEntry:
         )
 
     # role/organization come from the application form — only meaningful for the
-    # main applicant. Companions get blank values.
+    # main applicant. Companions get blank values. Prefer canonical keys, then
+    # known form aliases; mask the resolved values under the canonical keys.
     custom = (application.custom_fields or {}) if (is_main and application) else {}
 
     return AttendeesDirectoryEntry(
@@ -1405,8 +1417,16 @@ def _build_directory_entry(attendee) -> AttendeesDirectoryEntry:
         last_name=mask("last_name", human.last_name if human else None),
         email=mask("email", human.email if human else attendee.email),
         telegram=mask("telegram", human.telegram if human else None),
-        role=mask("role", custom.get("role")),
-        organization=mask("organization", custom.get("organization")),
+        role=mask(
+            "role",
+            _resolve_directory_custom_field(custom, "role", "role_in_the_organization"),
+        ),
+        organization=mask(
+            "organization",
+            _resolve_directory_custom_field(
+                custom, "organization", "organization_you_represent"
+            ),
+        ),
         residence=mask("residence", human.residence if human else None),
         age=mask("age", human.age if human else None),
         gender=mask("gender", human.gender if human else None),
