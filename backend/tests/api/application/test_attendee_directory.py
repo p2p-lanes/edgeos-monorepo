@@ -14,10 +14,13 @@ ticket-holding attendee, sourced from that attendee's own human):
   companions show their own profile with blank role/org and no masking.
 """
 
+import csv
+import io
 import uuid
 from decimal import Decimal
 
 import pytest
+from fastapi.testclient import TestClient
 from sqlmodel import Session
 
 from app.api.application.crud import applications_crud
@@ -30,6 +33,7 @@ from app.api.human.models import Humans
 from app.api.popup.models import Popups
 from app.api.product.models import Products
 from app.api.tenant.models import Tenants
+from app.core.security import create_access_token
 from tests._flow_helpers import application_flow_id
 
 # ---------------------------------------------------------------------------
@@ -296,6 +300,148 @@ def test_main_entry_keeps_role_org_and_masking(db: Session, directory_world) -> 
     assert entry.role == "Founder"
     assert entry.organization == "Staple & Spindle"
     assert entry.email == "*"  # masked via info_not_shared=["email"]
+
+
+DIRECTORY_FIELD_VALUES = {
+    "first_name": "Privacy",
+    "last_name": "Test",
+    "email": "privacy@example.com",
+    "telegram": "privacy_handle",
+    "role": "Founder",
+    "organization": "Test Organization",
+    "residence": "India",
+    "age": "30",
+    "gender": "Non-binary",
+}
+
+
+def _privacy_option(field: str, style: str) -> str:
+    if style == "capitalized":
+        return field.capitalize()
+    if style == "mixed_case":
+        return field.capitalize().swapcase()
+    if style == "whitespace":
+        return f" \t{field.capitalize()}\n "
+    return field
+
+
+@pytest.mark.parametrize(
+    "style", ["lowercase", "capitalized", "mixed_case", "whitespace"]
+)
+@pytest.mark.parametrize("hidden_field", DIRECTORY_FIELD_VALUES)
+def test_directory_masks_only_selected_field_regardless_of_case(
+    db: Session, tenant_a: Tenants, hidden_field: str, style: str
+) -> None:
+    popup = _popup(db, tenant_a)
+    main = _category(db, popup, "main", is_primary=True)
+    human = _human(
+        db,
+        tenant_a,
+        DIRECTORY_FIELD_VALUES["first_name"],
+        DIRECTORY_FIELD_VALUES["last_name"],
+        telegram=DIRECTORY_FIELD_VALUES["telegram"],
+        residence=DIRECTORY_FIELD_VALUES["residence"],
+        age=DIRECTORY_FIELD_VALUES["age"],
+        gender=DIRECTORY_FIELD_VALUES["gender"],
+    )
+    option = _privacy_option(hidden_field, style)
+    app = _application(
+        db,
+        popup,
+        human,
+        info_not_shared=[option],
+        custom_fields={
+            "role": DIRECTORY_FIELD_VALUES["role"],
+            "organization": DIRECTORY_FIELD_VALUES["organization"],
+        },
+    )
+    attendee = _attendee(db, popup, app, human, main)
+
+    entry = _build_directory_entry(attendee)
+
+    expected_values = {**DIRECTORY_FIELD_VALUES, "email": human.email}
+    for field, value in expected_values.items():
+        assert getattr(entry, field) == ("*" if field == hidden_field else value), field
+    # Normalize on read only: keep form option values intact in the database.
+    db.refresh(app)
+    assert app.info_not_shared == [option]
+
+
+@pytest.mark.parametrize(
+    "style", ["lowercase", "capitalized", "mixed_case", "whitespace"]
+)
+def test_directory_api_and_csv_mask_fields_without_masking_companions(
+    db: Session, tenant_a: Tenants, client: TestClient, style: str
+) -> None:
+    popup = _popup(db, tenant_a)
+    popup.show_attendee_directory = True
+    db.add(popup)
+    db.commit()
+    main = _category(db, popup, "main", is_primary=True)
+    spouse = _category(db, popup, "spouse", is_primary=False)
+    human = _human(
+        db,
+        tenant_a,
+        "Privacy",
+        "Applicant",
+        telegram="private_handle",
+        residence="India",
+        age="30",
+        gender="Non-binary",
+    )
+    companion = _human(db, tenant_a, "Visible", "Companion", telegram="visible_handle")
+    hidden_fields = [
+        "email",
+        "telegram",
+        "role",
+        "organization",
+        "residence",
+        "age",
+        "gender",
+    ]
+    options = [_privacy_option(field, style) for field in hidden_fields]
+    app = _application(
+        db,
+        popup,
+        human,
+        info_not_shared=options,
+        custom_fields={"role": "Founder", "organization": "Private Organization"},
+    )
+    main_attendee = _attendee(db, popup, app, human, main, tickets=1)
+    spouse_attendee = _attendee(db, popup, app, companion, spouse, tickets=1)
+    headers = {
+        "Authorization": f"Bearer {create_access_token(subject=human.id, token_type='human')}"
+    }
+    url = f"/api/v1/applications/my/directory/{popup.id}"
+
+    response = client.get(url, headers=headers)
+    assert response.status_code == 200, response.text
+    entries = {entry["id"]: entry for entry in response.json()["results"]}
+    main_entry = entries[str(main_attendee.id)]
+    for field in hidden_fields:
+        assert main_entry[field] == "*", field
+    assert main_entry["first_name"] == human.first_name
+    assert main_entry["last_name"] == human.last_name
+    spouse_entry = entries[str(spouse_attendee.id)]
+    assert spouse_entry["email"] == companion.email
+    assert spouse_entry["telegram"] == companion.telegram
+    assert spouse_entry["role"] is None
+    assert spouse_entry["organization"] is None
+
+    response = client.get(f"{url}/csv", headers=headers)
+    assert response.status_code == 200, response.text
+    rows = {
+        row["First Name"]: row for row in csv.DictReader(io.StringIO(response.text))
+    }
+    for field in hidden_fields:
+        assert rows[human.first_name][field.capitalize()] == "*", field
+    assert rows[human.first_name]["Last Name"] == human.last_name
+    assert rows[companion.first_name]["Email"] == companion.email
+    assert rows[companion.first_name]["Telegram"] == companion.telegram
+    assert rows[companion.first_name]["Role"] == ""
+    assert rows[companion.first_name]["Organization"] == ""
+    db.refresh(app)
+    assert app.info_not_shared == options
 
 
 def test_unlinked_attendee_entry_uses_identity_snapshot(

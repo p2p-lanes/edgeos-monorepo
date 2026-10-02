@@ -1358,12 +1358,16 @@ def _build_directory_entry(attendee) -> AttendeesDirectoryEntry:
     is_main = attendee.category == "main"
 
     # info_not_shared masking belongs to the main applicant's own application.
+    # Forms store labels like "Email", while directory keys are lowercase.
+    # Normalize on read without changing the stored form selections.
     info_hidden = (
-        set(application.info_not_shared or []) if (is_main and application) else set()
+        {field.strip().casefold() for field in (application.info_not_shared or [])}
+        if (is_main and application)
+        else set()
     )
 
     def mask(field: str, value: str | None) -> str | None:
-        return "*" if field in info_hidden else value
+        return "*" if field.casefold() in info_hidden else value
 
     # Each AttendeeProducts row is one ticket — dedupe by product_id so the
     # directory shows each product once even if the attendee holds several
