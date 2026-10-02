@@ -4,19 +4,19 @@ import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { useEffect, useRef, useState } from "react"
 import { useTranslation } from "react-i18next"
 import { toast } from "sonner"
-import type { ApplicationPublic } from "@/client"
+import type { ApplicationPortalPublic } from "@/client"
 import { ApplicationsService } from "@/client"
 import { queryKeys } from "@/lib/query-keys"
 
 const MAX_POLL_ATTEMPTS = 20
 
 interface FeePaymentBannerProps {
-  application: ApplicationPublic
+  application: ApplicationPortalPublic
   isReturnFromCheckout: boolean
 }
 
 export function useFeePaymentConfirmation(
-  application: ApplicationPublic,
+  application: ApplicationPortalPublic,
   isReturnFromCheckout: boolean,
 ) {
   const { t } = useTranslation()

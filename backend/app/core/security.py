@@ -411,7 +411,7 @@ def _resolve_api_key(token: str) -> TokenPayload:
             if human is None or human.red_flag:
                 raise HTTPException(
                     status_code=status.HTTP_403_FORBIDDEN,
-                    detail="API key owner is blocked from using API keys.",
+                    detail="API key is not available.",
                 )
             api_key_crud.touch_last_used(session, row)
             return TokenPayload(

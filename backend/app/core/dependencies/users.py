@@ -18,7 +18,7 @@ from app.core.security import (
 )
 
 if TYPE_CHECKING:
-    from app.api.human.schemas import HumanPublic
+    from app.api.human.schemas import AuthenticatedHuman
     from app.api.tenant.schemas import TenantPublic
     from app.api.user.schemas import UserPublic
 
@@ -100,9 +100,9 @@ def get_current_user(
 def get_current_human(
     token_payload: Annotated[TokenPayload, Depends(get_token_payload)],
     db: SessionDep,
-) -> "HumanPublic":
+) -> "AuthenticatedHuman":
     from app.api.human.models import Humans
-    from app.api.human.schemas import HumanPublic
+    from app.api.human.schemas import AuthenticatedHuman
 
     # Only allow human tokens
     if token_payload.token_type != "human":
@@ -130,7 +130,7 @@ def get_current_human(
             headers={"WWW-Authenticate": "Bearer"},
         )
 
-    return HumanPublic.model_validate(human)
+    return AuthenticatedHuman.model_validate(human)
 
 
 _optional_oauth2_scheme = OAuth2PasswordBearer(
@@ -141,7 +141,7 @@ _optional_oauth2_scheme = OAuth2PasswordBearer(
 def get_optional_human(
     token: Annotated[str | None, Depends(_optional_oauth2_scheme)],
     db: SessionDep,
-) -> "HumanPublic | None":
+) -> "AuthenticatedHuman | None":
     """Resolve the portal human when a valid human token is present, else None.
 
     For public endpoints that stay open to anonymous callers but tailor their
@@ -149,7 +149,7 @@ def get_optional_human(
     the redeemer at the portal instead of returning 410).
     """
     from app.api.human.models import Humans
-    from app.api.human.schemas import HumanPublic
+    from app.api.human.schemas import AuthenticatedHuman
 
     if not token:
         return None
@@ -164,7 +164,7 @@ def get_optional_human(
     except ValueError:
         return None
     human = db.exec(select(Humans).where(Humans.id == human_id)).first()
-    return HumanPublic.model_validate(human) if human else None
+    return AuthenticatedHuman.model_validate(human) if human else None
 
 
 def get_superadmin(
@@ -232,8 +232,8 @@ def get_check_in_operator(
 
 
 CurrentUser = Annotated["UserPublic", Depends(get_current_user)]
-CurrentHuman = Annotated["HumanPublic", Depends(get_current_human)]
-OptionalHuman = Annotated["HumanPublic | None", Depends(get_optional_human)]
+CurrentHuman = Annotated["AuthenticatedHuman", Depends(get_current_human)]
+OptionalHuman = Annotated["AuthenticatedHuman | None", Depends(get_optional_human)]
 CurrentSuperadmin = Annotated["UserPublic", Depends(get_superadmin)]
 CurrentAdmin = Annotated["UserPublic", Depends(get_admin)]
 CurrentOperator = Annotated["UserPublic", Depends(get_operator)]
@@ -447,7 +447,7 @@ HumanTenantSession = Annotated[Session, Depends(get_human_tenant_session)]
 def get_current_portal_staff(
     current_human: CurrentHuman,
     db: SessionDep,
-) -> "HumanPublic":
+) -> "AuthenticatedHuman":
     """Authorize a portal human as backoffice staff, by email match.
 
     Some features (e.g. event admin notes) are staff-only but must be reachable
@@ -482,7 +482,7 @@ def get_current_portal_staff(
     return current_human
 
 
-CurrentPortalStaff = Annotated["HumanPublic", Depends(get_current_portal_staff)]
+CurrentPortalStaff = Annotated["AuthenticatedHuman", Depends(get_current_portal_staff)]
 
 
 # ---------------------------------------------------------------------------
@@ -962,7 +962,7 @@ AdminOrApiKeySession_TranslationsWrite = Annotated[
 #       summary="Get your profile",
 #       dependencies=[needs("portal:profile:read")],
 #   )
-#   async def get_me(current_human: CurrentHuman, ...) -> HumanPublic: ...
+#   async def get_me(current_human: CurrentHuman, ...) -> HumanSelfPublic: ...
 #
 # The registry walker (app.api.access.introspection.register_scope_routes)
 # auto-discovers each route's scope by inspecting its dependency tree, so

@@ -404,7 +404,7 @@ class TestApiKeyPolicy:
 
         assert resp.status_code == 403, resp.text
         assert (
-            resp.json()["detail"] == "Blocked humans cannot create or manage API keys."
+            resp.json()["detail"] == "API keys are not available for this account."
         )
 
     def test_write_scope_api_key_defaults_expiry_when_omitted(

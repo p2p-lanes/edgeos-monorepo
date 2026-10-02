@@ -1,7 +1,7 @@
-import type { ApplicationPublic, PopupPublic } from "@/client"
+import type { ApplicationPortalPublic, PopupPublic } from "@/client"
 
 interface ScholarshipStatusBadgeProps {
-  application: ApplicationPublic
+  application: ApplicationPortalPublic
   popup: PopupPublic
 }
 

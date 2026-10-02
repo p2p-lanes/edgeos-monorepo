@@ -1,11 +1,11 @@
 import { renderHook } from "@testing-library/react"
 import { beforeEach, describe, expect, it, vi } from "vitest"
-import type { ApplicationPublic, SalesFlowPortalPublic } from "@/client"
+import type { ApplicationPortalPublic, SalesFlowPortalPublic } from "@/client"
 import { useGatheringDoors } from "./useGatheringDoors"
 
 const mocks = vi.hoisted(() => ({
   flows: undefined as SalesFlowPortalPublic[] | undefined,
-  popupApplications: [] as ApplicationPublic[],
+  popupApplications: [] as ApplicationPortalPublic[],
   applicationsQueryState: {
     isPending: true,
     isFetching: true,
@@ -139,7 +139,7 @@ describe("useGatheringDoors", () => {
         popup_id: "popup-1",
         sales_flow_id: "flow-a",
         status: "accepted",
-      } as ApplicationPublic,
+      } as ApplicationPortalPublic,
     ]
 
     const { result } = renderHook(() => useGatheringDoors("popup-1"))

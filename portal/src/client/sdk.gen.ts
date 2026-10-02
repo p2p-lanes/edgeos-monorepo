@@ -1775,7 +1775,7 @@ export class ApplicationsService {
      * @param data The data for the request.
      * @param data.skip Number of items to skip
      * @param data.limit Maximum number of items to return
-     * @returns ListModel_ApplicationPublic_ Successful Response
+     * @returns ListModel_ApplicationPortalPublic_ Successful Response
      * @throws ApiError
      */
     public static listMyApplications(data: ApplicationsListMyApplicationsData = {}): CancelablePromise<ApplicationsListMyApplicationsResponse> {
@@ -1863,7 +1863,7 @@ export class ApplicationsService {
      * Get current human's application for a popup (Portal).
      * @param data The data for the request.
      * @param data.popupId
-     * @returns ApplicationPublic Successful Response
+     * @returns ApplicationPortalPublic Successful Response
      * @throws ApiError
      */
     public static getMyApplication(data: ApplicationsGetMyApplicationData): CancelablePromise<ApplicationsGetMyApplicationResponse> {
@@ -1886,7 +1886,7 @@ export class ApplicationsService {
      * @param data.popupId
      * @param data.salesFlowId
      * @param data.requestBody
-     * @returns ApplicationPublic Successful Response
+     * @returns ApplicationPortalPublic Successful Response
      * @throws ApiError
      */
     public static updateMyApplication(data: ApplicationsUpdateMyApplicationData): CancelablePromise<ApplicationsUpdateMyApplicationResponse> {
@@ -1945,7 +1945,7 @@ export class ApplicationsService {
      * Create an application for the current human (Portal).
      * @param data The data for the request.
      * @param data.requestBody
-     * @returns ApplicationPublic Successful Response
+     * @returns ApplicationPortalPublic Successful Response
      * @throws ApiError
      */
     public static createMyApplication(data: ApplicationsCreateMyApplicationData): CancelablePromise<ApplicationsCreateMyApplicationResponse> {
@@ -2030,7 +2030,7 @@ export class ApplicationsService {
      * @param data The data for the request.
      * @param data.popupId
      * @param data.requestBody
-     * @returns ApplicationPublic Successful Response
+     * @returns ApplicationPortalPublic Successful Response
      * @throws ApiError
      */
     public static addMyAttendee(data: ApplicationsAddMyAttendeeData): CancelablePromise<ApplicationsAddMyAttendeeResponse> {
@@ -2055,7 +2055,7 @@ export class ApplicationsService {
      * @param data.popupId
      * @param data.attendeeId
      * @param data.requestBody
-     * @returns ApplicationPublic Successful Response
+     * @returns ApplicationPortalPublic Successful Response
      * @throws ApiError
      */
     public static updateMyAttendee(data: ApplicationsUpdateMyAttendeeData): CancelablePromise<ApplicationsUpdateMyAttendeeResponse> {
@@ -2080,7 +2080,7 @@ export class ApplicationsService {
      * @param data The data for the request.
      * @param data.popupId
      * @param data.attendeeId
-     * @returns ApplicationPublic Successful Response
+     * @returns ApplicationPortalPublic Successful Response
      * @throws ApiError
      */
     public static deleteMyAttendee(data: ApplicationsDeleteMyAttendeeData): CancelablePromise<ApplicationsDeleteMyAttendeeResponse> {
@@ -2552,7 +2552,7 @@ export class AttendeesService {
      * @param data.popupId
      * @param data.skip Number of items to skip
      * @param data.limit Max attendees to return
-     * @returns ListModel_AttendeeWithOriginPublic_ Successful Response
+     * @returns ListModel_AttendeeWithOriginPortalPublic_ Successful Response
      * @throws ApiError
      */
     public static listMyAttendeesByPopup(data: AttendeesListMyAttendeesByPopupData): CancelablePromise<AttendeesListMyAttendeesByPopupResponse> {
@@ -2586,7 +2586,7 @@ export class AttendeesService {
      * @param data The data for the request.
      * @param data.popupId
      * @param data.requestBody
-     * @returns AttendeeWithOriginPublic Successful Response
+     * @returns AttendeeWithOriginPortalPublic Successful Response
      * @throws ApiError
      */
     public static createMyAttendeeForPopup(data: AttendeesCreateMyAttendeeForPopupData): CancelablePromise<AttendeesCreateMyAttendeeForPopupResponse> {
@@ -2611,7 +2611,7 @@ export class AttendeesService {
      * @param data.popupId
      * @param data.attendeeId
      * @param data.requestBody
-     * @returns AttendeeWithOriginPublic Successful Response
+     * @returns AttendeeWithOriginPortalPublic Successful Response
      * @throws ApiError
      */
     public static updateMyAttendeeForPopup(data: AttendeesUpdateMyAttendeeForPopupData): CancelablePromise<AttendeesUpdateMyAttendeeForPopupResponse> {
@@ -2675,7 +2675,7 @@ export class AttendeesService {
      * @param data.attendeeId
      * @param data.ticketId
      * @param data.requestBody
-     * @returns AttendeeWithOriginPublic Successful Response
+     * @returns AttendeeWithOriginPortalPublic Successful Response
      * @throws ApiError
      */
     public static updateMyMealPlanTicket(data: AttendeesUpdateMyMealPlanTicketData): CancelablePromise<AttendeesUpdateMyMealPlanTicketResponse> {
@@ -7974,7 +7974,7 @@ export class HumansService {
 
     /**
      * Get your profile
-     * @returns HumanPublic Successful Response
+     * @returns HumanSelfPublic Successful Response
      * @throws ApiError
      */
     public static getCurrentHumanInfo(): CancelablePromise<HumansGetCurrentHumanInfoResponse> {
@@ -7989,7 +7989,7 @@ export class HumansService {
      * Update the current authenticated human's profile.
      * @param data The data for the request.
      * @param data.requestBody
-     * @returns HumanPublic Successful Response
+     * @returns HumanSelfPublic Successful Response
      * @throws ApiError
      */
     public static updateCurrentHuman(data: HumansUpdateCurrentHumanData): CancelablePromise<HumansUpdateCurrentHumanResponse> {
@@ -8359,6 +8359,7 @@ export class HumansService {
      * List a human's enrichment facts, newest first.
      * @param data The data for the request.
      * @param data.humanId
+     * @param data.xTenantId
      * @returns ListModel_HumanEnrichmentFactPublic_ Successful Response
      * @throws ApiError
      */
@@ -8368,6 +8369,9 @@ export class HumansService {
             url: '/api/v1/humans/{human_id}/enrichment-facts',
             path: {
                 human_id: data.humanId
+            },
+            headers: {
+                'X-Tenant-Id': data.xTenantId
             },
             errors: {
                 422: 'Validation Error'
@@ -8381,6 +8385,7 @@ export class HumansService {
      * @param data The data for the request.
      * @param data.humanId
      * @param data.requestBody
+     * @param data.xTenantId
      * @returns HumanEnrichmentFactPublic Successful Response
      * @throws ApiError
      */
@@ -8390,6 +8395,9 @@ export class HumansService {
             url: '/api/v1/humans/{human_id}/enrichment-facts',
             path: {
                 human_id: data.humanId
+            },
+            headers: {
+                'X-Tenant-Id': data.xTenantId
             },
             body: data.requestBody,
             mediaType: 'application/json',
@@ -8902,11 +8910,11 @@ export class PaymentsService {
      * Create application fee payment
      * Create an application fee payment for current human's application (Portal).
      *
-     * The application must be in PENDING_FEE status. Returns PaymentPublic with
+     * The application must be in PENDING_FEE status. Returns PaymentPortalPublic with
      * checkout URL to redirect the user to the payment provider.
      * @param data The data for the request.
      * @param data.requestBody
-     * @returns PaymentPublic Successful Response
+     * @returns PaymentPortalPublic Successful Response
      * @throws ApiError
      */
     public static createMyApplicationFee(data: PaymentsCreateMyApplicationFeeData): CancelablePromise<PaymentsCreateMyApplicationFeeResponse> {
@@ -8970,7 +8978,7 @@ export class PaymentsService {
      * @param data.popupId
      * @param data.skip Number of payments to skip
      * @param data.limit Max payments to return (max 100)
-     * @returns ListModel_PaymentPublic_ Successful Response
+     * @returns ListModel_PaymentPortalPublic_ Successful Response
      * @throws ApiError
      */
     public static listMyPaymentsByPopup(data: PaymentsListMyPaymentsByPopupData): CancelablePromise<PaymentsListMyPaymentsByPopupResponse> {
@@ -9039,7 +9047,7 @@ export class PaymentsService {
      * @param data.applicationId
      * @param data.skip Number of items to skip
      * @param data.limit Maximum number of items to return
-     * @returns ListModel_PaymentPublic_ Successful Response
+     * @returns ListModel_PaymentPortalPublic_ Successful Response
      * @throws ApiError
      */
     public static listMyPayments(data: PaymentsListMyPaymentsData): CancelablePromise<PaymentsListMyPaymentsResponse> {
@@ -9111,10 +9119,10 @@ export class PaymentsService {
      * If the total is zero or negative (covered by credit), the products
      * are immediately assigned and the payment is auto-approved.
      *
-     * Otherwise, returns PaymentPublic with checkout URL for external payment.
+     * Otherwise, returns PaymentPortalPublic with checkout URL for external payment.
      * @param data The data for the request.
      * @param data.requestBody
-     * @returns PaymentPublic Successful Response
+     * @returns PaymentPortalPublic Successful Response
      * @throws ApiError
      */
     public static createMyPayment(data: PaymentsCreateMyPaymentData): CancelablePromise<PaymentsCreateMyPaymentResponse> {
@@ -9729,7 +9737,7 @@ export class PortalService {
      * @param data.popupId
      * @param data.skip Number of items to skip
      * @param data.limit Max attendees to return
-     * @returns ListModel_AttendeeWithOriginPublic_ Successful Response
+     * @returns ListModel_AttendeeWithOriginPortalPublic_ Successful Response
      * @throws ApiError
      */
     public static attendeesListMyAttendeesByPopup(data: AttendeesListMyAttendeesByPopupData): CancelablePromise<AttendeesListMyAttendeesByPopupResponse> {
@@ -9763,7 +9771,7 @@ export class PortalService {
      * @param data The data for the request.
      * @param data.popupId
      * @param data.requestBody
-     * @returns AttendeeWithOriginPublic Successful Response
+     * @returns AttendeeWithOriginPortalPublic Successful Response
      * @throws ApiError
      */
     public static attendeesCreateMyAttendeeForPopup(data: AttendeesCreateMyAttendeeForPopupData): CancelablePromise<AttendeesCreateMyAttendeeForPopupResponse> {
@@ -9788,7 +9796,7 @@ export class PortalService {
      * @param data.popupId
      * @param data.attendeeId
      * @param data.requestBody
-     * @returns AttendeeWithOriginPublic Successful Response
+     * @returns AttendeeWithOriginPortalPublic Successful Response
      * @throws ApiError
      */
     public static attendeesUpdateMyAttendeeForPopup(data: AttendeesUpdateMyAttendeeForPopupData): CancelablePromise<AttendeesUpdateMyAttendeeForPopupResponse> {
@@ -9852,7 +9860,7 @@ export class PortalService {
      * @param data.attendeeId
      * @param data.ticketId
      * @param data.requestBody
-     * @returns AttendeeWithOriginPublic Successful Response
+     * @returns AttendeeWithOriginPortalPublic Successful Response
      * @throws ApiError
      */
     public static attendeesUpdateMyMealPlanTicket(data: AttendeesUpdateMyMealPlanTicketData): CancelablePromise<AttendeesUpdateMyMealPlanTicketResponse> {

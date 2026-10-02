@@ -5,7 +5,7 @@
  */
 export type AbandonedCartPublic = {
     id: string;
-    items: CartState_Output;
+    items: CartState;
     created_at?: (string | null);
     updated_at?: (string | null);
     email?: (string | null);
@@ -754,7 +754,47 @@ export type ApplicationGroupCount = {
 export type ApplicationLayout = 'single_page' | 'multi_step';
 
 /**
- * Application schema for API responses.
+ * Applicant-facing response, without administrative assessments or reviews.
+ */
+export type ApplicationPortalPublic = {
+    id: string;
+    tenant_id: string;
+    popup_id: string;
+    human_id: string;
+    group_id?: (string | null);
+    sales_flow_id: string;
+    referral?: (string | null);
+    invite_id?: (string | null);
+    referral_id?: (string | null);
+    referred_by_name?: (string | null);
+    access_sources?: Array<ApplicationAccessSource>;
+    info_not_shared?: Array<(string)>;
+    status: string;
+    custom_fields?: {
+        [key: string]: unknown;
+    };
+    custom_fields_schema?: ({
+    [key: string]: unknown;
+} | null);
+    credit?: string;
+    fee_credit_granted?: boolean;
+    submitted_at?: (string | null);
+    accepted_at?: (string | null);
+    created_at?: (string | null);
+    updated_at?: (string | null);
+    scholarship_request?: boolean;
+    scholarship_details?: (string | null);
+    scholarship_video_url?: (string | null);
+    scholarship_status?: (string | null);
+    discount_percentage?: (string | null);
+    incentive_amount?: (string | null);
+    incentive_currency?: (string | null);
+    human?: (HumanSelfPublic | null);
+    attendees?: Array<AttendeePortalPublic>;
+};
+
+/**
+ * Administrative application response; never return from portal routes.
  */
 export type ApplicationPublic = {
     id: string;
@@ -1192,6 +1232,29 @@ export type AttendeeListItem = {
 };
 
 /**
+ * Human-facing attendee, including safe historical profile metadata.
+ */
+export type AttendeePortalPublic = {
+    tenant_id: string;
+    application_id?: (string | null);
+    popup_id: string;
+    human_id?: (string | null);
+    name: string;
+    category_id?: (string | null);
+    email?: (string | null);
+    gender?: (string | null);
+    poap_url?: (string | null);
+    additional_data?: {
+        [key: string]: unknown;
+    };
+    id: string;
+    category?: (string | null);
+    created_at?: (string | null);
+    updated_at?: (string | null);
+    products?: Array<AttendeeProductPublic>;
+};
+
+/**
  * Schema for an individual ticket (one row per ticket, no quantity).
  *
  * requires_check_in is denormalized from the related Product so the frontend
@@ -1387,6 +1450,30 @@ export type AttendeeUpdate = {
     additional_data?: ({
     [key: string]: unknown;
 } | null);
+};
+
+/**
+ * Portal projection of an attendee with origin and sanitized metadata.
+ */
+export type AttendeeWithOriginPortalPublic = {
+    tenant_id: string;
+    application_id?: (string | null);
+    popup_id: string;
+    human_id?: (string | null);
+    name: string;
+    category_id?: (string | null);
+    email?: (string | null);
+    gender?: (string | null);
+    poap_url?: (string | null);
+    additional_data?: {
+        [key: string]: unknown;
+    };
+    id: string;
+    category?: (string | null);
+    created_at?: (string | null);
+    updated_at?: (string | null);
+    products?: Array<AttendeeProductPublic>;
+    origin?: string;
 };
 
 /**
@@ -1789,6 +1876,17 @@ export type CartPopupInfo = {
 };
 
 /**
+ * Read-time projection; also protects carts saved before the privacy fix.
+ */
+export type CartPortalState = {
+    lines?: Array<(CartProductLine | CartDateRangeLine | CartCustomAmountLine | CartMealPlanLine | CartAccommodationLine)>;
+    recipients?: Array<CartRecipientPortalProfile>;
+    promo_code?: (string | null);
+    insurance?: boolean;
+    current_step?: (string | null);
+};
+
+/**
  * A fixed-price product selection, assigned or unassigned.
  */
 export type CartProductLine = {
@@ -1807,7 +1905,7 @@ export type CartPublic = {
     id: string;
     human_id: string;
     popup_id: string;
-    items: CartState_Output;
+    items: CartPortalState;
     created_at?: (string | null);
     updated_at?: (string | null);
 };
@@ -1817,21 +1915,33 @@ export type CartRecipientAssignment = {
     recipient_key: string;
 };
 
+export type CartRecipientPortalProfile = {
+    recipient_key: string;
+    human_id?: (string | null);
+    existing_attendee_id?: (string | null);
+    name: string;
+    email?: (string | null);
+    category_id?: (string | null);
+    profile_snapshot?: {
+        [key: string]: unknown;
+    };
+};
+
 /**
  * Full cart state stored as JSONB.
  */
-export type CartState_Input = {
+export type CartState = {
     lines?: Array<(CartProductLine | CartDateRangeLine | CartCustomAmountLine | CartMealPlanLine | CartAccommodationLine)>;
-    recipients?: Array<PaymentRecipientRequest>;
+    recipients?: Array<PaymentRecipientProfile>;
     promo_code?: (string | null);
     insurance?: boolean;
     current_step?: (string | null);
 };
 
 /**
- * Full cart state stored as JSONB.
+ * Untrusted cart input: never persist administrative profile metadata.
  */
-export type CartState_Output = {
+export type CartStateRequest = {
     lines?: Array<(CartProductLine | CartDateRangeLine | CartCustomAmountLine | CartMealPlanLine | CartAccommodationLine)>;
     recipients?: Array<PaymentRecipientRequest>;
     promo_code?: (string | null);
@@ -1847,7 +1957,7 @@ export type CartUnassigned = {
  * Schema for updating cart items.
  */
 export type CartUpdate = {
-    items: CartState_Input;
+    items: CartStateRequest;
 };
 
 /**
@@ -3454,7 +3564,6 @@ export type HumanAuth = {
     tenant_id: string;
     email: string;
     picture_url?: (string | null);
-    red_flag?: boolean;
 };
 
 export type HumanCommentCreate = {
@@ -3592,7 +3701,7 @@ export type HumanProfileUpdate = {
 };
 
 /**
- * Human schema for API responses.
+ * Administrative human response. Never use on a human-facing route.
  */
 export type HumanPublic = {
     id: string;
@@ -3620,6 +3729,22 @@ export type HumanPublic = {
  * rejection emails); the other levels are purely advisory labels.
  */
 export type HumanRating = 'unrated' | 'red_flag' | 'orange_flag' | 'green_flag' | 'star';
+
+/**
+ * Allowlisted own-profile response for humans and third-party apps.
+ */
+export type HumanSelfPublic = {
+    id: string;
+    tenant_id: string;
+    email: string;
+    first_name?: (string | null);
+    last_name?: (string | null);
+    telegram?: (string | null);
+    gender?: (string | null);
+    age?: (string | null);
+    residence?: (string | null);
+    picture_url?: (string | null);
+};
 
 /**
  * Human schema for profile updates.
@@ -3841,6 +3966,11 @@ export type ListModel_ApplicationCommentPublic_ = {
     paging: Paging;
 };
 
+export type ListModel_ApplicationPortalPublic_ = {
+    results: Array<ApplicationPortalPublic>;
+    paging: Paging;
+};
+
 export type ListModel_ApplicationPublic_ = {
     results: Array<ApplicationPublic>;
     paging: Paging;
@@ -3866,8 +3996,8 @@ export type ListModel_AttendeesDirectoryEntry_ = {
     paging: Paging;
 };
 
-export type ListModel_AttendeeWithOriginPublic_ = {
-    results: Array<AttendeeWithOriginPublic>;
+export type ListModel_AttendeeWithOriginPortalPublic_ = {
+    results: Array<AttendeeWithOriginPortalPublic>;
     paging: Paging;
 };
 
@@ -3963,6 +4093,11 @@ export type ListModel_InvitePublic_ = {
 
 export type ListModel_MyGroupPublic_ = {
     results: Array<MyGroupPublic>;
+    paging: Paging;
+};
+
+export type ListModel_PaymentPortalPublic_ = {
+    results: Array<PaymentPortalPublic>;
     paging: Paging;
 };
 
@@ -4143,7 +4278,7 @@ export type OpenCartPublic = {
     id: string;
     popup_id: string;
     email: string;
-    items: CartState_Output;
+    items: CartPortalState;
     restore_token?: (string | null);
     created_at?: (string | null);
     updated_at?: (string | null);
@@ -4154,7 +4289,7 @@ export type OpenCartPublic = {
  */
 export type OpenCartUpsert = {
     email: string;
-    items: CartState_Input;
+    items: CartStateRequest;
 };
 
 /**
@@ -4216,6 +4351,50 @@ export type PaymentCreate = {
     insurance?: boolean;
     locale?: (string | null);
     return_context?: 'direct' | 'portal';
+};
+
+/**
+ * Human-facing payment response without internal recipient metadata.
+ */
+export type PaymentPortalPublic = {
+    tenant_id: string;
+    application_id?: (string | null);
+    popup_id: string;
+    buyer_human_id?: (string | null);
+    sales_flow_id?: (string | null);
+    external_id?: (string | null);
+    status?: string;
+    amount?: string;
+    amount_charged?: (string | null);
+    insurance_amount?: string;
+    contribution_amount?: string;
+    currency?: string;
+    settlement_currency?: (string | null);
+    rate?: (string | null);
+    source?: (string | null);
+    checkout_url?: (string | null);
+    buyer_snapshot?: ({
+    [key: string]: unknown;
+} | null);
+    coupon_id?: (string | null);
+    coupon_code?: (string | null);
+    discount_value?: (string | null);
+    edit_passes?: boolean;
+    is_installment_plan?: boolean;
+    installments_total?: (number | null);
+    installments_paid?: (number | null);
+    group_id?: (string | null);
+    payment_type?: string;
+    granted_by_user_id?: (string | null);
+    credit_applied?: string;
+    id: string;
+    products_snapshot?: Array<PaymentProductResponse>;
+    recipients?: Array<PaymentRecipientPortalResponse>;
+    buyer_email?: (string | null);
+    buyer_name?: (string | null);
+    redirect_url?: (string | null);
+    created_at?: (string | null);
+    updated_at?: (string | null);
 };
 
 /**
@@ -4343,7 +4522,40 @@ export type PaymentPublic = {
 };
 
 /**
+ * Public projection of a stored recipient; leaves historical data untouched.
+ */
+export type PaymentRecipientPortalResponse = {
+    recipient_key: string;
+    human_id?: (string | null);
+    existing_attendee_id?: (string | null);
+    name: string;
+    email?: (string | null);
+    category_id?: (string | null);
+    profile_snapshot?: {
+        [key: string]: unknown;
+    };
+    id: string;
+    attendee_id?: (string | null);
+    created_at: string;
+};
+
+/**
  * Stable recipient identity and profile supplied for one payment attempt.
+ */
+export type PaymentRecipientProfile = {
+    recipient_key: string;
+    human_id?: (string | null);
+    existing_attendee_id?: (string | null);
+    name: string;
+    email?: (string | null);
+    category_id?: (string | null);
+    profile_snapshot?: {
+        [key: string]: unknown;
+    };
+};
+
+/**
+ * Untrusted checkout input; old clients may send reserved keys, which are ignored.
  */
 export type PaymentRecipientRequest = {
     recipient_key: string;
@@ -7040,7 +7252,7 @@ export type ApplicationsListMyApplicationsData = {
     skip?: number;
 };
 
-export type ApplicationsListMyApplicationsResponse = (ListModel_ApplicationPublic_);
+export type ApplicationsListMyApplicationsResponse = (ListModel_ApplicationPortalPublic_);
 
 export type ApplicationsListMyTicketsResponse = (Array<AttendeeWithTickets>);
 
@@ -7060,7 +7272,7 @@ export type ApplicationsGetMyApplicationData = {
     popupId: string;
 };
 
-export type ApplicationsGetMyApplicationResponse = (ApplicationPublic);
+export type ApplicationsGetMyApplicationResponse = (ApplicationPortalPublic);
 
 export type ApplicationsUpdateMyApplicationData = {
     popupId: string;
@@ -7068,7 +7280,7 @@ export type ApplicationsUpdateMyApplicationData = {
     salesFlowId: string;
 };
 
-export type ApplicationsUpdateMyApplicationResponse = (ApplicationPublic);
+export type ApplicationsUpdateMyApplicationResponse = (ApplicationPortalPublic);
 
 export type ApplicationsDetachCompanionData = {
     requestBody: DetachCompanionRequest;
@@ -7080,7 +7292,7 @@ export type ApplicationsCreateMyApplicationData = {
     requestBody: ApplicationCreate;
 };
 
-export type ApplicationsCreateMyApplicationResponse = (ApplicationPublic);
+export type ApplicationsCreateMyApplicationResponse = (ApplicationPortalPublic);
 
 export type ApplicationsListAttendeesDirectoryData = {
     hideEmptyRows?: boolean;
@@ -7110,7 +7322,7 @@ export type ApplicationsAddMyAttendeeData = {
     requestBody: AttendeeCreate;
 };
 
-export type ApplicationsAddMyAttendeeResponse = (ApplicationPublic);
+export type ApplicationsAddMyAttendeeResponse = (ApplicationPortalPublic);
 
 export type ApplicationsUpdateMyAttendeeData = {
     attendeeId: string;
@@ -7118,14 +7330,14 @@ export type ApplicationsUpdateMyAttendeeData = {
     requestBody: AttendeeUpdate;
 };
 
-export type ApplicationsUpdateMyAttendeeResponse = (ApplicationPublic);
+export type ApplicationsUpdateMyAttendeeResponse = (ApplicationPortalPublic);
 
 export type ApplicationsDeleteMyAttendeeData = {
     attendeeId: string;
     popupId: string;
 };
 
-export type ApplicationsDeleteMyAttendeeResponse = (ApplicationPublic);
+export type ApplicationsDeleteMyAttendeeResponse = (ApplicationPortalPublic);
 
 export type ApplicationsReviewScholarshipData = {
     applicationId: string;
@@ -7260,14 +7472,14 @@ export type AttendeesListMyAttendeesByPopupData = {
     skip?: number;
 };
 
-export type AttendeesListMyAttendeesByPopupResponse = (ListModel_AttendeeWithOriginPublic_);
+export type AttendeesListMyAttendeesByPopupResponse = (ListModel_AttendeeWithOriginPortalPublic_);
 
 export type AttendeesCreateMyAttendeeForPopupData = {
     popupId: string;
     requestBody: AttendeeCreate;
 };
 
-export type AttendeesCreateMyAttendeeForPopupResponse = (AttendeeWithOriginPublic);
+export type AttendeesCreateMyAttendeeForPopupResponse = (AttendeeWithOriginPortalPublic);
 
 export type AttendeesUpdateMyAttendeeForPopupData = {
     attendeeId: string;
@@ -7275,7 +7487,7 @@ export type AttendeesUpdateMyAttendeeForPopupData = {
     requestBody: AttendeeUpdate;
 };
 
-export type AttendeesUpdateMyAttendeeForPopupResponse = (AttendeeWithOriginPublic);
+export type AttendeesUpdateMyAttendeeForPopupResponse = (AttendeeWithOriginPortalPublic);
 
 export type AttendeesDeleteMyAttendeeForPopupData = {
     attendeeId: string;
@@ -7293,7 +7505,7 @@ export type AttendeesUpdateMyMealPlanTicketData = {
     ticketId: string;
 };
 
-export type AttendeesUpdateMyMealPlanTicketResponse = (AttendeeWithOriginPublic);
+export type AttendeesUpdateMyMealPlanTicketResponse = (AttendeeWithOriginPortalPublic);
 
 export type AttendeesListAttendeesData = {
     applicationId?: (string | null);
@@ -8904,13 +9116,13 @@ export type HumansCreateHumanData = {
 
 export type HumansCreateHumanResponse = (HumanPublic);
 
-export type HumansGetCurrentHumanInfoResponse = (HumanPublic);
+export type HumansGetCurrentHumanInfoResponse = (HumanSelfPublic);
 
 export type HumansUpdateCurrentHumanData = {
     requestBody: HumanProfileUpdate;
 };
 
-export type HumansUpdateCurrentHumanResponse = (HumanPublic);
+export type HumansUpdateCurrentHumanResponse = (HumanSelfPublic);
 
 export type HumansGetCurrentHumanProfileStatsResponse = (HumanProfileStats);
 
@@ -9021,6 +9233,7 @@ export type HumansDeleteHumanCommentResponse = (void);
 
 export type HumansListHumanEnrichmentFactsData = {
     humanId: string;
+    xTenantId?: (string | null);
 };
 
 export type HumansListHumanEnrichmentFactsResponse = (ListModel_HumanEnrichmentFactPublic_);
@@ -9028,6 +9241,7 @@ export type HumansListHumanEnrichmentFactsResponse = (ListModel_HumanEnrichmentF
 export type HumansCreateHumanEnrichmentFactData = {
     humanId: string;
     requestBody: HumanEnrichmentFactCreate;
+    xTenantId?: (string | null);
 };
 
 export type HumansCreateHumanEnrichmentFactResponse = (HumanEnrichmentFactPublic);
@@ -9188,7 +9402,7 @@ export type PaymentsCreateMyApplicationFeeData = {
     requestBody: ApplicationFeeCreate;
 };
 
-export type PaymentsCreateMyApplicationFeeResponse = (PaymentPublic);
+export type PaymentsCreateMyApplicationFeeResponse = (PaymentPortalPublic);
 
 export type PaymentsReleaseMyPendingPaymentData = {
     requestBody: PendingReleaseAuthRequest;
@@ -9208,7 +9422,7 @@ export type PaymentsListMyPaymentsByPopupData = {
     skip?: number;
 };
 
-export type PaymentsListMyPaymentsByPopupResponse = (ListModel_PaymentPublic_);
+export type PaymentsListMyPaymentsByPopupResponse = (ListModel_PaymentPortalPublic_);
 
 export type PaymentsGetMyLatestPaymentData = {
     applicationId: string;
@@ -9234,7 +9448,7 @@ export type PaymentsListMyPaymentsData = {
     skip?: number;
 };
 
-export type PaymentsListMyPaymentsResponse = (ListModel_PaymentPublic_);
+export type PaymentsListMyPaymentsResponse = (ListModel_PaymentPortalPublic_);
 
 export type PaymentsGetMyInvoiceData = {
     paymentId: string;
@@ -9252,7 +9466,7 @@ export type PaymentsCreateMyPaymentData = {
     requestBody: PaymentCreate;
 };
 
-export type PaymentsCreateMyPaymentResponse = (PaymentPublic);
+export type PaymentsCreateMyPaymentResponse = (PaymentPortalPublic);
 
 export type PaymentsSimplefiWebhookResponse = ({
     [key: string]: unknown;

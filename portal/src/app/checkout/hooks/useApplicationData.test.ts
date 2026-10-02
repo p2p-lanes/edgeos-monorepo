@@ -1,4 +1,4 @@
-import type { ApplicationPublic, HumanPublic } from "@/client"
+import type { ApplicationPortalPublic, HumanSelfPublic } from "@/client"
 import type { ApplicationFormSchema } from "@/types/form-schema"
 import { hydrateCheckoutApplicationValues } from "./useApplicationData"
 
@@ -52,7 +52,7 @@ describe("hydrateCheckoutApplicationValues", () => {
       email: "human@example.com",
       first_name: "Human",
       gender: "Female",
-    } as HumanPublic
+    } as HumanSelfPublic
 
     const application = {
       popup_id: "popup-1",
@@ -65,7 +65,7 @@ describe("hydrateCheckoutApplicationValues", () => {
         favorite_color: "Blue",
         document_id: "A-123",
       },
-    } as unknown as ApplicationPublic
+    } as unknown as ApplicationPortalPublic
 
     expect(
       hydrateCheckoutApplicationValues({
@@ -90,7 +90,7 @@ describe("hydrateCheckoutApplicationValues", () => {
       email: "human@example.com",
       first_name: "Human",
       gender: "Male",
-    } as HumanPublic
+    } as HumanSelfPublic
 
     const application = {
       popup_id: "popup-2",
@@ -102,7 +102,7 @@ describe("hydrateCheckoutApplicationValues", () => {
       custom_fields: {
         favorite_color: "Blue",
       },
-    } as unknown as ApplicationPublic
+    } as unknown as ApplicationPortalPublic
 
     expect(
       hydrateCheckoutApplicationValues({

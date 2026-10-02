@@ -17,6 +17,7 @@ from app.api.payment.schemas import (
     ApplicationFeeCreate,
     PaymentCreate,
     PaymentFilter,
+    PaymentPortalPublic,
     PaymentPreview,
     PaymentProductResponse,
     PaymentProductUnitResponse,
@@ -593,7 +594,7 @@ async def update_payment(
 
 @router.post(
     "/my/application-fee",
-    response_model=PaymentPublic,
+    response_model=PaymentPortalPublic,
     status_code=status.HTTP_201_CREATED,
     summary="Create application fee payment",
     dependencies=[needs("portal:applications:write")],
@@ -602,10 +603,10 @@ async def create_my_application_fee(
     fee_in: ApplicationFeeCreate,
     db: HumanTenantSession,
     current_human: CurrentHuman,
-) -> PaymentPublic:
+) -> PaymentPortalPublic:
     """Create an application fee payment for current human's application (Portal).
 
-    The application must be in PENDING_FEE status. Returns PaymentPublic with
+    The application must be in PENDING_FEE status. Returns PaymentPortalPublic with
     checkout URL to redirect the user to the payment provider.
     """
     from app.api.application.crud import applications_crud
@@ -622,7 +623,7 @@ async def create_my_application_fee(
     popup = application.popup
     ensure_popup_writable(popup)
     payment = payments_crud.create_fee_payment(db, application, popup)
-    return PaymentPublic.model_validate(payment)
+    return PaymentPortalPublic.model_validate(payment)
 
 
 @router.post(
@@ -677,7 +678,7 @@ async def release_my_pending_payment(
 
 @router.get(
     "/my/popup/{popup_id}",
-    response_model=ListModel[PaymentPublic],
+    response_model=ListModel[PaymentPortalPublic],
     summary="List your payments for a popup",
     dependencies=[needs("portal:payments:read")],
 )
@@ -689,7 +690,7 @@ async def list_my_payments_by_popup(
     limit: Annotated[
         int, Query(ge=1, le=100, description="Max payments to return (max 100)")
     ] = 50,
-) -> ListModel[PaymentPublic]:
+) -> ListModel[PaymentPortalPublic]:
     """List all payments owned by the current Human for a specific popup (Portal).
 
     Ownership is resolved via dual-path predicate:
@@ -704,7 +705,7 @@ async def list_my_payments_by_popup(
     results = _payment_public_with_units(
         db, payments, current_human.tenant_id, current_human.id
     )
-    return ListModel[PaymentPublic](
+    return ListModel[PaymentPortalPublic](
         results=results,
         paging=Paging(offset=skip, limit=limit, total=total),
     )
@@ -765,7 +766,7 @@ async def get_my_payment_status(
 
 @router.get(
     "/my/{application_id}",
-    response_model=ListModel[PaymentPublic],
+    response_model=ListModel[PaymentPortalPublic],
     dependencies=[needs("portal:payments:read")],
 )
 async def list_my_payments(
@@ -774,7 +775,7 @@ async def list_my_payments(
     current_human: CurrentHuman,
     skip: PaginationSkip = 0,
     limit: PaginationLimit = 100,
-) -> ListModel[PaymentPublic]:
+) -> ListModel[PaymentPortalPublic]:
     """List payments for an application owned by current human (Portal)."""
     from app.api.application.crud import applications_crud
 
@@ -790,8 +791,8 @@ async def list_my_payments(
         db, application_id=application_id, skip=skip, limit=limit
     )
 
-    return ListModel[PaymentPublic](
-        results=[PaymentPublic.model_validate(p) for p in payments],
+    return ListModel[PaymentPortalPublic](
+        results=[PaymentPortalPublic.model_validate(p) for p in payments],
         paging=Paging(offset=skip, limit=limit, total=total),
     )
 
@@ -894,7 +895,7 @@ async def preview_my_payment(
 
 @router.post(
     "/my",
-    response_model=PaymentPublic,
+    response_model=PaymentPortalPublic,
     status_code=status.HTTP_201_CREATED,
     dependencies=[needs("portal:applications:write")],
     responses={
@@ -920,14 +921,14 @@ async def create_my_payment(
     request: Request,
     db: HumanTenantSession,
     current_human: CurrentHuman,
-) -> PaymentPublic:
+) -> PaymentPortalPublic:
     """
     Create a payment for current human's application (Portal).
 
     If the total is zero or negative (covered by credit), the products
     are immediately assigned and the payment is auto-approved.
 
-    Otherwise, returns PaymentPublic with checkout URL for external payment.
+    Otherwise, returns PaymentPortalPublic with checkout URL for external payment.
     """
     from app.api.application.crud import applications_crud
 
@@ -956,7 +957,7 @@ async def create_my_payment(
     if payment.status == PaymentStatus.APPROVED.value:
         await _send_payment_confirmed_email_best_effort(payment, db_session=db)
 
-    response = PaymentPublic.model_validate(payment)
+    response = PaymentPortalPublic.model_validate(payment)
     if payment.status == PaymentStatus.APPROVED.value and not payment.edit_passes:
         response.redirect_url = payments_crud.resolve_application_payment_success_url(
             db,
