@@ -715,7 +715,7 @@
   "attendees": {
     "title": "Directorio",
     "description": "Contactá a tus amigos para planificar fechas, encontrar alojamiento compartido u organizar actividades juntos. *Este directorio incluye solo la información de quienes voluntariamente optaron por compartir sus datos.",
-    "search_placeholder": "Buscar por nombre, email, organización...",
+    "search_placeholder": "Buscar por nombre, email o Telegram...",
     "export_csv": "Exportar asistentes como CSV",
     "no_attendees": "No se encontraron asistentes",
     "per_page_label": "Por página",
