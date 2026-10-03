@@ -400,9 +400,8 @@ function BulkGrantContent({ popupId }: { popupId: string }) {
         `Granted ${tickets} ticket${tickets === 1 ? "" : "s"} to ${granted} ` +
           `person${granted === 1 ? "" : "s"}`,
       )
-      queryClient.invalidateQueries({ queryKey: ["applications"] })
       queryClient.invalidateQueries({ queryKey: ["attendees"] })
-      queryClient.invalidateQueries({ queryKey: ["payments"] })
+      queryClient.invalidateQueries({ queryKey: ["humans"] })
       queryClient.invalidateQueries({ queryKey: ["products", popupId] })
       setPeople([])
       setDefaultProducts({})

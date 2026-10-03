@@ -1,3 +1,4 @@
+import json
 import uuid
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
@@ -152,6 +153,84 @@ def _create_payment(
 
 
 class TestPaymentListSearch:
+    def test_product_filters_combine_and_return_complete_payment_snapshot(
+        self,
+        client: TestClient,
+        db: Session,
+        tenant_a: Tenants,
+        admin_token_tenant_a: str,
+    ) -> None:
+        popup = _create_popup(db, tenant_a, suffix="product-filter")
+        flow = sales_flows_crud.get_default_flow(db, popup.id)
+        matching = _create_payment(
+            db,
+            tenant_a,
+            popup,
+            external_id="PRODUCT-FILTER-MATCH",
+            created_at=datetime.now(UTC),
+            attendee_specs=[{"name": "Buyer", "email": "buyer@test.com"}],
+        )
+        matching.sales_flow_id = flow.id
+        merch = _create_product(db, tenant_a, popup, suffix="merch-filter")
+        db.add(
+            PaymentProducts(
+                tenant_id=tenant_a.id,
+                payment_id=matching.id,
+                product_id=merch.id,
+                quantity=2,
+                product_name="Snapshot Merch",
+                product_description=None,
+                product_price=Decimal("25.00"),
+                product_category="merch",
+                product_currency="USD",
+            )
+        )
+        db.commit()
+        non_matching = _create_payment(
+            db,
+            tenant_a,
+            popup,
+            external_id="PRODUCT-FILTER-NO-MATCH",
+            created_at=datetime.now(UTC) + timedelta(minutes=1),
+            attendee_specs=[{"name": "Other", "email": "other@test.com"}],
+        )
+        non_matching.sales_flow_id = flow.id
+        db.add(non_matching)
+        db.commit()
+
+        response = client.get(
+            "/api/v1/payments",
+            params={
+                "popup_id": str(popup.id),
+                "filters": json.dumps(
+                    {
+                        "match": "all",
+                        "conditions": [
+                            {
+                                "field": "sales_flow_id",
+                                "op": "eq",
+                                "value": str(flow.id),
+                            },
+                            {"field": "product_id", "op": "eq", "value": str(merch.id)},
+                            {"field": "product_category", "op": "eq", "value": "merch"},
+                        ],
+                    }
+                ),
+            },
+            headers=_admin_headers(admin_token_tenant_a),
+        )
+
+        assert response.status_code == 200
+        payload = response.json()
+        assert payload["paging"]["total"] == 1
+        payment = payload["results"][0]
+        assert payment["id"] == str(matching.id)
+        assert len(payment["products_snapshot"]) == 2
+        assert {line["product_name"] for line in payment["products_snapshot"]} == {
+            "Product 1",
+            "Snapshot Merch",
+        }
+
     def test_status_filter_limits_results_across_full_popup_dataset(
         self,
         client: TestClient,

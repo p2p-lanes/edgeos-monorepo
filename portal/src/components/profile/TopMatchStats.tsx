@@ -1,7 +1,7 @@
 import { Users } from "lucide-react"
 import Image from "next/image"
 import { useCallback, useEffect, useState } from "react"
-import type { HumanPublic } from "@/client"
+import type { HumanSelfPublic } from "@/client"
 import { imageOptimization } from "@/lib/image-optimization"
 import type { EventParticipant } from "@/types/StatsSocialLayer"
 import { Avatar } from "../ui/avatar"
@@ -22,7 +22,7 @@ const TopMatchStats = ({
   eventsLoading,
   events,
 }: {
-  userData: HumanPublic | null
+  userData: HumanSelfPublic | null
   eventsLoading: boolean
   events: any
 }) => {

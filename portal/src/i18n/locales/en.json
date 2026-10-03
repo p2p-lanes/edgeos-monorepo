@@ -716,11 +716,26 @@
   "attendees": {
     "title": "Directory",
     "description": "Reach out to your friends to plan dates, find shared housing, or organize activities together. *This directory includes only the information of those who have voluntarily opted in to share their details.",
-    "search_placeholder": "Search by name, email, organization...",
+    "search_placeholder": "Search by name, email, or Telegram...",
     "export_csv": "Export attendees as CSV",
     "no_attendees": "No attendees found",
     "per_page_label": "Per page",
-    "showing_range": "Showing {{from}}–{{to}} of {{total}}"
+    "showing_range": "Showing {{from}}–{{to}} of {{total}}",
+    "privacy_button": "Sharing settings",
+    "privacy_title": "Choose what you share",
+    "privacy_description": "Choose which details other attendees can see in the directory.",
+    "privacy_save": "Save settings",
+    "privacy_saved": "Your sharing settings were saved.",
+    "privacy_error": "Could not save your sharing settings.",
+    "privacy_no_application": "Submit an application through this gathering's primary sales flow to manage your directory details.",
+    "fields": {
+      "first_name": "First name",
+      "last_name": "Last name",
+      "email": "Email",
+      "telegram": "Telegram",
+      "role": "Role",
+      "organization": "Organization"
+    }
   },
   "checkin": {
     "title": "Online Check-in for {{eventName}}",

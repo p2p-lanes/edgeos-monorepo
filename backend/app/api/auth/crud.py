@@ -373,7 +373,7 @@ async def login_human(
             tenant_id=data.tenant_id,
             email=data.email,
             picture_url=data.picture_url,
-            red_flag=data.red_flag,
+            red_flag=False,
         )
         auth_code_store.store_human_code(
             data.tenant_id, data.email, auth_code, is_pending=True
@@ -395,7 +395,7 @@ async def login_human(
             pending_human.code_expiration = code_expiration
             pending_human.attempts = 0
             pending_human.picture_url = data.picture_url
-            pending_human.red_flag = data.red_flag
+            pending_human.red_flag = False
         else:
             # Create new pending record (minimal data)
             pending_human = PendingHumans(
@@ -404,7 +404,7 @@ async def login_human(
                 auth_code=auth_code,
                 code_expiration=code_expiration,
                 picture_url=data.picture_url,
-                red_flag=data.red_flag,
+                red_flag=False,
                 attempts=0,
             )
 
@@ -563,11 +563,7 @@ async def authenticate_human(
             tenant_id=pending_data["tenant_id"],
             email=pending_data["email"],
             picture_url=pending_data["picture_url"],
-            rating=(
-                HumanRating.RED_FLAG
-                if pending_data["red_flag"]
-                else HumanRating.UNRATED
-            ),
+            rating=HumanRating.UNRATED,
         )
 
         session.add(human)
@@ -620,9 +616,7 @@ async def authenticate_human(
             tenant_id=pending_human.tenant_id,
             email=pending_human.email,
             picture_url=pending_human.picture_url,
-            rating=(
-                HumanRating.RED_FLAG if pending_human.red_flag else HumanRating.UNRATED
-            ),
+            rating=HumanRating.UNRATED,
         )
 
         session.add(human)

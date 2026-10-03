@@ -1,6 +1,6 @@
 import { useCallback, useMemo, useReducer } from "react"
 import { useTranslation } from "react-i18next"
-import type { ApplicationPublic } from "@/client"
+import type { ApplicationPortalPublic } from "@/client"
 import { buildFormZodSchema } from "@/lib/form-schema-builder"
 import type {
   ApplicationFormSchema,
@@ -64,7 +64,7 @@ function getDefaultValue(field: FormFieldSchema): unknown {
 
 function getInitialValues(
   schema: ApplicationFormSchema,
-  app?: ApplicationPublic | null,
+  app?: ApplicationPortalPublic | null,
   popupId?: string,
 ): Record<string, unknown> {
   const values: Record<string, unknown> = {}
@@ -142,7 +142,7 @@ function getFieldsInSectionKind(
 
 export function useApplicationForm(
   schema: ApplicationFormSchema,
-  initialApplication?: ApplicationPublic | null,
+  initialApplication?: ApplicationPortalPublic | null,
   popupId?: string,
 ) {
   const { t } = useTranslation()

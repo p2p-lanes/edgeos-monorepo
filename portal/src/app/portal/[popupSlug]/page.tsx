@@ -5,7 +5,7 @@ import { useQuery } from "@tanstack/react-query"
 import { useRouter, useSearchParams } from "next/navigation"
 import { useEffect } from "react"
 import { useTranslation } from "react-i18next"
-import type { ApplicationPublic, PopupPublic } from "@/client"
+import type { ApplicationPortalPublic, PopupPublic } from "@/client"
 import { ApiError, PopupsService } from "@/client"
 import DefaultPopupHome from "@/components/Portal/DefaultPopupHome"
 import { Loader } from "@/components/ui/Loader"
@@ -16,7 +16,7 @@ import { useFeePaymentConfirmation } from "./application/components/fee-payment-
 function FeePaymentConfirmationEffects({
   application,
 }: {
-  application: ApplicationPublic
+  application: ApplicationPortalPublic
 }) {
   useFeePaymentConfirmation(application, true)
   return null

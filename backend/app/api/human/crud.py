@@ -25,16 +25,20 @@ from app.api.shared.crud import BaseCRUD
 from app.core.filters import build_filter_expression, escape_like
 
 
+def _enriched_profile_is_missing():
+    """Treat SQL NULL and JSON null as missing; empty objects remain present."""
+    enriched_col = col(Humans.enriched_profile)
+    return or_(
+        enriched_col.is_(None),
+        func.jsonb_typeof(enriched_col) == "null",
+    )
+
+
 def _human_condition_expression(condition: HumanFilterCondition):
     """Human-specific conditions; None delegates to the shared engine."""
     if condition.field == "enriched_profile":
         enriched_col = col(Humans.enriched_profile)
-        # ORM-created rows persist JSON null instead of SQL NULL, so "never
-        # enriched" must match both.
-        missing = or_(
-            enriched_col.is_(None),
-            func.jsonb_typeof(enriched_col) == "null",
-        )
+        missing = _enriched_profile_is_missing()
         if condition.op == "is_empty":
             return missing
         if condition.op == "not_empty":
@@ -344,12 +348,8 @@ class HumansCRUD(BaseCRUD[Humans, HumanCreate, HumanUpdate]):
                 statement = statement.where(col(column).ilike(value))
 
         if has_enriched_profile is not None:
-            enriched_col = col(Humans.enriched_profile)
-            statement = statement.where(
-                enriched_col.isnot(None)
-                if has_enriched_profile
-                else enriched_col.is_(None)
-            )
+            missing = _enriched_profile_is_missing()
+            statement = statement.where(~missing if has_enriched_profile else missing)
 
         if enrichment_query:
             # Cast the JSONB to text and substring-match. Only humans with a

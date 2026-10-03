@@ -2,7 +2,11 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
 import { act, renderHook, waitFor } from "@testing-library/react"
 import { createElement, type ReactNode } from "react"
 import { vi } from "vitest"
-import { ApiError, type ApplicationPublic, ApplicationsService } from "@/client"
+import {
+  ApiError,
+  type ApplicationPortalPublic,
+  ApplicationsService,
+} from "@/client"
 import type { ApplicationFormSchema } from "@/types/form-schema"
 import useCheckoutState, {
   buildCheckoutApplicationMutationPayload,
@@ -169,7 +173,7 @@ describe("buildCheckoutApplicationMutationPayload", () => {
     const existingApplication = {
       id: "app-1",
       popup_id: "popup-1",
-    } as ApplicationPublic
+    } as ApplicationPortalPublic
 
     expect(
       buildCheckoutApplicationMutationPayload({
@@ -208,7 +212,7 @@ describe("findCheckoutApplication", () => {
         popup_id: "popup-1",
         sales_flow_id: "flow-partner",
       },
-    ] as ApplicationPublic[]
+    ] as ApplicationPortalPublic[]
 
     expect(
       findCheckoutApplication(applications, "popup-1", "flow-partner")?.id,
@@ -227,13 +231,13 @@ describe("upsertCheckoutApplication", () => {
       popup_id: "popup-1",
       sales_flow_id: "flow-main",
       status: "accepted",
-    } as ApplicationPublic
+    } as ApplicationPortalPublic
     const partner = {
       id: "application-partner",
       popup_id: "popup-1",
       sales_flow_id: "flow-partner",
       status: "in review",
-    } as ApplicationPublic
+    } as ApplicationPortalPublic
 
     expect(upsertCheckoutApplication([main], partner)).toEqual([partner, main])
     expect(
@@ -274,13 +278,13 @@ describe("useCheckoutState update flow identity", () => {
       popup_id: "popup-1",
       sales_flow_id: "flow-main",
       status: "draft",
-    } as ApplicationPublic
+    } as ApplicationPortalPublic
     const partner = {
       id: "application-partner",
       popup_id: "popup-1",
       sales_flow_id: "flow-partner",
       status: "draft",
-    } as ApplicationPublic
+    } as ApplicationPortalPublic
     queryClient.setQueryData(["applications", "mine"], [main, partner])
     vi.mocked(ApplicationsService.updateMyApplication).mockResolvedValue(
       partner,
@@ -314,7 +318,7 @@ describe("useCheckoutState update flow identity", () => {
       popup_id: "popup-1",
       sales_flow_id: "flow-partner",
       status: "draft",
-    } as ApplicationPublic
+    } as ApplicationPortalPublic
     vi.mocked(ApplicationsService.updateMyApplication).mockResolvedValue(
       partner,
     )

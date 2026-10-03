@@ -2,12 +2,20 @@ import uuid
 from datetime import date, datetime
 from typing import Annotated, Any, Literal
 
-from pydantic import BaseModel, ConfigDict, EmailStr, field_validator, model_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    EmailStr,
+    field_serializer,
+    field_validator,
+    model_validator,
+)
 from pydantic import Field as PydanticField
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlmodel import Column, Field, SQLModel
 
-from app.api.payment.schemas import PaymentRecipientRequest
+from app.api.human.privacy import public_profile_metadata
+from app.api.payment.schemas import PaymentRecipientProfile, PaymentRecipientRequest
 
 
 class CartAssignmentBase(BaseModel):
@@ -152,7 +160,7 @@ class CartState(BaseModel):
     """Full cart state stored as JSONB."""
 
     lines: list[CartLine] = PydanticField(default_factory=list)
-    recipients: list[PaymentRecipientRequest] = PydanticField(default_factory=list)
+    recipients: list[PaymentRecipientProfile] = PydanticField(default_factory=list)
     promo_code: str | None = None
     insurance: bool = False
     current_step: str | None = None
@@ -172,6 +180,28 @@ class CartState(BaseModel):
         if referenced - set(keys):
             raise ValueError("Every recipient_key must reference a supplied recipient")
         return self
+
+
+class CartStateRequest(CartState):
+    """Untrusted cart input: never persist administrative profile metadata."""
+
+    recipients: list[PaymentRecipientRequest] = PydanticField(default_factory=list)
+
+
+class CartRecipientPortalProfile(PaymentRecipientProfile):
+    model_config = ConfigDict(from_attributes=True)
+
+    @field_serializer("profile_snapshot")
+    def public_snapshot(self, value: dict) -> dict:
+        return public_profile_metadata(value)
+
+
+class CartPortalState(CartState):
+    """Read-time projection; also protects carts saved before the privacy fix."""
+
+    recipients: list[CartRecipientPortalProfile] = PydanticField(default_factory=list)
+
+    model_config = ConfigDict(extra="forbid", from_attributes=True)
 
 
 class CartBase(SQLModel):
@@ -200,7 +230,7 @@ class CartBase(SQLModel):
 class CartUpdate(BaseModel):
     """Schema for updating cart items."""
 
-    items: CartState
+    items: CartStateRequest
 
 
 class CartPublic(BaseModel):
@@ -209,7 +239,7 @@ class CartPublic(BaseModel):
     id: uuid.UUID
     human_id: uuid.UUID
     popup_id: uuid.UUID
-    items: CartState
+    items: CartPortalState
     created_at: datetime | None = None
     updated_at: datetime | None = None
 
@@ -220,7 +250,7 @@ class OpenCartUpsert(BaseModel):
     """Anonymous open-checkout cart upsert request (keyed by email)."""
 
     email: EmailStr
-    items: CartState
+    items: CartStateRequest
 
 
 class OpenCartPublic(BaseModel):
@@ -235,7 +265,7 @@ class OpenCartPublic(BaseModel):
     id: uuid.UUID
     popup_id: uuid.UUID
     email: str
-    items: CartState
+    items: CartPortalState
     restore_token: str | None = None
     created_at: datetime | None = None
     updated_at: datetime | None = None

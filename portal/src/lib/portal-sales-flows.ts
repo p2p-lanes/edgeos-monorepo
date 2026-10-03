@@ -1,4 +1,4 @@
-import type { PaymentPublic, SalesFlowPortalPublic } from "@/client"
+import type { PaymentPortalPublic, SalesFlowPortalPublic } from "@/client"
 import type { AttendeePassState, TicketEntry } from "@/types/Attendee"
 
 interface PortalFlowCollections {
@@ -117,7 +117,7 @@ interface PassesApplication {
 type PassesFlow = Pick<SalesFlowPortalPublic, "id" | "name" | "slug">
 
 type PassesPayment = Pick<
-  PaymentPublic,
+  PaymentPortalPublic,
   "application_id" | "id" | "sales_flow_id"
 >
 
@@ -152,9 +152,9 @@ function projectAttendeeTickets(
 
 /**
  * Groups Passes records only when the API exposes an authoritative ownership
- * chain. Tickets use their payment's flow when present, while tickets without
- * payment provenance and attendees without tickets use attendee application
- * ownership. Records without a resolvable eligible flow remain unassigned.
+ * chain. Tickets use their payment's flow when present. Manual assignments
+ * have no flow, even if the attendee has an application. Attendees without
+ * tickets can use their application ownership to find a purchase action.
  */
 export function groupPassesBySalesFlow({
   attendees,
@@ -205,11 +205,6 @@ export function groupPassesBySalesFlow({
               ? applicationFlowId
               : undefined
         }
-      } else if (
-        attendeeApplicationFlowId &&
-        flowsById.has(attendeeApplicationFlowId)
-      ) {
-        paymentFlowId = attendeeApplicationFlowId
       }
 
       if (paymentFlowId && flowsById.has(paymentFlowId)) {

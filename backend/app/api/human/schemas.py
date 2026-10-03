@@ -105,8 +105,8 @@ class HumanBase(SQLModel):
         return v.lower().strip()
 
 
-class HumanPublic(BaseModel):
-    """Human schema for API responses."""
+class HumanSelfPublic(BaseModel):
+    """Allowlisted own-profile response for humans and third-party apps."""
 
     id: uuid.UUID
     tenant_id: uuid.UUID
@@ -121,6 +121,13 @@ class HumanPublic(BaseModel):
     residence: str | None = None
 
     picture_url: str | None = None
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class HumanPublic(HumanSelfPublic):
+    """Administrative human response. Never use on a human-facing route."""
+
     rating: HumanRating = HumanRating.UNRATED
     # Derived from rating (rating == RED_FLAG). Kept so existing callers that
     # gate on the blocking state (api keys, group join, application submit)
@@ -130,6 +137,13 @@ class HumanPublic(BaseModel):
     enriched_profile: dict | None = None
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class AuthenticatedHuman(HumanPublic):
+    """Internal auth context, including assessment data needed by server gates.
+
+    This model must never be used as an API response model.
+    """
 
 
 class HumanPortalPublic(BaseModel):

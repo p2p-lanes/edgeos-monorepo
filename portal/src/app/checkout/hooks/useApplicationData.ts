@@ -1,5 +1,5 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query"
-import type { ApplicationPublic, HumanPublic } from "@/client"
+import type { ApplicationPortalPublic, HumanSelfPublic } from "@/client"
 import { ApplicationsService, HumansService } from "@/client"
 import { useIsAuthenticated } from "@/hooks/useIsAuthenticated"
 import { queryKeys } from "@/lib/query-keys"
@@ -26,8 +26,8 @@ function getSpecifiedGenderValue(value: unknown): string {
 
 interface HydrateCheckoutApplicationValuesArgs {
   schema: ApplicationFormSchema
-  human?: HumanPublic | null
-  application?: ApplicationPublic | null
+  human?: HumanSelfPublic | null
+  application?: ApplicationPortalPublic | null
   popupId?: string
 }
 
@@ -138,7 +138,7 @@ export const useApplicationData = ({
       const human = await HumansService.getCurrentHumanInfo()
       if (!human?.email) return null
 
-      let matchingApplication: ApplicationPublic | null = null
+      let matchingApplication: ApplicationPortalPublic | null = null
       if (groupPopupCityId) {
         try {
           const result = await ApplicationsService.listMyApplications()

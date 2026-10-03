@@ -3,6 +3,7 @@
 import uuid
 from decimal import Decimal
 
+import pytest
 from fastapi.testclient import TestClient
 from sqlmodel import Session, func, select
 
@@ -147,15 +148,19 @@ def test_paid_quantity_reconciles_partial_units_and_replays_stably(
     } == stable
 
 
+@pytest.mark.parametrize(
+    "category", ["ticket", "meal_plan", "housing", "merch", "patreon"]
+)
 def test_paymentless_grant_replay_preserves_units_stock_and_audit(
     client: TestClient,
     db: Session,
     admin_token_tenant_a: str,
     tenant_a: Tenants,
     popup_tenant_a: Popups,
+    category: str,
 ) -> None:
     _, attendee = _attendee(db, tenant_a, popup_tenant_a)
-    product = _product(db, popup_tenant_a, stock=5)
+    product = _product(db, popup_tenant_a, stock=5, category=category)
     db.commit()
     attendee_count = db.exec(select(func.count()).select_from(Attendees)).one()
     payment_count = db.exec(select(func.count()).select_from(Payments)).one()
@@ -201,7 +206,7 @@ def test_paymentless_grant_replay_preserves_units_stock_and_audit(
     assert {
         (unit.payment_id, unit.payment_product_id, unit.unit_index) for unit in replayed
     } == {(None, None, None)}
-    assert {unit.product_category_snapshot for unit in replayed} == {"ticket"}
+    assert {unit.product_category_snapshot for unit in replayed} == {category}
     assert {unit.requires_check_in_snapshot for unit in replayed} == {True}
     db.refresh(product)
     assert product.total_stock_remaining == 3

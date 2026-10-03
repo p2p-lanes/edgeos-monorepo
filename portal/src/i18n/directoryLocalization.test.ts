@@ -22,4 +22,32 @@ describe("Directory localization", () => {
       ]).toEqual(labels)
     }
   })
+
+  it.each([
+    {
+      locale: "en",
+      messages: en,
+      placeholder: "Search by name, email, or Telegram...",
+    },
+    {
+      locale: "es",
+      messages: es,
+      placeholder: "Buscar por nombre, email o Telegram...",
+    },
+    {
+      locale: "is",
+      messages: is,
+      placeholder: "Leita eftir nafni, netfangi eða Telegram...",
+    },
+    {
+      locale: "zh",
+      messages: zh,
+      placeholder: "按姓名、邮箱或 Telegram 搜索...",
+    },
+  ])("describes only supported directory search fields ($locale)", ({
+    messages,
+    placeholder,
+  }) => {
+    expect(messages.attendees.search_placeholder).toBe(placeholder)
+  })
 })
