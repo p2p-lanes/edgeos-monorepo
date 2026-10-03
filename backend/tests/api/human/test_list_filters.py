@@ -12,8 +12,10 @@ email and narrowing every request with the legacy ``email`` substring param.
 import json
 import uuid
 
+import pytest
 from fastapi.testclient import TestClient
-from sqlmodel import Session
+from sqlalchemy import JSON, null, update
+from sqlmodel import Session, func, select
 
 from app.api.human.models import Humans
 from app.api.shared.enums import HumanRating
@@ -83,6 +85,44 @@ def _one(field: str, op: str, value=None) -> dict:
         "match": "all",
         "conditions": [{"field": field, "op": op, "value": value}],
     }
+
+
+@pytest.fixture
+def enrichment_presence_world(db: Session, tenant_a: Tenants):
+    marker = _marker()
+    sql_null = _make_human(db, tenant_a, marker)
+    json_null = _make_human(db, tenant_a, marker)
+    empty = _make_human(db, tenant_a, marker, enriched_profile={})
+    filled = _make_human(
+        db, tenant_a, marker, enriched_profile={"headline": "Researcher"}
+    )
+    # Seed both database representations explicitly: deserialization maps both
+    # SQL NULL and JSON null to Python None, but the query must distinguish them.
+    for human, value in ((sql_null, null()), (json_null, JSON.NULL)):
+        db.exec(
+            update(Humans).where(Humans.id == human.id).values(enriched_profile=value)
+        )
+    db.commit()
+    for human, expected in ((sql_null, None), (json_null, "null")):
+        assert (
+            db.exec(
+                select(func.jsonb_typeof(Humans.enriched_profile)).where(
+                    Humans.id == human.id
+                )
+            ).one()
+            == expected
+        )
+    missing_ids = {str(sql_null.id), str(json_null.id)}
+    present_ids = {str(empty.id), str(filled.id)}
+    return (
+        _make_admin(db, tenant_a),
+        marker,
+        {
+            False: missing_ids,
+            True: present_ids,
+            None: missing_ids | present_ids,
+        },
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -301,3 +341,66 @@ class TestHumanListFilters:
             client, admin, tenant_a, marker, {"match": "all", "conditions": []}
         )
         assert _ids(response) == {str(first.id), str(second.id)}
+
+
+class TestHumanEnrichmentPresenceFilter:
+    @pytest.mark.parametrize("present", (True, False, None))
+    def test_legacy_presence_filter_handles_both_null_representations(
+        self, client: TestClient, tenant_a: Tenants, enrichment_presence_world, present
+    ) -> None:
+        admin, marker, expected = enrichment_presence_world
+        params = {} if present is None else {"has_enriched_profile": present}
+        response = _list(client, admin, tenant_a, marker, **params)
+        # Empty objects remain present; None means the filter is omitted.
+        assert _ids(response) == expected[present]
+        assert response.json()["paging"]["total"] == len(expected[present])
+
+    @pytest.mark.parametrize("present", (True, False))
+    def test_legacy_and_advanced_presence_filters_agree(
+        self, client: TestClient, tenant_a: Tenants, enrichment_presence_world, present
+    ) -> None:
+        admin, marker, expected = enrichment_presence_world
+        legacy = _list(client, admin, tenant_a, marker, has_enriched_profile=present)
+        advanced = _list(
+            client,
+            admin,
+            tenant_a,
+            marker,
+            _one("enriched_profile", "not_empty" if present else "is_empty"),
+        )
+        assert _ids(legacy) == _ids(advanced) == expected[present]
+        assert legacy.json()["paging"]["total"] == advanced.json()["paging"]["total"]
+
+    @pytest.mark.parametrize("present", (True, False))
+    def test_filtered_pagination_keeps_correct_total(
+        self, client: TestClient, tenant_a: Tenants, enrichment_presence_world, present
+    ) -> None:
+        admin, marker, expected = enrichment_presence_world
+        response = _list(
+            client,
+            admin,
+            tenant_a,
+            marker,
+            has_enriched_profile=present,
+            skip=1,
+            limit=1,
+        )
+        ids = _ids(response)
+        assert len(ids) == 1 and ids <= expected[present]
+        assert response.json()["paging"]["total"] == len(expected[present])
+
+    @pytest.mark.parametrize("present", (True, False))
+    def test_legacy_presence_filter_still_combines_with_advanced_filters(
+        self, client: TestClient, tenant_a: Tenants, enrichment_presence_world, present
+    ) -> None:
+        admin, marker, _ = enrichment_presence_world
+        response = _list(
+            client,
+            admin,
+            tenant_a,
+            marker,
+            _one("enriched_profile", "is_empty" if present else "not_empty"),
+            has_enriched_profile=present,
+        )
+        assert _ids(response) == set()
+        assert response.json()["paging"]["total"] == 0
