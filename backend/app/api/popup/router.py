@@ -17,6 +17,7 @@ from app.api.popup.models import PopupHomePages
 from app.api.popup.schemas import (
     CheckoutPreviewTokenPublic,
     PopupAdmin,
+    PopupCheckInPublic,
     PopupCreate,
     PopupHomeAdmin,
     PopupHomePublic,
@@ -38,9 +39,9 @@ from app.api.translation.service import (
     parse_accept_language,
 )
 from app.core.dependencies.users import (
-    CurrentCheckInOperator,
+    CurrentCheckInOperatorJwtOnly,
     CurrentHuman,
-    CurrentOperator,
+    CurrentOperatorJwtOnly,
     HumanTenantSession,
     SessionDep,
     TenantSession,
@@ -64,10 +65,44 @@ def _default_flow_or_404(db, popup_id: uuid.UUID):
     return flow
 
 
+@router.get("/check-in/list", response_model=ListModel[PopupCheckInPublic])
+async def list_check_in_popups(
+    db: TenantSession,
+    _: CurrentCheckInOperatorJwtOnly,
+    search: str | None = None,
+    skip: PaginationSkip = 0,
+    limit: PaginationLimit = 100,
+) -> ListModel[PopupCheckInPublic]:
+    """Operational popup data only; never expose administrative configuration."""
+    popups, total = crud.find(
+        db, skip=skip, limit=limit, search=search, search_fields=["name"]
+    )
+    return ListModel[PopupCheckInPublic](
+        results=[PopupCheckInPublic.model_validate(p) for p in popups],
+        paging=Paging(offset=skip, limit=limit, total=total),
+    )
+
+
+@router.get("/check-in/{popup_id}", response_model=PopupCheckInPublic)
+async def get_check_in_popup(
+    popup_id: uuid.UUID,
+    db: TenantSession,
+    _: CurrentCheckInOperatorJwtOnly,
+) -> PopupCheckInPublic:
+    """Get the scanner's allowlisted projection within its tenant."""
+    popup = crud.get(db, popup_id)
+    if not popup:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Popup not found",
+        )
+    return PopupCheckInPublic.model_validate(popup)
+
+
 @router.get("", response_model=ListModel[PopupAdmin])
 async def list_popups(
     db: TenantSession,
-    _: CurrentCheckInOperator,
+    _: CurrentOperatorJwtOnly,
     search: str | None = None,
     skip: PaginationSkip = 0,
     limit: PaginationLimit = 100,
@@ -122,7 +157,7 @@ async def list_public_popups(
 async def get_popup(
     popup_id: uuid.UUID,
     db: TenantSession,
-    _: CurrentCheckInOperator,
+    _: CurrentOperatorJwtOnly,
 ) -> PopupAdmin:
     popup = crud.get(db, popup_id)
 
@@ -139,7 +174,7 @@ async def get_popup(
 async def get_popup_home(
     popup_id: uuid.UUID,
     db: TenantSession,
-    _: CurrentCheckInOperator,
+    _: CurrentOperatorJwtOnly,
 ) -> PopupHomeAdmin:
     popup = crud.get(db, popup_id)
     if not popup:
@@ -169,7 +204,7 @@ async def update_popup_home(
     popup_id: uuid.UUID,
     popup_in: PopupHomeUpdate,
     db: TenantSession,
-    _current_user: CurrentOperator,
+    _current_user: CurrentOperatorJwtOnly,
 ) -> PopupHomeAdmin:
     popup = crud.get(db, popup_id)
     if not popup:
@@ -238,7 +273,7 @@ async def update_popup_home(
 async def create_checkout_preview_token(
     popup_id: uuid.UUID,
     db: TenantSession,
-    _: CurrentOperator,
+    _: CurrentOperatorJwtOnly,
 ) -> CheckoutPreviewTokenPublic:
     """Mint a short-lived token that unlocks this popup's checkout runtime.
 
@@ -263,7 +298,7 @@ async def create_checkout_preview_token(
 async def create_popup(
     popup_in: PopupCreate,
     db: TenantSession,
-    current_user: CurrentOperator,
+    current_user: CurrentOperatorJwtOnly,
     x_tenant_id: Annotated[str | None, Header(alias="X-Tenant-Id")] = None,
 ) -> PopupAdmin:
     if current_user.role == UserRole.SUPERADMIN:
@@ -346,7 +381,7 @@ async def update_popup(
     popup_id: uuid.UUID,
     popup_in: PopupUpdate,
     db: TenantSession,
-    _current_user: CurrentOperator,
+    _current_user: CurrentOperatorJwtOnly,
 ) -> PopupAdmin:
     popup = crud.get(db, popup_id)
 
@@ -456,7 +491,7 @@ async def update_popup(
 async def delete_popup(
     popup_id: uuid.UUID,
     db: TenantSession,
-    _current_user: CurrentOperator,
+    _current_user: CurrentOperatorJwtOnly,
 ) -> None:
     popup = crud.get(db, popup_id)
 

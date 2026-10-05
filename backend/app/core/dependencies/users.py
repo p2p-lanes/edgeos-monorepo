@@ -261,6 +261,24 @@ def get_operator_jwt_only(
 CurrentOperatorJwtOnly = Annotated["UserPublic", Depends(get_operator_jwt_only)]
 
 
+def get_check_in_operator_jwt_only(
+    token_payload: Annotated[TokenPayload, Depends(get_token_payload)],
+    current_user: Annotated["UserPublic", Depends(get_check_in_operator)],
+) -> "UserPublic":
+    """Allow scanner/admin JWTs, but never delegate popup access to API keys."""
+    if token_payload.via_api_key:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="This endpoint requires a JWT session; API keys are not accepted.",
+        )
+    return current_user
+
+
+CurrentCheckInOperatorJwtOnly = Annotated[
+    "UserPublic", Depends(get_check_in_operator_jwt_only)
+]
+
+
 def get_current_tenant(
     db: SessionDep,
     x_tenant_id: Annotated[str, Header(alias="X-Tenant-Id")],

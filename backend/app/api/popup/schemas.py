@@ -4,7 +4,7 @@ from decimal import Decimal
 from enum import StrEnum
 from typing import Self
 
-from pydantic import ConfigDict, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, field_validator, model_validator
 from sqlalchemy import Boolean, Column, Integer, Numeric, Text
 from sqlalchemy.dialects.postgresql import ARRAY, JSONB
 from sqlmodel import Field, SQLModel, String
@@ -740,6 +740,23 @@ class PopupPublic(SQLModel):
     installments_max: int | None = None
     installments_interval: InstallmentInterval = InstallmentInterval.month
     installments_interval_count: int = 1
+
+
+class PopupCheckInPublic(BaseModel):
+    """Allowlisted operational data for scanners, independent of admin schemas."""
+
+    id: uuid.UUID
+    name: str
+    tagline: str | None = None
+    location: str | None = None
+    slug: str
+    status: PopupStatus
+    start_date: datetime | None = None
+    end_date: datetime | None = None
+    image_url: str | None = None
+    self_check_in_enabled: bool = False
+
+    model_config = ConfigDict(from_attributes=True)
 
 
 class PopupAdmin(PopupBase):
