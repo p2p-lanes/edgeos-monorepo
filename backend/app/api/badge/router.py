@@ -31,14 +31,15 @@ from app.api.badge.schemas import (
     BadgeRuleConfig,
     BadgeRuleCreate,
     BadgeRuleEvaluation,
+    BadgeRuleOptions,
+    BadgeRulePreview,
+    BadgeRulePreviewRequest,
     BadgeRulePublic,
     BadgeRuleUpdate,
     BadgeStyleCreate,
     BadgeStylePublic,
     BadgeStyleUpdate,
     BadgeUpdate,
-    CheckinsInPopupConfig,
-    CheckinsInTrackConfig,
     IssuableBadge,
     MyBadge,
     PortalBadgeAwardCreate,
@@ -832,7 +833,7 @@ async def delete_issuer_policy(
 
 
 # ---------------------------------------------------------------------------
-# Automatic rules (badges earned from check-ins)
+# Automatic rules (badges earned from attending or hosting)
 # ---------------------------------------------------------------------------
 
 
@@ -860,19 +861,92 @@ def _get_rule_or_404(db: Session, rule_id: uuid.UUID) -> BadgeRules:
     return rule
 
 
-def _check_rule_target(db: Session, config: BadgeRuleConfig) -> None:
-    """The track or popup a rule watches must exist in this tenant."""
-    from app.api.popup.crud import popups_crud
+def _check_rule_target(
+    db: Session, tenant_id: uuid.UUID, config: BadgeRuleConfig
+) -> None:
+    """Every popup, track, venue and event a rule names must exist here."""
+    from app.api.event.models import Events
+    from app.api.event_venue.models import EventVenues
+    from app.api.popup.models import Popups
     from app.api.track.models import Tracks
 
-    if isinstance(config, CheckinsInTrackConfig) and not db.get(
-        Tracks, config.track_id
-    ):
-        raise _not_found("Track")
-    if isinstance(config, CheckinsInPopupConfig) and not popups_crud.get(
-        db, config.popup_id
-    ):
-        raise _not_found("Popup")
+    wanted: dict[str, tuple[type, set[uuid.UUID]]] = {
+        "Popup": (Popups, set()),
+        "Track": (Tracks, set()),
+        "Venue": (EventVenues, set()),
+        "Event": (Events, set()),
+    }
+    for condition in config.conditions:
+        f = condition.filters
+        if f.popup_id:
+            wanted["Popup"][1].add(f.popup_id)
+        wanted["Track"][1].update(f.track_ids)
+        wanted["Venue"][1].update(f.venue_ids)
+        wanted["Event"][1].update(f.event_ids)
+    for label, (model, ids) in wanted.items():
+        if not ids:
+            continue
+        found = db.exec(
+            select(func.count()).where(
+                col(model.id).in_(ids), model.tenant_id == tenant_id
+            )
+        ).one()
+        if found != len(ids):
+            raise _not_found(label)
+
+
+def _sorted_unique(values) -> list[str]:
+    seen: dict[str, str] = {}
+    for value in values:
+        value = (value or "").strip()
+        if value:
+            seen.setdefault(value.casefold(), value)
+    return sorted(seen.values(), key=str.casefold)
+
+
+@rules_router.get("/options", response_model=BadgeRuleOptions)
+async def badge_rule_options(
+    popup_id: uuid.UUID,
+    db: AdminOrApiKeySession_BadgesRead,
+    _: AdminOrApiKey_BadgesRead,
+) -> BadgeRuleOptions:
+    """Tags and kinds a rule can filter by: the curated lists plus used ones."""
+    from app.api.event.crud import events_crud
+    from app.api.event.models import Events
+    from app.api.event_settings.crud import event_settings_crud
+
+    settings = event_settings_crud.get_by_popup_id(db, popup_id)
+    used_kinds = db.exec(
+        select(Events.kind)
+        .where(Events.popup_id == popup_id, col(Events.kind).is_not(None))
+        .distinct()
+    ).all()
+    return BadgeRuleOptions(
+        tags=_sorted_unique(
+            [
+                *(settings.allowed_tags if settings else []),
+                *events_crud.list_distinct_tags(db, popup_id=popup_id),
+            ]
+        ),
+        kinds=_sorted_unique(
+            [*(settings.allowed_kinds if settings else []), *used_kinds]
+        ),
+    )
+
+
+@rules_router.post("/preview", response_model=BadgeRulePreview)
+async def preview_badge_rule(
+    body: BadgeRulePreviewRequest,
+    db: AdminOrApiKeySession_BadgesRead,
+    current_user: AdminOrApiKey_BadgesRead,
+    x_tenant_id: _XTenantId = None,
+) -> BadgeRulePreview:
+    """How many people meet a rule right now, without saving or awarding."""
+    tenant_id = _tenant_id(current_user, x_tenant_id)
+    badge = _get_badge_or_404(db, body.badge_id)
+    _check_rule_target(db, tenant_id, body.config)
+    qualified, new = rules.preview(db, tenant_id, badge, body.config)
+    return BadgeRulePreview(qualified=qualified, new_recipients=new)
 
 
 @rules_router.get("", response_model=list[BadgeRulePublic])
@@ -899,11 +973,11 @@ async def create_badge_rule(
     """Create a rule; by default it also awards everyone who already qualifies."""
     tenant_id = _tenant_id(current_user, x_tenant_id)
     _get_badge_or_404(db, body.badge_id)
-    _check_rule_target(db, body.config)
+    _check_rule_target(db, tenant_id, body.config)
     rule = BadgeRules(
         tenant_id=tenant_id,
         badge_id=body.badge_id,
-        type=body.config.type.value,
+        type=rules.RULE_CONFIG_TYPE,
         config=body.config.model_dump(mode="json"),
         is_active=body.is_active,
     )
@@ -926,8 +1000,8 @@ async def update_badge_rule(
     """Edit a rule. Awards already given stay; run evaluate to apply it now."""
     rule = _get_rule_or_404(db, rule_id)
     if body.config is not None:
-        _check_rule_target(db, body.config)
-        rule.type = body.config.type.value
+        _check_rule_target(db, rule.tenant_id, body.config)
+        rule.type = rules.RULE_CONFIG_TYPE
         rule.config = body.config.model_dump(mode="json")
     if body.is_active is not None:
         rule.is_active = body.is_active

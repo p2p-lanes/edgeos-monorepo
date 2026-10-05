@@ -1731,9 +1731,43 @@ export type BadgePublic = {
     award_count?: number;
 };
 
+/**
+ * Reach ``threshold`` of ``measure`` over the matching occurrences.
+ */
+export type BadgeRuleCondition_Input = {
+    activity?: RuleActivity;
+    measure?: RuleMeasure;
+    threshold: number;
+    filters?: BadgeRuleFilters;
+};
+
+/**
+ * Reach ``threshold`` of ``measure`` over the matching occurrences.
+ */
+export type BadgeRuleCondition_Output = {
+    activity?: RuleActivity;
+    measure?: RuleMeasure;
+    threshold: number;
+    filters?: BadgeRuleFilters;
+};
+
+/**
+ * A person earns the badge once every condition holds.
+ */
+export type BadgeRuleConfig_Input = {
+    conditions: Array<BadgeRuleCondition_Input>;
+};
+
+/**
+ * A person earns the badge once every condition holds.
+ */
+export type BadgeRuleConfig_Output = {
+    conditions: Array<BadgeRuleCondition_Output>;
+};
+
 export type BadgeRuleCreate = {
     badge_id: string;
-    config: (CheckinsInTrackConfig | CheckinsInPopupConfig);
+    config: BadgeRuleConfig_Input;
     is_active?: boolean;
     evaluate_now?: boolean;
 };
@@ -1743,10 +1777,52 @@ export type BadgeRuleEvaluation = {
     awarded: number;
 };
 
+/**
+ * Which occurrences a condition counts. Every filter set must match.
+ *
+ * Empty lists and nulls mean "any". Weekdays, times and dates are read in
+ * the popup's timezone, on the occurrence's start.
+ */
+export type BadgeRuleFilters = {
+    popup_id?: (string | null);
+    track_ids?: Array<(string)>;
+    tags?: Array<(string)>;
+    tags_match?: TagsMatch;
+    kinds?: Array<(string)>;
+    venue_ids?: Array<(string)>;
+    event_ids?: Array<(string)>;
+    weekdays?: Array<(number)>;
+    starts_after?: (string | null);
+    starts_before?: (string | null);
+    date_from?: (string | null);
+    date_to?: (string | null);
+};
+
+/**
+ * Values the rule editor offers for a popup's events.
+ */
+export type BadgeRuleOptions = {
+    tags: Array<(string)>;
+    kinds: Array<(string)>;
+};
+
+/**
+ * How many people meet a config right now, before saving it.
+ */
+export type BadgeRulePreview = {
+    qualified: number;
+    new_recipients: number;
+};
+
+export type BadgeRulePreviewRequest = {
+    badge_id: string;
+    config: BadgeRuleConfig_Input;
+};
+
 export type BadgeRulePublic = {
     id: string;
     badge_id: string;
-    config: (CheckinsInTrackConfig | CheckinsInPopupConfig);
+    config: BadgeRuleConfig_Output;
     is_active: boolean;
     award_count?: number;
     created_at: string;
@@ -1754,7 +1830,7 @@ export type BadgeRulePublic = {
 };
 
 export type BadgeRuleUpdate = {
-    config?: ((CheckinsInTrackConfig | CheckinsInPopupConfig) | null);
+    config?: (BadgeRuleConfig_Input | null);
     is_active?: (boolean | null);
 };
 
@@ -2240,18 +2316,6 @@ export type CheckInPayload = {
 };
 
 export type source = 'qr' | 'manual' | 'self_service';
-
-export type CheckinsInPopupConfig = {
-    type?: "checkins_in_popup";
-    popup_id: string;
-    threshold: number;
-};
-
-export type CheckinsInTrackConfig = {
-    type?: "checkins_in_track";
-    track_id: string;
-    threshold: number;
-};
 
 /**
  * Public buyer-form field for the checkout runtime.
@@ -5805,6 +5869,10 @@ export type RsvpEligibility = {
     reason?: ('rejected' | 'no_tickets' | null);
 };
 
+export type RuleActivity = 'attend' | 'host';
+
+export type RuleMeasure = 'count' | 'distinct_days' | 'streak_days';
+
 /**
  * What a door's checkout screen needs to know about its own settings.
  *
@@ -6276,6 +6344,8 @@ export type StaffTicketPublic = {
     first_scan_at?: (string | null);
     last_scan_at?: (string | null);
 };
+
+export type TagsMatch = 'any' | 'all';
 
 /**
  * Which surface a task relates to. Optional (NULL = unspecified).
@@ -8204,6 +8274,20 @@ export type BadgesDeleteIssuerPolicyData = {
 };
 
 export type BadgesDeleteIssuerPolicyResponse = (void);
+
+export type BadgesBadgeRuleOptionsData = {
+    popupId: string;
+    xTenantId?: (string | null);
+};
+
+export type BadgesBadgeRuleOptionsResponse = (BadgeRuleOptions);
+
+export type BadgesPreviewBadgeRuleData = {
+    requestBody: BadgeRulePreviewRequest;
+    xTenantId?: (string | null);
+};
+
+export type BadgesPreviewBadgeRuleResponse = (BadgeRulePreview);
 
 export type BadgesListBadgeRulesData = {
     badgeId?: (string | null);
