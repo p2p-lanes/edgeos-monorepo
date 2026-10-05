@@ -3374,8 +3374,10 @@ export class BadgesService {
 
     /**
      * List the badges you can give in a popup
+     * With ``attendee_id``, flags the badges that attendee already holds.
      * @param data The data for the request.
      * @param data.popupId
+     * @param data.attendeeId
      * @returns IssuableBadge Successful Response
      * @throws ApiError
      */
@@ -3384,7 +3386,8 @@ export class BadgesService {
             method: 'GET',
             url: '/api/v1/badges/portal/issuable',
             query: {
-                popup_id: data.popupId
+                popup_id: data.popupId,
+                attendee_id: data.attendeeId
             },
             errors: {
                 422: 'Validation Error'

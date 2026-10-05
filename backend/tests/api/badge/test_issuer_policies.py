@@ -323,6 +323,44 @@ def test_listed_humans_send_within_their_allowance(
     assert len(sent) == 2
 
 
+def test_issuable_flags_unique_badges_the_recipient_already_holds(
+    client: TestClient, headers, style, person, popup
+):
+    unique = _badge(client, headers, style, repeatable=False)
+    star = _badge(client, headers, style)
+    sender, recipient = person("Gil"), person("Hal")
+    _policy(
+        client,
+        headers,
+        name="Mixed",
+        audience_type="humans",
+        badge_ids=[unique["id"], star["id"]],
+        human_ids=[str(sender.human.id)],
+    )
+
+    def flags(attendee_id: str | None) -> dict[str, bool]:
+        params = {"popup_id": str(popup.id)}
+        if attendee_id:
+            params["attendee_id"] = attendee_id
+        items = client.get(
+            f"{BADGES}/portal/issuable", params=params, headers=sender.headers
+        ).json()
+        return {
+            i["badge"]["id"]: i["recipient_has_it"]
+            for i in items
+            if i["badge"]["id"] in (unique["id"], star["id"])
+        }
+
+    attendee = str(recipient.attendee.id)
+    assert flags(attendee) == {unique["id"]: False, star["id"]: False}
+    for badge in (unique, star):
+        assert _send(client, sender, recipient, badge, popup).status_code == 201
+    # Repeatable badges can always be sent again, so only the unique one is flagged.
+    assert flags(attendee) == {unique["id"]: True, star["id"]: False}
+    assert flags(None) == {unique["id"]: False, star["id"]: False}
+    assert _send(client, sender, recipient, unique, popup).status_code == 409
+
+
 def test_recipient_must_hold_a_ticket(
     client: TestClient, headers, style, person, popup
 ):

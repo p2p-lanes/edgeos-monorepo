@@ -450,6 +450,9 @@ class IssuableBadge(BaseModel):
     window: AllowanceWindow
     # When the allowance refills; NULL for windows that never reset.
     resets_at: datetime | None = None
+    # Only filled when asked about a specific recipient: they already hold
+    # this (non-repeatable) badge, so sending it again would conflict.
+    recipient_has_it: bool = False
 
 
 class PortalBadgeAwardCreate(BaseModel):

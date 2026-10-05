@@ -157,12 +157,16 @@ def _better(
 
 
 def issuable_badges(
-    db: Session, issuer_id: uuid.UUID, popup_id: uuid.UUID
+    db: Session,
+    issuer_id: uuid.UUID,
+    popup_id: uuid.UUID,
+    recipient_id: uuid.UUID | None = None,
 ) -> list[IssuableBadge]:
     """Every badge the issuer may give in the popup, with its best allowance.
 
     Exhausted badges are listed too (remaining 0) so the portal can say when
-    they come back instead of silently hiding them.
+    they come back instead of silently hiding them. With ``recipient_id``,
+    non-repeatable badges that person already holds are flagged.
     """
     tz = popup_timezone(db, popup_id)
     now = datetime.now(UTC)
@@ -176,6 +180,11 @@ def issuable_badges(
             current = best.get(badge.id)
             if current is None or _better(allowance, current[2]):
                 best[badge.id] = (badge, policy, allowance)
+    held = (
+        _held_unique(db, recipient_id, set(best))
+        if recipient_id is not None and best
+        else set()
+    )
     return sorted(
         (
             IssuableBadge(
@@ -185,10 +194,27 @@ def issuable_badges(
                 remaining=left,
                 window=AllowanceWindow(policy.allowance_window),
                 resets_at=resets_at,
+                recipient_has_it=not badge.repeatable and badge.id in held,
             )
             for badge, policy, (left, resets_at) in best.values()
         ),
         key=lambda item: item.badge.name.lower(),
+    )
+
+
+def _held_unique(
+    db: Session, human_id: uuid.UUID, badge_ids: set[uuid.UUID]
+) -> set[uuid.UUID]:
+    """Badges among ``badge_ids`` the person holds an active unique award of."""
+    return set(
+        db.exec(
+            select(BadgeAwards.badge_id).where(
+                BadgeAwards.recipient_human_id == human_id,
+                col(BadgeAwards.badge_id).in_(badge_ids),
+                col(BadgeAwards.revoked_at).is_(None),
+                col(BadgeAwards.is_unique).is_(True),
+            )
+        ).all()
     )
 
 

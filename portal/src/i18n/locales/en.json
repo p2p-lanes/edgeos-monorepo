@@ -745,6 +745,7 @@
       "remaining_other": "{{count}} left",
       "unlimited": "No limit",
       "none_left": "None left",
+      "already_has": "Already has it",
       "back_at": "Back {{when}}",
       "message_placeholder": "Add a note (optional)",
       "send": "Send badge",

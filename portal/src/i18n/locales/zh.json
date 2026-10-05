@@ -625,6 +625,7 @@
       "remaining_other": "剩余 {{count}} 枚",
       "unlimited": "不限数量",
       "none_left": "已用完",
+      "already_has": "已拥有",
       "back_at": "{{when}} 恢复",
       "message_placeholder": "添加留言（可选）",
       "send": "发送徽章",

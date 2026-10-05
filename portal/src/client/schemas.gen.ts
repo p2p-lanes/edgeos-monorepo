@@ -19527,6 +19527,11 @@ export const IssuableBadgeSchema = {
                 }
             ],
             title: 'Resets At'
+        },
+        recipient_has_it: {
+            type: 'boolean',
+            title: 'Recipient Has It',
+            default: false
         }
     },
     type: 'object',

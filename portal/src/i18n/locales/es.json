@@ -744,6 +744,7 @@
       "remaining_other": "Te quedan {{count}}",
       "unlimited": "Sin límite",
       "none_left": "No te quedan",
+      "already_has": "Ya la tiene",
       "back_at": "Vuelven {{when}}",
       "message_placeholder": "Agregá una nota (opcional)",
       "send": "Enviar insignia",

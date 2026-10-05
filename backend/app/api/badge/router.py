@@ -305,8 +305,17 @@ async def list_issuable_badges(
     popup_id: uuid.UUID,
     current_human: CurrentHuman,
     db: HumanTenantSession,
+    attendee_id: uuid.UUID | None = None,
 ) -> list[IssuableBadge]:
-    return policies.issuable_badges(db, current_human.id, popup_id)
+    """With ``attendee_id``, flags the badges that attendee already holds."""
+    from app.api.attendee.models import Attendees
+
+    recipient_id = None
+    if attendee_id is not None:
+        attendee = db.get(Attendees, attendee_id)
+        if attendee and attendee.popup_id == popup_id:
+            recipient_id = attendee.human_id
+    return policies.issuable_badges(db, current_human.id, popup_id, recipient_id)
 
 
 @router.post(

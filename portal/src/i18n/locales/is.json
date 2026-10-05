@@ -616,6 +616,7 @@
       "remaining_other": "{{count}} eftir",
       "unlimited": "Engin takmörk",
       "none_left": "Ekkert eftir",
+      "already_has": "Á hana nú þegar",
       "back_at": "Aftur {{when}}",
       "message_placeholder": "Bættu við athugasemd (valfrjálst)",
       "send": "Senda merki",

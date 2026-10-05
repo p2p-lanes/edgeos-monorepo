@@ -1,7 +1,7 @@
 "use client"
 
-import { useMutation, useQueryClient } from "@tanstack/react-query"
-import { Award } from "lucide-react"
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
+import { Award, Check } from "lucide-react"
 import Image from "next/image"
 import { useState } from "react"
 import { useTranslation } from "react-i18next"
@@ -60,6 +60,14 @@ export function SendBadgeDialog({
   const queryClient = useQueryClient()
   const [badgeId, setBadgeId] = useState<string | null>(null)
   const [message, setMessage] = useState("")
+  // Same list, now flagging the badges this attendee already holds. The
+  // directory's copy shows meanwhile so the dialog opens instantly.
+  const { data: options = issuable } = useQuery({
+    queryKey: queryKeys.profile.issuableBadges(popupId, attendeeId),
+    queryFn: () => BadgesService.listIssuableBadges({ popupId, attendeeId }),
+    placeholderData: issuable,
+    enabled: open,
+  })
 
   const send = useMutation({
     mutationFn: () =>
@@ -106,8 +114,9 @@ export function SendBadgeDialog({
         </DialogHeader>
 
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-          {issuable.map((item) => {
-            const disabled = item.remaining === 0
+          {options.map((item) => {
+            const held = item.recipient_has_it === true
+            const disabled = held || item.remaining === 0
             const selected = badgeId === item.badge.id
             return (
               <button
@@ -140,8 +149,15 @@ export function SendBadgeDialog({
                 <span className="text-sm font-medium leading-tight">
                   {item.badge.name}
                 </span>
-                <span className="text-xs text-muted-foreground">
-                  <AllowanceNote item={item} />
+                <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
+                  {held ? (
+                    <>
+                      <Check className="h-3 w-3" aria-hidden />
+                      {t("attendees.badges.already_has")}
+                    </>
+                  ) : (
+                    <AllowanceNote item={item} />
+                  )}
                 </span>
               </button>
             )

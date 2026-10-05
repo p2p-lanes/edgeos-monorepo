@@ -4148,6 +4148,7 @@ export type IssuableBadge = {
     remaining?: (number | null);
     window: AllowanceWindow;
     resets_at?: (string | null);
+    recipient_has_it?: boolean;
 };
 
 /**
@@ -8019,6 +8020,7 @@ export type BadgesRevokeBadgeAwardResponse = (BadgeAwardPublic);
 export type BadgesListMyBadgesResponse = (Array<MyBadge>);
 
 export type BadgesListIssuableBadgesData = {
+    attendeeId?: (string | null);
     popupId: string;
 };
 
