@@ -90,6 +90,11 @@ class BadgeAwardBase(SQLModel):
     popup_id: uuid.UUID | None = Field(
         default=None, foreign_key="popups.id", ondelete="SET NULL"
     )
+    # The issuer policy a peer award was given under; its allowance counts
+    # this award (until an admin revokes it).
+    policy_id: uuid.UUID | None = Field(
+        default=None, foreign_key="badge_issuer_policies.id", ondelete="SET NULL"
+    )
     message: str | None = Field(default=None, sa_type=Text())
     # Denormalized NOT badge.repeatable at insert time, so the partial unique
     # index can stop duplicates without reading the badges table.
@@ -275,6 +280,8 @@ class MyBadgeAward(BaseModel):
     awarded_at: datetime
     message: str | None = None
     popup_id: uuid.UUID | None = None
+    # Who gave it (a peer's name or the admin's), shown to the recipient only.
+    issuer_name: str | None = None
 
 
 class MyBadge(BaseModel):
@@ -308,3 +315,151 @@ class PublicProfileSettings(BaseModel):
 
 class PublicProfileSettingsUpdate(BaseModel):
     enabled: bool
+
+
+# ---------------------------------------------------------------------------
+# Issuer policies (phase 2): who besides admins can give which badges
+# ---------------------------------------------------------------------------
+
+
+class BadgeAudienceType(StrEnum):
+    """Who a policy lets give badges."""
+
+    # An explicit list of people (e.g. a dozen sauna regulars).
+    HUMANS = "humans"
+    # Every ticket holder of the policy's popup.
+    POPUP_ATTENDEES = "popup_attendees"
+    # Every human of the tenant.
+    TENANT = "tenant"
+
+
+class AllowanceWindow(StrEnum):
+    """Period an allowance resets on.
+
+    ``day`` and ``week`` (ISO, Monday start) follow the calendar of the popup
+    the badge is given in; ``popup`` counts everything given within the
+    policy's popup; ``lifetime`` never resets.
+    """
+
+    DAY = "day"
+    WEEK = "week"
+    POPUP = "popup"
+    LIFETIME = "lifetime"
+
+
+class BadgeIssuerPolicyBase(SQLModel):
+    tenant_id: uuid.UUID = Field(foreign_key="tenants.id", index=True)
+    name: str = Field(max_length=255)
+    audience_type: str = Field(max_length=32)
+    # Scopes the policy to one popup: required for popup_attendees audiences
+    # and the popup window, optional otherwise.
+    popup_id: uuid.UUID | None = Field(
+        default=None, foreign_key="popups.id", ondelete="CASCADE"
+    )
+    # NULL = unlimited.
+    allowance_quantity: int | None = None
+    allowance_window: str = Field(default=AllowanceWindow.DAY.value, max_length=16)
+    is_active: bool = Field(default=True)
+    created_at: datetime = Field(
+        default_factory=lambda: datetime.now(UTC), sa_type=DateTime(timezone=True)
+    )
+    updated_at: datetime = Field(
+        default_factory=lambda: datetime.now(UTC), sa_type=DateTime(timezone=True)
+    )
+
+
+class BadgeIssuerPolicyHuman(BaseModel):
+    id: uuid.UUID
+    email: str
+    first_name: str | None = None
+    last_name: str | None = None
+
+
+class BadgeIssuerPolicyPublic(BaseModel):
+    id: uuid.UUID
+    name: str
+    audience_type: BadgeAudienceType
+    popup_id: uuid.UUID | None = None
+    allowance_quantity: int | None = None
+    allowance_window: AllowanceWindow
+    is_active: bool
+    badges: list[BadgeSummary]
+    humans: list[BadgeIssuerPolicyHuman]
+    created_at: datetime
+    updated_at: datetime
+
+
+def check_policy_shape(
+    audience_type: BadgeAudienceType | None,
+    popup_id: uuid.UUID | None,
+    window: AllowanceWindow | None,
+) -> None:
+    if audience_type == BadgeAudienceType.POPUP_ATTENDEES and not popup_id:
+        raise ValueError("A popup attendees audience needs a popup_id")
+    if window == AllowanceWindow.POPUP and not popup_id:
+        raise ValueError("A per-popup allowance needs a popup_id")
+
+
+class BadgeIssuerPolicyCreate(BaseModel):
+    name: str = Field(min_length=1, max_length=255)
+    audience_type: BadgeAudienceType
+    popup_id: uuid.UUID | None = None
+    allowance_quantity: int | None = Field(default=None, ge=1)
+    allowance_window: AllowanceWindow = AllowanceWindow.DAY
+    is_active: bool = True
+    badge_ids: list[uuid.UUID] = Field(min_length=1)
+    # Only used by the humans audience.
+    human_ids: list[uuid.UUID] = []
+
+    model_config = ConfigDict(str_strip_whitespace=True)
+
+    @model_validator(mode="after")
+    def _shape(self) -> "BadgeIssuerPolicyCreate":
+        check_policy_shape(self.audience_type, self.popup_id, self.allowance_window)
+        return self
+
+
+class BadgeIssuerPolicyUpdate(BaseModel):
+    name: str | None = Field(default=None, min_length=1, max_length=255)
+    audience_type: BadgeAudienceType | None = None
+    popup_id: uuid.UUID | None = None
+    allowance_quantity: int | None = Field(default=None, ge=1)
+    allowance_window: AllowanceWindow | None = None
+    is_active: bool | None = None
+    badge_ids: list[uuid.UUID] | None = Field(default=None, min_length=1)
+    human_ids: list[uuid.UUID] | None = None
+
+    model_config = ConfigDict(str_strip_whitespace=True)
+
+
+class IssuableBadge(BaseModel):
+    """A badge the caller may give in a popup right now, and how many more."""
+
+    badge: BadgeSummary
+    policy_id: uuid.UUID
+    # NULL = unlimited.
+    allowance: int | None = None
+    remaining: int | None = None
+    window: AllowanceWindow
+    # When the allowance refills; NULL for windows that never reset.
+    resets_at: datetime | None = None
+
+
+class PortalBadgeAwardCreate(BaseModel):
+    badge_id: uuid.UUID
+    popup_id: uuid.UUID
+    # Directory entries expose attendee ids, never human ids.
+    attendee_id: uuid.UUID
+    message: str | None = Field(default=None, max_length=500)
+
+    model_config = ConfigDict(str_strip_whitespace=True)
+
+
+class SentBadgeAward(BaseModel):
+    id: uuid.UUID
+    badge: BadgeSummary
+    recipient_name: str | None = None
+    popup_id: uuid.UUID | None = None
+    message: str | None = None
+    awarded_at: datetime
+    revoked_at: datetime | None = None

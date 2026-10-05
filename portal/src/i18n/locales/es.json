@@ -734,6 +734,23 @@
       "telegram": "Telegram",
       "role": "Rol",
       "organization": "Organización"
+    },
+    "badges": {
+      "give": "Dar insignia",
+      "this_person": "esta persona",
+      "dialog_title": "Dale una insignia a {{name}}",
+      "dialog_description": "Aparece en su perfil. Tu mensaje solo lo ve esa persona.",
+      "remaining_one": "Te queda {{count}}",
+      "remaining_other": "Te quedan {{count}}",
+      "unlimited": "Sin límite",
+      "none_left": "No te quedan",
+      "back_at": "Vuelven {{when}}",
+      "message_placeholder": "Agregá una nota (opcional)",
+      "send": "Enviar insignia",
+      "sent": "Insignia enviada a {{name}}",
+      "error_exhausted": "Por ahora no te quedan más de esta insignia para dar.",
+      "error_forbidden": "No podés darle esta insignia a esta persona.",
+      "error_generic": "No se pudo enviar la insignia. Probá de nuevo."
     }
   },
   "checkin": {

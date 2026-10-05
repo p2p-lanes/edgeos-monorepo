@@ -32,6 +32,7 @@ HumanScope = Literal[
     "portal:payments:read",
     "portal:directory:read",
     "portal:api_keys:manage",
+    "portal:badges:write",
 ]
 
 # Admin API-key scope universe. Defined here (not in app.api.api_key.schemas)

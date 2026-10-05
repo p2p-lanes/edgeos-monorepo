@@ -1,15 +1,20 @@
 import uuid
+from typing import TYPE_CHECKING
 
 from sqlalchemy import CheckConstraint, Index, UniqueConstraint, text
 from sqlalchemy.dialects.postgresql import UUID
-from sqlmodel import Column, Field, Relationship
+from sqlmodel import Column, Field, Relationship, SQLModel
 
 from app.api.badge.schemas import (
     BadgeAwardBase,
     BadgeBase,
     BadgeImageBase,
+    BadgeIssuerPolicyBase,
     BadgeStyleBase,
 )
+
+if TYPE_CHECKING:
+    from app.api.human.models import Humans
 
 
 class BadgeStyles(BadgeStyleBase, table=True):
@@ -86,6 +91,13 @@ class BadgeAwards(BadgeAwardBase, table=True):
         Index("ix_badge_awards_recipient", "recipient_human_id", "revoked_at"),
         Index("ix_badge_awards_issuer_human", "issuer_human_id", "awarded_at"),
         Index("ix_badge_awards_badge", "badge_id"),
+        # Allowance counting: an issuer's awards under one policy since T.
+        Index(
+            "ix_badge_awards_policy_issuer",
+            "policy_id",
+            "issuer_human_id",
+            "awarded_at",
+        ),
     )
 
     id: uuid.UUID = Field(
@@ -94,3 +106,70 @@ class BadgeAwards(BadgeAwardBase, table=True):
     )
 
     badge: Badges = Relationship(sa_relationship_kwargs={"lazy": "joined"})
+
+
+class BadgeIssuerPolicyBadges(SQLModel, table=True):
+    """Badges a policy lets its audience give (sharing one allowance)."""
+
+    __tablename__ = "badge_issuer_policy_badges"
+
+    policy_id: uuid.UUID = Field(
+        foreign_key="badge_issuer_policies.id", primary_key=True, ondelete="CASCADE"
+    )
+    badge_id: uuid.UUID = Field(
+        foreign_key="badges.id", primary_key=True, ondelete="CASCADE"
+    )
+    tenant_id: uuid.UUID = Field(foreign_key="tenants.id", index=True)
+
+
+class BadgeIssuerPolicyHumans(SQLModel, table=True):
+    """The people of a ``humans`` audience."""
+
+    __tablename__ = "badge_issuer_policy_humans"
+
+    policy_id: uuid.UUID = Field(
+        foreign_key="badge_issuer_policies.id", primary_key=True, ondelete="CASCADE"
+    )
+    human_id: uuid.UUID = Field(
+        foreign_key="humans.id", primary_key=True, ondelete="CASCADE"
+    )
+    tenant_id: uuid.UUID = Field(foreign_key="tenants.id", index=True)
+
+
+class BadgeIssuerPolicies(BadgeIssuerPolicyBase, table=True):
+    __tablename__ = "badge_issuer_policies"
+    __table_args__ = (
+        CheckConstraint(
+            "audience_type IN ('humans', 'popup_attendees', 'tenant')",
+            name="ck_badge_issuer_policies_audience",
+        ),
+        CheckConstraint(
+            "allowance_window IN ('day', 'week', 'popup', 'lifetime')",
+            name="ck_badge_issuer_policies_window",
+        ),
+        CheckConstraint(
+            "(audience_type <> 'popup_attendees' AND allowance_window <> 'popup')"
+            " OR popup_id IS NOT NULL",
+            name="ck_badge_issuer_policies_popup",
+        ),
+        CheckConstraint(
+            "allowance_quantity IS NULL OR allowance_quantity > 0",
+            name="ck_badge_issuer_policies_quantity",
+        ),
+    )
+
+    id: uuid.UUID = Field(
+        default_factory=uuid.uuid4,
+        sa_column=Column(UUID(as_uuid=True), primary_key=True),
+    )
+
+    badges: list[Badges] = Relationship(
+        link_model=BadgeIssuerPolicyBadges,
+        # Read-only: link rows are written explicitly so they carry tenant_id.
+        sa_relationship_kwargs={"lazy": "selectin", "viewonly": True},
+    )
+    humans: list["Humans"] = Relationship(
+        link_model=BadgeIssuerPolicyHumans,
+        # Read-only: link rows are written explicitly so they carry tenant_id.
+        sa_relationship_kwargs={"lazy": "selectin", "viewonly": True},
+    )

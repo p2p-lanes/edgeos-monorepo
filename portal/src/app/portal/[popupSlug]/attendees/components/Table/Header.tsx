@@ -1,12 +1,17 @@
 import { TableHead, TableHeader, TableRow } from "@/components/ui/table"
 
-const Header = () => {
+const Header = ({ showBadges = false }: { showBadges?: boolean }) => {
   return (
     <TableHeader>
       <TableRow className="border-b border-border bg-card">
         <TableHead className="text-md font-semibold text-foreground whitespace-nowrap min-w-[200px]">
           Attendee
         </TableHead>
+        {showBadges && (
+          <TableHead className="text-md font-semibold text-foreground whitespace-nowrap">
+            <span className="sr-only">Badges</span>
+          </TableHead>
+        )}
         <TableHead className="text-md font-semibold text-foreground whitespace-nowrap min-w-[200px]">
           Email
         </TableHead>

@@ -615,6 +615,23 @@
       "telegram": "Telegram",
       "role": "职位",
       "organization": "组织"
+    },
+    "badges": {
+      "give": "送徽章",
+      "this_person": "此人",
+      "dialog_title": "送 {{name}} 一枚徽章",
+      "dialog_description": "徽章会显示在对方的个人资料上。你的留言只有对方能看到。",
+      "remaining_one": "剩余 {{count}} 枚",
+      "remaining_other": "剩余 {{count}} 枚",
+      "unlimited": "不限数量",
+      "none_left": "已用完",
+      "back_at": "{{when}} 恢复",
+      "message_placeholder": "添加留言（可选）",
+      "send": "发送徽章",
+      "sent": "已将徽章送给 {{name}}",
+      "error_exhausted": "你暂时没有这种徽章可以送了。",
+      "error_forbidden": "你不能把这枚徽章送给此人。",
+      "error_generic": "徽章发送失败，请重试。"
     }
   },
   "checkin": {

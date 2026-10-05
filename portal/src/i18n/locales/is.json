@@ -606,6 +606,23 @@
       "telegram": "Telegram",
       "role": "Hlutverk",
       "organization": "Samtök"
+    },
+    "badges": {
+      "give": "Gefa merki",
+      "this_person": "þessari manneskju",
+      "dialog_title": "Gefðu {{name}} merki",
+      "dialog_description": "Það birtist á prófílnum þeirra. Aðeins viðtakandinn sér skilaboðin þín.",
+      "remaining_one": "{{count}} eftir",
+      "remaining_other": "{{count}} eftir",
+      "unlimited": "Engin takmörk",
+      "none_left": "Ekkert eftir",
+      "back_at": "Aftur {{when}}",
+      "message_placeholder": "Bættu við athugasemd (valfrjálst)",
+      "send": "Senda merki",
+      "sent": "Merki sent til {{name}}",
+      "error_exhausted": "Þú átt ekki fleiri af þessu merki til að gefa í bili.",
+      "error_forbidden": "Þú getur ekki gefið þessari manneskju þetta merki.",
+      "error_generic": "Ekki tókst að senda merkið. Reyndu aftur."
     }
   },
   "checkin": {

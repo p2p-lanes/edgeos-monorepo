@@ -1,3 +1,3 @@
-from app.api.badge.router import router, styles_router
+from app.api.badge.router import policies_router, router, styles_router
 
-__all__ = ["router", "styles_router"]
+__all__ = ["policies_router", "router", "styles_router"]

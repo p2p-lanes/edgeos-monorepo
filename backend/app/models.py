@@ -65,7 +65,15 @@ from app.api.audit_log.schemas import AuditLogPublic
 from app.api.auth.pending_human_models import PendingHumans
 
 # Badges (SIM-108)
-from app.api.badge.models import BadgeAwards, BadgeImages, Badges, BadgeStyles
+from app.api.badge.models import (
+    BadgeAwards,
+    BadgeImages,
+    BadgeIssuerPolicies,
+    BadgeIssuerPolicyBadges,
+    BadgeIssuerPolicyHumans,
+    Badges,
+    BadgeStyles,
+)
 from app.api.check_in.models import CheckIn
 from app.api.check_in.schemas import CheckInPayload, CheckInPublic
 from app.api.coupon.models import Coupons
@@ -373,6 +381,9 @@ __all__ = [
     "EventSettingsUpdate",
     "BadgeAwards",
     "BadgeImages",
+    "BadgeIssuerPolicies",
+    "BadgeIssuerPolicyBadges",
+    "BadgeIssuerPolicyHumans",
     "Badges",
     "BadgeStyles",
     "Tracks",

@@ -3,7 +3,7 @@ from pathlib import Path
 from alembic.config import Config
 from alembic.script import ScriptDirectory
 
-HEAD_REVISION = "b5d2e8a4c7f1"
+HEAD_REVISION = "c7e3a9f15b28"
 
 
 def test_repository_has_one_alembic_head() -> None:

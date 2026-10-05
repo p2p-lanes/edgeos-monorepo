@@ -579,6 +579,15 @@ export type AITranslateRequest = {
 };
 
 /**
+ * Period an allowance resets on.
+ *
+ * ``day`` and ``week`` (ISO, Monday start) follow the calendar of the popup
+ * the badge is given in; ``popup`` counts everything given within the
+ * policy's popup; ``lifetime`` never resets.
+ */
+export type AllowanceWindow = 'day' | 'week' | 'popup' | 'lifetime';
+
+/**
  * Request body for creating a new API key.
  */
 export type ApiKeyCreate = {
@@ -1582,6 +1591,11 @@ export type AvailableScopes = {
 };
 
 /**
+ * Who a policy lets give badges.
+ */
+export type BadgeAudienceType = 'humans' | 'popup_attendees' | 'tenant';
+
+/**
  * Give a badge to a human, identified by id or by email.
  */
 export type BadgeAwardCreate = {
@@ -1647,6 +1661,49 @@ export type BadgeImageUpsert = {
     image_url: string;
     width?: (number | null);
     height?: (number | null);
+};
+
+export type BadgeIssuerPolicyCreate = {
+    name: string;
+    audience_type: BadgeAudienceType;
+    popup_id?: (string | null);
+    allowance_quantity?: (number | null);
+    allowance_window?: AllowanceWindow;
+    is_active?: boolean;
+    badge_ids: Array<(string)>;
+    human_ids?: Array<(string)>;
+};
+
+export type BadgeIssuerPolicyHuman = {
+    id: string;
+    email: string;
+    first_name?: (string | null);
+    last_name?: (string | null);
+};
+
+export type BadgeIssuerPolicyPublic = {
+    id: string;
+    name: string;
+    audience_type: BadgeAudienceType;
+    popup_id?: (string | null);
+    allowance_quantity?: (number | null);
+    allowance_window: AllowanceWindow;
+    is_active: boolean;
+    badges: Array<BadgeSummary>;
+    humans: Array<BadgeIssuerPolicyHuman>;
+    created_at: string;
+    updated_at: string;
+};
+
+export type BadgeIssuerPolicyUpdate = {
+    name?: (string | null);
+    audience_type?: (BadgeAudienceType | null);
+    popup_id?: (string | null);
+    allowance_quantity?: (number | null);
+    allowance_window?: (AllowanceWindow | null);
+    is_active?: (boolean | null);
+    badge_ids?: (Array<(string)> | null);
+    human_ids?: (Array<(string)> | null);
 };
 
 /**
@@ -4043,6 +4100,18 @@ export type InviteUpdate = {
 };
 
 /**
+ * A badge the caller may give in a popup right now, and how many more.
+ */
+export type IssuableBadge = {
+    badge: BadgeSummary;
+    policy_id: string;
+    allowance?: (number | null);
+    remaining?: (number | null);
+    window: AllowanceWindow;
+    resets_at?: (string | null);
+};
+
+/**
  * Top-level KPI cards with derived metrics.
  */
 export type KeyMetrics = {
@@ -4349,6 +4418,7 @@ export type MyBadgeAward = {
     awarded_at: string;
     message?: (string | null);
     popup_id?: (string | null);
+    issuer_name?: (string | null);
 };
 
 /**
@@ -5189,6 +5259,13 @@ export type PopupUpdate = {
     abandoned_application_delay_days?: (number | null);
     abandoned_application_repeat_days?: (number | null);
     abandoned_application_max_count?: (number | null);
+};
+
+export type PortalBadgeAwardCreate = {
+    badge_id: string;
+    popup_id: string;
+    attendee_id: string;
+    message?: (string | null);
 };
 
 /**
@@ -6104,6 +6181,16 @@ export type SendTestRequest = {
     popup_id?: (string | null);
 };
 
+export type SentBadgeAward = {
+    id: string;
+    badge: BadgeSummary;
+    recipient_name?: (string | null);
+    popup_id?: (string | null);
+    message?: (string | null);
+    awarded_at: string;
+    revoked_at?: (string | null);
+};
+
 /**
  * How SimpleFi redirects the buyer to the success URL after payment.
  *
@@ -6419,7 +6506,7 @@ export type TenantUpdate = {
  */
 export type ThirdPartyAppCreate = {
     name: string;
-    allowed_token_scopes?: Array<('portal:*' | 'portal:profile:read' | 'portal:profile:write' | 'portal:applications:read' | 'portal:applications:write' | 'portal:attendees:write' | 'portal:payments:read' | 'portal:directory:read' | 'portal:api_keys:manage')>;
+    allowed_token_scopes?: Array<('portal:*' | 'portal:profile:read' | 'portal:profile:write' | 'portal:applications:read' | 'portal:applications:write' | 'portal:attendees:write' | 'portal:payments:read' | 'portal:directory:read' | 'portal:api_keys:manage' | 'portal:badges:write')>;
     allowed_api_key_scopes?: Array<('events:read' | 'events:write' | 'rsvp:write' | 'venues:read' | 'venues:write' | 'applications:read' | 'applications:write' | 'attendees:read' | 'attendees:write' | 'humans:read' | 'humans:write' | 'groups:read' | 'groups:write' | 'products:read' | 'products:write' | 'accommodations:read' | 'accommodations:write' | 'coupons:read' | 'coupons:write' | 'forms:read' | 'forms:write' | 'payments:read' | 'tracks:read' | 'tracks:write' | 'ticketing_steps:read' | 'ticketing_steps:write' | 'translations:read' | 'translations:write' | 'badges:read' | 'badges:write')>;
 };
 
@@ -6470,7 +6557,7 @@ export type ThirdPartyAppPublic = {
  */
 export type ThirdPartyAppUpdate = {
     name?: (string | null);
-    allowed_token_scopes?: (Array<('portal:*' | 'portal:profile:read' | 'portal:profile:write' | 'portal:applications:read' | 'portal:applications:write' | 'portal:attendees:write' | 'portal:payments:read' | 'portal:directory:read' | 'portal:api_keys:manage')> | null);
+    allowed_token_scopes?: (Array<('portal:*' | 'portal:profile:read' | 'portal:profile:write' | 'portal:applications:read' | 'portal:applications:write' | 'portal:attendees:write' | 'portal:payments:read' | 'portal:directory:read' | 'portal:api_keys:manage' | 'portal:badges:write')> | null);
     allowed_api_key_scopes?: (Array<('events:read' | 'events:write' | 'rsvp:write' | 'venues:read' | 'venues:write' | 'applications:read' | 'applications:write' | 'attendees:read' | 'attendees:write' | 'humans:read' | 'humans:write' | 'groups:read' | 'groups:write' | 'products:read' | 'products:write' | 'accommodations:read' | 'accommodations:write' | 'coupons:read' | 'coupons:write' | 'forms:read' | 'forms:write' | 'payments:read' | 'tracks:read' | 'tracks:write' | 'ticketing_steps:read' | 'ticketing_steps:write' | 'translations:read' | 'translations:write' | 'badges:read' | 'badges:write')> | null);
 };
 
@@ -7892,6 +7979,24 @@ export type BadgesRevokeBadgeAwardResponse = (BadgeAwardPublic);
 
 export type BadgesListMyBadgesResponse = (Array<MyBadge>);
 
+export type BadgesListIssuableBadgesData = {
+    popupId: string;
+};
+
+export type BadgesListIssuableBadgesResponse = (Array<IssuableBadge>);
+
+export type BadgesGiveBadgeAsHumanData = {
+    requestBody: PortalBadgeAwardCreate;
+};
+
+export type BadgesGiveBadgeAsHumanResponse = (SentBadgeAward);
+
+export type BadgesListSentBadgesData = {
+    popupId?: (string | null);
+};
+
+export type BadgesListSentBadgesResponse = (Array<SentBadgeAward>);
+
 export type BadgesListBadgesData = {
     category?: (string | null);
     includeArchived?: boolean;
@@ -7997,6 +8102,42 @@ export type BadgesSetDefaultBadgeStyleData = {
 };
 
 export type BadgesSetDefaultBadgeStyleResponse = (BadgeStylePublic);
+
+export type BadgesListIssuerPoliciesData = {
+    badgeId?: (string | null);
+    xTenantId?: (string | null);
+};
+
+export type BadgesListIssuerPoliciesResponse = (Array<BadgeIssuerPolicyPublic>);
+
+export type BadgesCreateIssuerPolicyData = {
+    requestBody: BadgeIssuerPolicyCreate;
+    xTenantId?: (string | null);
+};
+
+export type BadgesCreateIssuerPolicyResponse = (BadgeIssuerPolicyPublic);
+
+export type BadgesGetIssuerPolicyData = {
+    policyId: string;
+    xTenantId?: (string | null);
+};
+
+export type BadgesGetIssuerPolicyResponse = (BadgeIssuerPolicyPublic);
+
+export type BadgesUpdateIssuerPolicyData = {
+    policyId: string;
+    requestBody: BadgeIssuerPolicyUpdate;
+    xTenantId?: (string | null);
+};
+
+export type BadgesUpdateIssuerPolicyResponse = (BadgeIssuerPolicyPublic);
+
+export type BadgesDeleteIssuerPolicyData = {
+    policyId: string;
+    xTenantId?: (string | null);
+};
+
+export type BadgesDeleteIssuerPolicyResponse = (void);
 
 export type BaseFieldConfigsListBaseFieldConfigsData = {
     /**

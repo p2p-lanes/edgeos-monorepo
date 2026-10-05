@@ -735,6 +735,23 @@
       "telegram": "Telegram",
       "role": "Role",
       "organization": "Organization"
+    },
+    "badges": {
+      "give": "Give badge",
+      "this_person": "this person",
+      "dialog_title": "Give {{name}} a badge",
+      "dialog_description": "It shows up on their profile. Your message is only visible to them.",
+      "remaining_one": "{{count}} left",
+      "remaining_other": "{{count}} left",
+      "unlimited": "No limit",
+      "none_left": "None left",
+      "back_at": "Back {{when}}",
+      "message_placeholder": "Add a note (optional)",
+      "send": "Send badge",
+      "sent": "Badge sent to {{name}}",
+      "error_exhausted": "You have no more of this badge to give for now.",
+      "error_forbidden": "You can't give this badge to this person.",
+      "error_generic": "Couldn't send the badge. Please try again."
     }
   },
   "checkin": {

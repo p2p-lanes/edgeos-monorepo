@@ -3,23 +3,38 @@ from datetime import UTC, datetime
 from typing import Annotated
 
 from fastapi import APIRouter, Header, HTTPException, status
-from sqlmodel import Session, select
+from sqlmodel import Session, col, select
 
-from app.api.badge import crud
-from app.api.badge.models import BadgeAwards, BadgeImages, Badges, BadgeStyles
+from app.api.badge import crud, policies
+from app.api.badge.models import (
+    BadgeAwards,
+    BadgeImages,
+    BadgeIssuerPolicies,
+    Badges,
+    BadgeStyles,
+)
 from app.api.badge.schemas import (
+    AllowanceWindow,
+    BadgeAudienceType,
     BadgeAwardCreate,
     BadgeAwardPublic,
     BadgeAwardRevoke,
     BadgeCreate,
     BadgeImageUpsert,
+    BadgeIssuerPolicyCreate,
+    BadgeIssuerPolicyHuman,
+    BadgeIssuerPolicyPublic,
+    BadgeIssuerPolicyUpdate,
     BadgeIssuerType,
     BadgePublic,
     BadgeStyleCreate,
     BadgeStylePublic,
     BadgeStyleUpdate,
     BadgeUpdate,
+    IssuableBadge,
     MyBadge,
+    PortalBadgeAwardCreate,
+    SentBadgeAward,
 )
 from app.api.human.models import Humans
 from app.api.shared.enums import UserRole
@@ -36,6 +51,7 @@ from app.core.dependencies.users import (
 
 router = APIRouter(prefix="/badges", tags=["badges"])
 styles_router = APIRouter(prefix="/badge-styles", tags=["badges"])
+policies_router = APIRouter(prefix="/badge-issuer-policies", tags=["badges"])
 
 _XTenantId = Annotated[str | None, Header(alias="X-Tenant-Id")]
 
@@ -270,6 +286,100 @@ async def list_my_badges(
     return crud.my_badges(db, current_human.id)
 
 
+@router.get(
+    "/portal/issuable",
+    response_model=list[IssuableBadge],
+    summary="List the badges you can give in a popup",
+    dependencies=[needs("portal:profile:read")],
+)
+async def list_issuable_badges(
+    popup_id: uuid.UUID,
+    current_human: CurrentHuman,
+    db: HumanTenantSession,
+) -> list[IssuableBadge]:
+    return policies.issuable_badges(db, current_human.id, popup_id)
+
+
+@router.post(
+    "/portal/awards",
+    response_model=SentBadgeAward,
+    status_code=status.HTTP_201_CREATED,
+    summary="Give a badge to another attendee",
+    dependencies=[needs("portal:badges:write")],
+)
+async def give_badge_as_human(
+    body: PortalBadgeAwardCreate,
+    current_human: CurrentHuman,
+    db: HumanTenantSession,
+) -> SentBadgeAward:
+    """Give a badge to an attendee of the popup under one of your policies.
+
+    The recipient is addressed by attendee id (what the directory exposes)
+    and must hold a ticket for the popup. 403 when no policy lets you give
+    this badge, 429 when your allowance for it is used up.
+    """
+    from app.api.attendee.models import Attendees
+    from app.api.event_participant.crud import event_participants_crud
+
+    badge = _get_badge_or_404(db, body.badge_id)
+    attendee = db.get(Attendees, body.attendee_id)
+    if not attendee or attendee.popup_id != body.popup_id or not attendee.human_id:
+        raise _not_found("Attendee")
+    eligible = event_participants_crud.eligibility_by_human(
+        db, body.popup_id, {attendee.human_id}
+    )
+    recipient = db.get(Humans, attendee.human_id)
+    if not recipient or not eligible[attendee.human_id].allowed:
+        raise _not_found("Attendee")
+
+    try:
+        award = policies.award_as_human(
+            db,
+            issuer_id=current_human.id,
+            badge=badge,
+            recipient=recipient,
+            popup_id=body.popup_id,
+            message=body.message,
+        )
+    except policies.BadgeForbiddenError as exc:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(exc))
+    except policies.AllowanceExhaustedError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="You have no more of this badge to give for now",
+            headers=(
+                {"X-Allowance-Resets-At": exc.resets_at.isoformat()}
+                if exc.resets_at
+                else None
+            ),
+        )
+    except crud.BadgeConflictError as exc:
+        raise _conflict(str(exc))
+    resolver = crud.ImageResolver(crud.list_styles(db))
+    return SentBadgeAward(
+        id=award.id,
+        badge=crud.to_badge_summary(award.badge, resolver),
+        recipient_name=recipient.full_name,
+        popup_id=award.popup_id,
+        message=award.message,
+        awarded_at=award.awarded_at,
+    )
+
+
+@router.get(
+    "/portal/sent",
+    response_model=list[SentBadgeAward],
+    summary="List the badges you gave",
+    dependencies=[needs("portal:profile:read")],
+)
+async def list_sent_badges(
+    current_human: CurrentHuman,
+    db: HumanTenantSession,
+    popup_id: uuid.UUID | None = None,
+) -> list[SentBadgeAward]:
+    return crud.list_sent(db, current_human.id, popup_id)
+
+
 # ---------------------------------------------------------------------------
 # Catalog
 # ---------------------------------------------------------------------------
@@ -488,3 +598,216 @@ async def award_badge(
         raise _conflict(str(exc))
     resolver = crud.ImageResolver(crud.list_styles(db))
     return crud.to_award_public(db, [award], resolver)[0]
+
+
+# ---------------------------------------------------------------------------
+# Issuer policies (who besides admins can give which badges)
+# ---------------------------------------------------------------------------
+
+
+def _policy_public(db: Session, policy: BadgeIssuerPolicies) -> BadgeIssuerPolicyPublic:
+    resolver = crud.ImageResolver(crud.list_styles(db))
+    return BadgeIssuerPolicyPublic(
+        id=policy.id,
+        name=policy.name,
+        audience_type=BadgeAudienceType(policy.audience_type),
+        popup_id=policy.popup_id,
+        allowance_quantity=policy.allowance_quantity,
+        allowance_window=AllowanceWindow(policy.allowance_window),
+        is_active=policy.is_active,
+        badges=[crud.to_badge_summary(b, resolver) for b in policy.badges],
+        humans=[
+            BadgeIssuerPolicyHuman(
+                id=h.id, email=h.email, first_name=h.first_name, last_name=h.last_name
+            )
+            for h in policy.humans
+        ],
+        created_at=policy.created_at,
+        updated_at=policy.updated_at,
+    )
+
+
+def _get_policy_or_404(db: Session, policy_id: uuid.UUID) -> BadgeIssuerPolicies:
+    policy = db.get(BadgeIssuerPolicies, policy_id)
+    if not policy:
+        raise _not_found("Issuer policy")
+    return policy
+
+
+def _resolve_policy_links(
+    db: Session,
+    badge_ids: list[uuid.UUID] | None,
+    human_ids: list[uuid.UUID] | None,
+    popup_id: uuid.UUID | None,
+) -> tuple[list[Badges] | None, list[Humans] | None]:
+    from app.api.popup.crud import popups_crud
+
+    if popup_id and not popups_crud.get(db, popup_id):
+        raise _not_found("Popup")
+    badges = None
+    if badge_ids is not None:
+        badges = [_get_badge_or_404(db, b) for b in dict.fromkeys(badge_ids)]
+    humans = None
+    if human_ids is not None:
+        humans = []
+        for human_id in dict.fromkeys(human_ids):
+            human = db.get(Humans, human_id)
+            if not human:
+                raise _not_found("Human")
+            humans.append(human)
+    return badges, humans
+
+
+def _set_links(
+    db: Session,
+    policy: BadgeIssuerPolicies,
+    badges: list[Badges] | None,
+    humans: list[Humans] | None,
+) -> None:
+    """Replace the policy's badge and/or human links (None leaves them as is).
+
+    Link rows are written explicitly (the relationships are read-only) so
+    each one carries the tenant_id RLS needs.
+    """
+    from sqlalchemy import delete
+
+    from app.api.badge.models import BadgeIssuerPolicyBadges, BadgeIssuerPolicyHumans
+
+    if badges is not None:
+        db.exec(
+            delete(BadgeIssuerPolicyBadges).where(
+                BadgeIssuerPolicyBadges.policy_id == policy.id
+            )
+        )
+        for badge in badges:
+            db.add(
+                BadgeIssuerPolicyBadges(
+                    policy_id=policy.id, badge_id=badge.id, tenant_id=policy.tenant_id
+                )
+            )
+    if humans is not None:
+        db.exec(
+            delete(BadgeIssuerPolicyHumans).where(
+                BadgeIssuerPolicyHumans.policy_id == policy.id
+            )
+        )
+        for human in humans:
+            db.add(
+                BadgeIssuerPolicyHumans(
+                    policy_id=policy.id, human_id=human.id, tenant_id=policy.tenant_id
+                )
+            )
+
+
+@policies_router.get("", response_model=list[BadgeIssuerPolicyPublic])
+async def list_issuer_policies(
+    db: AdminOrApiKeySession_BadgesRead,
+    _: AdminOrApiKey_BadgesRead,
+    badge_id: uuid.UUID | None = None,
+) -> list[BadgeIssuerPolicyPublic]:
+    found = [
+        p
+        for p in db.exec(
+            select(BadgeIssuerPolicies).order_by(col(BadgeIssuerPolicies.name))
+        ).all()
+        if badge_id is None or any(b.id == badge_id for b in p.badges)
+    ]
+    return [_policy_public(db, p) for p in found]
+
+
+@policies_router.post(
+    "", response_model=BadgeIssuerPolicyPublic, status_code=status.HTTP_201_CREATED
+)
+async def create_issuer_policy(
+    body: BadgeIssuerPolicyCreate,
+    db: AdminOrApiKeySession_BadgesWrite,
+    current_user: AdminOrApiKey_BadgesWrite,
+    x_tenant_id: _XTenantId = None,
+) -> BadgeIssuerPolicyPublic:
+    tenant_id = _tenant_id(current_user, x_tenant_id)
+    badges, humans = _resolve_policy_links(
+        db, body.badge_ids, body.human_ids, body.popup_id
+    )
+    policy = BadgeIssuerPolicies(
+        tenant_id=tenant_id,
+        name=body.name,
+        audience_type=body.audience_type.value,
+        popup_id=body.popup_id,
+        allowance_quantity=body.allowance_quantity,
+        allowance_window=body.allowance_window.value,
+        is_active=body.is_active,
+    )
+    db.add(policy)
+    db.flush()
+    _set_links(
+        db,
+        policy,
+        badges,
+        humans if body.audience_type == BadgeAudienceType.HUMANS else [],
+    )
+    db.commit()
+    db.refresh(policy)
+    return _policy_public(db, policy)
+
+
+@policies_router.get("/{policy_id}", response_model=BadgeIssuerPolicyPublic)
+async def get_issuer_policy(
+    policy_id: uuid.UUID,
+    db: AdminOrApiKeySession_BadgesRead,
+    _: AdminOrApiKey_BadgesRead,
+) -> BadgeIssuerPolicyPublic:
+    return _policy_public(db, _get_policy_or_404(db, policy_id))
+
+
+@policies_router.patch("/{policy_id}", response_model=BadgeIssuerPolicyPublic)
+async def update_issuer_policy(
+    policy_id: uuid.UUID,
+    body: BadgeIssuerPolicyUpdate,
+    db: AdminOrApiKeySession_BadgesWrite,
+    _: AdminOrApiKey_BadgesWrite,
+) -> BadgeIssuerPolicyPublic:
+    from app.api.badge.schemas import check_policy_shape
+
+    policy = _get_policy_or_404(db, policy_id)
+    data = body.model_dump(exclude_unset=True)
+    audience = BadgeAudienceType(data.get("audience_type") or policy.audience_type)
+    popup_id = data["popup_id"] if "popup_id" in data else policy.popup_id
+    window = AllowanceWindow(data.get("allowance_window") or policy.allowance_window)
+    try:
+        check_policy_shape(audience, popup_id, window)
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)
+        )
+    badges, humans = _resolve_policy_links(
+        db, data.get("badge_ids"), data.get("human_ids"), popup_id
+    )
+
+    if data.get("name"):
+        policy.name = data["name"]
+    policy.audience_type = audience.value
+    policy.popup_id = popup_id
+    if "allowance_quantity" in data:
+        policy.allowance_quantity = data["allowance_quantity"]
+    policy.allowance_window = window.value
+    if data.get("is_active") is not None:
+        policy.is_active = data["is_active"]
+    policy.updated_at = datetime.now(UTC)
+    db.add(policy)
+    if audience != BadgeAudienceType.HUMANS:
+        humans = []
+    _set_links(db, policy, badges, humans)
+    db.commit()
+    db.refresh(policy)
+    return _policy_public(db, policy)
+
+
+@policies_router.delete("/{policy_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_issuer_policy(
+    policy_id: uuid.UUID,
+    db: AdminOrApiKeySession_BadgesWrite,
+    _: AdminOrApiKey_BadgesWrite,
+) -> None:
+    """Delete a policy. Awards given under it stay; they just stop counting."""
+    db.delete(_get_policy_or_404(db, policy_id))
+    db.commit()

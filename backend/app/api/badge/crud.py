@@ -16,6 +16,7 @@ from app.api.badge.schemas import (
     MyBadge,
     MyBadgeAward,
     PublicProfileBadge,
+    SentBadgeAward,
 )
 from app.api.human.models import Humans
 from app.utils.utils import slugify
@@ -244,6 +245,7 @@ def create_award(
     issuer_human_id: uuid.UUID | None = None,
     issuer_name: str | None = None,
     popup_id: uuid.UUID | None = None,
+    policy_id: uuid.UUID | None = None,
     message: str | None = None,
 ) -> BadgeAwards:
     """Insert an award and commit.
@@ -266,6 +268,7 @@ def create_award(
         issuer_human_id=issuer_human_id,
         issuer_name=issuer_name,
         popup_id=popup_id,
+        policy_id=policy_id,
         message=message or None,
         is_unique=not badge.repeatable,
     )
@@ -403,7 +406,10 @@ def my_badges(db: Session, human_id: uuid.UUID) -> list[MyBadge]:
             last_awarded_at=awards[0].awarded_at,
             awards=[
                 MyBadgeAward(
-                    awarded_at=a.awarded_at, message=a.message, popup_id=a.popup_id
+                    awarded_at=a.awarded_at,
+                    message=a.message,
+                    popup_id=a.popup_id,
+                    issuer_name=a.issuer_name,
                 )
                 for a in awards
             ],
@@ -450,4 +456,44 @@ def public_profile_badges(db: Session, human: Humans) -> list[PublicProfileBadge
             count=len(items),
         )
         for items in grouped.values()
+    ]
+
+
+def list_sent(
+    db: Session, issuer_human_id: uuid.UUID, popup_id: uuid.UUID | None = None
+) -> list[SentBadgeAward]:
+    """Badges a human gave to others, newest first."""
+    statement = select(BadgeAwards).where(
+        BadgeAwards.issuer_human_id == issuer_human_id
+    )
+    if popup_id:
+        statement = statement.where(BadgeAwards.popup_id == popup_id)
+    awards = list(
+        db.exec(statement.order_by(col(BadgeAwards.awarded_at).desc()).limit(200))
+        .unique()
+        .all()
+    )
+    recipient_ids = {a.recipient_human_id for a in awards}
+    names = (
+        {
+            h.id: h.full_name
+            for h in db.exec(
+                select(Humans).where(col(Humans.id).in_(recipient_ids))
+            ).all()
+        }
+        if recipient_ids
+        else {}
+    )
+    resolver = ImageResolver(list_styles(db))
+    return [
+        SentBadgeAward(
+            id=a.id,
+            badge=to_badge_summary(a.badge, resolver),
+            recipient_name=names.get(a.recipient_human_id),
+            popup_id=a.popup_id,
+            message=a.message,
+            awarded_at=a.awarded_at,
+            revoked_at=a.revoked_at,
+        )
+        for a in awards
     ]

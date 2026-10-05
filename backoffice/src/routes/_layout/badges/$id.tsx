@@ -11,6 +11,7 @@ import { Suspense } from "react"
 import { BadgesService } from "@/client"
 import { BadgeAwardsList } from "@/components/Badges/BadgeAwardsList"
 import { BadgeForm } from "@/components/Badges/BadgeForm"
+import { IssuerPoliciesCard } from "@/components/Badges/IssuerPolicies"
 import { DangerZone } from "@/components/Common/DangerZone"
 import { FormPageLayout } from "@/components/Common/FormPageLayout"
 import { QueryErrorBoundary } from "@/components/Common/QueryErrorBoundary"
@@ -126,6 +127,8 @@ function BadgeDetailContent({ badgeId }: { badgeId: string }) {
         defaultValues={badge}
         onSuccess={goBack}
       />
+
+      <IssuerPoliciesCard badgeId={badgeId} />
 
       <Recipients badgeId={badgeId} />
 
