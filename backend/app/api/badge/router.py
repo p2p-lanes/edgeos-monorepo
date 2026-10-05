@@ -3,13 +3,14 @@ from datetime import UTC, datetime
 from typing import Annotated
 
 from fastapi import APIRouter, Header, HTTPException, status
-from sqlmodel import Session, col, select
+from sqlmodel import Session, col, func, select
 
-from app.api.badge import crud, policies
+from app.api.badge import crud, policies, rules
 from app.api.badge.models import (
     BadgeAwards,
     BadgeImages,
     BadgeIssuerPolicies,
+    BadgeRules,
     Badges,
     BadgeStyles,
 )
@@ -27,10 +28,17 @@ from app.api.badge.schemas import (
     BadgeIssuerPolicyUpdate,
     BadgeIssuerType,
     BadgePublic,
+    BadgeRuleConfig,
+    BadgeRuleCreate,
+    BadgeRuleEvaluation,
+    BadgeRulePublic,
+    BadgeRuleUpdate,
     BadgeStyleCreate,
     BadgeStylePublic,
     BadgeStyleUpdate,
     BadgeUpdate,
+    CheckinsInPopupConfig,
+    CheckinsInTrackConfig,
     IssuableBadge,
     MyBadge,
     PortalBadgeAwardCreate,
@@ -52,6 +60,7 @@ from app.core.dependencies.users import (
 router = APIRouter(prefix="/badges", tags=["badges"])
 styles_router = APIRouter(prefix="/badge-styles", tags=["badges"])
 policies_router = APIRouter(prefix="/badge-issuer-policies", tags=["badges"])
+rules_router = APIRouter(prefix="/badge-rules", tags=["badges"])
 
 _XTenantId = Annotated[str | None, Header(alias="X-Tenant-Id")]
 
@@ -811,3 +820,132 @@ async def delete_issuer_policy(
     """Delete a policy. Awards given under it stay; they just stop counting."""
     db.delete(_get_policy_or_404(db, policy_id))
     db.commit()
+
+
+# ---------------------------------------------------------------------------
+# Automatic rules (badges earned from check-ins)
+# ---------------------------------------------------------------------------
+
+
+def _rule_public(db: Session, rule: BadgeRules) -> BadgeRulePublic:
+    count = db.exec(
+        select(func.count()).where(
+            BadgeAwards.rule_id == rule.id, col(BadgeAwards.revoked_at).is_(None)
+        )
+    ).one()
+    return BadgeRulePublic(
+        id=rule.id,
+        badge_id=rule.badge_id,
+        config=rules.parse_config(rule),
+        is_active=rule.is_active,
+        award_count=count,
+        created_at=rule.created_at,
+        updated_at=rule.updated_at,
+    )
+
+
+def _get_rule_or_404(db: Session, rule_id: uuid.UUID) -> BadgeRules:
+    rule = db.get(BadgeRules, rule_id)
+    if not rule:
+        raise _not_found("Badge rule")
+    return rule
+
+
+def _check_rule_target(db: Session, config: BadgeRuleConfig) -> None:
+    """The track or popup a rule watches must exist in this tenant."""
+    from app.api.popup.crud import popups_crud
+    from app.api.track.models import Tracks
+
+    if isinstance(config, CheckinsInTrackConfig) and not db.get(
+        Tracks, config.track_id
+    ):
+        raise _not_found("Track")
+    if isinstance(config, CheckinsInPopupConfig) and not popups_crud.get(
+        db, config.popup_id
+    ):
+        raise _not_found("Popup")
+
+
+@rules_router.get("", response_model=list[BadgeRulePublic])
+async def list_badge_rules(
+    db: AdminOrApiKeySession_BadgesRead,
+    _: AdminOrApiKey_BadgesRead,
+    badge_id: uuid.UUID | None = None,
+) -> list[BadgeRulePublic]:
+    statement = select(BadgeRules).order_by(col(BadgeRules.created_at))
+    if badge_id:
+        statement = statement.where(BadgeRules.badge_id == badge_id)
+    return [_rule_public(db, r) for r in db.exec(statement).all()]
+
+
+@rules_router.post(
+    "", response_model=BadgeRulePublic, status_code=status.HTTP_201_CREATED
+)
+async def create_badge_rule(
+    body: BadgeRuleCreate,
+    db: AdminOrApiKeySession_BadgesWrite,
+    current_user: AdminOrApiKey_BadgesWrite,
+    x_tenant_id: _XTenantId = None,
+) -> BadgeRulePublic:
+    """Create a rule; by default it also awards everyone who already qualifies."""
+    tenant_id = _tenant_id(current_user, x_tenant_id)
+    _get_badge_or_404(db, body.badge_id)
+    _check_rule_target(db, body.config)
+    rule = BadgeRules(
+        tenant_id=tenant_id,
+        badge_id=body.badge_id,
+        type=body.config.type.value,
+        config=body.config.model_dump(mode="json"),
+        is_active=body.is_active,
+    )
+    db.add(rule)
+    db.commit()
+    db.refresh(rule)
+    if body.evaluate_now:
+        rules.evaluate_rule(db, rule)
+        db.refresh(rule)
+    return _rule_public(db, rule)
+
+
+@rules_router.patch("/{rule_id}", response_model=BadgeRulePublic)
+async def update_badge_rule(
+    rule_id: uuid.UUID,
+    body: BadgeRuleUpdate,
+    db: AdminOrApiKeySession_BadgesWrite,
+    _: AdminOrApiKey_BadgesWrite,
+) -> BadgeRulePublic:
+    """Edit a rule. Awards already given stay; run evaluate to apply it now."""
+    rule = _get_rule_or_404(db, rule_id)
+    if body.config is not None:
+        _check_rule_target(db, body.config)
+        rule.type = body.config.type.value
+        rule.config = body.config.model_dump(mode="json")
+    if body.is_active is not None:
+        rule.is_active = body.is_active
+    rule.updated_at = datetime.now(UTC)
+    db.add(rule)
+    db.commit()
+    db.refresh(rule)
+    return _rule_public(db, rule)
+
+
+@rules_router.delete("/{rule_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_badge_rule(
+    rule_id: uuid.UUID,
+    db: AdminOrApiKeySession_BadgesWrite,
+    _: AdminOrApiKey_BadgesWrite,
+) -> None:
+    """Delete a rule. Badges it already gave are kept."""
+    db.delete(_get_rule_or_404(db, rule_id))
+    db.commit()
+
+
+@rules_router.post("/{rule_id}/evaluate", response_model=BadgeRuleEvaluation)
+async def evaluate_badge_rule(
+    rule_id: uuid.UUID,
+    db: AdminOrApiKeySession_BadgesWrite,
+    _: AdminOrApiKey_BadgesWrite,
+) -> BadgeRuleEvaluation:
+    """Award the badge to everyone who meets the rule and doesn't have it yet."""
+    rule = _get_rule_or_404(db, rule_id)
+    return BadgeRuleEvaluation(rule_id=rule.id, awarded=rules.evaluate_rule(db, rule))

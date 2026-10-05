@@ -1731,6 +1731,33 @@ export type BadgePublic = {
     award_count?: number;
 };
 
+export type BadgeRuleCreate = {
+    badge_id: string;
+    config: (CheckinsInTrackConfig | CheckinsInPopupConfig);
+    is_active?: boolean;
+    evaluate_now?: boolean;
+};
+
+export type BadgeRuleEvaluation = {
+    rule_id: string;
+    awarded: number;
+};
+
+export type BadgeRulePublic = {
+    id: string;
+    badge_id: string;
+    config: (CheckinsInTrackConfig | CheckinsInPopupConfig);
+    is_active: boolean;
+    award_count?: number;
+    created_at: string;
+    updated_at: string;
+};
+
+export type BadgeRuleUpdate = {
+    config?: ((CheckinsInTrackConfig | CheckinsInPopupConfig) | null);
+    is_active?: (boolean | null);
+};
+
 export type BadgeStyleCreate = {
     name: string;
     key?: (string | null);
@@ -2213,6 +2240,18 @@ export type CheckInPayload = {
 };
 
 export type source = 'qr' | 'manual' | 'self_service';
+
+export type CheckinsInPopupConfig = {
+    type?: "checkins_in_popup";
+    popup_id: string;
+    threshold: number;
+};
+
+export type CheckinsInTrackConfig = {
+    type?: "checkins_in_track";
+    track_id: string;
+    threshold: number;
+};
 
 /**
  * Public buyer-form field for the checkout runtime.
@@ -8138,6 +8177,42 @@ export type BadgesDeleteIssuerPolicyData = {
 };
 
 export type BadgesDeleteIssuerPolicyResponse = (void);
+
+export type BadgesListBadgeRulesData = {
+    badgeId?: (string | null);
+    xTenantId?: (string | null);
+};
+
+export type BadgesListBadgeRulesResponse = (Array<BadgeRulePublic>);
+
+export type BadgesCreateBadgeRuleData = {
+    requestBody: BadgeRuleCreate;
+    xTenantId?: (string | null);
+};
+
+export type BadgesCreateBadgeRuleResponse = (BadgeRulePublic);
+
+export type BadgesUpdateBadgeRuleData = {
+    requestBody: BadgeRuleUpdate;
+    ruleId: string;
+    xTenantId?: (string | null);
+};
+
+export type BadgesUpdateBadgeRuleResponse = (BadgeRulePublic);
+
+export type BadgesDeleteBadgeRuleData = {
+    ruleId: string;
+    xTenantId?: (string | null);
+};
+
+export type BadgesDeleteBadgeRuleResponse = (void);
+
+export type BadgesEvaluateBadgeRuleData = {
+    ruleId: string;
+    xTenantId?: (string | null);
+};
+
+export type BadgesEvaluateBadgeRuleResponse = (BadgeRuleEvaluation);
 
 export type BaseFieldConfigsListBaseFieldConfigsData = {
     /**

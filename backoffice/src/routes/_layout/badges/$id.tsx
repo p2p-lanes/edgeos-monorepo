@@ -11,6 +11,7 @@ import { Suspense } from "react"
 import { BadgesService } from "@/client"
 import { BadgeAwardsList } from "@/components/Badges/BadgeAwardsList"
 import { BadgeForm } from "@/components/Badges/BadgeForm"
+import { BadgeRulesCard } from "@/components/Badges/BadgeRules"
 import { IssuerPoliciesCard } from "@/components/Badges/IssuerPolicies"
 import { DangerZone } from "@/components/Common/DangerZone"
 import { FormPageLayout } from "@/components/Common/FormPageLayout"
@@ -129,6 +130,8 @@ function BadgeDetailContent({ badgeId }: { badgeId: string }) {
       />
 
       <IssuerPoliciesCard badgeId={badgeId} />
+
+      <BadgeRulesCard badgeId={badgeId} />
 
       <Recipients badgeId={badgeId} />
 

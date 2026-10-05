@@ -10,6 +10,7 @@ from app.api.badge.schemas import (
     BadgeBase,
     BadgeImageBase,
     BadgeIssuerPolicyBase,
+    BadgeRuleBase,
     BadgeStyleBase,
 )
 
@@ -92,6 +93,15 @@ class BadgeAwards(BadgeAwardBase, table=True):
         Index("ix_badge_awards_issuer_human", "issuer_human_id", "awarded_at"),
         Index("ix_badge_awards_badge", "badge_id"),
         # Allowance counting: an issuer's awards under one policy since T.
+        # A rule awards each person at most once, ever: revoked rows count,
+        # so an admin's revoke is not undone by the next check-in.
+        Index(
+            "uq_badge_awards_rule_recipient",
+            "rule_id",
+            "recipient_human_id",
+            unique=True,
+            postgresql_where=text("rule_id IS NOT NULL"),
+        ),
         Index(
             "ix_badge_awards_policy_issuer",
             "policy_id",
@@ -173,3 +183,22 @@ class BadgeIssuerPolicies(BadgeIssuerPolicyBase, table=True):
         # Read-only: link rows are written explicitly so they carry tenant_id.
         sa_relationship_kwargs={"lazy": "selectin", "viewonly": True},
     )
+
+
+class BadgeRules(BadgeRuleBase, table=True):
+    """Awards a badge automatically once someone meets its condition."""
+
+    __tablename__ = "badge_rules"
+    __table_args__ = (
+        CheckConstraint(
+            "type IN ('checkins_in_track', 'checkins_in_popup')",
+            name="ck_badge_rules_type",
+        ),
+    )
+
+    id: uuid.UUID = Field(
+        default_factory=uuid.uuid4,
+        sa_column=Column(UUID(as_uuid=True), primary_key=True),
+    )
+
+    badge: Badges = Relationship(sa_relationship_kwargs={"lazy": "joined"})

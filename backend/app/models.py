@@ -71,6 +71,7 @@ from app.api.badge.models import (
     BadgeIssuerPolicies,
     BadgeIssuerPolicyBadges,
     BadgeIssuerPolicyHumans,
+    BadgeRules,
     Badges,
     BadgeStyles,
 )
@@ -384,6 +385,7 @@ __all__ = [
     "BadgeIssuerPolicies",
     "BadgeIssuerPolicyBadges",
     "BadgeIssuerPolicyHumans",
+    "BadgeRules",
     "Badges",
     "BadgeStyles",
     "Tracks",

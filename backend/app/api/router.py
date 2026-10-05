@@ -135,6 +135,7 @@ api_router.include_router(track.router)
 api_router.include_router(badge.router)
 api_router.include_router(badge.styles_router)
 api_router.include_router(badge.policies_router)
+api_router.include_router(badge.rules_router)
 
 # Task tracker (in-app product task board)
 api_router.include_router(task.router)

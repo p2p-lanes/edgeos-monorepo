@@ -1,10 +1,13 @@
 import uuid
 from datetime import UTC, datetime
 from enum import StrEnum
+from typing import Annotated, Literal
 
 from pydantic import BaseModel, ConfigDict, model_validator
+from pydantic import Field as PydanticField
 from sqlalchemy import Text
-from sqlmodel import DateTime, Field, SQLModel
+from sqlalchemy.dialects.postgresql import JSONB
+from sqlmodel import Column, DateTime, Field, SQLModel
 
 
 class BadgeIssuerType(StrEnum):
@@ -94,6 +97,10 @@ class BadgeAwardBase(SQLModel):
     # this award (until an admin revokes it).
     policy_id: uuid.UUID | None = Field(
         default=None, foreign_key="badge_issuer_policies.id", ondelete="SET NULL"
+    )
+    # The automatic rule that granted it (issuer_type "rule").
+    rule_id: uuid.UUID | None = Field(
+        default=None, foreign_key="badge_rules.id", ondelete="SET NULL"
     )
     message: str | None = Field(default=None, sa_type=Text())
     # Denormalized NOT badge.repeatable at insert time, so the partial unique
@@ -463,3 +470,76 @@ class SentBadgeAward(BaseModel):
     message: str | None = None
     awarded_at: datetime
     revoked_at: datetime | None = None
+
+
+# ---------------------------------------------------------------------------
+# Automatic rules (phase 3): badges earned by doing things
+# ---------------------------------------------------------------------------
+
+
+class BadgeRuleType(StrEnum):
+    # N check-ins (non-voided, one per event occurrence) in a track's events.
+    CHECKINS_IN_TRACK = "checkins_in_track"
+    # N check-ins in any event of a popup.
+    CHECKINS_IN_POPUP = "checkins_in_popup"
+
+
+class CheckinsInTrackConfig(BaseModel):
+    type: Literal[BadgeRuleType.CHECKINS_IN_TRACK] = BadgeRuleType.CHECKINS_IN_TRACK
+    track_id: uuid.UUID
+    threshold: int = Field(ge=1, le=1000)
+
+
+class CheckinsInPopupConfig(BaseModel):
+    type: Literal[BadgeRuleType.CHECKINS_IN_POPUP] = BadgeRuleType.CHECKINS_IN_POPUP
+    popup_id: uuid.UUID
+    threshold: int = Field(ge=1, le=1000)
+
+
+# Add a rule kind by adding a config model here and a metric in rules.py.
+BadgeRuleConfig = Annotated[
+    CheckinsInTrackConfig | CheckinsInPopupConfig, PydanticField(discriminator="type")
+]
+
+
+class BadgeRuleBase(SQLModel):
+    tenant_id: uuid.UUID = Field(foreign_key="tenants.id", index=True)
+    badge_id: uuid.UUID = Field(foreign_key="badges.id", ondelete="CASCADE")
+    type: str = Field(max_length=32)
+    # The validated BadgeRuleConfig, type included, so it round-trips.
+    config: dict = Field(default_factory=dict, sa_column=Column(JSONB, nullable=False))
+    is_active: bool = Field(default=True)
+    created_at: datetime = Field(
+        default_factory=lambda: datetime.now(UTC), sa_type=DateTime(timezone=True)
+    )
+    updated_at: datetime = Field(
+        default_factory=lambda: datetime.now(UTC), sa_type=DateTime(timezone=True)
+    )
+
+
+class BadgeRulePublic(BaseModel):
+    id: uuid.UUID
+    badge_id: uuid.UUID
+    config: BadgeRuleConfig
+    is_active: bool
+    award_count: int = 0
+    created_at: datetime
+    updated_at: datetime
+
+
+class BadgeRuleCreate(BaseModel):
+    badge_id: uuid.UUID
+    config: BadgeRuleConfig
+    is_active: bool = True
+    # Also award everyone who already meets the rule (historical check-ins).
+    evaluate_now: bool = True
+
+
+class BadgeRuleUpdate(BaseModel):
+    config: BadgeRuleConfig | None = None
+    is_active: bool | None = None
+
+
+class BadgeRuleEvaluation(BaseModel):
+    rule_id: uuid.UUID
+    awarded: int

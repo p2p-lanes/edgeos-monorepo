@@ -8378,6 +8378,162 @@ export const BadgePublicSchema = {
     title: 'BadgePublic'
 } as const;
 
+export const BadgeRuleCreateSchema = {
+    properties: {
+        badge_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Badge Id'
+        },
+        config: {
+            oneOf: [
+                {
+                    '$ref': '#/components/schemas/CheckinsInTrackConfig'
+                },
+                {
+                    '$ref': '#/components/schemas/CheckinsInPopupConfig'
+                }
+            ],
+            title: 'Config',
+            discriminator: {
+                propertyName: 'type',
+                mapping: {
+                    checkins_in_popup: '#/components/schemas/CheckinsInPopupConfig',
+                    checkins_in_track: '#/components/schemas/CheckinsInTrackConfig'
+                }
+            }
+        },
+        is_active: {
+            type: 'boolean',
+            title: 'Is Active',
+            default: true
+        },
+        evaluate_now: {
+            type: 'boolean',
+            title: 'Evaluate Now',
+            default: true
+        }
+    },
+    type: 'object',
+    required: ['badge_id', 'config'],
+    title: 'BadgeRuleCreate'
+} as const;
+
+export const BadgeRuleEvaluationSchema = {
+    properties: {
+        rule_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Rule Id'
+        },
+        awarded: {
+            type: 'integer',
+            title: 'Awarded'
+        }
+    },
+    type: 'object',
+    required: ['rule_id', 'awarded'],
+    title: 'BadgeRuleEvaluation'
+} as const;
+
+export const BadgeRulePublicSchema = {
+    properties: {
+        id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Id'
+        },
+        badge_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Badge Id'
+        },
+        config: {
+            oneOf: [
+                {
+                    '$ref': '#/components/schemas/CheckinsInTrackConfig'
+                },
+                {
+                    '$ref': '#/components/schemas/CheckinsInPopupConfig'
+                }
+            ],
+            title: 'Config',
+            discriminator: {
+                propertyName: 'type',
+                mapping: {
+                    checkins_in_popup: '#/components/schemas/CheckinsInPopupConfig',
+                    checkins_in_track: '#/components/schemas/CheckinsInTrackConfig'
+                }
+            }
+        },
+        is_active: {
+            type: 'boolean',
+            title: 'Is Active'
+        },
+        award_count: {
+            type: 'integer',
+            title: 'Award Count',
+            default: 0
+        },
+        created_at: {
+            type: 'string',
+            format: 'date-time',
+            title: 'Created At'
+        },
+        updated_at: {
+            type: 'string',
+            format: 'date-time',
+            title: 'Updated At'
+        }
+    },
+    type: 'object',
+    required: ['id', 'badge_id', 'config', 'is_active', 'created_at', 'updated_at'],
+    title: 'BadgeRulePublic'
+} as const;
+
+export const BadgeRuleUpdateSchema = {
+    properties: {
+        config: {
+            anyOf: [
+                {
+                    oneOf: [
+                        {
+                            '$ref': '#/components/schemas/CheckinsInTrackConfig'
+                        },
+                        {
+                            '$ref': '#/components/schemas/CheckinsInPopupConfig'
+                        }
+                    ],
+                    discriminator: {
+                        propertyName: 'type',
+                        mapping: {
+                            checkins_in_popup: '#/components/schemas/CheckinsInPopupConfig',
+                            checkins_in_track: '#/components/schemas/CheckinsInTrackConfig'
+                        }
+                    }
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Config'
+        },
+        is_active: {
+            anyOf: [
+                {
+                    type: 'boolean'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Is Active'
+        }
+    },
+    type: 'object',
+    title: 'BadgeRuleUpdate'
+} as const;
+
 export const BadgeStyleCreateSchema = {
     properties: {
         name: {
@@ -10412,6 +10568,56 @@ export const CheckInPayloadSchema = {
 
 \`source\` discriminates how the scan occurred. \`notes\` is an optional
 free-form operator annotation.`
+} as const;
+
+export const CheckinsInPopupConfigSchema = {
+    properties: {
+        type: {
+            type: 'string',
+            const: 'checkins_in_popup',
+            title: 'Type',
+            default: 'checkins_in_popup'
+        },
+        popup_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Popup Id'
+        },
+        threshold: {
+            type: 'integer',
+            maximum: 1000,
+            minimum: 1,
+            title: 'Threshold'
+        }
+    },
+    type: 'object',
+    required: ['popup_id', 'threshold'],
+    title: 'CheckinsInPopupConfig'
+} as const;
+
+export const CheckinsInTrackConfigSchema = {
+    properties: {
+        type: {
+            type: 'string',
+            const: 'checkins_in_track',
+            title: 'Type',
+            default: 'checkins_in_track'
+        },
+        track_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Track Id'
+        },
+        threshold: {
+            type: 'integer',
+            maximum: 1000,
+            minimum: 1,
+            title: 'Threshold'
+        }
+    },
+    type: 'object',
+    required: ['track_id', 'threshold'],
+    title: 'CheckinsInTrackConfig'
 } as const;
 
 export const CheckoutBuyerFieldSchema = {

@@ -246,6 +246,7 @@ def create_award(
     issuer_name: str | None = None,
     popup_id: uuid.UUID | None = None,
     policy_id: uuid.UUID | None = None,
+    rule_id: uuid.UUID | None = None,
     message: str | None = None,
 ) -> BadgeAwards:
     """Insert an award and commit.
@@ -269,6 +270,7 @@ def create_award(
         issuer_name=issuer_name,
         popup_id=popup_id,
         policy_id=policy_id,
+        rule_id=rule_id,
         message=message or None,
         is_unique=not badge.repeatable,
     )
