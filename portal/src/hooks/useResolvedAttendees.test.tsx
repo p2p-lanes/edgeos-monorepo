@@ -2,9 +2,9 @@ import { renderHook } from "@testing-library/react"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 import { CHECKOUT_MODE } from "@/checkout/popupCheckoutPolicy"
 import type {
-  ApplicationPublic,
+  ApplicationPortalPublic,
   AttendeeCategoryPublic,
-  AttendeeWithOriginPublic,
+  AttendeeWithOriginPortalPublic,
 } from "@/client"
 import {
   buildBaseAttendeePasses,
@@ -35,7 +35,7 @@ let mockUser: {
   picture_url?: string | null
   enriched_profile?: Record<string, unknown> | null
 } | null = null
-let mockApplications: ApplicationPublic[] | null = null
+let mockApplications: ApplicationPortalPublic[] | null = null
 let mockCategories: AttendeeCategoryPublic[] | undefined
 
 vi.mock("@/client", () => ({}))
@@ -78,8 +78,11 @@ vi.mock("@/providers/cityProvider", () => ({
 }))
 
 function makeAttendee(
-  overrides: Partial<AttendeeWithOriginPublic> & { id: string; name: string },
-): AttendeeWithOriginPublic {
+  overrides: Partial<AttendeeWithOriginPortalPublic> & {
+    id: string
+    name: string
+  },
+): AttendeeWithOriginPortalPublic {
   return {
     tenant_id: "tenant-1",
     popup_id: "popup-1",
@@ -92,7 +95,7 @@ function makeAttendee(
     products: [],
     origin: "application",
     ...overrides,
-  } as unknown as AttendeeWithOriginPublic
+  } as unknown as AttendeeWithOriginPortalPublic
 }
 
 const persistedAttendee = makeAttendee({
@@ -139,7 +142,6 @@ describe("useResolvedAttendees", () => {
       last_name: "Buyer",
       gender: null,
       residence: "Lisbon",
-      enriched_profile: { interests: ["music"] },
     }
     mockApplications = []
     mockCategories = [primaryCategory]
@@ -232,7 +234,7 @@ describe("useResolvedAttendees", () => {
         status: "accepted",
         custom_fields: { role: "Builder" },
       },
-    ] as ApplicationPublic[]
+    ] as ApplicationPortalPublic[]
     mockUseHumanAttendeesQuery.mockReturnValue({ data: [] })
 
     const { result, rerender } = renderHook(() => useResolvedAttendees())
@@ -263,7 +265,7 @@ describe("useResolvedAttendees", () => {
           last_name: "Buyer",
           gender: null,
           residence: "Lisbon",
-          enriched_profile: { interests: ["music"] },
+
           category: "main",
         },
       },
@@ -294,7 +296,7 @@ describe("useResolvedAttendees", () => {
         human_id: "human-1",
         sales_flow_id: "flow-partner",
       },
-    ] as ApplicationPublic[]
+    ] as ApplicationPortalPublic[]
     mockUseHumanAttendeesQuery.mockReturnValue({ data: [] })
 
     const { result } = renderHook(() => useResolvedAttendees("flow-partner"))
@@ -326,7 +328,7 @@ describe("useResolvedAttendees", () => {
           role: "Builder",
         },
       },
-    ] as ApplicationPublic[]
+    ] as ApplicationPortalPublic[]
     mockUseHumanAttendeesQuery.mockReturnValue({
       data: [
         makeAttendee({
@@ -384,7 +386,7 @@ describe("useResolvedAttendees", () => {
         human_id: "human-1",
         sales_flow_id: "flow-current",
       },
-    ] as ApplicationPublic[]
+    ] as ApplicationPortalPublic[]
     mockUseHumanAttendeesQuery.mockReturnValue({
       data: [
         makeAttendee({
@@ -429,7 +431,7 @@ describe("useResolvedAttendees", () => {
         human_id: "human-1",
         sales_flow_id: "flow-current",
       },
-    ] as ApplicationPublic[]
+    ] as ApplicationPortalPublic[]
     mockUseHumanAttendeesQuery.mockReturnValue({
       data: [
         makeAttendee({
@@ -591,7 +593,7 @@ describe("useResolvedAttendees", () => {
       checkout_mode: "pass_system",
       takes_applications: true,
     }
-    mockApplications = applications as ApplicationPublic[] | null
+    mockApplications = applications as ApplicationPortalPublic[] | null
     mockCategories = categories
     if (mockApplications?.length === 1) {
       mockApplications[0] = {
@@ -653,7 +655,7 @@ describe("useResolvedAttendees", () => {
         human_id: "human-1",
         sales_flow_id: "flow-general",
       },
-    ] as ApplicationPublic[]
+    ] as ApplicationPortalPublic[]
     mockUseHumanAttendeesQuery.mockReturnValue({ data: [persistedAttendee] })
 
     const { result } = renderHook(() => useResolvedAttendees())

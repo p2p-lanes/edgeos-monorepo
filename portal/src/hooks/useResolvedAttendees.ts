@@ -2,14 +2,15 @@
 
 import { dedupTicketEntries } from "@/app/portal/[popupSlug]/passes/utils/dedupTickets"
 import type {
-  ApplicationPublic,
-  AttendeeWithOriginPublic,
-  HumanPublic,
+  ApplicationPortalPublic,
+  AttendeeWithOriginPortalPublic,
+  HumanSelfPublic,
 } from "@/client"
 import { sortAttendees } from "@/helpers/filters"
 import { useAttendeeCategories } from "@/hooks/useAttendeeCategories"
 import useAuth from "@/hooks/useAuth"
 import useHumanAttendeesQuery from "@/hooks/useHumanAttendeesQuery"
+import { publicProfileMetadata } from "@/lib/public-profile-metadata"
 import { useApplication } from "@/providers/applicationProvider"
 import { useCityProvider } from "@/providers/cityProvider"
 import type { AttendeePassState } from "@/types/Attendee"
@@ -19,11 +20,11 @@ import {
 } from "@/types/checkout"
 
 function buildHumanProfileSnapshot(
-  user: HumanPublic,
-  application: ApplicationPublic | null,
+  user: HumanSelfPublic,
+  application: ApplicationPortalPublic | null,
 ): Record<string, unknown> {
   return {
-    ...(application?.custom_fields ?? {}),
+    ...publicProfileMetadata(application?.custom_fields),
     first_name: user.first_name ?? null,
     last_name: user.last_name ?? null,
     telegram: user.telegram ?? null,
@@ -31,7 +32,6 @@ function buildHumanProfileSnapshot(
     age: user.age ?? null,
     residence: user.residence ?? null,
     picture_url: user.picture_url ?? null,
-    enriched_profile: user.enriched_profile ?? null,
   }
 }
 
@@ -43,12 +43,12 @@ function withoutFlowRole(
     category_id: _categoryId,
     ...rest
   } = profile ?? {}
-  return rest
+  return publicProfileMetadata(rest)
 }
 
 function isLegacyBuyerAttendee(
-  attendee: AttendeeWithOriginPublic,
-  application: ApplicationPublic | null,
+  attendee: AttendeeWithOriginPortalPublic,
+  application: ApplicationPortalPublic | null,
   ownsApplication: boolean,
 ): boolean {
   if (!ownsApplication || !application) return false
@@ -64,7 +64,7 @@ function isLegacyBuyerAttendee(
 }
 
 function persistedPassState(
-  attendee: AttendeeWithOriginPublic,
+  attendee: AttendeeWithOriginPortalPublic,
 ): AttendeePassState {
   return {
     ...(attendee as unknown as AttendeePassState),

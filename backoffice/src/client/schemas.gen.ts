@@ -188,7 +188,7 @@ export const AbandonedCartPublicSchema = {
             title: 'Id'
         },
         items: {
-            '$ref': '#/components/schemas/CartState-Output'
+            '$ref': '#/components/schemas/CartState'
         },
         created_at: {
             anyOf: [
@@ -2950,7 +2950,7 @@ export const AdminGrantTicketsResponseSchema = {
     properties: {
         granted: {
             items: {
-                '$ref': '#/components/schemas/GrantedPaymentInfo'
+                '$ref': '#/components/schemas/GrantedAttendeeInfo'
             },
             type: 'array',
             title: 'Granted'
@@ -3775,6 +3775,285 @@ export const ApplicationLayoutSchema = {
 - multi_step: one section per step, with Next/Back navigation.`
 } as const;
 
+export const ApplicationPortalPublicSchema = {
+    properties: {
+        id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Id'
+        },
+        tenant_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Tenant Id'
+        },
+        popup_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Popup Id'
+        },
+        human_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Human Id'
+        },
+        group_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Group Id'
+        },
+        sales_flow_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Sales Flow Id'
+        },
+        referral: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Referral'
+        },
+        invite_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Invite Id'
+        },
+        referral_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Referral Id'
+        },
+        referred_by_name: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Referred By Name'
+        },
+        access_sources: {
+            items: {
+                '$ref': '#/components/schemas/ApplicationAccessSource'
+            },
+            type: 'array',
+            title: 'Access Sources'
+        },
+        info_not_shared: {
+            items: {
+                type: 'string'
+            },
+            type: 'array',
+            title: 'Info Not Shared',
+            default: []
+        },
+        status: {
+            type: 'string',
+            title: 'Status'
+        },
+        custom_fields: {
+            additionalProperties: true,
+            type: 'object',
+            title: 'Custom Fields',
+            default: {}
+        },
+        custom_fields_schema: {
+            anyOf: [
+                {
+                    additionalProperties: true,
+                    type: 'object'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Custom Fields Schema'
+        },
+        credit: {
+            type: 'string',
+            pattern: '^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$',
+            title: 'Credit',
+            default: '0'
+        },
+        fee_credit_granted: {
+            type: 'boolean',
+            title: 'Fee Credit Granted',
+            default: false
+        },
+        submitted_at: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Submitted At'
+        },
+        accepted_at: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Accepted At'
+        },
+        created_at: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Created At'
+        },
+        updated_at: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Updated At'
+        },
+        scholarship_request: {
+            type: 'boolean',
+            title: 'Scholarship Request',
+            default: false
+        },
+        scholarship_details: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Scholarship Details'
+        },
+        scholarship_video_url: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Scholarship Video Url'
+        },
+        scholarship_status: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Scholarship Status'
+        },
+        discount_percentage: {
+            anyOf: [
+                {
+                    type: 'string',
+                    pattern: '^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Discount Percentage'
+        },
+        incentive_amount: {
+            anyOf: [
+                {
+                    type: 'string',
+                    pattern: '^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Incentive Amount'
+        },
+        incentive_currency: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Incentive Currency'
+        },
+        human: {
+            anyOf: [
+                {
+                    '$ref': '#/components/schemas/HumanSelfPublic'
+                },
+                {
+                    type: 'null'
+                }
+            ]
+        },
+        attendees: {
+            items: {
+                '$ref': '#/components/schemas/AttendeePortalPublic'
+            },
+            type: 'array',
+            title: 'Attendees',
+            default: []
+        }
+    },
+    type: 'object',
+    required: ['id', 'tenant_id', 'popup_id', 'human_id', 'sales_flow_id', 'status'],
+    title: 'ApplicationPortalPublic',
+    description: 'Applicant-facing response, without administrative assessments or reviews.'
+} as const;
+
 export const ApplicationPublicSchema = {
     properties: {
         id: {
@@ -4100,7 +4379,7 @@ export const ApplicationPublicSchema = {
     type: 'object',
     required: ['id', 'tenant_id', 'popup_id', 'human_id', 'sales_flow_id', 'status'],
     title: 'ApplicationPublic',
-    description: 'Application schema for API responses.'
+    description: 'Administrative application response; never return from portal routes.'
 } as const;
 
 export const ApplicationReviewCreateSchema = {
@@ -5719,6 +5998,151 @@ shape returned by the list endpoint. Use AttendeePublic for detail views
 where AttendeeProductPublic (with per-ticket check_in_code) is needed.`
 } as const;
 
+export const AttendeePortalPublicSchema = {
+    properties: {
+        tenant_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Tenant Id'
+        },
+        application_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Application Id'
+        },
+        popup_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Popup Id'
+        },
+        human_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Human Id'
+        },
+        name: {
+            type: 'string',
+            title: 'Name'
+        },
+        category_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Category Id'
+        },
+        email: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Email'
+        },
+        gender: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Gender'
+        },
+        poap_url: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Poap Url'
+        },
+        additional_data: {
+            additionalProperties: true,
+            type: 'object',
+            title: 'Additional Data'
+        },
+        id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Id'
+        },
+        category: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Category'
+        },
+        created_at: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Created At'
+        },
+        updated_at: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Updated At'
+        },
+        products: {
+            items: {
+                '$ref': '#/components/schemas/AttendeeProductPublic'
+            },
+            type: 'array',
+            title: 'Products',
+            default: []
+        }
+    },
+    type: 'object',
+    required: ['tenant_id', 'popup_id', 'name', 'id'],
+    title: 'AttendeePortalPublic',
+    description: 'Human-facing attendee, including safe historical profile metadata.'
+} as const;
+
 export const AttendeeProductPublicSchema = {
     properties: {
         id: {
@@ -6332,6 +6756,156 @@ export const AttendeeUpdateSchema = {
     type: 'object',
     title: 'AttendeeUpdate',
     description: 'Attendee schema for updates.'
+} as const;
+
+export const AttendeeWithOriginPortalPublicSchema = {
+    properties: {
+        tenant_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Tenant Id'
+        },
+        application_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Application Id'
+        },
+        popup_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Popup Id'
+        },
+        human_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Human Id'
+        },
+        name: {
+            type: 'string',
+            title: 'Name'
+        },
+        category_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Category Id'
+        },
+        email: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Email'
+        },
+        gender: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Gender'
+        },
+        poap_url: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Poap Url'
+        },
+        additional_data: {
+            additionalProperties: true,
+            type: 'object',
+            title: 'Additional Data'
+        },
+        id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Id'
+        },
+        category: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Category'
+        },
+        created_at: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Created At'
+        },
+        updated_at: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Updated At'
+        },
+        products: {
+            items: {
+                '$ref': '#/components/schemas/AttendeeProductPublic'
+            },
+            type: 'array',
+            title: 'Products',
+            default: []
+        },
+        origin: {
+            type: 'string',
+            title: 'Origin',
+            default: ''
+        }
+    },
+    type: 'object',
+    required: ['tenant_id', 'popup_id', 'name', 'id'],
+    title: 'AttendeeWithOriginPortalPublic',
+    description: 'Portal projection of an attendee with origin and sanitized metadata.'
 } as const;
 
 export const AttendeeWithOriginPublicSchema = {
@@ -8092,6 +8666,82 @@ export const CartPopupInfoSchema = {
     description: 'Embedded popup info for abandoned cart listing.'
 } as const;
 
+export const CartPortalStateSchema = {
+    properties: {
+        lines: {
+            items: {
+                oneOf: [
+                    {
+                        '$ref': '#/components/schemas/CartProductLine'
+                    },
+                    {
+                        '$ref': '#/components/schemas/CartDateRangeLine'
+                    },
+                    {
+                        '$ref': '#/components/schemas/CartCustomAmountLine'
+                    },
+                    {
+                        '$ref': '#/components/schemas/CartMealPlanLine'
+                    },
+                    {
+                        '$ref': '#/components/schemas/CartAccommodationLine'
+                    }
+                ],
+                discriminator: {
+                    propertyName: 'kind',
+                    mapping: {
+                        accommodation: '#/components/schemas/CartAccommodationLine',
+                        custom_amount: '#/components/schemas/CartCustomAmountLine',
+                        date_range: '#/components/schemas/CartDateRangeLine',
+                        meal_plan: '#/components/schemas/CartMealPlanLine',
+                        product: '#/components/schemas/CartProductLine'
+                    }
+                }
+            },
+            type: 'array',
+            title: 'Lines'
+        },
+        recipients: {
+            items: {
+                '$ref': '#/components/schemas/CartRecipientPortalProfile'
+            },
+            type: 'array',
+            title: 'Recipients'
+        },
+        promo_code: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Promo Code'
+        },
+        insurance: {
+            type: 'boolean',
+            title: 'Insurance',
+            default: false
+        },
+        current_step: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Current Step'
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    title: 'CartPortalState',
+    description: 'Read-time projection; also protects carts saved before the privacy fix.'
+} as const;
+
 export const CartProductLineSchema = {
     properties: {
         assignment: {
@@ -8182,7 +8832,7 @@ export const CartPublicSchema = {
             title: 'Popup Id'
         },
         items: {
-            '$ref': '#/components/schemas/CartState-Output'
+            '$ref': '#/components/schemas/CartPortalState'
         },
         created_at: {
             anyOf: [
@@ -8235,7 +8885,79 @@ export const CartRecipientAssignmentSchema = {
     title: 'CartRecipientAssignment'
 } as const;
 
-export const CartState_InputSchema = {
+export const CartRecipientPortalProfileSchema = {
+    properties: {
+        recipient_key: {
+            type: 'string',
+            maxLength: 255,
+            minLength: 1,
+            title: 'Recipient Key'
+        },
+        human_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Human Id'
+        },
+        existing_attendee_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Existing Attendee Id'
+        },
+        name: {
+            type: 'string',
+            minLength: 1,
+            title: 'Name'
+        },
+        email: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'email'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Email'
+        },
+        category_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Category Id'
+        },
+        profile_snapshot: {
+            additionalProperties: true,
+            type: 'object',
+            title: 'Profile Snapshot'
+        }
+    },
+    type: 'object',
+    required: ['recipient_key', 'name'],
+    title: 'CartRecipientPortalProfile'
+} as const;
+
+export const CartStateSchema = {
     properties: {
         lines: {
             items: {
@@ -8272,7 +8994,7 @@ export const CartState_InputSchema = {
         },
         recipients: {
             items: {
-                '$ref': '#/components/schemas/PaymentRecipientRequest'
+                '$ref': '#/components/schemas/PaymentRecipientProfile'
             },
             type: 'array',
             title: 'Recipients'
@@ -8311,7 +9033,7 @@ export const CartState_InputSchema = {
     description: 'Full cart state stored as JSONB.'
 } as const;
 
-export const CartState_OutputSchema = {
+export const CartStateRequestSchema = {
     properties: {
         lines: {
             items: {
@@ -8383,8 +9105,8 @@ export const CartState_OutputSchema = {
     },
     additionalProperties: false,
     type: 'object',
-    title: 'CartState',
-    description: 'Full cart state stored as JSONB.'
+    title: 'CartStateRequest',
+    description: 'Untrusted cart input: never persist administrative profile metadata.'
 } as const;
 
 export const CartUnassignedSchema = {
@@ -8404,7 +9126,7 @@ export const CartUnassignedSchema = {
 export const CartUpdateSchema = {
     properties: {
         items: {
-            '$ref': '#/components/schemas/CartState-Input'
+            '$ref': '#/components/schemas/CartStateRequest'
         }
     },
     type: 'object',
@@ -14590,24 +15312,12 @@ export const GrantProductItemSchema = {
     description: 'One product line in the admin bulk-grant request.'
 } as const;
 
-export const GrantedPaymentInfoSchema = {
+export const GrantedAttendeeInfoSchema = {
     properties: {
-        payment_id: {
+        attendee_id: {
             type: 'string',
             format: 'uuid',
-            title: 'Payment Id'
-        },
-        application_id: {
-            anyOf: [
-                {
-                    type: 'string',
-                    format: 'uuid'
-                },
-                {
-                    type: 'null'
-                }
-            ],
-            title: 'Application Id'
+            title: 'Attendee Id'
         },
         human_id: {
             type: 'string',
@@ -14624,9 +15334,9 @@ export const GrantedPaymentInfoSchema = {
         }
     },
     type: 'object',
-    required: ['payment_id', 'application_id', 'human_id', 'email', 'tickets_created'],
-    title: 'GrantedPaymentInfo',
-    description: 'One $0 payment created by the admin bulk-grant flow.'
+    required: ['attendee_id', 'human_id', 'email', 'tickets_created'],
+    title: 'GrantedAttendeeInfo',
+    description: 'Products assigned directly to one attendee by the backoffice.'
 } as const;
 
 export const GroupAdminUpdateSchema = {
@@ -15931,11 +16641,6 @@ export const HumanAuthSchema = {
                 }
             ],
             title: 'Picture Url'
-        },
-        red_flag: {
-            type: 'boolean',
-            title: 'Red Flag',
-            default: false
         }
     },
     type: 'object',
@@ -16707,7 +17412,7 @@ export const HumanPublicSchema = {
     type: 'object',
     required: ['id', 'tenant_id', 'email'],
     title: 'HumanPublic',
-    description: 'Human schema for API responses.'
+    description: 'Administrative human response. Never use on a human-facing route.'
 } as const;
 
 export const HumanRatingSchema = {
@@ -16719,6 +17424,106 @@ export const HumanRatingSchema = {
 Replaces the legacy \`\`red_flag\`\` boolean. Only \`\`RED_FLAG\`\` carries the
 automatic cascade (revoke API keys, reject in-review applications, send
 rejection emails); the other levels are purely advisory labels.`
+} as const;
+
+export const HumanSelfPublicSchema = {
+    properties: {
+        id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Id'
+        },
+        tenant_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Tenant Id'
+        },
+        email: {
+            type: 'string',
+            title: 'Email'
+        },
+        first_name: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'First Name'
+        },
+        last_name: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Last Name'
+        },
+        telegram: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Telegram'
+        },
+        gender: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Gender'
+        },
+        age: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Age'
+        },
+        residence: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Residence'
+        },
+        picture_url: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Picture Url'
+        }
+    },
+    type: 'object',
+    required: ['id', 'tenant_id', 'email'],
+    title: 'HumanSelfPublic',
+    description: 'Allowlisted own-profile response for humans and third-party apps.'
 } as const;
 
 export const HumanUpdateSchema = {
@@ -17621,6 +18426,24 @@ export const ListModel_ApplicationCommentPublic_Schema = {
     title: 'ListModel[ApplicationCommentPublic]'
 } as const;
 
+export const ListModel_ApplicationPortalPublic_Schema = {
+    properties: {
+        results: {
+            items: {
+                '$ref': '#/components/schemas/ApplicationPortalPublic'
+            },
+            type: 'array',
+            title: 'Results'
+        },
+        paging: {
+            '$ref': '#/components/schemas/Paging'
+        }
+    },
+    type: 'object',
+    required: ['results', 'paging'],
+    title: 'ListModel[ApplicationPortalPublic]'
+} as const;
+
 export const ListModel_ApplicationPublic_Schema = {
     properties: {
         results: {
@@ -17693,11 +18516,11 @@ export const ListModel_AttendeeListItem_Schema = {
     title: 'ListModel[AttendeeListItem]'
 } as const;
 
-export const ListModel_AttendeeWithOriginPublic_Schema = {
+export const ListModel_AttendeeWithOriginPortalPublic_Schema = {
     properties: {
         results: {
             items: {
-                '$ref': '#/components/schemas/AttendeeWithOriginPublic'
+                '$ref': '#/components/schemas/AttendeeWithOriginPortalPublic'
             },
             type: 'array',
             title: 'Results'
@@ -17708,7 +18531,7 @@ export const ListModel_AttendeeWithOriginPublic_Schema = {
     },
     type: 'object',
     required: ['results', 'paging'],
-    title: 'ListModel[AttendeeWithOriginPublic]'
+    title: 'ListModel[AttendeeWithOriginPortalPublic]'
 } as const;
 
 export const ListModel_AttendeesDirectoryEntry_Schema = {
@@ -18069,6 +18892,24 @@ export const ListModel_MyGroupPublic_Schema = {
     type: 'object',
     required: ['results', 'paging'],
     title: 'ListModel[MyGroupPublic]'
+} as const;
+
+export const ListModel_PaymentPortalPublic_Schema = {
+    properties: {
+        results: {
+            items: {
+                '$ref': '#/components/schemas/PaymentPortalPublic'
+            },
+            type: 'array',
+            title: 'Results'
+        },
+        paging: {
+            '$ref': '#/components/schemas/Paging'
+        }
+    },
+    type: 'object',
+    required: ['results', 'paging'],
+    title: 'ListModel[PaymentPortalPublic]'
 } as const;
 
 export const ListModel_PaymentPublic_Schema = {
@@ -18765,7 +19606,7 @@ export const OpenCartPublicSchema = {
             title: 'Email'
         },
         items: {
-            '$ref': '#/components/schemas/CartState-Output'
+            '$ref': '#/components/schemas/CartPortalState'
         },
         restore_token: {
             anyOf: [
@@ -18822,7 +19663,7 @@ export const OpenCartUpsertSchema = {
             title: 'Email'
         },
         items: {
-            '$ref': '#/components/schemas/CartState-Input'
+            '$ref': '#/components/schemas/CartStateRequest'
         }
     },
     type: 'object',
@@ -19122,6 +19963,349 @@ export const PaymentCreateSchema = {
 
 Either application_id (application-based flow) or popup_id must be
 provided — at least one source is required.`
+} as const;
+
+export const PaymentPortalPublicSchema = {
+    properties: {
+        tenant_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Tenant Id'
+        },
+        application_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Application Id'
+        },
+        popup_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Popup Id'
+        },
+        buyer_human_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Buyer Human Id'
+        },
+        sales_flow_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Sales Flow Id'
+        },
+        external_id: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'External Id'
+        },
+        status: {
+            type: 'string',
+            title: 'Status',
+            default: 'pending'
+        },
+        amount: {
+            type: 'string',
+            pattern: '^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$',
+            title: 'Amount',
+            default: '0'
+        },
+        amount_charged: {
+            anyOf: [
+                {
+                    type: 'string',
+                    pattern: '^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Amount Charged'
+        },
+        insurance_amount: {
+            type: 'string',
+            pattern: '^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$',
+            title: 'Insurance Amount',
+            default: '0'
+        },
+        contribution_amount: {
+            type: 'string',
+            pattern: '^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$',
+            title: 'Contribution Amount',
+            default: '0'
+        },
+        currency: {
+            type: 'string',
+            title: 'Currency',
+            default: 'USD'
+        },
+        settlement_currency: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Settlement Currency'
+        },
+        rate: {
+            anyOf: [
+                {
+                    type: 'string',
+                    pattern: '^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Rate'
+        },
+        source: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Source'
+        },
+        checkout_url: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Checkout Url'
+        },
+        buyer_snapshot: {
+            anyOf: [
+                {
+                    additionalProperties: true,
+                    type: 'object'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Buyer Snapshot'
+        },
+        coupon_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Coupon Id'
+        },
+        coupon_code: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Coupon Code'
+        },
+        discount_value: {
+            anyOf: [
+                {
+                    type: 'string',
+                    pattern: '^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Discount Value'
+        },
+        edit_passes: {
+            type: 'boolean',
+            title: 'Edit Passes',
+            default: false
+        },
+        is_installment_plan: {
+            type: 'boolean',
+            title: 'Is Installment Plan',
+            default: false
+        },
+        installments_total: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Installments Total'
+        },
+        installments_paid: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Installments Paid',
+            default: 0
+        },
+        group_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Group Id'
+        },
+        payment_type: {
+            type: 'string',
+            title: 'Payment Type',
+            default: 'pass_purchase'
+        },
+        granted_by_user_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Granted By User Id'
+        },
+        credit_applied: {
+            type: 'string',
+            pattern: '^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$',
+            title: 'Credit Applied',
+            default: '0'
+        },
+        id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Id'
+        },
+        products_snapshot: {
+            items: {
+                '$ref': '#/components/schemas/PaymentProductResponse'
+            },
+            type: 'array',
+            title: 'Products Snapshot',
+            default: []
+        },
+        recipients: {
+            items: {
+                '$ref': '#/components/schemas/PaymentRecipientPortalResponse'
+            },
+            type: 'array',
+            title: 'Recipients'
+        },
+        buyer_email: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Buyer Email'
+        },
+        buyer_name: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Buyer Name'
+        },
+        redirect_url: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Redirect Url'
+        },
+        created_at: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Created At'
+        },
+        updated_at: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Updated At'
+        }
+    },
+    type: 'object',
+    required: ['tenant_id', 'popup_id', 'id'],
+    title: 'PaymentPortalPublic',
+    description: 'Human-facing payment response without internal recipient metadata.'
 } as const;
 
 export const PaymentPreviewSchema = {
@@ -19916,6 +21100,174 @@ export const PaymentPublicSchema = {
     description: 'Payment schema for API responses.'
 } as const;
 
+export const PaymentRecipientPortalResponseSchema = {
+    properties: {
+        recipient_key: {
+            type: 'string',
+            maxLength: 255,
+            minLength: 1,
+            title: 'Recipient Key'
+        },
+        human_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Human Id'
+        },
+        existing_attendee_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Existing Attendee Id'
+        },
+        name: {
+            type: 'string',
+            minLength: 1,
+            title: 'Name'
+        },
+        email: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'email'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Email'
+        },
+        category_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Category Id'
+        },
+        profile_snapshot: {
+            additionalProperties: true,
+            type: 'object',
+            title: 'Profile Snapshot'
+        },
+        id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Id'
+        },
+        attendee_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Attendee Id'
+        },
+        created_at: {
+            type: 'string',
+            format: 'date-time',
+            title: 'Created At'
+        }
+    },
+    type: 'object',
+    required: ['recipient_key', 'name', 'id', 'created_at'],
+    title: 'PaymentRecipientPortalResponse',
+    description: 'Public projection of a stored recipient; leaves historical data untouched.'
+} as const;
+
+export const PaymentRecipientProfileSchema = {
+    properties: {
+        recipient_key: {
+            type: 'string',
+            maxLength: 255,
+            minLength: 1,
+            title: 'Recipient Key'
+        },
+        human_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Human Id'
+        },
+        existing_attendee_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Existing Attendee Id'
+        },
+        name: {
+            type: 'string',
+            minLength: 1,
+            title: 'Name'
+        },
+        email: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'email'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Email'
+        },
+        category_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Category Id'
+        },
+        profile_snapshot: {
+            additionalProperties: true,
+            type: 'object',
+            title: 'Profile Snapshot'
+        }
+    },
+    type: 'object',
+    required: ['recipient_key', 'name'],
+    title: 'PaymentRecipientProfile',
+    description: 'Stable recipient identity and profile supplied for one payment attempt.'
+} as const;
+
 export const PaymentRecipientRequestSchema = {
     properties: {
         recipient_key: {
@@ -19986,7 +21338,7 @@ export const PaymentRecipientRequestSchema = {
     type: 'object',
     required: ['recipient_key', 'name'],
     title: 'PaymentRecipientRequest',
-    description: 'Stable recipient identity and profile supplied for one payment attempt.'
+    description: 'Untrusted checkout input; old clients may send reserved keys, which are ignored.'
 } as const;
 
 export const PaymentRecipientResponseSchema = {

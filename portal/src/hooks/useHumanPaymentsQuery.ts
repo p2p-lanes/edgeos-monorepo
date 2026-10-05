@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query"
-import type { PaymentPublic } from "@/client"
+import type { PaymentPortalPublic } from "@/client"
 import { PaymentsService } from "@/client"
 import { queryKeys } from "@/lib/query-keys"
 
@@ -24,7 +24,7 @@ export function useHumanPaymentsQuery(
 
   return useQuery({
     queryKey: queryKeys.payments.byPopup(popupId ?? ""),
-    queryFn: async (): Promise<PaymentPublic[]> => {
+    queryFn: async (): Promise<PaymentPortalPublic[]> => {
       const result = await PaymentsService.listMyPaymentsByPopup({
         popupId: popupId!,
         skip: offset,

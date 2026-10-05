@@ -1,5 +1,6 @@
 import type { PaymentRecipientRequest } from "@/client"
 import type { AccommodationGuestForm } from "@/lib/accommodationForm"
+import { publicProfileMetadata } from "@/lib/public-profile-metadata"
 import type { AttendeePassState } from "./Attendee"
 import type { ProductsPass } from "./Products"
 
@@ -144,7 +145,7 @@ export function buildCheckoutRecipientDraft(
     ...((embedded?.category_id ?? attendee.category_id) !== undefined
       ? { category_id: embedded?.category_id ?? attendee.category_id }
       : {}),
-    profile_snapshot: profileSnapshot,
+    profile_snapshot: publicProfileMetadata(profileSnapshot),
   }
 }
 

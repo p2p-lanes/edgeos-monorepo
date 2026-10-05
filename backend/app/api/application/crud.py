@@ -7,6 +7,7 @@ from fastapi import HTTPException, status
 from sqlalchemy import and_, case, desc, exists, nullslast, or_
 from sqlalchemy.dialects import postgresql
 from sqlalchemy.orm import selectinload
+from sqlalchemy.sql.elements import ColumnElement
 from sqlmodel import Session, col, func, select
 
 from app.api.application.models import (
@@ -52,20 +53,119 @@ if TYPE_CHECKING:
 # applicant and their spouse appear.
 DIRECTORY_VISIBLE_CATEGORY_KEYS = ("main", "spouse")
 
-# Default ``info_not_shared`` for applications materialized by an admin grant
-# (comped/gifted tickets): every field the directory can mask. The recipient
-# never filled the form, so nothing is shared until they opt in themselves.
-GRANTED_DEFAULT_INFO_NOT_SHARED = (
-    "first_name",
-    "last_name",
-    "email",
-    "telegram",
-    "role",
-    "organization",
-    "residence",
-    "age",
-    "gender",
+
+# PostgreSQL's locale-dependent [:space:] is not identical to Python str.strip().
+# Use its full whitespace set for both privacy options and custom text.
+_DIRECTORY_WHITESPACE = (
+    " \t\n\r\v\f\x1c\x1d\x1e\x1f\u0085\u00a0\u1680"
+    "\u2000\u2001\u2002\u2003\u2004\u2005\u2006\u2007\u2008\u2009\u200a"
+    "\u2028\u2029\u202f\u205f\u3000"
 )
+
+
+def _directory_category_key() -> ColumnElement[str]:
+    """Normalize legacy category labels for directory reads, not stored values."""
+    return func.lower(func.btrim(col(AttendeeCategories.key), _DIRECTORY_WHITESPACE))
+
+
+def _application_is_in_primary_flow(popup_id: uuid.UUID) -> ColumnElement[bool]:
+    """Use only the popup's explicitly designated primary flow, never a fallback."""
+    from app.api.sales_flow.models import SalesFlows
+
+    return exists(
+        select(1)
+        .select_from(SalesFlows)
+        .where(
+            SalesFlows.id == Applications.sales_flow_id,
+            SalesFlows.popup_id == popup_id,
+            SalesFlows.is_default == True,  # noqa: E712
+        )
+        .correlate(Applications)
+    )
+
+
+def _directory_field_is_shared(field: str) -> ColumnElement[bool]:
+    """SQL visibility predicate matching main-applicant directory masking."""
+    hidden_options = (
+        func.unnest(col(Applications.info_not_shared))
+        .table_valued("value")
+        .render_derived(name="directory_hidden_options")
+    )
+    # Form options are ASCII field labels; normalize case and surrounding
+    # whitespace, including tabs/newlines, just as the serializer does.
+    normalized_option = func.lower(
+        func.btrim(hidden_options.c.value, _DIRECTORY_WHITESPACE)
+    )
+    hides_field = exists(
+        select(1)
+        .select_from(hidden_options)
+        .where(normalized_option == field)
+        .correlate(Applications)
+    )
+    # Companions share their own profile, not the applicant's preferences.
+    return or_(_directory_category_key() != "main", ~hides_field)
+
+
+def _directory_has_text(value: ColumnElement[str]) -> ColumnElement[bool]:
+    return func.btrim(value, _DIRECTORY_WHITESPACE) != ""
+
+
+def _directory_custom_text(*keys: str) -> ColumnElement[str]:
+    """Resolve canonical/alias text with the serializer's type and priority rules."""
+    custom = col(Applications.custom_fields)
+    return func.coalesce(
+        *(
+            case(
+                (
+                    and_(
+                        func.jsonb_typeof(custom[key]) == "string",
+                        _directory_has_text(custom[key].astext),
+                    ),
+                    custom[key].astext,
+                ),
+                else_=None,
+            )
+            for key in keys
+        )
+    )
+
+
+def _directory_has_visible_portal_fields() -> ColumnElement[bool]:
+    """At least one of the six values rendered in the portal table is visible."""
+    is_main = _directory_category_key() == "main"
+    values = {
+        # Fall back to snapshots ONLY for unlinked attendees, as in the serializer.
+        "first_name": case(
+            (col(Humans.id).is_(None), col(Attendees.name)),
+            else_=col(Humans.first_name),
+        ),
+        "last_name": col(Humans.last_name),
+        "email": case(
+            (col(Humans.id).is_(None), col(Attendees.email)), else_=col(Humans.email)
+        ),
+        "telegram": col(Humans.telegram),
+        "role": case(
+            (is_main, _directory_custom_text("role", "role_in_the_organization")),
+            else_=None,
+        ),
+        "organization": case(
+            (
+                is_main,
+                _directory_custom_text("organization", "organization_you_represent"),
+            ),
+            else_=None,
+        ),
+    }
+    return or_(
+        *(
+            and_(
+                _directory_field_is_shared(field),
+                _directory_has_text(value),
+                value != "*",  # The UI renders this reserved value as an EyeOff icon.
+            )
+            for field, value in values.items()
+        )
+    )
 
 
 def _is_draft_status(status_value: object) -> bool:
@@ -297,6 +397,17 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
                 nullslast(desc(Applications.submitted_at)),
                 desc(Applications.id),
             )
+        )
+        return session.exec(statement).first()
+
+    def get_by_human_primary_flow(
+        self, session: Session, human_id: uuid.UUID, popup_id: uuid.UUID
+    ) -> Applications | None:
+        """Get the human's application in the popup's primary flow only."""
+        statement = select(Applications).where(
+            Applications.human_id == human_id,
+            Applications.popup_id == popup_id,
+            _application_is_in_primary_flow(popup_id),
         )
         return session.exec(statement).first()
 
@@ -758,11 +869,13 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
         skip: int = 0,
         limit: int = 100,
         q: str | None = None,
+        hide_empty_rows: bool = False,
     ) -> tuple[list[Attendees], int]:
         """Find attendees for the attendees directory.
 
-        Returns ticket-holding attendees whose parent application is accepted —
-        one entry per person, sourced from that attendee's own Human record.
+        Returns ticket-holding attendees whose parent application is accepted
+        and belongs to the popup's primary flow — one entry per attendee,
+        sourced from that attendee's own Human record.
         Only the main applicant and spouse categories are listed; kids (and any
         other categories) are excluded. Supports text search across the
         attendee's own human fields.
@@ -785,30 +898,48 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
                 Attendees.category_id == AttendeeCategories.id,  # type: ignore[arg-type]
             )
             .where(Attendees.popup_id == popup_id)
+            .where(_application_is_in_primary_flow(popup_id))
             .where(Applications.status == ApplicationStatus.ACCEPTED.value)
             .where(has_products)
-            .where(col(AttendeeCategories.key).in_(DIRECTORY_VISIBLE_CATEGORY_KEYS))
+            .where(_directory_category_key().in_(DIRECTORY_VISIBLE_CATEGORY_KEYS))
         )
 
-        # Text search across the attendee's OWN human fields, so companions are
-        # searchable by their own name/email — not the main applicant's.
-        if q:
-            search_term = f"%{q}%"
-            base_statement = base_statement.join(
+        if hide_empty_rows:
+            # This opt-in filter reflects the portal's columns, not all API fields.
+            # Retain unlinked attendees whose own name/email snapshot is visible.
+            base_statement = base_statement.outerjoin(
                 Humans,
                 Attendees.human_id == Humans.id,  # type: ignore[arg-type]
-            ).where(
+            ).where(_directory_has_visible_portal_fields())
+
+        # Search only shared fields from the attendee's OWN human record.
+        # Apply privacy in SQL before counting/paginating, not to fetched rows.
+        if q:
+            search_term = f"%{q}%"
+            visible_fields = {
+                field: case(
+                    (_directory_field_is_shared(field), col(getattr(Humans, field))),
+                    else_=None,
+                )
+                for field in ("first_name", "last_name", "email", "telegram")
+            }
+            # Concatenate only visible name parts. NULLIF prevents an empty
+            # fully-hidden name from matching wildcard-only queries like "%".
+            visible_full_name = func.nullif(
+                func.concat_ws(
+                    " ", visible_fields["first_name"], visible_fields["last_name"]
+                ),
+                "",
+            )
+            if not hide_empty_rows:
+                base_statement = base_statement.join(
+                    Humans,
+                    Attendees.human_id == Humans.id,  # type: ignore[arg-type]
+                )
+            base_statement = base_statement.where(
                 or_(
-                    col(Humans.first_name).ilike(search_term),
-                    col(Humans.last_name).ilike(search_term),
-                    # Full name ("first last") so a query spanning both fields —
-                    # e.g. "eva shang" — matches; the per-field checks above only
-                    # catch a term that fits within a single column.
-                    func.concat_ws(" ", Humans.first_name, Humans.last_name).ilike(
-                        search_term
-                    ),
-                    col(Humans.email).ilike(search_term),
-                    col(Humans.telegram).ilike(search_term),
+                    *(value.ilike(search_term) for value in visible_fields.values()),
+                    visible_full_name.ilike(search_term),
                 )
             )
 
@@ -846,15 +977,16 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
     ) -> tuple[list["Humans"], int]:
         """Find humans in the Portal attendee directory who share their name.
 
-        Same population as ``find_directory`` (accepted application, the attendee
-        holds at least one product, directory-visible main/spouse category) but
+        Same population as ``find_directory`` (accepted primary-flow application,
+        the attendee holds at least one product, main/spouse category) but
         returns the distinct underlying Humans instead of Attendee rows. Powers
         the event host picker: a creator may only pick a host who actually
         attends this popup AND has not hidden their name for it.
 
-        Applications that listed "first_name" or "last_name" in
+        Main applicants that listed "first_name" or "last_name" in
         ``info_not_shared`` are excluded — picking them would surface a name the
-        attendee chose to hide. Humans with no usable name are also excluded so
+        attendee chose to hide. Companions share their own names independently
+        of the applicant's preferences. Humans with no usable name are excluded so
         the picker never renders a blank entry. Optional ``q`` does an ilike
         match on the human's first/last name.
         """
@@ -863,13 +995,6 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
             AttendeeProducts.attendee_id == Attendees.id,
             AttendeeProducts.revoked_at.is_(None),
             AttendeeProducts.product_category_snapshot == "ticket",
-        )
-        # info_not_shared is a Postgres text[] column, so name-hiding is detected
-        # with the array-overlap operator (&&): true when the list shares any
-        # element with {first_name, last_name}. (?| is a JSONB operator and does
-        # NOT apply to a real array column.) Negated to EXCLUDE those rows.
-        hides_name = col(Applications.info_not_shared).op("&&")(
-            postgresql.array(("first_name", "last_name"))
         )
         has_name = or_(
             func.trim(func.coalesce(col(Humans.first_name), "")) != "",
@@ -885,10 +1010,12 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
                 Attendees.category_id == AttendeeCategories.id,  # type: ignore[arg-type]
             )
             .where(Attendees.popup_id == popup_id)
+            .where(_application_is_in_primary_flow(popup_id))
             .where(Applications.status == ApplicationStatus.ACCEPTED.value)
             .where(has_products)
-            .where(col(AttendeeCategories.key).in_(DIRECTORY_VISIBLE_CATEGORY_KEYS))
-            .where(~hides_name)
+            .where(_directory_category_key().in_(DIRECTORY_VISIBLE_CATEGORY_KEYS))
+            .where(_directory_field_is_shared("first_name"))
+            .where(_directory_field_is_shared("last_name"))
             .where(has_name)
         )
 
@@ -1851,101 +1978,6 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
         session.add(snapshot)
         session.flush()
         return snapshot
-
-    def promote_to_accepted(
-        self,
-        session: Session,
-        application: Applications,
-    ) -> Applications:
-        """Flush-only flip of an existing Application to ACCEPTED.
-
-        Used by the admin bulk-grant endpoint when a Human already has an
-        application for the popup but it is still in draft/in-review/etc.
-        Sets `accepted_at`, writes an audit snapshot, and flushes — the
-        caller owns the transaction so the entire grant batch stays atomic.
-
-        Idempotent: a no-op when the application is already accepted.
-        """
-
-        if application.status == ApplicationStatus.ACCEPTED.value:
-            return application
-
-        application.status = ApplicationStatus.ACCEPTED.value
-        application.accepted_at = datetime.now(UTC)
-        session.add(application)
-        self.create_snapshot(session, application, "admin_grant_accepted")
-        _maybe_grant_fee_credit(session, application)
-        return application
-
-    def create_for_admin_grant(
-        self,
-        session: Session,
-        *,
-        tenant_id: uuid.UUID,
-        popup_id: uuid.UUID,
-        human: "Humans",
-    ) -> Applications:
-        """Flush-only minimal Application + main Attendee for admin bulk grants.
-
-        Skips custom_fields validation, approval strategy, group whitelisting,
-        and the form-section fee gate — admin grants bypass user-facing checks
-        because they are the staff-side equivalent of marking a ticket as comp.
-        Status is hard-set to ACCEPTED and `accepted_at`/`submitted_at` are
-        stamped to now.
-
-        Caller owns the transaction boundary so a sold-out failure mid-batch
-        rolls back every Human/Application/Attendee created in this run.
-        """
-
-        from app.api.attendee_category.crud import attendee_categories_crud
-        from app.api.form_field.crud import form_fields_crud
-
-        now = datetime.now(UTC)
-        # sdd/sales-flows slice 5: stamp the popup's default flow, same as
-        # every other application-creation path. The caller (grant_tickets_admin)
-        # already confirmed no application exists for this human/popup via
-        # get_by_human_popup before reaching here, so this never collides.
-        flow_id = self.resolve_creation_flow_id(session, popup_id)
-        application = Applications(
-            tenant_id=tenant_id,
-            popup_id=popup_id,
-            human_id=human.id,
-            sales_flow_id=flow_id,
-            status=ApplicationStatus.ACCEPTED.value,
-            submitted_at=now,
-            accepted_at=now,
-            custom_fields_schema=form_fields_crud.build_schema_for_flow(
-                session, popup_id, flow_id
-            ),
-            # Granted (comped/gifted) people never filled the application
-            # form, so they never consented to sharing anything: default the
-            # attendee-directory privacy to fully hidden. They can opt in
-            # later by editing their privacy preferences. Grants to people
-            # with an EXISTING application keep whatever they chose.
-            info_not_shared=list(GRANTED_DEFAULT_INFO_NOT_SHARED),
-        )
-        session.add(application)
-        session.flush()
-
-        main_cat = attendee_categories_crud.get_primary_for_flow(session, flow_id)
-        name = (
-            f"{human.first_name or ''} {human.last_name or ''}".strip() or human.email
-        )
-        attendee = Attendees(
-            tenant_id=tenant_id,
-            application_id=application.id,
-            popup_id=popup_id,
-            name=name,
-            email=human.email,
-            gender=human.gender,
-            human_id=human.id,
-            category_id=main_cat.id if main_cat else None,
-        )
-        session.add(attendee)
-        self.create_snapshot(session, application, "admin_grant_created")
-        session.flush()
-        _maybe_grant_fee_credit(session, application)
-        return application
 
     def accept(
         self,

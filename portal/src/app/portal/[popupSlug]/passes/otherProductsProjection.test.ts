@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest"
-import type { PaymentPublic } from "@/client"
+import type { PaymentPortalPublic } from "@/client"
 import { projectOtherPurchasedProducts } from "./otherProductsProjection"
 
-const payment = (overrides: Partial<PaymentPublic> = {}): PaymentPublic => ({
+const payment = (
+  overrides: Partial<PaymentPortalPublic> = {},
+): PaymentPortalPublic => ({
   id: "payment-1",
   tenant_id: "tenant-1",
   popup_id: "popup-1",

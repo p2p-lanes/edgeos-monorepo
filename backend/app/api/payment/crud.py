@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING, Any
 
 from fastapi import HTTPException, status
 from loguru import logger
-from sqlalchemy import desc, or_, text
+from sqlalchemy import desc, not_, or_, text
 from sqlalchemy.orm import selectinload
 from sqlmodel import Session, func, select
 
@@ -78,6 +78,35 @@ def _classify_product_unit(line: PaymentProducts) -> str | None:
     if line.requires_check_in_snapshot is True:
         return "ownerless"
     return None
+
+
+def _payment_filter_override(condition: Any) -> Any | None:
+    """Compile filters backed by immutable payment-product snapshots."""
+    if condition.field not in {"product_id", "product_category"}:
+        return None
+
+    line = select(PaymentProducts.id).where(PaymentProducts.payment_id == Payments.id)
+    if condition.field == "product_id":
+        line = line.where(PaymentProducts.product_id == condition.uuid_value)
+    elif condition.value == "other":
+        line = line.where(
+            not_(
+                PaymentProducts.product_category.in_(
+                    ("ticket", "housing", "merch", "patreon")
+                )
+            )
+        )
+    else:
+        category = {
+            "ticket": "ticket",
+            "housing": "housing",
+            "merch": "merch",
+            "patreon": "patreon",
+        }[str(condition.value)]
+        line = line.where(PaymentProducts.product_category == category)
+
+    exists = line.exists()
+    return ~exists if condition.op == "neq" else exists
 
 
 class ReleaseResult:
@@ -983,26 +1012,19 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
         payment: Payments,
         products: list[PaymentProductRequest],
         *,
-        granted_by_user_id: uuid.UUID | None = None,
         replace_access: bool = False,
     ) -> Payments:
         """Auto-approve a $0 payment and materialize tickets, flush-only.
 
-        Used by three flows that all converge on the same write:
+        Used by checkout flows that converge on the same write:
         - authenticated application checkout when discounts zero the cart
         - anonymous open-ticketing checkout when a 100% coupon zeroes it
-        - admin bulk grant ($0 comps).
 
-        Sets status=APPROVED, optionally records `granted_by_user_id` (admin
-        grant only), and INSERTs AttendeeProducts for the given line items.
-        Does NOT commit — callers own the transaction boundary so this helper
-        can participate in a larger atomic batch (admin grant) or be paired
-        with caller-side commit + email dispatch (self-service flows).
+        Sets status=APPROVED and materializes product units for the payment.
+        Does NOT commit; callers own the transaction and email dispatch.
         """
 
         payment.status = PaymentStatus.APPROVED.value
-        if granted_by_user_id is not None:
-            payment.granted_by_user_id = granted_by_user_id
         session.flush()
         self._reconcile_payment_fulfillment(
             session, payment, replace_access=replace_access
@@ -2025,7 +2047,9 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
             statement = statement.where(Payments.status == status_filter.value)
 
         if filters is not None:
-            filter_expression = build_filter_expression(filters, Payments)
+            filter_expression = build_filter_expression(
+                filters, Payments, _payment_filter_override
+            )
             if filter_expression is not None:
                 statement = statement.where(filter_expression)
 

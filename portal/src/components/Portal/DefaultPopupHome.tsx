@@ -12,6 +12,7 @@ import { GatheringDoorCard } from "@/components/Portal/GatheringDoorCard"
 import { ScholarshipStatusBadge } from "@/components/ScholarshipStatusBadge"
 import { Loader } from "@/components/ui/Loader"
 import { useGatheringDoors } from "@/hooks/useGatheringDoors"
+import { useHumanPopupAccess } from "@/hooks/useHumanPopupAccess"
 import { usePortalDirectSalesFlows } from "@/hooks/usePortalDirectSalesFlows"
 import { useApplication } from "@/providers/applicationProvider"
 import { useCityProvider } from "@/providers/cityProvider"
@@ -25,6 +26,9 @@ export default function DefaultPopupHome() {
     ? searchParams.get("flow")
     : null
   const city = getCity()
+  const access = useHumanPopupAccess(city?.id)
+  const hasAssignedTickets =
+    access.state === "allowed" && access.source === "attendee"
   const {
     doors,
     isLoading: doorsLoading,
@@ -43,8 +47,9 @@ export default function DefaultPopupHome() {
   const nobodyApplies = city?.takes_applications === false
   const listedDirectFlow = directFlowsQuery.data?.[0]
 
-  if (!nobodyApplies && doorsLoading) return <Loader />
-  if (!nobodyApplies && doorsError) return <ApplicationUnavailable />
+  if (!nobodyApplies && !hasAssignedTickets && doorsLoading) return <Loader />
+  if (!nobodyApplies && !hasAssignedTickets && doorsError)
+    return <ApplicationUnavailable />
 
   // One relationship is unambiguous, so nothing has to be named and the
   // page stays exactly as it was. This is almost every gathering.
@@ -90,6 +95,12 @@ export default function DefaultPopupHome() {
               <EventCard.Tagline />
               <EventCard.Location />
               <EventCard.DateRange />
+              {hasAssignedTickets && (
+                <EventCard.ApplyButton
+                  onClick={() => router.push(`/portal/${city.slug}/passes`)}
+                  labelKey="cta.accepted"
+                />
+              )}
             </EventCard.Content>
           </EventCard>
           <div className="grid gap-4 sm:grid-cols-2">
@@ -112,6 +123,10 @@ export default function DefaultPopupHome() {
     : ((relevantApplication?.status as EventStatus) ?? "not_started")
 
   const onClickApply = () => {
+    if (hasAssignedTickets) {
+      router.push(`/portal/${city.slug}/passes`)
+      return
+    }
     if (nobodyApplies) {
       if (listedDirectFlow) {
         router.push(`/checkout/${city.slug}/${listedDirectFlow.slug}`)
@@ -136,20 +151,29 @@ export default function DefaultPopupHome() {
             <EventCard.Tagline />
             <EventCard.Location />
             <EventCard.DateRange />
-            {!nobodyApplies && <EventCard.Progress />}
+            {!nobodyApplies && (!hasAssignedTickets || relevantApplication) && (
+              <EventCard.Progress />
+            )}
             {!nobodyApplies && relevantApplication && (
               <ScholarshipStatusBadge
                 application={relevantApplication}
                 popup={city}
               />
             )}
-            {city.status !== "ended" &&
-              (!nobodyApplies || listedDirectFlow) && (
-                <EventCard.ApplyButton
-                  onClick={onClickApply}
-                  labelKey={nobodyApplies ? "cta.buy_tickets" : undefined}
-                />
-              )}
+            {(hasAssignedTickets ||
+              (city.status !== "ended" &&
+                (!nobodyApplies || listedDirectFlow))) && (
+              <EventCard.ApplyButton
+                onClick={onClickApply}
+                labelKey={
+                  hasAssignedTickets
+                    ? "cta.accepted"
+                    : nobodyApplies
+                      ? "cta.buy_tickets"
+                      : undefined
+                }
+              />
+            )}
           </EventCard.Content>
         </EventCard>
       </div>

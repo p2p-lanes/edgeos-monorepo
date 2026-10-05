@@ -15,8 +15,8 @@ from sqlalchemy.dialects.postgresql import ARRAY, JSONB
 from sqlmodel import Column, DateTime, Field, SQLModel
 
 from app.api.application_review.schemas import ReviewDecision
-from app.api.attendee.schemas import AttendeePublic
-from app.api.human.schemas import HumanPublic
+from app.api.attendee.schemas import AttendeePortalPublic, AttendeePublic
+from app.api.human.schemas import HumanPublic, HumanSelfPublic
 from app.api.shared.enums import HumanRating
 from app.core.filters import (
     DATE_OPS,
@@ -184,8 +184,8 @@ class ApplicationAccessSource(BaseModel):
     label: str
 
 
-class ApplicationPublic(BaseModel):
-    """Application schema for API responses."""
+class ApplicationPortalPublic(BaseModel):
+    """Applicant-facing response, without administrative assessments or reviews."""
 
     id: uuid.UUID
     tenant_id: uuid.UUID
@@ -231,6 +231,15 @@ class ApplicationPublic(BaseModel):
     incentive_currency: str | None = None
 
     # Related data
+    human: HumanSelfPublic | None = None
+    attendees: list[AttendeePortalPublic] = []
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class ApplicationPublic(ApplicationPortalPublic):
+    """Administrative application response; never return from portal routes."""
+
     human: HumanPublic | None = None
     attendees: list[AttendeePublic] = []
 
@@ -478,13 +487,10 @@ class AdminGrantTicketsRequest(BaseModel):
         return v
 
 
-class GrantedPaymentInfo(BaseModel):
-    """One $0 payment created by the admin bulk-grant flow."""
+class GrantedAttendeeInfo(BaseModel):
+    """Products assigned directly to one attendee by the backoffice."""
 
-    payment_id: uuid.UUID
-    # None when the person was already at the popup without an application of
-    # their own — the grant went onto their existing attendee row.
-    application_id: uuid.UUID | None
+    attendee_id: uuid.UUID
     human_id: uuid.UUID
     email: str
     tickets_created: int
@@ -493,7 +499,7 @@ class GrantedPaymentInfo(BaseModel):
 class AdminGrantTicketsResponse(BaseModel):
     """Response payload from POST /applications/admin/grant-tickets."""
 
-    granted: list[GrantedPaymentInfo]
+    granted: list[GrantedAttendeeInfo]
 
 
 class ApplicationFilter(BaseModel):

@@ -1,4 +1,4 @@
-import type { PaymentPublic } from "@/client"
+import type { PaymentPortalPublic } from "@/client"
 
 export type OrderStatus =
   | "approved"
@@ -50,7 +50,7 @@ function projectStatus(status: string | undefined): OrderStatus {
 }
 
 export function projectOrders(
-  payments: PaymentPublic[],
+  payments: PaymentPortalPublic[],
   invoiceAvailable: boolean,
 ): OrderProjection[] {
   return payments

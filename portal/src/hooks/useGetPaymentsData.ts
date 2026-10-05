@@ -1,9 +1,9 @@
-import type { PaymentProductResponse, PaymentPublic } from "@/client"
+import type { PaymentPortalPublic, PaymentProductResponse } from "@/client"
 import useHumanPaymentsQuery from "@/hooks/useHumanPaymentsQuery"
 import { useCityProvider } from "@/providers/cityProvider"
 import type { PaymentsProps } from "@/types/passes"
 
-function mapPayment(p: PaymentPublic): PaymentsProps {
+function mapPayment(p: PaymentPortalPublic): PaymentsProps {
   return {
     id: p.id,
     application_id: p.application_id ?? null,

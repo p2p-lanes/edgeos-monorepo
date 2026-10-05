@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query"
-import type { AttendeeWithOriginPublic } from "@/client"
+import type { AttendeeWithOriginPortalPublic } from "@/client"
 import { AttendeesService } from "@/client"
 import useAuth from "@/hooks/useAuth"
 import { queryKeys } from "@/lib/query-keys"
@@ -22,7 +22,7 @@ export function useHumanAttendeesQuery(popupId: string | null | undefined) {
   const { user } = useAuth()
   return useQuery({
     queryKey: queryKeys.attendees.byHumanPopup(popupId ?? ""),
-    queryFn: async (): Promise<AttendeeWithOriginPublic[]> => {
+    queryFn: async (): Promise<AttendeeWithOriginPortalPublic[]> => {
       const result = await AttendeesService.listMyAttendeesByPopup({
         popupId: popupId!,
       })

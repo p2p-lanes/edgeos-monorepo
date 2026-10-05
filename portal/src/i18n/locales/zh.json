@@ -596,11 +596,26 @@
   "attendees": {
     "title": "名录",
     "description": "联系您的朋友以计划日程、寻找合住住所或一起组织活动。*此名录仅包含自愿选择分享其信息的人的资料。",
-    "search_placeholder": "按姓名、邮箱、组织搜索...",
+    "search_placeholder": "按姓名、邮箱或 Telegram 搜索...",
     "export_csv": "导出参与者CSV",
     "no_attendees": "未找到参与者",
     "per_page_label": "每页",
-    "showing_range": "显示 {{from}}–{{to}}，共 {{total}}"
+    "showing_range": "显示 {{from}}–{{to}}，共 {{total}}",
+    "privacy_button": "共享设置",
+    "privacy_title": "选择要共享的信息",
+    "privacy_description": "选择其他参与者可以在名录中看到哪些信息。",
+    "privacy_save": "保存设置",
+    "privacy_saved": "共享设置已保存。",
+    "privacy_error": "无法保存共享设置。",
+    "privacy_no_application": "通过此活动的主要销售流程提交申请后，即可管理您在名录中的信息。",
+    "fields": {
+      "first_name": "名字",
+      "last_name": "姓氏",
+      "email": "邮箱",
+      "telegram": "Telegram",
+      "role": "职位",
+      "organization": "组织"
+    }
   },
   "checkin": {
     "title": "{{eventName}} 在线签到",

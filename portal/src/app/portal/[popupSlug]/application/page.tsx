@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation"
 import { useEffect, useMemo, useState } from "react"
 import { useTranslation } from "react-i18next"
 import { toast } from "sonner"
-import type { ApplicationPublic } from "@/client"
+import type { ApplicationPortalPublic } from "@/client"
 import { ApplicationUnavailable } from "@/components/Portal/ApplicationUnavailable"
 import { Loader } from "@/components/ui/Loader"
 import { useApplicationSchema } from "@/hooks/useApplicationSchema"
@@ -30,7 +30,7 @@ import { shouldRedirectToStatus } from "./lib/shouldRedirectToStatus"
  *   provider picked, and could overwrite the wrong one
  *   (sdd/sales-flows-rediseno).
  */
-function useFormInitData(application: ApplicationPublic | null) {
+function useFormInitData(application: ApplicationPortalPublic | null) {
   const { getCity, getPopups } = useCityProvider()
   const { applications } = useApplication()
   const city = getCity()
@@ -122,9 +122,8 @@ export default function FormPage() {
     useFormInitData(application)
 
   const [showImport, setShowImport] = useState(false)
-  const [importedData, setImportedData] = useState<ApplicationPublic | null>(
-    null,
-  )
+  const [importedData, setImportedData] =
+    useState<ApplicationPortalPublic | null>(null)
 
   // Show import dialog when import source is found
   useEffect(() => {

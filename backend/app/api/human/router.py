@@ -25,6 +25,7 @@ from app.api.human.schemas import (
     HumanProfileStats,
     HumanProfileUpdate,
     HumanPublic,
+    HumanSelfPublic,
     HumanUpdate,
     parse_human_filters,
 )
@@ -152,14 +153,14 @@ async def create_human(
 
 @router.get(
     "/me",
-    response_model=HumanPublic,
+    response_model=HumanSelfPublic,
     summary="Get your profile",
     dependencies=[needs("portal:profile:read")],
 )
 async def get_current_human_info(
     current_user: CurrentHuman,
-) -> HumanPublic:
-    return HumanPublic.model_validate(current_user)
+) -> HumanSelfPublic:
+    return HumanSelfPublic.model_validate(current_user.model_dump())
 
 
 @router.get(
@@ -178,7 +179,7 @@ async def get_current_human_profile_stats(
 
 @router.patch(
     "/me",
-    response_model=HumanPublic,
+    response_model=HumanSelfPublic,
     summary="Update your profile",
     dependencies=[needs("portal:profile:write")],
 )
@@ -186,7 +187,7 @@ async def update_current_human(
     human_in: HumanProfileUpdate,
     current_human: CurrentHuman,
     db: HumanTenantSession,
-) -> HumanPublic:
+) -> HumanSelfPublic:
     """Update the current authenticated human's profile."""
     human = crud.get(db, current_human.id)
 
@@ -197,7 +198,7 @@ async def update_current_human(
         )
 
     updated = crud.update(db, human, human_in)
-    return HumanPublic.model_validate(updated)
+    return HumanSelfPublic.model_validate(updated)
 
 
 @router.get(
@@ -598,12 +599,15 @@ async def delete_human_comment(
 )
 async def list_human_enrichment_facts(
     human_id: uuid.UUID,
-    db: SessionDep,
-    current_user: CurrentUser,
+    db: AdminOrApiKeySession_HumansRead,
+    current_user: AdminOrApiKey_HumansRead,
+    control_db: SessionDep,
 ) -> ListModel[HumanEnrichmentFactPublic]:
     """List a human's enrichment facts, newest first."""
     _get_human_in_tenant_or_404(db, human_id, current_user)
-    facts = crud.list_enrichment_facts(db, human_id)
+    # Facts are control-plane data (no tenant DB grants). Authorize the human
+    # through the scoped session above before reading by its verified ID.
+    facts = crud.list_enrichment_facts(control_db, human_id)
     return ListModel[HumanEnrichmentFactPublic](
         results=[HumanEnrichmentFactPublic.model_validate(f) for f in facts],
         paging=Paging(offset=0, limit=len(facts), total=len(facts)),
@@ -618,10 +622,11 @@ async def list_human_enrichment_facts(
 async def create_human_enrichment_fact(
     human_id: uuid.UUID,
     fact_in: HumanEnrichmentFactCreate,
-    db: SessionDep,
-    current_user: CurrentUser,
+    db: AdminOrApiKeySession_HumansWrite,
+    current_user: AdminOrApiKey_HumansWrite,
+    control_db: SessionDep,
 ) -> HumanEnrichmentFactPublic:
     """Append one provenance fact extracted by the enrichment agent."""
     _get_human_in_tenant_or_404(db, human_id, current_user)
-    fact = crud.create_enrichment_fact(db, human_id, fact_in)
+    fact = crud.create_enrichment_fact(control_db, human_id, fact_in)
     return HumanEnrichmentFactPublic.model_validate(fact)
