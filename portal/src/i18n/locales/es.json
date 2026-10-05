@@ -794,7 +794,21 @@
     "hosted_events_count_one": "{{count}} evento",
     "hosted_events_count_other": "{{count}} eventos",
     "top_five": "Top 5",
-    "no_calendar_activity": "Todavía no hay actividad en el calendario"
+    "no_calendar_activity": "Todavía no hay actividad en el calendario",
+    "badges": {
+      "title": "Insignias",
+      "subtitle": "El reconocimiento que fuiste juntando",
+      "empty": "Todavía no tenés insignias. Aparecen acá cuando alguien te da una.",
+      "link_title": "Enlace público del perfil",
+      "link_description": "Quien tenga el enlace ve tu nombre, tu foto y tus insignias. Nunca tu email.",
+      "link_toggle": "Enlace público del perfil",
+      "link_copy": "Copiar enlace",
+      "link_copied": "Enlace copiado",
+      "link_copy_failed": "No se pudo copiar el enlace",
+      "link_reset": "Cambiar enlace",
+      "link_reset_confirm": "¿Crear un enlace nuevo? El actual va a dejar de funcionar.",
+      "link_off": "Tu enlace está desactivado, nadie puede abrirlo."
+    }
   },
   "sidebar": {
     "your_participation": "Tu Participación",
@@ -1483,5 +1497,12 @@
       "error_host": "El host del evento no puede hacer check-in como asistente.",
       "error_not_checked_in": "Esta persona no tiene check-in."
     }
+  },
+  "publicProfile": {
+    "community": "Comunidad de {{tenant}}",
+    "anonymous": "Miembro de la comunidad",
+    "badge_count_one": "{{count}} insignia",
+    "badge_count_other": "{{count}} insignias",
+    "no_badges": "Todavía no tiene insignias."
   }
 }

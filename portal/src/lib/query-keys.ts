@@ -40,6 +40,8 @@ export const queryKeys = {
   profile: {
     current: ["profile", "current"] as const,
     stats: ["profile", "stats"] as const,
+    badges: ["profile", "badges"] as const,
+    publicProfile: ["profile", "public-profile"] as const,
   },
   formSchema: {
     // `salesFlowId` (sdd/sales-flows D6 URL scheme, task 9.4) is part of the

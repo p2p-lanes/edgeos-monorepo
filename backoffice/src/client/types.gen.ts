@@ -476,7 +476,7 @@ export type status = 'added' | 'invited';
  */
 export type AdminApiKeyCreate = {
     name: string;
-    scopes: Array<('events:read' | 'events:write' | 'rsvp:write' | 'venues:read' | 'venues:write' | 'applications:read' | 'applications:write' | 'attendees:read' | 'attendees:write' | 'humans:read' | 'humans:write' | 'groups:read' | 'groups:write' | 'products:read' | 'products:write' | 'accommodations:read' | 'accommodations:write' | 'coupons:read' | 'coupons:write' | 'forms:read' | 'forms:write' | 'payments:read' | 'tracks:read' | 'tracks:write' | 'ticketing_steps:read' | 'ticketing_steps:write' | 'translations:read' | 'translations:write')>;
+    scopes: Array<('events:read' | 'events:write' | 'rsvp:write' | 'venues:read' | 'venues:write' | 'applications:read' | 'applications:write' | 'attendees:read' | 'attendees:write' | 'humans:read' | 'humans:write' | 'groups:read' | 'groups:write' | 'products:read' | 'products:write' | 'accommodations:read' | 'accommodations:write' | 'coupons:read' | 'coupons:write' | 'forms:read' | 'forms:write' | 'payments:read' | 'tracks:read' | 'tracks:write' | 'ticketing_steps:read' | 'ticketing_steps:write' | 'translations:read' | 'translations:write' | 'badges:read' | 'badges:write')>;
     expires_at?: (string | null);
 };
 
@@ -489,7 +489,7 @@ export type AdminApiKeyCreated = {
     id: string;
     name: string;
     prefix: string;
-    scopes: Array<('events:read' | 'events:write' | 'rsvp:write' | 'venues:read' | 'venues:write' | 'applications:read' | 'applications:write' | 'attendees:read' | 'attendees:write' | 'humans:read' | 'humans:write' | 'groups:read' | 'groups:write' | 'products:read' | 'products:write' | 'accommodations:read' | 'accommodations:write' | 'coupons:read' | 'coupons:write' | 'forms:read' | 'forms:write' | 'payments:read' | 'tracks:read' | 'tracks:write' | 'ticketing_steps:read' | 'ticketing_steps:write' | 'translations:read' | 'translations:write')>;
+    scopes: Array<('events:read' | 'events:write' | 'rsvp:write' | 'venues:read' | 'venues:write' | 'applications:read' | 'applications:write' | 'attendees:read' | 'attendees:write' | 'humans:read' | 'humans:write' | 'groups:read' | 'groups:write' | 'products:read' | 'products:write' | 'accommodations:read' | 'accommodations:write' | 'coupons:read' | 'coupons:write' | 'forms:read' | 'forms:write' | 'payments:read' | 'tracks:read' | 'tracks:write' | 'ticketing_steps:read' | 'ticketing_steps:write' | 'translations:read' | 'translations:write' | 'badges:read' | 'badges:write')>;
     created_at: string;
     last_used_at?: (string | null);
     expires_at?: (string | null);
@@ -504,7 +504,7 @@ export type AdminApiKeyPublic = {
     id: string;
     name: string;
     prefix: string;
-    scopes: Array<('events:read' | 'events:write' | 'rsvp:write' | 'venues:read' | 'venues:write' | 'applications:read' | 'applications:write' | 'attendees:read' | 'attendees:write' | 'humans:read' | 'humans:write' | 'groups:read' | 'groups:write' | 'products:read' | 'products:write' | 'accommodations:read' | 'accommodations:write' | 'coupons:read' | 'coupons:write' | 'forms:read' | 'forms:write' | 'payments:read' | 'tracks:read' | 'tracks:write' | 'ticketing_steps:read' | 'ticketing_steps:write' | 'translations:read' | 'translations:write')>;
+    scopes: Array<('events:read' | 'events:write' | 'rsvp:write' | 'venues:read' | 'venues:write' | 'applications:read' | 'applications:write' | 'attendees:read' | 'attendees:write' | 'humans:read' | 'humans:write' | 'groups:read' | 'groups:write' | 'products:read' | 'products:write' | 'accommodations:read' | 'accommodations:write' | 'coupons:read' | 'coupons:write' | 'forms:read' | 'forms:write' | 'payments:read' | 'tracks:read' | 'tracks:write' | 'ticketing_steps:read' | 'ticketing_steps:write' | 'translations:read' | 'translations:write' | 'badges:read' | 'badges:write')>;
     created_at: string;
     last_used_at?: (string | null);
     expires_at?: (string | null);
@@ -585,7 +585,7 @@ export type ApiKeyCreate = {
     name: string;
     popup_id: string;
     expires_at?: (string | null);
-    scopes?: Array<('events:read' | 'events:write' | 'rsvp:write' | 'venues:read' | 'venues:write' | 'applications:read' | 'applications:write' | 'attendees:read' | 'attendees:write' | 'humans:read' | 'humans:write' | 'groups:read' | 'groups:write' | 'products:read' | 'products:write' | 'accommodations:read' | 'accommodations:write' | 'coupons:read' | 'coupons:write' | 'forms:read' | 'forms:write' | 'payments:read' | 'tracks:read' | 'tracks:write' | 'ticketing_steps:read' | 'ticketing_steps:write' | 'translations:read' | 'translations:write')>;
+    scopes?: Array<('events:read' | 'events:write' | 'rsvp:write' | 'venues:read' | 'venues:write' | 'applications:read' | 'applications:write' | 'attendees:read' | 'attendees:write' | 'humans:read' | 'humans:write' | 'groups:read' | 'groups:write' | 'products:read' | 'products:write' | 'accommodations:read' | 'accommodations:write' | 'coupons:read' | 'coupons:write' | 'forms:read' | 'forms:write' | 'payments:read' | 'tracks:read' | 'tracks:write' | 'ticketing_steps:read' | 'ticketing_steps:write' | 'translations:read' | 'translations:write' | 'badges:read' | 'badges:write')>;
 };
 
 /**
@@ -597,7 +597,7 @@ export type ApiKeyCreated = {
     name: string;
     prefix: string;
     popup_id?: (string | null);
-    scopes: Array<('events:read' | 'events:write' | 'rsvp:write' | 'venues:read' | 'venues:write' | 'applications:read' | 'applications:write' | 'attendees:read' | 'attendees:write' | 'humans:read' | 'humans:write' | 'groups:read' | 'groups:write' | 'products:read' | 'products:write' | 'accommodations:read' | 'accommodations:write' | 'coupons:read' | 'coupons:write' | 'forms:read' | 'forms:write' | 'payments:read' | 'tracks:read' | 'tracks:write' | 'ticketing_steps:read' | 'ticketing_steps:write' | 'translations:read' | 'translations:write')>;
+    scopes: Array<('events:read' | 'events:write' | 'rsvp:write' | 'venues:read' | 'venues:write' | 'applications:read' | 'applications:write' | 'attendees:read' | 'attendees:write' | 'humans:read' | 'humans:write' | 'groups:read' | 'groups:write' | 'products:read' | 'products:write' | 'accommodations:read' | 'accommodations:write' | 'coupons:read' | 'coupons:write' | 'forms:read' | 'forms:write' | 'payments:read' | 'tracks:read' | 'tracks:write' | 'ticketing_steps:read' | 'ticketing_steps:write' | 'translations:read' | 'translations:write' | 'badges:read' | 'badges:write')>;
     created_at: string;
     last_used_at?: (string | null);
     expires_at?: (string | null);
@@ -613,7 +613,7 @@ export type ApiKeyPublic = {
     name: string;
     prefix: string;
     popup_id?: (string | null);
-    scopes: Array<('events:read' | 'events:write' | 'rsvp:write' | 'venues:read' | 'venues:write' | 'applications:read' | 'applications:write' | 'attendees:read' | 'attendees:write' | 'humans:read' | 'humans:write' | 'groups:read' | 'groups:write' | 'products:read' | 'products:write' | 'accommodations:read' | 'accommodations:write' | 'coupons:read' | 'coupons:write' | 'forms:read' | 'forms:write' | 'payments:read' | 'tracks:read' | 'tracks:write' | 'ticketing_steps:read' | 'ticketing_steps:write' | 'translations:read' | 'translations:write')>;
+    scopes: Array<('events:read' | 'events:write' | 'rsvp:write' | 'venues:read' | 'venues:write' | 'applications:read' | 'applications:write' | 'attendees:read' | 'attendees:write' | 'humans:read' | 'humans:write' | 'groups:read' | 'groups:write' | 'products:read' | 'products:write' | 'accommodations:read' | 'accommodations:write' | 'coupons:read' | 'coupons:write' | 'forms:read' | 'forms:write' | 'payments:read' | 'tracks:read' | 'tracks:write' | 'ticketing_steps:read' | 'ticketing_steps:write' | 'translations:read' | 'translations:write' | 'badges:read' | 'badges:write')>;
     created_at: string;
     last_used_at?: (string | null);
     expires_at?: (string | null);
@@ -1579,6 +1579,140 @@ export type AuthCodeSentResponse = {
 export type AvailableScopes = {
     token_scopes: Array<(string)>;
     api_key_scopes: Array<(string)>;
+};
+
+/**
+ * Give a badge to a human, identified by id or by email.
+ */
+export type BadgeAwardCreate = {
+    recipient_human_id?: (string | null);
+    recipient_email?: (string | null);
+    popup_id?: (string | null);
+    message?: (string | null);
+};
+
+/**
+ * Administrative view of an award (backoffice and admin API keys).
+ */
+export type BadgeAwardPublic = {
+    id: string;
+    badge: BadgeSummary;
+    recipient: BadgeAwardRecipient;
+    issuer_type: BadgeIssuerType;
+    issuer_name?: (string | null);
+    popup_id?: (string | null);
+    message?: (string | null);
+    awarded_at: string;
+    revoked_at?: (string | null);
+    revoke_reason?: (string | null);
+};
+
+export type BadgeAwardRecipient = {
+    id: string;
+    email: string;
+    first_name?: (string | null);
+    last_name?: (string | null);
+    picture_url?: (string | null);
+};
+
+export type BadgeAwardRevoke = {
+    reason?: (string | null);
+};
+
+export type BadgeCreate = {
+    name: string;
+    slug?: (string | null);
+    description?: (string | null);
+    category?: (string | null);
+    style_override_id?: (string | null);
+    repeatable?: boolean;
+    images: Array<BadgeImageIn>;
+};
+
+export type BadgeImageIn = {
+    style_id: string;
+    image_url: string;
+    width?: (number | null);
+    height?: (number | null);
+};
+
+export type BadgeImagePublic = {
+    style_id: string;
+    image_url: string;
+    width?: (number | null);
+    height?: (number | null);
+};
+
+export type BadgeImageUpsert = {
+    image_url: string;
+    width?: (number | null);
+    height?: (number | null);
+};
+
+/**
+ * Who granted an award.
+ *
+ * Only ``admin`` is issued today; ``human`` (peer sending under an issuer
+ * policy) and ``rule`` (automatic check-in rules) are reserved for the next
+ * SIM-108 phases so awards never need a reshape.
+ */
+export type BadgeIssuerType = 'admin' | 'human' | 'rule';
+
+export type BadgePublic = {
+    id: string;
+    slug: string;
+    name: string;
+    description?: (string | null);
+    category?: (string | null);
+    style_override_id?: (string | null);
+    repeatable: boolean;
+    archived_at?: (string | null);
+    created_at: string;
+    updated_at: string;
+    images?: Array<BadgeImagePublic>;
+    image_url?: (string | null);
+    award_count?: number;
+};
+
+export type BadgeStyleCreate = {
+    name: string;
+    key?: (string | null);
+    sort_order?: number;
+};
+
+export type BadgeStylePublic = {
+    id: string;
+    key: string;
+    name: string;
+    is_default: boolean;
+    sort_order: number;
+};
+
+export type BadgeStyleUpdate = {
+    name?: (string | null);
+    sort_order?: (number | null);
+};
+
+/**
+ * The slice of a badge shown next to an award.
+ */
+export type BadgeSummary = {
+    id: string;
+    slug: string;
+    name: string;
+    description?: (string | null);
+    category?: (string | null);
+    repeatable: boolean;
+    image_url?: (string | null);
+};
+
+export type BadgeUpdate = {
+    name?: (string | null);
+    description?: (string | null);
+    category?: (string | null);
+    style_override_id?: (string | null);
+    repeatable?: (boolean | null);
+    archived?: (boolean | null);
 };
 
 export type BaseFieldConfigPublic = {
@@ -4006,6 +4140,16 @@ export type ListModel_AuditLogPublic_ = {
     paging: Paging;
 };
 
+export type ListModel_BadgeAwardPublic_ = {
+    results: Array<BadgeAwardPublic>;
+    paging: Paging;
+};
+
+export type ListModel_BadgePublic_ = {
+    results: Array<BadgePublic>;
+    paging: Paging;
+};
+
 export type ListModel_CheckInListItem_ = {
     results: Array<CheckInListItem>;
     paging: Paging;
@@ -4189,6 +4333,22 @@ export type MeAccess = {
     app_name: string;
     scopes: Array<(string)>;
     api_key_scopes: Array<(string)>;
+};
+
+/**
+ * A badge on the caller's own profile, with every active award of it.
+ */
+export type MyBadge = {
+    badge: BadgeSummary;
+    count: number;
+    last_awarded_at: string;
+    awards: Array<MyBadgeAward>;
+};
+
+export type MyBadgeAward = {
+    awarded_at: string;
+    message?: (string | null);
+    popup_id?: (string | null);
 };
 
 /**
@@ -5386,6 +5546,31 @@ export type PublicAccommodationProperty = {
     tax_percentage?: (string | null);
 };
 
+/**
+ * What anyone holding the share link sees. Never add contact fields.
+ */
+export type PublicProfile = {
+    display_name?: (string | null);
+    picture_url?: (string | null);
+    badges: Array<PublicProfileBadge>;
+};
+
+export type PublicProfileBadge = {
+    name: string;
+    description?: (string | null);
+    image_url?: (string | null);
+    count: number;
+};
+
+export type PublicProfileSettings = {
+    enabled: boolean;
+    token: string;
+};
+
+export type PublicProfileSettingsUpdate = {
+    enabled: boolean;
+};
+
 export type PublishableKeyCreate = {
     name: string;
     allowed_origins?: Array<(string)>;
@@ -6235,7 +6420,7 @@ export type TenantUpdate = {
 export type ThirdPartyAppCreate = {
     name: string;
     allowed_token_scopes?: Array<('portal:*' | 'portal:profile:read' | 'portal:profile:write' | 'portal:applications:read' | 'portal:applications:write' | 'portal:attendees:write' | 'portal:payments:read' | 'portal:directory:read' | 'portal:api_keys:manage')>;
-    allowed_api_key_scopes?: Array<('events:read' | 'events:write' | 'rsvp:write' | 'venues:read' | 'venues:write' | 'applications:read' | 'applications:write' | 'attendees:read' | 'attendees:write' | 'humans:read' | 'humans:write' | 'groups:read' | 'groups:write' | 'products:read' | 'products:write' | 'accommodations:read' | 'accommodations:write' | 'coupons:read' | 'coupons:write' | 'forms:read' | 'forms:write' | 'payments:read' | 'tracks:read' | 'tracks:write' | 'ticketing_steps:read' | 'ticketing_steps:write' | 'translations:read' | 'translations:write')>;
+    allowed_api_key_scopes?: Array<('events:read' | 'events:write' | 'rsvp:write' | 'venues:read' | 'venues:write' | 'applications:read' | 'applications:write' | 'attendees:read' | 'attendees:write' | 'humans:read' | 'humans:write' | 'groups:read' | 'groups:write' | 'products:read' | 'products:write' | 'accommodations:read' | 'accommodations:write' | 'coupons:read' | 'coupons:write' | 'forms:read' | 'forms:write' | 'payments:read' | 'tracks:read' | 'tracks:write' | 'ticketing_steps:read' | 'ticketing_steps:write' | 'translations:read' | 'translations:write' | 'badges:read' | 'badges:write')>;
 };
 
 /**
@@ -6286,7 +6471,7 @@ export type ThirdPartyAppPublic = {
 export type ThirdPartyAppUpdate = {
     name?: (string | null);
     allowed_token_scopes?: (Array<('portal:*' | 'portal:profile:read' | 'portal:profile:write' | 'portal:applications:read' | 'portal:applications:write' | 'portal:attendees:write' | 'portal:payments:read' | 'portal:directory:read' | 'portal:api_keys:manage')> | null);
-    allowed_api_key_scopes?: (Array<('events:read' | 'events:write' | 'rsvp:write' | 'venues:read' | 'venues:write' | 'applications:read' | 'applications:write' | 'attendees:read' | 'attendees:write' | 'humans:read' | 'humans:write' | 'groups:read' | 'groups:write' | 'products:read' | 'products:write' | 'accommodations:read' | 'accommodations:write' | 'coupons:read' | 'coupons:write' | 'forms:read' | 'forms:write' | 'payments:read' | 'tracks:read' | 'tracks:write' | 'ticketing_steps:read' | 'ticketing_steps:write' | 'translations:read' | 'translations:write')> | null);
+    allowed_api_key_scopes?: (Array<('events:read' | 'events:write' | 'rsvp:write' | 'venues:read' | 'venues:write' | 'applications:read' | 'applications:write' | 'attendees:read' | 'attendees:write' | 'humans:read' | 'humans:write' | 'groups:read' | 'groups:write' | 'products:read' | 'products:write' | 'accommodations:read' | 'accommodations:write' | 'coupons:read' | 'coupons:write' | 'forms:read' | 'forms:write' | 'payments:read' | 'tracks:read' | 'tracks:write' | 'ticketing_steps:read' | 'ticketing_steps:write' | 'translations:read' | 'translations:write' | 'badges:read' | 'badges:write')> | null);
 };
 
 /**
@@ -7678,6 +7863,140 @@ export type AuthThirdPartyHumanAuthenticateData = {
 };
 
 export type AuthThirdPartyHumanAuthenticateResponse = (Token);
+
+export type BadgesListBadgeAwardsData = {
+    badgeId?: (string | null);
+    email?: (string | null);
+    humanId?: (string | null);
+    includeRevoked?: boolean;
+    /**
+     * Maximum number of items to return
+     */
+    limit?: number;
+    /**
+     * Number of items to skip
+     */
+    skip?: number;
+    xTenantId?: (string | null);
+};
+
+export type BadgesListBadgeAwardsResponse = (ListModel_BadgeAwardPublic_);
+
+export type BadgesRevokeBadgeAwardData = {
+    awardId: string;
+    requestBody: BadgeAwardRevoke;
+    xTenantId?: (string | null);
+};
+
+export type BadgesRevokeBadgeAwardResponse = (BadgeAwardPublic);
+
+export type BadgesListMyBadgesResponse = (Array<MyBadge>);
+
+export type BadgesListBadgesData = {
+    category?: (string | null);
+    includeArchived?: boolean;
+    /**
+     * Maximum number of items to return
+     */
+    limit?: number;
+    search?: (string | null);
+    /**
+     * Number of items to skip
+     */
+    skip?: number;
+    xTenantId?: (string | null);
+};
+
+export type BadgesListBadgesResponse = (ListModel_BadgePublic_);
+
+export type BadgesCreateBadgeData = {
+    requestBody: BadgeCreate;
+    xTenantId?: (string | null);
+};
+
+export type BadgesCreateBadgeResponse = (BadgePublic);
+
+export type BadgesGetBadgeData = {
+    badgeId: string;
+    xTenantId?: (string | null);
+};
+
+export type BadgesGetBadgeResponse = (BadgePublic);
+
+export type BadgesUpdateBadgeData = {
+    badgeId: string;
+    requestBody: BadgeUpdate;
+    xTenantId?: (string | null);
+};
+
+export type BadgesUpdateBadgeResponse = (BadgePublic);
+
+export type BadgesDeleteBadgeData = {
+    badgeId: string;
+    xTenantId?: (string | null);
+};
+
+export type BadgesDeleteBadgeResponse = (void);
+
+export type BadgesPutBadgeImageData = {
+    badgeId: string;
+    requestBody: BadgeImageUpsert;
+    styleId: string;
+    xTenantId?: (string | null);
+};
+
+export type BadgesPutBadgeImageResponse = (BadgePublic);
+
+export type BadgesDeleteBadgeImageData = {
+    badgeId: string;
+    styleId: string;
+    xTenantId?: (string | null);
+};
+
+export type BadgesDeleteBadgeImageResponse = (BadgePublic);
+
+export type BadgesAwardBadgeData = {
+    badgeId: string;
+    requestBody: BadgeAwardCreate;
+    xTenantId?: (string | null);
+};
+
+export type BadgesAwardBadgeResponse = (BadgeAwardPublic);
+
+export type BadgesListBadgeStylesData = {
+    xTenantId?: (string | null);
+};
+
+export type BadgesListBadgeStylesResponse = (Array<BadgeStylePublic>);
+
+export type BadgesCreateBadgeStyleData = {
+    requestBody: BadgeStyleCreate;
+    xTenantId?: (string | null);
+};
+
+export type BadgesCreateBadgeStyleResponse = (BadgeStylePublic);
+
+export type BadgesUpdateBadgeStyleData = {
+    requestBody: BadgeStyleUpdate;
+    styleId: string;
+    xTenantId?: (string | null);
+};
+
+export type BadgesUpdateBadgeStyleResponse = (BadgeStylePublic);
+
+export type BadgesDeleteBadgeStyleData = {
+    styleId: string;
+    xTenantId?: (string | null);
+};
+
+export type BadgesDeleteBadgeStyleResponse = (void);
+
+export type BadgesSetDefaultBadgeStyleData = {
+    styleId: string;
+    xTenantId?: (string | null);
+};
+
+export type BadgesSetDefaultBadgeStyleResponse = (BadgeStylePublic);
 
 export type BaseFieldConfigsListBaseFieldConfigsData = {
     /**
@@ -9126,6 +9445,24 @@ export type HumansUpdateCurrentHumanData = {
 export type HumansUpdateCurrentHumanResponse = (HumanSelfPublic);
 
 export type HumansGetCurrentHumanProfileStatsResponse = (HumanProfileStats);
+
+export type HumansGetMyPublicProfileResponse = (PublicProfileSettings);
+
+export type HumansUpdateMyPublicProfileData = {
+    requestBody: PublicProfileSettingsUpdate;
+};
+
+export type HumansUpdateMyPublicProfileResponse = (PublicProfileSettings);
+
+export type HumansRegenerateMyPublicProfileResponse = (PublicProfileSettings);
+
+export type HumansGetPublicProfileData = {
+    token: string;
+    xEdgeOsPublishableKey?: (string | null);
+    xTenantId?: (string | null);
+};
+
+export type HumansGetPublicProfileResponse = (PublicProfile);
 
 export type HumansSearchHumansPortalData = {
     /**

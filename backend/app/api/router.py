@@ -14,6 +14,7 @@ from app.api import (
     attendee_category,
     audit_log,
     auth,
+    badge,
     base_field_config,
     cart,
     checkout,
@@ -129,6 +130,10 @@ api_router.include_router(event_venue.utils_router)
 api_router.include_router(event_venue.property_types_router)
 api_router.include_router(event_settings.router)
 api_router.include_router(track.router)
+
+# Badges (SIM-108)
+api_router.include_router(badge.router)
+api_router.include_router(badge.styles_router)
 
 # Task tracker (in-app product task board)
 api_router.include_router(task.router)

@@ -66,6 +66,8 @@ ApiKeyScope = Literal[
     "ticketing_steps:write",
     "translations:read",
     "translations:write",
+    "badges:read",
+    "badges:write",
 ]
 
 # Union used for TokenPayload.scopes — accepts both universes.
@@ -137,6 +139,8 @@ ADMIN_API_KEY_SCOPES: frozenset[str] = frozenset(
         "ticketing_steps:write",
         "translations:read",
         "translations:write",
+        "badges:read",
+        "badges:write",
     }
 )
 

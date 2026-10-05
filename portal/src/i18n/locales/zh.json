@@ -671,7 +671,21 @@
     "shared_events_count": "共同参加 {{count}} 场",
     "hosted_events_count": "参加 {{count}} 场",
     "top_five": "前 5 名",
-    "no_calendar_activity": "暂无日历活动"
+    "no_calendar_activity": "暂无日历活动",
+    "badges": {
+      "title": "徽章",
+      "subtitle": "你获得的认可",
+      "empty": "还没有徽章。有人送你徽章后会显示在这里。",
+      "link_title": "公开个人资料链接",
+      "link_description": "任何拥有链接的人都能看到你的名字、照片和徽章，但看不到你的邮箱。",
+      "link_toggle": "公开个人资料链接",
+      "link_copy": "复制链接",
+      "link_copied": "链接已复制",
+      "link_copy_failed": "无法复制链接",
+      "link_reset": "重置链接",
+      "link_reset_confirm": "要创建新链接吗？当前链接将失效。",
+      "link_off": "你的链接已关闭，任何人都无法打开。"
+    }
   },
   "sidebar": {
     "your_participation": "您的参与",
@@ -1323,5 +1337,12 @@
       "error_host": "活动主持人不能作为参与者签到。",
       "error_not_checked_in": "此人尚未签到。"
     }
+  },
+  "publicProfile": {
+    "community": "{{tenant}} 社区",
+    "anonymous": "社区成员",
+    "badge_count_one": "{{count}} 枚徽章",
+    "badge_count_other": "{{count}} 枚徽章",
+    "no_badges": "还没有徽章。"
   }
 }
