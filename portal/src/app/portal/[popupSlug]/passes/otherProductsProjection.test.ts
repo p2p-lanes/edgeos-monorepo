@@ -12,6 +12,8 @@ const payment = (overrides: Partial<PaymentPublic> = {}): PaymentPublic => ({
   ...overrides,
 })
 
+const shirtOrigin = { category: "merch", salesFlowId: "direct-flow" }
+
 const product = (
   productId: string,
   units?: Array<{
@@ -68,7 +70,9 @@ describe("projectOtherPurchasedProducts", () => {
       ],
     )
 
-    expect(result).toEqual([{ id: "shirt", name: "Event shirt", quantity: 1 }])
+    expect(result).toEqual([
+      { id: "shirt", name: "Event shirt", quantity: 1, ...shirtOrigin },
+    ])
   })
 
   it("excludes application, unapproved, and unattributed payments", () => {
@@ -134,7 +138,9 @@ describe("projectOtherPurchasedProducts", () => {
       [],
     )
 
-    expect(result).toEqual([{ id: "shirt", name: "Event shirt", quantity: 2 }])
+    expect(result).toEqual([
+      { id: "shirt", name: "Event shirt", quantity: 2, ...shirtOrigin },
+    ])
   })
 
   it("falls back to snapshot quantities when operational units are unavailable", () => {
@@ -160,6 +166,8 @@ describe("projectOtherPurchasedProducts", () => {
       ],
     )
 
-    expect(result).toEqual([{ id: "shirt", name: "Event shirt", quantity: 1 }])
+    expect(result).toEqual([
+      { id: "shirt", name: "Event shirt", quantity: 1, ...shirtOrigin },
+    ])
   })
 })

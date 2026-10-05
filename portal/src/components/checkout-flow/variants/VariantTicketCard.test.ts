@@ -276,4 +276,61 @@ describe("VariantTicketCard section layout", () => {
     expect(addedControl.className).toContain("bg-teal-800")
     expect(addedControl.className).not.toContain("opacity-50")
   })
+
+  // Reported for lunch tickets: every product had a description and none of
+  // the checkout steps showed it, only the card's own text.
+  it.each([
+    ["open checkout", "simple_quantity"],
+    ["pass system", "pass_system"],
+  ])("shows each product's description in %s rows", (_label, mode) => {
+    const product = {
+      id: "vegan-week-1",
+      name: "Vegan - Week 1",
+      description: "Chickpea bowl, tahini dressing",
+      price: 36,
+    } as unknown as ProductsPass
+    const row = {
+      product,
+      quantity: 0,
+      selected: false,
+      purchased: false,
+      editedForCredit: false,
+      usesStepper: false,
+      disabled: false,
+      maxQuantity: 1,
+      saleState: "on_sale",
+      price: 36,
+      comparePrice: null,
+    }
+    const section = { key: "week-1", label: "Week 1", rows: [row] }
+    useTicketsStep.mockReturnValue({
+      mode,
+      attendees:
+        mode === "pass_system"
+          ? [
+              {
+                id: "attendee-1",
+                name: "Attendee One",
+                category: "General",
+                category_id: "category-1",
+                selectedCount: 0,
+                sections: [section],
+              },
+            ]
+          : [],
+      sections: mode === "pass_system" ? [] : [section],
+      toggleRow: vi.fn(),
+      setRowQuantity: vi.fn(),
+      isEditing: false,
+    })
+
+    render(
+      createElement(VariantTicketCard, {
+        products: [product],
+        stepType: "tickets",
+      }),
+    )
+
+    expect(screen.getByText("Chickpea bowl, tahini dressing")).toBeTruthy()
+  })
 })
