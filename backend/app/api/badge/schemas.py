@@ -3,7 +3,7 @@ from datetime import UTC, date, datetime, time
 from enum import StrEnum
 from typing import Annotated
 
-from pydantic import BaseModel, ConfigDict, model_validator
+from pydantic import BaseModel, ConfigDict, field_validator, model_validator
 from pydantic import Field as PydanticField
 from sqlalchemy import Text
 from sqlalchemy.dialects.postgresql import JSONB
@@ -355,6 +355,29 @@ class BadgeAudienceType(StrEnum):
     POPUP_ATTENDEES = "popup_attendees"
     # Every human of the tenant.
     TENANT = "tenant"
+    # A list of email addresses, matched against the person's email. Covers
+    # people who haven't signed up yet: they can give it once they do.
+    EMAILS = "emails"
+
+
+MAX_POLICY_EMAILS = 2000
+
+
+def normalize_emails(values: list[str]) -> list[str]:
+    """Lowercase, de-duplicated, syntactically valid addresses."""
+    from email_validator import EmailNotValidError, validate_email
+
+    cleaned: dict[str, None] = {}
+    for raw in values:
+        value = raw.strip().lower()
+        if not value:
+            continue
+        try:
+            validate_email(value, check_deliverability=False)
+        except EmailNotValidError:
+            raise ValueError(f"Not a valid email: {raw.strip()}") from None
+        cleaned[value] = None
+    return list(cleaned)
 
 
 class AllowanceWindow(StrEnum):
@@ -384,6 +407,11 @@ class BadgeIssuerPolicyBase(SQLModel):
     allowance_quantity: int | None = None
     allowance_window: str = Field(default=AllowanceWindow.DAY.value, max_length=16)
     is_active: bool = Field(default=True)
+    # The addresses of an ``emails`` audience, lowercased; empty otherwise.
+    emails: list[str] = Field(
+        default_factory=list,
+        sa_column=Column(JSONB, nullable=False, server_default="[]"),
+    )
     created_at: datetime = Field(
         default_factory=lambda: datetime.now(UTC), sa_type=DateTime(timezone=True)
     )
@@ -409,6 +437,7 @@ class BadgeIssuerPolicyPublic(BaseModel):
     is_active: bool
     badges: list[BadgeSummary]
     humans: list[BadgeIssuerPolicyHuman]
+    emails: list[str] = []
     created_at: datetime
     updated_at: datetime
 
@@ -434,12 +463,21 @@ class BadgeIssuerPolicyCreate(BaseModel):
     badge_ids: list[uuid.UUID] = Field(min_length=1)
     # Only used by the humans audience.
     human_ids: list[uuid.UUID] = []
+    # Only used by the emails audience.
+    emails: list[str] = Field(default_factory=list, max_length=MAX_POLICY_EMAILS)
 
     model_config = ConfigDict(str_strip_whitespace=True)
+
+    @field_validator("emails")
+    @classmethod
+    def _emails(cls, value: list[str]) -> list[str]:
+        return normalize_emails(value)
 
     @model_validator(mode="after")
     def _shape(self) -> "BadgeIssuerPolicyCreate":
         check_policy_shape(self.audience_type, self.popup_id, self.allowance_window)
+        if self.audience_type == BadgeAudienceType.EMAILS and not self.emails:
+            raise ValueError("An emails audience needs at least one email")
         return self
 
 
@@ -459,8 +497,14 @@ class BadgeIssuerPolicyUpdate(BaseModel):
     is_active: bool | None = None
     badge_ids: list[uuid.UUID] | None = Field(default=None, min_length=1)
     human_ids: list[uuid.UUID] | None = None
+    emails: list[str] | None = Field(default=None, max_length=MAX_POLICY_EMAILS)
 
     model_config = ConfigDict(str_strip_whitespace=True)
+
+    @field_validator("emails")
+    @classmethod
+    def _emails(cls, value: list[str] | None) -> list[str] | None:
+        return None if value is None else normalize_emails(value)
 
 
 class IssuableBadge(BaseModel):

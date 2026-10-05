@@ -512,3 +512,63 @@ def test_concurrent_sends_cannot_exceed_the_allowance(
         a.commit()
     thread.join(10)
     assert outcome["result"] == "exhausted"
+
+
+# ---------------------------------------------------------------------------
+# Emails audience
+# ---------------------------------------------------------------------------
+
+
+def test_emails_audience_matches_by_email_including_later_sign_ups(
+    client: TestClient, db: Session, headers, style, person, popup
+):
+    badge = _badge(client, headers, style)
+    sender, recipient, outsider = person("Eve"), person("Fay"), person("Gus")
+    tag = uuid.uuid4().hex[:8]
+    later_email = f"later-{tag}@test.com"
+    policy = _policy(
+        client,
+        headers,
+        name="Crew",
+        audience_type="emails",
+        badge_ids=[badge["id"]],
+        # Case and spacing don't matter; duplicates collapse.
+        emails=[f"  {sender.human.email.upper()} ", sender.human.email, later_email],
+    )
+    assert policy["emails"] == [sender.human.email.lower(), later_email]
+
+    assert _send(client, sender, recipient, badge, popup).status_code == 201
+    assert _send(client, outsider, recipient, badge, popup).status_code == 403
+
+    # Someone on the list who signs up afterwards can give it right away.
+    newcomer = person("Hal")
+    newcomer.human.email = later_email
+    db.add(newcomer.human)
+    db.commit()
+    assert _send(client, newcomer, recipient, badge, popup).status_code == 201
+
+    # Switching to another audience drops the list.
+    resp = client.patch(
+        f"{POLICIES}/{policy['id']}",
+        json={"audience_type": "tenant"},
+        headers=headers,
+    )
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["emails"] == []
+
+
+def test_emails_audience_validation(client: TestClient, headers, style):
+    badge = _badge(client, headers, style)
+    base = {"name": "Crew", "audience_type": "emails", "badge_ids": [badge["id"]]}
+    assert client.post(POLICIES, json=base, headers=headers).status_code == 422
+    bad = client.post(
+        POLICIES, json={**base, "emails": ["ok@test.com", "nope"]}, headers=headers
+    )
+    assert bad.status_code == 422
+    assert "nope" in bad.text
+
+    policy = _policy(client, headers, **{**base, "emails": ["ok@test.com"]})
+    emptied = client.patch(
+        f"{POLICIES}/{policy['id']}", json={"emails": []}, headers=headers
+    )
+    assert emptied.status_code == 422

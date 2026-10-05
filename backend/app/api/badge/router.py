@@ -668,6 +668,7 @@ def _policy_public(db: Session, policy: BadgeIssuerPolicies) -> BadgeIssuerPolic
             )
             for h in policy.humans
         ],
+        emails=list(policy.emails or []),
         created_at=policy.created_at,
         updated_at=policy.updated_at,
     )
@@ -797,6 +798,7 @@ def _add_policy(
         allowance_quantity=body.allowance_quantity,
         allowance_window=body.allowance_window.value,
         is_active=body.is_active,
+        emails=body.emails if body.audience_type == BadgeAudienceType.EMAILS else [],
     )
     db.add(policy)
     db.flush()
@@ -851,6 +853,15 @@ async def update_issuer_policy(
     policy.allowance_window = window.value
     if data.get("is_active") is not None:
         policy.is_active = data["is_active"]
+    if audience != BadgeAudienceType.EMAILS:
+        policy.emails = []
+    elif data.get("emails") is not None:
+        policy.emails = data["emails"]
+    if audience == BadgeAudienceType.EMAILS and not policy.emails:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="An emails audience needs at least one email",
+        )
     policy.updated_at = datetime.now(UTC)
     db.add(policy)
     if audience != BadgeAudienceType.HUMANS:

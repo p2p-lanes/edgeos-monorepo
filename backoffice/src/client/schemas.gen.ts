@@ -7571,7 +7571,7 @@ populate its multi-select options without hardcoding scope strings.`
 
 export const BadgeAudienceTypeSchema = {
     type: 'string',
-    enum: ['humans', 'popup_attendees', 'tenant'],
+    enum: ['humans', 'popup_attendees', 'tenant', 'emails'],
     title: 'BadgeAudienceType',
     description: 'Who a policy lets give badges.'
 } as const;
@@ -8060,6 +8060,14 @@ export const BadgeIssuerPolicyCreateSchema = {
             type: 'array',
             title: 'Human Ids',
             default: []
+        },
+        emails: {
+            items: {
+                type: 'string'
+            },
+            type: 'array',
+            maxItems: 2000,
+            title: 'Emails'
         }
     },
     type: 'object',
@@ -8163,6 +8171,14 @@ export const BadgeIssuerPolicyPublicSchema = {
             },
             type: 'array',
             title: 'Humans'
+        },
+        emails: {
+            items: {
+                type: 'string'
+            },
+            type: 'array',
+            title: 'Emails',
+            default: []
         },
         created_at: {
             type: 'string',
@@ -8280,6 +8296,21 @@ export const BadgeIssuerPolicyUpdateSchema = {
                 }
             ],
             title: 'Human Ids'
+        },
+        emails: {
+            anyOf: [
+                {
+                    items: {
+                        type: 'string'
+                    },
+                    type: 'array',
+                    maxItems: 2000
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Emails'
         }
     },
     type: 'object',
@@ -8358,6 +8389,14 @@ export const BadgeNewIssuerPolicySchema = {
             type: 'array',
             title: 'Human Ids',
             default: []
+        },
+        emails: {
+            items: {
+                type: 'string'
+            },
+            type: 'array',
+            maxItems: 2000,
+            title: 'Emails'
         }
     },
     type: 'object',

@@ -128,6 +128,7 @@ def policies_for(
     candidates = list(db.exec(statement).all())
 
     attendee: bool | None = None
+    issuer_email: str | None = None
     out = []
     for policy in candidates:
         audience = BadgeAudienceType(policy.audience_type)
@@ -141,6 +142,12 @@ def policies_for(
                 )
                 attendee = eligibility[issuer_id].allowed
             if attendee:
+                out.append(policy)
+        elif audience == BadgeAudienceType.EMAILS:
+            if issuer_email is None:
+                issuer = db.get(Humans, issuer_id)
+                issuer_email = (issuer.email if issuer else "").strip().lower()
+            if issuer_email and issuer_email in (policy.emails or []):
                 out.append(policy)
         else:
             out.append(policy)

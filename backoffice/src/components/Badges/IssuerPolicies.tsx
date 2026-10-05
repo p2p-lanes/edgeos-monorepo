@@ -41,14 +41,46 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { Switch } from "@/components/ui/switch"
+import { Textarea } from "@/components/ui/textarea"
 import useAuth from "@/hooks/useAuth"
 import useCustomToast from "@/hooks/useCustomToast"
 import { createErrorHandler } from "@/utils"
 
 const AUDIENCE_LABELS: Record<BadgeAudienceType, string> = {
   humans: "Specific people",
+  emails: "A list of emails",
   popup_attendees: "Attendees of a gathering",
   tenant: "Everyone",
+}
+
+// Loose on purpose: the server validates for real, this only flags typos.
+const EMAIL_SHAPE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/
+
+/** Emails pasted as a list: any mix of commas, semicolons, spaces, lines. */
+function parseEmails(text: string): { valid: string[]; invalid: string[] } {
+  const valid = new Set<string>()
+  const invalid = new Set<string>()
+  for (const token of text.split(/[\s,;]+/)) {
+    const email = token.trim().toLowerCase()
+    if (!email) continue
+    if (EMAIL_SHAPE.test(email)) valid.add(email)
+    else invalid.add(token.trim())
+  }
+  return { valid: [...valid], invalid: [...invalid] }
+}
+
+function describeAudience(policy: {
+  audience_type: BadgeAudienceType
+  emails?: string[]
+  people: string[]
+}): string {
+  if (policy.audience_type === "humans") return policy.people.join(", ")
+  if (policy.audience_type === "emails") {
+    const emails = policy.emails ?? []
+    const shown = emails.slice(0, 2).join(", ")
+    return emails.length > 2 ? `${shown} and ${emails.length - 2} more` : shown
+  }
+  return AUDIENCE_LABELS[policy.audience_type]
 }
 
 const WINDOW_LABELS: Record<AllowanceWindow, string> = {
@@ -209,6 +241,10 @@ function PolicyDialog({
   const [allowanceWindow, setAllowanceWindow] = useState<AllowanceWindow>(
     source?.allowance_window ?? "day",
   )
+  const [emailsText, setEmailsText] = useState(
+    (source?.emails ?? []).join("\n"),
+  )
+  const emails = parseEmails(emailsText)
 
   const { data: popups } = useQuery({
     queryKey: ["popups", { limit: 100 }],
@@ -232,6 +268,7 @@ function PolicyDialog({
     allowance_window: allowanceWindow,
     badge_ids: badgeIds,
     human_ids: audience === "humans" ? people.map((p) => p.id) : [],
+    emails: audience === "emails" ? emails.valid : [],
   }
 
   const save = useMutation({
@@ -256,6 +293,8 @@ function PolicyDialog({
     (!onDraft && badgeIds.length === 0) ||
     (needsPopup && !popupId) ||
     (audience === "humans" && people.length === 0) ||
+    (audience === "emails" &&
+      (emails.valid.length === 0 || emails.invalid.length > 0)) ||
     (limited && !(Number(quantity) >= 1))
 
   return (
@@ -301,6 +340,27 @@ function PolicyDialog({
             </Select>
             {audience === "humans" && (
               <PeoplePicker value={people} onChange={setPeople} />
+            )}
+            {audience === "emails" && (
+              <div className="space-y-1">
+                <Textarea
+                  value={emailsText}
+                  onChange={(e) => setEmailsText(e.target.value)}
+                  rows={4}
+                  placeholder="Paste emails, separated by commas, spaces or new lines"
+                  aria-label="Emails"
+                />
+                <p className="text-xs text-muted-foreground">
+                  {emails.valid.length === 0
+                    ? "Includes people who haven't signed up yet: they can give it once they do."
+                    : `${emails.valid.length} ${emails.valid.length === 1 ? "email" : "emails"}. People who haven't signed up yet can give it once they do.`}
+                </p>
+                {emails.invalid.length > 0 && (
+                  <p className="text-xs text-destructive">
+                    Not valid: {emails.invalid.join(", ")}
+                  </p>
+                )}
+              </div>
             )}
           </div>
 
@@ -478,9 +538,10 @@ function PolicyRow({
           {!policy.is_active && <Badge variant="secondary">Paused</Badge>}
         </div>
         <p className="text-sm text-muted-foreground">
-          {policy.audience_type === "humans"
-            ? policy.humans.map(personName).join(", ")
-            : AUDIENCE_LABELS[policy.audience_type]}
+          {describeAudience({
+            ...policy,
+            people: policy.humans.map(personName),
+          })}
           {" · "}
           {describeAllowance(policy)}
         </p>
@@ -604,9 +665,10 @@ export function DraftIssuerPolicies({
               <div className="min-w-0 flex-1 space-y-0.5">
                 <span className="font-medium">{draft.name}</span>
                 <p className="text-sm text-muted-foreground">
-                  {draft.audience_type === "humans"
-                    ? draft.people.map((p) => p.label).join(", ")
-                    : AUDIENCE_LABELS[draft.audience_type]}
+                  {describeAudience({
+                    ...draft,
+                    people: draft.people.map((p) => p.label),
+                  })}
                   {" · "}
                   {describeAllowance(draft)}
                 </p>

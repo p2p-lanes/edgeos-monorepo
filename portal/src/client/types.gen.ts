@@ -1593,7 +1593,7 @@ export type AvailableScopes = {
 /**
  * Who a policy lets give badges.
  */
-export type BadgeAudienceType = 'humans' | 'popup_attendees' | 'tenant';
+export type BadgeAudienceType = 'humans' | 'popup_attendees' | 'tenant' | 'emails';
 
 /**
  * Give a badge to a human, identified by id or by email.
@@ -1675,6 +1675,7 @@ export type BadgeIssuerPolicyCreate = {
     is_active?: boolean;
     badge_ids: Array<(string)>;
     human_ids?: Array<(string)>;
+    emails?: Array<(string)>;
 };
 
 export type BadgeIssuerPolicyHuman = {
@@ -1694,6 +1695,7 @@ export type BadgeIssuerPolicyPublic = {
     is_active: boolean;
     badges: Array<BadgeSummary>;
     humans: Array<BadgeIssuerPolicyHuman>;
+    emails?: Array<(string)>;
     created_at: string;
     updated_at: string;
 };
@@ -1707,6 +1709,7 @@ export type BadgeIssuerPolicyUpdate = {
     is_active?: (boolean | null);
     badge_ids?: (Array<(string)> | null);
     human_ids?: (Array<(string)> | null);
+    emails?: (Array<(string)> | null);
 };
 
 /**
@@ -1730,6 +1733,7 @@ export type BadgeNewIssuerPolicy = {
     is_active?: boolean;
     badge_ids?: Array<(string)>;
     human_ids?: Array<(string)>;
+    emails?: Array<(string)>;
 };
 
 /**
