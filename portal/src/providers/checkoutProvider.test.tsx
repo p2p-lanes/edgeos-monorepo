@@ -372,10 +372,11 @@ describe("checkoutProvider — entry-link coupons", () => {
   beforeEach(() => localStorage.clear())
 
   it("applies an entry coupon after open-cart restoration and release settle", async () => {
-    cityState.current = { id: "popup-1", allows_coupons: true }
+    cityState.current = { id: "popup-1" }
     const validate = vi.fn().mockResolvedValue(20)
     const { result } = renderHook(() => useCheckout(), {
       wrapper: makeWrapper([], products, {
+        checkoutConfigOverride: { allows_coupons: true },
         salesFlowId: "flow-friends",
         salesFlowSlug: "friends",
         submitMode: "open-ticketing",
@@ -412,11 +413,12 @@ describe("checkoutProvider — entry-link coupons", () => {
     "zero-discount",
     "rejected",
   ])("keeps normal checkout totals without an error for a %s URL coupon", async (reason) => {
-    cityState.current = { id: "popup-1", allows_coupons: reason !== "disabled" }
+    cityState.current = { id: "popup-1" }
     const validate = vi.fn().mockResolvedValue(0)
     if (reason === "rejected") validate.mockRejectedValue({ status: 400 })
     const { result } = renderHook(() => useCheckout(), {
       wrapper: makeWrapper([], products, {
+        checkoutConfigOverride: { allows_coupons: reason !== "disabled" },
         salesFlowId: "flow-friends",
         salesFlowSlug: "friends",
         submitMode: "open-ticketing",
@@ -439,7 +441,7 @@ describe("checkoutProvider — entry-link coupons", () => {
   })
 
   it("waits for signed cart recovery and release before replacing a saved coupon", async () => {
-    cityState.current = { id: "popup-1", allows_coupons: true }
+    cityState.current = { id: "popup-1" }
     let resolveRestore!: (value: unknown) => void
     let resolveRelease!: (value: { released: boolean }) => void
     vi.mocked(CheckoutService.restoreFlowCart).mockReturnValueOnce(
@@ -455,6 +457,7 @@ describe("checkoutProvider — entry-link coupons", () => {
     const validate = vi.fn().mockResolvedValue(20)
     const { result } = renderHook(() => useCheckout(), {
       wrapper: makeWrapper([], products, {
+        checkoutConfigOverride: { allows_coupons: true },
         salesFlowId: "flow-friends",
         salesFlowSlug: "friends",
         submitMode: "open-ticketing",
@@ -506,10 +509,12 @@ describe("checkoutProvider — entry-link coupons", () => {
     allowsCoupons,
     previewMode,
   }) => {
-    cityState.current = { id: "popup-1", allows_coupons: allowsCoupons }
+    // The popup's stale column says yes; only the flow's answer counts.
+    cityState.current = { id: "popup-1", allows_coupons: true }
     const validate = vi.fn().mockResolvedValue(20)
     const { result } = renderHook(() => useCheckout(), {
       wrapper: makeWrapper([], products, {
+        checkoutConfigOverride: { allows_coupons: allowsCoupons },
         salesFlowId: "flow-friends",
         salesFlowSlug: "friends",
         submitMode: "open-ticketing",
@@ -586,13 +591,13 @@ describe("checkoutProvider — Sales Flow checkout boundary", () => {
   })
 
   it("includes stays in coupon and contribution calculations", async () => {
-    cityState.current = {
-      id: "popup-1",
-      contribution_enabled: true,
-      contribution_percentage: 10,
-    }
+    cityState.current = { id: "popup-1" }
     const { result } = renderHook(() => useCheckout(), {
       wrapper: makeWrapper([], [], {
+        checkoutConfigOverride: {
+          contribution_enabled: true,
+          contribution_percentage: "10",
+        },
         salesFlowId: "flow-main",
         validatePromoCodeOverride: async () => 20,
       }),
@@ -608,6 +613,25 @@ describe("checkoutProvider — Sales Flow checkout boundary", () => {
     expect(result.current.summary.discount).toBe(22)
     expect(result.current.summary.contributionSubtotal).toBe(8.8)
     expect(result.current.summary.grandTotal).toBe(96.8)
+  })
+
+  it("charges no contribution the flow has turned off, whatever the popup says", async () => {
+    cityState.current = {
+      id: "popup-1",
+      contribution_enabled: true,
+      contribution_percentage: 10,
+    }
+    const { result } = renderHook(() => useCheckout(), {
+      wrapper: makeWrapper([], [], {
+        checkoutConfigOverride: { contribution_enabled: false },
+        salesFlowId: "flow-main",
+      }),
+    })
+
+    act(() => result.current.addAccommodation(stay))
+
+    expect(result.current.summary.contributionSubtotal).toBe(0)
+    expect(result.current.summary.grandTotal).toBe(110)
   })
 })
 

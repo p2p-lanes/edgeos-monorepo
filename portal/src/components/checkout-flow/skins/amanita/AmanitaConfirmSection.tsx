@@ -153,6 +153,7 @@ export default function AmanitaConfirmSection({
     clearPatron,
     housingDatesShown,
     salesFlowId,
+    flowConfig,
   } = useCheckout()
 
   // Removing a pass mirrors the footer cart: day passes reset, everything else
@@ -693,7 +694,7 @@ export default function AmanitaConfirmSection({
 
           {/* Coupon — no rule above it: it reads as part of the order, and the
               only divider before the totals is the one the ladder sits on. */}
-          {popup?.allows_coupons && hasDiscountableItems && (
+          {flowConfig?.allows_coupons && hasDiscountableItems && (
             <div className="px-5 py-4 md:px-8">
               <label
                 htmlFor="ck-cupon"
@@ -829,19 +830,19 @@ export default function AmanitaConfirmSection({
                   style={{ color: MUTED }}
                 >
                   <p className="min-w-0">
-                    {popup?.contribution_label ||
+                    {flowConfig?.contribution_label ||
                       t("checkout.contribution.fallbackLabel")}
-                    {popup?.contribution_percentage
-                      ? ` (${Number(popup.contribution_percentage)}%)`
+                    {flowConfig?.contribution_percentage
+                      ? ` (${Number(flowConfig.contribution_percentage)}%)`
                       : ""}
                   </p>
                   <p className="shrink-0 font-condensed text-base">
                     {formatCurrency(summary.contributionSubtotal)}
                   </p>
                 </div>
-                {popup?.contribution_description && (
+                {flowConfig?.contribution_description && (
                   <p className="mt-1 text-xs" style={{ color: MUTED }}>
-                    {popup.contribution_description}
+                    {flowConfig.contribution_description}
                   </p>
                 )}
               </>
