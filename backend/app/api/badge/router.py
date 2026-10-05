@@ -3,6 +3,7 @@ from datetime import UTC, datetime
 from typing import Annotated
 
 from fastapi import APIRouter, Header, HTTPException, status
+from loguru import logger
 from sqlmodel import Session, col, func, select
 
 from app.api.badge import crud, policies, rules
@@ -464,8 +465,34 @@ async def create_badge(
     db.flush()
     for img in badge_in.images:
         crud.upsert_image(db, badge, img.style_id, img.image_url, img.width, img.height)
+    for recipient_in in {r.human_id: r for r in badge_in.recipients}.values():
+        recipient = db.get(Humans, recipient_in.human_id)
+        if not recipient:
+            raise _not_found("Human")
+        crud.create_award(
+            db,
+            badge=badge,
+            recipient=recipient,
+            issuer_type=BadgeIssuerType.ADMIN,
+            issuer_user_id=current_user.id,
+            issuer_name=current_user.full_name or current_user.email,
+            message=recipient_in.message,
+            commit=False,
+        )
+    for policy_in in badge_in.issuer_policies:
+        _add_policy(db, tenant_id, policy_in, also=badge)
+    new_rules = [
+        (
+            _add_rule(db, tenant_id, badge.id, rule_in.config, rule_in.is_active),
+            rule_in.evaluate_now,
+        )
+        for rule_in in badge_in.rules
+    ]
     db.commit()
     db.refresh(badge)
+    for rule, evaluate_now in new_rules:
+        if evaluate_now:
+            _evaluate_quietly(db, rule)
     return _badge_public(db, badge)
 
 
@@ -743,10 +770,25 @@ async def create_issuer_policy(
     current_user: AdminOrApiKey_BadgesWrite,
     x_tenant_id: _XTenantId = None,
 ) -> BadgeIssuerPolicyPublic:
-    tenant_id = _tenant_id(current_user, x_tenant_id)
+    policy = _add_policy(db, _tenant_id(current_user, x_tenant_id), body)
+    db.commit()
+    db.refresh(policy)
+    return _policy_public(db, policy)
+
+
+def _add_policy(
+    db: Session,
+    tenant_id: uuid.UUID,
+    body: BadgeIssuerPolicyCreate,
+    also: Badges | None = None,
+) -> BadgeIssuerPolicies:
+    """Stage a policy and its links (no commit). ``also`` joins its badges."""
     badges, humans = _resolve_policy_links(
         db, body.badge_ids, body.human_ids, body.popup_id
     )
+    badges = [b for b in badges or [] if also is None or b.id != also.id]
+    if also is not None:
+        badges.insert(0, also)
     policy = BadgeIssuerPolicies(
         tenant_id=tenant_id,
         name=body.name,
@@ -764,9 +806,7 @@ async def create_issuer_policy(
         badges,
         humans if body.audience_type == BadgeAudienceType.HUMANS else [],
     )
-    db.commit()
-    db.refresh(policy)
-    return _policy_public(db, policy)
+    return policy
 
 
 @policies_router.get("/{policy_id}", response_model=BadgeIssuerPolicyPublic)
@@ -943,10 +983,39 @@ async def preview_badge_rule(
 ) -> BadgeRulePreview:
     """How many people meet a rule right now, without saving or awarding."""
     tenant_id = _tenant_id(current_user, x_tenant_id)
-    badge = _get_badge_or_404(db, body.badge_id)
+    badge = _get_badge_or_404(db, body.badge_id) if body.badge_id else None
     _check_rule_target(db, tenant_id, body.config)
     qualified, new = rules.preview(db, tenant_id, badge, body.config)
     return BadgeRulePreview(qualified=qualified, new_recipients=new)
+
+
+def _add_rule(
+    db: Session,
+    tenant_id: uuid.UUID,
+    badge_id: uuid.UUID,
+    config: BadgeRuleConfig,
+    is_active: bool,
+) -> BadgeRules:
+    """Stage a rule (no commit) after checking what it points at."""
+    _check_rule_target(db, tenant_id, config)
+    rule = BadgeRules(
+        tenant_id=tenant_id,
+        badge_id=badge_id,
+        type=rules.RULE_CONFIG_TYPE,
+        config=config.model_dump(mode="json"),
+        is_active=is_active,
+    )
+    db.add(rule)
+    return rule
+
+
+def _evaluate_quietly(db: Session, rule: BadgeRules) -> None:
+    """Award a just-saved rule; on failure the sweep retries it later."""
+    try:
+        rules.evaluate_rule(db, rule)
+    except Exception:
+        db.rollback()
+        logger.exception("Evaluating new badge rule {} failed", rule.id)
 
 
 @rules_router.get("", response_model=list[BadgeRulePublic])
@@ -973,15 +1042,7 @@ async def create_badge_rule(
     """Create a rule; by default it also awards everyone who already qualifies."""
     tenant_id = _tenant_id(current_user, x_tenant_id)
     _get_badge_or_404(db, body.badge_id)
-    _check_rule_target(db, tenant_id, body.config)
-    rule = BadgeRules(
-        tenant_id=tenant_id,
-        badge_id=body.badge_id,
-        type=rules.RULE_CONFIG_TYPE,
-        config=body.config.model_dump(mode="json"),
-        is_active=body.is_active,
-    )
-    db.add(rule)
+    rule = _add_rule(db, tenant_id, body.badge_id, body.config, body.is_active)
     db.commit()
     db.refresh(rule)
     if body.evaluate_now:

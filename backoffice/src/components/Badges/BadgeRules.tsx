@@ -3,6 +3,7 @@ import { Pencil, Plus, RefreshCw, Trash2, Users, Zap } from "lucide-react"
 import { useEffect, useMemo, useState } from "react"
 
 import {
+  type BadgeNewRule,
   type BadgeRulePublic,
   BadgesService,
   EventVenuesService,
@@ -113,7 +114,7 @@ function Preview({
   badgeId,
   conditions,
 }: {
-  badgeId: string
+  badgeId?: string
   conditions: Condition[]
 }) {
   const config = useDebounced(
@@ -125,7 +126,7 @@ function Preview({
     queryKey: [...rulesKey, "preview", badgeId, config],
     queryFn: () =>
       BadgesService.previewBadgeRule({
-        requestBody: { badge_id: badgeId, config },
+        requestBody: { badge_id: badgeId ?? null, config },
       }),
     enabled: valid,
     staleTime: 30_000,
@@ -152,29 +153,34 @@ function RuleDialog({
   onOpenChange,
   badgeId,
   rule,
+  draft,
+  onDraft,
 }: {
   open: boolean
   onOpenChange: (open: boolean) => void
-  badgeId: string
+  badgeId?: string
   rule?: BadgeRulePublic
+  // Draft mode, for a badge being created: nothing is saved here, the rule
+  // goes back to the caller and is created with the badge.
+  draft?: BadgeNewRule
+  onDraft?: (draft: BadgeNewRule) => void
 }) {
   const queryClient = useQueryClient()
   const { showSuccessToast, showErrorToast } = useCustomToast()
   const names = useNames()
-  const [conditions, setConditions] = useState<Condition[]>(
-    () => rule?.config.conditions ?? [blankCondition()],
-  )
+  const initial = rule?.config.conditions ??
+    draft?.config.conditions ?? [blankCondition()]
+  const [conditions, setConditions] = useState<Condition[]>(initial)
   const [shown, setShown] = useState<FilterKey[][]>(() =>
-    (rule?.config.conditions ?? [blankCondition()]).map((c) =>
-      filtersInUse(c.filters),
-    ),
+    initial.map((c) => filtersInUse(c.filters)),
   )
-  const [applyNow, setApplyNow] = useState(true)
+  const [applyNow, setApplyNow] = useState(draft?.evaluate_now ?? true)
 
   const save = useMutation({
     mutationFn: async () => {
       const config = { conditions }
       if (!rule) {
+        if (!badgeId) throw new Error("Save the badge before adding rules")
         return BadgesService.createBadgeRule({
           requestBody: { badge_id: badgeId, config, evaluate_now: applyNow },
         })
@@ -185,7 +191,7 @@ function RuleDialog({
       })
       if (applyNow && updated.is_active) {
         await BadgesService.evaluateBadgeRule({ ruleId: rule.id })
-        return BadgesService.listBadgeRules({ badgeId }).then(
+        return BadgesService.listBadgeRules({ badgeId: rule.badge_id }).then(
           (all) => all.find((r) => r.id === rule.id) ?? updated,
         )
       }
@@ -227,7 +233,7 @@ function RuleDialog({
       <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
         <DialogHeader>
           <DialogTitle>
-            {rule ? "Edit rule" : "Earn it automatically"}
+            {rule || draft ? "Edit rule" : "Earn it automatically"}
           </DialogTitle>
           <DialogDescription>
             People get this badge on their own once they meet every condition.
@@ -299,9 +305,16 @@ function RuleDialog({
           <LoadingButton
             loading={save.isPending}
             disabled={blocker !== null}
-            onClick={() => save.mutate()}
+            onClick={() => {
+              if (onDraft) {
+                onDraft({ config: { conditions }, evaluate_now: applyNow })
+                onOpenChange(false)
+              } else {
+                save.mutate()
+              }
+            }}
           >
-            {rule ? "Save rule" : "Add rule"}
+            {rule || draft ? "Save rule" : "Add rule"}
           </LoadingButton>
         </DialogFooter>
       </DialogContent>
@@ -480,5 +493,90 @@ export function BadgeRulesCard({ badgeId }: { badgeId: string }) {
         )}
       </CardContent>
     </Card>
+  )
+}
+
+/**
+ * "Earned automatically" for a badge that's still being created: the rules
+ * are kept here and saved together with the badge.
+ */
+export function DraftBadgeRules({
+  value,
+  onChange,
+}: {
+  value: BadgeNewRule[]
+  onChange: (value: BadgeNewRule[]) => void
+}) {
+  const names = useNames()
+  // undefined = closed, -1 = adding, otherwise the index being edited.
+  const [editing, setEditing] = useState<number | undefined>()
+
+  return (
+    <div className="space-y-3">
+      {value.length === 0 ? (
+        <p className="text-sm text-muted-foreground">No rules.</p>
+      ) : (
+        <ul className="divide-y rounded-md border px-3">
+          {value.map((draft, index) => (
+            <li key={index} className="flex items-start gap-3 py-3">
+              <Zap className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
+              <div className="min-w-0 flex-1 space-y-0.5">
+                {describeRule(draft.config.conditions, names).map((line, i) => (
+                  <p key={i} className="font-medium">
+                    {i > 0 && (
+                      <span className="font-normal text-muted-foreground">
+                        and{" "}
+                      </span>
+                    )}
+                    {line}
+                  </p>
+                ))}
+              </div>
+              <Button
+                type="button"
+                size="icon"
+                variant="ghost"
+                aria-label="Edit rule"
+                onClick={() => setEditing(index)}
+              >
+                <Pencil className="h-4 w-4" />
+              </Button>
+              <Button
+                type="button"
+                size="icon"
+                variant="ghost"
+                aria-label="Remove rule"
+                onClick={() => onChange(value.filter((_, i) => i !== index))}
+              >
+                <Trash2 className="h-4 w-4" />
+              </Button>
+            </li>
+          ))}
+        </ul>
+      )}
+      <Button
+        type="button"
+        variant="outline"
+        size="sm"
+        onClick={() => setEditing(-1)}
+      >
+        <Plus className="mr-1 h-4 w-4" />
+        Add rule
+      </Button>
+      {editing !== undefined && (
+        <RuleDialog
+          open
+          onOpenChange={(open) => !open && setEditing(undefined)}
+          draft={editing >= 0 ? value[editing] : undefined}
+          onDraft={(draft) =>
+            onChange(
+              editing >= 0
+                ? value.map((d, i) => (i === editing ? draft : d))
+                : [...value, draft],
+            )
+          }
+        />
+      )}
+    </div>
   )
 }

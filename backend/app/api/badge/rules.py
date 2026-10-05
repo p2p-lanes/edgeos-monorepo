@@ -404,7 +404,7 @@ def preview(
     if not qualified:
         return 0, 0
     held = set()
-    if not badge.repeatable:
+    if badge is not None and not badge.repeatable:
         held = set(
             db.exec(
                 select(BadgeAwards.recipient_human_id).where(

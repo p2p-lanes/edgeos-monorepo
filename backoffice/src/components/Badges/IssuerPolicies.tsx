@@ -6,6 +6,7 @@ import {
   type AllowanceWindow,
   type BadgeAudienceType,
   type BadgeIssuerPolicyPublic,
+  type BadgeNewIssuerPolicy,
   BadgesService,
   HumansService,
   PopupsService,
@@ -59,9 +60,12 @@ const WINDOW_LABELS: Record<AllowanceWindow, string> = {
 
 const policiesKey = ["badge-issuer-policies"]
 
-function describeAllowance(policy: BadgeIssuerPolicyPublic): string {
+function describeAllowance(policy: {
+  allowance_quantity?: number | null
+  allowance_window?: AllowanceWindow
+}): string {
   if (policy.allowance_quantity == null) return "Unlimited"
-  return `${policy.allowance_quantity} ${WINDOW_LABELS[policy.allowance_window]}`
+  return `${policy.allowance_quantity} ${WINDOW_LABELS[policy.allowance_window ?? "day"]}`
 }
 
 function personName(p: {
@@ -72,9 +76,20 @@ function personName(p: {
   return [p.first_name, p.last_name].filter(Boolean).join(" ") || p.email
 }
 
-type Person = { id: string; email: string; label: string }
+export type Person = { id: string; email: string; label: string }
 
-function PeoplePicker({
+/** A policy for a badge that doesn't exist yet, saved along with it. */
+export type PolicyDraft = BadgeNewIssuerPolicy & { people: Person[] }
+
+/** What the API takes for a draft (the people labels are only for display). */
+export function draftToPayload({
+  people: _people,
+  ...policy
+}: PolicyDraft): BadgeNewIssuerPolicy {
+  return policy
+}
+
+export function PeoplePicker({
   value,
   onChange,
 }: {
@@ -151,37 +166,48 @@ function PolicyDialog({
   onOpenChange,
   policy,
   defaultBadgeId,
+  draft,
+  onDraft,
 }: {
   open: boolean
   onOpenChange: (open: boolean) => void
   policy?: BadgeIssuerPolicyPublic
-  defaultBadgeId: string
+  defaultBadgeId?: string
+  // Draft mode, for a badge being created: nothing is saved here, the
+  // policy goes back to the caller and is created with the badge.
+  draft?: PolicyDraft
+  onDraft?: (draft: PolicyDraft) => void
 }) {
   const queryClient = useQueryClient()
   const { showSuccessToast, showErrorToast } = useCustomToast()
-  const [name, setName] = useState(policy?.name ?? "")
+  const source = policy ?? draft
+  const [name, setName] = useState(source?.name ?? "")
   const [audience, setAudience] = useState<BadgeAudienceType>(
-    policy?.audience_type ?? "humans",
+    source?.audience_type ?? "humans",
   )
-  const [popupId, setPopupId] = useState(policy?.popup_id ?? "")
+  const [popupId, setPopupId] = useState(source?.popup_id ?? "")
   const [people, setPeople] = useState<Person[]>(
-    (policy?.humans ?? []).map((h) => ({
-      id: h.id,
-      email: h.email,
-      label: personName(h),
-    })),
+    draft?.people ??
+      (policy?.humans ?? []).map((h) => ({
+        id: h.id,
+        email: h.email,
+        label: personName(h),
+      })),
   )
+  // In draft mode these are the *other* badges sharing the allowance.
   const [badgeIds, setBadgeIds] = useState<string[]>(
-    policy?.badges.map((b) => b.id) ?? [defaultBadgeId],
+    policy?.badges.map((b) => b.id) ??
+      draft?.badge_ids ??
+      (defaultBadgeId ? [defaultBadgeId] : []),
   )
   const [limited, setLimited] = useState(
-    policy ? policy.allowance_quantity != null : true,
+    source ? source.allowance_quantity != null : true,
   )
   const [quantity, setQuantity] = useState(
-    String(policy?.allowance_quantity ?? 3),
+    String(source?.allowance_quantity ?? 3),
   )
   const [allowanceWindow, setAllowanceWindow] = useState<AllowanceWindow>(
-    policy?.allowance_window ?? "day",
+    source?.allowance_window ?? "day",
   )
 
   const { data: popups } = useQuery({
@@ -198,17 +224,18 @@ function PolicyDialog({
   const needsPopup =
     audience === "popup_attendees" || allowanceWindow === "popup"
 
+  const body = {
+    name: name.trim(),
+    audience_type: audience,
+    popup_id: popupId || null,
+    allowance_quantity: limited ? Number(quantity) : null,
+    allowance_window: allowanceWindow,
+    badge_ids: badgeIds,
+    human_ids: audience === "humans" ? people.map((p) => p.id) : [],
+  }
+
   const save = useMutation({
     mutationFn: () => {
-      const body = {
-        name: name.trim(),
-        audience_type: audience,
-        popup_id: popupId || null,
-        allowance_quantity: limited ? Number(quantity) : null,
-        allowance_window: allowanceWindow,
-        badge_ids: badgeIds,
-        human_ids: audience === "humans" ? people.map((p) => p.id) : [],
-      }
       return policy
         ? BadgesService.updateIssuerPolicy({
             policyId: policy.id,
@@ -226,7 +253,7 @@ function PolicyDialog({
 
   const invalid =
     !name.trim() ||
-    badgeIds.length === 0 ||
+    (!onDraft && badgeIds.length === 0) ||
     (needsPopup && !popupId) ||
     (audience === "humans" && people.length === 0) ||
     (limited && !(Number(quantity) >= 1))
@@ -235,7 +262,7 @@ function PolicyDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-lg">
         <DialogHeader>
-          <DialogTitle>{policy ? "Edit rule" : "Who can give it"}</DialogTitle>
+          <DialogTitle>{source ? "Edit rule" : "Who can give it"}</DialogTitle>
           <DialogDescription>
             Admins can always give badges. A rule lets other people give them
             too, with an optional allowance.
@@ -357,6 +384,14 @@ function PolicyDialog({
               Badges in the same rule share its allowance.
             </p>
             <div className="max-h-48 space-y-1 overflow-y-auto rounded-md border p-2">
+              {onDraft && (
+                <div className="flex items-center gap-2 rounded px-1 py-1">
+                  <Checkbox id="policy-badge-new" checked disabled />
+                  <Label htmlFor="policy-badge-new" className="font-normal">
+                    This badge
+                  </Label>
+                </div>
+              )}
               {(catalog?.results ?? []).map((b) => (
                 <div
                   key={b.id}
@@ -393,9 +428,19 @@ function PolicyDialog({
           <LoadingButton
             loading={save.isPending}
             disabled={invalid}
-            onClick={() => save.mutate()}
+            onClick={() => {
+              if (onDraft) {
+                onDraft({
+                  ...body,
+                  people: audience === "humans" ? people : [],
+                })
+                onOpenChange(false)
+              } else {
+                save.mutate()
+              }
+            }}
           >
-            {policy ? "Save rule" : "Add rule"}
+            {source ? "Save rule" : "Add rule"}
           </LoadingButton>
         </DialogFooter>
       </DialogContent>
@@ -527,5 +572,90 @@ export function IssuerPoliciesCard({ badgeId }: { badgeId: string }) {
         )}
       </CardContent>
     </Card>
+  )
+}
+
+/**
+ * "Who can give it" for a badge that's still being created: the policies
+ * are kept here and saved together with the badge.
+ */
+export function DraftIssuerPolicies({
+  value,
+  onChange,
+}: {
+  value: PolicyDraft[]
+  onChange: (value: PolicyDraft[]) => void
+}) {
+  // undefined = closed, -1 = adding, otherwise the index being edited.
+  const [editing, setEditing] = useState<number | undefined>()
+
+  return (
+    <div className="space-y-3">
+      {value.length === 0 ? (
+        <p className="text-sm text-muted-foreground">Only admins.</p>
+      ) : (
+        <ul className="divide-y rounded-md border px-3">
+          {value.map((draft, index) => (
+            <li
+              key={`${draft.name}-${index}`}
+              className="flex items-start gap-3 py-3"
+            >
+              <Users className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
+              <div className="min-w-0 flex-1 space-y-0.5">
+                <span className="font-medium">{draft.name}</span>
+                <p className="text-sm text-muted-foreground">
+                  {draft.audience_type === "humans"
+                    ? draft.people.map((p) => p.label).join(", ")
+                    : AUDIENCE_LABELS[draft.audience_type]}
+                  {" · "}
+                  {describeAllowance(draft)}
+                </p>
+              </div>
+              <Button
+                type="button"
+                size="icon"
+                variant="ghost"
+                aria-label="Edit rule"
+                onClick={() => setEditing(index)}
+              >
+                <Pencil className="h-4 w-4" />
+              </Button>
+              <Button
+                type="button"
+                size="icon"
+                variant="ghost"
+                aria-label="Remove rule"
+                onClick={() => onChange(value.filter((_, i) => i !== index))}
+              >
+                <Trash2 className="h-4 w-4" />
+              </Button>
+            </li>
+          ))}
+        </ul>
+      )}
+      <Button
+        type="button"
+        variant="outline"
+        size="sm"
+        onClick={() => setEditing(-1)}
+      >
+        <Plus className="mr-1 h-4 w-4" />
+        Add rule
+      </Button>
+      {editing !== undefined && (
+        <PolicyDialog
+          open
+          onOpenChange={(open) => !open && setEditing(undefined)}
+          draft={editing >= 0 ? value[editing] : undefined}
+          onDraft={(draft) =>
+            onChange(
+              editing >= 0
+                ? value.map((d, i) => (i === editing ? draft : d))
+                : [...value, draft],
+            )
+          }
+        />
+      )}
+    </div>
   )
 }

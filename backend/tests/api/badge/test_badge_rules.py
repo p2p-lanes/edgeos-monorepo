@@ -610,3 +610,156 @@ def test_options_merge_curated_and_used_values(
         "tags": ["Music", "Wellness", "Yoga"],
         "kinds": ["Talk", "Workshop"],
     }
+
+
+# ---------------------------------------------------------------------------
+# Setting a badge up in one go
+# ---------------------------------------------------------------------------
+
+
+def test_badge_is_created_with_its_policies_and_rules(
+    client: TestClient, db: Session, tenant_a: Tenants, admin, style
+):
+    popup = _make_popup(db, tenant_a)
+    regular, giver = _make_human(db, tenant_a), _make_human(db, tenant_a)
+    _mark(db, tenant_a, regular, _past_event(db, tenant_a, popup, _days_ago(2)))
+    sibling = _badge(client, admin, style)
+
+    resp = client.post(
+        BADGES,
+        json={
+            "name": f"Regular {uuid.uuid4().hex[:6]}",
+            "images": [
+                {"style_id": style["id"], "image_url": "https://cdn.test/r.webp"}
+            ],
+            "issuer_policies": [
+                {
+                    "name": "Hosts",
+                    "audience_type": "humans",
+                    "human_ids": [str(giver.id)],
+                    "badge_ids": [sibling["id"]],
+                    "allowance_quantity": 2,
+                    "allowance_window": "day",
+                }
+            ],
+            "rules": [
+                {
+                    "config": {
+                        "conditions": [
+                            {"threshold": 1, "filters": {"popup_id": str(popup.id)}}
+                        ]
+                    }
+                }
+            ],
+        },
+        headers=admin,
+    )
+    assert resp.status_code == 201, resp.text
+    badge = resp.json()
+    # The rule ran right away for people who already qualify.
+    assert badge["award_count"] == 1
+    assert len(_awards(db, badge["id"], regular.id)) == 1
+
+    [rule] = client.get(RULES, params={"badge_id": badge["id"]}, headers=admin).json()
+    assert rule["award_count"] == 1
+    [policy] = client.get(
+        "/api/v1/badge-issuer-policies",
+        params={"badge_id": badge["id"]},
+        headers=admin,
+    ).json()
+    assert [b["id"] for b in policy["badges"]] == [badge["id"], sibling["id"]]
+    assert [h["id"] for h in policy["humans"]] == [str(giver.id)]
+
+
+def test_badge_create_is_all_or_nothing(client: TestClient, admin, style):
+    name = f"Broken {uuid.uuid4().hex[:6]}"
+    resp = client.post(
+        BADGES,
+        json={
+            "name": name,
+            "images": [
+                {"style_id": style["id"], "image_url": "https://cdn.test/b.webp"}
+            ],
+            "rules": [
+                {
+                    "config": {
+                        "conditions": [
+                            {
+                                "threshold": 1,
+                                "filters": {"track_ids": [str(uuid.uuid4())]},
+                            }
+                        ]
+                    }
+                }
+            ],
+        },
+        headers=admin,
+    )
+    assert resp.status_code == 404
+    listed = client.get(BADGES, params={"limit": 500}, headers=admin).json()
+    assert name not in {b["name"] for b in listed["results"]}
+
+    # A policy without the badge needs nothing else to point at.
+    bad_policy = client.post(
+        BADGES,
+        json={
+            "name": name,
+            "images": [
+                {"style_id": style["id"], "image_url": "https://cdn.test/b.webp"}
+            ],
+            "issuer_policies": [
+                {"name": "Attendees", "audience_type": "popup_attendees"}
+            ],
+        },
+        headers=admin,
+    )
+    assert bad_policy.status_code == 422
+
+
+def test_preview_works_before_the_badge_exists(
+    client: TestClient, db: Session, tenant_a: Tenants, admin
+):
+    popup = _make_popup(db, tenant_a)
+    human = _make_human(db, tenant_a)
+    _mark(db, tenant_a, human, _past_event(db, tenant_a, popup, _days_ago(2)))
+    resp = client.post(
+        f"{RULES}/preview",
+        json={
+            "config": {
+                "conditions": [{"threshold": 1, "filters": {"popup_id": str(popup.id)}}]
+            }
+        },
+        headers=admin,
+    )
+    assert resp.status_code == 200, resp.text
+    assert resp.json() == {"qualified": 1, "new_recipients": 1}
+
+
+def test_badge_is_created_already_given_to_people(
+    client: TestClient, db: Session, tenant_a: Tenants, admin, style
+):
+    alice, bob = _make_human(db, tenant_a), _make_human(db, tenant_a)
+    body = {
+        "name": f"Founder {uuid.uuid4().hex[:6]}",
+        "images": [{"style_id": style["id"], "image_url": "https://cdn.test/f.webp"}],
+        "recipients": [
+            {"human_id": str(alice.id), "message": "Thanks for starting this"},
+            {"human_id": str(bob.id)},
+            # Listed twice: given once.
+            {"human_id": str(bob.id)},
+        ],
+    }
+    resp = client.post(BADGES, json=body, headers=admin)
+    assert resp.status_code == 201, resp.text
+    badge = resp.json()
+    assert badge["award_count"] == 2
+    [award] = _awards(db, badge["id"], alice.id)
+    assert award.issuer_type == "admin" and award.message == "Thanks for starting this"
+    assert len(_awards(db, badge["id"], bob.id)) == 1
+
+    # Someone who doesn't exist cancels the whole thing.
+    missing = {**body, "name": f"Ghost {uuid.uuid4().hex[:6]}"}
+    missing["recipients"] = [{"human_id": str(uuid.uuid4())}]
+    assert client.post(BADGES, json=missing, headers=admin).status_code == 404
+    listed = client.get(BADGES, params={"limit": 500}, headers=admin).json()
+    assert missing["name"] not in {b["name"] for b in listed["results"]}

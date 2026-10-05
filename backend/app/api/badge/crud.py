@@ -248,8 +248,9 @@ def create_award(
     policy_id: uuid.UUID | None = None,
     rule_id: uuid.UUID | None = None,
     message: str | None = None,
+    commit: bool = True,
 ) -> BadgeAwards:
-    """Insert an award and commit.
+    """Insert an award and commit (or only flush, with ``commit=False``).
 
     Raises ``BadgeConflictError`` when the badge is archived or when a
     non-repeatable badge is already active on the recipient (checked up front
@@ -275,6 +276,9 @@ def create_award(
         is_unique=not badge.repeatable,
     )
     db.add(award)
+    if not commit:
+        db.flush()
+        return award
     try:
         db.commit()
     except IntegrityError as exc:

@@ -7852,6 +7852,30 @@ export const BadgeCreateSchema = {
             type: 'array',
             minItems: 1,
             title: 'Images'
+        },
+        issuer_policies: {
+            items: {
+                '$ref': '#/components/schemas/BadgeNewIssuerPolicy'
+            },
+            type: 'array',
+            maxItems: 20,
+            title: 'Issuer Policies'
+        },
+        rules: {
+            items: {
+                '$ref': '#/components/schemas/BadgeNewRule'
+            },
+            type: 'array',
+            maxItems: 20,
+            title: 'Rules'
+        },
+        recipients: {
+            items: {
+                '$ref': '#/components/schemas/BadgeNewRecipient'
+            },
+            type: 'array',
+            maxItems: 500,
+            title: 'Recipients'
         }
     },
     type: 'object',
@@ -8273,6 +8297,123 @@ policy) and \`\`rule\`\` (automatic check-in rules) are reserved for the next
 SIM-108 phases so awards never need a reshape.`
 } as const;
 
+export const BadgeNewIssuerPolicySchema = {
+    properties: {
+        name: {
+            type: 'string',
+            maxLength: 255,
+            minLength: 1,
+            title: 'Name'
+        },
+        audience_type: {
+            '$ref': '#/components/schemas/BadgeAudienceType'
+        },
+        popup_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Popup Id'
+        },
+        allowance_quantity: {
+            anyOf: [
+                {
+                    type: 'integer',
+                    minimum: 1
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Allowance Quantity'
+        },
+        allowance_window: {
+            '$ref': '#/components/schemas/AllowanceWindow',
+            default: 'day'
+        },
+        is_active: {
+            type: 'boolean',
+            title: 'Is Active',
+            default: true
+        },
+        badge_ids: {
+            items: {
+                type: 'string',
+                format: 'uuid'
+            },
+            type: 'array',
+            title: 'Badge Ids',
+            default: []
+        },
+        human_ids: {
+            items: {
+                type: 'string',
+                format: 'uuid'
+            },
+            type: 'array',
+            title: 'Human Ids',
+            default: []
+        }
+    },
+    type: 'object',
+    required: ['name', 'audience_type'],
+    title: 'BadgeNewIssuerPolicy',
+    description: 'An issuer policy created with a new badge, which always joins it.'
+} as const;
+
+export const BadgeNewRecipientSchema = {
+    properties: {
+        human_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Human Id'
+        },
+        message: {
+            anyOf: [
+                {
+                    type: 'string',
+                    maxLength: 2000
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Message'
+        }
+    },
+    type: 'object',
+    required: ['human_id'],
+    title: 'BadgeNewRecipient',
+    description: "Someone who gets a badge as soon as it's created."
+} as const;
+
+export const BadgeNewRuleSchema = {
+    properties: {
+        config: {
+            '$ref': '#/components/schemas/BadgeRuleConfig-Input'
+        },
+        is_active: {
+            type: 'boolean',
+            title: 'Is Active',
+            default: true
+        },
+        evaluate_now: {
+            type: 'boolean',
+            title: 'Evaluate Now',
+            default: true
+        }
+    },
+    type: 'object',
+    required: ['config'],
+    title: 'BadgeNewRule',
+    description: 'A rule created with a new badge.'
+} as const;
+
 export const BadgePublicSchema = {
     properties: {
         id: {
@@ -8679,8 +8820,15 @@ export const BadgeRulePreviewSchema = {
 export const BadgeRulePreviewRequestSchema = {
     properties: {
         badge_id: {
-            type: 'string',
-            format: 'uuid',
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
             title: 'Badge Id'
         },
         config: {
@@ -8688,7 +8836,7 @@ export const BadgeRulePreviewRequestSchema = {
         }
     },
     type: 'object',
-    required: ['badge_id', 'config'],
+    required: ['config'],
     title: 'BadgeRulePreviewRequest'
 } as const;
 

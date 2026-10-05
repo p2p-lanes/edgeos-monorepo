@@ -1641,6 +1641,9 @@ export type BadgeCreate = {
     style_override_id?: (string | null);
     repeatable?: boolean;
     images: Array<BadgeImageIn>;
+    issuer_policies?: Array<BadgeNewIssuerPolicy>;
+    rules?: Array<BadgeNewRule>;
+    recipients?: Array<BadgeNewRecipient>;
 };
 
 export type BadgeImageIn = {
@@ -1714,6 +1717,37 @@ export type BadgeIssuerPolicyUpdate = {
  * SIM-108 phases so awards never need a reshape.
  */
 export type BadgeIssuerType = 'admin' | 'human' | 'rule';
+
+/**
+ * An issuer policy created with a new badge, which always joins it.
+ */
+export type BadgeNewIssuerPolicy = {
+    name: string;
+    audience_type: BadgeAudienceType;
+    popup_id?: (string | null);
+    allowance_quantity?: (number | null);
+    allowance_window?: AllowanceWindow;
+    is_active?: boolean;
+    badge_ids?: Array<(string)>;
+    human_ids?: Array<(string)>;
+};
+
+/**
+ * Someone who gets a badge as soon as it's created.
+ */
+export type BadgeNewRecipient = {
+    human_id: string;
+    message?: (string | null);
+};
+
+/**
+ * A rule created with a new badge.
+ */
+export type BadgeNewRule = {
+    config: BadgeRuleConfig_Input;
+    is_active?: boolean;
+    evaluate_now?: boolean;
+};
 
 export type BadgePublic = {
     id: string;
@@ -1815,7 +1849,7 @@ export type BadgeRulePreview = {
 };
 
 export type BadgeRulePreviewRequest = {
-    badge_id: string;
+    badge_id?: (string | null);
     config: BadgeRuleConfig_Input;
 };
 

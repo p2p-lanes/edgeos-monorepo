@@ -193,6 +193,14 @@ class BadgeCreate(BaseModel):
     style_override_id: uuid.UUID | None = None
     repeatable: bool = False
     images: list[BadgeImageIn] = Field(min_length=1)
+    # Set the badge up in one go: who can give it and how it's earned. All
+    # of it is saved in the same transaction as the badge.
+    issuer_policies: list["BadgeNewIssuerPolicy"] = Field(
+        default_factory=list, max_length=20
+    )
+    rules: list["BadgeNewRule"] = Field(default_factory=list, max_length=20)
+    # People who get it right away, from whoever creates the badge.
+    recipients: list["BadgeNewRecipient"] = Field(default_factory=list, max_length=500)
 
     model_config = ConfigDict(str_strip_whitespace=True)
 
@@ -272,6 +280,15 @@ class BadgeAwardCreate(BaseModel):
                 "Provide exactly one of recipient_human_id or recipient_email"
             )
         return self
+
+
+class BadgeNewRecipient(BaseModel):
+    """Someone who gets a badge as soon as it's created."""
+
+    human_id: uuid.UUID
+    message: str | None = Field(default=None, max_length=2000)
+
+    model_config = ConfigDict(str_strip_whitespace=True)
 
 
 class BadgeAwardRevoke(BaseModel):
@@ -424,6 +441,13 @@ class BadgeIssuerPolicyCreate(BaseModel):
     def _shape(self) -> "BadgeIssuerPolicyCreate":
         check_policy_shape(self.audience_type, self.popup_id, self.allowance_window)
         return self
+
+
+class BadgeNewIssuerPolicy(BadgeIssuerPolicyCreate):
+    """An issuer policy created with a new badge, which always joins it."""
+
+    # Other badges that share this policy's allowance.
+    badge_ids: list[uuid.UUID] = []
 
 
 class BadgeIssuerPolicyUpdate(BaseModel):
@@ -607,6 +631,14 @@ class BadgeRuleCreate(BaseModel):
     evaluate_now: bool = True
 
 
+class BadgeNewRule(BaseModel):
+    """A rule created with a new badge."""
+
+    config: BadgeRuleConfig
+    is_active: bool = True
+    evaluate_now: bool = True
+
+
 class BadgeRuleUpdate(BaseModel):
     config: BadgeRuleConfig | None = None
     is_active: bool | None = None
@@ -626,7 +658,8 @@ class BadgeRulePreview(BaseModel):
 
 
 class BadgeRulePreviewRequest(BaseModel):
-    badge_id: uuid.UUID
+    # Omitted while the badge is still being created: nobody holds it yet.
+    badge_id: uuid.UUID | None = None
     config: BadgeRuleConfig
 
 
@@ -635,3 +668,6 @@ class BadgeRuleOptions(BaseModel):
 
     tags: list[str]
     kinds: list[str]
+
+
+BadgeCreate.model_rebuild()
