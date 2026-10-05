@@ -9954,6 +9954,16 @@ export const CheckoutRuntimeResponseSchema = {
         selected_flow: {
             '$ref': '#/components/schemas/SelectedSalesFlow'
         },
+        checkout_config: {
+            anyOf: [
+                {
+                    '$ref': '#/components/schemas/SalesFlowCheckoutConfig'
+                },
+                {
+                    type: 'null'
+                }
+            ]
+        },
         products: {
             items: {
                 '$ref': '#/components/schemas/CheckoutRuntimeProduct'
@@ -26636,6 +26646,86 @@ export const SaleTypeSchema = {
 - application: traditional application-based flow (approval required).
 - direct: direct purchase by a logged-in Human, no application.
 Enum is extensible for future types (e.g. waitlist, lottery, registration).`
+} as const;
+
+export const SalesFlowCheckoutConfigSchema = {
+    properties: {
+        allows_coupons: {
+            type: 'boolean',
+            title: 'Allows Coupons',
+            default: false
+        },
+        insurance_enabled: {
+            type: 'boolean',
+            title: 'Insurance Enabled',
+            default: false
+        },
+        insurance_percentage: {
+            anyOf: [
+                {
+                    type: 'string',
+                    pattern: '^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Insurance Percentage'
+        },
+        contribution_enabled: {
+            type: 'boolean',
+            title: 'Contribution Enabled',
+            default: false
+        },
+        contribution_percentage: {
+            anyOf: [
+                {
+                    type: 'string',
+                    pattern: '^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Contribution Percentage'
+        },
+        contribution_label: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Contribution Label'
+        },
+        contribution_description: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Contribution Description'
+        }
+    },
+    type: 'object',
+    title: 'SalesFlowCheckoutConfig',
+    description: `What a door's checkout screen needs to know about its own settings.
+
+The portal used to read these off \`PopupPublic\`, whose columns stopped
+being edited once each flow owned its configuration (slice 7). The
+checkout then offered a promo code field on a door with coupons off, and
+quoted an insurance or contribution line the payment would not charge.
+
+An allowlist like \`SalesFlowPortalPublic\`: every field is something the
+buyer sees on the confirm step anyway. Never widen this to the whole
+\`EffectiveFlowConfig\`, which carries \`open_checkout_signing_secret\`.
+Unset values read as off, matching how the payment and coupon paths treat
+them.`
 } as const;
 
 export const SalesFlowCreateSchema = {
