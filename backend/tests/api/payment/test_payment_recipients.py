@@ -11,6 +11,7 @@ from sqlmodel import Session, select
 from app.api.application.models import Applications
 from app.api.application.schemas import ApplicationStatus
 from app.api.attendee.models import Attendees
+from app.api.attendee_category.crud import attendee_categories_crud
 from app.api.attendee_category.models import AttendeeCategories
 from app.api.checkout.schemas import BuyerInfo, OpenTicketingPurchaseCreate, ProductLine
 from app.api.human.models import Humans
@@ -33,6 +34,7 @@ from app.api.tenant.models import Tenants
 from app.api.tenant.utils import get_portal_url
 from app.api.ticketing_step.constants import seed_ticketing_steps_for_popup
 from app.api.ticketing_step.models import TicketingSteps
+from app.core.security import create_access_token
 from tests._flow_helpers import seed_default_steps
 
 
@@ -1227,14 +1229,20 @@ def test_application_fee_snapshots_buyer_but_accepts_no_recipients(
 
 @pytest.mark.parametrize("role", ["spouse", "kid"])
 @pytest.mark.parametrize("free", [False, True])
+@pytest.mark.parametrize("payment_has_application_id", [False, True])
 def test_purchase_preserves_companion_category_and_buyer_main(
-    client, db, tenant_a, superadmin_token, role, free
+    client, db, tenant_a, superadmin_token, role, free, payment_has_application_id
 ):
     popup, _, buyer, category, application, product = _payment_context(db, tenant_a)
+    flow = db.get(SalesFlows, application.sales_flow_id)
+    assert flow is not None
+    main_category = attendee_categories_crud.seed_main_for_flow(db, flow)
+    popup.show_attendee_directory = True
     category.key = role
+    product.attendee_category_id = None
     if free:
         product.price = Decimal("0")
-    db.add_all([category, product])
+    db.add_all([popup, category, main_category, product])
     db.commit()
     request = _request(application, product, category, recipient_name="Named Companion")
     request.recipients.append(
@@ -1246,6 +1254,10 @@ def test_purchase_preserves_companion_category_and_buyer_main(
     with patch("app.services.simplefi.get_simplefi_client") as provider:
         provider.return_value.create_payment.return_value = _provider_response("roles")
         payment, _ = payments_crud.create_payment(db, request)
+    if not payment_has_application_id:
+        payment.application_id = None
+        db.add(payment)
+        db.commit()
     payments_crud.approve_payment(db, payment.id)
     payments_crud.approve_payment(db, payment.id)
     attendees = db.exec(select(Attendees).where(Attendees.popup_id == popup.id)).all()
@@ -1253,12 +1265,25 @@ def test_purchase_preserves_companion_category_and_buyer_main(
     own = next(a for a in attendees if a.human_id == buyer.id)
     companion = next(a for a in attendees if a.managed_by_human_id == buyer.id)
     assert own.category == "main"
+    assert own.application_id == application.id
+    assert own.category_id == main_category.id
     assert companion.human_id is None
     assert companion.category_id == category.id
     headers = {
-        "Authorization": f"Bearer {superadmin_token}",
-        "X-Tenant-Id": str(tenant_a.id),
+        "Authorization": f"Bearer {create_access_token(subject=buyer.id, token_type='human')}"
     }
+    directory = client.get(
+        f"/api/v1/applications/my/directory/{popup.id}", headers=headers
+    )
+    assert directory.status_code == 200, directory.text
+    assert any(entry["id"] == str(own.id) for entry in directory.json()["results"])
+
+    headers.update(
+        {
+            "Authorization": f"Bearer {superadmin_token}",
+            "X-Tenant-Id": str(tenant_a.id),
+        }
+    )
     detail = client.get(f"/api/v1/attendees/{companion.id}", headers=headers)
     assert detail.status_code == 200, detail.text
     assert detail.json()["category"] == role
