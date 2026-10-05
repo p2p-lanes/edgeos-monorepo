@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react"
 import { useTranslation } from "react-i18next"
+import BadgesSection from "@/components/profile/BadgesSection"
 import HeaderProfile from "@/components/profile/HeaderProfile"
 import HumanForm from "@/components/profile/HumanForm"
 import PopupsHistory from "@/components/profile/PopupsHistory"
@@ -135,6 +136,8 @@ export default function ProfileContent() {
           />
 
           <StatsCards stats={stats} isLoading={isStatsLoading} />
+
+          <BadgesSection />
 
           <PopupsHistory popups={stats?.popups ?? []} />
         </div>

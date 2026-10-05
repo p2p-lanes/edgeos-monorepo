@@ -21,6 +21,7 @@ if TYPE_CHECKING:
 class Humans(HumanBase, table=True):
     __table_args__ = (
         UniqueConstraint("email", "tenant_id", name="uq_human_email_tenant_id"),
+        UniqueConstraint("public_profile_token", name="uq_humans_public_profile_token"),
     )
 
     id: uuid.UUID = Field(
@@ -29,6 +30,17 @@ class Humans(HumanBase, table=True):
             UUID(as_uuid=True),
             primary_key=True,
         ),
+    )
+
+    # Public profile share link (SIM-108). The token is opaque, generated on
+    # first read and regenerable; the link is on unless the human turns it off.
+    public_profile_token: str | None = Field(
+        default=None,
+        sa_column=Column(String(64), nullable=True),
+    )
+    public_profile_enabled: bool = Field(
+        default=True,
+        sa_column=Column(Boolean, nullable=False, server_default="true"),
     )
 
     tenant: "Tenants" = Relationship(back_populates="humans")

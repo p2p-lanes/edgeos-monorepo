@@ -476,7 +476,7 @@ export type status = 'added' | 'invited';
  */
 export type AdminApiKeyCreate = {
     name: string;
-    scopes: Array<('events:read' | 'events:write' | 'rsvp:write' | 'venues:read' | 'venues:write' | 'applications:read' | 'applications:write' | 'attendees:read' | 'attendees:write' | 'humans:read' | 'humans:write' | 'groups:read' | 'groups:write' | 'products:read' | 'products:write' | 'accommodations:read' | 'accommodations:write' | 'coupons:read' | 'coupons:write' | 'forms:read' | 'forms:write' | 'payments:read' | 'tracks:read' | 'tracks:write' | 'ticketing_steps:read' | 'ticketing_steps:write' | 'translations:read' | 'translations:write')>;
+    scopes: Array<('events:read' | 'events:write' | 'rsvp:write' | 'venues:read' | 'venues:write' | 'applications:read' | 'applications:write' | 'attendees:read' | 'attendees:write' | 'humans:read' | 'humans:write' | 'groups:read' | 'groups:write' | 'products:read' | 'products:write' | 'accommodations:read' | 'accommodations:write' | 'coupons:read' | 'coupons:write' | 'forms:read' | 'forms:write' | 'payments:read' | 'tracks:read' | 'tracks:write' | 'ticketing_steps:read' | 'ticketing_steps:write' | 'translations:read' | 'translations:write' | 'badges:read' | 'badges:write')>;
     expires_at?: (string | null);
 };
 
@@ -489,7 +489,7 @@ export type AdminApiKeyCreated = {
     id: string;
     name: string;
     prefix: string;
-    scopes: Array<('events:read' | 'events:write' | 'rsvp:write' | 'venues:read' | 'venues:write' | 'applications:read' | 'applications:write' | 'attendees:read' | 'attendees:write' | 'humans:read' | 'humans:write' | 'groups:read' | 'groups:write' | 'products:read' | 'products:write' | 'accommodations:read' | 'accommodations:write' | 'coupons:read' | 'coupons:write' | 'forms:read' | 'forms:write' | 'payments:read' | 'tracks:read' | 'tracks:write' | 'ticketing_steps:read' | 'ticketing_steps:write' | 'translations:read' | 'translations:write')>;
+    scopes: Array<('events:read' | 'events:write' | 'rsvp:write' | 'venues:read' | 'venues:write' | 'applications:read' | 'applications:write' | 'attendees:read' | 'attendees:write' | 'humans:read' | 'humans:write' | 'groups:read' | 'groups:write' | 'products:read' | 'products:write' | 'accommodations:read' | 'accommodations:write' | 'coupons:read' | 'coupons:write' | 'forms:read' | 'forms:write' | 'payments:read' | 'tracks:read' | 'tracks:write' | 'ticketing_steps:read' | 'ticketing_steps:write' | 'translations:read' | 'translations:write' | 'badges:read' | 'badges:write')>;
     created_at: string;
     last_used_at?: (string | null);
     expires_at?: (string | null);
@@ -504,7 +504,7 @@ export type AdminApiKeyPublic = {
     id: string;
     name: string;
     prefix: string;
-    scopes: Array<('events:read' | 'events:write' | 'rsvp:write' | 'venues:read' | 'venues:write' | 'applications:read' | 'applications:write' | 'attendees:read' | 'attendees:write' | 'humans:read' | 'humans:write' | 'groups:read' | 'groups:write' | 'products:read' | 'products:write' | 'accommodations:read' | 'accommodations:write' | 'coupons:read' | 'coupons:write' | 'forms:read' | 'forms:write' | 'payments:read' | 'tracks:read' | 'tracks:write' | 'ticketing_steps:read' | 'ticketing_steps:write' | 'translations:read' | 'translations:write')>;
+    scopes: Array<('events:read' | 'events:write' | 'rsvp:write' | 'venues:read' | 'venues:write' | 'applications:read' | 'applications:write' | 'attendees:read' | 'attendees:write' | 'humans:read' | 'humans:write' | 'groups:read' | 'groups:write' | 'products:read' | 'products:write' | 'accommodations:read' | 'accommodations:write' | 'coupons:read' | 'coupons:write' | 'forms:read' | 'forms:write' | 'payments:read' | 'tracks:read' | 'tracks:write' | 'ticketing_steps:read' | 'ticketing_steps:write' | 'translations:read' | 'translations:write' | 'badges:read' | 'badges:write')>;
     created_at: string;
     last_used_at?: (string | null);
     expires_at?: (string | null);
@@ -579,13 +579,22 @@ export type AITranslateRequest = {
 };
 
 /**
+ * Period an allowance resets on.
+ *
+ * ``day`` and ``week`` (ISO, Monday start) follow the calendar of the popup
+ * the badge is given in; ``popup`` counts everything given within the
+ * policy's popup; ``lifetime`` never resets.
+ */
+export type AllowanceWindow = 'day' | 'week' | 'popup' | 'lifetime';
+
+/**
  * Request body for creating a new API key.
  */
 export type ApiKeyCreate = {
     name: string;
     popup_id: string;
     expires_at?: (string | null);
-    scopes?: Array<('events:read' | 'events:write' | 'rsvp:write' | 'venues:read' | 'venues:write' | 'applications:read' | 'applications:write' | 'attendees:read' | 'attendees:write' | 'humans:read' | 'humans:write' | 'groups:read' | 'groups:write' | 'products:read' | 'products:write' | 'accommodations:read' | 'accommodations:write' | 'coupons:read' | 'coupons:write' | 'forms:read' | 'forms:write' | 'payments:read' | 'tracks:read' | 'tracks:write' | 'ticketing_steps:read' | 'ticketing_steps:write' | 'translations:read' | 'translations:write')>;
+    scopes?: Array<('events:read' | 'events:write' | 'rsvp:write' | 'venues:read' | 'venues:write' | 'applications:read' | 'applications:write' | 'attendees:read' | 'attendees:write' | 'humans:read' | 'humans:write' | 'groups:read' | 'groups:write' | 'products:read' | 'products:write' | 'accommodations:read' | 'accommodations:write' | 'coupons:read' | 'coupons:write' | 'forms:read' | 'forms:write' | 'payments:read' | 'tracks:read' | 'tracks:write' | 'ticketing_steps:read' | 'ticketing_steps:write' | 'translations:read' | 'translations:write' | 'badges:read' | 'badges:write')>;
 };
 
 /**
@@ -597,7 +606,7 @@ export type ApiKeyCreated = {
     name: string;
     prefix: string;
     popup_id?: (string | null);
-    scopes: Array<('events:read' | 'events:write' | 'rsvp:write' | 'venues:read' | 'venues:write' | 'applications:read' | 'applications:write' | 'attendees:read' | 'attendees:write' | 'humans:read' | 'humans:write' | 'groups:read' | 'groups:write' | 'products:read' | 'products:write' | 'accommodations:read' | 'accommodations:write' | 'coupons:read' | 'coupons:write' | 'forms:read' | 'forms:write' | 'payments:read' | 'tracks:read' | 'tracks:write' | 'ticketing_steps:read' | 'ticketing_steps:write' | 'translations:read' | 'translations:write')>;
+    scopes: Array<('events:read' | 'events:write' | 'rsvp:write' | 'venues:read' | 'venues:write' | 'applications:read' | 'applications:write' | 'attendees:read' | 'attendees:write' | 'humans:read' | 'humans:write' | 'groups:read' | 'groups:write' | 'products:read' | 'products:write' | 'accommodations:read' | 'accommodations:write' | 'coupons:read' | 'coupons:write' | 'forms:read' | 'forms:write' | 'payments:read' | 'tracks:read' | 'tracks:write' | 'ticketing_steps:read' | 'ticketing_steps:write' | 'translations:read' | 'translations:write' | 'badges:read' | 'badges:write')>;
     created_at: string;
     last_used_at?: (string | null);
     expires_at?: (string | null);
@@ -613,7 +622,7 @@ export type ApiKeyPublic = {
     name: string;
     prefix: string;
     popup_id?: (string | null);
-    scopes: Array<('events:read' | 'events:write' | 'rsvp:write' | 'venues:read' | 'venues:write' | 'applications:read' | 'applications:write' | 'attendees:read' | 'attendees:write' | 'humans:read' | 'humans:write' | 'groups:read' | 'groups:write' | 'products:read' | 'products:write' | 'accommodations:read' | 'accommodations:write' | 'coupons:read' | 'coupons:write' | 'forms:read' | 'forms:write' | 'payments:read' | 'tracks:read' | 'tracks:write' | 'ticketing_steps:read' | 'ticketing_steps:write' | 'translations:read' | 'translations:write')>;
+    scopes: Array<('events:read' | 'events:write' | 'rsvp:write' | 'venues:read' | 'venues:write' | 'applications:read' | 'applications:write' | 'attendees:read' | 'attendees:write' | 'humans:read' | 'humans:write' | 'groups:read' | 'groups:write' | 'products:read' | 'products:write' | 'accommodations:read' | 'accommodations:write' | 'coupons:read' | 'coupons:write' | 'forms:read' | 'forms:write' | 'payments:read' | 'tracks:read' | 'tracks:write' | 'ticketing_steps:read' | 'ticketing_steps:write' | 'translations:read' | 'translations:write' | 'badges:read' | 'badges:write')>;
     created_at: string;
     last_used_at?: (string | null);
     expires_at?: (string | null);
@@ -1581,6 +1590,215 @@ export type AvailableScopes = {
     api_key_scopes: Array<(string)>;
 };
 
+/**
+ * Who a policy lets give badges.
+ */
+export type BadgeAudienceType = 'humans' | 'popup_attendees' | 'tenant';
+
+/**
+ * Give a badge to a human, identified by id or by email.
+ */
+export type BadgeAwardCreate = {
+    recipient_human_id?: (string | null);
+    recipient_email?: (string | null);
+    popup_id?: (string | null);
+    message?: (string | null);
+};
+
+/**
+ * Administrative view of an award (backoffice and admin API keys).
+ */
+export type BadgeAwardPublic = {
+    id: string;
+    badge: BadgeSummary;
+    recipient: BadgeAwardRecipient;
+    issuer_type: BadgeIssuerType;
+    issuer_name?: (string | null);
+    popup_id?: (string | null);
+    message?: (string | null);
+    awarded_at: string;
+    revoked_at?: (string | null);
+    revoke_reason?: (string | null);
+};
+
+export type BadgeAwardRecipient = {
+    id: string;
+    email: string;
+    first_name?: (string | null);
+    last_name?: (string | null);
+    picture_url?: (string | null);
+};
+
+export type BadgeAwardRevoke = {
+    reason?: (string | null);
+};
+
+export type BadgeCreate = {
+    name: string;
+    slug?: (string | null);
+    description?: (string | null);
+    category?: (string | null);
+    style_override_id?: (string | null);
+    repeatable?: boolean;
+    images: Array<BadgeImageIn>;
+};
+
+export type BadgeImageIn = {
+    style_id: string;
+    image_url: string;
+    width?: (number | null);
+    height?: (number | null);
+};
+
+export type BadgeImagePublic = {
+    style_id: string;
+    image_url: string;
+    width?: (number | null);
+    height?: (number | null);
+};
+
+export type BadgeImageUpsert = {
+    image_url: string;
+    width?: (number | null);
+    height?: (number | null);
+};
+
+export type BadgeIssuerPolicyCreate = {
+    name: string;
+    audience_type: BadgeAudienceType;
+    popup_id?: (string | null);
+    allowance_quantity?: (number | null);
+    allowance_window?: AllowanceWindow;
+    is_active?: boolean;
+    badge_ids: Array<(string)>;
+    human_ids?: Array<(string)>;
+};
+
+export type BadgeIssuerPolicyHuman = {
+    id: string;
+    email: string;
+    first_name?: (string | null);
+    last_name?: (string | null);
+};
+
+export type BadgeIssuerPolicyPublic = {
+    id: string;
+    name: string;
+    audience_type: BadgeAudienceType;
+    popup_id?: (string | null);
+    allowance_quantity?: (number | null);
+    allowance_window: AllowanceWindow;
+    is_active: boolean;
+    badges: Array<BadgeSummary>;
+    humans: Array<BadgeIssuerPolicyHuman>;
+    created_at: string;
+    updated_at: string;
+};
+
+export type BadgeIssuerPolicyUpdate = {
+    name?: (string | null);
+    audience_type?: (BadgeAudienceType | null);
+    popup_id?: (string | null);
+    allowance_quantity?: (number | null);
+    allowance_window?: (AllowanceWindow | null);
+    is_active?: (boolean | null);
+    badge_ids?: (Array<(string)> | null);
+    human_ids?: (Array<(string)> | null);
+};
+
+/**
+ * Who granted an award.
+ *
+ * Only ``admin`` is issued today; ``human`` (peer sending under an issuer
+ * policy) and ``rule`` (automatic check-in rules) are reserved for the next
+ * SIM-108 phases so awards never need a reshape.
+ */
+export type BadgeIssuerType = 'admin' | 'human' | 'rule';
+
+export type BadgePublic = {
+    id: string;
+    slug: string;
+    name: string;
+    description?: (string | null);
+    category?: (string | null);
+    style_override_id?: (string | null);
+    repeatable: boolean;
+    archived_at?: (string | null);
+    created_at: string;
+    updated_at: string;
+    images?: Array<BadgeImagePublic>;
+    image_url?: (string | null);
+    award_count?: number;
+};
+
+export type BadgeRuleCreate = {
+    badge_id: string;
+    config: (CheckinsInTrackConfig | CheckinsInPopupConfig);
+    is_active?: boolean;
+    evaluate_now?: boolean;
+};
+
+export type BadgeRuleEvaluation = {
+    rule_id: string;
+    awarded: number;
+};
+
+export type BadgeRulePublic = {
+    id: string;
+    badge_id: string;
+    config: (CheckinsInTrackConfig | CheckinsInPopupConfig);
+    is_active: boolean;
+    award_count?: number;
+    created_at: string;
+    updated_at: string;
+};
+
+export type BadgeRuleUpdate = {
+    config?: ((CheckinsInTrackConfig | CheckinsInPopupConfig) | null);
+    is_active?: (boolean | null);
+};
+
+export type BadgeStyleCreate = {
+    name: string;
+    key?: (string | null);
+    sort_order?: number;
+};
+
+export type BadgeStylePublic = {
+    id: string;
+    key: string;
+    name: string;
+    is_default: boolean;
+    sort_order: number;
+};
+
+export type BadgeStyleUpdate = {
+    name?: (string | null);
+    sort_order?: (number | null);
+};
+
+/**
+ * The slice of a badge shown next to an award.
+ */
+export type BadgeSummary = {
+    id: string;
+    slug: string;
+    name: string;
+    description?: (string | null);
+    category?: (string | null);
+    repeatable: boolean;
+    image_url?: (string | null);
+};
+
+export type BadgeUpdate = {
+    name?: (string | null);
+    description?: (string | null);
+    category?: (string | null);
+    style_override_id?: (string | null);
+    repeatable?: (boolean | null);
+    archived?: (boolean | null);
+};
+
 export type BaseFieldConfigPublic = {
     id: string;
     tenant_id: string;
@@ -2022,6 +2240,18 @@ export type CheckInPayload = {
 };
 
 export type source = 'qr' | 'manual' | 'self_service';
+
+export type CheckinsInPopupConfig = {
+    type?: "checkins_in_popup";
+    popup_id: string;
+    threshold: number;
+};
+
+export type CheckinsInTrackConfig = {
+    type?: "checkins_in_track";
+    track_id: string;
+    threshold: number;
+};
 
 /**
  * Public buyer-form field for the checkout runtime.
@@ -3910,6 +4140,19 @@ export type InviteUpdate = {
 };
 
 /**
+ * A badge the caller may give in a popup right now, and how many more.
+ */
+export type IssuableBadge = {
+    badge: BadgeSummary;
+    policy_id: string;
+    allowance?: (number | null);
+    remaining?: (number | null);
+    window: AllowanceWindow;
+    resets_at?: (string | null);
+    recipient_has_it?: boolean;
+};
+
+/**
  * Top-level KPI cards with derived metrics.
  */
 export type KeyMetrics = {
@@ -4004,6 +4247,16 @@ export type ListModel_AttendeeWithOriginPortalPublic_ = {
 
 export type ListModel_AuditLogPublic_ = {
     results: Array<AuditLogPublic>;
+    paging: Paging;
+};
+
+export type ListModel_BadgeAwardPublic_ = {
+    results: Array<BadgeAwardPublic>;
+    paging: Paging;
+};
+
+export type ListModel_BadgePublic_ = {
+    results: Array<BadgePublic>;
     paging: Paging;
 };
 
@@ -4190,6 +4443,23 @@ export type MeAccess = {
     app_name: string;
     scopes: Array<(string)>;
     api_key_scopes: Array<(string)>;
+};
+
+/**
+ * A badge on the caller's own profile, with every active award of it.
+ */
+export type MyBadge = {
+    badge: BadgeSummary;
+    count: number;
+    last_awarded_at: string;
+    awards: Array<MyBadgeAward>;
+};
+
+export type MyBadgeAward = {
+    awarded_at: string;
+    message?: (string | null);
+    popup_id?: (string | null);
+    issuer_name?: (string | null);
 };
 
 /**
@@ -5032,6 +5302,13 @@ export type PopupUpdate = {
     abandoned_application_max_count?: (number | null);
 };
 
+export type PortalBadgeAwardCreate = {
+    badge_id: string;
+    popup_id: string;
+    attendee_id: string;
+    message?: (string | null);
+};
+
 /**
  * Request to generate a presigned upload URL.
  */
@@ -5385,6 +5662,31 @@ export type PublicAccommodationProperty = {
     address?: (string | null);
     description?: (string | null);
     tax_percentage?: (string | null);
+};
+
+/**
+ * What anyone holding the share link sees. Never add contact fields.
+ */
+export type PublicProfile = {
+    display_name?: (string | null);
+    picture_url?: (string | null);
+    badges: Array<PublicProfileBadge>;
+};
+
+export type PublicProfileBadge = {
+    name: string;
+    description?: (string | null);
+    image_url?: (string | null);
+    count: number;
+};
+
+export type PublicProfileSettings = {
+    enabled: boolean;
+    token: string;
+};
+
+export type PublicProfileSettingsUpdate = {
+    enabled: boolean;
 };
 
 export type PublishableKeyCreate = {
@@ -5944,6 +6246,16 @@ export type SendTestRequest = {
     popup_id?: (string | null);
 };
 
+export type SentBadgeAward = {
+    id: string;
+    badge: BadgeSummary;
+    recipient_name?: (string | null);
+    popup_id?: (string | null);
+    message?: (string | null);
+    awarded_at: string;
+    revoked_at?: (string | null);
+};
+
 /**
  * How SimpleFi redirects the buyer to the success URL after payment.
  *
@@ -6259,8 +6571,8 @@ export type TenantUpdate = {
  */
 export type ThirdPartyAppCreate = {
     name: string;
-    allowed_token_scopes?: Array<('portal:*' | 'portal:profile:read' | 'portal:profile:write' | 'portal:applications:read' | 'portal:applications:write' | 'portal:attendees:write' | 'portal:payments:read' | 'portal:directory:read' | 'portal:api_keys:manage')>;
-    allowed_api_key_scopes?: Array<('events:read' | 'events:write' | 'rsvp:write' | 'venues:read' | 'venues:write' | 'applications:read' | 'applications:write' | 'attendees:read' | 'attendees:write' | 'humans:read' | 'humans:write' | 'groups:read' | 'groups:write' | 'products:read' | 'products:write' | 'accommodations:read' | 'accommodations:write' | 'coupons:read' | 'coupons:write' | 'forms:read' | 'forms:write' | 'payments:read' | 'tracks:read' | 'tracks:write' | 'ticketing_steps:read' | 'ticketing_steps:write' | 'translations:read' | 'translations:write')>;
+    allowed_token_scopes?: Array<('portal:*' | 'portal:profile:read' | 'portal:profile:write' | 'portal:applications:read' | 'portal:applications:write' | 'portal:attendees:write' | 'portal:payments:read' | 'portal:directory:read' | 'portal:api_keys:manage' | 'portal:badges:write')>;
+    allowed_api_key_scopes?: Array<('events:read' | 'events:write' | 'rsvp:write' | 'venues:read' | 'venues:write' | 'applications:read' | 'applications:write' | 'attendees:read' | 'attendees:write' | 'humans:read' | 'humans:write' | 'groups:read' | 'groups:write' | 'products:read' | 'products:write' | 'accommodations:read' | 'accommodations:write' | 'coupons:read' | 'coupons:write' | 'forms:read' | 'forms:write' | 'payments:read' | 'tracks:read' | 'tracks:write' | 'ticketing_steps:read' | 'ticketing_steps:write' | 'translations:read' | 'translations:write' | 'badges:read' | 'badges:write')>;
 };
 
 /**
@@ -6310,8 +6622,8 @@ export type ThirdPartyAppPublic = {
  */
 export type ThirdPartyAppUpdate = {
     name?: (string | null);
-    allowed_token_scopes?: (Array<('portal:*' | 'portal:profile:read' | 'portal:profile:write' | 'portal:applications:read' | 'portal:applications:write' | 'portal:attendees:write' | 'portal:payments:read' | 'portal:directory:read' | 'portal:api_keys:manage')> | null);
-    allowed_api_key_scopes?: (Array<('events:read' | 'events:write' | 'rsvp:write' | 'venues:read' | 'venues:write' | 'applications:read' | 'applications:write' | 'attendees:read' | 'attendees:write' | 'humans:read' | 'humans:write' | 'groups:read' | 'groups:write' | 'products:read' | 'products:write' | 'accommodations:read' | 'accommodations:write' | 'coupons:read' | 'coupons:write' | 'forms:read' | 'forms:write' | 'payments:read' | 'tracks:read' | 'tracks:write' | 'ticketing_steps:read' | 'ticketing_steps:write' | 'translations:read' | 'translations:write')> | null);
+    allowed_token_scopes?: (Array<('portal:*' | 'portal:profile:read' | 'portal:profile:write' | 'portal:applications:read' | 'portal:applications:write' | 'portal:attendees:write' | 'portal:payments:read' | 'portal:directory:read' | 'portal:api_keys:manage' | 'portal:badges:write')> | null);
+    allowed_api_key_scopes?: (Array<('events:read' | 'events:write' | 'rsvp:write' | 'venues:read' | 'venues:write' | 'applications:read' | 'applications:write' | 'attendees:read' | 'attendees:write' | 'humans:read' | 'humans:write' | 'groups:read' | 'groups:write' | 'products:read' | 'products:write' | 'accommodations:read' | 'accommodations:write' | 'coupons:read' | 'coupons:write' | 'forms:read' | 'forms:write' | 'payments:read' | 'tracks:read' | 'tracks:write' | 'ticketing_steps:read' | 'ticketing_steps:write' | 'translations:read' | 'translations:write' | 'badges:read' | 'badges:write')> | null);
 };
 
 /**
@@ -7703,6 +8015,231 @@ export type AuthThirdPartyHumanAuthenticateData = {
 };
 
 export type AuthThirdPartyHumanAuthenticateResponse = (Token);
+
+export type BadgesListBadgeAwardsData = {
+    badgeId?: (string | null);
+    email?: (string | null);
+    humanId?: (string | null);
+    includeRevoked?: boolean;
+    /**
+     * Maximum number of items to return
+     */
+    limit?: number;
+    /**
+     * Number of items to skip
+     */
+    skip?: number;
+    xTenantId?: (string | null);
+};
+
+export type BadgesListBadgeAwardsResponse = (ListModel_BadgeAwardPublic_);
+
+export type BadgesRevokeBadgeAwardData = {
+    awardId: string;
+    requestBody: BadgeAwardRevoke;
+    xTenantId?: (string | null);
+};
+
+export type BadgesRevokeBadgeAwardResponse = (BadgeAwardPublic);
+
+export type BadgesListMyBadgesResponse = (Array<MyBadge>);
+
+export type BadgesListIssuableBadgesData = {
+    attendeeId?: (string | null);
+    popupId: string;
+};
+
+export type BadgesListIssuableBadgesResponse = (Array<IssuableBadge>);
+
+export type BadgesGiveBadgeAsHumanData = {
+    requestBody: PortalBadgeAwardCreate;
+};
+
+export type BadgesGiveBadgeAsHumanResponse = (SentBadgeAward);
+
+export type BadgesListSentBadgesData = {
+    popupId?: (string | null);
+};
+
+export type BadgesListSentBadgesResponse = (Array<SentBadgeAward>);
+
+export type BadgesListBadgesData = {
+    category?: (string | null);
+    includeArchived?: boolean;
+    /**
+     * Maximum number of items to return
+     */
+    limit?: number;
+    search?: (string | null);
+    /**
+     * Number of items to skip
+     */
+    skip?: number;
+    xTenantId?: (string | null);
+};
+
+export type BadgesListBadgesResponse = (ListModel_BadgePublic_);
+
+export type BadgesCreateBadgeData = {
+    requestBody: BadgeCreate;
+    xTenantId?: (string | null);
+};
+
+export type BadgesCreateBadgeResponse = (BadgePublic);
+
+export type BadgesGetBadgeData = {
+    badgeId: string;
+    xTenantId?: (string | null);
+};
+
+export type BadgesGetBadgeResponse = (BadgePublic);
+
+export type BadgesUpdateBadgeData = {
+    badgeId: string;
+    requestBody: BadgeUpdate;
+    xTenantId?: (string | null);
+};
+
+export type BadgesUpdateBadgeResponse = (BadgePublic);
+
+export type BadgesDeleteBadgeData = {
+    badgeId: string;
+    xTenantId?: (string | null);
+};
+
+export type BadgesDeleteBadgeResponse = (void);
+
+export type BadgesPutBadgeImageData = {
+    badgeId: string;
+    requestBody: BadgeImageUpsert;
+    styleId: string;
+    xTenantId?: (string | null);
+};
+
+export type BadgesPutBadgeImageResponse = (BadgePublic);
+
+export type BadgesDeleteBadgeImageData = {
+    badgeId: string;
+    styleId: string;
+    xTenantId?: (string | null);
+};
+
+export type BadgesDeleteBadgeImageResponse = (BadgePublic);
+
+export type BadgesAwardBadgeData = {
+    badgeId: string;
+    requestBody: BadgeAwardCreate;
+    xTenantId?: (string | null);
+};
+
+export type BadgesAwardBadgeResponse = (BadgeAwardPublic);
+
+export type BadgesListBadgeStylesData = {
+    xTenantId?: (string | null);
+};
+
+export type BadgesListBadgeStylesResponse = (Array<BadgeStylePublic>);
+
+export type BadgesCreateBadgeStyleData = {
+    requestBody: BadgeStyleCreate;
+    xTenantId?: (string | null);
+};
+
+export type BadgesCreateBadgeStyleResponse = (BadgeStylePublic);
+
+export type BadgesUpdateBadgeStyleData = {
+    requestBody: BadgeStyleUpdate;
+    styleId: string;
+    xTenantId?: (string | null);
+};
+
+export type BadgesUpdateBadgeStyleResponse = (BadgeStylePublic);
+
+export type BadgesDeleteBadgeStyleData = {
+    styleId: string;
+    xTenantId?: (string | null);
+};
+
+export type BadgesDeleteBadgeStyleResponse = (void);
+
+export type BadgesSetDefaultBadgeStyleData = {
+    styleId: string;
+    xTenantId?: (string | null);
+};
+
+export type BadgesSetDefaultBadgeStyleResponse = (BadgeStylePublic);
+
+export type BadgesListIssuerPoliciesData = {
+    badgeId?: (string | null);
+    xTenantId?: (string | null);
+};
+
+export type BadgesListIssuerPoliciesResponse = (Array<BadgeIssuerPolicyPublic>);
+
+export type BadgesCreateIssuerPolicyData = {
+    requestBody: BadgeIssuerPolicyCreate;
+    xTenantId?: (string | null);
+};
+
+export type BadgesCreateIssuerPolicyResponse = (BadgeIssuerPolicyPublic);
+
+export type BadgesGetIssuerPolicyData = {
+    policyId: string;
+    xTenantId?: (string | null);
+};
+
+export type BadgesGetIssuerPolicyResponse = (BadgeIssuerPolicyPublic);
+
+export type BadgesUpdateIssuerPolicyData = {
+    policyId: string;
+    requestBody: BadgeIssuerPolicyUpdate;
+    xTenantId?: (string | null);
+};
+
+export type BadgesUpdateIssuerPolicyResponse = (BadgeIssuerPolicyPublic);
+
+export type BadgesDeleteIssuerPolicyData = {
+    policyId: string;
+    xTenantId?: (string | null);
+};
+
+export type BadgesDeleteIssuerPolicyResponse = (void);
+
+export type BadgesListBadgeRulesData = {
+    badgeId?: (string | null);
+    xTenantId?: (string | null);
+};
+
+export type BadgesListBadgeRulesResponse = (Array<BadgeRulePublic>);
+
+export type BadgesCreateBadgeRuleData = {
+    requestBody: BadgeRuleCreate;
+    xTenantId?: (string | null);
+};
+
+export type BadgesCreateBadgeRuleResponse = (BadgeRulePublic);
+
+export type BadgesUpdateBadgeRuleData = {
+    requestBody: BadgeRuleUpdate;
+    ruleId: string;
+    xTenantId?: (string | null);
+};
+
+export type BadgesUpdateBadgeRuleResponse = (BadgeRulePublic);
+
+export type BadgesDeleteBadgeRuleData = {
+    ruleId: string;
+    xTenantId?: (string | null);
+};
+
+export type BadgesDeleteBadgeRuleResponse = (void);
+
+export type BadgesEvaluateBadgeRuleData = {
+    ruleId: string;
+    xTenantId?: (string | null);
+};
+
+export type BadgesEvaluateBadgeRuleResponse = (BadgeRuleEvaluation);
 
 export type BaseFieldConfigsListBaseFieldConfigsData = {
     /**
@@ -9151,6 +9688,24 @@ export type HumansUpdateCurrentHumanData = {
 export type HumansUpdateCurrentHumanResponse = (HumanSelfPublic);
 
 export type HumansGetCurrentHumanProfileStatsResponse = (HumanProfileStats);
+
+export type HumansGetMyPublicProfileResponse = (PublicProfileSettings);
+
+export type HumansUpdateMyPublicProfileData = {
+    requestBody: PublicProfileSettingsUpdate;
+};
+
+export type HumansUpdateMyPublicProfileResponse = (PublicProfileSettings);
+
+export type HumansRegenerateMyPublicProfileResponse = (PublicProfileSettings);
+
+export type HumansGetPublicProfileData = {
+    token: string;
+    xEdgeOsPublishableKey?: (string | null);
+    xTenantId?: (string | null);
+};
+
+export type HumansGetPublicProfileResponse = (PublicProfile);
 
 export type HumansSearchHumansPortalData = {
     /**

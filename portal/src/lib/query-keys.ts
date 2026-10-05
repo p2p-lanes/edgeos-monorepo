@@ -40,6 +40,13 @@ export const queryKeys = {
   profile: {
     current: ["profile", "current"] as const,
     stats: ["profile", "stats"] as const,
+    badges: ["profile", "badges"] as const,
+    publicProfile: ["profile", "public-profile"] as const,
+    // With an attendee, the list also flags what that person already holds.
+    issuableBadges: (popupId: string, attendeeId?: string) =>
+      attendeeId
+        ? (["profile", "issuable-badges", popupId, attendeeId] as const)
+        : (["profile", "issuable-badges", popupId] as const),
   },
   formSchema: {
     // `salesFlowId` (sdd/sales-flows D6 URL scheme, task 9.4) is part of the

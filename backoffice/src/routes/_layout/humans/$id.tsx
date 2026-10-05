@@ -16,6 +16,7 @@ import { DeclaredFieldsCard } from "@/components/Humans/DeclaredFieldsCard"
 import { EnrichedProfileCard } from "@/components/Humans/EnrichedProfileCard"
 import { HumanActivity } from "@/components/Humans/HumanActivity"
 import { HumanApiKeysCard } from "@/components/Humans/HumanApiKeysCard"
+import { HumanBadgesCard } from "@/components/Humans/HumanBadgesCard"
 import { HumanCommentThread } from "@/components/Humans/HumanCommentThread"
 import { HumanProfileEditForm } from "@/components/Humans/HumanProfileEditForm"
 import { HumanRatingBadge } from "@/components/Humans/HumanRatingBadge"
@@ -167,6 +168,18 @@ function EditHumanContent({ humanId }: { humanId: string }) {
             </div>
 
             <div className="space-y-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Badges</CardTitle>
+                  <CardDescription>
+                    Shown on their profile and public link.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <HumanBadgesCard human={human} />
+                </CardContent>
+              </Card>
+
               <Card>
                 <CardHeader>
                   <CardTitle>Rich profile</CardTitle>

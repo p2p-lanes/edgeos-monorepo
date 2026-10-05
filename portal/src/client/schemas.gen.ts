@@ -2752,7 +2752,7 @@ export const AdminApiKeyCreateSchema = {
         scopes: {
             items: {
                 type: 'string',
-                enum: ['events:read', 'events:write', 'rsvp:write', 'venues:read', 'venues:write', 'applications:read', 'applications:write', 'attendees:read', 'attendees:write', 'humans:read', 'humans:write', 'groups:read', 'groups:write', 'products:read', 'products:write', 'accommodations:read', 'accommodations:write', 'coupons:read', 'coupons:write', 'forms:read', 'forms:write', 'payments:read', 'tracks:read', 'tracks:write', 'ticketing_steps:read', 'ticketing_steps:write', 'translations:read', 'translations:write']
+                enum: ['events:read', 'events:write', 'rsvp:write', 'venues:read', 'venues:write', 'applications:read', 'applications:write', 'attendees:read', 'attendees:write', 'humans:read', 'humans:write', 'groups:read', 'groups:write', 'products:read', 'products:write', 'accommodations:read', 'accommodations:write', 'coupons:read', 'coupons:write', 'forms:read', 'forms:write', 'payments:read', 'tracks:read', 'tracks:write', 'ticketing_steps:read', 'ticketing_steps:write', 'translations:read', 'translations:write', 'badges:read', 'badges:write']
             },
             type: 'array',
             minItems: 1,
@@ -2795,7 +2795,7 @@ export const AdminApiKeyCreatedSchema = {
         scopes: {
             items: {
                 type: 'string',
-                enum: ['events:read', 'events:write', 'rsvp:write', 'venues:read', 'venues:write', 'applications:read', 'applications:write', 'attendees:read', 'attendees:write', 'humans:read', 'humans:write', 'groups:read', 'groups:write', 'products:read', 'products:write', 'accommodations:read', 'accommodations:write', 'coupons:read', 'coupons:write', 'forms:read', 'forms:write', 'payments:read', 'tracks:read', 'tracks:write', 'ticketing_steps:read', 'ticketing_steps:write', 'translations:read', 'translations:write']
+                enum: ['events:read', 'events:write', 'rsvp:write', 'venues:read', 'venues:write', 'applications:read', 'applications:write', 'attendees:read', 'attendees:write', 'humans:read', 'humans:write', 'groups:read', 'groups:write', 'products:read', 'products:write', 'accommodations:read', 'accommodations:write', 'coupons:read', 'coupons:write', 'forms:read', 'forms:write', 'payments:read', 'tracks:read', 'tracks:write', 'ticketing_steps:read', 'ticketing_steps:write', 'translations:read', 'translations:write', 'badges:read', 'badges:write']
             },
             type: 'array',
             title: 'Scopes'
@@ -2872,7 +2872,7 @@ export const AdminApiKeyPublicSchema = {
         scopes: {
             items: {
                 type: 'string',
-                enum: ['events:read', 'events:write', 'rsvp:write', 'venues:read', 'venues:write', 'applications:read', 'applications:write', 'attendees:read', 'attendees:write', 'humans:read', 'humans:write', 'groups:read', 'groups:write', 'products:read', 'products:write', 'accommodations:read', 'accommodations:write', 'coupons:read', 'coupons:write', 'forms:read', 'forms:write', 'payments:read', 'tracks:read', 'tracks:write', 'ticketing_steps:read', 'ticketing_steps:write', 'translations:read', 'translations:write']
+                enum: ['events:read', 'events:write', 'rsvp:write', 'venues:read', 'venues:write', 'applications:read', 'applications:write', 'attendees:read', 'attendees:write', 'humans:read', 'humans:write', 'groups:read', 'groups:write', 'products:read', 'products:write', 'accommodations:read', 'accommodations:write', 'coupons:read', 'coupons:write', 'forms:read', 'forms:write', 'payments:read', 'tracks:read', 'tracks:write', 'ticketing_steps:read', 'ticketing_steps:write', 'translations:read', 'translations:write', 'badges:read', 'badges:write']
             },
             type: 'array',
             title: 'Scopes'
@@ -2962,6 +2962,17 @@ export const AdminGrantTicketsResponseSchema = {
     description: 'Response payload from POST /applications/admin/grant-tickets.'
 } as const;
 
+export const AllowanceWindowSchema = {
+    type: 'string',
+    enum: ['day', 'week', 'popup', 'lifetime'],
+    title: 'AllowanceWindow',
+    description: `Period an allowance resets on.
+
+\`\`day\`\` and \`\`week\`\` (ISO, Monday start) follow the calendar of the popup
+the badge is given in; \`\`popup\`\` counts everything given within the
+policy's popup; \`\`lifetime\`\` never resets.`
+} as const;
+
 export const ApiKeyCreateSchema = {
     properties: {
         name: {
@@ -2990,7 +3001,7 @@ export const ApiKeyCreateSchema = {
         scopes: {
             items: {
                 type: 'string',
-                enum: ['events:read', 'events:write', 'rsvp:write', 'venues:read', 'venues:write', 'applications:read', 'applications:write', 'attendees:read', 'attendees:write', 'humans:read', 'humans:write', 'groups:read', 'groups:write', 'products:read', 'products:write', 'accommodations:read', 'accommodations:write', 'coupons:read', 'coupons:write', 'forms:read', 'forms:write', 'payments:read', 'tracks:read', 'tracks:write', 'ticketing_steps:read', 'ticketing_steps:write', 'translations:read', 'translations:write']
+                enum: ['events:read', 'events:write', 'rsvp:write', 'venues:read', 'venues:write', 'applications:read', 'applications:write', 'attendees:read', 'attendees:write', 'humans:read', 'humans:write', 'groups:read', 'groups:write', 'products:read', 'products:write', 'accommodations:read', 'accommodations:write', 'coupons:read', 'coupons:write', 'forms:read', 'forms:write', 'payments:read', 'tracks:read', 'tracks:write', 'ticketing_steps:read', 'ticketing_steps:write', 'translations:read', 'translations:write', 'badges:read', 'badges:write']
             },
             type: 'array',
             title: 'Scopes'
@@ -3032,7 +3043,7 @@ export const ApiKeyCreatedSchema = {
         scopes: {
             items: {
                 type: 'string',
-                enum: ['events:read', 'events:write', 'rsvp:write', 'venues:read', 'venues:write', 'applications:read', 'applications:write', 'attendees:read', 'attendees:write', 'humans:read', 'humans:write', 'groups:read', 'groups:write', 'products:read', 'products:write', 'accommodations:read', 'accommodations:write', 'coupons:read', 'coupons:write', 'forms:read', 'forms:write', 'payments:read', 'tracks:read', 'tracks:write', 'ticketing_steps:read', 'ticketing_steps:write', 'translations:read', 'translations:write']
+                enum: ['events:read', 'events:write', 'rsvp:write', 'venues:read', 'venues:write', 'applications:read', 'applications:write', 'attendees:read', 'attendees:write', 'humans:read', 'humans:write', 'groups:read', 'groups:write', 'products:read', 'products:write', 'accommodations:read', 'accommodations:write', 'coupons:read', 'coupons:write', 'forms:read', 'forms:write', 'payments:read', 'tracks:read', 'tracks:write', 'ticketing_steps:read', 'ticketing_steps:write', 'translations:read', 'translations:write', 'badges:read', 'badges:write']
             },
             type: 'array',
             title: 'Scopes'
@@ -3120,7 +3131,7 @@ export const ApiKeyPublicSchema = {
         scopes: {
             items: {
                 type: 'string',
-                enum: ['events:read', 'events:write', 'rsvp:write', 'venues:read', 'venues:write', 'applications:read', 'applications:write', 'attendees:read', 'attendees:write', 'humans:read', 'humans:write', 'groups:read', 'groups:write', 'products:read', 'products:write', 'accommodations:read', 'accommodations:write', 'coupons:read', 'coupons:write', 'forms:read', 'forms:write', 'payments:read', 'tracks:read', 'tracks:write', 'ticketing_steps:read', 'ticketing_steps:write', 'translations:read', 'translations:write']
+                enum: ['events:read', 'events:write', 'rsvp:write', 'venues:read', 'venues:write', 'applications:read', 'applications:write', 'attendees:read', 'attendees:write', 'humans:read', 'humans:write', 'groups:read', 'groups:write', 'products:read', 'products:write', 'accommodations:read', 'accommodations:write', 'coupons:read', 'coupons:write', 'forms:read', 'forms:write', 'payments:read', 'tracks:read', 'tracks:write', 'ticketing_steps:read', 'ticketing_steps:write', 'translations:read', 'translations:write', 'badges:read', 'badges:write']
             },
             type: 'array',
             title: 'Scopes'
@@ -7558,6 +7569,1198 @@ Returns the platform MAX constants so the frontend create modal can
 populate its multi-select options without hardcoding scope strings.`
 } as const;
 
+export const BadgeAudienceTypeSchema = {
+    type: 'string',
+    enum: ['humans', 'popup_attendees', 'tenant'],
+    title: 'BadgeAudienceType',
+    description: 'Who a policy lets give badges.'
+} as const;
+
+export const BadgeAwardCreateSchema = {
+    properties: {
+        recipient_human_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Recipient Human Id'
+        },
+        recipient_email: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Recipient Email'
+        },
+        popup_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Popup Id'
+        },
+        message: {
+            anyOf: [
+                {
+                    type: 'string',
+                    maxLength: 2000
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Message'
+        }
+    },
+    type: 'object',
+    title: 'BadgeAwardCreate',
+    description: 'Give a badge to a human, identified by id or by email.'
+} as const;
+
+export const BadgeAwardPublicSchema = {
+    properties: {
+        id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Id'
+        },
+        badge: {
+            '$ref': '#/components/schemas/BadgeSummary'
+        },
+        recipient: {
+            '$ref': '#/components/schemas/BadgeAwardRecipient'
+        },
+        issuer_type: {
+            '$ref': '#/components/schemas/BadgeIssuerType'
+        },
+        issuer_name: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Issuer Name'
+        },
+        popup_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Popup Id'
+        },
+        message: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Message'
+        },
+        awarded_at: {
+            type: 'string',
+            format: 'date-time',
+            title: 'Awarded At'
+        },
+        revoked_at: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Revoked At'
+        },
+        revoke_reason: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Revoke Reason'
+        }
+    },
+    type: 'object',
+    required: ['id', 'badge', 'recipient', 'issuer_type', 'awarded_at'],
+    title: 'BadgeAwardPublic',
+    description: 'Administrative view of an award (backoffice and admin API keys).'
+} as const;
+
+export const BadgeAwardRecipientSchema = {
+    properties: {
+        id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Id'
+        },
+        email: {
+            type: 'string',
+            title: 'Email'
+        },
+        first_name: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'First Name'
+        },
+        last_name: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Last Name'
+        },
+        picture_url: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Picture Url'
+        }
+    },
+    type: 'object',
+    required: ['id', 'email'],
+    title: 'BadgeAwardRecipient'
+} as const;
+
+export const BadgeAwardRevokeSchema = {
+    properties: {
+        reason: {
+            anyOf: [
+                {
+                    type: 'string',
+                    maxLength: 2000
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Reason'
+        }
+    },
+    type: 'object',
+    title: 'BadgeAwardRevoke'
+} as const;
+
+export const BadgeCreateSchema = {
+    properties: {
+        name: {
+            type: 'string',
+            maxLength: 255,
+            minLength: 1,
+            title: 'Name'
+        },
+        slug: {
+            anyOf: [
+                {
+                    type: 'string',
+                    maxLength: 100
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Slug'
+        },
+        description: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Description'
+        },
+        category: {
+            anyOf: [
+                {
+                    type: 'string',
+                    maxLength: 100
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Category'
+        },
+        style_override_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Style Override Id'
+        },
+        repeatable: {
+            type: 'boolean',
+            title: 'Repeatable',
+            default: false
+        },
+        images: {
+            items: {
+                '$ref': '#/components/schemas/BadgeImageIn'
+            },
+            type: 'array',
+            minItems: 1,
+            title: 'Images'
+        }
+    },
+    type: 'object',
+    required: ['name', 'images'],
+    title: 'BadgeCreate'
+} as const;
+
+export const BadgeImageInSchema = {
+    properties: {
+        style_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Style Id'
+        },
+        image_url: {
+            type: 'string',
+            maxLength: 500,
+            minLength: 1,
+            title: 'Image Url'
+        },
+        width: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Width'
+        },
+        height: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Height'
+        }
+    },
+    type: 'object',
+    required: ['style_id', 'image_url'],
+    title: 'BadgeImageIn'
+} as const;
+
+export const BadgeImagePublicSchema = {
+    properties: {
+        style_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Style Id'
+        },
+        image_url: {
+            type: 'string',
+            title: 'Image Url'
+        },
+        width: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Width'
+        },
+        height: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Height'
+        }
+    },
+    type: 'object',
+    required: ['style_id', 'image_url'],
+    title: 'BadgeImagePublic'
+} as const;
+
+export const BadgeImageUpsertSchema = {
+    properties: {
+        image_url: {
+            type: 'string',
+            maxLength: 500,
+            minLength: 1,
+            title: 'Image Url'
+        },
+        width: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Width'
+        },
+        height: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Height'
+        }
+    },
+    type: 'object',
+    required: ['image_url'],
+    title: 'BadgeImageUpsert'
+} as const;
+
+export const BadgeIssuerPolicyCreateSchema = {
+    properties: {
+        name: {
+            type: 'string',
+            maxLength: 255,
+            minLength: 1,
+            title: 'Name'
+        },
+        audience_type: {
+            '$ref': '#/components/schemas/BadgeAudienceType'
+        },
+        popup_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Popup Id'
+        },
+        allowance_quantity: {
+            anyOf: [
+                {
+                    type: 'integer',
+                    minimum: 1
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Allowance Quantity'
+        },
+        allowance_window: {
+            '$ref': '#/components/schemas/AllowanceWindow',
+            default: 'day'
+        },
+        is_active: {
+            type: 'boolean',
+            title: 'Is Active',
+            default: true
+        },
+        badge_ids: {
+            items: {
+                type: 'string',
+                format: 'uuid'
+            },
+            type: 'array',
+            minItems: 1,
+            title: 'Badge Ids'
+        },
+        human_ids: {
+            items: {
+                type: 'string',
+                format: 'uuid'
+            },
+            type: 'array',
+            title: 'Human Ids',
+            default: []
+        }
+    },
+    type: 'object',
+    required: ['name', 'audience_type', 'badge_ids'],
+    title: 'BadgeIssuerPolicyCreate'
+} as const;
+
+export const BadgeIssuerPolicyHumanSchema = {
+    properties: {
+        id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Id'
+        },
+        email: {
+            type: 'string',
+            title: 'Email'
+        },
+        first_name: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'First Name'
+        },
+        last_name: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Last Name'
+        }
+    },
+    type: 'object',
+    required: ['id', 'email'],
+    title: 'BadgeIssuerPolicyHuman'
+} as const;
+
+export const BadgeIssuerPolicyPublicSchema = {
+    properties: {
+        id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Id'
+        },
+        name: {
+            type: 'string',
+            title: 'Name'
+        },
+        audience_type: {
+            '$ref': '#/components/schemas/BadgeAudienceType'
+        },
+        popup_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Popup Id'
+        },
+        allowance_quantity: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Allowance Quantity'
+        },
+        allowance_window: {
+            '$ref': '#/components/schemas/AllowanceWindow'
+        },
+        is_active: {
+            type: 'boolean',
+            title: 'Is Active'
+        },
+        badges: {
+            items: {
+                '$ref': '#/components/schemas/BadgeSummary'
+            },
+            type: 'array',
+            title: 'Badges'
+        },
+        humans: {
+            items: {
+                '$ref': '#/components/schemas/BadgeIssuerPolicyHuman'
+            },
+            type: 'array',
+            title: 'Humans'
+        },
+        created_at: {
+            type: 'string',
+            format: 'date-time',
+            title: 'Created At'
+        },
+        updated_at: {
+            type: 'string',
+            format: 'date-time',
+            title: 'Updated At'
+        }
+    },
+    type: 'object',
+    required: ['id', 'name', 'audience_type', 'allowance_window', 'is_active', 'badges', 'humans', 'created_at', 'updated_at'],
+    title: 'BadgeIssuerPolicyPublic'
+} as const;
+
+export const BadgeIssuerPolicyUpdateSchema = {
+    properties: {
+        name: {
+            anyOf: [
+                {
+                    type: 'string',
+                    maxLength: 255,
+                    minLength: 1
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Name'
+        },
+        audience_type: {
+            anyOf: [
+                {
+                    '$ref': '#/components/schemas/BadgeAudienceType'
+                },
+                {
+                    type: 'null'
+                }
+            ]
+        },
+        popup_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Popup Id'
+        },
+        allowance_quantity: {
+            anyOf: [
+                {
+                    type: 'integer',
+                    minimum: 1
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Allowance Quantity'
+        },
+        allowance_window: {
+            anyOf: [
+                {
+                    '$ref': '#/components/schemas/AllowanceWindow'
+                },
+                {
+                    type: 'null'
+                }
+            ]
+        },
+        is_active: {
+            anyOf: [
+                {
+                    type: 'boolean'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Is Active'
+        },
+        badge_ids: {
+            anyOf: [
+                {
+                    items: {
+                        type: 'string',
+                        format: 'uuid'
+                    },
+                    type: 'array',
+                    minItems: 1
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Badge Ids'
+        },
+        human_ids: {
+            anyOf: [
+                {
+                    items: {
+                        type: 'string',
+                        format: 'uuid'
+                    },
+                    type: 'array'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Human Ids'
+        }
+    },
+    type: 'object',
+    title: 'BadgeIssuerPolicyUpdate'
+} as const;
+
+export const BadgeIssuerTypeSchema = {
+    type: 'string',
+    enum: ['admin', 'human', 'rule'],
+    title: 'BadgeIssuerType',
+    description: `Who granted an award.
+
+Only \`\`admin\`\` is issued today; \`\`human\`\` (peer sending under an issuer
+policy) and \`\`rule\`\` (automatic check-in rules) are reserved for the next
+SIM-108 phases so awards never need a reshape.`
+} as const;
+
+export const BadgePublicSchema = {
+    properties: {
+        id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Id'
+        },
+        slug: {
+            type: 'string',
+            title: 'Slug'
+        },
+        name: {
+            type: 'string',
+            title: 'Name'
+        },
+        description: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Description'
+        },
+        category: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Category'
+        },
+        style_override_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Style Override Id'
+        },
+        repeatable: {
+            type: 'boolean',
+            title: 'Repeatable'
+        },
+        archived_at: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Archived At'
+        },
+        created_at: {
+            type: 'string',
+            format: 'date-time',
+            title: 'Created At'
+        },
+        updated_at: {
+            type: 'string',
+            format: 'date-time',
+            title: 'Updated At'
+        },
+        images: {
+            items: {
+                '$ref': '#/components/schemas/BadgeImagePublic'
+            },
+            type: 'array',
+            title: 'Images',
+            default: []
+        },
+        image_url: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Image Url'
+        },
+        award_count: {
+            type: 'integer',
+            title: 'Award Count',
+            default: 0
+        }
+    },
+    type: 'object',
+    required: ['id', 'slug', 'name', 'repeatable', 'created_at', 'updated_at'],
+    title: 'BadgePublic'
+} as const;
+
+export const BadgeRuleCreateSchema = {
+    properties: {
+        badge_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Badge Id'
+        },
+        config: {
+            oneOf: [
+                {
+                    '$ref': '#/components/schemas/CheckinsInTrackConfig'
+                },
+                {
+                    '$ref': '#/components/schemas/CheckinsInPopupConfig'
+                }
+            ],
+            title: 'Config',
+            discriminator: {
+                propertyName: 'type',
+                mapping: {
+                    checkins_in_popup: '#/components/schemas/CheckinsInPopupConfig',
+                    checkins_in_track: '#/components/schemas/CheckinsInTrackConfig'
+                }
+            }
+        },
+        is_active: {
+            type: 'boolean',
+            title: 'Is Active',
+            default: true
+        },
+        evaluate_now: {
+            type: 'boolean',
+            title: 'Evaluate Now',
+            default: true
+        }
+    },
+    type: 'object',
+    required: ['badge_id', 'config'],
+    title: 'BadgeRuleCreate'
+} as const;
+
+export const BadgeRuleEvaluationSchema = {
+    properties: {
+        rule_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Rule Id'
+        },
+        awarded: {
+            type: 'integer',
+            title: 'Awarded'
+        }
+    },
+    type: 'object',
+    required: ['rule_id', 'awarded'],
+    title: 'BadgeRuleEvaluation'
+} as const;
+
+export const BadgeRulePublicSchema = {
+    properties: {
+        id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Id'
+        },
+        badge_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Badge Id'
+        },
+        config: {
+            oneOf: [
+                {
+                    '$ref': '#/components/schemas/CheckinsInTrackConfig'
+                },
+                {
+                    '$ref': '#/components/schemas/CheckinsInPopupConfig'
+                }
+            ],
+            title: 'Config',
+            discriminator: {
+                propertyName: 'type',
+                mapping: {
+                    checkins_in_popup: '#/components/schemas/CheckinsInPopupConfig',
+                    checkins_in_track: '#/components/schemas/CheckinsInTrackConfig'
+                }
+            }
+        },
+        is_active: {
+            type: 'boolean',
+            title: 'Is Active'
+        },
+        award_count: {
+            type: 'integer',
+            title: 'Award Count',
+            default: 0
+        },
+        created_at: {
+            type: 'string',
+            format: 'date-time',
+            title: 'Created At'
+        },
+        updated_at: {
+            type: 'string',
+            format: 'date-time',
+            title: 'Updated At'
+        }
+    },
+    type: 'object',
+    required: ['id', 'badge_id', 'config', 'is_active', 'created_at', 'updated_at'],
+    title: 'BadgeRulePublic'
+} as const;
+
+export const BadgeRuleUpdateSchema = {
+    properties: {
+        config: {
+            anyOf: [
+                {
+                    oneOf: [
+                        {
+                            '$ref': '#/components/schemas/CheckinsInTrackConfig'
+                        },
+                        {
+                            '$ref': '#/components/schemas/CheckinsInPopupConfig'
+                        }
+                    ],
+                    discriminator: {
+                        propertyName: 'type',
+                        mapping: {
+                            checkins_in_popup: '#/components/schemas/CheckinsInPopupConfig',
+                            checkins_in_track: '#/components/schemas/CheckinsInTrackConfig'
+                        }
+                    }
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Config'
+        },
+        is_active: {
+            anyOf: [
+                {
+                    type: 'boolean'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Is Active'
+        }
+    },
+    type: 'object',
+    title: 'BadgeRuleUpdate'
+} as const;
+
+export const BadgeStyleCreateSchema = {
+    properties: {
+        name: {
+            type: 'string',
+            maxLength: 255,
+            minLength: 1,
+            title: 'Name'
+        },
+        key: {
+            anyOf: [
+                {
+                    type: 'string',
+                    maxLength: 64
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Key'
+        },
+        sort_order: {
+            type: 'integer',
+            title: 'Sort Order',
+            default: 0
+        }
+    },
+    type: 'object',
+    required: ['name'],
+    title: 'BadgeStyleCreate'
+} as const;
+
+export const BadgeStylePublicSchema = {
+    properties: {
+        id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Id'
+        },
+        key: {
+            type: 'string',
+            title: 'Key'
+        },
+        name: {
+            type: 'string',
+            title: 'Name'
+        },
+        is_default: {
+            type: 'boolean',
+            title: 'Is Default'
+        },
+        sort_order: {
+            type: 'integer',
+            title: 'Sort Order'
+        }
+    },
+    type: 'object',
+    required: ['id', 'key', 'name', 'is_default', 'sort_order'],
+    title: 'BadgeStylePublic'
+} as const;
+
+export const BadgeStyleUpdateSchema = {
+    properties: {
+        name: {
+            anyOf: [
+                {
+                    type: 'string',
+                    maxLength: 255,
+                    minLength: 1
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Name'
+        },
+        sort_order: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Sort Order'
+        }
+    },
+    type: 'object',
+    title: 'BadgeStyleUpdate'
+} as const;
+
+export const BadgeSummarySchema = {
+    properties: {
+        id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Id'
+        },
+        slug: {
+            type: 'string',
+            title: 'Slug'
+        },
+        name: {
+            type: 'string',
+            title: 'Name'
+        },
+        description: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Description'
+        },
+        category: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Category'
+        },
+        repeatable: {
+            type: 'boolean',
+            title: 'Repeatable'
+        },
+        image_url: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Image Url'
+        }
+    },
+    type: 'object',
+    required: ['id', 'slug', 'name', 'repeatable'],
+    title: 'BadgeSummary',
+    description: 'The slice of a badge shown next to an award.'
+} as const;
+
+export const BadgeUpdateSchema = {
+    properties: {
+        name: {
+            anyOf: [
+                {
+                    type: 'string',
+                    maxLength: 255,
+                    minLength: 1
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Name'
+        },
+        description: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Description'
+        },
+        category: {
+            anyOf: [
+                {
+                    type: 'string',
+                    maxLength: 100
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Category'
+        },
+        style_override_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Style Override Id'
+        },
+        repeatable: {
+            anyOf: [
+                {
+                    type: 'boolean'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Repeatable'
+        },
+        archived: {
+            anyOf: [
+                {
+                    type: 'boolean'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Archived'
+        }
+    },
+    type: 'object',
+    title: 'BadgeUpdate'
+} as const;
+
 export const BaseFieldConfigPublicSchema = {
     properties: {
         id: {
@@ -9365,6 +10568,56 @@ export const CheckInPayloadSchema = {
 
 \`source\` discriminates how the scan occurred. \`notes\` is an optional
 free-form operator annotation.`
+} as const;
+
+export const CheckinsInPopupConfigSchema = {
+    properties: {
+        type: {
+            type: 'string',
+            const: 'checkins_in_popup',
+            title: 'Type',
+            default: 'checkins_in_popup'
+        },
+        popup_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Popup Id'
+        },
+        threshold: {
+            type: 'integer',
+            maximum: 1000,
+            minimum: 1,
+            title: 'Threshold'
+        }
+    },
+    type: 'object',
+    required: ['popup_id', 'threshold'],
+    title: 'CheckinsInPopupConfig'
+} as const;
+
+export const CheckinsInTrackConfigSchema = {
+    properties: {
+        type: {
+            type: 'string',
+            const: 'checkins_in_track',
+            title: 'Type',
+            default: 'checkins_in_track'
+        },
+        track_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Track Id'
+        },
+        threshold: {
+            type: 'integer',
+            maximum: 1000,
+            minimum: 1,
+            title: 'Threshold'
+        }
+    },
+    type: 'object',
+    required: ['track_id', 'threshold'],
+    title: 'CheckinsInTrackConfig'
 } as const;
 
 export const CheckoutBuyerFieldSchema = {
@@ -18238,6 +19491,65 @@ export const InviteUpdateSchema = {
 token and recipient_email are immutable post-create.`
 } as const;
 
+export const IssuableBadgeSchema = {
+    properties: {
+        badge: {
+            '$ref': '#/components/schemas/BadgeSummary'
+        },
+        policy_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Policy Id'
+        },
+        allowance: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Allowance'
+        },
+        remaining: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Remaining'
+        },
+        window: {
+            '$ref': '#/components/schemas/AllowanceWindow'
+        },
+        resets_at: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Resets At'
+        },
+        recipient_has_it: {
+            type: 'boolean',
+            title: 'Recipient Has It',
+            default: false
+        }
+    },
+    type: 'object',
+    required: ['badge', 'policy_id', 'window'],
+    title: 'IssuableBadge',
+    description: 'A badge the caller may give in a popup right now, and how many more.'
+} as const;
+
 export const KeyMetricsSchema = {
     properties: {
         people: {
@@ -18568,6 +19880,42 @@ export const ListModel_AuditLogPublic_Schema = {
     type: 'object',
     required: ['results', 'paging'],
     title: 'ListModel[AuditLogPublic]'
+} as const;
+
+export const ListModel_BadgeAwardPublic_Schema = {
+    properties: {
+        results: {
+            items: {
+                '$ref': '#/components/schemas/BadgeAwardPublic'
+            },
+            type: 'array',
+            title: 'Results'
+        },
+        paging: {
+            '$ref': '#/components/schemas/Paging'
+        }
+    },
+    type: 'object',
+    required: ['results', 'paging'],
+    title: 'ListModel[BadgeAwardPublic]'
+} as const;
+
+export const ListModel_BadgePublic_Schema = {
+    properties: {
+        results: {
+            items: {
+                '$ref': '#/components/schemas/BadgePublic'
+            },
+            type: 'array',
+            title: 'Results'
+        },
+        paging: {
+            '$ref': '#/components/schemas/Paging'
+        }
+    },
+    type: 'object',
+    required: ['results', 'paging'],
+    title: 'ListModel[BadgePublic]'
 } as const;
 
 export const ListModel_CheckInListItem_Schema = {
@@ -19235,6 +20583,81 @@ export const MeAccessSchema = {
     required: ['app_name', 'scopes', 'api_key_scopes'],
     title: 'MeAccess',
     description: 'Response shape for GET /me/access.'
+} as const;
+
+export const MyBadgeSchema = {
+    properties: {
+        badge: {
+            '$ref': '#/components/schemas/BadgeSummary'
+        },
+        count: {
+            type: 'integer',
+            title: 'Count'
+        },
+        last_awarded_at: {
+            type: 'string',
+            format: 'date-time',
+            title: 'Last Awarded At'
+        },
+        awards: {
+            items: {
+                '$ref': '#/components/schemas/MyBadgeAward'
+            },
+            type: 'array',
+            title: 'Awards'
+        }
+    },
+    type: 'object',
+    required: ['badge', 'count', 'last_awarded_at', 'awards'],
+    title: 'MyBadge',
+    description: "A badge on the caller's own profile, with every active award of it."
+} as const;
+
+export const MyBadgeAwardSchema = {
+    properties: {
+        awarded_at: {
+            type: 'string',
+            format: 'date-time',
+            title: 'Awarded At'
+        },
+        message: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Message'
+        },
+        popup_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Popup Id'
+        },
+        issuer_name: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Issuer Name'
+        }
+    },
+    type: 'object',
+    required: ['awarded_at'],
+    title: 'MyBadgeAward'
 } as const;
 
 export const MyGroupPublicSchema = {
@@ -24385,6 +25808,41 @@ export const PopupUpdateSchema = {
     title: 'PopupUpdate'
 } as const;
 
+export const PortalBadgeAwardCreateSchema = {
+    properties: {
+        badge_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Badge Id'
+        },
+        popup_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Popup Id'
+        },
+        attendee_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Attendee Id'
+        },
+        message: {
+            anyOf: [
+                {
+                    type: 'string',
+                    maxLength: 500
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Message'
+        }
+    },
+    type: 'object',
+    required: ['badge_id', 'popup_id', 'attendee_id'],
+    title: 'PortalBadgeAwardCreate'
+} as const;
+
 export const PresignedUrlRequestSchema = {
     properties: {
         filename: {
@@ -26196,6 +27654,110 @@ Deliberately narrower than \`\`AccommodationPropertyPublic\`\`: the contact
 name and email belong to the operator's relationship with the owner, not
 to a checkout page. The tax percentage is exposed because it shows up as
 a line in the quote and the buyer is entitled to know why.`
+} as const;
+
+export const PublicProfileSchema = {
+    properties: {
+        display_name: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Display Name'
+        },
+        picture_url: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Picture Url'
+        },
+        badges: {
+            items: {
+                '$ref': '#/components/schemas/PublicProfileBadge'
+            },
+            type: 'array',
+            title: 'Badges'
+        }
+    },
+    type: 'object',
+    required: ['badges'],
+    title: 'PublicProfile',
+    description: 'What anyone holding the share link sees. Never add contact fields.'
+} as const;
+
+export const PublicProfileBadgeSchema = {
+    properties: {
+        name: {
+            type: 'string',
+            title: 'Name'
+        },
+        description: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Description'
+        },
+        image_url: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Image Url'
+        },
+        count: {
+            type: 'integer',
+            title: 'Count'
+        }
+    },
+    type: 'object',
+    required: ['name', 'count'],
+    title: 'PublicProfileBadge'
+} as const;
+
+export const PublicProfileSettingsSchema = {
+    properties: {
+        enabled: {
+            type: 'boolean',
+            title: 'Enabled'
+        },
+        token: {
+            type: 'string',
+            title: 'Token'
+        }
+    },
+    type: 'object',
+    required: ['enabled', 'token'],
+    title: 'PublicProfileSettings'
+} as const;
+
+export const PublicProfileSettingsUpdateSchema = {
+    properties: {
+        enabled: {
+            type: 'boolean',
+            title: 'Enabled'
+        }
+    },
+    type: 'object',
+    required: ['enabled'],
+    title: 'PublicProfileSettingsUpdate'
 } as const;
 
 export const PublishPermissionSchema = {
@@ -28982,6 +30544,73 @@ export const SendTestRequestSchema = {
     title: 'SendTestRequest'
 } as const;
 
+export const SentBadgeAwardSchema = {
+    properties: {
+        id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Id'
+        },
+        badge: {
+            '$ref': '#/components/schemas/BadgeSummary'
+        },
+        recipient_name: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Recipient Name'
+        },
+        popup_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Popup Id'
+        },
+        message: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Message'
+        },
+        awarded_at: {
+            type: 'string',
+            format: 'date-time',
+            title: 'Awarded At'
+        },
+        revoked_at: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Revoked At'
+        }
+    },
+    type: 'object',
+    required: ['id', 'badge', 'awarded_at'],
+    title: 'SentBadgeAward'
+} as const;
+
 export const SimpleFiSuccessBehaviorSchema = {
     type: 'string',
     enum: ['manual', 'automatic'],
@@ -30917,7 +32546,7 @@ export const ThirdPartyAppCreateSchema = {
         allowed_token_scopes: {
             items: {
                 type: 'string',
-                enum: ['portal:*', 'portal:profile:read', 'portal:profile:write', 'portal:applications:read', 'portal:applications:write', 'portal:attendees:write', 'portal:payments:read', 'portal:directory:read', 'portal:api_keys:manage']
+                enum: ['portal:*', 'portal:profile:read', 'portal:profile:write', 'portal:applications:read', 'portal:applications:write', 'portal:attendees:write', 'portal:payments:read', 'portal:directory:read', 'portal:api_keys:manage', 'portal:badges:write']
             },
             type: 'array',
             title: 'Allowed Token Scopes'
@@ -30925,7 +32554,7 @@ export const ThirdPartyAppCreateSchema = {
         allowed_api_key_scopes: {
             items: {
                 type: 'string',
-                enum: ['events:read', 'events:write', 'rsvp:write', 'venues:read', 'venues:write', 'applications:read', 'applications:write', 'attendees:read', 'attendees:write', 'humans:read', 'humans:write', 'groups:read', 'groups:write', 'products:read', 'products:write', 'accommodations:read', 'accommodations:write', 'coupons:read', 'coupons:write', 'forms:read', 'forms:write', 'payments:read', 'tracks:read', 'tracks:write', 'ticketing_steps:read', 'ticketing_steps:write', 'translations:read', 'translations:write']
+                enum: ['events:read', 'events:write', 'rsvp:write', 'venues:read', 'venues:write', 'applications:read', 'applications:write', 'attendees:read', 'attendees:write', 'humans:read', 'humans:write', 'groups:read', 'groups:write', 'products:read', 'products:write', 'accommodations:read', 'accommodations:write', 'coupons:read', 'coupons:write', 'forms:read', 'forms:write', 'payments:read', 'tracks:read', 'tracks:write', 'ticketing_steps:read', 'ticketing_steps:write', 'translations:read', 'translations:write', 'badges:read', 'badges:write']
             },
             type: 'array',
             title: 'Allowed Api Key Scopes'
@@ -31123,7 +32752,7 @@ export const ThirdPartyAppUpdateSchema = {
                 {
                     items: {
                         type: 'string',
-                        enum: ['portal:*', 'portal:profile:read', 'portal:profile:write', 'portal:applications:read', 'portal:applications:write', 'portal:attendees:write', 'portal:payments:read', 'portal:directory:read', 'portal:api_keys:manage']
+                        enum: ['portal:*', 'portal:profile:read', 'portal:profile:write', 'portal:applications:read', 'portal:applications:write', 'portal:attendees:write', 'portal:payments:read', 'portal:directory:read', 'portal:api_keys:manage', 'portal:badges:write']
                     },
                     type: 'array'
                 },
@@ -31138,7 +32767,7 @@ export const ThirdPartyAppUpdateSchema = {
                 {
                     items: {
                         type: 'string',
-                        enum: ['events:read', 'events:write', 'rsvp:write', 'venues:read', 'venues:write', 'applications:read', 'applications:write', 'attendees:read', 'attendees:write', 'humans:read', 'humans:write', 'groups:read', 'groups:write', 'products:read', 'products:write', 'accommodations:read', 'accommodations:write', 'coupons:read', 'coupons:write', 'forms:read', 'forms:write', 'payments:read', 'tracks:read', 'tracks:write', 'ticketing_steps:read', 'ticketing_steps:write', 'translations:read', 'translations:write']
+                        enum: ['events:read', 'events:write', 'rsvp:write', 'venues:read', 'venues:write', 'applications:read', 'applications:write', 'attendees:read', 'attendees:write', 'humans:read', 'humans:write', 'groups:read', 'groups:write', 'products:read', 'products:write', 'accommodations:read', 'accommodations:write', 'coupons:read', 'coupons:write', 'forms:read', 'forms:write', 'payments:read', 'tracks:read', 'tracks:write', 'ticketing_steps:read', 'ticketing_steps:write', 'translations:read', 'translations:write', 'badges:read', 'badges:write']
                     },
                     type: 'array'
                 },
