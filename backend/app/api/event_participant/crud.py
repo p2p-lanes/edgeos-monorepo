@@ -171,14 +171,15 @@ class EventParticipantsCRUD(
             statement = statement.where(
                 EventParticipants.profile_id != exclude_profile_id
             )
-        if occurrence_start is None:
-            statement = statement.where(
-                EventParticipants.occurrence_start.is_(None)  # type: ignore[union-attr]
-            )
-        else:
-            statement = statement.where(
-                EventParticipants.occurrence_start == occurrence_start
-            )
+        if scope_to_occurrence:
+            if occurrence_start is None:
+                statement = statement.where(
+                    EventParticipants.occurrence_start.is_(None)  # type: ignore[union-attr]
+                )
+            else:
+                statement = statement.where(
+                    EventParticipants.occurrence_start == occurrence_start
+                )
         rows = list(session.exec(statement.offset(skip).limit(limit)).all())
         total = session.exec(
             select(func.count()).select_from(statement.subquery())
@@ -212,17 +213,15 @@ class EventParticipantsCRUD(
             )
         return session.exec(statement).one()
 
-    def count_active_for_events(
+    def count_active_for_occurrences(
         self,
         session: Session,
         event_ids: list[uuid.UUID],
-    ) -> dict[uuid.UUID, int]:
-        """Active (non-cancelled) RSVP counts for many events in one query.
+    ) -> dict[tuple[uuid.UUID, datetime | None], int]:
+        """Batch active counts keyed by (event_id, occurrence_start).
 
-        Returns a ``{event_id: count}`` map; event_ids with no active
-        participants are omitted (callers should default missing keys to 0).
-        Used by the backoffice event list so operators can see RSVP counts
-        without opening each event, avoiding an N+1 of ``count_active_for_event``.
+        NULL identifies a one-off or detached child, not the whole series.
+        Missing keys have zero registrations. Hosts never occupy a seat.
         """
         from app.api.event.models import Events
 
@@ -231,6 +230,7 @@ class EventParticipantsCRUD(
         statement = (
             select(
                 EventParticipants.event_id,
+                EventParticipants.occurrence_start,
                 func.count().label("count"),
             )
             .join(Events, Events.id == EventParticipants.event_id)
@@ -242,9 +242,9 @@ class EventParticipantsCRUD(
                     EventParticipants.profile_id != Events.host_id,
                 ),
             )
-            .group_by(EventParticipants.event_id)
+            .group_by(EventParticipants.event_id, EventParticipants.occurrence_start)
         )
-        return {row[0]: int(row[1]) for row in session.exec(statement).all()}
+        return {(row[0], row[1]): int(row[2]) for row in session.exec(statement).all()}
 
     def cancel_all_for_event(
         self,

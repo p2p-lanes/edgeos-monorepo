@@ -434,7 +434,7 @@ export function DayBody({
       eventId: event.id,
       flowId,
       from,
-      occurrenceStart: event.occurrence_id ? event.start_time : null,
+      occurrenceStart: event.rrule ? event.start_time : null,
     })
   const handleEventClick = (
     event: EventPublic,

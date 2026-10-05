@@ -1272,7 +1272,11 @@ function EventsPage() {
       navigate({
         to: "/events/$eventId",
         params: { eventId: occ ? occ.masterId : event.id },
-        search: occ ? { occ: occ.start } : {},
+        search: occ
+          ? { occ: occ.start }
+          : event.rrule
+            ? { occ: event.start_time }
+            : {},
       })
     },
     [navigate],

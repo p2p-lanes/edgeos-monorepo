@@ -2991,6 +2991,7 @@ export type EventPublic = {
     updated_at?: string;
     id: string;
     occurrence_id?: (string | null);
+    resolved_occurrence_start?: (string | null);
     venue_title?: (string | null);
     venue_location?: (string | null);
     venue_image_url?: (string | null);
@@ -3064,6 +3065,37 @@ export type EventRecurringAvailabilityResult = {
     checked_occurrences: number;
     conflicts?: Array<OccurrenceConflict>;
     truncated?: boolean;
+};
+
+export type EventSeriesOccurrence = {
+    event_id: string;
+    occurrence_start: (string | null);
+    start_time: string;
+    end_time: string;
+    timezone: string;
+    title: string;
+    status: EventStatus;
+    is_detached: boolean;
+    attendee_count: number;
+};
+
+export type EventSeriesSummary = {
+    series_id: string;
+    series_title: string;
+    timezone: string;
+    window_start: string;
+    window_end: string;
+    occurrences: Array<EventSeriesOccurrence>;
+    outside_schedule: Array<EventSeriesUnscheduledRsvps>;
+};
+
+export type EventSeriesUnscheduledRsvps = {
+    event_id: string;
+    occurrence_start: (string | null);
+    title: string;
+    timezone: string;
+    attendee_count: number;
+    participants: Array<EventParticipantPublic>;
 };
 
 /**
@@ -8638,6 +8670,7 @@ export type EventParticipantsListParticipantsData = {
      * Maximum number of items to return
      */
     limit?: number;
+    occurrenceStart?: (string | null);
     /**
      * Number of items to skip
      */
@@ -8861,6 +8894,7 @@ export type EventsListEventHostsResponse = (Array<EventHostOption>);
 
 export type EventsGetEventData = {
     eventId: string;
+    occurrenceStart?: (string | null);
     xTenantId?: (string | null);
 };
 
@@ -8880,6 +8914,16 @@ export type EventsDeleteEventData = {
 };
 
 export type EventsDeleteEventResponse = (void);
+
+export type EventsGetEventSeriesSummaryData = {
+    anchor?: (string | null);
+    eventId: string;
+    windowEnd?: (string | null);
+    windowStart?: (string | null);
+    xTenantId?: (string | null);
+};
+
+export type EventsGetEventSeriesSummaryResponse = (EventSeriesSummary);
 
 export type EventsGetEventAdminNotesData = {
     eventId: string;

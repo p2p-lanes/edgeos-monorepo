@@ -435,9 +435,7 @@ export function ListBody({
                     slug,
                     eventId: event.id,
                     flowId,
-                    occurrenceStart: event.occurrence_id
-                      ? event.start_time
-                      : null,
+                    occurrenceStart: event.rrule ? event.start_time : null,
                   })
                   const handleClick = (
                     e: React.MouseEvent<HTMLAnchorElement>,
