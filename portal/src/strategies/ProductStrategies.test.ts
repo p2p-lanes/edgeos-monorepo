@@ -217,6 +217,46 @@ describe("getProductStrategy — category-scoped selection", () => {
     }
   })
 
+  it.each([
+    1, 2, 3,
+  ])("auto-upgrades to month when all %i available weeks are selected without an explicit scope", (weekCount) => {
+    const weeks = Array.from({ length: weekCount }, (_, index) =>
+      createProduct({
+        id: `week-${index + 1}`,
+        category: "ticket",
+        selected: index < weekCount - 1,
+        duration_type: "week",
+        max_per_order: 1,
+      }),
+    )
+    const lastWeek = weeks[weekCount - 1]
+    if (!lastWeek) throw new Error("Expected at least one weekly product")
+    const monthTicket = createProduct({
+      id: "month-ticket",
+      category: "ticket",
+      selected: false,
+      duration_type: "month",
+      max_per_order: 1,
+    })
+    const attendees = [createAttendee([...weeks, monthTicket])]
+    const strategy = getProductStrategy(
+      lastWeek,
+      false,
+      CHECKOUT_MODE.PASS_SYSTEM,
+    )
+
+    const result = strategy.handleSelection(attendees, "attendee-1", lastWeek)
+
+    expect(
+      result[0]?.products.find((p) => p.id === "month-ticket")?.selected,
+    ).toBe(true)
+    for (const week of weeks) {
+      expect(result[0]?.products.find((p) => p.id === week.id)?.selected).toBe(
+        false,
+      )
+    }
+  })
+
   it("auto-upgrade to month keeps purchased weeks selected (cannot retroactively refund)", () => {
     const t1 = createProduct({
       id: "t1",
@@ -616,6 +656,25 @@ describe("EditProductStrategy — month upgrade while editing", () => {
     for (const id of ["w2", "w3", "w4"]) {
       expect(products?.find((p) => p.id === id)?.selected).toBe(false)
     }
+  })
+
+  it("auto-promotes when all available weeks are selected without an explicit scope", () => {
+    const attendees = [
+      createAttendee([
+        month(),
+        week("w1", { purchased: true, selected: true }),
+        week("w2", { selected: false }),
+      ]),
+    ]
+    const w2 = week("w2", { selected: false })
+    const strategy = getProductStrategy(w2, true, CHECKOUT_MODE.PASS_SYSTEM)
+
+    const result = strategy.handleSelection(attendees, "attendee-1", w2)
+
+    const products = result[0]?.products
+    expect(products?.find((p) => p.id === "month")?.selected).toBe(true)
+    expect(products?.find((p) => p.id === "w1")?.edit).toBe(true)
+    expect(products?.find((p) => p.id === "w2")?.selected).toBe(false)
   })
 
   // Below the threshold there is no promotion: selecting a 2nd week with one
