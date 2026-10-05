@@ -35,6 +35,7 @@ import { QueryErrorBoundary } from "@/components/Common/QueryErrorBoundary"
 import { StatusBadge } from "@/components/Common/StatusBadge"
 import { CoverImage } from "@/components/events/CoverImage"
 import { EventAttendanceCard } from "@/components/events/EventAttendanceCard"
+import { OtherSeriesOccurrences } from "@/components/events/OtherSeriesOccurrences"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import {
@@ -125,13 +126,20 @@ function EventViewContent() {
   const [editChoiceOpen, setEditChoiceOpen] = useState(false)
 
   const { data: event } = useQuery({
-    queryKey: ["event", eventId],
-    queryFn: () => EventsService.getEvent({ eventId }),
+    queryKey: ["event", eventId, occ],
+    queryFn: () => EventsService.getEvent({ eventId, occurrenceStart: occ }),
+    // Invalid/stale occurrence links must reach the error boundary, not leave
+    // the page on its loading skeleton indefinitely.
+    throwOnError: true,
+    retry: false,
   })
 
+  const occurrenceStart = event?.resolved_occurrence_start ?? undefined
+
   const { data: participantsData } = useQuery({
-    queryKey: ["event-participants", eventId],
-    queryFn: () => EventParticipantsService.listParticipants({ eventId }),
+    queryKey: ["event-participants", eventId, occurrenceStart],
+    queryFn: () =>
+      EventParticipantsService.listParticipants({ eventId, occurrenceStart }),
     enabled: !!event,
   })
 
@@ -152,12 +160,13 @@ function EventViewContent() {
     mutationFn: () =>
       EventsService.detachOccurrence({
         eventId,
-        requestBody: { occurrence_start: occ! },
+        requestBody: { occurrence_start: occurrenceStart! },
       }),
     onSuccess: (child: EventPublic) => {
       showSuccessToast("Detached occurrence for editing")
       setEditChoiceOpen(false)
       queryClient.invalidateQueries({ queryKey: ["events"] })
+      queryClient.invalidateQueries({ queryKey: ["event-series-summary"] })
       navigate({ to: "/events/$eventId/edit", params: { eventId: child.id } })
     },
     onError: createErrorHandler(showErrorToast),
@@ -165,7 +174,7 @@ function EventViewContent() {
 
   if (!event) return <Skeleton className="h-96 w-full" />
 
-  const isRecurringOccurrence = !!event.rrule && !!occ
+  const isRecurringOccurrence = !!event.rrule && !!occurrenceStart
   const goToEditSeries = () =>
     navigate({ to: "/events/$eventId/edit", params: { eventId } })
   const onEdit = () => {
@@ -179,13 +188,13 @@ function EventViewContent() {
   const portalUrl =
     portalBase && popup?.slug
       ? `${getPopupPortalUrl(portalBase, popup.slug)}/events/${event.id}${
-          occ ? `?occ=${encodeURIComponent(occ)}` : ""
+          occurrenceStart ? `?occ=${encodeURIComponent(occurrenceStart)}` : ""
         }`
       : null
 
   // A recurring master viewed without ?occ= is its own first occurrence, so
   // the QR still pins a single date rather than the whole series.
-  const checkInOcc = event.rrule ? (occ ?? event.start_time) : null
+  const checkInOcc = occurrenceStart ?? null
   const checkInUrl =
     portalBase && popup?.slug
       ? getEventCheckInUrl(portalBase, popup.slug, event.id, checkInOcc)
@@ -470,7 +479,12 @@ function EventViewContent() {
 
         <div className="rounded-xl border bg-card p-4">
           <div className="mb-3 flex items-center justify-between">
-            <h3 className="text-sm font-semibold">Participants</h3>
+            <div>
+              <h3 className="text-sm font-semibold">Participants</h3>
+              <p className="mt-1 text-xs text-muted-foreground">
+                {formatRange(event.start_time, event.end_time, event.timezone)}
+              </p>
+            </div>
             <span className="text-sm text-muted-foreground">
               {goingCount}
               {event.max_participant ? ` / ${event.max_participant}` : ""}
@@ -509,6 +523,13 @@ function EventViewContent() {
             </div>
           )}
         </div>
+        {(event.rrule || event.recurrence_master_id) && (
+          <OtherSeriesOccurrences
+            key={`${event.id}:${occurrenceStart ?? "oneoff"}`}
+            event={event}
+            formatRange={formatRange}
+          />
+        )}
       </div>
 
       <Dialog open={editChoiceOpen} onOpenChange={setEditChoiceOpen}>

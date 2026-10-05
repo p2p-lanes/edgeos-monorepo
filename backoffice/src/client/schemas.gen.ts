@@ -12586,6 +12586,18 @@ export const EventPublicSchema = {
             ],
             title: 'Occurrence Id'
         },
+        resolved_occurrence_start: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Resolved Occurrence Start'
+        },
         venue_title: {
             anyOf: [
                 {
@@ -12991,6 +13003,149 @@ export const EventRecurringAvailabilityResultSchema = {
     type: 'object',
     required: ['available', 'total_occurrences', 'checked_occurrences'],
     title: 'EventRecurringAvailabilityResult'
+} as const;
+
+export const EventSeriesOccurrenceSchema = {
+    properties: {
+        event_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Event Id'
+        },
+        occurrence_start: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Occurrence Start'
+        },
+        start_time: {
+            type: 'string',
+            format: 'date-time',
+            title: 'Start Time'
+        },
+        end_time: {
+            type: 'string',
+            format: 'date-time',
+            title: 'End Time'
+        },
+        timezone: {
+            type: 'string',
+            title: 'Timezone'
+        },
+        title: {
+            type: 'string',
+            title: 'Title'
+        },
+        status: {
+            '$ref': '#/components/schemas/EventStatus'
+        },
+        is_detached: {
+            type: 'boolean',
+            title: 'Is Detached'
+        },
+        attendee_count: {
+            type: 'integer',
+            title: 'Attendee Count'
+        }
+    },
+    type: 'object',
+    required: ['event_id', 'occurrence_start', 'start_time', 'end_time', 'timezone', 'title', 'status', 'is_detached', 'attendee_count'],
+    title: 'EventSeriesOccurrence'
+} as const;
+
+export const EventSeriesSummarySchema = {
+    properties: {
+        series_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Series Id'
+        },
+        series_title: {
+            type: 'string',
+            title: 'Series Title'
+        },
+        timezone: {
+            type: 'string',
+            title: 'Timezone'
+        },
+        window_start: {
+            type: 'string',
+            format: 'date-time',
+            title: 'Window Start'
+        },
+        window_end: {
+            type: 'string',
+            format: 'date-time',
+            title: 'Window End'
+        },
+        occurrences: {
+            items: {
+                '$ref': '#/components/schemas/EventSeriesOccurrence'
+            },
+            type: 'array',
+            title: 'Occurrences'
+        },
+        outside_schedule: {
+            items: {
+                '$ref': '#/components/schemas/EventSeriesUnscheduledRsvps'
+            },
+            type: 'array',
+            title: 'Outside Schedule'
+        }
+    },
+    type: 'object',
+    required: ['series_id', 'series_title', 'timezone', 'window_start', 'window_end', 'occurrences', 'outside_schedule'],
+    title: 'EventSeriesSummary'
+} as const;
+
+export const EventSeriesUnscheduledRsvpsSchema = {
+    properties: {
+        event_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Event Id'
+        },
+        occurrence_start: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Occurrence Start'
+        },
+        title: {
+            type: 'string',
+            title: 'Title'
+        },
+        timezone: {
+            type: 'string',
+            title: 'Timezone'
+        },
+        attendee_count: {
+            type: 'integer',
+            title: 'Attendee Count'
+        },
+        participants: {
+            items: {
+                '$ref': '#/components/schemas/EventParticipantPublic'
+            },
+            type: 'array',
+            title: 'Participants'
+        }
+    },
+    type: 'object',
+    required: ['event_id', 'occurrence_start', 'title', 'timezone', 'attendee_count', 'participants'],
+    title: 'EventSeriesUnscheduledRsvps'
 } as const;
 
 export const EventSettingsCreateSchema = {

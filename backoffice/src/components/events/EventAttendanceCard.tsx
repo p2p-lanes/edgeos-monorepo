@@ -30,7 +30,7 @@ const MODE_LABELS: Record<AttendanceMode, string> = {
 }
 
 const STATUS_LABELS: Record<string, string> = {
-  registered: "RSVPed",
+  registered: "RSVP'd",
   checked_in: "Checked in",
   cancelled: "Not attending",
 }
@@ -228,7 +228,7 @@ export function EventAttendanceCard({
 
           {roster.entries.length === 0 ? (
             <p className="text-sm text-muted-foreground">
-              No one has RSVPed or checked in yet.
+              No one has RSVP'd or checked in yet.
             </p>
           ) : (
             <ul className="divide-y rounded-lg border">

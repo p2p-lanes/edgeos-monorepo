@@ -163,10 +163,8 @@ export default function EventDetailPage() {
   // it from the URL, so it survives a refresh on this detail page but
   // never sticks around on the list once used.
   const fromSearch = searchParams.get("from") ?? ""
-  // For an expanded recurring instance, the calendar passes the occurrence's
-  // ISO start time via ?occ=. We render that in place of the master's
-  // start_time (and shift end_time by the same offset) so the user sees the
-  // specific instance they clicked, not the series' first occurrence.
+  // Calendars pass the selected recurring date via ?occ=. The API returns
+  // its effective times and resolves an omitted date to the first instance.
   const occParam = searchParams.get("occ")
   const flowId = searchParams.get("flow")
   // Rebuild the originating list state and retain the selected gathering door.
@@ -204,7 +202,7 @@ export default function EventDetailPage() {
     retry: (failureCount, err) => {
       if (
         err instanceof ApiError &&
-        (err.status === 404 || err.status === 403)
+        (err.status === 400 || err.status === 404 || err.status === 403)
       ) {
         return false
       }
@@ -212,13 +210,32 @@ export default function EventDetailPage() {
     },
   })
 
+  const occurrenceStart = event?.resolved_occurrence_start ?? null
+
   const { data: participantsData } = useQuery({
-    queryKey: ["portal-event-participants", params.eventId, occParam],
-    queryFn: () =>
-      EventParticipantsService.listPortalParticipants({
+    queryKey: ["portal-event-participants", params.eventId, occurrenceStart],
+    queryFn: async () => {
+      const request = {
         eventId: params.eventId,
-        occurrenceStart: occParam ?? undefined,
-      }),
+        occurrenceStart: occurrenceStart ?? undefined,
+      }
+      let page = await EventParticipantsService.listPortalParticipants(request)
+      const results = [...page.results]
+      // Load the complete visible roster before counting unlisted RSVPs.
+      // Privacy filtering reduces both this page's results and its total,
+      // but offsets still refer to the unfiltered rows on the server.
+      while (
+        page.paging &&
+        page.paging.total > page.paging.offset + page.results.length
+      ) {
+        page = await EventParticipantsService.listPortalParticipants({
+          ...request,
+          skip: page.paging.offset + page.paging.limit,
+        })
+        results.push(...page.results)
+      }
+      return { results }
+    },
     enabled: !!params.eventId && !!event,
   })
 
@@ -252,6 +269,9 @@ export default function EventDetailPage() {
   // the roster above). Prefer the backend count so the badge and the "full"
   // state stay consistent with what registration actually allows.
   const goingCount = event?.attendee_count ?? activeParticipants.length
+  const unlistedParticipantCount = participantsData
+    ? Math.max(0, goingCount - activeParticipants.length)
+    : 0
   const isFull =
     event?.max_participant != null && goingCount >= event.max_participant
 
@@ -265,17 +285,11 @@ export default function EventDetailPage() {
         ? (t("events.rsvp.requires_ticket") as string)
         : undefined
 
-  // Recurring events require occurrence_start so the RSVP targets a single
-  // instance; one-off events must not send it (the backend rejects mixing
-  // the two semantics). Prefer the ?occ= param (set when the user came from
-  // an expanded occurrence); fall back to the event's own start_time when
-  // landing on a recurring master without ?occ=, since its start IS the
-  // first occurrence.
-  const rsvpBody = occParam
-    ? { occurrence_start: occParam }
-    : event?.rrule
-      ? { occurrence_start: event.start_time }
-      : undefined
+  // Use the API-resolved date everywhere, including links without ?occ=.
+  // Detached children are one-off events and must not send occurrence_start.
+  const rsvpBody = occurrenceStart
+    ? { occurrence_start: occurrenceStart }
+    : undefined
   const invalidateRsvpQueries = () => {
     queryClient.invalidateQueries({
       queryKey: ["portal-event-participants", params.eventId],
@@ -359,7 +373,7 @@ export default function EventDetailPage() {
   // we treat "clicked Google/Outlook/Yahoo/.ics" as added and let them
   // manually clear the flag from the modal if they remove it later.
   const [calendarAdded, markCalendarAdded, markCalendarRemoved] =
-    useCalendarAddedFlag(event?.id, occParam)
+    useCalendarAddedFlag(event?.id, occurrenceStart)
 
   const bulkInviteMutation = useMutation({
     mutationFn: async () => {
@@ -457,16 +471,9 @@ export default function EventDetailPage() {
 
   const isPending = registerMutation.isPending || cancelMutation.isPending
 
-  // Effective start/end: if `?occ=<iso>` is present, this is a recurring
-  // occurrence — shift end_time by (master end - master start) to preserve
-  // duration. Otherwise show the row's own times.
-  const effectiveStartTime = occParam ?? event.start_time
-  const effectiveEndTime = (() => {
-    if (!occParam) return event.end_time
-    const masterDuration =
-      new Date(event.end_time).getTime() - new Date(event.start_time).getTime()
-    return new Date(new Date(occParam).getTime() + masterDuration).toISOString()
-  })()
+  // The API returns the selected occurrence's effective dates.
+  const effectiveStartTime = event.start_time
+  const effectiveEndTime = event.end_time
 
   const coverUrl =
     event.cover_url ||
@@ -477,7 +484,7 @@ export default function EventDetailPage() {
     !event.cover_url && event.venue_image_url ? event.venue_title : null
 
   const sharePath = `/portal/${city?.slug}/events/${params.eventId}${
-    occParam ? `?occ=${encodeURIComponent(occParam)}` : ""
+    occurrenceStart ? `?occ=${encodeURIComponent(occurrenceStart)}` : ""
   }`
   const shareUrl =
     typeof window !== "undefined"
@@ -495,8 +502,8 @@ export default function EventDetailPage() {
     }
   }
 
-  // Managers (owner/host/collaborator) copy every active RSVPer's email in
-  // one click. The endpoint is gated server-side to the same roles and
+  // Managers (owner/host/collaborator) copy this occurrence's active emails
+  // in one click. The endpoint is gated server-side to the same roles and
   // returns all registrants — including those who hid their name from the
   // directory — so the organiser can actually reach everyone.
   const handleCopyAttendeeEmails = async () => {
@@ -504,7 +511,7 @@ export default function EventDetailPage() {
     try {
       const res = await EventParticipantsService.listPortalAttendeeEmails({
         eventId: params.eventId,
-        occurrenceStart: occParam ?? undefined,
+        occurrenceStart: occurrenceStart ?? undefined,
       })
       if (res.emails.length === 0) {
         toast.info(t("events.detail.copy_attendee_emails_empty"))
@@ -842,7 +849,7 @@ export default function EventDetailPage() {
             // events-list `from`) so the venue page can return here.
             const eventDetailQs = new URLSearchParams()
             if (flowId) eventDetailQs.set("flow", flowId)
-            if (occParam) eventDetailQs.set("occ", occParam)
+            if (occurrenceStart) eventDetailQs.set("occ", occurrenceStart)
             if (fromSearch) eventDetailQs.set("from", fromSearch)
             const eventDetailQsStr = eventDetailQs.toString()
             const eventDetailHref = eventDetailQsStr
@@ -1010,7 +1017,7 @@ export default function EventDetailPage() {
       {event.status === "published" && !isEnded && (
         <EventAttendance
           eventId={params.eventId}
-          occurrenceStart={event.rrule ? effectiveStartTime : null}
+          occurrenceStart={occurrenceStart}
           canManage={canManage}
           timezone={timezone}
         />
@@ -1096,9 +1103,9 @@ export default function EventDetailPage() {
 
       {canManage && (
         <EventMessages
-          key={`${event.id}:${occParam ?? "all"}`}
+          key={`${event.id}:${occurrenceStart ?? "oneoff"}`}
           eventId={event.id}
-          occurrenceStart={occParam}
+          occurrenceStart={occurrenceStart}
           timezone={timezone}
           canSend={!isEnded && event.status === "published"}
         />
@@ -1129,7 +1136,13 @@ export default function EventDetailPage() {
         )}
         {activeParticipants.length === 0 ? (
           <p className="text-sm text-muted-foreground">
-            {t("events.detail.no_participants_yet")}
+            {unlistedParticipantCount > 0
+              ? t("events.detail.participants_count", {
+                  count: unlistedParticipantCount,
+                })
+              : goingCount === 0
+                ? t("events.detail.no_participants_yet")
+                : null}
           </p>
         ) : (
           <div className="space-y-2">
@@ -1177,6 +1190,13 @@ export default function EventDetailPage() {
                       count: activeParticipants.length - 10,
                     })}
               </button>
+            )}
+            {unlistedParticipantCount > 0 && (
+              <p className="text-sm text-muted-foreground">
+                {t("events.detail.participants_unlisted", {
+                  count: unlistedParticipantCount,
+                })}
+              </p>
             )}
           </div>
         )}
