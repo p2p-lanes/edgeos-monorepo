@@ -2377,6 +2377,7 @@ export type CheckoutRuntimeProduct = {
 export type CheckoutRuntimeResponse = {
     popup: PopupPublic;
     selected_flow: SelectedSalesFlow;
+    checkout_config?: (SalesFlowCheckoutConfig | null);
     products: Array<CheckoutRuntimeProduct>;
     buyer_form: Array<CheckoutBuyerSection>;
     ticketing_steps: Array<TicketingStepPublic>;
@@ -5802,6 +5803,30 @@ export type ReviewSummary = {
 export type RsvpEligibility = {
     allowed: boolean;
     reason?: ('rejected' | 'no_tickets' | null);
+};
+
+/**
+ * What a door's checkout screen needs to know about its own settings.
+ *
+ * The portal used to read these off `PopupPublic`, whose columns stopped
+ * being edited once each flow owned its configuration (slice 7). The
+ * checkout then offered a promo code field on a door with coupons off, and
+ * quoted an insurance or contribution line the payment would not charge.
+ *
+ * An allowlist like `SalesFlowPortalPublic`: every field is something the
+ * buyer sees on the confirm step anyway. Never widen this to the whole
+ * `EffectiveFlowConfig`, which carries `open_checkout_signing_secret`.
+ * Unset values read as off, matching how the payment and coupon paths treat
+ * them.
+ */
+export type SalesFlowCheckoutConfig = {
+    allows_coupons?: boolean;
+    insurance_enabled?: boolean;
+    insurance_percentage?: (string | null);
+    contribution_enabled?: boolean;
+    contribution_percentage?: (string | null);
+    contribution_label?: (string | null);
+    contribution_description?: (string | null);
 };
 
 /**
@@ -10307,6 +10332,13 @@ export type SalesFlowsListPortalDirectSalesFlowsData = {
 };
 
 export type SalesFlowsListPortalDirectSalesFlowsResponse = (ListModel_SalesFlowPortalPublic_);
+
+export type SalesFlowsGetPortalCheckoutConfigData = {
+    popupId: string;
+    salesFlowId?: (string | null);
+};
+
+export type SalesFlowsGetPortalCheckoutConfigResponse = (SalesFlowCheckoutConfig);
 
 export type SalesFlowsListSalesFlowsData = {
     /**

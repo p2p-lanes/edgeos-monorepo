@@ -18,7 +18,7 @@ from app.api.attendee_category.schemas import AttendeeCategoryPublic
 from app.api.human.privacy import public_profile_metadata
 from app.api.payment.schemas import PaymentRecipientRequest
 from app.api.popup.schemas import PopupPublic
-from app.api.sales_flow.schemas import SelectedSalesFlow
+from app.api.sales_flow.schemas import SalesFlowCheckoutConfig, SelectedSalesFlow
 from app.api.ticketing_step.schemas import TicketingStepPublic
 
 # ---------------------------------------------------------------------------
@@ -107,6 +107,10 @@ class CheckoutRuntimeResponse(BaseModel):
 
     popup: PopupPublic
     selected_flow: SelectedSalesFlow
+    # The flow's own buyer-facing settings (coupons, insurance, contribution).
+    # `popup` still carries same-named columns, but nothing edits them since
+    # each flow owns its configuration, so they must not drive the checkout.
+    checkout_config: SalesFlowCheckoutConfig | None = None
     products: list[CheckoutRuntimeProduct]
     buyer_form: list[CheckoutBuyerSection]
     ticketing_steps: list[TicketingStepPublic]

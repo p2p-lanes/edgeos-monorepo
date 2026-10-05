@@ -15,7 +15,6 @@ import {
 import { useTranslation } from "react-i18next"
 import { resolveStepIcon } from "@/lib/checkoutStepIcons"
 import { useCheckout } from "@/providers/checkoutProvider"
-import { useCityProvider } from "@/providers/cityProvider"
 import { formatCheckoutDate, formatCurrency } from "@/types/checkout"
 
 export default function CartItemList({
@@ -26,8 +25,6 @@ export default function CartItemList({
   showServiceFee?: boolean
 } = {}) {
   const { t } = useTranslation()
-  const { getCity } = useCityProvider()
-  const popup = getCity()
   const {
     cart,
     summary,
@@ -43,6 +40,7 @@ export default function CartItemList({
     removeDynamicItem,
     isEditing,
     stepConfigs,
+    flowConfig,
   } = useCheckout()
 
   // Group dynamic items by their originating step so the drawer renders one
@@ -409,7 +407,7 @@ export default function CartItemList({
         </div>
       )}
 
-      {/* Contribution fee — mandatory when popup has it enabled; no buyer
+      {/* Contribution fee — mandatory when the flow has it enabled; no buyer
           toggle. Hidden until the confirm step so earlier steps show a
           products-only cart. */}
       {showServiceFee && summary.contributionSubtotal > 0 && (
@@ -418,10 +416,10 @@ export default function CartItemList({
             <div className="flex items-center gap-3 min-w-0">
               <HandCoins className="w-4 h-4 text-muted-foreground shrink-0" />
               <span className="text-sm font-medium text-foreground">
-                {popup?.contribution_label ||
+                {flowConfig?.contribution_label ||
                   t("checkout.contribution.fallbackLabel")}
-                {popup?.contribution_percentage
-                  ? ` (${Number(popup.contribution_percentage)}%)`
+                {flowConfig?.contribution_percentage
+                  ? ` (${Number(flowConfig.contribution_percentage)}%)`
                   : ""}
               </span>
             </div>
@@ -429,9 +427,9 @@ export default function CartItemList({
               {formatCurrency(summary.contributionSubtotal)}
             </span>
           </div>
-          {popup?.contribution_description && (
+          {flowConfig?.contribution_description && (
             <p className="text-xs text-muted-foreground mt-1 ml-7">
-              {popup.contribution_description}
+              {flowConfig.contribution_description}
             </p>
           )}
         </div>

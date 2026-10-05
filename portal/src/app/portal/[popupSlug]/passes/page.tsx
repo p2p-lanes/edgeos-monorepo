@@ -274,6 +274,8 @@ export default function HomePasses() {
             <OtherPurchasedProducts
               products={otherProducts}
               paymentsHref={`/portal/${params.popupSlug}/orders`}
+              popupId={popupId}
+              catalog={products}
             />
           </div>
         )}
