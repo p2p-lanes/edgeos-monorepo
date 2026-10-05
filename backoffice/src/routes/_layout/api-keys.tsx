@@ -57,6 +57,8 @@ const ADMIN_API_KEY_SCOPES = [
   "ticketing_steps:write",
   "translations:read",
   "translations:write",
+  "badges:read",
+  "badges:write",
 ] as const
 
 type AdminApiKeyScope = (typeof ADMIN_API_KEY_SCOPES)[number]
@@ -79,6 +81,8 @@ const SCOPE_GROUPS: { label: string; scopes: AdminApiKeyScope[] }[] = [
       "humans:write",
       "groups:read",
       "groups:write",
+      "badges:read",
+      "badges:write",
     ],
   },
   {

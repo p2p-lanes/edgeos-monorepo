@@ -322,6 +322,10 @@ def manual_check_in(
         actor_user_id=actor_user_id,
         actor_name=actor_name,
     )
+    if not already:
+        from app.api.badge.rules import evaluate_after_check_in
+
+        evaluate_after_check_in(db, human.id, event)
     return ManualCheckInResult(
         entry=_serialize_entries(db, [participant])[0],
         already_checked_in=already,

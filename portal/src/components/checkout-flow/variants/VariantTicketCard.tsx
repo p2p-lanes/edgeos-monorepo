@@ -232,6 +232,13 @@ function PassSystemProductRow({
             </h4>
             <SaleStateBadge state={row.saleState} />
           </div>
+          {product.description && (
+            <ExpandableDescription
+              text={product.description}
+              clamp={2}
+              className="text-xs text-muted-foreground whitespace-pre-line mt-0.5"
+            />
+          )}
           {/* Credit indicator: visible when isEditing and product.edit */}
           {isEditing && row.editedForCredit && (
             <div className="flex items-center gap-1 mt-0.5">
@@ -417,6 +424,13 @@ function OpenCheckoutProductRow({
             </h4>
             <SaleStateBadge state={row.saleState} />
           </div>
+          {product.description && (
+            <ExpandableDescription
+              text={product.description}
+              clamp={2}
+              className="text-xs text-muted-foreground whitespace-pre-line mt-0.5"
+            />
+          )}
         </div>
         <div className="flex items-center gap-4 shrink-0">
           <div

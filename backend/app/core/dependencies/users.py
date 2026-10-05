@@ -954,6 +954,21 @@ AdminOrApiKeySession_TranslationsWrite = Annotated[
 ]
 
 
+# badges
+AdminOrApiKey_BadgesRead = Annotated[
+    "UserPublic", Depends(CurrentAdminOrApiKey("badges:read"))
+]
+AdminOrApiKey_BadgesWrite = Annotated[
+    "UserPublic", Depends(CurrentAdminOrApiKey("badges:write"))
+]
+AdminOrApiKeySession_BadgesRead = Annotated[
+    Session, Depends(get_admin_or_api_key_tenant_session("badges:read"))
+]
+AdminOrApiKeySession_BadgesWrite = Annotated[
+    Session, Depends(get_admin_or_api_key_tenant_session("badges:write"))
+]
+
+
 # DRY helper for scope-gated routes. Use directly in the route decorator's
 # `dependencies=[...]` list instead of declaring a per-scope Annotated alias:
 #

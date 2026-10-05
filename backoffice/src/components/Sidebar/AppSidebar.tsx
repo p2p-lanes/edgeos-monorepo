@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query"
 import {
+  Award,
   BedDouble,
   Building2,
   Calendar,
@@ -188,6 +189,7 @@ export function AppSidebar() {
       },
       { icon: ClipboardCheck, title: "Check In", path: "/check-in" },
       { icon: User, title: "Humans", path: "/humans" },
+      { icon: Award, title: "Badges", path: "/badges" },
       {
         icon: CreditCard,
         title: "Payments",
