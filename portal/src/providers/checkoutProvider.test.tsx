@@ -6,7 +6,11 @@
 import { act, renderHook, waitFor } from "@testing-library/react"
 import type { ComponentProps, ReactNode } from "react"
 import { beforeEach, describe, expect, it, vi } from "vitest"
-import { CheckoutService, type TicketingStepPublic } from "@/client"
+import {
+  CheckoutService,
+  type SalesFlowCheckoutConfig,
+  type TicketingStepPublic,
+} from "@/client"
 import type { ApplicationFormSchema } from "@/types/form-schema"
 import type { ProductsPass } from "@/types/Products"
 import { CheckoutProvider, useCheckout } from "./checkoutProvider"
@@ -25,6 +29,13 @@ const cityState = vi.hoisted(() => ({
   current: null as Record<string, unknown> | null,
 }))
 const queryState = vi.hoisted(() => ({ loading: false, authenticated: false }))
+const flowConfigQuerySpy = vi.hoisted(() => vi.fn())
+const flowConfigState = vi.hoisted(() => ({
+  data: undefined as SalesFlowCheckoutConfig | undefined,
+  isError: false,
+  isFetching: false,
+  refetch: vi.fn(),
+}))
 const passesDataSpy = vi.hoisted(() =>
   vi.fn(() => ({ products: [], loading: queryState.loading })),
 )
@@ -44,6 +55,7 @@ vi.mock("@/client", () => ({
   OpenAPI: {},
   PaymentsService: { releaseMyPendingPayment: vi.fn() },
   TicketingStepsService: { listPortalTicketingSteps: vi.fn() },
+  SalesFlowsService: { getPortalCheckoutConfig: vi.fn() },
 }))
 vi.mock("@/hooks/checkout", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/hooks/checkout")>()),
@@ -65,6 +77,12 @@ beforeEach(() => {
   queryState.loading = false
   queryState.authenticated = false
   passesDataSpy.mockClear()
+  paymentSubmitSpy.mockClear()
+  flowConfigQuerySpy.mockClear()
+  flowConfigState.data = undefined
+  flowConfigState.isError = false
+  flowConfigState.isFetching = false
+  flowConfigState.refetch.mockReset()
 })
 vi.mock("@/providers/discountProvider", () => ({
   useDiscount: () => ({
@@ -88,7 +106,13 @@ vi.mock("@/hooks/useIsAuthenticated", () => ({
   useIsAuthenticated: () => queryState.authenticated,
 }))
 vi.mock("@tanstack/react-query", () => ({
-  useQuery: () => ({ data: undefined, isLoading: queryState.loading }),
+  useQuery: (options: { queryKey: string[] }) => {
+    if (options.queryKey[0] === "sales-flow-checkout-config") {
+      flowConfigQuerySpy(options)
+      return { ...flowConfigState }
+    }
+    return { data: undefined, isLoading: queryState.loading }
+  },
   useQueryClient: () => ({
     getQueryData: vi.fn(),
     setQueryData: vi.fn(),
@@ -168,6 +192,7 @@ function makeWrapper(
         configuredStepsOverride={steps}
         productsOverride={products}
         cartPersistenceEnabled={false}
+        checkoutConfigOverride={{}}
         {...extraProps}
       >
         {children}
@@ -204,6 +229,189 @@ describe("checkoutProvider override loading", () => {
     props.configuredStepsOverride = undefined
     rerender()
     expect(result.current.isInitialLoading).toBe(true)
+  })
+})
+
+describe("checkoutProvider — checkout config readiness", () => {
+  const stay = {
+    accommodationId: "room-1",
+    productId: "room-product",
+    name: "Room",
+    propertyId: "property-1",
+    propertyName: "Hotel",
+    checkIn: "2026-09-01",
+    checkOut: "2026-09-02",
+    nights: 1,
+    guestCount: 1,
+    guests: [{ name: "Buyer", answers: {} }],
+    bookerAnswers: {},
+    guestForm: null,
+    subtotal: 100,
+    tax: 0,
+    totalPrice: 100,
+  }
+  const props = {
+    salesFlowId: "flow-1",
+    checkoutConfigOverride: undefined,
+  }
+
+  beforeEach(() => {
+    cityState.current = { id: "popup-1" }
+    queryState.authenticated = true
+  })
+
+  function underlyingSubmit() {
+    return paymentSubmitSpy.mock.results.at(-1)!.value.submitPayment
+  }
+
+  it("waits for settings even when products and steps are already loaded", async () => {
+    flowConfigState.isFetching = true
+    const { result } = renderHook(() => useCheckout(), {
+      wrapper: makeWrapper([], [], props),
+    })
+
+    expect(result.current.flowConfig).toBeNull()
+    expect(result.current.isInitialLoading).toBe(true)
+    expect(result.current.flowConfigError).toBeNull()
+    expect(await result.current.submitPayment()).toEqual({
+      success: false,
+      error: "checkout.config_loading",
+    })
+    expect(underlyingSubmit()).not.toHaveBeenCalled()
+  })
+
+  it("surfaces a failed settings request and blocks direct payment calls", async () => {
+    flowConfigState.isError = true
+    const { result } = renderHook(() => useCheckout(), {
+      wrapper: makeWrapper([], [], props),
+    })
+
+    expect(result.current.isInitialLoading).toBe(false)
+    expect(result.current.flowConfigError).toBe("checkout.config_load_error")
+    expect(result.current.error).toBe("checkout.config_load_error")
+    expect(await result.current.submitPayment()).toEqual({
+      success: false,
+      error: "checkout.config_load_error",
+    })
+    expect(underlyingSubmit()).not.toHaveBeenCalled()
+  })
+
+  it("only enables payment after a retry has loaded the real contribution", async () => {
+    flowConfigState.isError = true
+    const { result, rerender } = renderHook(() => useCheckout(), {
+      wrapper: makeWrapper([], [], props),
+    })
+    act(() => result.current.addAccommodation(stay))
+    const blockedSubmit = underlyingSubmit()
+    await result.current.submitPayment()
+    expect(blockedSubmit).not.toHaveBeenCalled()
+
+    act(() => result.current.retryFlowConfig())
+    expect(flowConfigState.refetch).toHaveBeenCalledOnce()
+    // React Query retains the error status while the retry is fetching.
+    flowConfigState.isFetching = true
+    rerender()
+    expect(result.current.isInitialLoading).toBe(true)
+    await result.current.submitPayment()
+    expect(underlyingSubmit()).not.toHaveBeenCalled()
+
+    flowConfigState.data = {
+      contribution_enabled: true,
+      contribution_percentage: "10",
+    }
+    flowConfigState.isError = false
+    flowConfigState.isFetching = false
+    rerender()
+    expect(result.current.isInitialLoading).toBe(false)
+    expect(result.current.flowConfigError).toBeNull()
+    expect(result.current.error).toBeNull()
+    expect(result.current.summary.contributionSubtotal).toBe(10)
+    expect(result.current.summary.grandTotal).toBe(110)
+    const resolvedSubmit = underlyingSubmit()
+    await result.current.submitPayment()
+    expect(resolvedSubmit).toHaveBeenCalledOnce()
+  })
+
+  it("allows a successfully loaded config with every option disabled", async () => {
+    flowConfigState.data = {
+      allows_coupons: false,
+      insurance_enabled: false,
+      contribution_enabled: false,
+    }
+    const { result } = renderHook(() => useCheckout(), {
+      wrapper: makeWrapper([], [], props),
+    })
+
+    expect(result.current.isInitialLoading).toBe(false)
+    expect(result.current.flowConfigError).toBeNull()
+    expect(result.current.summary.contributionSubtotal).toBe(0)
+    await result.current.submitPayment()
+    expect(underlyingSubmit()).toHaveBeenCalledOnce()
+  })
+
+  it("uses a supplied runtime config without waiting for the disabled query", async () => {
+    flowConfigState.isFetching = true
+    flowConfigState.isError = true
+    const config = { contribution_enabled: true, contribution_percentage: "10" }
+    const { result } = renderHook(() => useCheckout(), {
+      wrapper: makeWrapper([], [], {
+        ...props,
+        checkoutConfigOverride: config,
+      }),
+    })
+    act(() => result.current.addAccommodation(stay))
+
+    expect(flowConfigQuerySpy).toHaveBeenLastCalledWith(
+      expect.objectContaining({ enabled: false }),
+    )
+    expect(result.current.isInitialLoading).toBe(false)
+    expect(result.current.flowConfigError).toBeNull()
+    expect(result.current.summary.grandTotal).toBe(110)
+    await result.current.submitPayment()
+    expect(underlyingSubmit()).toHaveBeenCalledOnce()
+  })
+
+  it("blocks a public runtime with a missing config rather than treating it as off", async () => {
+    const { result } = renderHook(() => useCheckout(), {
+      wrapper: makeWrapper([], [], { ...props, checkoutConfigOverride: null }),
+    })
+
+    expect(result.current.flowConfigError).toBe("checkout.config_load_error")
+    await result.current.submitPayment()
+    expect(underlyingSubmit()).not.toHaveBeenCalled()
+  })
+
+  it("keeps preview submission inert when no config has loaded", async () => {
+    const { result } = renderHook(() => useCheckout(), {
+      wrapper: makeWrapper([], [], { ...props, previewMode: true }),
+    })
+
+    expect(await result.current.submitPayment()).toEqual({
+      success: false,
+      error: "preview",
+    })
+  })
+
+  it("blocks again when the selected flow has no cached settings", async () => {
+    const selectedProps = { ...props }
+    flowConfigState.data = { contribution_enabled: false }
+    const { result, rerender } = renderHook(() => useCheckout(), {
+      wrapper: makeWrapper([], [], selectedProps),
+    })
+    expect(result.current.isInitialLoading).toBe(false)
+
+    selectedProps.salesFlowId = "flow-2"
+    flowConfigState.data = undefined
+    flowConfigState.isFetching = true
+    rerender()
+    expect(result.current.isInitialLoading).toBe(true)
+    expect(flowConfigQuerySpy).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        queryKey: ["sales-flow-checkout-config", "popup-1", "flow-2"],
+      }),
+    )
+    await result.current.submitPayment()
+    expect(underlyingSubmit()).not.toHaveBeenCalled()
   })
 })
 
@@ -372,10 +580,11 @@ describe("checkoutProvider — entry-link coupons", () => {
   beforeEach(() => localStorage.clear())
 
   it("applies an entry coupon after open-cart restoration and release settle", async () => {
-    cityState.current = { id: "popup-1", allows_coupons: true }
+    cityState.current = { id: "popup-1" }
     const validate = vi.fn().mockResolvedValue(20)
     const { result } = renderHook(() => useCheckout(), {
       wrapper: makeWrapper([], products, {
+        checkoutConfigOverride: { allows_coupons: true },
         salesFlowId: "flow-friends",
         salesFlowSlug: "friends",
         submitMode: "open-ticketing",
@@ -412,11 +621,12 @@ describe("checkoutProvider — entry-link coupons", () => {
     "zero-discount",
     "rejected",
   ])("keeps normal checkout totals without an error for a %s URL coupon", async (reason) => {
-    cityState.current = { id: "popup-1", allows_coupons: reason !== "disabled" }
+    cityState.current = { id: "popup-1" }
     const validate = vi.fn().mockResolvedValue(0)
     if (reason === "rejected") validate.mockRejectedValue({ status: 400 })
     const { result } = renderHook(() => useCheckout(), {
       wrapper: makeWrapper([], products, {
+        checkoutConfigOverride: { allows_coupons: reason !== "disabled" },
         salesFlowId: "flow-friends",
         salesFlowSlug: "friends",
         submitMode: "open-ticketing",
@@ -439,7 +649,7 @@ describe("checkoutProvider — entry-link coupons", () => {
   })
 
   it("waits for signed cart recovery and release before replacing a saved coupon", async () => {
-    cityState.current = { id: "popup-1", allows_coupons: true }
+    cityState.current = { id: "popup-1" }
     let resolveRestore!: (value: unknown) => void
     let resolveRelease!: (value: { released: boolean }) => void
     vi.mocked(CheckoutService.restoreFlowCart).mockReturnValueOnce(
@@ -455,6 +665,7 @@ describe("checkoutProvider — entry-link coupons", () => {
     const validate = vi.fn().mockResolvedValue(20)
     const { result } = renderHook(() => useCheckout(), {
       wrapper: makeWrapper([], products, {
+        checkoutConfigOverride: { allows_coupons: true },
         salesFlowId: "flow-friends",
         salesFlowSlug: "friends",
         submitMode: "open-ticketing",
@@ -506,10 +717,12 @@ describe("checkoutProvider — entry-link coupons", () => {
     allowsCoupons,
     previewMode,
   }) => {
-    cityState.current = { id: "popup-1", allows_coupons: allowsCoupons }
+    // The popup's stale column says yes; only the flow's answer counts.
+    cityState.current = { id: "popup-1", allows_coupons: true }
     const validate = vi.fn().mockResolvedValue(20)
     const { result } = renderHook(() => useCheckout(), {
       wrapper: makeWrapper([], products, {
+        checkoutConfigOverride: { allows_coupons: allowsCoupons },
         salesFlowId: "flow-friends",
         salesFlowSlug: "friends",
         submitMode: "open-ticketing",
@@ -586,13 +799,13 @@ describe("checkoutProvider — Sales Flow checkout boundary", () => {
   })
 
   it("includes stays in coupon and contribution calculations", async () => {
-    cityState.current = {
-      id: "popup-1",
-      contribution_enabled: true,
-      contribution_percentage: 10,
-    }
+    cityState.current = { id: "popup-1" }
     const { result } = renderHook(() => useCheckout(), {
       wrapper: makeWrapper([], [], {
+        checkoutConfigOverride: {
+          contribution_enabled: true,
+          contribution_percentage: "10",
+        },
         salesFlowId: "flow-main",
         validatePromoCodeOverride: async () => 20,
       }),
@@ -608,6 +821,25 @@ describe("checkoutProvider — Sales Flow checkout boundary", () => {
     expect(result.current.summary.discount).toBe(22)
     expect(result.current.summary.contributionSubtotal).toBe(8.8)
     expect(result.current.summary.grandTotal).toBe(96.8)
+  })
+
+  it("charges no contribution the flow has turned off, whatever the popup says", async () => {
+    cityState.current = {
+      id: "popup-1",
+      contribution_enabled: true,
+      contribution_percentage: 10,
+    }
+    const { result } = renderHook(() => useCheckout(), {
+      wrapper: makeWrapper([], [], {
+        checkoutConfigOverride: { contribution_enabled: false },
+        salesFlowId: "flow-main",
+      }),
+    })
+
+    act(() => result.current.addAccommodation(stay))
+
+    expect(result.current.summary.contributionSubtotal).toBe(0)
+    expect(result.current.summary.grandTotal).toBe(110)
   })
 })
 

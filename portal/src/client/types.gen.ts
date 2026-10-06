@@ -2147,6 +2147,7 @@ export type CheckoutRuntimeProduct = {
 export type CheckoutRuntimeResponse = {
     popup: PopupPublic;
     selected_flow: SelectedSalesFlow;
+    checkout_config?: (SalesFlowCheckoutConfig | null);
     products: Array<CheckoutRuntimeProduct>;
     buyer_form: Array<CheckoutBuyerSection>;
     ticketing_steps: Array<TicketingStepPublic>;
@@ -2833,6 +2834,27 @@ export type EventRecurringAvailabilityResult = {
     checked_occurrences: number;
     conflicts?: Array<OccurrenceConflict>;
     truncated?: boolean;
+};
+
+export type EventSeriesOccurrence = {
+    event_id: string;
+    occurrence_start: (string | null);
+    start_time: string;
+    end_time: string;
+    timezone: string;
+    title: string;
+    status: EventStatus;
+    is_detached: boolean;
+    attendee_count: number;
+};
+
+export type EventSeriesSummary = {
+    series_id: string;
+    series_title: string;
+    timezone: string;
+    window_start: string;
+    window_end: string;
+    occurrences: Array<EventSeriesOccurrence>;
 };
 
 /**
@@ -4111,6 +4133,11 @@ export type ListModel_PopupAdmin_ = {
     paging: Paging;
 };
 
+export type ListModel_PopupCheckInPublic_ = {
+    results: Array<PopupCheckInPublic>;
+    paging: Paging;
+};
+
 export type ListModel_PopupReviewerPublic_ = {
     results: Array<PopupReviewerPublic>;
     paging: Paging;
@@ -4771,6 +4798,22 @@ export type PopupAdmin = {
     id: string;
     takes_applications?: boolean;
     sells_directly?: boolean;
+};
+
+/**
+ * Allowlisted operational data for scanners, independent of admin schemas.
+ */
+export type PopupCheckInPublic = {
+    id: string;
+    name: string;
+    tagline?: (string | null);
+    location?: (string | null);
+    slug: string;
+    status: PopupStatus;
+    start_date?: (string | null);
+    end_date?: (string | null);
+    image_url?: (string | null);
+    self_check_in_enabled?: boolean;
 };
 
 export type PopupCreate = {
@@ -5500,6 +5543,30 @@ export type ReviewSummary = {
 export type RsvpEligibility = {
     allowed: boolean;
     reason?: ('rejected' | 'no_tickets' | null);
+};
+
+/**
+ * What a door's checkout screen needs to know about its own settings.
+ *
+ * The portal used to read these off `PopupPublic`, whose columns stopped
+ * being edited once each flow owned its configuration (slice 7). The
+ * checkout then offered a promo code field on a door with coupons off, and
+ * quoted an insurance or contribution line the payment would not charge.
+ *
+ * An allowlist like `SalesFlowPortalPublic`: every field is something the
+ * buyer sees on the confirm step anyway. Never widen this to the whole
+ * `EffectiveFlowConfig`, which carries `open_checkout_signing_secret`.
+ * Unset values read as off, matching how the payment and coupon paths treat
+ * them.
+ */
+export type SalesFlowCheckoutConfig = {
+    allows_coupons?: boolean;
+    insurance_enabled?: boolean;
+    insurance_percentage?: (string | null);
+    contribution_enabled?: boolean;
+    contribution_percentage?: (string | null);
+    contribution_label?: (string | null);
+    contribution_description?: (string | null);
 };
 
 /**
@@ -8076,6 +8143,8 @@ export type EventParticipantsListParticipantsData = {
      * Maximum number of items to return
      */
     limit?: number;
+    occurrenceStart?: (string | null);
+    scopeToOccurrence?: boolean;
     /**
      * Number of items to skip
      */
@@ -8319,6 +8388,13 @@ export type EventsDeleteEventData = {
 
 export type EventsDeleteEventResponse = (void);
 
+export type EventsGetEventSeriesSummaryData = {
+    eventId: string;
+    xTenantId?: (string | null);
+};
+
+export type EventsGetEventSeriesSummaryResponse = (EventSeriesSummary);
+
 export type EventsGetEventAdminNotesData = {
     eventId: string;
     xTenantId?: (string | null);
@@ -8543,6 +8619,13 @@ export type EventsUpdatePortalEventData = {
 };
 
 export type EventsUpdatePortalEventResponse = (EventPublic);
+
+export type EventsDetachPortalOccurrenceData = {
+    eventId: string;
+    requestBody: OccurrenceRef;
+};
+
+export type EventsDetachPortalOccurrenceResponse = (EventPublic);
 
 export type EventsGetPortalEventAdminNotesData = {
     eventId: string;
@@ -9516,6 +9599,28 @@ export type PopupReviewersRemoveReviewerData = {
 
 export type PopupReviewersRemoveReviewerResponse = (void);
 
+export type PopupsListCheckInPopupsData = {
+    /**
+     * Maximum number of items to return
+     */
+    limit?: number;
+    search?: (string | null);
+    /**
+     * Number of items to skip
+     */
+    skip?: number;
+    xTenantId?: (string | null);
+};
+
+export type PopupsListCheckInPopupsResponse = (ListModel_PopupCheckInPublic_);
+
+export type PopupsGetCheckInPopupData = {
+    popupId: string;
+    xTenantId?: (string | null);
+};
+
+export type PopupsGetCheckInPopupResponse = (PopupCheckInPublic);
+
 export type PopupsListPopupsData = {
     /**
      * Maximum number of items to return
@@ -9752,6 +9857,13 @@ export type SalesFlowsListPortalDirectSalesFlowsData = {
 };
 
 export type SalesFlowsListPortalDirectSalesFlowsResponse = (ListModel_SalesFlowPortalPublic_);
+
+export type SalesFlowsGetPortalCheckoutConfigData = {
+    popupId: string;
+    salesFlowId?: (string | null);
+};
+
+export type SalesFlowsGetPortalCheckoutConfigResponse = (SalesFlowCheckoutConfig);
 
 export type SalesFlowsListSalesFlowsData = {
     /**

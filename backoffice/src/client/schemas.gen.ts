@@ -9954,6 +9954,16 @@ export const CheckoutRuntimeResponseSchema = {
         selected_flow: {
             '$ref': '#/components/schemas/SelectedSalesFlow'
         },
+        checkout_config: {
+            anyOf: [
+                {
+                    '$ref': '#/components/schemas/SalesFlowCheckoutConfig'
+                },
+                {
+                    type: 'null'
+                }
+            ]
+        },
         products: {
             items: {
                 '$ref': '#/components/schemas/CheckoutRuntimeProduct'
@@ -12981,6 +12991,98 @@ export const EventRecurringAvailabilityResultSchema = {
     type: 'object',
     required: ['available', 'total_occurrences', 'checked_occurrences'],
     title: 'EventRecurringAvailabilityResult'
+} as const;
+
+export const EventSeriesOccurrenceSchema = {
+    properties: {
+        event_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Event Id'
+        },
+        occurrence_start: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Occurrence Start'
+        },
+        start_time: {
+            type: 'string',
+            format: 'date-time',
+            title: 'Start Time'
+        },
+        end_time: {
+            type: 'string',
+            format: 'date-time',
+            title: 'End Time'
+        },
+        timezone: {
+            type: 'string',
+            title: 'Timezone'
+        },
+        title: {
+            type: 'string',
+            title: 'Title'
+        },
+        status: {
+            '$ref': '#/components/schemas/EventStatus'
+        },
+        is_detached: {
+            type: 'boolean',
+            title: 'Is Detached'
+        },
+        attendee_count: {
+            type: 'integer',
+            title: 'Attendee Count'
+        }
+    },
+    type: 'object',
+    required: ['event_id', 'occurrence_start', 'start_time', 'end_time', 'timezone', 'title', 'status', 'is_detached', 'attendee_count'],
+    title: 'EventSeriesOccurrence'
+} as const;
+
+export const EventSeriesSummarySchema = {
+    properties: {
+        series_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Series Id'
+        },
+        series_title: {
+            type: 'string',
+            title: 'Series Title'
+        },
+        timezone: {
+            type: 'string',
+            title: 'Timezone'
+        },
+        window_start: {
+            type: 'string',
+            format: 'date-time',
+            title: 'Window Start'
+        },
+        window_end: {
+            type: 'string',
+            format: 'date-time',
+            title: 'Window End'
+        },
+        occurrences: {
+            items: {
+                '$ref': '#/components/schemas/EventSeriesOccurrence'
+            },
+            type: 'array',
+            title: 'Occurrences'
+        }
+    },
+    type: 'object',
+    required: ['series_id', 'series_title', 'timezone', 'window_start', 'window_end', 'occurrences'],
+    title: 'EventSeriesSummary'
 } as const;
 
 export const EventSettingsCreateSchema = {
@@ -18938,6 +19040,24 @@ export const ListModel_PopupAdmin_Schema = {
     title: 'ListModel[PopupAdmin]'
 } as const;
 
+export const ListModel_PopupCheckInPublic_Schema = {
+    properties: {
+        results: {
+            items: {
+                '$ref': '#/components/schemas/PopupCheckInPublic'
+            },
+            type: 'array',
+            title: 'Results'
+        },
+        paging: {
+            '$ref': '#/components/schemas/Paging'
+        }
+    },
+    type: 'object',
+    required: ['results', 'paging'],
+    title: 'ListModel[PopupCheckInPublic]'
+} as const;
+
 export const ListModel_PopupReviewerPublic_Schema = {
     properties: {
         results: {
@@ -22358,6 +22478,93 @@ export const PopupAdminSchema = {
     required: ['name', 'slug', 'tenant_id', 'id'],
     title: 'PopupAdmin',
     description: 'Admin popup schema — all fields including sensitive ones.'
+} as const;
+
+export const PopupCheckInPublicSchema = {
+    properties: {
+        id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Id'
+        },
+        name: {
+            type: 'string',
+            title: 'Name'
+        },
+        tagline: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Tagline'
+        },
+        location: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Location'
+        },
+        slug: {
+            type: 'string',
+            title: 'Slug'
+        },
+        status: {
+            '$ref': '#/components/schemas/PopupStatus'
+        },
+        start_date: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Start Date'
+        },
+        end_date: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'End Date'
+        },
+        image_url: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Image Url'
+        },
+        self_check_in_enabled: {
+            type: 'boolean',
+            title: 'Self Check In Enabled',
+            default: false
+        }
+    },
+    type: 'object',
+    required: ['id', 'name', 'slug', 'status'],
+    title: 'PopupCheckInPublic',
+    description: 'Allowlisted operational data for scanners, independent of admin schemas.'
 } as const;
 
 export const PopupCreateSchema = {
@@ -26636,6 +26843,86 @@ export const SaleTypeSchema = {
 - application: traditional application-based flow (approval required).
 - direct: direct purchase by a logged-in Human, no application.
 Enum is extensible for future types (e.g. waitlist, lottery, registration).`
+} as const;
+
+export const SalesFlowCheckoutConfigSchema = {
+    properties: {
+        allows_coupons: {
+            type: 'boolean',
+            title: 'Allows Coupons',
+            default: false
+        },
+        insurance_enabled: {
+            type: 'boolean',
+            title: 'Insurance Enabled',
+            default: false
+        },
+        insurance_percentage: {
+            anyOf: [
+                {
+                    type: 'string',
+                    pattern: '^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Insurance Percentage'
+        },
+        contribution_enabled: {
+            type: 'boolean',
+            title: 'Contribution Enabled',
+            default: false
+        },
+        contribution_percentage: {
+            anyOf: [
+                {
+                    type: 'string',
+                    pattern: '^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Contribution Percentage'
+        },
+        contribution_label: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Contribution Label'
+        },
+        contribution_description: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Contribution Description'
+        }
+    },
+    type: 'object',
+    title: 'SalesFlowCheckoutConfig',
+    description: `What a door's checkout screen needs to know about its own settings.
+
+The portal used to read these off \`PopupPublic\`, whose columns stopped
+being edited once each flow owned its configuration (slice 7). The
+checkout then offered a promo code field on a door with coupons off, and
+quoted an insurance or contribution line the payment would not charge.
+
+An allowlist like \`SalesFlowPortalPublic\`: every field is something the
+buyer sees on the confirm step anyway. Never widen this to the whole
+\`EffectiveFlowConfig\`, which carries \`open_checkout_signing_secret\`.
+Unset values read as off, matching how the payment and coupon paths treat
+them.`
 } as const;
 
 export const SalesFlowCreateSchema = {

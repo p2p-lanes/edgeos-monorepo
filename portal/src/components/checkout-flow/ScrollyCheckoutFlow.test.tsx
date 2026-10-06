@@ -1,10 +1,13 @@
-import { render, waitFor } from "@testing-library/react"
+import { fireEvent, render, screen, waitFor } from "@testing-library/react"
 import type { ReactNode } from "react"
 import ScrollyCheckoutFlow from "./ScrollyCheckoutFlow"
 
 const mockUseSearchParams = vi.fn()
 const mockReadAndClearPendingPaymentRedirectState = vi.fn()
 const mockRouterReplace = vi.fn()
+const retryFlowConfig = vi.fn()
+let flowConfigError: string | null = null
+let isInitialLoading = false
 
 vi.mock("next/navigation", () => ({
   useParams: () => ({ popupSlug: "popup-a" }),
@@ -22,7 +25,18 @@ vi.mock("@/providers/checkoutProvider", () => ({
     availableSteps: ["passes"],
     submitPayment: vi.fn().mockResolvedValue({ success: true }),
     stepConfigs: [],
+    flowConfigError,
+    retryFlowConfig,
+    isInitialLoading,
   }),
+}))
+
+vi.mock("react-i18next", () => ({
+  useTranslation: () => ({ t: (key: string) => key }),
+}))
+
+vi.mock("@/components/ui/Loader", () => ({
+  Loader: () => <div>loading</div>,
 }))
 
 vi.mock("@/providers/cityProvider", () => ({
@@ -70,6 +84,28 @@ describe("ScrollyCheckoutFlow", () => {
     mockReadAndClearPendingPaymentRedirectState.mockReset()
     mockUseSearchParams.mockReset()
     mockRouterReplace.mockReset()
+    retryFlowConfig.mockReset()
+    flowConfigError = null
+    isInitialLoading = false
+    mockUseSearchParams.mockReturnValue({ get: () => null })
+  })
+
+  it("hides the checkout while settings are pending", () => {
+    isInitialLoading = true
+    render(<ScrollyCheckoutFlow />)
+    expect(screen.getByText("loading")).toBeTruthy()
+    expect(screen.queryByText("footer")).toBeNull()
+  })
+
+  it("shows a retry instead of the payment footer when settings fail", () => {
+    flowConfigError = "Checkout fees could not be loaded"
+    render(<ScrollyCheckoutFlow />)
+    expect(screen.getByRole("alert").textContent).toBe(flowConfigError)
+    expect(screen.queryByText("footer")).toBeNull()
+    fireEvent.click(
+      screen.getByRole("button", { name: "checkout.config_retry" }),
+    )
+    expect(retryFlowConfig).toHaveBeenCalledOnce()
   })
 
   it("redirects to /passes when returning from SimpleFI", async () => {

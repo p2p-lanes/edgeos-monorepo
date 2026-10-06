@@ -73,7 +73,7 @@ operation discovery. Skills teach domain workflows; they never grant permissions
 | `GEMINI_API_KEY` | When using Google | — |
 | `TOOL_APPROVAL_SECRET` | To use chat | — |
 | `BACKEND_URL` | No | `http://localhost:8000` |
-| `AI_MODEL` | No | `gpt-5.6-terra` or `gemini-2.5-flash` |
+| `AI_MODEL` | No | `gpt-6-luna` or `gemini-2.5-flash` |
 | `PORT` | No | `3002` |
 
 Generate the approval secret with:

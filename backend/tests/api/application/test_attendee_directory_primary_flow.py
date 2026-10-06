@@ -153,6 +153,32 @@ def test_directory_human_picker_cannot_use_a_sibling_to_bypass_primary_privacy(
     assert rows == [] and total == 0
 
 
+def test_directory_includes_ticket_grants_without_application(
+    db: Session, tenant_a: Tenants, primary_flow_world
+) -> None:
+    world = primary_flow_world
+    granted_human = _human(db, tenant_a, "Granted", "Ticket")
+    granted = _attendee(
+        db,
+        world["popup"],
+        world["primary_app"],
+        granted_human,
+        _category(db, world["popup"], "main", is_primary=True),
+        tickets=1,
+    )
+    granted.application_id = None
+    db.add(granted)
+    db.commit()
+
+    rows, total = applications_crud.find_directory(db, world["popup"].id)
+    assert total == 2
+    assert {row.id for row in rows} == {world["primary_attendee"].id, granted.id}
+
+    humans, total = applications_crud.find_directory_humans(db, world["popup"].id)
+    assert total == 2
+    assert {human.id for human in humans} == {world["person"].id, granted_human.id}
+
+
 def test_directory_api_and_csv_use_primary_application_data(
     client: TestClient, primary_flow_world
 ) -> None:

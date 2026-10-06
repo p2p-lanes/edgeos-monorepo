@@ -23,6 +23,8 @@ import {
   ApiError,
   CheckoutService,
   PaymentsService,
+  type SalesFlowCheckoutConfig,
+  SalesFlowsService,
   type TicketingStepPublic,
   TicketingStepsService,
 } from "@/client"
@@ -86,6 +88,15 @@ interface CheckoutContextValue {
    */
   salesFlowId: string | null
   salesFlowSlug: string | null
+  /**
+   * The door's own coupon, insurance and contribution settings. `null`
+   * until they load; payment must wait for a non-null config. The popup
+   * carries same-named fields, but each flow owns its configuration, so the
+   * checkout must never read those.
+   */
+  flowConfig: SalesFlowCheckoutConfig | null
+  flowConfigError: string | null
+  retryFlowConfig: () => void
   /** How that door sells. Resolved once here so no section has to ask the
    *  gathering, which cannot answer for a door that differs from it. */
   checkoutMode: CheckoutMode
@@ -304,6 +315,10 @@ interface CheckoutProviderProps {
   /** How that door sells. `null` while it is still being resolved, which is
    *  the same default the portal has always started from. */
   flowType?: string | null
+  /** The door's buyer-facing settings when the caller already has them (the
+   *  open checkout runtime ships them). Omitted, they are fetched for
+   *  `salesFlowId`, or the default flow. */
+  checkoutConfigOverride?: SalesFlowCheckoutConfig | null
   accountCreditOverride?: number
   validatePromoCodeOverride?: (code: string) => Promise<number | null>
   /** Optional ?coupon= entry-link code for open checkout. */
@@ -340,6 +355,7 @@ export function CheckoutProvider({
   salesFlowId,
   salesFlowSlug,
   flowType = null,
+  checkoutConfigOverride,
   accountCreditOverride,
   validatePromoCodeOverride,
   initialPromoCode = null,
@@ -403,6 +419,47 @@ export function CheckoutProvider({
   const [buyerGeneralError, setBuyerGeneralError] = useState<string | null>(
     null,
   )
+
+  const requiresFlowConfigQuery =
+    checkoutConfigOverride === undefined && !!cityId && isAuthenticated
+  const {
+    data: queriedFlowConfig,
+    isError: isFlowConfigQueryError,
+    isFetching: isFetchingFlowConfig,
+    refetch: refetchFlowConfig,
+  } = useQuery({
+    queryKey: ["sales-flow-checkout-config", cityId, salesFlowId ?? null],
+    queryFn: () =>
+      SalesFlowsService.getPortalCheckoutConfig({
+        popupId: cityId!,
+        salesFlowId: salesFlowId ?? undefined,
+      }),
+    enabled: requiresFlowConfigQuery,
+  })
+  const flowConfig =
+    checkoutConfigOverride === undefined
+      ? (queriedFlowConfig ?? null)
+      : checkoutConfigOverride
+  // Unknown settings are not an all-off config. Keep the checkout blocked
+  // until the first successful response, including while retrying a failure.
+  const isFlowConfigPending =
+    requiresFlowConfigQuery &&
+    flowConfig === null &&
+    (!isFlowConfigQueryError || isFetchingFlowConfig)
+  const flowConfigError =
+    flowConfig === null &&
+    (checkoutConfigOverride === null ||
+      (requiresFlowConfigQuery && isFlowConfigQueryError))
+      ? t("checkout.config_load_error")
+      : null
+  const retryFlowConfig = useCallback(() => {
+    if (checkoutConfigOverride === null) {
+      // Runtime overrides are owned by the public checkout's parent query.
+      window.location.reload()
+    } else {
+      void refetchFlowConfig()
+    }
+  }, [checkoutConfigOverride, refetchFlowConfig])
 
   // Ticketing step configuration from API
   const { data: stepsData, isLoading: isLoadingSteps } = useQuery({
@@ -474,15 +531,16 @@ export function CheckoutProvider({
     return Array.from(seen)
   }, [buyerFormSchema, buyerValues])
 
-  // True while step configs or products are still loading on first render.
+  // True while checkout settings, step configs or products are initially loading.
   // Why: when both queries are pending, availableSteps falls back to
   // ["passes", "confirm"] with default labels and the cart total reads $0,
   // producing a brief flash of a "broken" checkout before real data arrives.
   const isInitialLoading =
-    !!cityId &&
-    isAuthenticated &&
-    ((configuredStepsOverride === undefined && isLoadingSteps) ||
-      (productsOverride === undefined && isLoadingProducts))
+    isFlowConfigPending ||
+    (!!cityId &&
+      isAuthenticated &&
+      ((configuredStepsOverride === undefined && isLoadingSteps) ||
+        (productsOverride === undefined && isLoadingProducts)))
 
   // Step-aware product resolution (replaces hardcoded useProductCategories).
   // Each step's product list is derived from step.product_category at runtime,
@@ -793,7 +851,9 @@ export function CheckoutProvider({
   })
 
   const entryPromoCode =
-    !previewMode && submitMode === "open-ticketing" && city?.allows_coupons
+    !previewMode &&
+    submitMode === "open-ticketing" &&
+    flowConfig?.allows_coupons
       ? initialPromoCode?.trim().toUpperCase() || null
       : null
 
@@ -1103,7 +1163,7 @@ export function CheckoutProvider({
   // Insurance calculations
   const { insurancePotentialAmount, insuranceAmount } = useInsuranceCalculation(
     {
-      popup: city,
+      popup: flowConfig,
       selectedPasses,
       housing,
       merch,
@@ -1210,19 +1270,19 @@ export function CheckoutProvider({
   const preFeeAmount =
     discountedProductsAmount + nonDiscountableProductsSubtotal
 
-  // Contribution fee — derived from popup config (mandatory when enabled).
-  // The popup is the single source of truth for the rate; there is no buyer
-  // opt-in toggle. We calculate client-side from popup.contribution_percentage
+  // Contribution fee — derived from the flow's config (mandatory when enabled).
+  // The flow is the single source of truth for the rate; there is no buyer
+  // opt-in toggle. We calculate client-side from contribution_percentage
   // so the summary line renders before submit (transparency requirement).
   // Base mirrors backend: % of pre_fee_amount (post-discount standard + non
   // discountable). Zero when there is nothing being charged for products.
   const contributionAmount = useMemo<number>(() => {
-    if (!city?.contribution_enabled) return 0
+    if (!flowConfig?.contribution_enabled) return 0
     if (preFeeAmount <= 0) return 0
-    const pct = Number(city.contribution_percentage)
+    const pct = Number(flowConfig.contribution_percentage)
     if (Number.isNaN(pct) || pct <= 0) return 0
     return Math.round(((preFeeAmount * pct) / 100) * 100) / 100
-  }, [city, preFeeAmount])
+  }, [flowConfig, preFeeAmount])
 
   // Cart summary
   const { summary } = useCartSummary({
@@ -1273,7 +1333,7 @@ export function CheckoutProvider({
 
   // Loading states
   const isLoading = promoIsLoading
-  const error = promoError
+  const error = flowConfigError ?? promoError
 
   // Restore current step from saved cart (after availableSteps is ready).
   // Uses a ref to capture the initial cart step — ignores subsequent saveCart() updates
@@ -1605,7 +1665,7 @@ export function CheckoutProvider({
   ])
 
   // Submit payment (consolidated via usePaymentSubmit)
-  const { submitPayment, isSubmitting } = usePaymentSubmit({
+  const paymentSubmission = usePaymentSubmit({
     applicationId: application?.id,
     popupId: cityId,
     popupSlug: submitPopupSlug ?? city?.slug ?? null,
@@ -1655,6 +1715,20 @@ export function CheckoutProvider({
           }
         : null,
   })
+  const { submitPayment: submitResolvedPayment, isSubmitting } =
+    paymentSubmission
+
+  // Defence in depth: even a direct submit call must not create a payment
+  // before the buyer has seen the flow's actual fees. Preview remains inert.
+  const submitPayment = useCallback(async () => {
+    if (!previewMode && flowConfig === null) {
+      return {
+        success: false,
+        error: flowConfigError ?? t("checkout.config_loading"),
+      }
+    }
+    return submitResolvedPayment()
+  }, [previewMode, flowConfig, flowConfigError, t, submitResolvedPayment])
 
   const value: CheckoutContextValue = {
     checkoutMode: checkoutPolicy.checkoutMode,
@@ -1663,6 +1737,9 @@ export function CheckoutProvider({
     stepConfigs: configuredSteps,
     salesFlowId: salesFlowId ?? null,
     salesFlowSlug: salesFlowSlug ?? null,
+    flowConfig,
+    flowConfigError,
+    retryFlowConfig,
     cart,
     summary,
     allProducts: products,

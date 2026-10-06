@@ -30,6 +30,7 @@ from app.api.sales_flow.eligibility import (
     assert_application_flow_eligible,
     assert_upsale_eligible,
 )
+from app.api.sales_flow.resolver import build_checkout_config
 from app.api.ticketing_step.crud import ticketing_steps_crud
 from app.api.ticketing_step.models import TicketingSteps
 from app.api.ticketing_step.schemas import TicketingStepPublic
@@ -343,6 +344,7 @@ def runtime_for_slug(
 
     return CheckoutRuntimeResponse(
         selected_flow=selected_flow(flow),
+        checkout_config=build_checkout_config(flow),
         flow_type=flow.type,
         theme_config=flow.theme_config,
         popup=PopupPublic.model_validate(popup_data),

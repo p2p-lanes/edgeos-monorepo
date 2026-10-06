@@ -11,10 +11,12 @@ from app.api.sales_flow.application_defaults import seed_application_defaults
 from app.api.sales_flow.crud import START_FRESH
 from app.api.sales_flow.models import SalesFlows
 from app.api.sales_flow.readiness import flow_readiness
+from app.api.sales_flow.resolver import build_checkout_config
 from app.api.sales_flow.schemas import (
     EFFECTIVE_CONFIG_FIELDS,
     FlowSettingsByType,
     FlowStartPreview,
+    SalesFlowCheckoutConfig,
     SalesFlowCreate,
     SalesFlowPortalPublic,
     SalesFlowPublic,
@@ -111,6 +113,33 @@ async def list_portal_direct_sales_flows(
         results=[_portal_flow_public(db, flow) for flow in flows],
         paging=Paging(offset=0, limit=len(flows), total=len(flows)),
     )
+
+
+@router.get("/portal/checkout-config", response_model=SalesFlowCheckoutConfig)
+async def get_portal_checkout_config(
+    db: HumanTenantSession,
+    _: CurrentHuman,
+    popup_id: uuid.UUID,
+    sales_flow_id: uuid.UUID | None = None,
+) -> SalesFlowCheckoutConfig:
+    """The settings a door's checkout screen renders from (Portal).
+
+    Names the flow the same way the portal ticketing steps do: the requested
+    one, which must belong to this popup, or the popup's default flow when
+    omitted. The anonymous checkout gets the same object inside its runtime.
+    """
+    if sales_flow_id is None:
+        flow = crud.sales_flows_crud.get_default_flow(db, popup_id)
+    else:
+        flow = crud.sales_flows_crud.get(db, sales_flow_id)
+        if flow is not None and flow.popup_id != popup_id:
+            flow = None
+    if flow is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Sales flow not found for this popup",
+        )
+    return build_checkout_config(flow)
 
 
 def _raise_on_default_conflict(exc: IntegrityError) -> NoReturn:

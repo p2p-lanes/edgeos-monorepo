@@ -2,6 +2,7 @@ import uuid
 from decimal import Decimal
 from io import BytesIO
 
+import pytest
 from fastapi.testclient import TestClient
 from openpyxl import load_workbook
 from sqlmodel import Session
@@ -13,9 +14,10 @@ from app.api.human.models import Humans
 from app.api.payment.models import Payments
 from app.api.payment.schemas import PaymentStatus
 from app.api.popup.models import Popups
+from app.api.shared.enums import HumanRating
 from app.api.tenant.models import Tenants
 from app.api.user.models import Users
-from app.core.security import create_access_token
+from app.core.security import ADMIN_API_KEY_SCOPES, create_access_token
 from tests._flow_helpers import application_flow_id
 
 
@@ -154,3 +156,117 @@ def test_preview_and_download_cross_resource_xlsx(
         "Application status,Applicant email,Attendee count,Approved payment total"
     )
     assert csv_lines[1] == f"accepted,{human.email},1,125.50"
+
+
+@pytest.fixture
+def rating_export(db: Session, tenant_a: Tenants):
+    human = Humans(
+        tenant_id=tenant_a.id,
+        email=f"rating-export-{uuid.uuid4().hex}@test.com",
+        rating=HumanRating.RED_FLAG,
+    )
+    db.add(human)
+    db.commit()
+    db.refresh(human)
+    spec = {
+        "dataset": "humans",
+        "columns": [{"field": "human.email"}, {"field": "human.rating"}],
+        "filters": [{"field": "human.id", "operator": "eq", "value": str(human.id)}],
+        "format": "csv",
+    }
+    return human, spec
+
+
+@pytest.mark.parametrize(
+    "token_fixture",
+    ["admin_token_tenant_a", "operator_token_tenant_a", "superadmin_token"],
+)
+def test_authorized_jwts_can_export_ratings(
+    client: TestClient, tenant_a: Tenants, rating_export, request, token_fixture
+) -> None:
+    human, spec = rating_export
+    headers = {
+        "Authorization": f"Bearer {request.getfixturevalue(token_fixture)}",
+        "X-Tenant-Id": str(tenant_a.id),
+    }
+    assert (
+        client.get("/api/v1/custom-exports/catalog", headers=headers).status_code == 200
+    )
+    response = client.post("/api/v1/custom-exports/preview", headers=headers, json=spec)
+    assert response.status_code == 200, response.text
+    preview = response.json()
+    assert preview["estimated_rows"] == 1
+    response = client.post(
+        "/api/v1/custom-exports/download",
+        headers=headers,
+        json={"spec": preview["spec"], "fingerprint": preview["fingerprint"]},
+    )
+    assert response.status_code == 200, response.text
+    assert response.content.decode("utf-8-sig").splitlines() == [
+        "Email,Rating",
+        f"{human.email},red_flag",
+    ]
+
+
+@pytest.mark.parametrize(
+    "scopes", [["events:read"], ["humans:read"], sorted(ADMIN_API_KEY_SCOPES)]
+)
+def test_api_keys_cannot_access_exports_even_with_valid_jwt_fingerprint(
+    client: TestClient,
+    tenant_a: Tenants,
+    admin_user_tenant_a: Users,
+    admin_api_key_factory,
+    rating_export,
+    scopes,
+) -> None:
+    _, spec = rating_export
+    response = client.post(
+        "/api/v1/custom-exports/preview",
+        headers=_headers(admin_user_tenant_a, tenant_a),
+        json=spec,
+    )
+    assert response.status_code == 200, response.text
+    preview = response.json()
+    _, raw_key = admin_api_key_factory(scopes)
+    headers = {"Authorization": f"Bearer {raw_key}"}
+    responses = [
+        client.get("/api/v1/custom-exports/catalog", headers=headers),
+        client.post("/api/v1/custom-exports/preview", headers=headers, json=spec),
+        client.post(
+            "/api/v1/custom-exports/download",
+            headers=headers,
+            json={"spec": preview["spec"], "fingerprint": preview["fingerprint"]},
+        ),
+    ]
+    for response in responses:
+        assert response.status_code == 403, response.text
+        assert response.json()["detail"] == (
+            "This endpoint requires a JWT session; API keys are not accepted."
+        )
+
+
+@pytest.mark.parametrize(
+    "caller",
+    ["viewer_token_tenant_a", "check_in_controller_token_tenant_a", "human"],
+)
+def test_non_administrative_jwts_cannot_access_exports(
+    client: TestClient, tenant_a: Tenants, rating_export, request, caller
+) -> None:
+    human, spec = rating_export
+    token = (
+        create_access_token(subject=human.id, token_type="human")
+        if caller == "human"
+        else request.getfixturevalue(caller)
+    )
+    headers = {"Authorization": f"Bearer {token}", "X-Tenant-Id": str(tenant_a.id)}
+    responses = [
+        client.get("/api/v1/custom-exports/catalog", headers=headers),
+        client.post("/api/v1/custom-exports/preview", headers=headers, json=spec),
+        client.post(
+            "/api/v1/custom-exports/download",
+            headers=headers,
+            json={"spec": spec, "fingerprint": "unauthorized-fingerprint"},
+        ),
+    ]
+    for response in responses:
+        assert response.status_code == 403, response.text

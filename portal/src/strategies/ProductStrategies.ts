@@ -157,7 +157,8 @@ class WeekProductStrategy implements ProductStrategy {
     return products.find((p) => p.duration_type === "month")
   }
 
-  // Threshold: with scope, all weeks in that scope; without, legacy "4 weeks".
+  // Threshold: all weeks in the visible scope, or all attendee weeks when the
+  // caller doesn't provide a scope. Some gatherings sell fewer than four weeks.
   protected weeksInScopeCount(
     products: ProductsPass[],
     scopeIds: string[] | undefined,
@@ -167,7 +168,7 @@ class WeekProductStrategy implements ProductStrategy {
         (p) => p.duration_type === "week" && scopeIds.includes(p.id),
       ).length
     }
-    return 4
+    return products.filter((p) => p.duration_type === "week").length
   }
 
   protected shouldSelectMonth(
@@ -446,7 +447,8 @@ class EditProductStrategy implements ProductStrategy {
     ).length
   }
 
-  // Threshold: with scope, all weeks in that scope; without, legacy "4 weeks".
+  // Threshold: all weeks in the visible scope, or all attendee weeks when the
+  // caller doesn't provide a scope. Some gatherings sell fewer than four weeks.
   private weeksThreshold(
     products: ProductsPass[],
     scopeIds: string[] | undefined,
@@ -456,7 +458,7 @@ class EditProductStrategy implements ProductStrategy {
         (p) => p.duration_type === "week" && scopeIds.includes(p.id),
       ).length
     }
-    return 4
+    return products.filter((p) => p.duration_type === "week").length
   }
 
   // Collapse the weekly/day passes into the month: select the month, give up

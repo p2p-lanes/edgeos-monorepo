@@ -26,6 +26,7 @@ from app.api.sales_flow.models import SalesFlows
 from app.api.sales_flow.schemas import (
     EFFECTIVE_CONFIG_FIELDS,
     EffectiveFlowConfig,
+    SalesFlowCheckoutConfig,
     SalesFlowType,
 )
 from app.api.shared.enums import SaleType
@@ -196,3 +197,22 @@ def config_for(
     if flow is None:
         return EffectiveFlowConfig(**dict.fromkeys(EFFECTIVE_CONFIG_FIELDS))
     return build_effective_config(flow)
+
+
+def build_checkout_config(flow: SalesFlows) -> SalesFlowCheckoutConfig:
+    """The buyer-facing slice of the flow's configuration.
+
+    Unset toggles come back off, because that is how the coupon and payment
+    paths read them: showing a field the server will refuse is the bug this
+    exists to fix.
+    """
+    config = build_effective_config(flow)
+    return SalesFlowCheckoutConfig(
+        allows_coupons=bool(config.allows_coupons),
+        insurance_enabled=bool(config.insurance_enabled),
+        insurance_percentage=config.insurance_percentage,
+        contribution_enabled=bool(config.contribution_enabled),
+        contribution_percentage=config.contribution_percentage,
+        contribution_label=config.contribution_label,
+        contribution_description=config.contribution_description,
+    )

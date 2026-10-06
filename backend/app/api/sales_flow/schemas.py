@@ -486,6 +486,30 @@ class SalesFlowPortalPublic(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
+class SalesFlowCheckoutConfig(BaseModel):
+    """What a door's checkout screen needs to know about its own settings.
+
+    The portal used to read these off `PopupPublic`, whose columns stopped
+    being edited once each flow owned its configuration (slice 7). The
+    checkout then offered a promo code field on a door with coupons off, and
+    quoted an insurance or contribution line the payment would not charge.
+
+    An allowlist like `SalesFlowPortalPublic`: every field is something the
+    buyer sees on the confirm step anyway. Never widen this to the whole
+    `EffectiveFlowConfig`, which carries `open_checkout_signing_secret`.
+    Unset values read as off, matching how the payment and coupon paths treat
+    them.
+    """
+
+    allows_coupons: bool = False
+    insurance_enabled: bool = False
+    insurance_percentage: Decimal | None = None
+    contribution_enabled: bool = False
+    contribution_percentage: Decimal | None = None
+    contribution_label: str | None = None
+    contribution_description: str | None = None
+
+
 class SalesFlowReadiness(BaseModel):
     """What a flow is missing before it can sell
     (sdd/sales-flows-rediseno slice 8).

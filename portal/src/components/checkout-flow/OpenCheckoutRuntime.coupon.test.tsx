@@ -62,8 +62,8 @@ const runtime = {
     id: "popup-1",
     name: "Festival",
     currency: "USD",
-    allows_coupons: true,
   },
+  checkout_config: { allows_coupons: true },
   products: [],
   selected_flow: { id: "flow-friends", slug: "friends" },
   flow_type: "direct",
@@ -92,6 +92,7 @@ describe("OpenCheckoutRuntime coupon URL wiring", () => {
       discount_value: "20",
     } as never)
     const props = renderRuntime()
+    expect(props.checkoutConfigOverride).toEqual({ allows_coupons: true })
     expect(props.initialPromoCode).toBe("FRIENDS+20")
     expect(await props.validatePromoCodeOverride!("FRIENDS+20")).toBe(20)
     expect(CouponsService.validateCouponPublic).toHaveBeenCalledWith({

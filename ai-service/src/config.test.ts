@@ -10,7 +10,7 @@ describe("loadConfig", () => {
 
     expect(config.provider).toBe("openai")
     expect(config.openaiApiKey).toBe("openai-key")
-    expect(config.model).toBe("gpt-5.6-terra")
+    expect(config.model).toBe("gpt-6-luna")
   })
 
   it("preserves Gemini as the default for existing installations", () => {
