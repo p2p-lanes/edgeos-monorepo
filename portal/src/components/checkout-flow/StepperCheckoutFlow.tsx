@@ -12,6 +12,7 @@ import { imageOptimization } from "@/lib/image-optimization"
 import { useCheckout } from "@/providers/checkoutProvider"
 import { useCityProvider } from "@/providers/cityProvider"
 import { formatCurrency } from "@/types/checkout"
+import CheckoutConfigError from "./CheckoutConfigError"
 import CheckoutToast from "./CheckoutToast"
 import DynamicProductStep from "./DynamicProductStep"
 import { deriveCheckoutSections } from "./deriveCheckoutSections"
@@ -256,6 +257,7 @@ export default function StepperCheckoutFlow({
     submitPayment,
     isInitialLoading,
     previewMode,
+    flowConfigError,
     markStepVisited,
     hasAnyCartItems,
     summary,
@@ -456,6 +458,7 @@ export default function StepperCheckoutFlow({
   )
 
   if (isInitialLoading) return <Loader />
+  if (flowConfigError) return <CheckoutConfigError />
 
   const current = sections[active]
   const isLast = active === last
