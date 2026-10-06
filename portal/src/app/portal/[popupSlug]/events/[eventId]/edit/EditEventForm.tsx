@@ -48,6 +48,8 @@ import { useEditEventForm } from "./useEditEventForm"
 
 interface EditEventFormProps {
   event: EventPublic
+  occurrenceStart: string | null
+  editScope: "series" | "occurrence"
   popupId: string
   citySlug: string
   cityName: string
@@ -57,6 +59,8 @@ interface EditEventFormProps {
 
 export function EditEventForm({
   event,
+  occurrenceStart,
+  editScope,
   popupId,
   citySlug,
   cityName,
@@ -119,8 +123,14 @@ export function EditEventForm({
   // events, so depending on event.id is unnecessary here.
   const initialSchedule = useMemo(() => {
     const eventTz = event.timezone || displayTz
-    const startDate = new Date(event.start_time)
-    const endDate = new Date(event.end_time)
+    const startDate = new Date(
+      editScope === "occurrence"
+        ? (occurrenceStart ?? event.start_time)
+        : event.start_time,
+    )
+    const masterDuration =
+      new Date(event.end_time).getTime() - new Date(event.start_time).getTime()
+    const endDate = new Date(startDate.getTime() + masterDuration)
     const minutes = Math.max(
       1,
       Math.round((endDate.getTime() - startDate.getTime()) / 60_000),
@@ -130,7 +140,14 @@ export function EditEventForm({
       initialTimeStr: formatHhmmInTz(startDate, eventTz),
       initialDurationMinutes: minutes,
     }
-  }, [event.timezone, event.start_time, event.end_time, displayTz])
+  }, [
+    event.timezone,
+    event.start_time,
+    event.end_time,
+    displayTz,
+    occurrenceStart,
+    editScope,
+  ])
 
   const {
     dateStr,
@@ -184,16 +201,26 @@ export function EditEventForm({
   })
 
   const updateMutation = useMutation({
-    mutationFn: (payload: EventUpdate) =>
-      EventsService.updatePortalEvent({
-        eventId: event.id,
+    mutationFn: async ({ payload }: { payload: EventUpdate }) => {
+      const targetId =
+        editScope === "occurrence" && occurrenceStart
+          ? (
+              await EventsService.detachPortalOccurrence({
+                eventId: event.id,
+                requestBody: { occurrence_start: occurrenceStart },
+              })
+            ).id
+          : event.id
+      return EventsService.updatePortalEvent({
+        eventId: targetId,
         requestBody: payload,
-      }),
-    onSuccess: () => {
+      })
+    },
+    onSuccess: (updatedEvent) => {
       toast.success(t("events.form.event_updated_success"))
       queryClient.invalidateQueries({ queryKey: ["portal-event"] })
       queryClient.invalidateQueries({ queryKey: ["portal-events"] })
-      router.push(`/portal/${citySlug}/events/${event.id}`)
+      router.push(`/portal/${citySlug}/events/${updatedEvent.id}`)
     },
     onError: (err) => {
       const msg =
@@ -232,12 +259,16 @@ export function EditEventForm({
     availability !== "checking" &&
     !updateMutation.isPending
 
+  const save = () => {
+    updateMutation.mutate({
+      payload: form.buildPayload(timezone || "UTC", startIso, endIso),
+    })
+  }
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     if (!canSubmit) return
-    updateMutation.mutate(
-      form.buildPayload(timezone || "UTC", startIso, endIso),
-    )
+    save()
   }
 
   const eventDetailHref = `/portal/${citySlug}/events/${event.id}`
