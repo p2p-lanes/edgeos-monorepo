@@ -152,16 +152,37 @@ def test_admin_api_keys_cannot_read_or_modify_popup_configuration(
 
 
 def test_scanner_popup_reads_are_tenant_scoped(
-    client, configured_popup, popup_tenant_b, check_in_controller_token_tenant_a
+    client, db, tenant_a, tenant_b, check_in_controller_token_tenant_a
 ):
+    # The full suite shares a DB: search unique data rather than assuming our
+    # popup is on the first page. Both tenants must match the search so filtering
+    # cannot conceal a broken tenant boundary.
+    name = f"Scanner tenant isolation {uuid.uuid4().hex}"
+    own_popup = Popups(
+        tenant_id=tenant_a.id, name=name, slug=f"scanner-own-{uuid.uuid4().hex}"
+    )
+    foreign_popup = Popups(
+        tenant_id=tenant_b.id, name=name, slug=f"scanner-foreign-{uuid.uuid4().hex}"
+    )
+    db.add_all([own_popup, foreign_popup])
+    db.commit()
+    db.refresh(own_popup)
+    db.refresh(foreign_popup)
+
     auth = headers(check_in_controller_token_tenant_a)
-    response = client.get(f"/api/v1/popups/check-in/{popup_tenant_b.id}", headers=auth)
+    response = client.get(f"/api/v1/popups/check-in/{foreign_popup.id}", headers=auth)
     assert response.status_code == 404, response.text
-    response = client.get("/api/v1/popups/check-in/list", headers=auth)
+    response = client.get(f"/api/v1/popups/check-in/{own_popup.id}", headers=auth)
+    assert response.status_code == 200, response.text
+    assert response.json()["id"] == str(own_popup.id)
+    response = client.get(
+        "/api/v1/popups/check-in/list", headers=auth, params={"search": name}
+    )
     assert response.status_code == 200, response.text
     ids = {r["id"] for r in response.json()["results"]}
-    assert str(configured_popup.id) in ids
-    assert str(popup_tenant_b.id) not in ids
+    assert ids == {str(own_popup.id)}
+    assert str(foreign_popup.id) not in ids
+    assert response.json()["paging"]["total"] == 1
 
 
 def test_public_and_human_sessions_cannot_use_backoffice_popup_routes(
