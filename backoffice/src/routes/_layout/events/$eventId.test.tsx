@@ -94,7 +94,7 @@ beforeEach(() => {
   mocks.participants.mockResolvedValue({ results: [] })
 })
 
-describe("backoffice occurrence detail", () => {
+describe("backoffice participants by occurrence", () => {
   it("keeps the current participants and attendance scoped when all other rosters are shown", async () => {
     mocks.getEvent.mockResolvedValue({
       id: "event-1",
@@ -104,7 +104,6 @@ describe("backoffice occurrence detail", () => {
       end_time: "2031-03-03T11:00:00Z",
       timezone: "UTC",
       rrule: "FREQ=DAILY;COUNT=3",
-      resolved_occurrence_start: FIRST,
       attendee_count: 1,
       status: "published",
       visibility: "public",
@@ -115,7 +114,6 @@ describe("backoffice occurrence detail", () => {
       timezone: "UTC",
       window_start: FIRST,
       window_end: "2031-03-06T10:00:00Z",
-      outside_schedule: [],
       occurrences: [
         {
           event_id: "event-1",
@@ -155,6 +153,7 @@ describe("backoffice occurrence detail", () => {
     expect(mocks.participants).toHaveBeenCalledWith({
       eventId: "event-1",
       occurrenceStart: SECOND,
+      scopeToOccurrence: true,
     })
   })
 
@@ -166,7 +165,6 @@ describe("backoffice occurrence detail", () => {
       start_time: FIRST,
       end_time: "2031-03-03T11:00:00Z",
       timezone: "UTC",
-      resolved_occurrence_start: null,
       rrule: null,
       status: "published",
       visibility: "public",
@@ -184,32 +182,48 @@ describe("backoffice occurrence detail", () => {
   it.each([
     undefined,
     SECOND,
-  ])("uses the API-resolved occurrence when occ is %s", async (occ) => {
+  ])("selects the roster in the frontend without changing raw event reads when occ is %s", async (occ) => {
     mocks.occ = occ
     const selected = occ ?? FIRST
     mocks.getEvent.mockResolvedValue({
       id: "event-1",
       popup_id: "popup-1",
       title: "Recurring class",
-      start_time: selected,
-      end_time: selected.replace("10:00", "11:00"),
+      start_time: FIRST,
+      end_time: "2031-03-03T11:00:00Z",
       timezone: "UTC",
       rrule: "FREQ=DAILY;COUNT=3",
-      resolved_occurrence_start: selected,
-      attendee_count: 3,
+      attendee_count: 99,
       status: "published",
       visibility: "public",
+    })
+    mocks.participants.mockResolvedValue({
+      results: [
+        {
+          id: "1",
+          first_name: "Maria",
+          status: "registered",
+          role: "attendee",
+        },
+        {
+          id: "2",
+          first_name: "Bruno",
+          status: "checked_in",
+          role: "attendee",
+        },
+        { id: "3", first_name: "Pablo", status: "cancelled", role: "attendee" },
+      ],
     })
     renderPage()
     await waitFor(() =>
       expect(mocks.participants).toHaveBeenCalledWith({
         eventId: "event-1",
         occurrenceStart: selected,
+        scopeToOccurrence: true,
       }),
     )
     expect(mocks.getEvent).toHaveBeenCalledWith({
       eventId: "event-1",
-      occurrenceStart: occ,
     })
     expect(mocks.attendance.mock.calls.at(-1)?.[0]).toEqual(
       expect.objectContaining({ occurrenceStart: selected }),
@@ -218,6 +232,8 @@ describe("backoffice occurrence detail", () => {
     expect(screen.getAllByText(new RegExp(expectedDay)).length).toBeGreaterThan(
       0,
     )
-    expect(screen.getByText("3")).toBeTruthy()
+    expect(await screen.findByText("2")).toBeTruthy()
+    expect(screen.queryByText("99")).toBeNull()
+    expect(screen.queryByText("Pablo")).toBeNull()
   })
 })

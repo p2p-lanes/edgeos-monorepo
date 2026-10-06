@@ -2761,7 +2761,6 @@ export type EventPublic = {
     updated_at?: string;
     id: string;
     occurrence_id?: (string | null);
-    resolved_occurrence_start?: (string | null);
     venue_title?: (string | null);
     venue_location?: (string | null);
     venue_image_url?: (string | null);
@@ -2856,16 +2855,6 @@ export type EventSeriesSummary = {
     window_start: string;
     window_end: string;
     occurrences: Array<EventSeriesOccurrence>;
-    outside_schedule: Array<EventSeriesUnscheduledRsvps>;
-};
-
-export type EventSeriesUnscheduledRsvps = {
-    event_id: string;
-    occurrence_start: (string | null);
-    title: string;
-    timezone: string;
-    attendee_count: number;
-    participants: Array<EventParticipantPublic>;
 };
 
 /**
@@ -8134,6 +8123,7 @@ export type EventParticipantsListParticipantsData = {
      */
     limit?: number;
     occurrenceStart?: (string | null);
+    scopeToOccurrence?: boolean;
     /**
      * Number of items to skip
      */
@@ -8357,7 +8347,6 @@ export type EventsListEventHostsResponse = (Array<EventHostOption>);
 
 export type EventsGetEventData = {
     eventId: string;
-    occurrenceStart?: (string | null);
     xTenantId?: (string | null);
 };
 
@@ -8379,10 +8368,7 @@ export type EventsDeleteEventData = {
 export type EventsDeleteEventResponse = (void);
 
 export type EventsGetEventSeriesSummaryData = {
-    anchor?: (string | null);
     eventId: string;
-    windowEnd?: (string | null);
-    windowStart?: (string | null);
     xTenantId?: (string | null);
 };
 

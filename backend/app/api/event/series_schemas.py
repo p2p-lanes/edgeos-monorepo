@@ -1,4 +1,4 @@
-"""Read-only backoffice projections of an event series."""
+"""Read-only projections for the backoffice's participants-by-date view."""
 
 import uuid
 from datetime import datetime
@@ -6,7 +6,6 @@ from datetime import datetime
 from pydantic import BaseModel
 
 from app.api.event.schemas import EventStatus
-from app.api.event_participant.schemas import EventParticipantPublic
 
 
 class EventSeriesOccurrence(BaseModel):
@@ -21,15 +20,6 @@ class EventSeriesOccurrence(BaseModel):
     attendee_count: int
 
 
-class EventSeriesUnscheduledRsvps(BaseModel):
-    event_id: uuid.UUID
-    occurrence_start: datetime | None
-    title: str
-    timezone: str
-    attendee_count: int
-    participants: list[EventParticipantPublic]
-
-
 class EventSeriesSummary(BaseModel):
     series_id: uuid.UUID
     series_title: str
@@ -37,4 +27,3 @@ class EventSeriesSummary(BaseModel):
     window_start: datetime
     window_end: datetime
     occurrences: list[EventSeriesOccurrence]
-    outside_schedule: list[EventSeriesUnscheduledRsvps]

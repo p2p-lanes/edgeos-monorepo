@@ -1,21 +1,18 @@
-"""Detail dates, participant lists and counters must describe one occurrence."""
+"""Occurrence roster reads must not change event or registration behavior."""
 
 import uuid
 from datetime import UTC, datetime, timedelta
 
 import pytest
-from fastapi.testclient import TestClient
 from sqlmodel import Session
 
 from app.api.event.models import Events
 from app.api.event.schemas import EventStatus, EventVisibility
-from app.api.event_participant.crud import event_participants_crud
 from app.api.event_participant.models import EventParticipants
 from app.api.event_participant.schemas import ParticipantStatus
 from app.api.human.models import Humans
 from app.api.popup.models import Popups
 from app.api.tenant.models import Tenants
-from app.core.security import create_access_token
 
 
 @pytest.fixture
@@ -71,280 +68,176 @@ def series(db: Session, tenant_a: Tenants):
     return event, humans, start
 
 
-def human_headers(human: Humans):
-    token = create_access_token(subject=human.id, token_type="human")
-    return {"Authorization": f"Bearer {token}"}
+def roster(client, event, token, **params):
+    return client.get(
+        "/api/v1/event-participants",
+        headers={"Authorization": f"Bearer {token}"},
+        params={"event_id": str(event.id), **params},
+    )
 
 
-def parse_date(value: str):
-    return datetime.fromisoformat(value.replace("Z", "+00:00"))
-
-
-@pytest.mark.parametrize("surface", ["admin", "portal"])
-@pytest.mark.parametrize("selected_day", [None, 0, 1, 2])
-def test_detail_resolves_dates_count_and_rsvp(
-    client: TestClient, series, admin_token_tenant_a: str, surface, selected_day
+def test_admin_rosters_filter_by_date_and_preserve_unscoped_listing(
+    client, series, admin_token_tenant_a
 ):
-    event, humans, start = series
-    day = selected_day or 0
-    occurrence = start + timedelta(days=day)
-    path = (
-        f"/api/v1/events/{event.id}"
-        if surface == "admin"
-        else f"/api/v1/events/portal/events/{event.id}"
-    )
-    headers = (
-        {"Authorization": f"Bearer {admin_token_tenant_a}"}
-        if surface == "admin"
-        else human_headers(humans[0])
-    )
-    response = client.get(
-        path,
-        headers=headers,
-        params={}
-        if selected_day is None
-        else {"occurrence_start": occurrence.isoformat()},
-    )
-    assert response.status_code == 200, response.text
-    body = response.json()
-    assert parse_date(body["resolved_occurrence_start"]) == occurrence
-    assert parse_date(body["start_time"]) == occurrence
-    assert parse_date(body["end_time"]) == occurrence + timedelta(hours=1)
-    assert body["attendee_count"] == [1, 2, 0][day]
-    if surface == "portal":
-        assert body["my_rsvp_status"] == ("registered" if day < 2 else None)
-
-
-@pytest.mark.parametrize("surface", ["admin", "portal"])
-def test_participants_scoped_and_legacy_series_listing(
-    client: TestClient, series, admin_token_tenant_a: str, surface
-):
-    event, humans, start = series
-    headers = (
-        {"Authorization": f"Bearer {admin_token_tenant_a}"}
-        if surface == "admin"
-        else human_headers(humans[0])
-    )
-    path = (
-        "/api/v1/event-participants"
-        if surface == "admin"
-        else "/api/v1/event-participants/portal/participants"
-    )
+    event, _, start = series
     for params, expected in [
         ({}, 4),
         ({"occurrence_start": start.isoformat()}, 1),
         ({"occurrence_start": (start + timedelta(days=1)).isoformat()}, 3),
         ({"occurrence_start": (start + timedelta(days=2)).isoformat()}, 0),
     ]:
-        response = client.get(
-            path,
-            headers=headers,
-            params={"event_id": str(event.id), **params},
-        )
+        response = roster(client, event, admin_token_tenant_a, **params)
         assert response.status_code == 200, response.text
         assert response.json()["paging"]["total"] == expected
         assert len(response.json()["results"]) == expected
 
 
-@pytest.mark.parametrize("surface", ["admin", "portal"])
-def test_list_counts_each_occurrence_not_the_series(
-    client: TestClient, series, admin_token_tenant_a: str, surface
+def test_occurrence_roster_pagination_and_offset_normalization(
+    client, series, admin_token_tenant_a
 ):
-    event, humans, start = series
-    response = client.get(
-        "/api/v1/events" if surface == "admin" else "/api/v1/events/portal/events",
-        headers=(
-            {"Authorization": f"Bearer {admin_token_tenant_a}"}
-            if surface == "admin"
-            else human_headers(humans[0])
-        ),
-        params={
-            "popup_id": str(event.popup_id),
-            "start_after": start.isoformat(),
-            "start_before": (start + timedelta(days=3)).isoformat(),
-        },
-    )
-    assert response.status_code == 200, response.text
-    rows = response.json()["results"]
-    assert len(rows) == 3
-    assert [r["attendee_count"] for r in rows] == [1, 2, 0]
+    event, _, _ = series
+    params = {"occurrence_start": "2031-03-04T15:30:00+05:30", "limit": 2}
+    first = roster(client, event, admin_token_tenant_a, **params).json()
+    second = roster(client, event, admin_token_tenant_a, skip=2, **params).json()
+    assert first["paging"]["total"] == second["paging"]["total"] == 3
+    assert len(first["results"]) == 2
+    assert len(second["results"]) == 1
+    assert not {p["id"] for p in first["results"]} & {
+        p["id"] for p in second["results"]
+    }
 
 
-def test_excluding_host_does_not_scope_series_to_null(db: Session, series):
-    event, humans, _ = series
-    rows, total = event_participants_crud.find_by_event(
-        db, event.id, exclude_profile_id=humans[0].id
-    )
-    assert total == 2
-    assert {r.profile_id for r in rows} == {humans[1].id, humans[2].id}
-
-
-def test_host_excluded_from_occurrence_count_and_lists(
-    client: TestClient, db: Session, series, admin_token_tenant_a: str
+def test_host_exclusion_is_only_applied_to_explicit_occurrence_reads(
+    client, db, series, admin_token_tenant_a
 ):
     event, humans, start = series
     event.host_id = humans[0].id
     db.add(event)
     db.commit()
-    occurrence = start + timedelta(days=1)
-    for surface in ["admin", "portal"]:
-        prefix = (
-            "/api/v1/events" if surface == "admin" else "/api/v1/events/portal/events"
-        )
-        participants = (
-            "/api/v1/event-participants"
-            if surface == "admin"
-            else "/api/v1/event-participants/portal/participants"
-        )
-        headers = (
-            {"Authorization": f"Bearer {admin_token_tenant_a}"}
-            if surface == "admin"
-            else human_headers(humans[0])
-        )
-        params = {"occurrence_start": occurrence.isoformat()}
-        detail = client.get(f"{prefix}/{event.id}", headers=headers, params=params)
-        assert detail.status_code == 200, detail.text
-        assert detail.json()["attendee_count"] == 1
-        listing = client.get(
-            participants, headers=headers, params={"event_id": str(event.id), **params}
-        )
-        assert listing.status_code == 200, listing.text
-        assert str(humans[0].id) not in {
-            r["profile_id"] for r in listing.json()["results"]
-        }
+    selected = roster(
+        client,
+        event,
+        admin_token_tenant_a,
+        occurrence_start=(start + timedelta(days=1)).isoformat(),
+    ).json()
+    assert {p["profile_id"] for p in selected["results"]} == {
+        str(humans[1].id),
+        str(humans[2].id),
+    }
+    # Default administrative listing is intentionally unchanged.
+    assert roster(client, event, admin_token_tenant_a).json()["paging"]["total"] == 4
 
 
-@pytest.mark.parametrize(
-    "date", ["2031-03-10T10:00:00Z", "2031-03-03T11:00:00Z", "2031-03-03T10:00:00"]
-)
-def test_invalid_detail_occurrence_rejected(
-    client: TestClient, series, admin_token_tenant_a: str, date
-):
-    event, humans, _ = series
-    for path, headers in [
-        (
-            f"/api/v1/events/{event.id}",
-            {"Authorization": f"Bearer {admin_token_tenant_a}"},
-        ),
-        (f"/api/v1/events/portal/events/{event.id}", human_headers(humans[0])),
-        (
-            "/api/v1/event-participants",
-            {"Authorization": f"Bearer {admin_token_tenant_a}"},
-        ),
-        ("/api/v1/event-participants/portal/participants", human_headers(humans[0])),
-        ("/api/v1/event-participants/portal/attendee-emails", human_headers(humans[0])),
-    ]:
-        response = client.get(
-            path,
-            headers=headers,
-            params={"event_id": str(event.id), "occurrence_start": date},
-        )
-        assert response.status_code == 400, response.text
-
-
-def test_detached_child_owns_portal_rsvp_and_my_events(
-    client: TestClient, db: Session, series, tenant_a: Tenants
+def test_detached_roster_can_explicitly_select_null_without_remapping_rows(
+    client, db, series, admin_token_tenant_a
 ):
     master, humans, start = series
     child = Events(
-        tenant_id=tenant_a.id,
+        tenant_id=master.tenant_id,
         popup_id=master.popup_id,
-        owner_id=humans[0].id,
-        title="Detached instance",
-        start_time=start + timedelta(days=4),
-        end_time=start + timedelta(days=4, hours=1),
-        timezone="UTC",
+        owner_id=master.owner_id,
+        host_id=humans[0].id,
         recurrence_master_id=master.id,
-        status=EventStatus.PUBLISHED,
-        visibility=EventVisibility.PUBLIC,
+        title="Detached",
+        start_time=start,
+        end_time=start + timedelta(hours=1),
     )
     db.add(child)
     db.flush()
-    db.add(
+    rows = [
         EventParticipants(
-            tenant_id=tenant_a.id,
+            tenant_id=master.tenant_id,
             event_id=child.id,
-            profile_id=humans[0].id,
-            occurrence_start=None,
+            profile_id=person.id,
+            occurrence_start=occ,
         )
-    )
+        for person, occ in [(humans[0], None), (humans[1], None), (humans[2], start)]
+    ]
+    db.add_all(rows)
     db.commit()
-    headers = human_headers(humans[0])
-    detail = client.get(f"/api/v1/events/portal/events/{child.id}", headers=headers)
-    assert detail.status_code == 200, detail.text
-    assert detail.json()["resolved_occurrence_start"] is None
-    assert detail.json()["my_rsvp_status"] == "registered"
-    assert detail.json()["attendee_count"] == 1
-    listing = client.get(
-        "/api/v1/events/portal/events",
-        headers=headers,
-        params={"popup_id": str(master.popup_id), "rsvped_only": True},
-    )
-    assert listing.status_code == 200, listing.text
-    child_rows = [r for r in listing.json()["results"] if r["id"] == str(child.id)]
-    assert len(child_rows) == 1
-    assert child_rows[0]["my_rsvp_status"] == "registered"
-    assert child_rows[0]["attendee_count"] == 1
-    invalid = client.get(
-        f"/api/v1/events/portal/events/{child.id}",
-        headers=headers,
-        params={"occurrence_start": child.start_time.isoformat()},
-    )
-    assert invalid.status_code == 400
+    response = roster(client, child, admin_token_tenant_a, scope_to_occurrence=True)
+    assert response.status_code == 200, response.text
+    assert [p["profile_id"] for p in response.json()["results"]] == [str(humans[1].id)]
+    assert roster(client, child, admin_token_tenant_a).json()["paging"]["total"] == 3
+    db.expire_all()
+    assert [db.get(EventParticipants, row.id).occurrence_start for row in rows] == [
+        None,
+        None,
+        start,
+    ]
 
 
-def test_oneoff_admin_detail_and_participants_exclude_host(
-    client: TestClient,
-    db: Session,
-    series,
-    tenant_a: Tenants,
-    admin_token_tenant_a: str,
-):
-    master, humans, start = series
-    event = Events(
-        tenant_id=tenant_a.id,
-        popup_id=master.popup_id,
-        owner_id=humans[0].id,
-        host_id=humans[0].id,
-        title="One-off with legacy host registration",
-        start_time=start,
-        end_time=start + timedelta(hours=1),
-        status=EventStatus.PUBLISHED,
-    )
-    db.add(event)
-    db.flush()
-    for human in humans[:2]:
-        db.add(
-            EventParticipants(
-                tenant_id=tenant_a.id, event_id=event.id, profile_id=human.id
-            )
-        )
-    db.commit()
-    headers = {"Authorization": f"Bearer {admin_token_tenant_a}"}
-    detail = client.get(f"/api/v1/events/{event.id}", headers=headers)
-    assert detail.status_code == 200, detail.text
-    assert detail.json()["resolved_occurrence_start"] is None
-    assert detail.json()["attendee_count"] == 1
-    listing = client.get(
-        "/api/v1/event-participants",
-        headers=headers,
-        params={"event_id": str(event.id)},
-    )
-    assert listing.status_code == 200, listing.text
-    assert [r["profile_id"] for r in listing.json()["results"]] == [str(humans[1].id)]
-
-
-def test_detail_normalizes_equivalent_offset_to_utc(
-    client: TestClient, series, admin_token_tenant_a: str
+def test_read_filters_do_not_resolve_or_rewrite_event_details(
+    client, series, admin_token_tenant_a
 ):
     event, _, start = series
-    response = client.get(
-        f"/api/v1/events/{event.id}",
-        headers={"Authorization": f"Bearer {admin_token_tenant_a}"},
-        params={"occurrence_start": "2031-03-04T15:30:00+05:30"},
+    headers = {"Authorization": f"Bearer {admin_token_tenant_a}"}
+    before = client.get(f"/api/v1/events/{event.id}", headers=headers).json()
+    roster(
+        client,
+        event,
+        admin_token_tenant_a,
+        occurrence_start=(start + timedelta(days=1)).isoformat(),
     )
-    assert response.status_code == 200, response.text
-    body = response.json()
-    assert body["resolved_occurrence_start"] == "2031-03-04T10:00:00Z"
-    assert parse_date(body["start_time"]) == start + timedelta(days=1)
-    assert body["attendee_count"] == 2
+    after = client.get(f"/api/v1/events/{event.id}", headers=headers).json()
+    assert after == before
+    assert datetime.fromisoformat(after["start_time"]) == start
+    assert "resolved_occurrence_start" not in after
+    # The existing list still uses its series-wide RSVP counter.
+    events = client.get(
+        "/api/v1/events",
+        headers=headers,
+        params={
+            "popup_id": str(event.popup_id),
+            "start_after": start.isoformat(),
+            "start_before": (start + timedelta(days=3)).isoformat(),
+        },
+    ).json()["results"]
+    assert [row["attendee_count"] for row in events] == [3, 3, 3]
+
+
+def test_occurrence_filter_requires_event_and_timezone(
+    client, series, admin_token_tenant_a
+):
+    event, _, _ = series
+    headers = {"Authorization": f"Bearer {admin_token_tenant_a}"}
+    assert (
+        client.get(
+            "/api/v1/event-participants",
+            headers=headers,
+            params={"scope_to_occurrence": True},
+        ).status_code
+        == 400
+    )
+    assert (
+        roster(
+            client, event, admin_token_tenant_a, occurrence_start="2031-03-04T10:00:00"
+        ).status_code
+        == 400
+    )
+    assert (
+        client.get(
+            "/api/v1/event-participants",
+            headers=headers,
+            params={"event_id": str(uuid.uuid4()), "scope_to_occurrence": True},
+        ).status_code
+        == 404
+    )
+
+
+def test_scoped_rosters_keep_administrative_access_controls(
+    client,
+    series,
+    admin_token_tenant_a,
+    admin_token_tenant_b,
+    viewer_token_tenant_a,
+    admin_api_key_factory,
+):
+    event, _, start = series
+    params = {"occurrence_start": start.isoformat()}
+    assert roster(client, event, admin_token_tenant_a, **params).status_code == 200
+    assert roster(client, event, admin_token_tenant_b, **params).status_code == 404
+    assert roster(client, event, viewer_token_tenant_a, **params).status_code == 403
+    for scopes, expected in [(["events:read"], 200), (["venues:read"], 403)]:
+        _, raw = admin_api_key_factory(scopes=scopes)
+        assert roster(client, event, raw, **params).status_code == expected

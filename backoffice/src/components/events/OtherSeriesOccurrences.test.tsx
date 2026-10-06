@@ -51,7 +51,6 @@ const EVENT: EventPublic = {
   end_time: "2031-03-03T11:00:00Z",
   timezone: "UTC",
   rrule: "FREQ=DAILY;COUNT=4",
-  resolved_occurrence_start: FIRST,
 }
 function occurrence(
   start: string,
@@ -86,7 +85,6 @@ const SUMMARY: EventSeriesSummary = {
       is_detached: true,
     }),
   ],
-  outside_schedule: [],
 }
 function person(name: string, status = "registered") {
   return {
@@ -104,7 +102,11 @@ function renderSection(event: EventPublic = EVENT) {
         new QueryClient({ defaultOptions: { queries: { retry: false } } })
       }
     >
-      <OtherSeriesOccurrences event={event} formatRange={(start) => start} />
+      <OtherSeriesOccurrences
+        event={event}
+        occurrenceStart={event.rrule ? event.start_time : null}
+        formatRange={(start) => start}
+      />
     </QueryClientProvider>,
   )
 }
@@ -135,7 +137,7 @@ describe("other series occurrences", () => {
   it("loads only on expansion and excludes the current date by instant", async () => {
     renderSection({
       ...EVENT,
-      resolved_occurrence_start: "2031-03-03T10:00:00+00:00",
+      start_time: "2031-03-03T10:00:00+00:00",
     })
     expect(mocks.summary).not.toHaveBeenCalled()
     expect(mocks.participants).not.toHaveBeenCalled()
@@ -159,6 +161,7 @@ describe("other series occurrences", () => {
     expect(mocks.participants).not.toHaveBeenCalledWith({
       eventId: "master",
       occurrenceStart: THIRD,
+      scopeToOccurrence: true,
     })
     expect(
       screen
@@ -184,6 +187,7 @@ describe("other series occurrences", () => {
     expect(mocks.participants).toHaveBeenCalledWith({
       eventId: "master",
       occurrenceStart: SECOND,
+      scopeToOccurrence: true,
     })
     expect(screen.getByText("Checked in")).toBeTruthy()
     expect(screen.getAllByText("RSVP'd").length).toBeGreaterThan(0)
@@ -206,6 +210,7 @@ describe("other series occurrences", () => {
     expect(mocks.participants).toHaveBeenCalledWith({
       eventId: "child",
       occurrenceStart: undefined,
+      scopeToOccurrence: true,
     })
   })
 
@@ -215,7 +220,6 @@ describe("other series occurrences", () => {
       id: "child",
       recurrence_master_id: "master",
       rrule: null,
-      resolved_occurrence_start: null,
       start_time: FOURTH,
     })
     fireEvent.click(
@@ -245,41 +249,10 @@ describe("other series occurrences", () => {
     expect(mocks.participants).toHaveBeenCalledWith({
       eventId: "master",
       occurrenceStart: SECOND,
+      scopeToOccurrence: true,
       skip: 2,
     })
     expect(screen.queryByText("Pablo")).toBeNull()
-  })
-
-  it("renders obsolete and legacy groups separately without scheduled-date links", async () => {
-    mocks.summary.mockResolvedValue({
-      ...SUMMARY,
-      outside_schedule: [
-        {
-          event_id: "master",
-          occurrence_start: null,
-          title: "Yoga",
-          timezone: "UTC",
-          attendee_count: 1,
-          participants: [person("Legacy attendee")],
-        },
-      ],
-    })
-    renderSection()
-    await openSection()
-    expect(screen.getByText("RSVPs outside the current schedule")).toBeTruthy()
-    expect(await screen.findByText("Legacy attendee")).toBeTruthy()
-    expect(
-      screen.queryByRole("button", {
-        name: /No occurrence date \(legacy RSVP\)/,
-      }),
-    ).toBeNull()
-    expect(
-      screen.getAllByRole("link", { name: /^View occurrence:/ }),
-    ).toHaveLength(3)
-    expect(mocks.participants).not.toHaveBeenCalledWith({
-      eventId: "master",
-      occurrenceStart: undefined,
-    })
   })
 
   it("shows an inline summary error and allows retry", async () => {
