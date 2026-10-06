@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest"
-import type { PaymentPublic } from "@/client"
+import type { PaymentPortalPublic } from "@/client"
 import { projectOtherPurchasedProducts } from "./otherProductsProjection"
 
-const payment = (overrides: Partial<PaymentPublic> = {}): PaymentPublic => ({
+const payment = (
+  overrides: Partial<PaymentPortalPublic> = {},
+): PaymentPortalPublic => ({
   id: "payment-1",
   tenant_id: "tenant-1",
   popup_id: "popup-1",
@@ -11,6 +13,8 @@ const payment = (overrides: Partial<PaymentPublic> = {}): PaymentPublic => ({
   products_snapshot: [],
   ...overrides,
 })
+
+const shirtOrigin = { category: "merch", salesFlowId: "direct-flow" }
 
 const product = (
   productId: string,
@@ -68,7 +72,9 @@ describe("projectOtherPurchasedProducts", () => {
       ],
     )
 
-    expect(result).toEqual([{ id: "shirt", name: "Event shirt", quantity: 1 }])
+    expect(result).toEqual([
+      { id: "shirt", name: "Event shirt", quantity: 1, ...shirtOrigin },
+    ])
   })
 
   it("excludes application, unapproved, and unattributed payments", () => {
@@ -134,7 +140,9 @@ describe("projectOtherPurchasedProducts", () => {
       [],
     )
 
-    expect(result).toEqual([{ id: "shirt", name: "Event shirt", quantity: 2 }])
+    expect(result).toEqual([
+      { id: "shirt", name: "Event shirt", quantity: 2, ...shirtOrigin },
+    ])
   })
 
   it("falls back to snapshot quantities when operational units are unavailable", () => {
@@ -160,6 +168,8 @@ describe("projectOtherPurchasedProducts", () => {
       ],
     )
 
-    expect(result).toEqual([{ id: "shirt", name: "Event shirt", quantity: 1 }])
+    expect(result).toEqual([
+      { id: "shirt", name: "Event shirt", quantity: 1, ...shirtOrigin },
+    ])
   })
 })

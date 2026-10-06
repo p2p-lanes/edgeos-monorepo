@@ -14,7 +14,7 @@ from app.api.cart.schemas import (
 from app.api.shared.response import ListModel, PaginationLimit, PaginationSkip, Paging
 from app.core.dependencies.users import (
     CurrentHuman,
-    CurrentUser,
+    CurrentOperatorJwtOnly,
     HumanTenantSession,
     TenantSession,
 )
@@ -40,7 +40,7 @@ def _resolve_cart_flow_id(
 @router.get("", response_model=ListModel[AbandonedCartPublic])
 async def list_abandoned_carts(
     db: TenantSession,
-    _: CurrentUser,
+    _: CurrentOperatorJwtOnly,
     popup_id: uuid.UUID | None = None,
     skip: PaginationSkip = 0,
     limit: PaginationLimit = 100,

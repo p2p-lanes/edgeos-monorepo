@@ -4254,6 +4254,27 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
             is None
         ):
             raise self._fulfillment_error()
+        buyer_application = None
+        buyer_primary_category = None
+        if recipient.human_id == buyer_human_id:
+            from app.api.application.crud import applications_crud
+
+            buyer_application = applications_crud.get_by_human_primary_flow(
+                session, buyer_human_id, payment.popup_id
+            )
+            if buyer_application is not None:
+                buyer_primary_category = session.exec(
+                    select(AttendeeCategories).where(
+                        AttendeeCategories.sales_flow_id
+                        == buyer_application.sales_flow_id,
+                        AttendeeCategories.tenant_id == payment.tenant_id,
+                        AttendeeCategories.popup_id == payment.popup_id,
+                        AttendeeCategories.is_primary.is_(True),  # type: ignore[union-attr]
+                        AttendeeCategories.deleted_at.is_(None),  # type: ignore[union-attr]
+                    )
+                ).first()
+                if buyer_primary_category is None:
+                    raise self._fulfillment_error()
         companion_category_id = None
         if recipient.category_id is not None:
             category = session.exec(
@@ -4304,14 +4325,20 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
             if human is None:
                 raise self._fulfillment_error()
             if attendee is None:
-                attendee = session.exec(
-                    select(Attendees)
-                    .where(
-                        Attendees.tenant_id == payment.tenant_id,
-                        Attendees.popup_id == payment.popup_id,
-                        Attendees.human_id == recipient.human_id,
+                attendee_query = select(Attendees).where(
+                    Attendees.tenant_id == payment.tenant_id,
+                    Attendees.popup_id == payment.popup_id,
+                    Attendees.human_id == recipient.human_id,
+                )
+                if buyer_application is not None:
+                    attendee_query = attendee_query.where(
+                        or_(
+                            Attendees.application_id == buyer_application.id,
+                            Attendees.application_id.is_(None),  # type: ignore[union-attr]
+                        )
                     )
-                    .order_by(Attendees.created_at, Attendees.id)
+                attendee = session.exec(
+                    attendee_query.order_by(Attendees.created_at, Attendees.id)
                     .limit(1)
                     .with_for_update()
                 ).first()
@@ -4319,8 +4346,20 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
                 attendee.tenant_id != payment.tenant_id
                 or attendee.popup_id != payment.popup_id
                 or attendee.human_id != recipient.human_id
+                or (
+                    buyer_application is not None
+                    and attendee.application_id not in (None, buyer_application.id)
+                )
             ):
                 raise self._fulfillment_error()
+            if buyer_application is not None and attendee is not None:
+                if attendee.application_id is None:
+                    attendee.application_id = buyer_application.id
+                    attendee.category_id = buyer_primary_category.id
+                    session.add(attendee)
+                elif attendee.category_id is None:
+                    attendee.category_id = buyer_primary_category.id
+                    session.add(attendee)
         elif attendee is not None:
             authorized = attendees_crud.get_for_human_popup(
                 session,
@@ -4338,7 +4377,9 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
             enforce_trial_attendee_cap(session, payment.tenant_id)
             attendee = Attendees(
                 tenant_id=payment.tenant_id,
-                application_id=None,
+                application_id=(
+                    buyer_application.id if buyer_application is not None else None
+                ),
                 popup_id=payment.popup_id,
                 human_id=recipient.human_id,
                 managed_by_human_id=(
@@ -4349,7 +4390,11 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
                 # Establish a new companion's category from the validated
                 # recipient. Buyers remain Main; existing attendees retain
                 # their category even when purchasing through another flow.
-                category_id=companion_category_id,
+                category_id=(
+                    buyer_primary_category.id
+                    if buyer_primary_category is not None
+                    else companion_category_id
+                ),
                 additional_data=recipient.profile_snapshot,
             )
             session.add(attendee)

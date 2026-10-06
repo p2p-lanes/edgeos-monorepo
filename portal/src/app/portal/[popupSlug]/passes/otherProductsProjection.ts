@@ -1,9 +1,13 @@
-import type { PaymentPublic } from "@/client"
+import type { PaymentPortalPublic } from "@/client"
 
 export interface OtherPurchasedProduct {
   id: string
   name: string
   quantity: number
+  /** Category and door of the first purchase seen: what ties the product
+   *  back to the checkout step it was sold from, for its icon. */
+  category: string
+  salesFlowId: string
 }
 
 export interface VisiblePassReference {
@@ -13,7 +17,7 @@ export interface VisiblePassReference {
 }
 
 export function projectOtherPurchasedProducts(
-  payments: PaymentPublic[],
+  payments: PaymentPortalPublic[],
   applicationFlowIds: ReadonlySet<string>,
   visiblePasses: VisiblePassReference[],
 ): OtherPurchasedProduct[] {
@@ -63,6 +67,8 @@ export function projectOtherPurchasedProducts(
         id: line.product_id,
         name: existing?.name ?? line.product_name,
         quantity: (existing?.quantity ?? 0) + quantity,
+        category: existing?.category ?? line.product_category,
+        salesFlowId: existing?.salesFlowId ?? payment.sales_flow_id,
       })
     }
   }

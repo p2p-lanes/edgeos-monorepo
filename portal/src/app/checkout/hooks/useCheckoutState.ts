@@ -6,7 +6,7 @@ import { useTranslation } from "react-i18next"
 import {
   ApiError,
   type ApplicationCreate,
-  type ApplicationPublic,
+  type ApplicationPortalPublic,
   ApplicationsService,
   type ApplicationUpdate,
   HumansService,
@@ -38,7 +38,7 @@ interface BuildCheckoutApplicationMutationPayloadArgs {
   salesFlowId?: string | null
   values: CheckoutApplicationValues
   schema: ApplicationFormSchema
-  existingApplication: ApplicationPublic | null
+  existingApplication: ApplicationPortalPublic | null
 }
 
 type CheckoutApplicationMutationPayload =
@@ -135,10 +135,10 @@ export function buildCheckoutApplicationMutationPayload({
 }
 
 export function findCheckoutApplication(
-  applications: ApplicationPublic[] | undefined,
+  applications: ApplicationPortalPublic[] | undefined,
   popupId: string,
   salesFlowId?: string | null,
-): ApplicationPublic | undefined {
+): ApplicationPortalPublic | undefined {
   const popupApplications = (applications ?? []).filter(
     (application) => application.popup_id === popupId,
   )
@@ -151,9 +151,9 @@ export function findCheckoutApplication(
 }
 
 export function upsertCheckoutApplication(
-  applications: ApplicationPublic[] | undefined,
-  application: ApplicationPublic,
-): ApplicationPublic[] {
+  applications: ApplicationPortalPublic[] | undefined,
+  application: ApplicationPortalPublic,
+): ApplicationPortalPublic[] {
   return [
     application,
     ...(applications ?? []).filter(
@@ -212,7 +212,7 @@ const useCheckoutState = ({
         throw new Error("Application checkout schema is required")
       }
 
-      const existingApps = queryClient.getQueryData<ApplicationPublic[]>(
+      const existingApps = queryClient.getQueryData<ApplicationPortalPublic[]>(
         queryKeys.applications.mine(),
       )
       const existingApp = findCheckoutApplication(
@@ -232,7 +232,7 @@ const useCheckoutState = ({
         existingApplication: existingApp ?? null,
       })
 
-      let application: ApplicationPublic
+      let application: ApplicationPortalPublic
       if (mutationPayload.kind === "update") {
         if (!existingApp?.sales_flow_id) {
           throw new Error("Application sales flow is required for updates")
@@ -264,7 +264,7 @@ const useCheckoutState = ({
     },
     onSuccess: ({ matchingApp }) => {
       if (matchingApp) {
-        queryClient.setQueryData<ApplicationPublic[]>(
+        queryClient.setQueryData<ApplicationPortalPublic[]>(
           queryKeys.applications.mine(),
           (current) => upsertCheckoutApplication(current, matchingApp),
         )
@@ -307,7 +307,7 @@ const useCheckoutState = ({
             )
 
             if (existingApp) {
-              queryClient.setQueryData<ApplicationPublic[]>(
+              queryClient.setQueryData<ApplicationPortalPublic[]>(
                 queryKeys.applications.mine(),
                 (current) => upsertCheckoutApplication(current, existingApp),
               )
@@ -353,7 +353,7 @@ const useCheckoutState = ({
       setErrorMessage(null)
     },
     onSuccess: (application) => {
-      queryClient.setQueryData<ApplicationPublic[]>(
+      queryClient.setQueryData<ApplicationPortalPublic[]>(
         queryKeys.applications.mine(),
         (current) => upsertCheckoutApplication(current, application),
       )

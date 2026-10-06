@@ -1,6 +1,6 @@
 import { useState } from "react"
 import { useTranslation } from "react-i18next"
-import type { ApplicationPublic, PopupPublic } from "@/client"
+import type { ApplicationPortalPublic, PopupPublic } from "@/client"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
@@ -15,7 +15,7 @@ import { useCityProvider } from "@/providers/cityProvider"
 interface ExistingApplicationCardProps {
   onImport: () => void
   onCancel: () => void
-  data: ApplicationPublic
+  data: ApplicationPortalPublic
 }
 
 export function ExistingApplicationCard({
@@ -53,7 +53,7 @@ export function ExistingApplicationCard({
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-2">
-          {/* LEGACY: first_name, last_name, email no longer in ApplicationPublic */}
+          {/* LEGACY: first_name, last_name, email no longer in ApplicationPortalPublic */}
           {data.human && (
             <p>
               <strong>{t("application.applicant")}</strong>{" "}

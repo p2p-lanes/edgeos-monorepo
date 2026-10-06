@@ -5,7 +5,7 @@
  */
 export type AbandonedCartPublic = {
     id: string;
-    items: CartState_Output;
+    items: CartState;
     created_at?: (string | null);
     updated_at?: (string | null);
     email?: (string | null);
@@ -476,7 +476,7 @@ export type status = 'added' | 'invited';
  */
 export type AdminApiKeyCreate = {
     name: string;
-    scopes: Array<('events:read' | 'events:write' | 'rsvp:write' | 'venues:read' | 'venues:write' | 'applications:read' | 'applications:write' | 'attendees:read' | 'attendees:write' | 'humans:read' | 'humans:write' | 'groups:read' | 'groups:write' | 'products:read' | 'products:write' | 'accommodations:read' | 'accommodations:write' | 'coupons:read' | 'coupons:write' | 'forms:read' | 'forms:write' | 'payments:read' | 'tracks:read' | 'tracks:write' | 'ticketing_steps:read' | 'ticketing_steps:write' | 'translations:read' | 'translations:write')>;
+    scopes: Array<('events:read' | 'events:write' | 'rsvp:write' | 'venues:read' | 'venues:write' | 'applications:read' | 'applications:write' | 'attendees:read' | 'attendees:write' | 'humans:read' | 'humans:write' | 'groups:read' | 'groups:write' | 'products:read' | 'products:write' | 'accommodations:read' | 'accommodations:write' | 'coupons:read' | 'coupons:write' | 'forms:read' | 'forms:write' | 'payments:read' | 'tracks:read' | 'tracks:write' | 'ticketing_steps:read' | 'ticketing_steps:write' | 'translations:read' | 'translations:write' | 'badges:read' | 'badges:write')>;
     expires_at?: (string | null);
 };
 
@@ -489,7 +489,7 @@ export type AdminApiKeyCreated = {
     id: string;
     name: string;
     prefix: string;
-    scopes: Array<('events:read' | 'events:write' | 'rsvp:write' | 'venues:read' | 'venues:write' | 'applications:read' | 'applications:write' | 'attendees:read' | 'attendees:write' | 'humans:read' | 'humans:write' | 'groups:read' | 'groups:write' | 'products:read' | 'products:write' | 'accommodations:read' | 'accommodations:write' | 'coupons:read' | 'coupons:write' | 'forms:read' | 'forms:write' | 'payments:read' | 'tracks:read' | 'tracks:write' | 'ticketing_steps:read' | 'ticketing_steps:write' | 'translations:read' | 'translations:write')>;
+    scopes: Array<('events:read' | 'events:write' | 'rsvp:write' | 'venues:read' | 'venues:write' | 'applications:read' | 'applications:write' | 'attendees:read' | 'attendees:write' | 'humans:read' | 'humans:write' | 'groups:read' | 'groups:write' | 'products:read' | 'products:write' | 'accommodations:read' | 'accommodations:write' | 'coupons:read' | 'coupons:write' | 'forms:read' | 'forms:write' | 'payments:read' | 'tracks:read' | 'tracks:write' | 'ticketing_steps:read' | 'ticketing_steps:write' | 'translations:read' | 'translations:write' | 'badges:read' | 'badges:write')>;
     created_at: string;
     last_used_at?: (string | null);
     expires_at?: (string | null);
@@ -504,7 +504,7 @@ export type AdminApiKeyPublic = {
     id: string;
     name: string;
     prefix: string;
-    scopes: Array<('events:read' | 'events:write' | 'rsvp:write' | 'venues:read' | 'venues:write' | 'applications:read' | 'applications:write' | 'attendees:read' | 'attendees:write' | 'humans:read' | 'humans:write' | 'groups:read' | 'groups:write' | 'products:read' | 'products:write' | 'accommodations:read' | 'accommodations:write' | 'coupons:read' | 'coupons:write' | 'forms:read' | 'forms:write' | 'payments:read' | 'tracks:read' | 'tracks:write' | 'ticketing_steps:read' | 'ticketing_steps:write' | 'translations:read' | 'translations:write')>;
+    scopes: Array<('events:read' | 'events:write' | 'rsvp:write' | 'venues:read' | 'venues:write' | 'applications:read' | 'applications:write' | 'attendees:read' | 'attendees:write' | 'humans:read' | 'humans:write' | 'groups:read' | 'groups:write' | 'products:read' | 'products:write' | 'accommodations:read' | 'accommodations:write' | 'coupons:read' | 'coupons:write' | 'forms:read' | 'forms:write' | 'payments:read' | 'tracks:read' | 'tracks:write' | 'ticketing_steps:read' | 'ticketing_steps:write' | 'translations:read' | 'translations:write' | 'badges:read' | 'badges:write')>;
     created_at: string;
     last_used_at?: (string | null);
     expires_at?: (string | null);
@@ -579,13 +579,22 @@ export type AITranslateRequest = {
 };
 
 /**
+ * Period an allowance resets on.
+ *
+ * ``day`` and ``week`` (ISO, Monday start) follow the calendar of the popup
+ * the badge is given in; ``popup`` counts everything given within the
+ * policy's popup; ``lifetime`` never resets.
+ */
+export type AllowanceWindow = 'day' | 'week' | 'popup' | 'lifetime';
+
+/**
  * Request body for creating a new API key.
  */
 export type ApiKeyCreate = {
     name: string;
     popup_id: string;
     expires_at?: (string | null);
-    scopes?: Array<('events:read' | 'events:write' | 'rsvp:write' | 'venues:read' | 'venues:write' | 'applications:read' | 'applications:write' | 'attendees:read' | 'attendees:write' | 'humans:read' | 'humans:write' | 'groups:read' | 'groups:write' | 'products:read' | 'products:write' | 'accommodations:read' | 'accommodations:write' | 'coupons:read' | 'coupons:write' | 'forms:read' | 'forms:write' | 'payments:read' | 'tracks:read' | 'tracks:write' | 'ticketing_steps:read' | 'ticketing_steps:write' | 'translations:read' | 'translations:write')>;
+    scopes?: Array<('events:read' | 'events:write' | 'rsvp:write' | 'venues:read' | 'venues:write' | 'applications:read' | 'applications:write' | 'attendees:read' | 'attendees:write' | 'humans:read' | 'humans:write' | 'groups:read' | 'groups:write' | 'products:read' | 'products:write' | 'accommodations:read' | 'accommodations:write' | 'coupons:read' | 'coupons:write' | 'forms:read' | 'forms:write' | 'payments:read' | 'tracks:read' | 'tracks:write' | 'ticketing_steps:read' | 'ticketing_steps:write' | 'translations:read' | 'translations:write' | 'badges:read' | 'badges:write')>;
 };
 
 /**
@@ -597,7 +606,7 @@ export type ApiKeyCreated = {
     name: string;
     prefix: string;
     popup_id?: (string | null);
-    scopes: Array<('events:read' | 'events:write' | 'rsvp:write' | 'venues:read' | 'venues:write' | 'applications:read' | 'applications:write' | 'attendees:read' | 'attendees:write' | 'humans:read' | 'humans:write' | 'groups:read' | 'groups:write' | 'products:read' | 'products:write' | 'accommodations:read' | 'accommodations:write' | 'coupons:read' | 'coupons:write' | 'forms:read' | 'forms:write' | 'payments:read' | 'tracks:read' | 'tracks:write' | 'ticketing_steps:read' | 'ticketing_steps:write' | 'translations:read' | 'translations:write')>;
+    scopes: Array<('events:read' | 'events:write' | 'rsvp:write' | 'venues:read' | 'venues:write' | 'applications:read' | 'applications:write' | 'attendees:read' | 'attendees:write' | 'humans:read' | 'humans:write' | 'groups:read' | 'groups:write' | 'products:read' | 'products:write' | 'accommodations:read' | 'accommodations:write' | 'coupons:read' | 'coupons:write' | 'forms:read' | 'forms:write' | 'payments:read' | 'tracks:read' | 'tracks:write' | 'ticketing_steps:read' | 'ticketing_steps:write' | 'translations:read' | 'translations:write' | 'badges:read' | 'badges:write')>;
     created_at: string;
     last_used_at?: (string | null);
     expires_at?: (string | null);
@@ -613,7 +622,7 @@ export type ApiKeyPublic = {
     name: string;
     prefix: string;
     popup_id?: (string | null);
-    scopes: Array<('events:read' | 'events:write' | 'rsvp:write' | 'venues:read' | 'venues:write' | 'applications:read' | 'applications:write' | 'attendees:read' | 'attendees:write' | 'humans:read' | 'humans:write' | 'groups:read' | 'groups:write' | 'products:read' | 'products:write' | 'accommodations:read' | 'accommodations:write' | 'coupons:read' | 'coupons:write' | 'forms:read' | 'forms:write' | 'payments:read' | 'tracks:read' | 'tracks:write' | 'ticketing_steps:read' | 'ticketing_steps:write' | 'translations:read' | 'translations:write')>;
+    scopes: Array<('events:read' | 'events:write' | 'rsvp:write' | 'venues:read' | 'venues:write' | 'applications:read' | 'applications:write' | 'attendees:read' | 'attendees:write' | 'humans:read' | 'humans:write' | 'groups:read' | 'groups:write' | 'products:read' | 'products:write' | 'accommodations:read' | 'accommodations:write' | 'coupons:read' | 'coupons:write' | 'forms:read' | 'forms:write' | 'payments:read' | 'tracks:read' | 'tracks:write' | 'ticketing_steps:read' | 'ticketing_steps:write' | 'translations:read' | 'translations:write' | 'badges:read' | 'badges:write')>;
     created_at: string;
     last_used_at?: (string | null);
     expires_at?: (string | null);
@@ -754,7 +763,47 @@ export type ApplicationGroupCount = {
 export type ApplicationLayout = 'single_page' | 'multi_step';
 
 /**
- * Application schema for API responses.
+ * Applicant-facing response, without administrative assessments or reviews.
+ */
+export type ApplicationPortalPublic = {
+    id: string;
+    tenant_id: string;
+    popup_id: string;
+    human_id: string;
+    group_id?: (string | null);
+    sales_flow_id: string;
+    referral?: (string | null);
+    invite_id?: (string | null);
+    referral_id?: (string | null);
+    referred_by_name?: (string | null);
+    access_sources?: Array<ApplicationAccessSource>;
+    info_not_shared?: Array<(string)>;
+    status: string;
+    custom_fields?: {
+        [key: string]: unknown;
+    };
+    custom_fields_schema?: ({
+    [key: string]: unknown;
+} | null);
+    credit?: string;
+    fee_credit_granted?: boolean;
+    submitted_at?: (string | null);
+    accepted_at?: (string | null);
+    created_at?: (string | null);
+    updated_at?: (string | null);
+    scholarship_request?: boolean;
+    scholarship_details?: (string | null);
+    scholarship_video_url?: (string | null);
+    scholarship_status?: (string | null);
+    discount_percentage?: (string | null);
+    incentive_amount?: (string | null);
+    incentive_currency?: (string | null);
+    human?: (HumanSelfPublic | null);
+    attendees?: Array<AttendeePortalPublic>;
+};
+
+/**
+ * Administrative application response; never return from portal routes.
  */
 export type ApplicationPublic = {
     id: string;
@@ -1192,6 +1241,29 @@ export type AttendeeListItem = {
 };
 
 /**
+ * Human-facing attendee, including safe historical profile metadata.
+ */
+export type AttendeePortalPublic = {
+    tenant_id: string;
+    application_id?: (string | null);
+    popup_id: string;
+    human_id?: (string | null);
+    name: string;
+    category_id?: (string | null);
+    email?: (string | null);
+    gender?: (string | null);
+    poap_url?: (string | null);
+    additional_data?: {
+        [key: string]: unknown;
+    };
+    id: string;
+    category?: (string | null);
+    created_at?: (string | null);
+    updated_at?: (string | null);
+    products?: Array<AttendeeProductPublic>;
+};
+
+/**
  * Schema for an individual ticket (one row per ticket, no quantity).
  *
  * requires_check_in is denormalized from the related Product so the frontend
@@ -1390,6 +1462,30 @@ export type AttendeeUpdate = {
 };
 
 /**
+ * Portal projection of an attendee with origin and sanitized metadata.
+ */
+export type AttendeeWithOriginPortalPublic = {
+    tenant_id: string;
+    application_id?: (string | null);
+    popup_id: string;
+    human_id?: (string | null);
+    name: string;
+    category_id?: (string | null);
+    email?: (string | null);
+    gender?: (string | null);
+    poap_url?: (string | null);
+    additional_data?: {
+        [key: string]: unknown;
+    };
+    id: string;
+    category?: (string | null);
+    created_at?: (string | null);
+    updated_at?: (string | null);
+    products?: Array<AttendeeProductPublic>;
+    origin?: string;
+};
+
+/**
  * Attendee response with an origin discriminator field.
  *
  * Used by GET /attendees/my/popup/{popup_id} and related human-scoped
@@ -1492,6 +1588,215 @@ export type AuthCodeSentResponse = {
 export type AvailableScopes = {
     token_scopes: Array<(string)>;
     api_key_scopes: Array<(string)>;
+};
+
+/**
+ * Who a policy lets give badges.
+ */
+export type BadgeAudienceType = 'humans' | 'popup_attendees' | 'tenant';
+
+/**
+ * Give a badge to a human, identified by id or by email.
+ */
+export type BadgeAwardCreate = {
+    recipient_human_id?: (string | null);
+    recipient_email?: (string | null);
+    popup_id?: (string | null);
+    message?: (string | null);
+};
+
+/**
+ * Administrative view of an award (backoffice and admin API keys).
+ */
+export type BadgeAwardPublic = {
+    id: string;
+    badge: BadgeSummary;
+    recipient: BadgeAwardRecipient;
+    issuer_type: BadgeIssuerType;
+    issuer_name?: (string | null);
+    popup_id?: (string | null);
+    message?: (string | null);
+    awarded_at: string;
+    revoked_at?: (string | null);
+    revoke_reason?: (string | null);
+};
+
+export type BadgeAwardRecipient = {
+    id: string;
+    email: string;
+    first_name?: (string | null);
+    last_name?: (string | null);
+    picture_url?: (string | null);
+};
+
+export type BadgeAwardRevoke = {
+    reason?: (string | null);
+};
+
+export type BadgeCreate = {
+    name: string;
+    slug?: (string | null);
+    description?: (string | null);
+    category?: (string | null);
+    style_override_id?: (string | null);
+    repeatable?: boolean;
+    images: Array<BadgeImageIn>;
+};
+
+export type BadgeImageIn = {
+    style_id: string;
+    image_url: string;
+    width?: (number | null);
+    height?: (number | null);
+};
+
+export type BadgeImagePublic = {
+    style_id: string;
+    image_url: string;
+    width?: (number | null);
+    height?: (number | null);
+};
+
+export type BadgeImageUpsert = {
+    image_url: string;
+    width?: (number | null);
+    height?: (number | null);
+};
+
+export type BadgeIssuerPolicyCreate = {
+    name: string;
+    audience_type: BadgeAudienceType;
+    popup_id?: (string | null);
+    allowance_quantity?: (number | null);
+    allowance_window?: AllowanceWindow;
+    is_active?: boolean;
+    badge_ids: Array<(string)>;
+    human_ids?: Array<(string)>;
+};
+
+export type BadgeIssuerPolicyHuman = {
+    id: string;
+    email: string;
+    first_name?: (string | null);
+    last_name?: (string | null);
+};
+
+export type BadgeIssuerPolicyPublic = {
+    id: string;
+    name: string;
+    audience_type: BadgeAudienceType;
+    popup_id?: (string | null);
+    allowance_quantity?: (number | null);
+    allowance_window: AllowanceWindow;
+    is_active: boolean;
+    badges: Array<BadgeSummary>;
+    humans: Array<BadgeIssuerPolicyHuman>;
+    created_at: string;
+    updated_at: string;
+};
+
+export type BadgeIssuerPolicyUpdate = {
+    name?: (string | null);
+    audience_type?: (BadgeAudienceType | null);
+    popup_id?: (string | null);
+    allowance_quantity?: (number | null);
+    allowance_window?: (AllowanceWindow | null);
+    is_active?: (boolean | null);
+    badge_ids?: (Array<(string)> | null);
+    human_ids?: (Array<(string)> | null);
+};
+
+/**
+ * Who granted an award.
+ *
+ * Only ``admin`` is issued today; ``human`` (peer sending under an issuer
+ * policy) and ``rule`` (automatic check-in rules) are reserved for the next
+ * SIM-108 phases so awards never need a reshape.
+ */
+export type BadgeIssuerType = 'admin' | 'human' | 'rule';
+
+export type BadgePublic = {
+    id: string;
+    slug: string;
+    name: string;
+    description?: (string | null);
+    category?: (string | null);
+    style_override_id?: (string | null);
+    repeatable: boolean;
+    archived_at?: (string | null);
+    created_at: string;
+    updated_at: string;
+    images?: Array<BadgeImagePublic>;
+    image_url?: (string | null);
+    award_count?: number;
+};
+
+export type BadgeRuleCreate = {
+    badge_id: string;
+    config: (CheckinsInTrackConfig | CheckinsInPopupConfig);
+    is_active?: boolean;
+    evaluate_now?: boolean;
+};
+
+export type BadgeRuleEvaluation = {
+    rule_id: string;
+    awarded: number;
+};
+
+export type BadgeRulePublic = {
+    id: string;
+    badge_id: string;
+    config: (CheckinsInTrackConfig | CheckinsInPopupConfig);
+    is_active: boolean;
+    award_count?: number;
+    created_at: string;
+    updated_at: string;
+};
+
+export type BadgeRuleUpdate = {
+    config?: ((CheckinsInTrackConfig | CheckinsInPopupConfig) | null);
+    is_active?: (boolean | null);
+};
+
+export type BadgeStyleCreate = {
+    name: string;
+    key?: (string | null);
+    sort_order?: number;
+};
+
+export type BadgeStylePublic = {
+    id: string;
+    key: string;
+    name: string;
+    is_default: boolean;
+    sort_order: number;
+};
+
+export type BadgeStyleUpdate = {
+    name?: (string | null);
+    sort_order?: (number | null);
+};
+
+/**
+ * The slice of a badge shown next to an award.
+ */
+export type BadgeSummary = {
+    id: string;
+    slug: string;
+    name: string;
+    description?: (string | null);
+    category?: (string | null);
+    repeatable: boolean;
+    image_url?: (string | null);
+};
+
+export type BadgeUpdate = {
+    name?: (string | null);
+    description?: (string | null);
+    category?: (string | null);
+    style_override_id?: (string | null);
+    repeatable?: (boolean | null);
+    archived?: (boolean | null);
 };
 
 export type BaseFieldConfigPublic = {
@@ -1789,6 +2094,17 @@ export type CartPopupInfo = {
 };
 
 /**
+ * Read-time projection; also protects carts saved before the privacy fix.
+ */
+export type CartPortalState = {
+    lines?: Array<(CartProductLine | CartDateRangeLine | CartCustomAmountLine | CartMealPlanLine | CartAccommodationLine)>;
+    recipients?: Array<CartRecipientPortalProfile>;
+    promo_code?: (string | null);
+    insurance?: boolean;
+    current_step?: (string | null);
+};
+
+/**
  * A fixed-price product selection, assigned or unassigned.
  */
 export type CartProductLine = {
@@ -1807,7 +2123,7 @@ export type CartPublic = {
     id: string;
     human_id: string;
     popup_id: string;
-    items: CartState_Output;
+    items: CartPortalState;
     created_at?: (string | null);
     updated_at?: (string | null);
 };
@@ -1817,21 +2133,33 @@ export type CartRecipientAssignment = {
     recipient_key: string;
 };
 
+export type CartRecipientPortalProfile = {
+    recipient_key: string;
+    human_id?: (string | null);
+    existing_attendee_id?: (string | null);
+    name: string;
+    email?: (string | null);
+    category_id?: (string | null);
+    profile_snapshot?: {
+        [key: string]: unknown;
+    };
+};
+
 /**
  * Full cart state stored as JSONB.
  */
-export type CartState_Input = {
+export type CartState = {
     lines?: Array<(CartProductLine | CartDateRangeLine | CartCustomAmountLine | CartMealPlanLine | CartAccommodationLine)>;
-    recipients?: Array<PaymentRecipientRequest>;
+    recipients?: Array<PaymentRecipientProfile>;
     promo_code?: (string | null);
     insurance?: boolean;
     current_step?: (string | null);
 };
 
 /**
- * Full cart state stored as JSONB.
+ * Untrusted cart input: never persist administrative profile metadata.
  */
-export type CartState_Output = {
+export type CartStateRequest = {
     lines?: Array<(CartProductLine | CartDateRangeLine | CartCustomAmountLine | CartMealPlanLine | CartAccommodationLine)>;
     recipients?: Array<PaymentRecipientRequest>;
     promo_code?: (string | null);
@@ -1847,7 +2175,7 @@ export type CartUnassigned = {
  * Schema for updating cart items.
  */
 export type CartUpdate = {
-    items: CartState_Input;
+    items: CartStateRequest;
 };
 
 /**
@@ -1912,6 +2240,18 @@ export type CheckInPayload = {
 };
 
 export type source = 'qr' | 'manual' | 'self_service';
+
+export type CheckinsInPopupConfig = {
+    type?: "checkins_in_popup";
+    popup_id: string;
+    threshold: number;
+};
+
+export type CheckinsInTrackConfig = {
+    type?: "checkins_in_track";
+    track_id: string;
+    threshold: number;
+};
 
 /**
  * Public buyer-form field for the checkout runtime.
@@ -2037,6 +2377,7 @@ export type CheckoutRuntimeProduct = {
 export type CheckoutRuntimeResponse = {
     popup: PopupPublic;
     selected_flow: SelectedSalesFlow;
+    checkout_config?: (SalesFlowCheckoutConfig | null);
     products: Array<CheckoutRuntimeProduct>;
     buyer_form: Array<CheckoutBuyerSection>;
     ticketing_steps: Array<TicketingStepPublic>;
@@ -3454,7 +3795,6 @@ export type HumanAuth = {
     tenant_id: string;
     email: string;
     picture_url?: (string | null);
-    red_flag?: boolean;
 };
 
 export type HumanCommentCreate = {
@@ -3592,7 +3932,7 @@ export type HumanProfileUpdate = {
 };
 
 /**
- * Human schema for API responses.
+ * Administrative human response. Never use on a human-facing route.
  */
 export type HumanPublic = {
     id: string;
@@ -3620,6 +3960,22 @@ export type HumanPublic = {
  * rejection emails); the other levels are purely advisory labels.
  */
 export type HumanRating = 'unrated' | 'red_flag' | 'orange_flag' | 'green_flag' | 'star';
+
+/**
+ * Allowlisted own-profile response for humans and third-party apps.
+ */
+export type HumanSelfPublic = {
+    id: string;
+    tenant_id: string;
+    email: string;
+    first_name?: (string | null);
+    last_name?: (string | null);
+    telegram?: (string | null);
+    gender?: (string | null);
+    age?: (string | null);
+    residence?: (string | null);
+    picture_url?: (string | null);
+};
 
 /**
  * Human schema for profile updates.
@@ -3784,6 +4140,19 @@ export type InviteUpdate = {
 };
 
 /**
+ * A badge the caller may give in a popup right now, and how many more.
+ */
+export type IssuableBadge = {
+    badge: BadgeSummary;
+    policy_id: string;
+    allowance?: (number | null);
+    remaining?: (number | null);
+    window: AllowanceWindow;
+    resets_at?: (string | null);
+    recipient_has_it?: boolean;
+};
+
+/**
  * Top-level KPI cards with derived metrics.
  */
 export type KeyMetrics = {
@@ -3841,6 +4210,11 @@ export type ListModel_ApplicationCommentPublic_ = {
     paging: Paging;
 };
 
+export type ListModel_ApplicationPortalPublic_ = {
+    results: Array<ApplicationPortalPublic>;
+    paging: Paging;
+};
+
 export type ListModel_ApplicationPublic_ = {
     results: Array<ApplicationPublic>;
     paging: Paging;
@@ -3866,13 +4240,23 @@ export type ListModel_AttendeesDirectoryEntry_ = {
     paging: Paging;
 };
 
-export type ListModel_AttendeeWithOriginPublic_ = {
-    results: Array<AttendeeWithOriginPublic>;
+export type ListModel_AttendeeWithOriginPortalPublic_ = {
+    results: Array<AttendeeWithOriginPortalPublic>;
     paging: Paging;
 };
 
 export type ListModel_AuditLogPublic_ = {
     results: Array<AuditLogPublic>;
+    paging: Paging;
+};
+
+export type ListModel_BadgeAwardPublic_ = {
+    results: Array<BadgeAwardPublic>;
+    paging: Paging;
+};
+
+export type ListModel_BadgePublic_ = {
+    results: Array<BadgePublic>;
     paging: Paging;
 };
 
@@ -3963,6 +4347,11 @@ export type ListModel_InvitePublic_ = {
 
 export type ListModel_MyGroupPublic_ = {
     results: Array<MyGroupPublic>;
+    paging: Paging;
+};
+
+export type ListModel_PaymentPortalPublic_ = {
+    results: Array<PaymentPortalPublic>;
     paging: Paging;
 };
 
@@ -4057,6 +4446,23 @@ export type MeAccess = {
 };
 
 /**
+ * A badge on the caller's own profile, with every active award of it.
+ */
+export type MyBadge = {
+    badge: BadgeSummary;
+    count: number;
+    last_awarded_at: string;
+    awards: Array<MyBadgeAward>;
+};
+
+export type MyBadgeAward = {
+    awarded_at: string;
+    message?: (string | null);
+    popup_id?: (string | null);
+    issuer_name?: (string | null);
+};
+
+/**
  * Group public schema augmented with the viewer's role (portal).
  */
 export type MyGroupPublic = {
@@ -4143,7 +4549,7 @@ export type OpenCartPublic = {
     id: string;
     popup_id: string;
     email: string;
-    items: CartState_Output;
+    items: CartPortalState;
     restore_token?: (string | null);
     created_at?: (string | null);
     updated_at?: (string | null);
@@ -4154,7 +4560,7 @@ export type OpenCartPublic = {
  */
 export type OpenCartUpsert = {
     email: string;
-    items: CartState_Input;
+    items: CartStateRequest;
 };
 
 /**
@@ -4216,6 +4622,50 @@ export type PaymentCreate = {
     insurance?: boolean;
     locale?: (string | null);
     return_context?: 'direct' | 'portal';
+};
+
+/**
+ * Human-facing payment response without internal recipient metadata.
+ */
+export type PaymentPortalPublic = {
+    tenant_id: string;
+    application_id?: (string | null);
+    popup_id: string;
+    buyer_human_id?: (string | null);
+    sales_flow_id?: (string | null);
+    external_id?: (string | null);
+    status?: string;
+    amount?: string;
+    amount_charged?: (string | null);
+    insurance_amount?: string;
+    contribution_amount?: string;
+    currency?: string;
+    settlement_currency?: (string | null);
+    rate?: (string | null);
+    source?: (string | null);
+    checkout_url?: (string | null);
+    buyer_snapshot?: ({
+    [key: string]: unknown;
+} | null);
+    coupon_id?: (string | null);
+    coupon_code?: (string | null);
+    discount_value?: (string | null);
+    edit_passes?: boolean;
+    is_installment_plan?: boolean;
+    installments_total?: (number | null);
+    installments_paid?: (number | null);
+    group_id?: (string | null);
+    payment_type?: string;
+    granted_by_user_id?: (string | null);
+    credit_applied?: string;
+    id: string;
+    products_snapshot?: Array<PaymentProductResponse>;
+    recipients?: Array<PaymentRecipientPortalResponse>;
+    buyer_email?: (string | null);
+    buyer_name?: (string | null);
+    redirect_url?: (string | null);
+    created_at?: (string | null);
+    updated_at?: (string | null);
 };
 
 /**
@@ -4343,7 +4793,40 @@ export type PaymentPublic = {
 };
 
 /**
+ * Public projection of a stored recipient; leaves historical data untouched.
+ */
+export type PaymentRecipientPortalResponse = {
+    recipient_key: string;
+    human_id?: (string | null);
+    existing_attendee_id?: (string | null);
+    name: string;
+    email?: (string | null);
+    category_id?: (string | null);
+    profile_snapshot?: {
+        [key: string]: unknown;
+    };
+    id: string;
+    attendee_id?: (string | null);
+    created_at: string;
+};
+
+/**
  * Stable recipient identity and profile supplied for one payment attempt.
+ */
+export type PaymentRecipientProfile = {
+    recipient_key: string;
+    human_id?: (string | null);
+    existing_attendee_id?: (string | null);
+    name: string;
+    email?: (string | null);
+    category_id?: (string | null);
+    profile_snapshot?: {
+        [key: string]: unknown;
+    };
+};
+
+/**
+ * Untrusted checkout input; old clients may send reserved keys, which are ignored.
  */
 export type PaymentRecipientRequest = {
     recipient_key: string;
@@ -4819,6 +5302,13 @@ export type PopupUpdate = {
     abandoned_application_max_count?: (number | null);
 };
 
+export type PortalBadgeAwardCreate = {
+    badge_id: string;
+    popup_id: string;
+    attendee_id: string;
+    message?: (string | null);
+};
+
 /**
  * Request to generate a presigned upload URL.
  */
@@ -5174,6 +5664,31 @@ export type PublicAccommodationProperty = {
     tax_percentage?: (string | null);
 };
 
+/**
+ * What anyone holding the share link sees. Never add contact fields.
+ */
+export type PublicProfile = {
+    display_name?: (string | null);
+    picture_url?: (string | null);
+    badges: Array<PublicProfileBadge>;
+};
+
+export type PublicProfileBadge = {
+    name: string;
+    description?: (string | null);
+    image_url?: (string | null);
+    count: number;
+};
+
+export type PublicProfileSettings = {
+    enabled: boolean;
+    token: string;
+};
+
+export type PublicProfileSettingsUpdate = {
+    enabled: boolean;
+};
+
 export type PublishableKeyCreate = {
     name: string;
     allowed_origins?: Array<(string)>;
@@ -5288,6 +5803,30 @@ export type ReviewSummary = {
 export type RsvpEligibility = {
     allowed: boolean;
     reason?: ('rejected' | 'no_tickets' | null);
+};
+
+/**
+ * What a door's checkout screen needs to know about its own settings.
+ *
+ * The portal used to read these off `PopupPublic`, whose columns stopped
+ * being edited once each flow owned its configuration (slice 7). The
+ * checkout then offered a promo code field on a door with coupons off, and
+ * quoted an insurance or contribution line the payment would not charge.
+ *
+ * An allowlist like `SalesFlowPortalPublic`: every field is something the
+ * buyer sees on the confirm step anyway. Never widen this to the whole
+ * `EffectiveFlowConfig`, which carries `open_checkout_signing_secret`.
+ * Unset values read as off, matching how the payment and coupon paths treat
+ * them.
+ */
+export type SalesFlowCheckoutConfig = {
+    allows_coupons?: boolean;
+    insurance_enabled?: boolean;
+    insurance_percentage?: (string | null);
+    contribution_enabled?: boolean;
+    contribution_percentage?: (string | null);
+    contribution_label?: (string | null);
+    contribution_description?: (string | null);
 };
 
 /**
@@ -5707,6 +6246,16 @@ export type SendTestRequest = {
     popup_id?: (string | null);
 };
 
+export type SentBadgeAward = {
+    id: string;
+    badge: BadgeSummary;
+    recipient_name?: (string | null);
+    popup_id?: (string | null);
+    message?: (string | null);
+    awarded_at: string;
+    revoked_at?: (string | null);
+};
+
 /**
  * How SimpleFi redirects the buyer to the success URL after payment.
  *
@@ -6022,8 +6571,8 @@ export type TenantUpdate = {
  */
 export type ThirdPartyAppCreate = {
     name: string;
-    allowed_token_scopes?: Array<('portal:*' | 'portal:profile:read' | 'portal:profile:write' | 'portal:applications:read' | 'portal:applications:write' | 'portal:attendees:write' | 'portal:payments:read' | 'portal:directory:read' | 'portal:api_keys:manage')>;
-    allowed_api_key_scopes?: Array<('events:read' | 'events:write' | 'rsvp:write' | 'venues:read' | 'venues:write' | 'applications:read' | 'applications:write' | 'attendees:read' | 'attendees:write' | 'humans:read' | 'humans:write' | 'groups:read' | 'groups:write' | 'products:read' | 'products:write' | 'accommodations:read' | 'accommodations:write' | 'coupons:read' | 'coupons:write' | 'forms:read' | 'forms:write' | 'payments:read' | 'tracks:read' | 'tracks:write' | 'ticketing_steps:read' | 'ticketing_steps:write' | 'translations:read' | 'translations:write')>;
+    allowed_token_scopes?: Array<('portal:*' | 'portal:profile:read' | 'portal:profile:write' | 'portal:applications:read' | 'portal:applications:write' | 'portal:attendees:write' | 'portal:payments:read' | 'portal:directory:read' | 'portal:api_keys:manage' | 'portal:badges:write')>;
+    allowed_api_key_scopes?: Array<('events:read' | 'events:write' | 'rsvp:write' | 'venues:read' | 'venues:write' | 'applications:read' | 'applications:write' | 'attendees:read' | 'attendees:write' | 'humans:read' | 'humans:write' | 'groups:read' | 'groups:write' | 'products:read' | 'products:write' | 'accommodations:read' | 'accommodations:write' | 'coupons:read' | 'coupons:write' | 'forms:read' | 'forms:write' | 'payments:read' | 'tracks:read' | 'tracks:write' | 'ticketing_steps:read' | 'ticketing_steps:write' | 'translations:read' | 'translations:write' | 'badges:read' | 'badges:write')>;
 };
 
 /**
@@ -6073,8 +6622,8 @@ export type ThirdPartyAppPublic = {
  */
 export type ThirdPartyAppUpdate = {
     name?: (string | null);
-    allowed_token_scopes?: (Array<('portal:*' | 'portal:profile:read' | 'portal:profile:write' | 'portal:applications:read' | 'portal:applications:write' | 'portal:attendees:write' | 'portal:payments:read' | 'portal:directory:read' | 'portal:api_keys:manage')> | null);
-    allowed_api_key_scopes?: (Array<('events:read' | 'events:write' | 'rsvp:write' | 'venues:read' | 'venues:write' | 'applications:read' | 'applications:write' | 'attendees:read' | 'attendees:write' | 'humans:read' | 'humans:write' | 'groups:read' | 'groups:write' | 'products:read' | 'products:write' | 'accommodations:read' | 'accommodations:write' | 'coupons:read' | 'coupons:write' | 'forms:read' | 'forms:write' | 'payments:read' | 'tracks:read' | 'tracks:write' | 'ticketing_steps:read' | 'ticketing_steps:write' | 'translations:read' | 'translations:write')> | null);
+    allowed_token_scopes?: (Array<('portal:*' | 'portal:profile:read' | 'portal:profile:write' | 'portal:applications:read' | 'portal:applications:write' | 'portal:attendees:write' | 'portal:payments:read' | 'portal:directory:read' | 'portal:api_keys:manage' | 'portal:badges:write')> | null);
+    allowed_api_key_scopes?: (Array<('events:read' | 'events:write' | 'rsvp:write' | 'venues:read' | 'venues:write' | 'applications:read' | 'applications:write' | 'attendees:read' | 'attendees:write' | 'humans:read' | 'humans:write' | 'groups:read' | 'groups:write' | 'products:read' | 'products:write' | 'accommodations:read' | 'accommodations:write' | 'coupons:read' | 'coupons:write' | 'forms:read' | 'forms:write' | 'payments:read' | 'tracks:read' | 'tracks:write' | 'ticketing_steps:read' | 'ticketing_steps:write' | 'translations:read' | 'translations:write' | 'badges:read' | 'badges:write')> | null);
 };
 
 /**
@@ -7040,7 +7589,7 @@ export type ApplicationsListMyApplicationsData = {
     skip?: number;
 };
 
-export type ApplicationsListMyApplicationsResponse = (ListModel_ApplicationPublic_);
+export type ApplicationsListMyApplicationsResponse = (ListModel_ApplicationPortalPublic_);
 
 export type ApplicationsListMyTicketsResponse = (Array<AttendeeWithTickets>);
 
@@ -7058,9 +7607,10 @@ export type ApplicationsGetMyPurchasesResponse = (Array<AttendeePurchases>);
 
 export type ApplicationsGetMyApplicationData = {
     popupId: string;
+    primaryFlowOnly?: boolean;
 };
 
-export type ApplicationsGetMyApplicationResponse = (ApplicationPublic);
+export type ApplicationsGetMyApplicationResponse = (ApplicationPortalPublic);
 
 export type ApplicationsUpdateMyApplicationData = {
     popupId: string;
@@ -7068,7 +7618,7 @@ export type ApplicationsUpdateMyApplicationData = {
     salesFlowId: string;
 };
 
-export type ApplicationsUpdateMyApplicationResponse = (ApplicationPublic);
+export type ApplicationsUpdateMyApplicationResponse = (ApplicationPortalPublic);
 
 export type ApplicationsDetachCompanionData = {
     requestBody: DetachCompanionRequest;
@@ -7080,9 +7630,10 @@ export type ApplicationsCreateMyApplicationData = {
     requestBody: ApplicationCreate;
 };
 
-export type ApplicationsCreateMyApplicationResponse = (ApplicationPublic);
+export type ApplicationsCreateMyApplicationResponse = (ApplicationPortalPublic);
 
 export type ApplicationsListAttendeesDirectoryData = {
+    hideEmptyRows?: boolean;
     /**
      * Maximum number of items to return
      */
@@ -7109,7 +7660,7 @@ export type ApplicationsAddMyAttendeeData = {
     requestBody: AttendeeCreate;
 };
 
-export type ApplicationsAddMyAttendeeResponse = (ApplicationPublic);
+export type ApplicationsAddMyAttendeeResponse = (ApplicationPortalPublic);
 
 export type ApplicationsUpdateMyAttendeeData = {
     attendeeId: string;
@@ -7117,14 +7668,14 @@ export type ApplicationsUpdateMyAttendeeData = {
     requestBody: AttendeeUpdate;
 };
 
-export type ApplicationsUpdateMyAttendeeResponse = (ApplicationPublic);
+export type ApplicationsUpdateMyAttendeeResponse = (ApplicationPortalPublic);
 
 export type ApplicationsDeleteMyAttendeeData = {
     attendeeId: string;
     popupId: string;
 };
 
-export type ApplicationsDeleteMyAttendeeResponse = (ApplicationPublic);
+export type ApplicationsDeleteMyAttendeeResponse = (ApplicationPortalPublic);
 
 export type ApplicationsReviewScholarshipData = {
     applicationId: string;
@@ -7259,14 +7810,14 @@ export type AttendeesListMyAttendeesByPopupData = {
     skip?: number;
 };
 
-export type AttendeesListMyAttendeesByPopupResponse = (ListModel_AttendeeWithOriginPublic_);
+export type AttendeesListMyAttendeesByPopupResponse = (ListModel_AttendeeWithOriginPortalPublic_);
 
 export type AttendeesCreateMyAttendeeForPopupData = {
     popupId: string;
     requestBody: AttendeeCreate;
 };
 
-export type AttendeesCreateMyAttendeeForPopupResponse = (AttendeeWithOriginPublic);
+export type AttendeesCreateMyAttendeeForPopupResponse = (AttendeeWithOriginPortalPublic);
 
 export type AttendeesUpdateMyAttendeeForPopupData = {
     attendeeId: string;
@@ -7274,7 +7825,7 @@ export type AttendeesUpdateMyAttendeeForPopupData = {
     requestBody: AttendeeUpdate;
 };
 
-export type AttendeesUpdateMyAttendeeForPopupResponse = (AttendeeWithOriginPublic);
+export type AttendeesUpdateMyAttendeeForPopupResponse = (AttendeeWithOriginPortalPublic);
 
 export type AttendeesDeleteMyAttendeeForPopupData = {
     attendeeId: string;
@@ -7292,7 +7843,7 @@ export type AttendeesUpdateMyMealPlanTicketData = {
     ticketId: string;
 };
 
-export type AttendeesUpdateMyMealPlanTicketResponse = (AttendeeWithOriginPublic);
+export type AttendeesUpdateMyMealPlanTicketResponse = (AttendeeWithOriginPortalPublic);
 
 export type AttendeesListAttendeesData = {
     applicationId?: (string | null);
@@ -7464,6 +8015,231 @@ export type AuthThirdPartyHumanAuthenticateData = {
 };
 
 export type AuthThirdPartyHumanAuthenticateResponse = (Token);
+
+export type BadgesListBadgeAwardsData = {
+    badgeId?: (string | null);
+    email?: (string | null);
+    humanId?: (string | null);
+    includeRevoked?: boolean;
+    /**
+     * Maximum number of items to return
+     */
+    limit?: number;
+    /**
+     * Number of items to skip
+     */
+    skip?: number;
+    xTenantId?: (string | null);
+};
+
+export type BadgesListBadgeAwardsResponse = (ListModel_BadgeAwardPublic_);
+
+export type BadgesRevokeBadgeAwardData = {
+    awardId: string;
+    requestBody: BadgeAwardRevoke;
+    xTenantId?: (string | null);
+};
+
+export type BadgesRevokeBadgeAwardResponse = (BadgeAwardPublic);
+
+export type BadgesListMyBadgesResponse = (Array<MyBadge>);
+
+export type BadgesListIssuableBadgesData = {
+    attendeeId?: (string | null);
+    popupId: string;
+};
+
+export type BadgesListIssuableBadgesResponse = (Array<IssuableBadge>);
+
+export type BadgesGiveBadgeAsHumanData = {
+    requestBody: PortalBadgeAwardCreate;
+};
+
+export type BadgesGiveBadgeAsHumanResponse = (SentBadgeAward);
+
+export type BadgesListSentBadgesData = {
+    popupId?: (string | null);
+};
+
+export type BadgesListSentBadgesResponse = (Array<SentBadgeAward>);
+
+export type BadgesListBadgesData = {
+    category?: (string | null);
+    includeArchived?: boolean;
+    /**
+     * Maximum number of items to return
+     */
+    limit?: number;
+    search?: (string | null);
+    /**
+     * Number of items to skip
+     */
+    skip?: number;
+    xTenantId?: (string | null);
+};
+
+export type BadgesListBadgesResponse = (ListModel_BadgePublic_);
+
+export type BadgesCreateBadgeData = {
+    requestBody: BadgeCreate;
+    xTenantId?: (string | null);
+};
+
+export type BadgesCreateBadgeResponse = (BadgePublic);
+
+export type BadgesGetBadgeData = {
+    badgeId: string;
+    xTenantId?: (string | null);
+};
+
+export type BadgesGetBadgeResponse = (BadgePublic);
+
+export type BadgesUpdateBadgeData = {
+    badgeId: string;
+    requestBody: BadgeUpdate;
+    xTenantId?: (string | null);
+};
+
+export type BadgesUpdateBadgeResponse = (BadgePublic);
+
+export type BadgesDeleteBadgeData = {
+    badgeId: string;
+    xTenantId?: (string | null);
+};
+
+export type BadgesDeleteBadgeResponse = (void);
+
+export type BadgesPutBadgeImageData = {
+    badgeId: string;
+    requestBody: BadgeImageUpsert;
+    styleId: string;
+    xTenantId?: (string | null);
+};
+
+export type BadgesPutBadgeImageResponse = (BadgePublic);
+
+export type BadgesDeleteBadgeImageData = {
+    badgeId: string;
+    styleId: string;
+    xTenantId?: (string | null);
+};
+
+export type BadgesDeleteBadgeImageResponse = (BadgePublic);
+
+export type BadgesAwardBadgeData = {
+    badgeId: string;
+    requestBody: BadgeAwardCreate;
+    xTenantId?: (string | null);
+};
+
+export type BadgesAwardBadgeResponse = (BadgeAwardPublic);
+
+export type BadgesListBadgeStylesData = {
+    xTenantId?: (string | null);
+};
+
+export type BadgesListBadgeStylesResponse = (Array<BadgeStylePublic>);
+
+export type BadgesCreateBadgeStyleData = {
+    requestBody: BadgeStyleCreate;
+    xTenantId?: (string | null);
+};
+
+export type BadgesCreateBadgeStyleResponse = (BadgeStylePublic);
+
+export type BadgesUpdateBadgeStyleData = {
+    requestBody: BadgeStyleUpdate;
+    styleId: string;
+    xTenantId?: (string | null);
+};
+
+export type BadgesUpdateBadgeStyleResponse = (BadgeStylePublic);
+
+export type BadgesDeleteBadgeStyleData = {
+    styleId: string;
+    xTenantId?: (string | null);
+};
+
+export type BadgesDeleteBadgeStyleResponse = (void);
+
+export type BadgesSetDefaultBadgeStyleData = {
+    styleId: string;
+    xTenantId?: (string | null);
+};
+
+export type BadgesSetDefaultBadgeStyleResponse = (BadgeStylePublic);
+
+export type BadgesListIssuerPoliciesData = {
+    badgeId?: (string | null);
+    xTenantId?: (string | null);
+};
+
+export type BadgesListIssuerPoliciesResponse = (Array<BadgeIssuerPolicyPublic>);
+
+export type BadgesCreateIssuerPolicyData = {
+    requestBody: BadgeIssuerPolicyCreate;
+    xTenantId?: (string | null);
+};
+
+export type BadgesCreateIssuerPolicyResponse = (BadgeIssuerPolicyPublic);
+
+export type BadgesGetIssuerPolicyData = {
+    policyId: string;
+    xTenantId?: (string | null);
+};
+
+export type BadgesGetIssuerPolicyResponse = (BadgeIssuerPolicyPublic);
+
+export type BadgesUpdateIssuerPolicyData = {
+    policyId: string;
+    requestBody: BadgeIssuerPolicyUpdate;
+    xTenantId?: (string | null);
+};
+
+export type BadgesUpdateIssuerPolicyResponse = (BadgeIssuerPolicyPublic);
+
+export type BadgesDeleteIssuerPolicyData = {
+    policyId: string;
+    xTenantId?: (string | null);
+};
+
+export type BadgesDeleteIssuerPolicyResponse = (void);
+
+export type BadgesListBadgeRulesData = {
+    badgeId?: (string | null);
+    xTenantId?: (string | null);
+};
+
+export type BadgesListBadgeRulesResponse = (Array<BadgeRulePublic>);
+
+export type BadgesCreateBadgeRuleData = {
+    requestBody: BadgeRuleCreate;
+    xTenantId?: (string | null);
+};
+
+export type BadgesCreateBadgeRuleResponse = (BadgeRulePublic);
+
+export type BadgesUpdateBadgeRuleData = {
+    requestBody: BadgeRuleUpdate;
+    ruleId: string;
+    xTenantId?: (string | null);
+};
+
+export type BadgesUpdateBadgeRuleResponse = (BadgeRulePublic);
+
+export type BadgesDeleteBadgeRuleData = {
+    ruleId: string;
+    xTenantId?: (string | null);
+};
+
+export type BadgesDeleteBadgeRuleResponse = (void);
+
+export type BadgesEvaluateBadgeRuleData = {
+    ruleId: string;
+    xTenantId?: (string | null);
+};
+
+export type BadgesEvaluateBadgeRuleResponse = (BadgeRuleEvaluation);
 
 export type BaseFieldConfigsListBaseFieldConfigsData = {
     /**
@@ -8910,15 +9686,33 @@ export type HumansCreateHumanData = {
 
 export type HumansCreateHumanResponse = (HumanPublic);
 
-export type HumansGetCurrentHumanInfoResponse = (HumanPublic);
+export type HumansGetCurrentHumanInfoResponse = (HumanSelfPublic);
 
 export type HumansUpdateCurrentHumanData = {
     requestBody: HumanProfileUpdate;
 };
 
-export type HumansUpdateCurrentHumanResponse = (HumanPublic);
+export type HumansUpdateCurrentHumanResponse = (HumanSelfPublic);
 
 export type HumansGetCurrentHumanProfileStatsResponse = (HumanProfileStats);
+
+export type HumansGetMyPublicProfileResponse = (PublicProfileSettings);
+
+export type HumansUpdateMyPublicProfileData = {
+    requestBody: PublicProfileSettingsUpdate;
+};
+
+export type HumansUpdateMyPublicProfileResponse = (PublicProfileSettings);
+
+export type HumansRegenerateMyPublicProfileResponse = (PublicProfileSettings);
+
+export type HumansGetPublicProfileData = {
+    token: string;
+    xEdgeOsPublishableKey?: (string | null);
+    xTenantId?: (string | null);
+};
+
+export type HumansGetPublicProfileResponse = (PublicProfile);
 
 export type HumansSearchHumansPortalData = {
     /**
@@ -9027,6 +9821,7 @@ export type HumansDeleteHumanCommentResponse = (void);
 
 export type HumansListHumanEnrichmentFactsData = {
     humanId: string;
+    xTenantId?: (string | null);
 };
 
 export type HumansListHumanEnrichmentFactsResponse = (ListModel_HumanEnrichmentFactPublic_);
@@ -9034,6 +9829,7 @@ export type HumansListHumanEnrichmentFactsResponse = (ListModel_HumanEnrichmentF
 export type HumansCreateHumanEnrichmentFactData = {
     humanId: string;
     requestBody: HumanEnrichmentFactCreate;
+    xTenantId?: (string | null);
 };
 
 export type HumansCreateHumanEnrichmentFactResponse = (HumanEnrichmentFactPublic);
@@ -9194,7 +9990,7 @@ export type PaymentsCreateMyApplicationFeeData = {
     requestBody: ApplicationFeeCreate;
 };
 
-export type PaymentsCreateMyApplicationFeeResponse = (PaymentPublic);
+export type PaymentsCreateMyApplicationFeeResponse = (PaymentPortalPublic);
 
 export type PaymentsReleaseMyPendingPaymentData = {
     requestBody: PendingReleaseAuthRequest;
@@ -9214,7 +10010,7 @@ export type PaymentsListMyPaymentsByPopupData = {
     skip?: number;
 };
 
-export type PaymentsListMyPaymentsByPopupResponse = (ListModel_PaymentPublic_);
+export type PaymentsListMyPaymentsByPopupResponse = (ListModel_PaymentPortalPublic_);
 
 export type PaymentsGetMyLatestPaymentData = {
     applicationId: string;
@@ -9240,7 +10036,7 @@ export type PaymentsListMyPaymentsData = {
     skip?: number;
 };
 
-export type PaymentsListMyPaymentsResponse = (ListModel_PaymentPublic_);
+export type PaymentsListMyPaymentsResponse = (ListModel_PaymentPortalPublic_);
 
 export type PaymentsGetMyInvoiceData = {
     paymentId: string;
@@ -9258,7 +10054,7 @@ export type PaymentsCreateMyPaymentData = {
     requestBody: PaymentCreate;
 };
 
-export type PaymentsCreateMyPaymentResponse = (PaymentPublic);
+export type PaymentsCreateMyPaymentResponse = (PaymentPortalPublic);
 
 export type PaymentsSimplefiWebhookResponse = ({
     [key: string]: unknown;
@@ -9543,6 +10339,13 @@ export type SalesFlowsListPortalDirectSalesFlowsData = {
 };
 
 export type SalesFlowsListPortalDirectSalesFlowsResponse = (ListModel_SalesFlowPortalPublic_);
+
+export type SalesFlowsGetPortalCheckoutConfigData = {
+    popupId: string;
+    salesFlowId?: (string | null);
+};
+
+export type SalesFlowsGetPortalCheckoutConfigResponse = (SalesFlowCheckoutConfig);
 
 export type SalesFlowsListSalesFlowsData = {
     /**

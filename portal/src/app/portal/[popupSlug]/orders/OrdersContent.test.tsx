@@ -6,7 +6,7 @@ import {
   within,
 } from "@testing-library/react"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
-import { OpenAPI, type PaymentPublic } from "@/client"
+import { OpenAPI, type PaymentPortalPublic } from "@/client"
 import { OrdersContent } from "./OrdersContent"
 
 const { mockToastError } = vi.hoisted(() => ({
@@ -120,7 +120,7 @@ describe("OrdersContent", () => {
                 created_at: "2026-08-21T12:00:00Z",
               },
             ],
-          } as PaymentPublic,
+          } as PaymentPortalPublic,
         ]}
       />,
     )
@@ -185,7 +185,7 @@ describe("OrdersContent", () => {
             sales_flow_id: null,
             created_at: "2023-01-01T00:00:00Z",
             products_snapshot: [],
-          } as PaymentPublic,
+          } as PaymentPortalPublic,
         ]}
       />,
     )
@@ -247,7 +247,7 @@ describe("OrdersContent", () => {
                 },
               ],
             },
-          ] as PaymentPublic[]
+          ] as PaymentPortalPublic[]
         }
       />,
     )
@@ -319,7 +319,7 @@ describe("OrdersContent", () => {
             sales_flow_id: "merch-flow",
             created_at: "2026-08-21T12:00:00Z",
             products_snapshot: [],
-          } as PaymentPublic,
+          } as PaymentPortalPublic,
         ]}
       />,
     )
@@ -365,7 +365,7 @@ describe("OrdersContent", () => {
             sales_flow_id: "merch-flow",
             created_at: "2026-08-21T12:00:00Z",
             products_snapshot: [],
-          } as PaymentPublic,
+          } as PaymentPortalPublic,
         ]}
       />,
     )

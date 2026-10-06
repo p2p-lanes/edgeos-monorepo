@@ -1,4 +1,4 @@
-import type { PaymentPublic, SalesFlowPortalPublic } from "@/client"
+import type { PaymentPortalPublic, SalesFlowPortalPublic } from "@/client"
 import type { AttendeePassState, TicketEntry } from "@/types/Attendee"
 
 interface PortalFlowCollections {
@@ -117,7 +117,7 @@ interface PassesApplication {
 type PassesFlow = Pick<SalesFlowPortalPublic, "id" | "name" | "slug">
 
 type PassesPayment = Pick<
-  PaymentPublic,
+  PaymentPortalPublic,
   "application_id" | "id" | "sales_flow_id"
 >
 

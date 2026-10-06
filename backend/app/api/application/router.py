@@ -10,7 +10,7 @@ from loguru import logger
 
 from app.api.application import crud
 from app.api.application.history_crud import build_previous_applications
-from app.api.application.models import ApplicationComment
+from app.api.application.models import ApplicationComment, Applications
 from app.api.application.schemas import (
     AdminGrantTicketsRequest,
     AdminGrantTicketsResponse,
@@ -22,6 +22,7 @@ from app.api.application.schemas import (
     ApplicationCommentUpdate,
     ApplicationCreate,
     ApplicationGroupCount,
+    ApplicationPortalPublic,
     ApplicationPublic,
     ApplicationReviewerOption,
     ApplicationReviewerVote,
@@ -204,6 +205,15 @@ def _build_application_public(
         my_skip_reason=my_skip_reason,
     )
     return app_public
+
+
+def _build_application_portal_public(
+    application: Applications,
+) -> ApplicationPortalPublic:
+    """Project through the portal allowlist, including nested human/attendee data."""
+    return ApplicationPortalPublic.model_validate(
+        _build_application_public(application).model_dump()
+    )
 
 
 @router.get("", response_model=ListModel[ApplicationPublic])
@@ -675,7 +685,7 @@ async def grant_application_credit(
 
 @router.get(
     "/my/applications",
-    response_model=ListModel[ApplicationPublic],
+    response_model=ListModel[ApplicationPortalPublic],
     summary="List your applications",
     dependencies=[needs("portal:applications:read")],
 )
@@ -684,15 +694,15 @@ async def list_my_applications(
     current_human: CurrentHuman,
     skip: PaginationSkip = 0,
     limit: PaginationLimit = 100,
-) -> ListModel[ApplicationPublic]:
+) -> ListModel[ApplicationPortalPublic]:
     """List applications for the current human (Portal)."""
     applications, total = crud.applications_crud.find_by_human(
         db, human_id=current_human.id, skip=skip, limit=limit
     )
 
-    results = [_build_application_public(a) for a in applications]
+    results = [_build_application_portal_public(a) for a in applications]
 
-    return ListModel[ApplicationPublic](
+    return ListModel[ApplicationPortalPublic](
         results=results,
         paging=Paging(offset=skip, limit=limit, total=total),
     )
@@ -890,7 +900,7 @@ async def get_my_purchases(
 
 @router.get(
     "/my/{popup_id}",
-    response_model=ApplicationPublic,
+    response_model=ApplicationPortalPublic,
     summary="Get your application for a popup",
     dependencies=[needs("portal:applications:read")],
 )
@@ -898,11 +908,21 @@ async def get_my_application(
     popup_id: uuid.UUID,
     db: HumanTenantSession,
     current_human: CurrentHuman,
-) -> ApplicationPublic:
-    """Get current human's application for a popup (Portal)."""
-    application = crud.applications_crud.get_by_human_popup(
-        db, human_id=current_human.id, popup_id=popup_id
-    )
+    primary_flow_only: bool = False,
+) -> ApplicationPortalPublic:
+    """Get current human's application for a popup (Portal).
+
+    With primary_flow_only, return only the application in the popup's primary
+    sales flow. Missing primary applications return 404, never another flow.
+    """
+    if primary_flow_only:
+        application = crud.applications_crud.get_by_human_primary_flow(
+            db, human_id=current_human.id, popup_id=popup_id
+        )
+    else:
+        application = crud.applications_crud.get_by_human_popup(
+            db, human_id=current_human.id, popup_id=popup_id
+        )
 
     if not application:
         raise HTTPException(
@@ -910,7 +930,7 @@ async def get_my_application(
             detail="Application not found",
         )
 
-    return _build_application_public(application)
+    return _build_application_portal_public(application)
 
 
 def _host_paid_for_any(db, attendee_products) -> bool:
@@ -1023,7 +1043,7 @@ async def detach_companion(
 
 @router.post(
     "/my",
-    response_model=ApplicationPublic,
+    response_model=ApplicationPortalPublic,
     status_code=status.HTTP_201_CREATED,
     summary="Create your application",
     dependencies=[needs("portal:applications:write")],
@@ -1032,7 +1052,7 @@ async def create_my_application(
     app_in: ApplicationCreate,
     db: HumanTenantSession,
     current_human: CurrentHuman,
-) -> ApplicationPublic:
+) -> ApplicationPortalPublic:
     """Create an application for the current human (Portal)."""
     from app.api.popup.crud import popups_crud
     from app.api.popup.guards import ensure_popup_writable
@@ -1124,12 +1144,12 @@ async def create_my_application(
     # Send appropriate email based on application status
     await send_application_status_email(application, current_human, db)
 
-    return _build_application_public(application)
+    return _build_application_portal_public(application)
 
 
 @router.patch(
     "/my/{popup_id}",
-    response_model=ApplicationPublic,
+    response_model=ApplicationPortalPublic,
     summary="Update your application for a sales flow",
     dependencies=[needs("portal:applications:write")],
 )
@@ -1139,7 +1159,7 @@ async def update_my_application(
     app_in: ApplicationUpdate,
     db: HumanTenantSession,
     current_human: CurrentHuman,
-) -> ApplicationPublic:
+) -> ApplicationPortalPublic:
     """Update the current human's application in a selected sales flow."""
     from app.api.popup.crud import popups_crud
     from app.api.popup.guards import ensure_popup_writable
@@ -1341,7 +1361,18 @@ async def update_my_application(
         application, current_human, db, status_before=status_before_str
     )
 
-    return _build_application_public(application)
+    return _build_application_portal_public(application)
+
+
+def _resolve_directory_custom_field(
+    custom: dict[str, object], *keys: str
+) -> str | None:
+    """Return the first nonblank text value, preserving its original content."""
+    for key in keys:
+        value = custom.get(key)
+        if isinstance(value, str) and value.strip():
+            return value
+    return None
 
 
 def _build_directory_entry(attendee) -> AttendeesDirectoryEntry:
@@ -1355,15 +1386,20 @@ def _build_directory_entry(attendee) -> AttendeesDirectoryEntry:
     """
     human = attendee.human
     application = attendee.application
-    is_main = attendee.category == "main"
+    # Match SQL category normalization while preserving the response's raw key.
+    is_main = (attendee.category or "").strip().lower() == "main"
 
     # info_not_shared masking belongs to the main applicant's own application.
+    # Forms store labels like "Email", while directory keys are lowercase.
+    # Normalize on read without changing the stored form selections.
     info_hidden = (
-        set(application.info_not_shared or []) if (is_main and application) else set()
+        {field.strip().casefold() for field in (application.info_not_shared or [])}
+        if (is_main and application)
+        else set()
     )
 
     def mask(field: str, value: str | None) -> str | None:
-        return "*" if field in info_hidden else value
+        return "*" if field.casefold() in info_hidden else value
 
     # Each AttendeeProducts row is one ticket — dedupe by product_id so the
     # directory shows each product once even if the attendee holds several
@@ -1392,7 +1428,8 @@ def _build_directory_entry(attendee) -> AttendeesDirectoryEntry:
         )
 
     # role/organization come from the application form — only meaningful for the
-    # main applicant. Companions get blank values.
+    # main applicant. Companions get blank values. Prefer canonical keys, then
+    # known form aliases; mask the resolved values under the canonical keys.
     custom = (application.custom_fields or {}) if (is_main and application) else {}
 
     return AttendeesDirectoryEntry(
@@ -1401,8 +1438,16 @@ def _build_directory_entry(attendee) -> AttendeesDirectoryEntry:
         last_name=mask("last_name", human.last_name if human else None),
         email=mask("email", human.email if human else attendee.email),
         telegram=mask("telegram", human.telegram if human else None),
-        role=mask("role", custom.get("role")),
-        organization=mask("organization", custom.get("organization")),
+        role=mask(
+            "role",
+            _resolve_directory_custom_field(custom, "role", "role_in_the_organization"),
+        ),
+        organization=mask(
+            "organization",
+            _resolve_directory_custom_field(
+                custom, "organization", "organization_you_represent"
+            ),
+        ),
         residence=mask("residence", human.residence if human else None),
         age=mask("age", human.age if human else None),
         gender=mask("gender", human.gender if human else None),
@@ -1457,11 +1502,16 @@ async def list_attendees_directory(
     skip: PaginationSkip = 0,
     limit: PaginationLimit = 100,
     q: str | None = None,
+    hide_empty_rows: bool = False,
 ) -> ListModel[AttendeesDirectoryEntry]:
     """List attendees directory for a popup (Portal).
 
-    Returns accepted applications with at least one product.
-    Respects info_not_shared masking.
+    Returns ticket-holding attendees of accepted applications in the popup's
+    primary sales flow only. Respects that application's info_not_shared masking.
+    When hide_empty_rows is true, excludes entries without shared, nonblank
+    name, email, Telegram, role or organization. Residence, age and gender remain
+    in the response but do not determine portal row visibility. The default
+    listing and CSV export do not apply the empty-row filter.
     """
     _ensure_attendee_directory_enabled(db, popup_id)
 
@@ -1471,6 +1521,7 @@ async def list_attendees_directory(
         skip=skip,
         limit=limit,
         q=q,
+        hide_empty_rows=hide_empty_rows,
     )
 
     results = [_build_directory_entry(a) for a in attendees]
@@ -1501,7 +1552,7 @@ async def export_attendees_directory_csv(
 ) -> Response:
     """Export attendees directory as CSV (Portal).
 
-    No pagination — fetches all matching entries.
+    No pagination — fetches all matching primary-flow entries.
     """
     _ensure_attendee_directory_enabled(db, popup_id)
 
@@ -1554,7 +1605,7 @@ async def export_attendees_directory_csv(
 
 @router.post(
     "/my/{popup_id}/attendees",
-    response_model=ApplicationPublic,
+    response_model=ApplicationPortalPublic,
     status_code=status.HTTP_201_CREATED,
     summary="Add an attendee to your application",
     dependencies=[needs("portal:attendees:write")],
@@ -1564,7 +1615,7 @@ async def add_my_attendee(
     attendee_in: AttendeeCreate,
     db: HumanTenantSession,
     current_human: CurrentHuman,
-) -> ApplicationPublic:
+) -> ApplicationPortalPublic:
     """Add an attendee to current human's application (Portal)."""
     application = crud.applications_crud.get_by_human_popup(
         db, human_id=current_human.id, popup_id=popup_id
@@ -1609,12 +1660,12 @@ async def add_my_attendee(
         gender=attendee_in.gender,
     )
 
-    return _build_application_public(application)
+    return _build_application_portal_public(application)
 
 
 @router.patch(
     "/my/{popup_id}/attendees/{attendee_id}",
-    response_model=ApplicationPublic,
+    response_model=ApplicationPortalPublic,
     summary="Update an attendee on your application",
     dependencies=[needs("portal:attendees:write")],
 )
@@ -1624,7 +1675,7 @@ async def update_my_attendee(
     attendee_in: AttendeeUpdate,
     db: HumanTenantSession,
     current_human: CurrentHuman,
-) -> ApplicationPublic:
+) -> ApplicationPortalPublic:
     """Update an attendee in current human's application (Portal)."""
     from app.api.attendee.crud import attendees_crud
 
@@ -1665,12 +1716,12 @@ async def update_my_attendee(
     attendees_crud.update_attendee(db, attendee, attendee_in)
     db.refresh(application)
 
-    return _build_application_public(application)
+    return _build_application_portal_public(application)
 
 
 @router.delete(
     "/my/{popup_id}/attendees/{attendee_id}",
-    response_model=ApplicationPublic,
+    response_model=ApplicationPortalPublic,
     summary="Remove an attendee from your application",
     dependencies=[needs("portal:attendees:write")],
 )
@@ -1679,7 +1730,7 @@ async def delete_my_attendee(
     attendee_id: uuid.UUID,
     db: HumanTenantSession,
     current_human: CurrentHuman,
-) -> ApplicationPublic:
+) -> ApplicationPortalPublic:
     """Delete an attendee from current human's application (Portal)."""
     application = crud.applications_crud.get_by_human_popup(
         db, human_id=current_human.id, popup_id=popup_id
@@ -1698,7 +1749,7 @@ async def delete_my_attendee(
 
     crud.applications_crud.delete_attendee(db, application, attendee_id)
 
-    return _build_application_public(application)
+    return _build_application_portal_public(application)
 
 
 @router.patch(

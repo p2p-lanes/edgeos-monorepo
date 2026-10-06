@@ -3,7 +3,7 @@ import { act, renderHook } from "@testing-library/react"
 import type { ReactNode } from "react"
 import { createElement } from "react"
 import { describe, expect, it, vi } from "vitest"
-import type { ApplicationPublic, PopupPublic } from "@/client"
+import type { ApplicationPortalPublic, PopupPublic } from "@/client"
 import { ApplicationsService } from "@/client"
 import type { ApplicationFormSchema } from "@/types/form-schema"
 import { useSubmitApplication } from "./use-submit-application"
@@ -56,7 +56,7 @@ describe("useSubmitApplication create-vs-update (rel-001 correction)", () => {
     const existing = {
       id: "app-1",
       sales_flow_id: "flow-a",
-    } as ApplicationPublic
+    } as ApplicationPortalPublic
     const { result } = renderHook(
       () =>
         useSubmitApplication({
@@ -110,7 +110,7 @@ describe("useSubmitApplication create-vs-update (rel-001 correction)", () => {
     const applications = [
       { id: "app-1", sales_flow_id: "flow-a" },
       { id: "app-2", sales_flow_id: "flow-b" },
-    ] as ApplicationPublic[]
+    ] as ApplicationPortalPublic[]
     const existing = applications[1]
     const { result } = renderHook(
       () =>

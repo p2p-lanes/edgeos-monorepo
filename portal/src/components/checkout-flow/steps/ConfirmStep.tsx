@@ -44,6 +44,7 @@ export default function ConfirmStep() {
     buyerGeneralError,
     removeMealPlan,
     housingDatesShown,
+    flowConfig,
   } = useCheckout()
   const { getCity } = useCityProvider()
   const popup = getCity()
@@ -115,12 +116,13 @@ export default function ConfirmStep() {
     Object.values(cart.dynamicItems).some((items) => items.length > 0) ||
     hasEditChanges
 
-  // Insurance available if popup has insurance enabled with a valid percentage.
+  // Insurance available if the flow has insurance enabled with a valid percentage.
   // Gate on the post-discount product subtotal so insurance is hidden whenever
   // there are no products left to insure — covers coupons that drop it to $0,
   // group/scholarship discounts of 100%, and patreon zeroing other products.
   const isInsuranceEnabled =
-    popup?.insurance_enabled === true && popup?.insurance_percentage != null
+    flowConfig?.insurance_enabled === true &&
+    flowConfig?.insurance_percentage != null
   const discountedProductsSubtotal =
     summary.discountableSubtotal - summary.discount
   const hasInsurableProducts =
@@ -553,7 +555,7 @@ export default function ConfirmStep() {
           </>
         )}
 
-        {/* Contribution fee — mandatory when popup has it enabled; no buyer toggle */}
+        {/* Contribution fee — mandatory when the flow has it enabled; no buyer toggle */}
         {summary.contributionSubtotal > 0 && (
           <>
             <div className="border-t border-border" />
@@ -562,10 +564,10 @@ export default function ConfirmStep() {
                 <div className="flex items-center gap-2 min-w-0">
                   <HandCoins className="w-4 h-4 text-muted-foreground shrink-0" />
                   <span className="text-foreground">
-                    {popup?.contribution_label ||
+                    {flowConfig?.contribution_label ||
                       t("checkout.contribution.fallbackLabel")}
-                    {popup?.contribution_percentage
-                      ? ` (${Number(popup.contribution_percentage)}%)`
+                    {flowConfig?.contribution_percentage
+                      ? ` (${Number(flowConfig.contribution_percentage)}%)`
                       : ""}
                   </span>
                 </div>
@@ -573,9 +575,9 @@ export default function ConfirmStep() {
                   {formatCurrency(summary.contributionSubtotal)}
                 </span>
               </div>
-              {popup?.contribution_description && (
+              {flowConfig?.contribution_description && (
                 <p className="text-xs text-muted-foreground mt-2 ml-6">
-                  {popup.contribution_description}
+                  {flowConfig.contribution_description}
                 </p>
               )}
             </div>
@@ -583,7 +585,7 @@ export default function ConfirmStep() {
         )}
 
         {/* Promo Code Section */}
-        {popup?.allows_coupons && hasDiscountableItems && (
+        {flowConfig?.allows_coupons && hasDiscountableItems && (
           <>
             <div className="border-t border-border" />
             <div className="px-4 sm:px-5 py-4">

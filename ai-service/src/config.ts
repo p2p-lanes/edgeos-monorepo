@@ -48,7 +48,7 @@ export function loadConfig(environment: Environment = process.env): Config {
     openaiApiKey,
     model:
       optional(environment, "AI_MODEL") ??
-      (provider === "openai" ? "gpt-5.6-terra" : "gemini-2.5-flash"),
+      (provider === "openai" ? "gpt-6-luna" : "gemini-2.5-flash"),
     toolApprovalSecret: optional(environment, "TOOL_APPROVAL_SECRET"),
   }
 }

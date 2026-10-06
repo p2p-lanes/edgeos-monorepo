@@ -32,6 +32,7 @@ HumanScope = Literal[
     "portal:payments:read",
     "portal:directory:read",
     "portal:api_keys:manage",
+    "portal:badges:write",
 ]
 
 # Admin API-key scope universe. Defined here (not in app.api.api_key.schemas)
@@ -66,6 +67,8 @@ ApiKeyScope = Literal[
     "ticketing_steps:write",
     "translations:read",
     "translations:write",
+    "badges:read",
+    "badges:write",
 ]
 
 # Union used for TokenPayload.scopes — accepts both universes.
@@ -137,6 +140,8 @@ ADMIN_API_KEY_SCOPES: frozenset[str] = frozenset(
         "ticketing_steps:write",
         "translations:read",
         "translations:write",
+        "badges:read",
+        "badges:write",
     }
 )
 
@@ -411,7 +416,7 @@ def _resolve_api_key(token: str) -> TokenPayload:
             if human is None or human.red_flag:
                 raise HTTPException(
                     status_code=status.HTTP_403_FORBIDDEN,
-                    detail="API key owner is blocked from using API keys.",
+                    detail="API key is not available.",
                 )
             api_key_crud.touch_last_used(session, row)
             return TokenPayload(

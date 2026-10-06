@@ -10,7 +10,7 @@ from app.core.db import engine
 from app.core.security import TokenPayload, get_token_payload
 
 if TYPE_CHECKING:
-    from app.api.human.schemas import HumanPublic
+    from app.api.human.schemas import AuthenticatedHuman
     from app.api.tenant.schemas import TenantPublic
     from app.api.user.schemas import UserPublic
 
@@ -226,9 +226,9 @@ CurrentTenant = Annotated["TenantPublic", Depends(get_current_tenant)]
 def get_current_human(
     token_payload: Annotated[TokenPayload, Depends(get_token_payload)],
     db: SessionDep,
-) -> "HumanPublic":
+) -> "AuthenticatedHuman":
     from app.api.human.models import Humans
-    from app.api.human.schemas import HumanPublic
+    from app.api.human.schemas import AuthenticatedHuman
 
     # Only allow human tokens
     if token_payload.token_type != "human":
@@ -256,7 +256,7 @@ def get_current_human(
             headers={"WWW-Authenticate": "Bearer"},
         )
 
-    return HumanPublic.model_validate(human)
+    return AuthenticatedHuman.model_validate(human)
 
 
-CurrentHuman = Annotated["HumanPublic", Depends(get_current_human)]
+CurrentHuman = Annotated["AuthenticatedHuman", Depends(get_current_human)]

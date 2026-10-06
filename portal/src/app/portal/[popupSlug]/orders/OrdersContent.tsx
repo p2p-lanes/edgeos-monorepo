@@ -4,7 +4,7 @@ import { Download, FileText, Loader2 } from "lucide-react"
 import { useState } from "react"
 import { useTranslation } from "react-i18next"
 import { toast } from "sonner"
-import { OpenAPI, type PaymentPublic } from "@/client"
+import { OpenAPI, type PaymentPortalPublic } from "@/client"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { formatDate } from "@/helpers/dates"
@@ -32,7 +32,7 @@ export function OrdersContent({
   payments,
   invoiceAvailable,
 }: {
-  payments: PaymentPublic[]
+  payments: PaymentPortalPublic[]
   invoiceAvailable: boolean
 }) {
   const { t } = useTranslation()

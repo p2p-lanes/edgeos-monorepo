@@ -1,19 +1,26 @@
+import secrets
 import uuid
 from datetime import UTC, datetime
 from typing import Annotated
 
-from fastapi import APIRouter, Header, HTTPException, status
+from fastapi import APIRouter, Depends, Header, HTTPException, status
 
 from app.api.api_key import crud as api_key_crud
 from app.api.api_key.schemas import ApiKeyPublic
 from app.api.audit_log.actor import actor_from_user
 from app.api.audit_log.constants import AuditAction, AuditEntityType
 from app.api.audit_log.crud import audit_logs_crud
+from app.api.badge.schemas import (
+    PublicProfile,
+    PublicProfileSettings,
+    PublicProfileSettingsUpdate,
+)
 from app.api.human import crud
 from app.api.human.activity_crud import build_human_activity, note_log_to_item
 from app.api.human.activity_schemas import HumanActivityCreate, HumanActivityItem
 from app.api.human.crud import HardDeleteSummary
 from app.api.human.models import HumanComment
+from app.api.human.privacy import public_display_name
 from app.api.human.schemas import (
     HumanCommentCreate,
     HumanCommentPublic,
@@ -25,11 +32,13 @@ from app.api.human.schemas import (
     HumanProfileStats,
     HumanProfileUpdate,
     HumanPublic,
+    HumanSelfPublic,
     HumanUpdate,
     parse_human_filters,
 )
 from app.api.shared.enums import HumanRating, UserRole
 from app.api.shared.response import ListModel, PaginationLimit, PaginationSkip, Paging
+from app.core.dependencies.tenants import PublicTenant
 from app.core.dependencies.users import (
     AdminOrApiKey_HumansRead,
     AdminOrApiKey_HumansWrite,
@@ -45,6 +54,7 @@ from app.core.dependencies.users import (
     TenantSession,
     needs,
 )
+from app.core.rate_limit import RateLimit
 from app.services.email_helpers import send_application_status_email
 
 router = APIRouter(prefix="/humans", tags=["humans"])
@@ -152,14 +162,14 @@ async def create_human(
 
 @router.get(
     "/me",
-    response_model=HumanPublic,
+    response_model=HumanSelfPublic,
     summary="Get your profile",
     dependencies=[needs("portal:profile:read")],
 )
 async def get_current_human_info(
     current_user: CurrentHuman,
-) -> HumanPublic:
-    return HumanPublic.model_validate(current_user)
+) -> HumanSelfPublic:
+    return HumanSelfPublic.model_validate(current_user.model_dump())
 
 
 @router.get(
@@ -178,7 +188,7 @@ async def get_current_human_profile_stats(
 
 @router.patch(
     "/me",
-    response_model=HumanPublic,
+    response_model=HumanSelfPublic,
     summary="Update your profile",
     dependencies=[needs("portal:profile:write")],
 )
@@ -186,7 +196,7 @@ async def update_current_human(
     human_in: HumanProfileUpdate,
     current_human: CurrentHuman,
     db: HumanTenantSession,
-) -> HumanPublic:
+) -> HumanSelfPublic:
     """Update the current authenticated human's profile."""
     human = crud.get(db, current_human.id)
 
@@ -197,7 +207,123 @@ async def update_current_human(
         )
 
     updated = crud.update(db, human, human_in)
-    return HumanPublic.model_validate(updated)
+    return HumanSelfPublic.model_validate(updated)
+
+
+def _ensure_public_profile_token(db, human) -> str:
+    """Return the human's share token, minting one on first use."""
+    if not human.public_profile_token:
+        human.public_profile_token = secrets.token_urlsafe(16)
+        db.add(human)
+        db.commit()
+        db.refresh(human)
+    return human.public_profile_token
+
+
+@router.get(
+    "/me/public-profile",
+    response_model=PublicProfileSettings,
+    summary="Get your public profile link settings",
+    dependencies=[needs("portal:profile:read")],
+)
+async def get_my_public_profile(
+    current_human: CurrentHuman,
+    db: HumanTenantSession,
+) -> PublicProfileSettings:
+    human = crud.get(db, current_human.id)
+    if not human:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Human not found"
+        )
+    token = _ensure_public_profile_token(db, human)
+    return PublicProfileSettings(enabled=human.public_profile_enabled, token=token)
+
+
+@router.patch(
+    "/me/public-profile",
+    response_model=PublicProfileSettings,
+    summary="Turn your public profile link on or off",
+    dependencies=[needs("portal:profile:write")],
+)
+async def update_my_public_profile(
+    body: PublicProfileSettingsUpdate,
+    current_human: CurrentHuman,
+    db: HumanTenantSession,
+) -> PublicProfileSettings:
+    human = crud.get(db, current_human.id)
+    if not human:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Human not found"
+        )
+    human.public_profile_enabled = body.enabled
+    db.add(human)
+    db.commit()
+    db.refresh(human)
+    token = _ensure_public_profile_token(db, human)
+    return PublicProfileSettings(enabled=human.public_profile_enabled, token=token)
+
+
+@router.post(
+    "/me/public-profile/regenerate",
+    response_model=PublicProfileSettings,
+    summary="Replace your public profile link",
+    dependencies=[needs("portal:profile:write")],
+)
+async def regenerate_my_public_profile(
+    current_human: CurrentHuman,
+    db: HumanTenantSession,
+) -> PublicProfileSettings:
+    """Mint a new share token; the previous link stops working at once."""
+    human = crud.get(db, current_human.id)
+    if not human:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Human not found"
+        )
+    human.public_profile_token = secrets.token_urlsafe(16)
+    db.add(human)
+    db.commit()
+    db.refresh(human)
+    return PublicProfileSettings(
+        enabled=human.public_profile_enabled, token=human.public_profile_token
+    )
+
+
+@router.get(
+    "/public/profiles/{token}",
+    response_model=PublicProfile,
+    dependencies=[
+        Depends(
+            RateLimit(limit=120, window_sec=60, key_prefix="rl:human-public-profile")
+        ),
+    ],
+)
+async def get_public_profile(
+    token: str,
+    db: SessionDep,
+    tenant: PublicTenant,
+) -> PublicProfile:
+    """Unauthenticated profile card behind a human's share link.
+
+    Exposes only a display name (first name and last initial), the avatar and
+    the badges; never email, contact fields, award messages or ids. Unknown,
+    regenerated, disabled and sibling-tenant tokens all get the same opaque
+    404 so the route can't be used to probe for people.
+    """
+    from sqlmodel import select
+
+    from app.api.badge.crud import public_profile_badges
+    from app.api.human.models import Humans
+
+    human = db.exec(select(Humans).where(Humans.public_profile_token == token)).first()
+    if not human or human.tenant_id != tenant.id or not human.public_profile_enabled:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Profile not found"
+        )
+    return PublicProfile(
+        display_name=public_display_name(human.first_name, human.last_name),
+        picture_url=human.picture_url,
+        badges=public_profile_badges(db, human),
+    )
 
 
 @router.get(
@@ -598,12 +724,15 @@ async def delete_human_comment(
 )
 async def list_human_enrichment_facts(
     human_id: uuid.UUID,
-    db: SessionDep,
-    current_user: CurrentUser,
+    db: AdminOrApiKeySession_HumansRead,
+    current_user: AdminOrApiKey_HumansRead,
+    control_db: SessionDep,
 ) -> ListModel[HumanEnrichmentFactPublic]:
     """List a human's enrichment facts, newest first."""
     _get_human_in_tenant_or_404(db, human_id, current_user)
-    facts = crud.list_enrichment_facts(db, human_id)
+    # Facts are control-plane data (no tenant DB grants). Authorize the human
+    # through the scoped session above before reading by its verified ID.
+    facts = crud.list_enrichment_facts(control_db, human_id)
     return ListModel[HumanEnrichmentFactPublic](
         results=[HumanEnrichmentFactPublic.model_validate(f) for f in facts],
         paging=Paging(offset=0, limit=len(facts), total=len(facts)),
@@ -618,10 +747,11 @@ async def list_human_enrichment_facts(
 async def create_human_enrichment_fact(
     human_id: uuid.UUID,
     fact_in: HumanEnrichmentFactCreate,
-    db: SessionDep,
-    current_user: CurrentUser,
+    db: AdminOrApiKeySession_HumansWrite,
+    current_user: AdminOrApiKey_HumansWrite,
+    control_db: SessionDep,
 ) -> HumanEnrichmentFactPublic:
     """Append one provenance fact extracted by the enrichment agent."""
     _get_human_in_tenant_or_404(db, human_id, current_user)
-    fact = crud.create_enrichment_fact(db, human_id, fact_in)
+    fact = crud.create_enrichment_fact(control_db, human_id, fact_in)
     return HumanEnrichmentFactPublic.model_validate(fact)

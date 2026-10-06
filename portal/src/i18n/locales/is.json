@@ -587,11 +587,44 @@
   "attendees": {
     "title": "Skrá",
     "description": "Hafðu samband við vini þína til að skipuleggja stefnumót, finna sameiginlegt húsnæði eða skipuleggja athafnir saman. *Þessi skrá inniheldur aðeins upplýsingar þeirra sem hafa sjálfviljugir samþykkt að deila upplýsingum sínum.",
-    "search_placeholder": "Leita eftir nafni, netfangi, stofnun...",
+    "search_placeholder": "Leita eftir nafni, netfangi eða Telegram...",
     "export_csv": "Flytja þátttakendur út sem CSV",
     "no_attendees": "Engir þátttakendur fundust",
     "per_page_label": "Á síðu",
-    "showing_range": "Sýni {{from}}–{{to}} af {{total}}"
+    "showing_range": "Sýni {{from}}–{{to}} af {{total}}",
+    "privacy_button": "Stillingar miðlunar",
+    "privacy_title": "Veldu hvað þú deilir",
+    "privacy_description": "Veldu hvaða upplýsingar aðrir þátttakendur geta séð í skránni.",
+    "privacy_save": "Vista stillingar",
+    "privacy_saved": "Stillingar þínar voru vistaðar.",
+    "privacy_error": "Ekki tókst að vista stillingarnar þínar.",
+    "privacy_no_application": "Sendu inn umsókn í gegnum aðalsöluferli þessa viðburðar til að stjórna upplýsingum þínum í skránni.",
+    "fields": {
+      "first_name": "Fornafn",
+      "last_name": "Eftirnafn",
+      "email": "Netfang",
+      "telegram": "Telegram",
+      "role": "Hlutverk",
+      "organization": "Samtök"
+    },
+    "badges": {
+      "give": "Gefa merki",
+      "this_person": "þessari manneskju",
+      "dialog_title": "Gefðu {{name}} merki",
+      "dialog_description": "Það birtist á prófílnum þeirra. Aðeins viðtakandinn sér skilaboðin þín.",
+      "remaining_one": "{{count}} eftir",
+      "remaining_other": "{{count}} eftir",
+      "unlimited": "Engin takmörk",
+      "none_left": "Ekkert eftir",
+      "already_has": "Á hana nú þegar",
+      "back_at": "Aftur {{when}}",
+      "message_placeholder": "Bættu við athugasemd (valfrjálst)",
+      "send": "Senda merki",
+      "sent": "Merki sent til {{name}}",
+      "error_exhausted": "Þú átt ekki fleiri af þessu merki til að gefa í bili.",
+      "error_forbidden": "Þú getur ekki gefið þessari manneskju þetta merki.",
+      "error_generic": "Ekki tókst að senda merkið. Reyndu aftur."
+    }
   },
   "checkin": {
     "title": "Innritun á netinu fyrir {{eventName}}",
@@ -651,7 +684,21 @@
     "hosted_events_count_one": "{{count}} viðburður",
     "hosted_events_count_other": "{{count}} viðburðir",
     "top_five": "Top 5",
-    "no_calendar_activity": "Engin dagatalsvirkni ennþá"
+    "no_calendar_activity": "Engin dagatalsvirkni ennþá",
+    "badges": {
+      "title": "Merki",
+      "subtitle": "Viðurkenningar sem þú hefur safnað",
+      "empty": "Engin merki enn. Þau birtast hér þegar einhver gefur þér merki.",
+      "link_title": "Opinber prófílhlekkur",
+      "link_description": "Allir með hlekkinn sjá nafnið þitt, mynd og merki. Aldrei netfangið þitt.",
+      "link_toggle": "Opinber prófílhlekkur",
+      "link_copy": "Afrita hlekk",
+      "link_copied": "Hlekkur afritaður",
+      "link_copy_failed": "Ekki tókst að afrita hlekkinn",
+      "link_reset": "Endurstilla hlekk",
+      "link_reset_confirm": "Búa til nýjan hlekk? Núverandi hlekkur hættir að virka.",
+      "link_off": "Slökkt er á hlekknum þínum, enginn getur opnað hann."
+    }
   },
   "sidebar": {
     "your_participation": "Þátttaka þín",
@@ -1303,5 +1350,12 @@
       "error_host": "Gestgjafi viðburðarins getur ekki innritað sig sem gestur.",
       "error_not_checked_in": "Þessi manneskja er ekki innrituð."
     }
+  },
+  "publicProfile": {
+    "community": "Samfélag {{tenant}}",
+    "anonymous": "Meðlimur samfélagsins",
+    "badge_count_one": "{{count}} merki",
+    "badge_count_other": "{{count}} merki",
+    "no_badges": "Engin merki enn."
   }
 }

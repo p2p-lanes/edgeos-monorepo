@@ -13,7 +13,7 @@ import Image from "next/image"
 import { useRef, useState } from "react"
 import { useTranslation } from "react-i18next"
 import { RiTelegram2Line } from "react-icons/ri"
-import type { HumanPublic } from "@/client"
+import type { HumanSelfPublic } from "@/client"
 import uploadFileToS3 from "@/helpers/upload"
 import { imageOptimization } from "@/lib/image-optimization"
 import { Button } from "../ui/button"
@@ -30,7 +30,7 @@ const HumanForm = ({
   editForm,
   setEditForm,
 }: {
-  userData: HumanPublic | null
+  userData: HumanSelfPublic | null
   isEditing: boolean
   setIsEditing: (isEditing: boolean) => void
   handleSave: () => void

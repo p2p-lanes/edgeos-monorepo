@@ -41,6 +41,7 @@ let summary: {
 }
 let termsAccepted = false
 let popup: Record<string, unknown> = {}
+let flowConfig: Record<string, unknown> = {}
 
 vi.mock("@/providers/checkoutProvider", () => ({
   useCheckout: () => ({
@@ -62,6 +63,7 @@ vi.mock("@/providers/checkoutProvider", () => ({
     buyerGeneralError: null,
     removeMealPlan: vi.fn(),
     housingDatesShown: true,
+    flowConfig,
   }),
 }))
 
@@ -96,9 +98,9 @@ describe("AmanitaConfirmSection", () => {
     setTermsAccepted.mockClear()
     termsAccepted = false
     popup = {
-      allows_coupons: true,
       terms_and_conditions_url: "https://example.com/terms",
     }
+    flowConfig = { allows_coupons: true }
     cart = {
       ...createInitialCartState(),
       passes: [makePass()],
@@ -228,7 +230,7 @@ describe("AmanitaConfirmSection", () => {
   })
 
   it("lays the summary out as items → coupon → subtotal → fee → total", () => {
-    popup = { ...popup, contribution_label: "Service fee" }
+    flowConfig = { ...flowConfig, contribution_label: "Service fee" }
     summary = { ...summary, contributionSubtotal: 10, grandTotal: 110 }
 
     const { container } = render(<AmanitaConfirmSection />)
@@ -252,7 +254,7 @@ describe("AmanitaConfirmSection", () => {
      110. Printed raw, the fee showed up twice and Subtotal read the same as
      Total — the column never added up. */
   it("shows Subtotal without the service fee the Total adds back", () => {
-    popup = { ...popup, contribution_label: "Service fee" }
+    flowConfig = { ...flowConfig, contribution_label: "Service fee" }
     summary = {
       ...summary,
       subtotal: 110,

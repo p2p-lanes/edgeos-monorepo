@@ -1,5 +1,12 @@
+import { Award } from "lucide-react"
+import { useState } from "react"
 import { useTranslation } from "react-i18next"
+import { SendBadgeDialog } from "@/components/badges/SendBadgeDialog"
+import { Button } from "@/components/ui/button"
 import { Table, TableBody, TableCell, TableRow } from "@/components/ui/table"
+import useGetProfile from "@/hooks/useGetProfile"
+import useIssuableBadges from "@/hooks/useIssuableBadges"
+import { useCityProvider } from "@/providers/cityProvider"
 import type { AttendeeDirectory } from "@/types/Attendee"
 import PaginationControls from "./Pagination"
 import AttendeeCell from "./Table/Cells/AttendeeCell"
@@ -27,6 +34,16 @@ const AttendeesTable = ({
   onPageSizeChange,
 }: AttendeesTableProps) => {
   const { t } = useTranslation()
+  const { getCity } = useCityProvider()
+  const popupId = getCity()?.id
+  const { issuable } = useIssuableBadges(popupId)
+  const canGive = issuable.length > 0
+  const { profile } = useGetProfile()
+  // You can't give yourself a badge; the server refuses it anyway.
+  const isMe = (attendee: AttendeeDirectory) =>
+    !!profile?.email &&
+    attendee.email?.toLowerCase() === profile.email.toLowerCase()
+  const [recipient, setRecipient] = useState<AttendeeDirectory | null>(null)
 
   if (attendees.length === 0 && !loading) {
     return (
@@ -41,11 +58,11 @@ const AttendeesTable = ({
   return (
     <div className="flex flex-col w-full mt-4">
       <Table>
-        <Header />
+        <Header showBadges={canGive} />
         <TableBody>
           {loading ? (
             <TableRow>
-              <TableCell colSpan={5} className="h-[530px]">
+              <TableCell colSpan={canGive ? 6 : 5} className="h-[530px]">
                 <div className="flex justify-center items-center h-full">
                   <div className="w-6 h-6 border-2 border-gray-400 border-t-primary rounded-full animate-spin" />
                 </div>
@@ -58,6 +75,20 @@ const AttendeesTable = ({
                 className="border-b border-border hover:bg-muted bg-card sticky z-10 left-0"
               >
                 <AttendeeCell attendee={attendee} />
+                {canGive && (
+                  <TableCell className="whitespace-nowrap">
+                    {!isMe(attendee) && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => setRecipient(attendee)}
+                      >
+                        <Award className="mr-1 h-4 w-4" />
+                        {t("attendees.badges.give")}
+                      </Button>
+                    )}
+                  </TableCell>
+                )}
                 <CommonCell value={attendee.email ?? ""} />
                 <CommonCell value={attendee.telegram ?? ""} />
                 <CommonCell
@@ -79,6 +110,21 @@ const AttendeesTable = ({
           )}
         </TableBody>
       </Table>
+
+      {recipient && popupId && (
+        <SendBadgeDialog
+          open={!!recipient}
+          onOpenChange={(open) => !open && setRecipient(null)}
+          popupId={popupId}
+          attendeeId={recipient.id}
+          recipientName={
+            [recipient.first_name, recipient.last_name]
+              .filter(Boolean)
+              .join(" ") || t("attendees.badges.this_person")
+          }
+          issuable={issuable}
+        />
+      )}
 
       <PaginationControls
         currentPage={currentPage}

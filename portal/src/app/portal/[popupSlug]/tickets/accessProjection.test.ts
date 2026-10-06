@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest"
-import type { AttendeeWithOriginPublic, PaymentPublic } from "@/client"
+import type {
+  AttendeeWithOriginPortalPublic,
+  PaymentPortalPublic,
+} from "@/client"
 import { projectTicketAccess } from "./accessProjection"
 
 describe("projectTicketAccess", () => {
@@ -20,7 +23,7 @@ describe("projectTicketAccess", () => {
             requires_check_in: true,
           },
         ],
-      } as AttendeeWithOriginPublic,
+      } as AttendeeWithOriginPortalPublic,
     ])
 
     expect(access[0]?.tickets).toMatchObject([
@@ -55,7 +58,7 @@ describe("projectTicketAccess", () => {
               ],
             },
           ],
-        } as PaymentPublic,
+        } as PaymentPortalPublic,
       ],
     )
 
@@ -154,7 +157,7 @@ describe("projectTicketAccess", () => {
             requires_check_in: true,
           },
         ],
-      } as AttendeeWithOriginPublic,
+      } as AttendeeWithOriginPortalPublic,
       {
         id: "holder-2",
         name: "Jamie Morgan",
@@ -171,7 +174,7 @@ describe("projectTicketAccess", () => {
             requires_check_in: true,
           },
         ],
-      } as AttendeeWithOriginPublic,
+      } as AttendeeWithOriginPortalPublic,
     ])
 
     expect(access).toEqual([
@@ -249,7 +252,7 @@ describe("projectTicketAccess", () => {
             requires_check_in: false,
           },
         ],
-      } as AttendeeWithOriginPublic,
+      } as AttendeeWithOriginPortalPublic,
     ])
 
     expect(access).toEqual([])
@@ -282,7 +285,7 @@ describe("projectTicketAccess", () => {
               revoked_at: "2026-08-22T12:00:00Z",
             },
           ],
-        } as AttendeeWithOriginPublic,
+        } as AttendeeWithOriginPortalPublic,
       ],
       [
         {
@@ -331,7 +334,7 @@ describe("projectTicketAccess", () => {
               ],
             },
           ],
-        } as PaymentPublic,
+        } as PaymentPortalPublic,
       ],
     )
 
@@ -382,7 +385,7 @@ describe("projectTicketAccess", () => {
             requires_check_in: true,
           },
         ],
-      } as AttendeeWithOriginPublic,
+      } as AttendeeWithOriginPortalPublic,
     ])
 
     expect(access).toMatchObject([
@@ -410,7 +413,7 @@ describe("projectTicketAccess", () => {
             requires_check_in: true,
           },
         ],
-      } as AttendeeWithOriginPublic,
+      } as AttendeeWithOriginPortalPublic,
       {
         id: "holder-2",
         name: "Jamie Morgan",
@@ -426,7 +429,7 @@ describe("projectTicketAccess", () => {
             requires_check_in: true,
           },
         ],
-      } as AttendeeWithOriginPublic,
+      } as AttendeeWithOriginPortalPublic,
     ])
 
     expect(access).toMatchObject([
@@ -468,7 +471,7 @@ describe("projectTicketAccess", () => {
             requires_check_in: true,
           },
         ],
-      } as AttendeeWithOriginPublic,
+      } as AttendeeWithOriginPortalPublic,
     ])
 
     expect(access[0]?.tickets).toMatchObject([

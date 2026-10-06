@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation"
 import { useState } from "react"
 import { useTranslation } from "react-i18next"
 import { toast } from "sonner"
-import type { ApplicationPublic, PopupPublic } from "@/client"
+import type { ApplicationPortalPublic, PopupPublic } from "@/client"
 import { ApplicationsService } from "@/client"
 import { withCheckoutLocale } from "@/helpers/checkout"
 import { useApplicationFee } from "@/hooks/useApplicationFee"
@@ -21,7 +21,7 @@ const VIRTUAL_FIELD_I18N_KEYS: Record<string, string> = {
 }
 
 export function resolveApplicationUpdateSalesFlowId(
-  application: ApplicationPublic,
+  application: ApplicationPortalPublic,
   selectedSalesFlowId?: string | null,
 ): string {
   if (!application.sales_flow_id) {
@@ -58,7 +58,7 @@ interface UseSubmitApplicationArgs {
   popup: PopupPublic
   schema: ApplicationFormSchema
   values: Record<string, unknown>
-  application: ApplicationPublic | null | undefined
+  application: ApplicationPortalPublic | null | undefined
   validate: (isDraft: boolean) => {
     isValid: boolean
     errors: Record<string, string>

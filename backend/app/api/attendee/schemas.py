@@ -2,12 +2,13 @@ import uuid
 from datetime import datetime
 from typing import ClassVar
 
-from pydantic import BaseModel, ConfigDict, field_validator
+from pydantic import BaseModel, ConfigDict, field_serializer, field_validator
 from pydantic import Field as PydanticField
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.dialects.postgresql import UUID as PgUUID
 from sqlmodel import Column, DateTime, Field, SQLModel
 
+from app.api.human.privacy import public_profile_metadata
 from app.api.product.schemas import ProductWithQuantity
 from app.core.filters import (
     ENUMISH_OPS,
@@ -102,6 +103,14 @@ class AttendeePublic(AttendeeBase):
     model_config = ConfigDict(from_attributes=True)
 
 
+class AttendeePortalPublic(AttendeePublic):
+    """Human-facing attendee, including safe historical profile metadata."""
+
+    @field_serializer("additional_data")
+    def public_additional_data(self, value: dict) -> dict:
+        return public_profile_metadata(value)
+
+
 class AttendeeCreate(BaseModel):
     """Attendee schema for creation (by user).
 
@@ -118,6 +127,11 @@ class AttendeeCreate(BaseModel):
     gender: str | None = None
     # Declarative required_fields answers (e.g. {"date_of_birth": "2018-05-01"}).
     additional_data: dict | None = None
+
+    @field_validator("additional_data")
+    @classmethod
+    def public_additional_data(cls, value: dict | None) -> dict | None:
+        return public_profile_metadata(value) if value is not None else None
 
     @field_validator("email")
     @classmethod
@@ -138,6 +152,11 @@ class AttendeeUpdate(BaseModel):
     # Replaces the whole additional_data blob when provided (not a partial merge).
     additional_data: dict | None = None
     # Category cannot be changed once set if products exist
+
+    @field_validator("additional_data")
+    @classmethod
+    def public_additional_data(cls, value: dict | None) -> dict | None:
+        return public_profile_metadata(value) if value is not None else None
 
     @field_validator("email")
     @classmethod
@@ -373,6 +392,14 @@ class AttendeeWithOriginPublic(AttendeePublic):
     origin: str = (
         ""  # "application" | "direct_sale" — set by router after model_validate
     )
+
+
+class AttendeeWithOriginPortalPublic(AttendeeWithOriginPublic):
+    """Portal projection of an attendee with origin and sanitized metadata."""
+
+    @field_serializer("additional_data")
+    def public_additional_data(self, value: dict) -> dict:
+        return public_profile_metadata(value)
 
 
 class AttendeeListItem(AttendeeBase):

@@ -9,7 +9,7 @@ import {
   useMemo,
 } from "react"
 import type {
-  ApplicationPublic,
+  ApplicationPortalPublic,
   ApplicationsGetMyParticipationResponse,
 } from "@/client"
 import { useApplicationsQuery } from "@/hooks/useGetApplications"
@@ -19,7 +19,7 @@ import type { AttendeePassState } from "@/types/Attendee"
 import { useCityProvider } from "./cityProvider"
 
 interface ApplicationContextProps {
-  applications: ApplicationPublic[] | null
+  applications: ApplicationPortalPublic[] | null
   participation: ApplicationsGetMyParticipationResponse | null
   /**
    * The application on screen.
@@ -30,10 +30,12 @@ interface ApplicationContextProps {
    * two balances (sdd/sales-flows-rediseno). Omitting it is only correct
    * when the gathering has a single door.
    */
-  getRelevantApplication: (flowId?: string | null) => ApplicationPublic | null
-  getApplicationsForPopup: () => ApplicationPublic[]
+  getRelevantApplication: (
+    flowId?: string | null,
+  ) => ApplicationPortalPublic | null
+  getApplicationsForPopup: () => ApplicationPortalPublic[]
   getAttendees: (flowId?: string | null) => AttendeePassState[]
-  updateApplication: (application: ApplicationPublic) => void
+  updateApplication: (application: ApplicationPortalPublic) => void
 }
 
 export const ApplicationContext = createContext<ApplicationContextProps | null>(
@@ -50,8 +52,8 @@ const ApplicationProvider = ({ children }: { children: ReactNode }) => {
   )
 
   const updateApplication = useCallback(
-    (application: ApplicationPublic): void => {
-      queryClient.setQueryData<ApplicationPublic[]>(
+    (application: ApplicationPortalPublic): void => {
+      queryClient.setQueryData<ApplicationPortalPublic[]>(
         queryKeys.applications.mine(),
         (old) => {
           if (!old) return old
@@ -64,16 +66,16 @@ const ApplicationProvider = ({ children }: { children: ReactNode }) => {
     [queryClient],
   )
 
-  const getApplicationsForPopup = useCallback((): ApplicationPublic[] => {
+  const getApplicationsForPopup = useCallback((): ApplicationPortalPublic[] => {
     const city = getCity()
     if (!applications || !city?.id) return []
     return applications.filter(
-      (app: ApplicationPublic) => app.popup_id === city.id,
+      (app: ApplicationPortalPublic) => app.popup_id === city.id,
     )
   }, [applications, getCity])
 
   const getRelevantApplication = useCallback(
-    (flowId?: string | null): ApplicationPublic | null => {
+    (flowId?: string | null): ApplicationPortalPublic | null => {
       const mine = getApplicationsForPopup()
       if (mine.length === 0) return null
 

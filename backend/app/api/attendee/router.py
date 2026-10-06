@@ -17,6 +17,7 @@ from app.api.attendee.schemas import (
     AttendeeTicketMetadataUpdate,
     AttendeeTicketProductSwap,
     AttendeeUpdate,
+    AttendeeWithOriginPortalPublic,
     AttendeeWithOriginPublic,
     AttendeeWithTickets,
     TicketAttendeeSnapshot,
@@ -33,7 +34,9 @@ from app.api.check_in.crud import (
     record_check_in,
 )
 from app.api.check_in.schemas import CheckInPayload
+from app.api.human.privacy import public_profile_metadata
 from app.api.product.models import Products
+from app.api.shared.enums import UserRole
 from app.api.shared.response import ListModel, PaginationLimit, PaginationSkip, Paging
 from app.core.dependencies.users import (
     AdminOrApiKey_AttendeesWrite,
@@ -208,7 +211,7 @@ def _get_my_attendee(
 
 @router.get(
     "/my/popup/{popup_id}",
-    response_model=ListModel[AttendeeWithOriginPublic],
+    response_model=ListModel[AttendeeWithOriginPortalPublic],
     tags=["portal"],
     summary="List your attendees for a popup",
     dependencies=[needs("portal:applications:read")],
@@ -219,7 +222,7 @@ async def list_my_attendees_by_popup(
     current_human: CurrentHuman,
     skip: PaginationSkip = 0,
     limit: _AttendeeLimit = 50,
-) -> ListModel[AttendeeWithOriginPublic]:
+) -> ListModel[AttendeeWithOriginPortalPublic]:
     """List all attendees owned by the current Human for a specific popup.
 
     Returns both application-linked and direct-sale attendees, each with an
@@ -239,7 +242,7 @@ async def list_my_attendees_by_popup(
     ticket_ids = [ap.id for a in attendees for ap in a.attendee_products]
     last_scan_by_ticket = get_last_scan_by_tickets(db, ticket_ids)
     results = [_build_attendee_with_origin(a, last_scan_by_ticket) for a in attendees]
-    return ListModel[AttendeeWithOriginPublic](
+    return ListModel[AttendeeWithOriginPortalPublic](
         results=results,
         paging=Paging(offset=skip, limit=limit, total=total),
     )
@@ -247,7 +250,7 @@ async def list_my_attendees_by_popup(
 
 @router.post(
     "/my/popup/{popup_id}",
-    response_model=AttendeeWithOriginPublic,
+    response_model=AttendeeWithOriginPortalPublic,
     tags=["portal"],
     summary="Create a companion attendee",
     dependencies=[needs("portal:attendees:write")],
@@ -257,7 +260,7 @@ async def create_my_attendee_for_popup(
     attendee_in: AttendeeCreate,
     db: HumanTenantSession,
     current_human: CurrentHuman,
-) -> AttendeeWithOriginPublic:
+) -> AttendeeWithOriginPortalPublic:
     """Create a companion attendee (spouse/child) for the current Human's application.
 
     Requires:
@@ -398,7 +401,7 @@ async def create_my_attendee_for_popup(
 
 @router.patch(
     "/my/popup/{popup_id}/{attendee_id}",
-    response_model=AttendeeWithOriginPublic,
+    response_model=AttendeeWithOriginPortalPublic,
     tags=["portal"],
     summary="Update your attendee",
     dependencies=[needs("portal:attendees:write")],
@@ -409,7 +412,7 @@ async def update_my_attendee_for_popup(
     attendee_in: AttendeeUpdate,
     db: HumanTenantSession,
     current_human: CurrentHuman,
-) -> AttendeeWithOriginPublic:
+) -> AttendeeWithOriginPortalPublic:
     """Update a self, explicitly managed, or legacy-owned Attendee."""
     attendee = _get_my_attendee(
         db,
@@ -440,7 +443,7 @@ async def update_my_attendee_for_popup(
 
 @router.patch(
     "/my/popup/{popup_id}/{attendee_id}/tickets/{ticket_id}/meal-plan",
-    response_model=AttendeeWithOriginPublic,
+    response_model=AttendeeWithOriginPortalPublic,
     tags=["portal"],
     summary="Edit your meal-plan ticket choices",
     dependencies=[needs("portal:attendees:write")],
@@ -452,7 +455,7 @@ async def update_my_meal_plan_ticket(
     body: AttendeeTicketMetadataUpdate,
     db: HumanTenantSession,
     current_human: CurrentHuman,
-) -> AttendeeWithOriginPublic:
+) -> AttendeeWithOriginPortalPublic:
     """Edit a purchased meal-plan ticket's per-day choices (portal, no payment).
 
     Mutates only AttendeeProducts.purchase_metadata (daily_choices,
@@ -529,7 +532,7 @@ async def delete_my_attendee_for_popup(
 @router.get("", response_model=ListModel[AttendeeListItem])
 async def list_attendees(
     db: CheckInOrApiKeySession_AttendeesRead,
-    _: CheckInOrApiKey_AttendeesRead,
+    current_user: CheckInOrApiKey_AttendeesRead,
     application_id: uuid.UUID | None = None,
     popup_id: uuid.UUID | None = None,
     email: str | None = None,
@@ -598,6 +601,10 @@ async def list_attendees(
 
         attendee_data = AttendeeListItem.model_validate(a)
         attendee_data.products = products
+        if current_user.role == UserRole.CHECK_IN_CONTROLLER:
+            attendee_data.additional_data = public_profile_metadata(
+                attendee_data.additional_data
+            )
         results.append(attendee_data)
 
     return ListModel[AttendeeListItem](
@@ -682,7 +689,7 @@ async def export_attendees_csv(
 async def get_attendee(
     attendee_id: uuid.UUID,
     db: CheckInOrApiKeySession_AttendeesRead,
-    _: CheckInOrApiKey_AttendeesRead,
+    current_user: CheckInOrApiKey_AttendeesRead,
 ) -> AttendeeWithOriginPublic:
     """Get a single attendee with full ticket details (BO only).
 
@@ -702,7 +709,10 @@ async def get_attendee(
     last_scan_by_ticket = get_last_scan_by_tickets(
         db, [ap.id for ap in attendee.attendee_products]
     )
-    return _build_attendee_with_origin(attendee, last_scan_by_ticket)
+    result = _build_attendee_with_origin(attendee, last_scan_by_ticket)
+    if current_user.role == UserRole.CHECK_IN_CONTROLLER:
+        result.additional_data = public_profile_metadata(result.additional_data)
+    return result
 
 
 @router.patch("/{attendee_id}", response_model=AttendeeWithOriginPublic)
