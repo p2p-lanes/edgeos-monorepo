@@ -4,11 +4,19 @@ import { useNavigate } from "@tanstack/react-router"
 import { FolderTree, Palette, Repeat } from "lucide-react"
 import { useRef, useState } from "react"
 
-import { type BadgePublic, BadgesService } from "@/client"
+import { type BadgeNewRule, type BadgePublic, BadgesService } from "@/client"
+import { DraftBadgeRules } from "@/components/Badges/BadgeRules"
 import {
   BadgeStylesDialog,
   useBadgeStyles,
 } from "@/components/Badges/BadgeStylesDialog"
+import {
+  DraftIssuerPolicies,
+  draftToPayload,
+  PeoplePicker,
+  type Person,
+  type PolicyDraft,
+} from "@/components/Badges/IssuerPolicies"
 import { FieldError } from "@/components/Common/FieldError"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Button } from "@/components/ui/button"
@@ -49,6 +57,11 @@ interface BadgeFormValues {
   repeatable: boolean
   style_override_id: string
   images: ImageMap
+  // Only on create: saved together with the badge.
+  issuer_policies: PolicyDraft[]
+  rules: BadgeNewRule[]
+  recipients: Person[]
+  recipient_message: string
 }
 
 interface BadgeFormProps {
@@ -78,6 +91,9 @@ export function BadgeForm({ defaultValues, onSuccess }: BadgeFormProps) {
   const done = (message: string) => {
     showSuccessToast(message)
     queryClient.invalidateQueries({ queryKey: ["badges"] })
+    queryClient.invalidateQueries({ queryKey: ["badge-issuer-policies"] })
+    queryClient.invalidateQueries({ queryKey: ["badge-rules"] })
+    queryClient.invalidateQueries({ queryKey: ["badge-awards"] })
     skipBlockerRef.current = true
     form.reset()
     onSuccess()
@@ -105,6 +121,12 @@ export function BadgeForm({ defaultValues, onSuccess }: BadgeFormProps) {
             images: wanted.map(([style_id, image_url]) => ({
               style_id,
               image_url,
+            })),
+            issuer_policies: value.issuer_policies.map(draftToPayload),
+            rules: value.rules,
+            recipients: value.recipients.map((person) => ({
+              human_id: person.id,
+              message: value.recipient_message.trim() || null,
             })),
           },
         })
@@ -137,7 +159,16 @@ export function BadgeForm({ defaultValues, onSuccess }: BadgeFormProps) {
       }
       return BadgesService.getBadge({ badgeId })
     },
-    onSuccess: () => done(isEdit ? "Badge updated" : "Badge created"),
+    onSuccess: (badge) => {
+      const given = badge.award_count ?? 0
+      done(
+        isEdit
+          ? "Badge updated"
+          : given > 0
+            ? `Badge created and given to ${given} ${given === 1 ? "person" : "people"}`
+            : "Badge created",
+      )
+    },
     onError: createErrorHandler(showErrorToast),
   })
 
@@ -149,6 +180,10 @@ export function BadgeForm({ defaultValues, onSuccess }: BadgeFormProps) {
       repeatable: defaultValues?.repeatable ?? false,
       style_override_id: defaultValues?.style_override_id ?? DEFAULT_STYLE,
       images: imagesOf(defaultValues),
+      issuer_policies: [],
+      rules: [],
+      recipients: [],
+      recipient_message: "",
     } as BadgeFormValues,
     onSubmit: ({ value }) => {
       if (readOnly) return
@@ -331,6 +366,78 @@ export function BadgeForm({ defaultValues, onSuccess }: BadgeFormProps) {
             </form.Field>
           )}
         </InlineSection>
+
+        {!isEdit && !readOnly && (
+          <>
+            <Separator />
+
+            <InlineSection
+              title="Who can give it"
+              description="Admins always can. Add rules to let other people give it, like regulars of an activity or every attendee."
+            >
+              <form.Field name="issuer_policies">
+                {(field) => (
+                  <DraftIssuerPolicies
+                    value={field.state.value}
+                    onChange={(next) => field.handleChange(next)}
+                  />
+                )}
+              </form.Field>
+            </InlineSection>
+
+            <Separator />
+
+            <InlineSection
+              title="Give it to"
+              description="People who get it as soon as you create it."
+            >
+              <div className="space-y-2">
+                <form.Field name="recipients">
+                  {(field) => (
+                    <PeoplePicker
+                      value={field.state.value}
+                      onChange={(next) => field.handleChange(next)}
+                    />
+                  )}
+                </form.Field>
+                <form.Subscribe selector={(state) => state.values.recipients}>
+                  {(recipients) =>
+                    recipients.length > 0 && (
+                      <form.Field name="recipient_message">
+                        {(field) => (
+                          <Textarea
+                            value={field.state.value}
+                            onChange={(e) => field.handleChange(e.target.value)}
+                            maxLength={2000}
+                            rows={2}
+                            placeholder="Add a note for them (optional). Only they and admins see it."
+                            aria-label="Note for the people who get it"
+                          />
+                        )}
+                      </form.Field>
+                    )
+                  }
+                </form.Subscribe>
+              </div>
+            </InlineSection>
+
+            <Separator />
+
+            <InlineSection
+              title="Earned automatically"
+              description="Give it on its own when people show up or host enough. Check-ins count once they can no longer be voided, about two hours after the event ends."
+            >
+              <form.Field name="rules">
+                {(field) => (
+                  <DraftBadgeRules
+                    value={field.state.value}
+                    onChange={(next) => field.handleChange(next)}
+                  />
+                )}
+              </form.Field>
+            </InlineSection>
+          </>
+        )}
 
         <Separator />
 

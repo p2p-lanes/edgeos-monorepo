@@ -6,6 +6,7 @@ import {
   type AllowanceWindow,
   type BadgeAudienceType,
   type BadgeIssuerPolicyPublic,
+  type BadgeNewIssuerPolicy,
   BadgesService,
   HumansService,
   PopupsService,
@@ -40,14 +41,46 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { Switch } from "@/components/ui/switch"
+import { Textarea } from "@/components/ui/textarea"
 import useAuth from "@/hooks/useAuth"
 import useCustomToast from "@/hooks/useCustomToast"
 import { createErrorHandler } from "@/utils"
 
 const AUDIENCE_LABELS: Record<BadgeAudienceType, string> = {
   humans: "Specific people",
+  emails: "A list of emails",
   popup_attendees: "Attendees of a gathering",
   tenant: "Everyone",
+}
+
+// Loose on purpose: the server validates for real, this only flags typos.
+const EMAIL_SHAPE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/
+
+/** Emails pasted as a list: any mix of commas, semicolons, spaces, lines. */
+function parseEmails(text: string): { valid: string[]; invalid: string[] } {
+  const valid = new Set<string>()
+  const invalid = new Set<string>()
+  for (const token of text.split(/[\s,;]+/)) {
+    const email = token.trim().toLowerCase()
+    if (!email) continue
+    if (EMAIL_SHAPE.test(email)) valid.add(email)
+    else invalid.add(token.trim())
+  }
+  return { valid: [...valid], invalid: [...invalid] }
+}
+
+function describeAudience(policy: {
+  audience_type: BadgeAudienceType
+  emails?: string[]
+  people: string[]
+}): string {
+  if (policy.audience_type === "humans") return policy.people.join(", ")
+  if (policy.audience_type === "emails") {
+    const emails = policy.emails ?? []
+    const shown = emails.slice(0, 2).join(", ")
+    return emails.length > 2 ? `${shown} and ${emails.length - 2} more` : shown
+  }
+  return AUDIENCE_LABELS[policy.audience_type]
 }
 
 const WINDOW_LABELS: Record<AllowanceWindow, string> = {
@@ -59,9 +92,12 @@ const WINDOW_LABELS: Record<AllowanceWindow, string> = {
 
 const policiesKey = ["badge-issuer-policies"]
 
-function describeAllowance(policy: BadgeIssuerPolicyPublic): string {
+function describeAllowance(policy: {
+  allowance_quantity?: number | null
+  allowance_window?: AllowanceWindow
+}): string {
   if (policy.allowance_quantity == null) return "Unlimited"
-  return `${policy.allowance_quantity} ${WINDOW_LABELS[policy.allowance_window]}`
+  return `${policy.allowance_quantity} ${WINDOW_LABELS[policy.allowance_window ?? "day"]}`
 }
 
 function personName(p: {
@@ -72,9 +108,20 @@ function personName(p: {
   return [p.first_name, p.last_name].filter(Boolean).join(" ") || p.email
 }
 
-type Person = { id: string; email: string; label: string }
+export type Person = { id: string; email: string; label: string }
 
-function PeoplePicker({
+/** A policy for a badge that doesn't exist yet, saved along with it. */
+export type PolicyDraft = BadgeNewIssuerPolicy & { people: Person[] }
+
+/** What the API takes for a draft (the people labels are only for display). */
+export function draftToPayload({
+  people: _people,
+  ...policy
+}: PolicyDraft): BadgeNewIssuerPolicy {
+  return policy
+}
+
+export function PeoplePicker({
   value,
   onChange,
 }: {
@@ -151,38 +198,53 @@ function PolicyDialog({
   onOpenChange,
   policy,
   defaultBadgeId,
+  draft,
+  onDraft,
 }: {
   open: boolean
   onOpenChange: (open: boolean) => void
   policy?: BadgeIssuerPolicyPublic
-  defaultBadgeId: string
+  defaultBadgeId?: string
+  // Draft mode, for a badge being created: nothing is saved here, the
+  // policy goes back to the caller and is created with the badge.
+  draft?: PolicyDraft
+  onDraft?: (draft: PolicyDraft) => void
 }) {
   const queryClient = useQueryClient()
   const { showSuccessToast, showErrorToast } = useCustomToast()
-  const [name, setName] = useState(policy?.name ?? "")
+  const source = policy ?? draft
+  const [name, setName] = useState(source?.name ?? "")
   const [audience, setAudience] = useState<BadgeAudienceType>(
-    policy?.audience_type ?? "humans",
+    source?.audience_type ?? "humans",
   )
-  const [popupId, setPopupId] = useState(policy?.popup_id ?? "")
+  const [popupId, setPopupId] = useState(source?.popup_id ?? "")
   const [people, setPeople] = useState<Person[]>(
-    (policy?.humans ?? []).map((h) => ({
-      id: h.id,
-      email: h.email,
-      label: personName(h),
-    })),
+    draft?.people ??
+      (policy?.humans ?? []).map((h) => ({
+        id: h.id,
+        email: h.email,
+        label: personName(h),
+      })),
   )
+  // In draft mode these are the *other* badges sharing the allowance.
   const [badgeIds, setBadgeIds] = useState<string[]>(
-    policy?.badges.map((b) => b.id) ?? [defaultBadgeId],
+    policy?.badges.map((b) => b.id) ??
+      draft?.badge_ids ??
+      (defaultBadgeId ? [defaultBadgeId] : []),
   )
   const [limited, setLimited] = useState(
-    policy ? policy.allowance_quantity != null : true,
+    source ? source.allowance_quantity != null : true,
   )
   const [quantity, setQuantity] = useState(
-    String(policy?.allowance_quantity ?? 3),
+    String(source?.allowance_quantity ?? 3),
   )
   const [allowanceWindow, setAllowanceWindow] = useState<AllowanceWindow>(
-    policy?.allowance_window ?? "day",
+    source?.allowance_window ?? "day",
   )
+  const [emailsText, setEmailsText] = useState(
+    (source?.emails ?? []).join("\n"),
+  )
+  const emails = parseEmails(emailsText)
 
   const { data: popups } = useQuery({
     queryKey: ["popups", { limit: 100 }],
@@ -198,17 +260,19 @@ function PolicyDialog({
   const needsPopup =
     audience === "popup_attendees" || allowanceWindow === "popup"
 
+  const body = {
+    name: name.trim(),
+    audience_type: audience,
+    popup_id: popupId || null,
+    allowance_quantity: limited ? Number(quantity) : null,
+    allowance_window: allowanceWindow,
+    badge_ids: badgeIds,
+    human_ids: audience === "humans" ? people.map((p) => p.id) : [],
+    emails: audience === "emails" ? emails.valid : [],
+  }
+
   const save = useMutation({
     mutationFn: () => {
-      const body = {
-        name: name.trim(),
-        audience_type: audience,
-        popup_id: popupId || null,
-        allowance_quantity: limited ? Number(quantity) : null,
-        allowance_window: allowanceWindow,
-        badge_ids: badgeIds,
-        human_ids: audience === "humans" ? people.map((p) => p.id) : [],
-      }
       return policy
         ? BadgesService.updateIssuerPolicy({
             policyId: policy.id,
@@ -226,16 +290,18 @@ function PolicyDialog({
 
   const invalid =
     !name.trim() ||
-    badgeIds.length === 0 ||
+    (!onDraft && badgeIds.length === 0) ||
     (needsPopup && !popupId) ||
     (audience === "humans" && people.length === 0) ||
+    (audience === "emails" &&
+      (emails.valid.length === 0 || emails.invalid.length > 0)) ||
     (limited && !(Number(quantity) >= 1))
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-lg">
         <DialogHeader>
-          <DialogTitle>{policy ? "Edit rule" : "Who can give it"}</DialogTitle>
+          <DialogTitle>{source ? "Edit rule" : "Who can give it"}</DialogTitle>
           <DialogDescription>
             Admins can always give badges. A rule lets other people give them
             too, with an optional allowance.
@@ -274,6 +340,27 @@ function PolicyDialog({
             </Select>
             {audience === "humans" && (
               <PeoplePicker value={people} onChange={setPeople} />
+            )}
+            {audience === "emails" && (
+              <div className="space-y-1">
+                <Textarea
+                  value={emailsText}
+                  onChange={(e) => setEmailsText(e.target.value)}
+                  rows={4}
+                  placeholder="Paste emails, separated by commas, spaces or new lines"
+                  aria-label="Emails"
+                />
+                <p className="text-xs text-muted-foreground">
+                  {emails.valid.length === 0
+                    ? "Includes people who haven't signed up yet: they can give it once they do."
+                    : `${emails.valid.length} ${emails.valid.length === 1 ? "email" : "emails"}. People who haven't signed up yet can give it once they do.`}
+                </p>
+                {emails.invalid.length > 0 && (
+                  <p className="text-xs text-destructive">
+                    Not valid: {emails.invalid.join(", ")}
+                  </p>
+                )}
+              </div>
             )}
           </div>
 
@@ -357,6 +444,14 @@ function PolicyDialog({
               Badges in the same rule share its allowance.
             </p>
             <div className="max-h-48 space-y-1 overflow-y-auto rounded-md border p-2">
+              {onDraft && (
+                <div className="flex items-center gap-2 rounded px-1 py-1">
+                  <Checkbox id="policy-badge-new" checked disabled />
+                  <Label htmlFor="policy-badge-new" className="font-normal">
+                    This badge
+                  </Label>
+                </div>
+              )}
               {(catalog?.results ?? []).map((b) => (
                 <div
                   key={b.id}
@@ -393,9 +488,19 @@ function PolicyDialog({
           <LoadingButton
             loading={save.isPending}
             disabled={invalid}
-            onClick={() => save.mutate()}
+            onClick={() => {
+              if (onDraft) {
+                onDraft({
+                  ...body,
+                  people: audience === "humans" ? people : [],
+                })
+                onOpenChange(false)
+              } else {
+                save.mutate()
+              }
+            }}
           >
-            {policy ? "Save rule" : "Add rule"}
+            {source ? "Save rule" : "Add rule"}
           </LoadingButton>
         </DialogFooter>
       </DialogContent>
@@ -433,9 +538,10 @@ function PolicyRow({
           {!policy.is_active && <Badge variant="secondary">Paused</Badge>}
         </div>
         <p className="text-sm text-muted-foreground">
-          {policy.audience_type === "humans"
-            ? policy.humans.map(personName).join(", ")
-            : AUDIENCE_LABELS[policy.audience_type]}
+          {describeAudience({
+            ...policy,
+            people: policy.humans.map(personName),
+          })}
           {" · "}
           {describeAllowance(policy)}
         </p>
@@ -527,5 +633,91 @@ export function IssuerPoliciesCard({ badgeId }: { badgeId: string }) {
         )}
       </CardContent>
     </Card>
+  )
+}
+
+/**
+ * "Who can give it" for a badge that's still being created: the policies
+ * are kept here and saved together with the badge.
+ */
+export function DraftIssuerPolicies({
+  value,
+  onChange,
+}: {
+  value: PolicyDraft[]
+  onChange: (value: PolicyDraft[]) => void
+}) {
+  // undefined = closed, -1 = adding, otherwise the index being edited.
+  const [editing, setEditing] = useState<number | undefined>()
+
+  return (
+    <div className="space-y-3">
+      {value.length === 0 ? (
+        <p className="text-sm text-muted-foreground">Only admins.</p>
+      ) : (
+        <ul className="divide-y rounded-md border px-3">
+          {value.map((draft, index) => (
+            <li
+              key={`${draft.name}-${index}`}
+              className="flex items-start gap-3 py-3"
+            >
+              <Users className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
+              <div className="min-w-0 flex-1 space-y-0.5">
+                <span className="font-medium">{draft.name}</span>
+                <p className="text-sm text-muted-foreground">
+                  {describeAudience({
+                    ...draft,
+                    people: draft.people.map((p) => p.label),
+                  })}
+                  {" · "}
+                  {describeAllowance(draft)}
+                </p>
+              </div>
+              <Button
+                type="button"
+                size="icon"
+                variant="ghost"
+                aria-label="Edit rule"
+                onClick={() => setEditing(index)}
+              >
+                <Pencil className="h-4 w-4" />
+              </Button>
+              <Button
+                type="button"
+                size="icon"
+                variant="ghost"
+                aria-label="Remove rule"
+                onClick={() => onChange(value.filter((_, i) => i !== index))}
+              >
+                <Trash2 className="h-4 w-4" />
+              </Button>
+            </li>
+          ))}
+        </ul>
+      )}
+      <Button
+        type="button"
+        variant="outline"
+        size="sm"
+        onClick={() => setEditing(-1)}
+      >
+        <Plus className="mr-1 h-4 w-4" />
+        Add rule
+      </Button>
+      {editing !== undefined && (
+        <PolicyDialog
+          open
+          onOpenChange={(open) => !open && setEditing(undefined)}
+          draft={editing >= 0 ? value[editing] : undefined}
+          onDraft={(draft) =>
+            onChange(
+              editing >= 0
+                ? value.map((d, i) => (i === editing ? draft : d))
+                : [...value, draft],
+            )
+          }
+        />
+      )}
+    </div>
   )
 }

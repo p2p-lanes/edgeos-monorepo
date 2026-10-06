@@ -52,8 +52,13 @@ export function buildDirectoryResource({
 
 const useResources = () => {
   const { t } = useTranslation()
-  const { getCity } = useCityProvider()
-  const { getApplicationsForPopup, participation } = useApplication()
+  const { getCity, popupsLoaded } = useCityProvider()
+  const {
+    getApplicationsForPopup,
+    participation,
+    applicationsLoading,
+    participationLoading,
+  } = useApplication()
   // Which door into the gathering the sidebar is describing. It is
   // always on screen, so with two applications and no door named it
   // would have to speak for both at once with one status
@@ -82,8 +87,19 @@ const useResources = () => {
   )
   const canShareReferrals = useCanShareReferrals(popupId)
 
+  // A hidden resource is not a denial until its initial access data resolves.
+  // Use initial pending state, not background fetching, and do not wait on
+  // unrelated shop/referral queries. Ended popups use the existing access gate.
+  const permissionsLoading =
+    !popupsLoaded ||
+    (city !== null &&
+      (city.status === "ended"
+        ? endedAccess.state === "loading"
+        : city.takes_applications !== false &&
+          (applicationsLoading || participationLoading)))
+
   if (!city) {
-    return { resources: [], doorName: null }
+    return { resources: [], doorName: null, permissionsLoading }
   }
 
   // What the sidebar actually branches on: whether anybody applies here. A
@@ -110,7 +126,7 @@ const useResources = () => {
     })
     resources[0].path = overviewPath
     if (hasCustomHome) resources.unshift(homeResource)
-    return { resources, doorName: null }
+    return { resources, doorName: null, permissionsLoading }
   }
 
   // Popup-level feature flag: hides the entire events module when off.
@@ -181,7 +197,7 @@ const useResources = () => {
       ...flowResources,
     ]
 
-    return { resources, doorName: null }
+    return { resources, doorName: null, permissionsLoading }
   }
 
   if (isCompanion) {
@@ -254,7 +270,7 @@ const useResources = () => {
       }),
     ]
 
-    return { resources, doorName: null }
+    return { resources, doorName: null, permissionsLoading }
   }
 
   const resources: Resource[] = [
@@ -331,6 +347,6 @@ const useResources = () => {
     },
   ]
 
-  return { resources, doorName }
+  return { resources, doorName, permissionsLoading }
 }
 export default useResources

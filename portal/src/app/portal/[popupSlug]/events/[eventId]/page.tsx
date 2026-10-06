@@ -608,7 +608,7 @@ export default function EventDetailPage() {
           {canManage && !isEnded && (
             <Button asChild variant="outline" size="sm">
               <Link
-                href={`/portal/${city?.slug}/events/${event.id}/edit`}
+                href={`/portal/${city?.slug}/events/${event.id}/edit${occParam || event.rrule ? `?occ=${encodeURIComponent(occParam ?? event.start_time)}` : ""}`}
                 aria-label={t("events.detail.edit_event_button")}
               >
                 <Pencil className="mr-2 h-3.5 w-3.5" />

@@ -733,11 +733,6 @@ async def check_in(
     participant, already_checked_in, created = perform_check_in(
         db, event, current_human, occ_start
     )
-    if not already_checked_in:
-        from app.api.badge.rules import evaluate_after_check_in
-
-        evaluate_after_check_in(db, current_human.id, event)
-
     return EventCheckInResult(
         participant=EventParticipantPublic.model_validate(participant),
         already_checked_in=already_checked_in,

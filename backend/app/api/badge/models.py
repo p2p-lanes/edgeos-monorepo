@@ -150,7 +150,7 @@ class BadgeIssuerPolicies(BadgeIssuerPolicyBase, table=True):
     __tablename__ = "badge_issuer_policies"
     __table_args__ = (
         CheckConstraint(
-            "audience_type IN ('humans', 'popup_attendees', 'tenant')",
+            "audience_type IN ('humans', 'popup_attendees', 'tenant', 'emails')",
             name="ck_badge_issuer_policies_audience",
         ),
         CheckConstraint(
