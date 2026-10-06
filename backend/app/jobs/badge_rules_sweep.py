@@ -1,8 +1,9 @@
 """Entrypoint for the badge rules sweep (SIM-108).
 
-Awards automatic badges to everyone who meets an active rule. Check-ins
-already trigger their rules right away; the sweep catches anything that
-hook missed (a failure, a rule edited after the fact).
+Awards automatic badges to everyone who meets an active rule. This is the
+only path that turns attendance into badges: an occurrence counts once its
+check-in window has closed (two hours after it ends, when a check-in can no
+longer be voided), so the badge lands on the first sweep after that.
 
 Designed to be invoked by an external scheduler (k8s CronJob, EventBridge
 Schedule -> ECS RunTask, systemd timer, plain crontab).
@@ -11,10 +12,10 @@ Usage:
     uv run python -m app.jobs.badge_rules_sweep
 
 Exit codes:
-    0 — run completed (possibly a no-op)
-    1 — run completed but at least one rule failed; check logs
+    0: run completed (possibly a no-op)
+    1: run completed but at least one rule failed; check logs
 
-Recommended interval: hourly.
+Recommended interval: every 15 minutes.
 """
 
 import sys
