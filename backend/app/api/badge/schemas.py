@@ -1,9 +1,9 @@
 import uuid
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime, time
 from enum import StrEnum
-from typing import Annotated, Literal
+from typing import Annotated
 
-from pydantic import BaseModel, ConfigDict, model_validator
+from pydantic import BaseModel, ConfigDict, field_validator, model_validator
 from pydantic import Field as PydanticField
 from sqlalchemy import Text
 from sqlalchemy.dialects.postgresql import JSONB
@@ -193,6 +193,14 @@ class BadgeCreate(BaseModel):
     style_override_id: uuid.UUID | None = None
     repeatable: bool = False
     images: list[BadgeImageIn] = Field(min_length=1)
+    # Set the badge up in one go: who can give it and how it's earned. All
+    # of it is saved in the same transaction as the badge.
+    issuer_policies: list["BadgeNewIssuerPolicy"] = Field(
+        default_factory=list, max_length=20
+    )
+    rules: list["BadgeNewRule"] = Field(default_factory=list, max_length=20)
+    # People who get it right away, from whoever creates the badge.
+    recipients: list["BadgeNewRecipient"] = Field(default_factory=list, max_length=500)
 
     model_config = ConfigDict(str_strip_whitespace=True)
 
@@ -274,6 +282,15 @@ class BadgeAwardCreate(BaseModel):
         return self
 
 
+class BadgeNewRecipient(BaseModel):
+    """Someone who gets a badge as soon as it's created."""
+
+    human_id: uuid.UUID
+    message: str | None = Field(default=None, max_length=2000)
+
+    model_config = ConfigDict(str_strip_whitespace=True)
+
+
 class BadgeAwardRevoke(BaseModel):
     reason: str | None = Field(default=None, max_length=2000)
 
@@ -338,6 +355,29 @@ class BadgeAudienceType(StrEnum):
     POPUP_ATTENDEES = "popup_attendees"
     # Every human of the tenant.
     TENANT = "tenant"
+    # A list of email addresses, matched against the person's email. Covers
+    # people who haven't signed up yet: they can give it once they do.
+    EMAILS = "emails"
+
+
+MAX_POLICY_EMAILS = 2000
+
+
+def normalize_emails(values: list[str]) -> list[str]:
+    """Lowercase, de-duplicated, syntactically valid addresses."""
+    from email_validator import EmailNotValidError, validate_email
+
+    cleaned: dict[str, None] = {}
+    for raw in values:
+        value = raw.strip().lower()
+        if not value:
+            continue
+        try:
+            validate_email(value, check_deliverability=False)
+        except EmailNotValidError:
+            raise ValueError(f"Not a valid email: {raw.strip()}") from None
+        cleaned[value] = None
+    return list(cleaned)
 
 
 class AllowanceWindow(StrEnum):
@@ -367,6 +407,11 @@ class BadgeIssuerPolicyBase(SQLModel):
     allowance_quantity: int | None = None
     allowance_window: str = Field(default=AllowanceWindow.DAY.value, max_length=16)
     is_active: bool = Field(default=True)
+    # The addresses of an ``emails`` audience, lowercased; empty otherwise.
+    emails: list[str] = Field(
+        default_factory=list,
+        sa_column=Column(JSONB, nullable=False, server_default="[]"),
+    )
     created_at: datetime = Field(
         default_factory=lambda: datetime.now(UTC), sa_type=DateTime(timezone=True)
     )
@@ -392,6 +437,7 @@ class BadgeIssuerPolicyPublic(BaseModel):
     is_active: bool
     badges: list[BadgeSummary]
     humans: list[BadgeIssuerPolicyHuman]
+    emails: list[str] = []
     created_at: datetime
     updated_at: datetime
 
@@ -417,13 +463,29 @@ class BadgeIssuerPolicyCreate(BaseModel):
     badge_ids: list[uuid.UUID] = Field(min_length=1)
     # Only used by the humans audience.
     human_ids: list[uuid.UUID] = []
+    # Only used by the emails audience.
+    emails: list[str] = Field(default_factory=list, max_length=MAX_POLICY_EMAILS)
 
     model_config = ConfigDict(str_strip_whitespace=True)
+
+    @field_validator("emails")
+    @classmethod
+    def _emails(cls, value: list[str]) -> list[str]:
+        return normalize_emails(value)
 
     @model_validator(mode="after")
     def _shape(self) -> "BadgeIssuerPolicyCreate":
         check_policy_shape(self.audience_type, self.popup_id, self.allowance_window)
+        if self.audience_type == BadgeAudienceType.EMAILS and not self.emails:
+            raise ValueError("An emails audience needs at least one email")
         return self
+
+
+class BadgeNewIssuerPolicy(BadgeIssuerPolicyCreate):
+    """An issuer policy created with a new badge, which always joins it."""
+
+    # Other badges that share this policy's allowance.
+    badge_ids: list[uuid.UUID] = []
 
 
 class BadgeIssuerPolicyUpdate(BaseModel):
@@ -435,8 +497,14 @@ class BadgeIssuerPolicyUpdate(BaseModel):
     is_active: bool | None = None
     badge_ids: list[uuid.UUID] | None = Field(default=None, min_length=1)
     human_ids: list[uuid.UUID] | None = None
+    emails: list[str] | None = Field(default=None, max_length=MAX_POLICY_EMAILS)
 
     model_config = ConfigDict(str_strip_whitespace=True)
+
+    @field_validator("emails")
+    @classmethod
+    def _emails(cls, value: list[str] | None) -> list[str] | None:
+        return None if value is None else normalize_emails(value)
 
 
 class IssuableBadge(BaseModel):
@@ -480,36 +548,105 @@ class SentBadgeAward(BaseModel):
 # ---------------------------------------------------------------------------
 
 
-class BadgeRuleType(StrEnum):
-    # N check-ins (non-voided, one per event occurrence) in a track's events.
-    CHECKINS_IN_TRACK = "checkins_in_track"
-    # N check-ins in any event of a popup.
-    CHECKINS_IN_POPUP = "checkins_in_popup"
+class RuleActivity(StrEnum):
+    # Checked in to an event occurrence (non-voided).
+    ATTEND = "attend"
+    # Hosted or spoke at a published event: its owner, or a participant with
+    # the host/speaker role.
+    HOST = "host"
 
 
-class CheckinsInTrackConfig(BaseModel):
-    type: Literal[BadgeRuleType.CHECKINS_IN_TRACK] = BadgeRuleType.CHECKINS_IN_TRACK
-    track_id: uuid.UUID
-    threshold: int = Field(ge=1, le=1000)
+class RuleMeasure(StrEnum):
+    # Event occurrences; one per occurrence however many marks it has.
+    COUNT = "count"
+    # Calendar days (popup timezone) with at least one matching occurrence.
+    DISTINCT_DAYS = "distinct_days"
+    # Longest run of consecutive such days.
+    STREAK_DAYS = "streak_days"
 
 
-class CheckinsInPopupConfig(BaseModel):
-    type: Literal[BadgeRuleType.CHECKINS_IN_POPUP] = BadgeRuleType.CHECKINS_IN_POPUP
-    popup_id: uuid.UUID
-    threshold: int = Field(ge=1, le=1000)
+class TagsMatch(StrEnum):
+    ANY = "any"
+    ALL = "all"
 
 
-# Add a rule kind by adding a config model here and a metric in rules.py.
-BadgeRuleConfig = Annotated[
-    CheckinsInTrackConfig | CheckinsInPopupConfig, PydanticField(discriminator="type")
-]
+def _clean_strings(values: list[str]) -> list[str]:
+    """Strip, drop blanks and case-insensitive duplicates, keep order."""
+    seen: set[str] = set()
+    cleaned: list[str] = []
+    for value in values:
+        value = value.strip()
+        if value and value.casefold() not in seen:
+            seen.add(value.casefold())
+            cleaned.append(value)
+    return cleaned
+
+
+class BadgeRuleFilters(BaseModel):
+    """Which occurrences a condition counts. Every filter set must match.
+
+    Empty lists and nulls mean "any". Weekdays, times and dates are read in
+    the popup's timezone, on the occurrence's start.
+    """
+
+    popup_id: uuid.UUID | None = None
+    track_ids: list[uuid.UUID] = PydanticField(default_factory=list, max_length=50)
+    # Matched case-insensitively against the event's tags.
+    tags: list[str] = PydanticField(default_factory=list, max_length=20)
+    tags_match: TagsMatch = TagsMatch.ANY
+    kinds: list[str] = PydanticField(default_factory=list, max_length=20)
+    venue_ids: list[uuid.UUID] = PydanticField(default_factory=list, max_length=50)
+    event_ids: list[uuid.UUID] = PydanticField(default_factory=list, max_length=100)
+    # ISO weekdays: 1 = Monday ... 7 = Sunday.
+    weekdays: list[Annotated[int, PydanticField(ge=1, le=7)]] = PydanticField(
+        default_factory=list
+    )
+    # Occurrence starts at or after / before this local time of day.
+    starts_after: time | None = None
+    starts_before: time | None = None
+    # Inclusive local dates.
+    date_from: date | None = None
+    date_to: date | None = None
+
+    @model_validator(mode="after")
+    def _normalize(self) -> "BadgeRuleFilters":
+        self.tags = _clean_strings(self.tags)
+        self.kinds = _clean_strings(self.kinds)
+        self.weekdays = sorted(set(self.weekdays))
+        self.track_ids = list(dict.fromkeys(self.track_ids))
+        self.venue_ids = list(dict.fromkeys(self.venue_ids))
+        self.event_ids = list(dict.fromkeys(self.event_ids))
+        if (
+            self.starts_after is not None
+            and self.starts_before is not None
+            and self.starts_after >= self.starts_before
+        ):
+            raise ValueError("starts_after must be earlier than starts_before")
+        if self.date_from and self.date_to and self.date_from > self.date_to:
+            raise ValueError("date_from must not be after date_to")
+        return self
+
+
+class BadgeRuleCondition(BaseModel):
+    """Reach ``threshold`` of ``measure`` over the matching occurrences."""
+
+    activity: RuleActivity = RuleActivity.ATTEND
+    measure: RuleMeasure = RuleMeasure.COUNT
+    threshold: int = PydanticField(ge=1, le=1000)
+    filters: BadgeRuleFilters = PydanticField(default_factory=BadgeRuleFilters)
+
+
+class BadgeRuleConfig(BaseModel):
+    """A person earns the badge once every condition holds."""
+
+    conditions: list[BadgeRuleCondition] = PydanticField(min_length=1, max_length=5)
 
 
 class BadgeRuleBase(SQLModel):
     tenant_id: uuid.UUID = Field(foreign_key="tenants.id", index=True)
     badge_id: uuid.UUID = Field(foreign_key="badges.id", ondelete="CASCADE")
+    # Config format; "conditions" (BadgeRuleConfig) is the only one today.
     type: str = Field(max_length=32)
-    # The validated BadgeRuleConfig, type included, so it round-trips.
     config: dict = Field(default_factory=dict, sa_column=Column(JSONB, nullable=False))
     is_active: bool = Field(default=True)
     created_at: datetime = Field(
@@ -538,6 +675,14 @@ class BadgeRuleCreate(BaseModel):
     evaluate_now: bool = True
 
 
+class BadgeNewRule(BaseModel):
+    """A rule created with a new badge."""
+
+    config: BadgeRuleConfig
+    is_active: bool = True
+    evaluate_now: bool = True
+
+
 class BadgeRuleUpdate(BaseModel):
     config: BadgeRuleConfig | None = None
     is_active: bool | None = None
@@ -546,3 +691,27 @@ class BadgeRuleUpdate(BaseModel):
 class BadgeRuleEvaluation(BaseModel):
     rule_id: uuid.UUID
     awarded: int
+
+
+class BadgeRulePreview(BaseModel):
+    """How many people meet a config right now, before saving it."""
+
+    qualified: int
+    # Of those, how many don't hold the badge yet.
+    new_recipients: int
+
+
+class BadgeRulePreviewRequest(BaseModel):
+    # Omitted while the badge is still being created: nobody holds it yet.
+    badge_id: uuid.UUID | None = None
+    config: BadgeRuleConfig
+
+
+class BadgeRuleOptions(BaseModel):
+    """Values the rule editor offers for a popup's events."""
+
+    tags: list[str]
+    kinds: list[str]
+
+
+BadgeCreate.model_rebuild()

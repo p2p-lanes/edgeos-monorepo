@@ -7571,7 +7571,7 @@ populate its multi-select options without hardcoding scope strings.`
 
 export const BadgeAudienceTypeSchema = {
     type: 'string',
-    enum: ['humans', 'popup_attendees', 'tenant'],
+    enum: ['humans', 'popup_attendees', 'tenant', 'emails'],
     title: 'BadgeAudienceType',
     description: 'Who a policy lets give badges.'
 } as const;
@@ -7852,6 +7852,30 @@ export const BadgeCreateSchema = {
             type: 'array',
             minItems: 1,
             title: 'Images'
+        },
+        issuer_policies: {
+            items: {
+                '$ref': '#/components/schemas/BadgeNewIssuerPolicy'
+            },
+            type: 'array',
+            maxItems: 20,
+            title: 'Issuer Policies'
+        },
+        rules: {
+            items: {
+                '$ref': '#/components/schemas/BadgeNewRule'
+            },
+            type: 'array',
+            maxItems: 20,
+            title: 'Rules'
+        },
+        recipients: {
+            items: {
+                '$ref': '#/components/schemas/BadgeNewRecipient'
+            },
+            type: 'array',
+            maxItems: 500,
+            title: 'Recipients'
         }
     },
     type: 'object',
@@ -8036,6 +8060,14 @@ export const BadgeIssuerPolicyCreateSchema = {
             type: 'array',
             title: 'Human Ids',
             default: []
+        },
+        emails: {
+            items: {
+                type: 'string'
+            },
+            type: 'array',
+            maxItems: 2000,
+            title: 'Emails'
         }
     },
     type: 'object',
@@ -8139,6 +8171,14 @@ export const BadgeIssuerPolicyPublicSchema = {
             },
             type: 'array',
             title: 'Humans'
+        },
+        emails: {
+            items: {
+                type: 'string'
+            },
+            type: 'array',
+            title: 'Emails',
+            default: []
         },
         created_at: {
             type: 'string',
@@ -8256,6 +8296,21 @@ export const BadgeIssuerPolicyUpdateSchema = {
                 }
             ],
             title: 'Human Ids'
+        },
+        emails: {
+            anyOf: [
+                {
+                    items: {
+                        type: 'string'
+                    },
+                    type: 'array',
+                    maxItems: 2000
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Emails'
         }
     },
     type: 'object',
@@ -8271,6 +8326,131 @@ export const BadgeIssuerTypeSchema = {
 Only \`\`admin\`\` is issued today; \`\`human\`\` (peer sending under an issuer
 policy) and \`\`rule\`\` (automatic check-in rules) are reserved for the next
 SIM-108 phases so awards never need a reshape.`
+} as const;
+
+export const BadgeNewIssuerPolicySchema = {
+    properties: {
+        name: {
+            type: 'string',
+            maxLength: 255,
+            minLength: 1,
+            title: 'Name'
+        },
+        audience_type: {
+            '$ref': '#/components/schemas/BadgeAudienceType'
+        },
+        popup_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Popup Id'
+        },
+        allowance_quantity: {
+            anyOf: [
+                {
+                    type: 'integer',
+                    minimum: 1
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Allowance Quantity'
+        },
+        allowance_window: {
+            '$ref': '#/components/schemas/AllowanceWindow',
+            default: 'day'
+        },
+        is_active: {
+            type: 'boolean',
+            title: 'Is Active',
+            default: true
+        },
+        badge_ids: {
+            items: {
+                type: 'string',
+                format: 'uuid'
+            },
+            type: 'array',
+            title: 'Badge Ids',
+            default: []
+        },
+        human_ids: {
+            items: {
+                type: 'string',
+                format: 'uuid'
+            },
+            type: 'array',
+            title: 'Human Ids',
+            default: []
+        },
+        emails: {
+            items: {
+                type: 'string'
+            },
+            type: 'array',
+            maxItems: 2000,
+            title: 'Emails'
+        }
+    },
+    type: 'object',
+    required: ['name', 'audience_type'],
+    title: 'BadgeNewIssuerPolicy',
+    description: 'An issuer policy created with a new badge, which always joins it.'
+} as const;
+
+export const BadgeNewRecipientSchema = {
+    properties: {
+        human_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Human Id'
+        },
+        message: {
+            anyOf: [
+                {
+                    type: 'string',
+                    maxLength: 2000
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Message'
+        }
+    },
+    type: 'object',
+    required: ['human_id'],
+    title: 'BadgeNewRecipient',
+    description: "Someone who gets a badge as soon as it's created."
+} as const;
+
+export const BadgeNewRuleSchema = {
+    properties: {
+        config: {
+            '$ref': '#/components/schemas/BadgeRuleConfig-Input'
+        },
+        is_active: {
+            type: 'boolean',
+            title: 'Is Active',
+            default: true
+        },
+        evaluate_now: {
+            type: 'boolean',
+            title: 'Evaluate Now',
+            default: true
+        }
+    },
+    type: 'object',
+    required: ['config'],
+    title: 'BadgeNewRule',
+    description: 'A rule created with a new badge.'
 } as const;
 
 export const BadgePublicSchema = {
@@ -8378,6 +8558,94 @@ export const BadgePublicSchema = {
     title: 'BadgePublic'
 } as const;
 
+export const BadgeRuleCondition_InputSchema = {
+    properties: {
+        activity: {
+            '$ref': '#/components/schemas/RuleActivity',
+            default: 'attend'
+        },
+        measure: {
+            '$ref': '#/components/schemas/RuleMeasure',
+            default: 'count'
+        },
+        threshold: {
+            type: 'integer',
+            maximum: 1000,
+            minimum: 1,
+            title: 'Threshold'
+        },
+        filters: {
+            '$ref': '#/components/schemas/BadgeRuleFilters'
+        }
+    },
+    type: 'object',
+    required: ['threshold'],
+    title: 'BadgeRuleCondition',
+    description: 'Reach ``threshold`` of ``measure`` over the matching occurrences.'
+} as const;
+
+export const BadgeRuleCondition_OutputSchema = {
+    properties: {
+        activity: {
+            '$ref': '#/components/schemas/RuleActivity',
+            default: 'attend'
+        },
+        measure: {
+            '$ref': '#/components/schemas/RuleMeasure',
+            default: 'count'
+        },
+        threshold: {
+            type: 'integer',
+            maximum: 1000,
+            minimum: 1,
+            title: 'Threshold'
+        },
+        filters: {
+            '$ref': '#/components/schemas/BadgeRuleFilters'
+        }
+    },
+    type: 'object',
+    required: ['threshold'],
+    title: 'BadgeRuleCondition',
+    description: 'Reach ``threshold`` of ``measure`` over the matching occurrences.'
+} as const;
+
+export const BadgeRuleConfig_InputSchema = {
+    properties: {
+        conditions: {
+            items: {
+                '$ref': '#/components/schemas/BadgeRuleCondition-Input'
+            },
+            type: 'array',
+            maxItems: 5,
+            minItems: 1,
+            title: 'Conditions'
+        }
+    },
+    type: 'object',
+    required: ['conditions'],
+    title: 'BadgeRuleConfig',
+    description: 'A person earns the badge once every condition holds.'
+} as const;
+
+export const BadgeRuleConfig_OutputSchema = {
+    properties: {
+        conditions: {
+            items: {
+                '$ref': '#/components/schemas/BadgeRuleCondition-Output'
+            },
+            type: 'array',
+            maxItems: 5,
+            minItems: 1,
+            title: 'Conditions'
+        }
+    },
+    type: 'object',
+    required: ['conditions'],
+    title: 'BadgeRuleConfig',
+    description: 'A person earns the badge once every condition holds.'
+} as const;
+
 export const BadgeRuleCreateSchema = {
     properties: {
         badge_id: {
@@ -8386,22 +8654,7 @@ export const BadgeRuleCreateSchema = {
             title: 'Badge Id'
         },
         config: {
-            oneOf: [
-                {
-                    '$ref': '#/components/schemas/CheckinsInTrackConfig'
-                },
-                {
-                    '$ref': '#/components/schemas/CheckinsInPopupConfig'
-                }
-            ],
-            title: 'Config',
-            discriminator: {
-                propertyName: 'type',
-                mapping: {
-                    checkins_in_popup: '#/components/schemas/CheckinsInPopupConfig',
-                    checkins_in_track: '#/components/schemas/CheckinsInTrackConfig'
-                }
-            }
+            '$ref': '#/components/schemas/BadgeRuleConfig-Input'
         },
         is_active: {
             type: 'boolean',
@@ -8436,6 +8689,196 @@ export const BadgeRuleEvaluationSchema = {
     title: 'BadgeRuleEvaluation'
 } as const;
 
+export const BadgeRuleFiltersSchema = {
+    properties: {
+        popup_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Popup Id'
+        },
+        track_ids: {
+            items: {
+                type: 'string',
+                format: 'uuid'
+            },
+            type: 'array',
+            maxItems: 50,
+            title: 'Track Ids'
+        },
+        tags: {
+            items: {
+                type: 'string'
+            },
+            type: 'array',
+            maxItems: 20,
+            title: 'Tags'
+        },
+        tags_match: {
+            '$ref': '#/components/schemas/TagsMatch',
+            default: 'any'
+        },
+        kinds: {
+            items: {
+                type: 'string'
+            },
+            type: 'array',
+            maxItems: 20,
+            title: 'Kinds'
+        },
+        venue_ids: {
+            items: {
+                type: 'string',
+                format: 'uuid'
+            },
+            type: 'array',
+            maxItems: 50,
+            title: 'Venue Ids'
+        },
+        event_ids: {
+            items: {
+                type: 'string',
+                format: 'uuid'
+            },
+            type: 'array',
+            maxItems: 100,
+            title: 'Event Ids'
+        },
+        weekdays: {
+            items: {
+                type: 'integer',
+                maximum: 7,
+                minimum: 1
+            },
+            type: 'array',
+            title: 'Weekdays'
+        },
+        starts_after: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Starts After'
+        },
+        starts_before: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Starts Before'
+        },
+        date_from: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Date From'
+        },
+        date_to: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Date To'
+        }
+    },
+    type: 'object',
+    title: 'BadgeRuleFilters',
+    description: `Which occurrences a condition counts. Every filter set must match.
+
+Empty lists and nulls mean "any". Weekdays, times and dates are read in
+the popup's timezone, on the occurrence's start.`
+} as const;
+
+export const BadgeRuleOptionsSchema = {
+    properties: {
+        tags: {
+            items: {
+                type: 'string'
+            },
+            type: 'array',
+            title: 'Tags'
+        },
+        kinds: {
+            items: {
+                type: 'string'
+            },
+            type: 'array',
+            title: 'Kinds'
+        }
+    },
+    type: 'object',
+    required: ['tags', 'kinds'],
+    title: 'BadgeRuleOptions',
+    description: "Values the rule editor offers for a popup's events."
+} as const;
+
+export const BadgeRulePreviewSchema = {
+    properties: {
+        qualified: {
+            type: 'integer',
+            title: 'Qualified'
+        },
+        new_recipients: {
+            type: 'integer',
+            title: 'New Recipients'
+        }
+    },
+    type: 'object',
+    required: ['qualified', 'new_recipients'],
+    title: 'BadgeRulePreview',
+    description: 'How many people meet a config right now, before saving it.'
+} as const;
+
+export const BadgeRulePreviewRequestSchema = {
+    properties: {
+        badge_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Badge Id'
+        },
+        config: {
+            '$ref': '#/components/schemas/BadgeRuleConfig-Input'
+        }
+    },
+    type: 'object',
+    required: ['config'],
+    title: 'BadgeRulePreviewRequest'
+} as const;
+
 export const BadgeRulePublicSchema = {
     properties: {
         id: {
@@ -8449,22 +8892,7 @@ export const BadgeRulePublicSchema = {
             title: 'Badge Id'
         },
         config: {
-            oneOf: [
-                {
-                    '$ref': '#/components/schemas/CheckinsInTrackConfig'
-                },
-                {
-                    '$ref': '#/components/schemas/CheckinsInPopupConfig'
-                }
-            ],
-            title: 'Config',
-            discriminator: {
-                propertyName: 'type',
-                mapping: {
-                    checkins_in_popup: '#/components/schemas/CheckinsInPopupConfig',
-                    checkins_in_track: '#/components/schemas/CheckinsInTrackConfig'
-                }
-            }
+            '$ref': '#/components/schemas/BadgeRuleConfig-Output'
         },
         is_active: {
             type: 'boolean',
@@ -8496,27 +8924,12 @@ export const BadgeRuleUpdateSchema = {
         config: {
             anyOf: [
                 {
-                    oneOf: [
-                        {
-                            '$ref': '#/components/schemas/CheckinsInTrackConfig'
-                        },
-                        {
-                            '$ref': '#/components/schemas/CheckinsInPopupConfig'
-                        }
-                    ],
-                    discriminator: {
-                        propertyName: 'type',
-                        mapping: {
-                            checkins_in_popup: '#/components/schemas/CheckinsInPopupConfig',
-                            checkins_in_track: '#/components/schemas/CheckinsInTrackConfig'
-                        }
-                    }
+                    '$ref': '#/components/schemas/BadgeRuleConfig-Input'
                 },
                 {
                     type: 'null'
                 }
-            ],
-            title: 'Config'
+            ]
         },
         is_active: {
             anyOf: [
@@ -10568,56 +10981,6 @@ export const CheckInPayloadSchema = {
 
 \`source\` discriminates how the scan occurred. \`notes\` is an optional
 free-form operator annotation.`
-} as const;
-
-export const CheckinsInPopupConfigSchema = {
-    properties: {
-        type: {
-            type: 'string',
-            const: 'checkins_in_popup',
-            title: 'Type',
-            default: 'checkins_in_popup'
-        },
-        popup_id: {
-            type: 'string',
-            format: 'uuid',
-            title: 'Popup Id'
-        },
-        threshold: {
-            type: 'integer',
-            maximum: 1000,
-            minimum: 1,
-            title: 'Threshold'
-        }
-    },
-    type: 'object',
-    required: ['popup_id', 'threshold'],
-    title: 'CheckinsInPopupConfig'
-} as const;
-
-export const CheckinsInTrackConfigSchema = {
-    properties: {
-        type: {
-            type: 'string',
-            const: 'checkins_in_track',
-            title: 'Type',
-            default: 'checkins_in_track'
-        },
-        track_id: {
-            type: 'string',
-            format: 'uuid',
-            title: 'Track Id'
-        },
-        threshold: {
-            type: 'integer',
-            maximum: 1000,
-            minimum: 1,
-            title: 'Threshold'
-        }
-    },
-    type: 'object',
-    required: ['track_id', 'threshold'],
-    title: 'CheckinsInTrackConfig'
 } as const;
 
 export const CheckoutBuyerFieldSchema = {
@@ -28199,6 +28562,18 @@ export const RsvpEligibilitySchema = {
     title: 'RsvpEligibility'
 } as const;
 
+export const RuleActivitySchema = {
+    type: 'string',
+    enum: ['attend', 'host'],
+    title: 'RuleActivity'
+} as const;
+
+export const RuleMeasureSchema = {
+    type: 'string',
+    enum: ['count', 'distinct_days', 'streak_days'],
+    title: 'RuleMeasure'
+} as const;
+
 export const SaleTypeSchema = {
     type: 'string',
     enum: ['application', 'direct'],
@@ -30692,6 +31067,12 @@ export const StaffTicketPublicSchema = {
     type: 'object',
     required: ['id', 'check_in_code', 'product'],
     title: 'StaffTicketPublic'
+} as const;
+
+export const TagsMatchSchema = {
+    type: 'string',
+    enum: ['any', 'all'],
+    title: 'TagsMatch'
 } as const;
 
 export const TaskAppSchema = {
