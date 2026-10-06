@@ -8,6 +8,7 @@ import useGetProfile from "@/hooks/useGetProfile"
 import useIssuableBadges from "@/hooks/useIssuableBadges"
 import { useCityProvider } from "@/providers/cityProvider"
 import type { AttendeeDirectory } from "@/types/Attendee"
+import GiveableBadgesBanner from "./GiveableBadgesBanner"
 import PaginationControls from "./Pagination"
 import AttendeeCell from "./Table/Cells/AttendeeCell"
 import CommonCell from "./Table/Cells/CommonCell"
@@ -57,6 +58,7 @@ const AttendeesTable = ({
 
   return (
     <div className="flex flex-col w-full mt-4">
+      <GiveableBadgesBanner issuable={issuable} />
       <Table>
         <Header showBadges={canGive} />
         <TableBody>
@@ -72,23 +74,9 @@ const AttendeesTable = ({
             attendees.map((attendee, index) => (
               <TableRow
                 key={index}
-                className="border-b border-border hover:bg-muted bg-card sticky z-10 left-0"
+                className="group border-b border-border hover:bg-muted bg-card sticky z-10 left-0"
               >
                 <AttendeeCell attendee={attendee} />
-                {canGive && (
-                  <TableCell className="whitespace-nowrap">
-                    {!isMe(attendee) && (
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => setRecipient(attendee)}
-                      >
-                        <Award className="mr-1 h-4 w-4" />
-                        {t("attendees.badges.give")}
-                      </Button>
-                    )}
-                  </TableCell>
-                )}
                 <CommonCell value={attendee.email ?? ""} />
                 <CommonCell value={attendee.telegram ?? ""} />
                 <CommonCell
@@ -105,6 +93,22 @@ const AttendeesTable = ({
                       : (attendee.organization ?? "")
                   }
                 />
+                {canGive && (
+                  // Pinned to the right edge so it stays reachable while the
+                  // other columns scroll sideways.
+                  <TableCell className="sticky right-0 whitespace-nowrap bg-card text-right group-hover:bg-muted">
+                    {!isMe(attendee) && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => setRecipient(attendee)}
+                      >
+                        <Award className="mr-1 h-4 w-4" />
+                        {t("attendees.badges.give")}
+                      </Button>
+                    )}
+                  </TableCell>
+                )}
               </TableRow>
             ))
           )}

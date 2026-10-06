@@ -747,12 +747,24 @@
       "none_left": "None left",
       "already_has": "Already has it",
       "back_at": "Back {{when}}",
-      "message_placeholder": "Add a note (optional)",
+      "step_message": "2. Add a note (optional)",
+      "message_example": "e.g. Thanks for the great session!",
       "send": "Send badge",
       "sent": "Badge sent to {{name}}",
       "error_exhausted": "You have no more of this badge to give for now.",
       "error_forbidden": "You can't give this badge to this person.",
-      "error_generic": "Couldn't send the badge. Please try again."
+      "error_generic": "Couldn't send the badge. Please try again.",
+      "step_choose": "1. Choose the badge to give",
+      "step_choose_hint": "Tap a badge to select it.",
+      "step_choose_single": "This is the badge you have to give.",
+      "search_placeholder": "Search your badges",
+      "search_empty": "No badge matches.",
+      "choose_first": "Choose a badge",
+      "banner_title_one": "You have {{count}} badge to give",
+      "banner_title_other": "You have {{count}} badges to give",
+      "banner_hint": "Find someone below and tap Give badge on their row.",
+      "banner_all_used": "You've given all your badges for now",
+      "banner_all_used_hint": "You can give more once your allowance resets."
     }
   },
   "checkin": {
