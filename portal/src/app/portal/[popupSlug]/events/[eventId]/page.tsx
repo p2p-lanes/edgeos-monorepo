@@ -56,6 +56,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog"
 import { Pill } from "@/components/ui/pill"
+import { Skeleton } from "@/components/ui/skeleton"
 import { Textarea } from "@/components/ui/textarea"
 import {
   Tooltip,
@@ -69,6 +70,7 @@ import { CoverImage } from "../lib/CoverImage"
 import { EventAttendance } from "../lib/EventAttendance"
 import { EventMessages } from "../lib/EventMessages"
 import { canManageEvent } from "../lib/eventPermissions"
+import { fetchAllPortalParticipants } from "../lib/fetchAllPortalParticipants"
 import { RsvpBlockedCta } from "../lib/RsvpBlockedCta"
 import { RsvpStatusAction } from "../lib/RsvpStatusAction"
 import { summarizeRrule } from "../lib/summarizeRrule"
@@ -212,13 +214,28 @@ export default function EventDetailPage() {
     },
   })
 
-  const { data: participantsData } = useQuery({
-    queryKey: ["portal-event-participants", params.eventId, occParam],
-    queryFn: () =>
-      EventParticipantsService.listPortalParticipants({
-        eventId: params.eventId,
-        occurrenceStart: occParam ?? undefined,
-      }),
+  // Match the detail counter's first-date default without changing the event
+  // API or RSVP behavior. Detached children are one-offs and send no date.
+  const rosterOccurrenceStart = event?.rrule
+    ? (occParam ?? event.start_time)
+    : null
+  const {
+    data: participantsData,
+    isPending: participantsLoading,
+    isError: participantsError,
+    refetch: refetchParticipants,
+  } = useQuery({
+    queryKey: [
+      "portal-event-participants",
+      params.eventId,
+      rosterOccurrenceStart,
+    ],
+    queryFn: async () => ({
+      results: await fetchAllPortalParticipants(
+        params.eventId,
+        rosterOccurrenceStart,
+      ),
+    }),
     enabled: !!params.eventId && !!event,
   })
 
@@ -252,6 +269,9 @@ export default function EventDetailPage() {
   // the roster above). Prefer the backend count so the badge and the "full"
   // state stay consistent with what registration actually allows.
   const goingCount = event?.attendee_count ?? activeParticipants.length
+  const unlistedParticipantCount = participantsData
+    ? Math.max(0, goingCount - activeParticipants.length)
+    : 0
   const isFull =
     event?.max_participant != null && goingCount >= event.max_participant
 
@@ -1127,9 +1147,24 @@ export default function EventDetailPage() {
             {t("events.detail.copy_attendee_emails")}
           </Button>
         )}
-        {activeParticipants.length === 0 ? (
+        {participantsLoading ? (
+          <Skeleton className="h-12 w-full" />
+        ) : participantsError ? (
+          <div role="alert" className="text-sm text-muted-foreground">
+            {t("events.detail.participants_load_error")}{" "}
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => refetchParticipants()}
+            >
+              {t("events.detail.participants_retry")}
+            </Button>
+          </div>
+        ) : activeParticipants.length === 0 ? (
           <p className="text-sm text-muted-foreground">
-            {t("events.detail.no_participants_yet")}
+            {goingCount > 0
+              ? t("events.detail.participants_count", { count: goingCount })
+              : t("events.detail.no_participants_yet")}
           </p>
         ) : (
           <div className="space-y-2">
@@ -1177,6 +1212,13 @@ export default function EventDetailPage() {
                       count: activeParticipants.length - 10,
                     })}
               </button>
+            )}
+            {unlistedParticipantCount > 0 && (
+              <p className="text-sm text-muted-foreground">
+                {t("events.detail.participants_unlisted", {
+                  count: unlistedParticipantCount,
+                })}
+              </p>
             )}
           </div>
         )}

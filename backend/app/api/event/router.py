@@ -50,6 +50,8 @@ from app.api.event.schemas import (
     TrackEventCount,
     VenueEventCount,
 )
+from app.api.event.series import build_series_summary
+from app.api.event.series_schemas import EventSeriesSummary
 from app.api.event_audit.crud import build_event_snapshot, record_event_audit
 from app.api.event_audit.schemas import EventAuditAction
 from app.api.popup.guards import (
@@ -1257,6 +1259,37 @@ async def get_event(
             status_code=status.HTTP_404_NOT_FOUND, detail="Event not found"
         )
     return _with_collaborators(db, _to_public(event), event, include_email=True)
+
+
+@router.get("/{event_id}/series-summary", response_model=EventSeriesSummary)
+async def get_event_series_summary(
+    event_id: uuid.UUID,
+    db: AdminOrApiKeySession_EventsRead,
+    _: AdminOrApiKey_EventsRead,
+    token_payload: CallerToken,
+) -> EventSeriesSummary:
+    """Read scheduled dates and RSVP counts for the backoffice series view.
+
+    Uses the gathering date range and resolves detached children to their
+    master. This projection never changes event details or registrations.
+    """
+    event = crud.events_crud.get(db, event_id)
+    if not event:
+        raise HTTPException(404, "Event not found")
+    ensure_api_key_popup(token_payload, event.popup_id)
+    master = (
+        crud.events_crud.get(db, event.recurrence_master_id)
+        if event.recurrence_master_id
+        else event
+    )
+    if (
+        not master
+        or master.tenant_id != event.tenant_id
+        or master.popup_id != event.popup_id
+    ):
+        raise HTTPException(404, "Series not found")
+    ensure_api_key_popup(token_payload, master.popup_id)
+    return build_series_summary(db, master)
 
 
 # ---------------------------------------------------------------------------

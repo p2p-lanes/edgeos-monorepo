@@ -3168,6 +3168,27 @@ export type EventRecurringAvailabilityResult = {
     truncated?: boolean;
 };
 
+export type EventSeriesOccurrence = {
+    event_id: string;
+    occurrence_start: (string | null);
+    start_time: string;
+    end_time: string;
+    timezone: string;
+    title: string;
+    status: EventStatus;
+    is_detached: boolean;
+    attendee_count: number;
+};
+
+export type EventSeriesSummary = {
+    series_id: string;
+    series_title: string;
+    timezone: string;
+    window_start: string;
+    window_end: string;
+    occurrences: Array<EventSeriesOccurrence>;
+};
+
 /**
  * Event settings schema for creation.
  */
@@ -8760,6 +8781,8 @@ export type EventParticipantsListParticipantsData = {
      * Maximum number of items to return
      */
     limit?: number;
+    occurrenceStart?: (string | null);
+    scopeToOccurrence?: boolean;
     /**
      * Number of items to skip
      */
@@ -9002,6 +9025,13 @@ export type EventsDeleteEventData = {
 };
 
 export type EventsDeleteEventResponse = (void);
+
+export type EventsGetEventSeriesSummaryData = {
+    eventId: string;
+    xTenantId?: (string | null);
+};
+
+export type EventsGetEventSeriesSummaryResponse = (EventSeriesSummary);
 
 export type EventsGetEventAdminNotesData = {
     eventId: string;
