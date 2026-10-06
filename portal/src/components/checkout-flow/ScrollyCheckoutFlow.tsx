@@ -8,6 +8,7 @@ import { useCheckoutStepTracking } from "@/hooks/checkout/useCheckoutStepTrackin
 import { readAndClearPendingPaymentRedirectState } from "@/hooks/usePaymentRedirect"
 import { useCheckout } from "@/providers/checkoutProvider"
 import { useCityProvider } from "@/providers/cityProvider"
+import CheckoutConfigError from "./CheckoutConfigError"
 import CheckoutToast from "./CheckoutToast"
 import DynamicProductStep from "./DynamicProductStep"
 import { shouldUseDynamicStep } from "./registries/stepRegistry"
@@ -45,6 +46,7 @@ function ScrollyCheckoutFlowInner({
     stepConfigs,
     isInitialLoading,
     previewMode,
+    flowConfigError,
     markStepVisited,
   } = useCheckout()
   const { getCity } = useCityProvider()
@@ -472,6 +474,8 @@ function ScrollyCheckoutFlowInner({
   if (isSimpleFIReturn || isInitialLoading) {
     return <Loader />
   }
+
+  if (flowConfigError) return <CheckoutConfigError />
 
   const lastSectionId = allSections[allSections.length - 1]?.id
 
