@@ -14609,6 +14609,98 @@ export const EventRecurringAvailabilityResultSchema = {
     title: 'EventRecurringAvailabilityResult'
 } as const;
 
+export const EventSeriesOccurrenceSchema = {
+    properties: {
+        event_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Event Id'
+        },
+        occurrence_start: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Occurrence Start'
+        },
+        start_time: {
+            type: 'string',
+            format: 'date-time',
+            title: 'Start Time'
+        },
+        end_time: {
+            type: 'string',
+            format: 'date-time',
+            title: 'End Time'
+        },
+        timezone: {
+            type: 'string',
+            title: 'Timezone'
+        },
+        title: {
+            type: 'string',
+            title: 'Title'
+        },
+        status: {
+            '$ref': '#/components/schemas/EventStatus'
+        },
+        is_detached: {
+            type: 'boolean',
+            title: 'Is Detached'
+        },
+        attendee_count: {
+            type: 'integer',
+            title: 'Attendee Count'
+        }
+    },
+    type: 'object',
+    required: ['event_id', 'occurrence_start', 'start_time', 'end_time', 'timezone', 'title', 'status', 'is_detached', 'attendee_count'],
+    title: 'EventSeriesOccurrence'
+} as const;
+
+export const EventSeriesSummarySchema = {
+    properties: {
+        series_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Series Id'
+        },
+        series_title: {
+            type: 'string',
+            title: 'Series Title'
+        },
+        timezone: {
+            type: 'string',
+            title: 'Timezone'
+        },
+        window_start: {
+            type: 'string',
+            format: 'date-time',
+            title: 'Window Start'
+        },
+        window_end: {
+            type: 'string',
+            format: 'date-time',
+            title: 'Window End'
+        },
+        occurrences: {
+            items: {
+                '$ref': '#/components/schemas/EventSeriesOccurrence'
+            },
+            type: 'array',
+            title: 'Occurrences'
+        }
+    },
+    type: 'object',
+    required: ['series_id', 'series_title', 'timezone', 'window_start', 'window_end', 'occurrences'],
+    title: 'EventSeriesSummary'
+} as const;
+
 export const EventSettingsCreateSchema = {
     properties: {
         popup_id: {
