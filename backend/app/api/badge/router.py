@@ -4,6 +4,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, Header, HTTPException, status
 from loguru import logger
+from sqlalchemy.exc import IntegrityError
 from sqlmodel import Session, col, func, select
 
 from app.api.badge import crud, policies, rules
@@ -20,7 +21,10 @@ from app.api.badge.schemas import (
     BadgeAudienceType,
     BadgeAwardCreate,
     BadgeAwardPublic,
+    BadgeAwardRecipient,
     BadgeAwardRevoke,
+    BadgeBulkAwardCreate,
+    BadgeBulkAwardResult,
     BadgeCreate,
     BadgeImageUpsert,
     BadgeIssuerPolicyCreate,
@@ -644,6 +648,86 @@ async def award_badge(
         raise _conflict(str(exc))
     resolver = crud.ImageResolver(crud.list_styles(db))
     return crud.to_award_public(db, [award], resolver)[0]
+
+
+@router.post(
+    "/{badge_id}/awards/bulk",
+    response_model=BadgeBulkAwardResult,
+    status_code=status.HTTP_201_CREATED,
+)
+async def award_badge_bulk(
+    badge_id: uuid.UUID,
+    award_in: BadgeBulkAwardCreate,
+    db: AdminOrApiKeySession_BadgesWrite,
+    current_user: AdminOrApiKey_BadgesWrite,
+) -> BadgeBulkAwardResult:
+    """Give a badge to many people in one go.
+
+    People who already hold a non-repeatable badge are skipped, and pasted
+    emails that match nobody are reported back instead of failing the batch.
+    Everyone else gets it atomically.
+    """
+    badge = _get_badge_or_404(db, badge_id)
+    if badge.archived_at is not None:
+        raise _conflict("This badge is archived")
+    if award_in.popup_id:
+        from app.api.popup.crud import popups_crud
+
+        if not popups_crud.get(db, award_in.popup_id):
+            raise _not_found("Popup")
+
+    by_id: dict[uuid.UUID, Humans] = {}
+    if award_in.recipient_human_ids:
+        found = db.exec(
+            select(Humans).where(col(Humans.id).in_(award_in.recipient_human_ids))
+        ).all()
+        by_id = {h.id: h for h in found}
+        if len(by_id) != len(set(award_in.recipient_human_ids)):
+            raise _not_found("Human")
+    unknown_emails: list[str] = []
+    if award_in.recipient_emails:
+        # Emails are stored lowercased (see crud.find_human_by_email).
+        found = db.exec(
+            select(Humans).where(col(Humans.email).in_(award_in.recipient_emails))
+        ).all()
+        by_email = {h.email: h for h in found}
+        unknown_emails = [e for e in award_in.recipient_emails if e not in by_email]
+        for human in by_email.values():
+            by_id.setdefault(human.id, human)
+
+    awards: list[BadgeAwards] = []
+    already_had: list[BadgeAwardRecipient] = []
+    try:
+        for recipient in by_id.values():
+            try:
+                awards.append(
+                    crud.create_award(
+                        db,
+                        badge=badge,
+                        recipient=recipient,
+                        issuer_type=BadgeIssuerType.ADMIN,
+                        issuer_user_id=current_user.id,
+                        issuer_name=current_user.full_name or current_user.email,
+                        popup_id=award_in.popup_id,
+                        message=award_in.message,
+                        commit=False,
+                    )
+                )
+            except crud.BadgeConflictError:
+                already_had.append(
+                    BadgeAwardRecipient.model_validate(recipient, from_attributes=True)
+                )
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        raise _conflict("Someone else just gave this badge; try again")
+
+    resolver = crud.ImageResolver(crud.list_styles(db))
+    return BadgeBulkAwardResult(
+        awarded=crud.to_award_public(db, awards, resolver),
+        already_had=already_had,
+        unknown_emails=unknown_emails,
+    )
 
 
 # ---------------------------------------------------------------------------

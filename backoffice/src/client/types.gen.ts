@@ -1633,6 +1633,22 @@ export type BadgeAwardRevoke = {
     reason?: (string | null);
 };
 
+/**
+ * Give a badge to many people at once, by id and/or by email.
+ */
+export type BadgeBulkAwardCreate = {
+    recipient_human_ids?: Array<(string)>;
+    recipient_emails?: Array<(string)>;
+    popup_id?: (string | null);
+    message?: (string | null);
+};
+
+export type BadgeBulkAwardResult = {
+    awarded: Array<BadgeAwardPublic>;
+    already_had: Array<BadgeAwardRecipient>;
+    unknown_emails: Array<(string)>;
+};
+
 export type BadgeCreate = {
     name: string;
     slug?: (string | null);
@@ -4488,6 +4504,11 @@ export type ListModel_PopupAdmin_ = {
     paging: Paging;
 };
 
+export type ListModel_PopupCheckInPublic_ = {
+    results: Array<PopupCheckInPublic>;
+    paging: Paging;
+};
+
 export type ListModel_PopupReviewerPublic_ = {
     results: Array<PopupReviewerPublic>;
     paging: Paging;
@@ -5165,6 +5186,22 @@ export type PopupAdmin = {
     id: string;
     takes_applications?: boolean;
     sells_directly?: boolean;
+};
+
+/**
+ * Allowlisted operational data for scanners, independent of admin schemas.
+ */
+export type PopupCheckInPublic = {
+    id: string;
+    name: string;
+    tagline?: (string | null);
+    location?: (string | null);
+    slug: string;
+    status: PopupStatus;
+    start_date?: (string | null);
+    end_date?: (string | null);
+    image_url?: (string | null);
+    self_check_in_enabled?: boolean;
 };
 
 export type PopupCreate = {
@@ -8263,6 +8300,14 @@ export type BadgesAwardBadgeData = {
 
 export type BadgesAwardBadgeResponse = (BadgeAwardPublic);
 
+export type BadgesAwardBadgeBulkData = {
+    badgeId: string;
+    requestBody: BadgeBulkAwardCreate;
+    xTenantId?: (string | null);
+};
+
+export type BadgesAwardBadgeBulkResponse = (BadgeBulkAwardResult);
+
 export type BadgesListBadgeStylesData = {
     xTenantId?: (string | null);
 };
@@ -10254,6 +10299,28 @@ export type PopupReviewersRemoveReviewerData = {
 };
 
 export type PopupReviewersRemoveReviewerResponse = (void);
+
+export type PopupsListCheckInPopupsData = {
+    /**
+     * Maximum number of items to return
+     */
+    limit?: number;
+    search?: (string | null);
+    /**
+     * Number of items to skip
+     */
+    skip?: number;
+    xTenantId?: (string | null);
+};
+
+export type PopupsListCheckInPopupsResponse = (ListModel_PopupCheckInPublic_);
+
+export type PopupsGetCheckInPopupData = {
+    popupId: string;
+    xTenantId?: (string | null);
+};
+
+export type PopupsGetCheckInPopupResponse = (PopupCheckInPublic);
 
 export type PopupsListPopupsData = {
     /**

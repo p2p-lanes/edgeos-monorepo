@@ -57,7 +57,10 @@ const AUDIENCE_LABELS: Record<BadgeAudienceType, string> = {
 const EMAIL_SHAPE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/
 
 /** Emails pasted as a list: any mix of commas, semicolons, spaces, lines. */
-function parseEmails(text: string): { valid: string[]; invalid: string[] } {
+export function parseEmails(text: string): {
+  valid: string[]
+  invalid: string[]
+} {
   const valid = new Set<string>()
   const invalid = new Set<string>()
   for (const token of text.split(/[\s,;]+/)) {
