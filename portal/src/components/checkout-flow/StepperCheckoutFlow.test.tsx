@@ -9,6 +9,9 @@ let availableStepsOverride: string[] | null = null
 let stepConfigsOverride: Record<string, unknown>[] | null = null
 let hasAnyCartItemsOverride: boolean | null = null
 let buyerCompleteOverride: boolean | null = null
+let flowConfigError: string | null = null
+let isInitialLoading = false
+const retryFlowConfig = vi.fn()
 
 const markBuyerFieldsTouched = vi.fn()
 const triggerCheckoutToast = vi.fn()
@@ -36,7 +39,9 @@ vi.mock("@/providers/checkoutProvider", () => ({
     availableSteps: availableStepsOverride ?? ["passes", "confirm"],
     stepConfigs: stepConfigsOverride ?? [],
     submitPayment,
-    isInitialLoading: false,
+    isInitialLoading,
+    flowConfigError,
+    retryFlowConfig,
     markStepVisited: vi.fn(),
     // Open checkout (`/checkout/[popupSlug]`) routes ticket picks to
     // cart.dynamicItems, never cart.passes — see useTicketsStep.ts:284,336.
@@ -113,10 +118,32 @@ describe("StepperCheckoutFlow", () => {
     stepConfigsOverride = null
     hasAnyCartItemsOverride = null
     buyerCompleteOverride = null
+    flowConfigError = null
+    isInitialLoading = false
+    retryFlowConfig.mockReset()
     amanitaConfirmProps = null
     markBuyerFieldsTouched.mockClear()
     triggerCheckoutToast.mockClear()
     dismissCheckoutToast.mockClear()
+  })
+
+  it("hides the checkout while settings are pending", () => {
+    isInitialLoading = true
+    render(<StepperCheckoutFlow />)
+    expect(screen.getByText("loading")).toBeTruthy()
+    expect(screen.queryByTestId("stepper-next")).toBeNull()
+  })
+
+  it("shows a retry instead of the payment bar when settings fail", () => {
+    flowConfigError = "Checkout fees could not be loaded"
+    render(<StepperCheckoutFlow />)
+    expect(screen.getByRole("alert").textContent).toBe(flowConfigError)
+    expect(screen.queryByTestId("stepper-next")).toBeNull()
+    fireEvent.click(
+      screen.getByRole("button", { name: "checkout.config_retry" }),
+    )
+    expect(retryFlowConfig).toHaveBeenCalledOnce()
+    expect(submitPayment).not.toHaveBeenCalled()
   })
 
   // The buyer form is the only step with formal field validation, and the
