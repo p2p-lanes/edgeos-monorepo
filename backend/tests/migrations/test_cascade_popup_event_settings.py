@@ -1,7 +1,7 @@
 import pytest
 from alembic import command
 from alembic.config import Config
-from sqlalchemy import inspect
+from sqlalchemy import inspect, text
 from sqlalchemy.exc import IntegrityError
 from sqlmodel import Session, create_engine, delete, select
 from testcontainers.postgres import PostgresContainer
@@ -18,6 +18,12 @@ def test_settings_follow_popup_deletion_and_fk_downgrade_preserves_rows():
             config = Config("alembic.ini")
             config.attributes["connection"] = connection
             command.upgrade(config, "a9d3e7f2b6c4")
+            # The ORM model already has the later popup badges flag.
+            connection.execute(
+                text(
+                    "ALTER TABLE popups ADD COLUMN badges_enabled BOOLEAN NOT NULL DEFAULT false"
+                )
+            )
             with Session(connection) as session:
                 tenant = Tenants(name="Cascade tenant", slug="cascade-tenant")
                 session.add(tenant)

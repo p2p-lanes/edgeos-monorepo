@@ -11,12 +11,15 @@ import { useGoBack } from "@/hooks/useGoBack"
 
 export const Route = createFileRoute("/_layout/popups/$id/edit")({
   component: EditPopupPage,
+  // ?tab=features opens straight on a tab, for links to one setting.
+  validateSearch: (search: Record<string, unknown>): { tab?: string } =>
+    typeof search.tab === "string" ? { tab: search.tab } : {},
   head: () => ({
     meta: [{ title: "Edit Gathering - EdgeOS" }],
   }),
 })
 
-function EditPopupContent({ popupId }: { popupId: string }) {
+function EditPopupContent({ popupId, tab }: { popupId: string; tab?: string }) {
   const goBack = useGoBack({ to: "/popups" })
   const [{ data: popup }, { data: home }] = useSuspenseQueries({
     queries: [
@@ -32,12 +35,18 @@ function EditPopupContent({ popupId }: { popupId: string }) {
   })
 
   return (
-    <PopupForm defaultValues={popup} defaultHome={home} onSuccess={goBack} />
+    <PopupForm
+      defaultValues={popup}
+      defaultHome={home}
+      onSuccess={goBack}
+      initialTab={tab}
+    />
   )
 }
 
 function EditPopupPage() {
   const { id } = Route.useParams()
+  const { tab } = Route.useSearch()
 
   return (
     <FormPageLayout
@@ -47,7 +56,7 @@ function EditPopupPage() {
     >
       <QueryErrorBoundary>
         <Suspense fallback={<Skeleton className="h-96 w-full" />}>
-          <EditPopupContent popupId={id} />
+          <EditPopupContent popupId={id} tab={tab} />
         </Suspense>
       </QueryErrorBoundary>
     </FormPageLayout>

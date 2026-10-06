@@ -282,6 +282,75 @@ def test_awards_can_be_looked_up_by_email(
     assert unknown.json()["results"] == []
 
 
+def test_bulk_award_skips_holders_and_reports_unknown_emails(
+    client: TestClient, db: Session, tenant, headers, styles
+):
+    badge = _badge(client, headers, styles)
+    holder = _human(db, tenant)
+    picked = _human(db, tenant, first_name="Grace")
+    pasted = _human(db, tenant)
+    url = f"{BADGES}/{badge['id']}/awards"
+    client.post(url, json={"recipient_human_id": str(holder.id)}, headers=headers)
+
+    resp = client.post(
+        f"{url}/bulk",
+        json={
+            # The same person by id and by email gets it once.
+            "recipient_human_ids": [str(picked.id), str(holder.id)],
+            "recipient_emails": [
+                picked.email.upper(),
+                f" {pasted.email} ",
+                "nobody@test.com",
+            ],
+            "message": "Thanks for showing up",
+        },
+        headers=headers,
+    )
+    assert resp.status_code == 201, resp.text
+    body = resp.json()
+    assert {a["recipient"]["id"] for a in body["awarded"]} == {
+        str(picked.id),
+        str(pasted.id),
+    }
+    assert all(a["message"] == "Thanks for showing up" for a in body["awarded"])
+    assert all(a["issuer_type"] == "admin" for a in body["awarded"])
+    assert [h["id"] for h in body["already_had"]] == [str(holder.id)]
+    assert body["unknown_emails"] == ["nobody@test.com"]
+
+    detail = client.get(f"{BADGES}/{badge['id']}", headers=headers).json()
+    assert detail["award_count"] == 3
+
+
+def test_bulk_award_rejects_bad_input(
+    client: TestClient, db: Session, tenant, headers, styles
+):
+    badge = _badge(client, headers, styles)
+    url = f"{BADGES}/{badge['id']}/awards/bulk"
+
+    empty = client.post(url, json={}, headers=headers)
+    assert empty.status_code == 422
+
+    bad_email = client.post(
+        url, json={"recipient_emails": ["not-an-email"]}, headers=headers
+    )
+    assert bad_email.status_code == 422
+
+    missing = client.post(
+        url, json={"recipient_human_ids": [str(uuid.uuid4())]}, headers=headers
+    )
+    assert missing.status_code == 404
+
+    # Awarded once, so deleting it archives it, and then nobody can get it.
+    first = _human(db, tenant)
+    client.post(url, json={"recipient_human_ids": [str(first.id)]}, headers=headers)
+    client.delete(f"{BADGES}/{badge['id']}", headers=headers)
+    late = _human(db, tenant)
+    archived = client.post(
+        url, json={"recipient_human_ids": [str(late.id)]}, headers=headers
+    )
+    assert archived.status_code == 409
+
+
 def test_deleting_an_awarded_badge_archives_it(
     client: TestClient, db: Session, tenant, headers, styles
 ):

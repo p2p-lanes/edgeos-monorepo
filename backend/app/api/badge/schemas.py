@@ -282,6 +282,43 @@ class BadgeAwardCreate(BaseModel):
         return self
 
 
+MAX_BULK_AWARDS = 500
+
+
+class BadgeBulkAwardCreate(BaseModel):
+    """Give a badge to many people at once, by id and/or by email."""
+
+    recipient_human_ids: list[uuid.UUID] = Field(
+        default_factory=list, max_length=MAX_BULK_AWARDS
+    )
+    recipient_emails: list[str] = Field(
+        default_factory=list, max_length=MAX_BULK_AWARDS
+    )
+    popup_id: uuid.UUID | None = None
+    message: str | None = Field(default=None, max_length=2000)
+
+    model_config = ConfigDict(str_strip_whitespace=True)
+
+    @field_validator("recipient_emails")
+    @classmethod
+    def _emails(cls, value: list[str]) -> list[str]:
+        return normalize_emails(value)
+
+    @model_validator(mode="after")
+    def _some_recipient(self) -> "BadgeBulkAwardCreate":
+        if not self.recipient_human_ids and not self.recipient_emails:
+            raise ValueError("Provide at least one recipient")
+        return self
+
+
+class BadgeBulkAwardResult(BaseModel):
+    awarded: list[BadgeAwardPublic]
+    # Skipped: they already hold this (non-repeatable) badge.
+    already_had: list[BadgeAwardRecipient]
+    # Pasted addresses that match nobody in this tenant.
+    unknown_emails: list[str]
+
+
 class BadgeNewRecipient(BaseModel):
     """Someone who gets a badge as soon as it's created."""
 

@@ -6,6 +6,7 @@ import { useForm } from "@tanstack/react-form"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { useNavigate } from "@tanstack/react-router"
 import {
+  Award,
   Building2,
   Calendar,
   CalendarDays,
@@ -83,6 +84,8 @@ interface PopupFormProps {
   defaultValues?: PopupAdmin
   defaultHome?: PopupHomeAdmin
   onSuccess: () => void
+  /** Tab to open on, for links that point at one setting. */
+  initialTab?: string
 }
 
 const POPUP_STATUSES = [
@@ -141,8 +144,9 @@ export function PopupForm({
   defaultValues,
   defaultHome,
   onSuccess,
+  initialTab = "general",
 }: PopupFormProps) {
-  const [activeTab, setActiveTab] = useState("general")
+  const [activeTab, setActiveTab] = useState(initialTab)
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const { showSuccessToast, showErrorToast, showWarningToast } =
@@ -267,6 +271,7 @@ export function PopupForm({
       edit_passes_enabled: defaultValues?.edit_passes_enabled ?? false,
       self_check_in_enabled: defaultValues?.self_check_in_enabled ?? false,
       show_attendee_directory: defaultValues?.show_attendee_directory ?? false,
+      badges_enabled: defaultValues?.badges_enabled ?? false,
       group_private_events_enabled:
         defaultValues?.group_private_events_enabled ?? false,
     },
@@ -318,6 +323,7 @@ export function PopupForm({
         events_enabled: value.events_enabled,
         edit_passes_enabled: value.edit_passes_enabled,
         self_check_in_enabled: value.self_check_in_enabled,
+        badges_enabled: value.badges_enabled,
         show_attendee_directory:
           (isEdit ? takesApplications : value.sale_type === "application") &&
           value.show_attendee_directory,
@@ -982,6 +988,28 @@ export function PopupForm({
                 ) : null
               }
             </form.Subscribe>
+
+            {/* Badges feature flag */}
+            <InlineSection title="Badges">
+              <form.Field name="badges_enabled">
+                {(field) => (
+                  <InlineRow
+                    icon={<Award className="h-4 w-4 text-muted-foreground" />}
+                    label="Enable badges"
+                    description="Let attendees give badges from the directory, count this gathering's check-ins toward badge rules, and show badges and the public profile link in its portal. When off, nothing about badges shows here."
+                  >
+                    <Switch
+                      id="badges_enabled"
+                      checked={field.state.value}
+                      onCheckedChange={(checked) => field.handleChange(checked)}
+                      disabled={readOnly}
+                    />
+                  </InlineRow>
+                )}
+              </form.Field>
+            </InlineSection>
+
+            <Separator />
 
             {/* Events module feature flag */}
             <InlineSection title="Events module">

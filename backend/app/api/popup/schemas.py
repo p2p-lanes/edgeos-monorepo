@@ -334,6 +334,13 @@ class PopupBase(SQLModel):
         default=False,
         sa_column=Column(Boolean, nullable=False, server_default="false"),
     )
+    # Badges in this popup: peer giving in the directory, check-ins counting
+    # toward badge rules, policies and admin awards tied to it, and the badge
+    # section of the portal profile while this popup is the one open.
+    badges_enabled: bool = Field(
+        default=False,
+        sa_column=Column(Boolean, nullable=False, server_default="false"),
+    )
     edit_passes_enabled: bool = Field(
         default=False,
         sa_column=Column(Boolean, nullable=False, server_default="false"),
@@ -439,6 +446,7 @@ class PopupCreate(SQLModel):
     events_enabled: bool = True
     self_check_in_enabled: bool = False
     show_attendee_directory: bool = False
+    badges_enabled: bool = False
     edit_passes_enabled: bool = False
     installments_enabled: bool = False
     installments_deadline: datetime | None = None
@@ -567,6 +575,7 @@ class PopupUpdate(SQLModel):
     events_enabled: bool | None = None
     self_check_in_enabled: bool | None = None
     show_attendee_directory: bool | None = None
+    badges_enabled: bool | None = None
     edit_passes_enabled: bool | None = None
     installments_enabled: bool | None = None
     installments_deadline: datetime | None = None
@@ -729,6 +738,7 @@ class PopupPublic(SQLModel):
     events_enabled: bool = True
     accommodation_min_stay: int = 1
     show_attendee_directory: bool = False
+    badges_enabled: bool = False
     edit_passes_enabled: bool = False
     # groups-rework feature flags (portal needs these to gate nav/UI)
     invites_enabled: bool = False

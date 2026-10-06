@@ -621,12 +621,24 @@
       "none_left": "Ekkert eftir",
       "already_has": "Á hana nú þegar",
       "back_at": "Aftur {{when}}",
-      "message_placeholder": "Bættu við athugasemd (valfrjálst)",
+      "step_message": "2. Bættu við athugasemd (valfrjálst)",
+      "message_example": "T.d. Takk fyrir frábæra stund!",
       "send": "Senda merki",
       "sent": "Merki sent til {{name}}",
       "error_exhausted": "Þú átt ekki fleiri af þessu merki til að gefa í bili.",
       "error_forbidden": "Þú getur ekki gefið þessari manneskju þetta merki.",
-      "error_generic": "Ekki tókst að senda merkið. Reyndu aftur."
+      "error_generic": "Ekki tókst að senda merkið. Reyndu aftur.",
+      "step_choose": "1. Veldu merkið sem þú vilt gefa",
+      "step_choose_hint": "Ýttu á merki til að velja það.",
+      "step_choose_single": "Þetta er merkið sem þú getur gefið.",
+      "search_placeholder": "Leita í merkjunum þínum",
+      "search_empty": "Ekkert merki passar.",
+      "choose_first": "Veldu merki",
+      "banner_title_one": "Þú átt {{count}} merki til að gefa",
+      "banner_title_other": "Þú átt {{count}} merki til að gefa",
+      "banner_hint": "Finndu einhvern hér fyrir neðan og ýttu á Gefa merki í línunni hans.",
+      "banner_all_used": "Þú hefur gefið öll merkin þín í bili",
+      "banner_all_used_hint": "Þú getur gefið fleiri þegar kvótinn þinn endurnýjast."
     }
   },
   "checkin": {

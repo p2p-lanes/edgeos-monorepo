@@ -749,12 +749,24 @@
       "none_left": "No te quedan",
       "already_has": "Ya la tiene",
       "back_at": "Vuelven {{when}}",
-      "message_placeholder": "Agregá una nota (opcional)",
+      "step_message": "2. Agregá una nota (opcional)",
+      "message_example": "Ej.: ¡Gracias por la sesión!",
       "send": "Enviar insignia",
       "sent": "Insignia enviada a {{name}}",
       "error_exhausted": "Por ahora no te quedan más de esta insignia para dar.",
       "error_forbidden": "No podés darle esta insignia a esta persona.",
-      "error_generic": "No se pudo enviar la insignia. Probá de nuevo."
+      "error_generic": "No se pudo enviar la insignia. Probá de nuevo.",
+      "step_choose": "1. Elegí la insignia que querés dar",
+      "step_choose_hint": "Tocá una insignia para seleccionarla.",
+      "step_choose_single": "Esta es la insignia que tenés para dar.",
+      "search_placeholder": "Buscar entre tus insignias",
+      "search_empty": "Ninguna insignia coincide.",
+      "choose_first": "Elegí una insignia",
+      "banner_title_one": "Tenés {{count}} insignia para dar",
+      "banner_title_other": "Tenés {{count}} insignias para dar",
+      "banner_hint": "Buscá a alguien abajo y tocá Dar insignia en su fila.",
+      "banner_all_used": "Por ahora ya diste todas tus insignias",
+      "banner_all_used_hint": "Vas a poder dar más cuando se renueve tu cupo."
     }
   },
   "checkin": {
