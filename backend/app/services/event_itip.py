@@ -447,35 +447,50 @@ def summarize_event_changes(db, before: dict, after) -> dict[str, dict[str, str]
     - ``time``     → start/end change (combined into a single time range)
     - ``location`` → venue change
 
-    Unchanged fields are omitted so the template only highlights what
-    actually moved.
+    Every row is included when its source fields are available. This keeps
+    all before/after variables available to custom templates; the built-in
+    template can still choose which rows to highlight by comparing values.
     """
     changes: dict[str, dict[str, str]] = {}
 
     if "title" in before:
         old, new = before.get("title"), getattr(after, "title", None)
-        if old != new:
-            changes["event"] = {"before": old or "—", "after": new or "—"}
+        changes["event"] = {"before": old or "—", "after": new or "—"}
 
     if "start_time" in before or "end_time" in before:
         old_start = before.get("start_time", getattr(after, "start_time", None))
         old_end = before.get("end_time", getattr(after, "end_time", None))
         new_start = getattr(after, "start_time", None)
         new_end = getattr(after, "end_time", None)
-        if old_start != new_start or old_end != new_end:
-            tz = getattr(after, "timezone", None)
-            changes["time"] = {
-                "before": format_event_when_range(old_start, old_end, tz),
-                "after": format_event_when_range(new_start, new_end, tz),
-            }
+        tz = getattr(after, "timezone", None)
+        changes["time"] = {
+            "before": format_event_when_range(old_start, old_end, tz),
+            "after": format_event_when_range(new_start, new_end, tz),
+        }
 
-    if "venue_id" in before:
-        old, new = before.get("venue_id"), getattr(after, "venue_id", None)
-        if old != new:
-            changes["location"] = {
-                "before": _venue_name(db, old),
-                "after": _venue_name(db, new),
-            }
+    location_fields = (
+        "venue_id",
+        "custom_location_name",
+        "custom_location_url",
+        "meeting_url",
+    )
+    if any(field in before for field in location_fields):
+        old_location = before.get("custom_location_name") or (
+            _venue_name(db, before.get("venue_id"))
+            if before.get("venue_id")
+            else before.get("meeting_url")
+        )
+        new_location = getattr(after, "custom_location_name", None) or (
+            _venue_name(db, getattr(after, "venue_id", None))
+            if getattr(after, "venue_id", None)
+            else getattr(after, "meeting_url", None)
+        )
+        old_location = old_location or "—"
+        new_location = new_location or "—"
+        changes["location"] = {
+            "before": old_location,
+            "after": new_location,
+        }
 
     return changes
 

@@ -242,6 +242,8 @@ export function OpenCheckoutRuntime({
             // accessor answers empty rather than guessing.
             applications: null,
             participation: null,
+            applicationsLoading: false,
+            participationLoading: false,
             getRelevantApplication: () => null,
             getApplicationsForPopup: () => [],
             getAttendees: () => [],
@@ -274,6 +276,7 @@ export function OpenCheckoutRuntime({
                 salesFlowId={runtime.selected_flow.id}
                 salesFlowSlug={flowSlug}
                 flowType={runtime.flow_type ?? null}
+                checkoutConfigOverride={runtime.checkout_config ?? null}
                 productsOverride={products}
                 emptyCatalogReason={runtime.empty_catalog_reason ?? null}
                 configuredStepsOverride={runtime.ticketing_steps}

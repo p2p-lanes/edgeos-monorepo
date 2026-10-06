@@ -50,6 +50,8 @@ from app.api.event.schemas import (
     TrackEventCount,
     VenueEventCount,
 )
+from app.api.event.series import build_series_summary
+from app.api.event.series_schemas import EventSeriesSummary
 from app.api.event_audit.crud import build_event_snapshot, record_event_audit
 from app.api.event_audit.schemas import EventAuditAction
 from app.api.popup.guards import (
@@ -1257,6 +1259,37 @@ async def get_event(
             status_code=status.HTTP_404_NOT_FOUND, detail="Event not found"
         )
     return _with_collaborators(db, _to_public(event), event, include_email=True)
+
+
+@router.get("/{event_id}/series-summary", response_model=EventSeriesSummary)
+async def get_event_series_summary(
+    event_id: uuid.UUID,
+    db: AdminOrApiKeySession_EventsRead,
+    _: AdminOrApiKey_EventsRead,
+    token_payload: CallerToken,
+) -> EventSeriesSummary:
+    """Read scheduled dates and RSVP counts for the backoffice series view.
+
+    Uses the gathering date range and resolves detached children to their
+    master. This projection never changes event details or registrations.
+    """
+    event = crud.events_crud.get(db, event_id)
+    if not event:
+        raise HTTPException(404, "Event not found")
+    ensure_api_key_popup(token_payload, event.popup_id)
+    master = (
+        crud.events_crud.get(db, event.recurrence_master_id)
+        if event.recurrence_master_id
+        else event
+    )
+    if (
+        not master
+        or master.tenant_id != event.tenant_id
+        or master.popup_id != event.popup_id
+    ):
+        raise HTTPException(404, "Series not found")
+    ensure_api_key_popup(token_payload, master.popup_id)
+    return build_series_summary(db, master)
 
 
 # ---------------------------------------------------------------------------
@@ -3396,6 +3429,108 @@ async def get_portal_event(
         updates["my_rsvp_status"] = rsvp
     pub = pub.model_copy(update=updates)
     return _with_collaborators(db, pub, event)
+
+
+@router.post("/portal/events/{event_id}/detach-occurrence", response_model=EventPublic)
+async def detach_portal_occurrence(
+    event_id: uuid.UUID,
+    payload: OccurrenceRef,
+    db: HumanTenantSession,
+    current_human: CurrentHuman,
+    token_payload: CallerToken,
+) -> EventPublic:
+    """Materialize one managed recurring occurrence for an isolated edit."""
+    from app.api.event.models import Events
+
+    master = crud.events_crud.get(db, event_id)
+    if not master:
+        raise HTTPException(status_code=404, detail="Event not found")
+    ensure_api_key_popup(token_payload, master.popup_id)
+    if not _human_manages_event(master, current_human):
+        raise HTTPException(
+            status_code=403, detail="Only the event owner or host can edit"
+        )
+    if not master.rrule:
+        raise HTTPException(status_code=400, detail="Event is not a recurring series")
+
+    occ_start = payload.occurrence_start
+    existing = crud.events_crud.get_detached_child(db, master.id, occ_start)
+    if existing is not None:
+        return _with_collaborators(db, _to_public(existing), existing)
+
+    rule = parse_rrule(master.rrule)
+    occurrences = (
+        expand(
+            dtstart=master.start_time,
+            rule=rule,
+            window_start=occ_start,
+            window_end=occ_start,
+            exdates=list(master.recurrence_exdates or []),
+            max_occurrences=1,
+            timezone=master.timezone,
+        )
+        if rule
+        else []
+    )
+    if not any(occ == occ_start for occ in occurrences):
+        raise HTTPException(
+            status_code=400, detail="This is not a scheduled occurrence"
+        )
+
+    duration = master.end_time - master.start_time
+    excluded = list(master.recurrence_exdates or [])
+    if occ_start.isoformat() not in excluded:
+        excluded.append(occ_start.isoformat())
+    master.recurrence_exdates = excluded
+    child = Events(
+        **{
+            column.name: getattr(master, column.name)
+            for column in master.__table__.columns
+            if column.name
+            not in {
+                "id",
+                "created_at",
+                "updated_at",
+                "start_time",
+                "end_time",
+                "rrule",
+                "recurrence_master_id",
+                "recurrence_exdates",
+            }
+        },
+        start_time=occ_start,
+        end_time=occ_start + duration,
+        rrule=None,
+        recurrence_master_id=master.id,
+        recurrence_exdates=[],
+    )
+    db.add(master)
+    db.add(child)
+    db.commit()
+    db.refresh(child)
+
+    from app.api.event_participant.crud import event_participants_crud
+
+    event_participants_crud.repoint_occurrence_to_event(
+        db, master.id, occ_start, child.id
+    )
+    from app.api.event_participant.check_in_crud import event_check_ins_crud
+
+    event_check_ins_crud.repoint_occurrence_to_event(db, master.id, occ_start, child.id)
+    db.commit()
+    db.refresh(child)
+
+    snapshot = build_event_snapshot(db, master)
+    snapshot["occurrence_start"] = occ_start.isoformat()
+    snapshot["detached_child_id"] = str(child.id)
+    record_event_audit(
+        db,
+        event=master,
+        action=EventAuditAction.OCCURRENCE_DETACHED,
+        actor=actor_from_human(current_human),
+        snapshot=snapshot,
+    )
+    return _with_collaborators(db, _to_public(child), child)
 
 
 # ---------------------------------------------------------------------------

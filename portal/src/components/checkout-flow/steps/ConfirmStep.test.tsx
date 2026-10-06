@@ -20,6 +20,7 @@ import ConfirmStep from "./ConfirmStep"
 let cart: any
 let summary: Record<string, number>
 let popup: Record<string, unknown> = {}
+let flowConfig: Record<string, unknown> | null = null
 
 vi.mock("@/providers/checkoutProvider", () => ({
   useCheckout: () => ({
@@ -41,6 +42,7 @@ vi.mock("@/providers/checkoutProvider", () => ({
     buyerGeneralError: null,
     removeMealPlan: vi.fn(),
     housingDatesShown: true,
+    flowConfig,
   }),
 }))
 
@@ -77,7 +79,8 @@ function bookedRoom() {
 }
 
 beforeEach(() => {
-  popup = { allows_coupons: false }
+  popup = {}
+  flowConfig = { allows_coupons: false }
   cart = { ...createInitialCartState(), accommodations: [bookedRoom()] }
   summary = {
     subtotal: 440,
@@ -112,5 +115,34 @@ describe("a booked room", () => {
     render(<ConfirmStep />)
 
     expect(screen.queryByText("Garden Studio")).toBeNull()
+  })
+})
+
+// Coupons belong to the flow. The popup still carries a column of the same
+// name that nothing edits any more, and reading it showed a promo code field
+// on a door whose coupons were off, where every code was then refused.
+describe("the promo code field", () => {
+  it("follows the flow, not the popup", () => {
+    popup = { allows_coupons: true }
+    flowConfig = { allows_coupons: false }
+    render(<ConfirmStep />)
+
+    expect(screen.queryByPlaceholderText("Promo code")).toBeNull()
+  })
+
+  it("shows when the flow takes coupons", () => {
+    popup = { allows_coupons: false }
+    flowConfig = { allows_coupons: true }
+    render(<ConfirmStep />)
+
+    expect(screen.getByPlaceholderText("Promo code")).toBeTruthy()
+  })
+
+  it("stays hidden while the flow's settings are still loading", () => {
+    popup = { allows_coupons: true }
+    flowConfig = null
+    render(<ConfirmStep />)
+
+    expect(screen.queryByPlaceholderText("Promo code")).toBeNull()
   })
 })

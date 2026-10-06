@@ -874,17 +874,18 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
         """Find attendees for the attendees directory.
 
         Returns ticket-holding attendees whose parent application is accepted
-        and belongs to the popup's primary flow — one entry per attendee,
-        sourced from that attendee's own Human record.
+        and belongs to the popup's primary flow, plus attendees with no parent
+        application. There is one entry per attendee, sourced from that
+        attendee's own Human record.
         Only the main applicant and spouse categories are listed; kids (and any
         other categories) are excluded. Supports text search across the
         attendee's own human fields.
         """
 
         # Root on attendees so the spouse appears as their own row, not just
-        # nested under the main applicant. Gate on an accepted parent
-        # application, on the attendee holding at least one product, and on the
-        # category being directory-visible (main/spouse — kids are excluded).
+        # nested under the main applicant. A product grant can create an
+        # attendee without creating an application, so only require an accepted
+        # primary-flow application when one exists.
         has_products = exists().where(
             AttendeeProducts.attendee_id == Attendees.id,
             AttendeeProducts.revoked_at.is_(None),
@@ -892,14 +893,21 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
         )
         base_statement = (
             select(Attendees)
-            .join(Applications, Attendees.application_id == Applications.id)  # type: ignore[arg-type]
+            .outerjoin(Applications, Attendees.application_id == Applications.id)  # type: ignore[arg-type]
             .join(
                 AttendeeCategories,
                 Attendees.category_id == AttendeeCategories.id,  # type: ignore[arg-type]
             )
             .where(Attendees.popup_id == popup_id)
-            .where(_application_is_in_primary_flow(popup_id))
-            .where(Applications.status == ApplicationStatus.ACCEPTED.value)
+            .where(
+                or_(
+                    Applications.id.is_(None),
+                    (
+                        _application_is_in_primary_flow(popup_id)
+                        & (Applications.status == ApplicationStatus.ACCEPTED.value)
+                    ),
+                )
+            )
             .where(has_products)
             .where(_directory_category_key().in_(DIRECTORY_VISIBLE_CATEGORY_KEYS))
         )
@@ -1004,14 +1012,21 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
         base_statement = (
             select(Humans)
             .join(Attendees, Attendees.human_id == Humans.id)  # type: ignore[arg-type]
-            .join(Applications, Attendees.application_id == Applications.id)  # type: ignore[arg-type]
+            .outerjoin(Applications, Attendees.application_id == Applications.id)  # type: ignore[arg-type]
             .join(
                 AttendeeCategories,
                 Attendees.category_id == AttendeeCategories.id,  # type: ignore[arg-type]
             )
             .where(Attendees.popup_id == popup_id)
-            .where(_application_is_in_primary_flow(popup_id))
-            .where(Applications.status == ApplicationStatus.ACCEPTED.value)
+            .where(
+                or_(
+                    Applications.id.is_(None),
+                    (
+                        _application_is_in_primary_flow(popup_id)
+                        & (Applications.status == ApplicationStatus.ACCEPTED.value)
+                    ),
+                )
+            )
             .where(has_products)
             .where(_directory_category_key().in_(DIRECTORY_VISIBLE_CATEGORY_KEYS))
             .where(_directory_field_is_shared("first_name"))

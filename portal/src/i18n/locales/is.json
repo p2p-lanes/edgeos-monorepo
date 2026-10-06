@@ -606,6 +606,24 @@
       "telegram": "Telegram",
       "role": "Hlutverk",
       "organization": "Samtök"
+    },
+    "badges": {
+      "give": "Gefa merki",
+      "this_person": "þessari manneskju",
+      "dialog_title": "Gefðu {{name}} merki",
+      "dialog_description": "Það birtist á prófílnum þeirra. Aðeins viðtakandinn sér skilaboðin þín.",
+      "remaining_one": "{{count}} eftir",
+      "remaining_other": "{{count}} eftir",
+      "unlimited": "Engin takmörk",
+      "none_left": "Ekkert eftir",
+      "already_has": "Á hana nú þegar",
+      "back_at": "Aftur {{when}}",
+      "message_placeholder": "Bættu við athugasemd (valfrjálst)",
+      "send": "Senda merki",
+      "sent": "Merki sent til {{name}}",
+      "error_exhausted": "Þú átt ekki fleiri af þessu merki til að gefa í bili.",
+      "error_forbidden": "Þú getur ekki gefið þessari manneskju þetta merki.",
+      "error_generic": "Ekki tókst að senda merkið. Reyndu aftur."
     }
   },
   "checkin": {
@@ -666,7 +684,21 @@
     "hosted_events_count_one": "{{count}} viðburður",
     "hosted_events_count_other": "{{count}} viðburðir",
     "top_five": "Top 5",
-    "no_calendar_activity": "Engin dagatalsvirkni ennþá"
+    "no_calendar_activity": "Engin dagatalsvirkni ennþá",
+    "badges": {
+      "title": "Merki",
+      "subtitle": "Viðurkenningar sem þú hefur safnað",
+      "empty": "Engin merki enn. Þau birtast hér þegar einhver gefur þér merki.",
+      "link_title": "Opinber prófílhlekkur",
+      "link_description": "Allir með hlekkinn sjá nafnið þitt, mynd og merki. Aldrei netfangið þitt.",
+      "link_toggle": "Opinber prófílhlekkur",
+      "link_copy": "Afrita hlekk",
+      "link_copied": "Hlekkur afritaður",
+      "link_copy_failed": "Ekki tókst að afrita hlekkinn",
+      "link_reset": "Endurstilla hlekk",
+      "link_reset_confirm": "Búa til nýjan hlekk? Núverandi hlekkur hættir að virka.",
+      "link_off": "Slökkt er á hlekknum þínum, enginn getur opnað hann."
+    }
   },
   "sidebar": {
     "your_participation": "Þátttaka þín",
@@ -1059,7 +1091,12 @@
       "invitations_empty": "Engin boð enn",
       "participants_heading": "Þátttakendur",
       "no_participants_yet": "Engir þátttakendur enn",
-      "participants_more": "+{{count}} fleiri",
+      "participants_more": "Sýna {{count}} fleiri",
+      "participants_unlisted": "og {{count}} í viðbót",
+      "participants_count_one": "{{count}} þátttakandi",
+      "participants_count_other": "{{count}} þátttakendur",
+      "participants_load_error": "Ekki tókst að hlaða þátttakendum.",
+      "participants_retry": "Reyna aftur",
       "participants_show_less": "Sýna minna",
       "unnamed_participant": "Ónafngreindur",
       "bulk_invite_success": "Boðið {{invited}} · Sleppt {{skipped}} · Ekki fundið {{notFound}}",
@@ -1318,5 +1355,12 @@
       "error_host": "Gestgjafi viðburðarins getur ekki innritað sig sem gestur.",
       "error_not_checked_in": "Þessi manneskja er ekki innrituð."
     }
+  },
+  "publicProfile": {
+    "community": "Samfélag {{tenant}}",
+    "anonymous": "Meðlimur samfélagsins",
+    "badge_count_one": "{{count}} merki",
+    "badge_count_other": "{{count}} merki",
+    "no_badges": "Engin merki enn."
   }
 }

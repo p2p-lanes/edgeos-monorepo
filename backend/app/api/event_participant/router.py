@@ -92,17 +92,44 @@ def _participants_with_names(db, participants: list) -> list[EventParticipantPub
 async def list_participants(
     db: AdminOrApiKeySession_EventsRead,
     _: AdminOrApiKey_EventsRead,
+    token_payload: CallerToken,
     event_id: uuid.UUID | None = None,
     skip: PaginationSkip = 0,
     limit: PaginationLimit = 100,
+    occurrence_start: datetime | None = None,
+    scope_to_occurrence: bool = False,
 ) -> ListModel[EventParticipantPublic]:
-    """List participants with optional event filter (backoffice)."""
+    """Read participants for the backoffice, optionally scoped to one date.
+
+    A timestamp selects that occurrence. scope_to_occurrence without a
+    timestamp selects NULL registrations (one-offs and detached children).
+    Requests without either option retain the existing series-wide listing.
+    """
+    scoped = scope_to_occurrence or occurrence_start is not None
+    host_id = None
+    if scoped:
+        if event_id is None:
+            raise HTTPException(400, "event_id is required for occurrence filtering")
+        if occurrence_start is not None:
+            if occurrence_start.tzinfo is None:
+                raise HTTPException(400, "occurrence_start must include a timezone")
+            occurrence_start = occurrence_start.astimezone(UTC)
+        from app.api.event.crud import events_crud
+
+        event = events_crud.get(db, event_id)
+        if not event:
+            raise HTTPException(404, "Event not found")
+        ensure_api_key_popup(token_payload, event.popup_id)
+        host_id = event.host_id
     if event_id:
         participants, total = crud.event_participants_crud.find_by_event(
             db,
             event_id=event_id,
             skip=skip,
             limit=limit,
+            occurrence_start=occurrence_start,
+            scope_to_occurrence=scoped,
+            exclude_profile_id=host_id,
         )
     else:
         participants, total = crud.event_participants_crud.find(
@@ -706,7 +733,6 @@ async def check_in(
     participant, already_checked_in, created = perform_check_in(
         db, event, current_human, occ_start
     )
-
     return EventCheckInResult(
         participant=EventParticipantPublic.model_validate(participant),
         already_checked_in=already_checked_in,

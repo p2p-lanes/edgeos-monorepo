@@ -23,6 +23,8 @@ import {
   ApiError,
   CheckoutService,
   PaymentsService,
+  type SalesFlowCheckoutConfig,
+  SalesFlowsService,
   type TicketingStepPublic,
   TicketingStepsService,
 } from "@/client"
@@ -86,6 +88,13 @@ interface CheckoutContextValue {
    */
   salesFlowId: string | null
   salesFlowSlug: string | null
+  /**
+   * The door's own coupon, insurance and contribution settings. `null`
+   * until they load, which reads as all off. The popup carries same-named
+   * fields, but nothing edits them since each flow owns its configuration,
+   * so the checkout must never read those.
+   */
+  flowConfig: SalesFlowCheckoutConfig | null
   /** How that door sells. Resolved once here so no section has to ask the
    *  gathering, which cannot answer for a door that differs from it. */
   checkoutMode: CheckoutMode
@@ -304,6 +313,10 @@ interface CheckoutProviderProps {
   /** How that door sells. `null` while it is still being resolved, which is
    *  the same default the portal has always started from. */
   flowType?: string | null
+  /** The door's buyer-facing settings when the caller already has them (the
+   *  open checkout runtime ships them). Omitted, they are fetched for
+   *  `salesFlowId`, or the default flow. */
+  checkoutConfigOverride?: SalesFlowCheckoutConfig | null
   accountCreditOverride?: number
   validatePromoCodeOverride?: (code: string) => Promise<number | null>
   /** Optional ?coupon= entry-link code for open checkout. */
@@ -340,6 +353,7 @@ export function CheckoutProvider({
   salesFlowId,
   salesFlowSlug,
   flowType = null,
+  checkoutConfigOverride,
   accountCreditOverride,
   validatePromoCodeOverride,
   initialPromoCode = null,
@@ -403,6 +417,21 @@ export function CheckoutProvider({
   const [buyerGeneralError, setBuyerGeneralError] = useState<string | null>(
     null,
   )
+
+  const { data: queriedFlowConfig } = useQuery({
+    queryKey: ["sales-flow-checkout-config", cityId, salesFlowId ?? null],
+    queryFn: () =>
+      SalesFlowsService.getPortalCheckoutConfig({
+        popupId: cityId!,
+        salesFlowId: salesFlowId ?? undefined,
+      }),
+    enabled:
+      checkoutConfigOverride === undefined && !!cityId && isAuthenticated,
+  })
+  const flowConfig =
+    checkoutConfigOverride === undefined
+      ? (queriedFlowConfig ?? null)
+      : checkoutConfigOverride
 
   // Ticketing step configuration from API
   const { data: stepsData, isLoading: isLoadingSteps } = useQuery({
@@ -793,7 +822,9 @@ export function CheckoutProvider({
   })
 
   const entryPromoCode =
-    !previewMode && submitMode === "open-ticketing" && city?.allows_coupons
+    !previewMode &&
+    submitMode === "open-ticketing" &&
+    flowConfig?.allows_coupons
       ? initialPromoCode?.trim().toUpperCase() || null
       : null
 
@@ -1103,7 +1134,7 @@ export function CheckoutProvider({
   // Insurance calculations
   const { insurancePotentialAmount, insuranceAmount } = useInsuranceCalculation(
     {
-      popup: city,
+      popup: flowConfig,
       selectedPasses,
       housing,
       merch,
@@ -1210,19 +1241,19 @@ export function CheckoutProvider({
   const preFeeAmount =
     discountedProductsAmount + nonDiscountableProductsSubtotal
 
-  // Contribution fee — derived from popup config (mandatory when enabled).
-  // The popup is the single source of truth for the rate; there is no buyer
-  // opt-in toggle. We calculate client-side from popup.contribution_percentage
+  // Contribution fee — derived from the flow's config (mandatory when enabled).
+  // The flow is the single source of truth for the rate; there is no buyer
+  // opt-in toggle. We calculate client-side from contribution_percentage
   // so the summary line renders before submit (transparency requirement).
   // Base mirrors backend: % of pre_fee_amount (post-discount standard + non
   // discountable). Zero when there is nothing being charged for products.
   const contributionAmount = useMemo<number>(() => {
-    if (!city?.contribution_enabled) return 0
+    if (!flowConfig?.contribution_enabled) return 0
     if (preFeeAmount <= 0) return 0
-    const pct = Number(city.contribution_percentage)
+    const pct = Number(flowConfig.contribution_percentage)
     if (Number.isNaN(pct) || pct <= 0) return 0
     return Math.round(((preFeeAmount * pct) / 100) * 100) / 100
-  }, [city, preFeeAmount])
+  }, [flowConfig, preFeeAmount])
 
   // Cart summary
   const { summary } = useCartSummary({
@@ -1663,6 +1694,7 @@ export function CheckoutProvider({
     stepConfigs: configuredSteps,
     salesFlowId: salesFlowId ?? null,
     salesFlowSlug: salesFlowSlug ?? null,
+    flowConfig,
     cart,
     summary,
     allProducts: products,

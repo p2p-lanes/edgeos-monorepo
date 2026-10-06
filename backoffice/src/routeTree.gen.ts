@@ -36,6 +36,7 @@ import { Route as LayoutFormBuilderIndexRouteImport } from './routes/_layout/for
 import { Route as LayoutEventsIndexRouteImport } from './routes/_layout/events/index'
 import { Route as LayoutEmailTemplatesIndexRouteImport } from './routes/_layout/email-templates/index'
 import { Route as LayoutCouponsIndexRouteImport } from './routes/_layout/coupons/index'
+import { Route as LayoutBadgesIndexRouteImport } from './routes/_layout/badges/index'
 import { Route as LayoutAttendeesIndexRouteImport } from './routes/_layout/attendees/index'
 import { Route as LayoutApplicationsIndexRouteImport } from './routes/_layout/applications/index'
 import { Route as LayoutAdminIndexRouteImport } from './routes/_layout/admin/index'
@@ -55,6 +56,8 @@ import { Route as LayoutEventsNewRouteImport } from './routes/_layout/events/new
 import { Route as LayoutEventsDayByVenueRouteImport } from './routes/_layout/events/day-by-venue'
 import { Route as LayoutEventsEventIdRouteImport } from './routes/_layout/events/$eventId'
 import { Route as LayoutCouponsNewRouteImport } from './routes/_layout/coupons/new'
+import { Route as LayoutBadgesNewRouteImport } from './routes/_layout/badges/new'
+import { Route as LayoutBadgesIdRouteImport } from './routes/_layout/badges/$id'
 import { Route as LayoutAttendeesAttendeeIdRouteImport } from './routes/_layout/attendees/$attendeeId'
 import { Route as LayoutApplicationsReviewQueueRouteImport } from './routes/_layout/applications/review-queue'
 import { Route as LayoutApplicationsIdRouteImport } from './routes/_layout/applications/$id'
@@ -223,6 +226,11 @@ const LayoutCouponsIndexRoute = LayoutCouponsIndexRouteImport.update({
   path: '/coupons/',
   getParentRoute: () => LayoutRoute,
 } as any)
+const LayoutBadgesIndexRoute = LayoutBadgesIndexRouteImport.update({
+  id: '/badges/',
+  path: '/badges/',
+  getParentRoute: () => LayoutRoute,
+} as any)
 const LayoutAttendeesIndexRoute = LayoutAttendeesIndexRouteImport.update({
   id: '/attendees/',
   path: '/attendees/',
@@ -318,6 +326,16 @@ const LayoutEventsEventIdRoute = LayoutEventsEventIdRouteImport.update({
 const LayoutCouponsNewRoute = LayoutCouponsNewRouteImport.update({
   id: '/coupons/new',
   path: '/coupons/new',
+  getParentRoute: () => LayoutRoute,
+} as any)
+const LayoutBadgesNewRoute = LayoutBadgesNewRouteImport.update({
+  id: '/badges/new',
+  path: '/badges/new',
+  getParentRoute: () => LayoutRoute,
+} as any)
+const LayoutBadgesIdRoute = LayoutBadgesIdRouteImport.update({
+  id: '/badges/$id',
+  path: '/badges/$id',
   getParentRoute: () => LayoutRoute,
 } as any)
 const LayoutAttendeesAttendeeIdRoute =
@@ -502,6 +520,8 @@ export interface FileRoutesByFullPath {
   '/applications/$id': typeof LayoutApplicationsIdRoute
   '/applications/review-queue': typeof LayoutApplicationsReviewQueueRoute
   '/attendees/$attendeeId': typeof LayoutAttendeesAttendeeIdRoute
+  '/badges/$id': typeof LayoutBadgesIdRoute
+  '/badges/new': typeof LayoutBadgesNewRoute
   '/coupons/new': typeof LayoutCouponsNewRoute
   '/events/$eventId': typeof LayoutEventsEventIdRoute
   '/events/day-by-venue': typeof LayoutEventsDayByVenueRoute
@@ -521,6 +541,7 @@ export interface FileRoutesByFullPath {
   '/admin/': typeof LayoutAdminIndexRoute
   '/applications/': typeof LayoutApplicationsIndexRoute
   '/attendees/': typeof LayoutAttendeesIndexRoute
+  '/badges/': typeof LayoutBadgesIndexRoute
   '/coupons/': typeof LayoutCouponsIndexRoute
   '/email-templates/': typeof LayoutEmailTemplatesIndexRoute
   '/events/': typeof LayoutEventsIndexRoute
@@ -579,6 +600,8 @@ export interface FileRoutesByTo {
   '/applications/$id': typeof LayoutApplicationsIdRoute
   '/applications/review-queue': typeof LayoutApplicationsReviewQueueRoute
   '/attendees/$attendeeId': typeof LayoutAttendeesAttendeeIdRoute
+  '/badges/$id': typeof LayoutBadgesIdRoute
+  '/badges/new': typeof LayoutBadgesNewRoute
   '/coupons/new': typeof LayoutCouponsNewRoute
   '/events/$eventId': typeof LayoutEventsEventIdRoute
   '/events/day-by-venue': typeof LayoutEventsDayByVenueRoute
@@ -598,6 +621,7 @@ export interface FileRoutesByTo {
   '/admin': typeof LayoutAdminIndexRoute
   '/applications': typeof LayoutApplicationsIndexRoute
   '/attendees': typeof LayoutAttendeesIndexRoute
+  '/badges': typeof LayoutBadgesIndexRoute
   '/coupons': typeof LayoutCouponsIndexRoute
   '/email-templates': typeof LayoutEmailTemplatesIndexRoute
   '/events': typeof LayoutEventsIndexRoute
@@ -658,6 +682,8 @@ export interface FileRoutesById {
   '/_layout/applications/$id': typeof LayoutApplicationsIdRoute
   '/_layout/applications/review-queue': typeof LayoutApplicationsReviewQueueRoute
   '/_layout/attendees/$attendeeId': typeof LayoutAttendeesAttendeeIdRoute
+  '/_layout/badges/$id': typeof LayoutBadgesIdRoute
+  '/_layout/badges/new': typeof LayoutBadgesNewRoute
   '/_layout/coupons/new': typeof LayoutCouponsNewRoute
   '/_layout/events/$eventId': typeof LayoutEventsEventIdRoute
   '/_layout/events/day-by-venue': typeof LayoutEventsDayByVenueRoute
@@ -677,6 +703,7 @@ export interface FileRoutesById {
   '/_layout/admin/': typeof LayoutAdminIndexRoute
   '/_layout/applications/': typeof LayoutApplicationsIndexRoute
   '/_layout/attendees/': typeof LayoutAttendeesIndexRoute
+  '/_layout/badges/': typeof LayoutBadgesIndexRoute
   '/_layout/coupons/': typeof LayoutCouponsIndexRoute
   '/_layout/email-templates/': typeof LayoutEmailTemplatesIndexRoute
   '/_layout/events/': typeof LayoutEventsIndexRoute
@@ -737,6 +764,8 @@ export interface FileRouteTypes {
     | '/applications/$id'
     | '/applications/review-queue'
     | '/attendees/$attendeeId'
+    | '/badges/$id'
+    | '/badges/new'
     | '/coupons/new'
     | '/events/$eventId'
     | '/events/day-by-venue'
@@ -756,6 +785,7 @@ export interface FileRouteTypes {
     | '/admin/'
     | '/applications/'
     | '/attendees/'
+    | '/badges/'
     | '/coupons/'
     | '/email-templates/'
     | '/events/'
@@ -814,6 +844,8 @@ export interface FileRouteTypes {
     | '/applications/$id'
     | '/applications/review-queue'
     | '/attendees/$attendeeId'
+    | '/badges/$id'
+    | '/badges/new'
     | '/coupons/new'
     | '/events/$eventId'
     | '/events/day-by-venue'
@@ -833,6 +865,7 @@ export interface FileRouteTypes {
     | '/admin'
     | '/applications'
     | '/attendees'
+    | '/badges'
     | '/coupons'
     | '/email-templates'
     | '/events'
@@ -892,6 +925,8 @@ export interface FileRouteTypes {
     | '/_layout/applications/$id'
     | '/_layout/applications/review-queue'
     | '/_layout/attendees/$attendeeId'
+    | '/_layout/badges/$id'
+    | '/_layout/badges/new'
     | '/_layout/coupons/new'
     | '/_layout/events/$eventId'
     | '/_layout/events/day-by-venue'
@@ -911,6 +946,7 @@ export interface FileRouteTypes {
     | '/_layout/admin/'
     | '/_layout/applications/'
     | '/_layout/attendees/'
+    | '/_layout/badges/'
     | '/_layout/coupons/'
     | '/_layout/email-templates/'
     | '/_layout/events/'
@@ -1150,6 +1186,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof LayoutCouponsIndexRouteImport
       parentRoute: typeof LayoutRoute
     }
+    '/_layout/badges/': {
+      id: '/_layout/badges/'
+      path: '/badges'
+      fullPath: '/badges/'
+      preLoaderRoute: typeof LayoutBadgesIndexRouteImport
+      parentRoute: typeof LayoutRoute
+    }
     '/_layout/attendees/': {
       id: '/_layout/attendees/'
       path: '/attendees'
@@ -1281,6 +1324,20 @@ declare module '@tanstack/react-router' {
       path: '/coupons/new'
       fullPath: '/coupons/new'
       preLoaderRoute: typeof LayoutCouponsNewRouteImport
+      parentRoute: typeof LayoutRoute
+    }
+    '/_layout/badges/new': {
+      id: '/_layout/badges/new'
+      path: '/badges/new'
+      fullPath: '/badges/new'
+      preLoaderRoute: typeof LayoutBadgesNewRouteImport
+      parentRoute: typeof LayoutRoute
+    }
+    '/_layout/badges/$id': {
+      id: '/_layout/badges/$id'
+      path: '/badges/$id'
+      fullPath: '/badges/$id'
+      preLoaderRoute: typeof LayoutBadgesIdRouteImport
       parentRoute: typeof LayoutRoute
     }
     '/_layout/attendees/$attendeeId': {
@@ -1511,6 +1568,8 @@ interface LayoutRouteChildren {
   LayoutApplicationsIdRoute: typeof LayoutApplicationsIdRoute
   LayoutApplicationsReviewQueueRoute: typeof LayoutApplicationsReviewQueueRoute
   LayoutAttendeesAttendeeIdRoute: typeof LayoutAttendeesAttendeeIdRoute
+  LayoutBadgesIdRoute: typeof LayoutBadgesIdRoute
+  LayoutBadgesNewRoute: typeof LayoutBadgesNewRoute
   LayoutCouponsNewRoute: typeof LayoutCouponsNewRoute
   LayoutEventsEventIdRoute: typeof LayoutEventsEventIdRoute
   LayoutEventsDayByVenueRoute: typeof LayoutEventsDayByVenueRoute
@@ -1530,6 +1589,7 @@ interface LayoutRouteChildren {
   LayoutAdminIndexRoute: typeof LayoutAdminIndexRoute
   LayoutApplicationsIndexRoute: typeof LayoutApplicationsIndexRoute
   LayoutAttendeesIndexRoute: typeof LayoutAttendeesIndexRoute
+  LayoutBadgesIndexRoute: typeof LayoutBadgesIndexRoute
   LayoutCouponsIndexRoute: typeof LayoutCouponsIndexRoute
   LayoutEmailTemplatesIndexRoute: typeof LayoutEmailTemplatesIndexRoute
   LayoutEventsIndexRoute: typeof LayoutEventsIndexRoute
@@ -1588,6 +1648,8 @@ const LayoutRouteChildren: LayoutRouteChildren = {
   LayoutApplicationsIdRoute: LayoutApplicationsIdRoute,
   LayoutApplicationsReviewQueueRoute: LayoutApplicationsReviewQueueRoute,
   LayoutAttendeesAttendeeIdRoute: LayoutAttendeesAttendeeIdRoute,
+  LayoutBadgesIdRoute: LayoutBadgesIdRoute,
+  LayoutBadgesNewRoute: LayoutBadgesNewRoute,
   LayoutCouponsNewRoute: LayoutCouponsNewRoute,
   LayoutEventsEventIdRoute: LayoutEventsEventIdRoute,
   LayoutEventsDayByVenueRoute: LayoutEventsDayByVenueRoute,
@@ -1607,6 +1669,7 @@ const LayoutRouteChildren: LayoutRouteChildren = {
   LayoutAdminIndexRoute: LayoutAdminIndexRoute,
   LayoutApplicationsIndexRoute: LayoutApplicationsIndexRoute,
   LayoutAttendeesIndexRoute: LayoutAttendeesIndexRoute,
+  LayoutBadgesIndexRoute: LayoutBadgesIndexRoute,
   LayoutCouponsIndexRoute: LayoutCouponsIndexRoute,
   LayoutEmailTemplatesIndexRoute: LayoutEmailTemplatesIndexRoute,
   LayoutEventsIndexRoute: LayoutEventsIndexRoute,

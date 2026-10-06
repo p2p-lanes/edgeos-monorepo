@@ -31,8 +31,10 @@ from app.api.event.schemas import EventStatus, EventVisibility
 from app.api.event_participant.crud import event_participants_crud
 from app.api.event_participant.models import EventParticipants
 from app.api.event_participant.schemas import ParticipantStatus
+from app.api.human.models import Humans
 from app.api.popup.models import Popups
 from app.api.tenant.models import Tenants
+from app.core.security import create_access_token
 
 
 def _auth(token: str) -> dict[str, str]:
@@ -233,3 +235,53 @@ class TestDetachCopiesFields:
         # And it's a standalone override of the master.
         assert child["recurrence_master_id"] == str(master.id)
         assert child["rrule"] is None
+
+
+class TestPortalOccurrenceEdit:
+    def test_isolated_occurrence_survives_later_series_edit(
+        self,
+        client: TestClient,
+        db: Session,
+        tenant_a: Tenants,
+    ) -> None:
+        popup = _make_popup(db, tenant_a)
+        human = Humans(
+            tenant_id=tenant_a.id,
+            email=f"recurrence-{uuid.uuid4().hex[:8]}@test.com",
+            first_name="Series",
+            last_name="Host",
+        )
+        db.add(human)
+        db.commit()
+        db.refresh(human)
+        master = _make_master(
+            db,
+            tenant_a,
+            popup,
+            start=datetime(2026, 6, 5, 14, 0, tzinfo=UTC),
+        )
+        master.owner_id = human.id
+        db.add(master)
+        db.commit()
+        headers = _auth(create_access_token(subject=human.id, token_type="human"))
+        occurrence = "2026-06-12T14:00:00+00:00"
+
+        detached = client.post(
+            f"/api/v1/events/portal/events/{master.id}/detach-occurrence",
+            headers=headers,
+            json={"occurrence_start": occurrence},
+        )
+        assert detached.status_code == 200, detached.text
+        child_id = detached.json()["id"]
+
+        updated = client.patch(
+            f"/api/v1/events/portal/events/{master.id}",
+            headers=headers,
+            json={"title": "Updated series title"},
+        )
+        assert updated.status_code == 200, updated.text
+
+        child = db.get(Events, uuid.UUID(child_id))
+        assert child is not None
+        assert child.title == "Series master"
+        assert child.recurrence_master_id == master.id

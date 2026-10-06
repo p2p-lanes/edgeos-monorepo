@@ -3,10 +3,20 @@
 import { useQuery } from "@tanstack/react-query"
 import { Image as ImageIcon, Loader2 } from "lucide-react"
 import Link from "next/link"
-import { useParams } from "next/navigation"
+import { useParams, useSearchParams } from "next/navigation"
+import { useState } from "react"
 import { useTranslation } from "react-i18next"
 
 import { EventsService, HumansService } from "@/client"
+import { Button } from "@/components/ui/button"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
 import { useCityProvider } from "@/providers/cityProvider"
 import { canManageEvent } from "../../lib/eventPermissions"
 import { EditEventForm } from "./EditEventForm"
@@ -14,12 +24,21 @@ import { EditEventForm } from "./EditEventForm"
 export default function EditPortalEventPage() {
   const { t } = useTranslation()
   const params = useParams<{ popupSlug: string; eventId: string }>()
+  const searchParams = useSearchParams()
+  const occurrenceStart = searchParams.get("occ")
+  const [editScope, setEditScope] = useState<"series" | "occurrence" | null>(
+    null,
+  )
   const { getCity } = useCityProvider()
   const city = getCity()
 
   const { data: event, isLoading: eventLoading } = useQuery({
-    queryKey: ["portal-event", params.eventId],
-    queryFn: () => EventsService.getPortalEvent({ eventId: params.eventId }),
+    queryKey: ["portal-event", params.eventId, occurrenceStart],
+    queryFn: () =>
+      EventsService.getPortalEvent({
+        eventId: params.eventId,
+        occurrenceStart: occurrenceStart ?? undefined,
+      }),
     enabled: !!params.eventId,
   })
 
@@ -88,10 +107,43 @@ export default function EditPortalEventPage() {
     )
   }
 
+  if (event.rrule && occurrenceStart && editScope === null) {
+    return (
+      <div className="flex min-h-[50vh] items-center justify-center p-4">
+        <Dialog open onOpenChange={(open) => !open && setEditScope("series")}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>
+                {t("events.form.recurrence_edit_title")}
+              </DialogTitle>
+              <DialogDescription>
+                {t("events.form.recurrence_edit_description")}
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter className="flex-col sm:flex-row">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setEditScope("occurrence")}
+              >
+                {t("events.form.recurrence_edit_this")}
+              </Button>
+              <Button type="button" onClick={() => setEditScope("series")}>
+                {t("events.form.recurrence_edit_all")}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      </div>
+    )
+  }
+
   return (
     <EditEventForm
       key={event.id}
       event={event}
+      occurrenceStart={occurrenceStart}
+      editScope={editScope ?? "series"}
       popupId={city.id}
       citySlug={city.slug ?? params.popupSlug}
       cityName={city.name ?? ""}

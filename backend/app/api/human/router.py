@@ -1,19 +1,26 @@
+import secrets
 import uuid
 from datetime import UTC, datetime
 from typing import Annotated
 
-from fastapi import APIRouter, Header, HTTPException, status
+from fastapi import APIRouter, Depends, Header, HTTPException, status
 
 from app.api.api_key import crud as api_key_crud
 from app.api.api_key.schemas import ApiKeyPublic
 from app.api.audit_log.actor import actor_from_user
 from app.api.audit_log.constants import AuditAction, AuditEntityType
 from app.api.audit_log.crud import audit_logs_crud
+from app.api.badge.schemas import (
+    PublicProfile,
+    PublicProfileSettings,
+    PublicProfileSettingsUpdate,
+)
 from app.api.human import crud
 from app.api.human.activity_crud import build_human_activity, note_log_to_item
 from app.api.human.activity_schemas import HumanActivityCreate, HumanActivityItem
 from app.api.human.crud import HardDeleteSummary
 from app.api.human.models import HumanComment
+from app.api.human.privacy import public_display_name
 from app.api.human.schemas import (
     HumanCommentCreate,
     HumanCommentPublic,
@@ -31,6 +38,7 @@ from app.api.human.schemas import (
 )
 from app.api.shared.enums import HumanRating, UserRole
 from app.api.shared.response import ListModel, PaginationLimit, PaginationSkip, Paging
+from app.core.dependencies.tenants import PublicTenant
 from app.core.dependencies.users import (
     AdminOrApiKey_HumansRead,
     AdminOrApiKey_HumansWrite,
@@ -46,6 +54,7 @@ from app.core.dependencies.users import (
     TenantSession,
     needs,
 )
+from app.core.rate_limit import RateLimit
 from app.services.email_helpers import send_application_status_email
 
 router = APIRouter(prefix="/humans", tags=["humans"])
@@ -199,6 +208,122 @@ async def update_current_human(
 
     updated = crud.update(db, human, human_in)
     return HumanSelfPublic.model_validate(updated)
+
+
+def _ensure_public_profile_token(db, human) -> str:
+    """Return the human's share token, minting one on first use."""
+    if not human.public_profile_token:
+        human.public_profile_token = secrets.token_urlsafe(16)
+        db.add(human)
+        db.commit()
+        db.refresh(human)
+    return human.public_profile_token
+
+
+@router.get(
+    "/me/public-profile",
+    response_model=PublicProfileSettings,
+    summary="Get your public profile link settings",
+    dependencies=[needs("portal:profile:read")],
+)
+async def get_my_public_profile(
+    current_human: CurrentHuman,
+    db: HumanTenantSession,
+) -> PublicProfileSettings:
+    human = crud.get(db, current_human.id)
+    if not human:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Human not found"
+        )
+    token = _ensure_public_profile_token(db, human)
+    return PublicProfileSettings(enabled=human.public_profile_enabled, token=token)
+
+
+@router.patch(
+    "/me/public-profile",
+    response_model=PublicProfileSettings,
+    summary="Turn your public profile link on or off",
+    dependencies=[needs("portal:profile:write")],
+)
+async def update_my_public_profile(
+    body: PublicProfileSettingsUpdate,
+    current_human: CurrentHuman,
+    db: HumanTenantSession,
+) -> PublicProfileSettings:
+    human = crud.get(db, current_human.id)
+    if not human:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Human not found"
+        )
+    human.public_profile_enabled = body.enabled
+    db.add(human)
+    db.commit()
+    db.refresh(human)
+    token = _ensure_public_profile_token(db, human)
+    return PublicProfileSettings(enabled=human.public_profile_enabled, token=token)
+
+
+@router.post(
+    "/me/public-profile/regenerate",
+    response_model=PublicProfileSettings,
+    summary="Replace your public profile link",
+    dependencies=[needs("portal:profile:write")],
+)
+async def regenerate_my_public_profile(
+    current_human: CurrentHuman,
+    db: HumanTenantSession,
+) -> PublicProfileSettings:
+    """Mint a new share token; the previous link stops working at once."""
+    human = crud.get(db, current_human.id)
+    if not human:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Human not found"
+        )
+    human.public_profile_token = secrets.token_urlsafe(16)
+    db.add(human)
+    db.commit()
+    db.refresh(human)
+    return PublicProfileSettings(
+        enabled=human.public_profile_enabled, token=human.public_profile_token
+    )
+
+
+@router.get(
+    "/public/profiles/{token}",
+    response_model=PublicProfile,
+    dependencies=[
+        Depends(
+            RateLimit(limit=120, window_sec=60, key_prefix="rl:human-public-profile")
+        ),
+    ],
+)
+async def get_public_profile(
+    token: str,
+    db: SessionDep,
+    tenant: PublicTenant,
+) -> PublicProfile:
+    """Unauthenticated profile card behind a human's share link.
+
+    Exposes only a display name (first name and last initial), the avatar and
+    the badges; never email, contact fields, award messages or ids. Unknown,
+    regenerated, disabled and sibling-tenant tokens all get the same opaque
+    404 so the route can't be used to probe for people.
+    """
+    from sqlmodel import select
+
+    from app.api.badge.crud import public_profile_badges
+    from app.api.human.models import Humans
+
+    human = db.exec(select(Humans).where(Humans.public_profile_token == token)).first()
+    if not human or human.tenant_id != tenant.id or not human.public_profile_enabled:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Profile not found"
+        )
+    return PublicProfile(
+        display_name=public_display_name(human.first_name, human.last_name),
+        picture_url=human.picture_url,
+        badges=public_profile_badges(db, human),
+    )
 
 
 @router.get(

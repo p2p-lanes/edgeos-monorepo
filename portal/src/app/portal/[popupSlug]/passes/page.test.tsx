@@ -1,3 +1,4 @@
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
 import { fireEvent, render, screen } from "@testing-library/react"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 import HomePasses from "./page"
@@ -128,6 +129,12 @@ vi.mock("@/providers/applicationProvider", () => ({
     getApplicationsForPopup: () => mocks.applications,
     participation: mocks.participation,
   }),
+}))
+
+vi.mock("@/client", () => ({
+  TicketingStepsService: {
+    listPortalTicketingSteps: vi.fn(async () => ({ results: [] })),
+  },
 }))
 
 vi.mock("@/providers/cityProvider", () => ({
@@ -529,7 +536,11 @@ describe("Passes page", () => {
       },
     ]
 
-    render(<HomePasses />)
+    render(
+      <QueryClientProvider client={new QueryClient()}>
+        <HomePasses />
+      </QueryClientProvider>,
+    )
 
     expect(screen.getByText("passes.your_purchases")).toBeTruthy()
     expect(screen.getByText("passes.other_products")).toBeTruthy()
