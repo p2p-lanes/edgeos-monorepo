@@ -36,8 +36,12 @@ const AttendeesTable = ({
 }: AttendeesTableProps) => {
   const { t } = useTranslation()
   const { getCity } = useCityProvider()
-  const popupId = getCity()?.id
-  const { issuable } = useIssuableBadges(popupId)
+  const city = getCity()
+  const popupId = city?.id
+  // Popups with badges off show nothing about them, so don't even ask.
+  const { issuable } = useIssuableBadges(
+    city?.badges_enabled ? popupId : undefined,
+  )
   const canGive = issuable.length > 0
   const { profile } = useGetProfile()
   // You can't give yourself a badge; the server refuses it anyway.

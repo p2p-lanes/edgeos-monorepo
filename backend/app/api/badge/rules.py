@@ -73,9 +73,18 @@ class _Occurrence:
 
 
 def _event_filters(statement, filters: BadgeRuleFilters):
-    """Narrow a statement joined to ``Events`` by the event-level filters."""
-    from app.api.event.models import Events
+    """Narrow a statement joined to ``Events`` by the event-level filters.
 
+    Only events of popups with badges turned on ever count.
+    """
+    from app.api.event.models import Events
+    from app.api.popup.models import Popups
+
+    statement = statement.where(
+        col(Events.popup_id).in_(
+            select(Popups.id).where(col(Popups.badges_enabled).is_(True))
+        )
+    )
     if filters.popup_id is not None:
         statement = statement.where(Events.popup_id == filters.popup_id)
     if filters.track_ids:

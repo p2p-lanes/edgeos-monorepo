@@ -24154,6 +24154,11 @@ export const PopupAdminSchema = {
             title: 'Show Attendee Directory',
             default: false
         },
+        badges_enabled: {
+            type: 'boolean',
+            title: 'Badges Enabled',
+            default: false
+        },
         edit_passes_enabled: {
             type: 'boolean',
             title: 'Edit Passes Enabled',
@@ -24861,6 +24866,11 @@ export const PopupCreateSchema = {
             title: 'Show Attendee Directory',
             default: false
         },
+        badges_enabled: {
+            type: 'boolean',
+            title: 'Badges Enabled',
+            default: false
+        },
         edit_passes_enabled: {
             type: 'boolean',
             title: 'Edit Passes Enabled',
@@ -25461,6 +25471,11 @@ export const PopupPublicSchema = {
         show_attendee_directory: {
             type: 'boolean',
             title: 'Show Attendee Directory',
+            default: false
+        },
+        badges_enabled: {
+            type: 'boolean',
+            title: 'Badges Enabled',
             default: false
         },
         edit_passes_enabled: {
@@ -26208,6 +26223,17 @@ export const PopupUpdateSchema = {
                 }
             ],
             title: 'Show Attendee Directory'
+        },
+        badges_enabled: {
+            anyOf: [
+                {
+                    type: 'boolean'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Badges Enabled'
         },
         edit_passes_enabled: {
             anyOf: [

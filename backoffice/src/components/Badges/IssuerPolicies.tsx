@@ -388,8 +388,14 @@ function PolicyDialog({
                   <SelectItem value="__any__">Any gathering</SelectItem>
                 )}
                 {(popups?.results ?? []).map((p) => (
-                  <SelectItem key={p.id} value={p.id}>
+                  <SelectItem
+                    key={p.id}
+                    value={p.id}
+                    // Nobody can give badges there; a saved choice stays.
+                    disabled={!p.badges_enabled && p.id !== source?.popup_id}
+                  >
                     {p.name}
+                    {!p.badges_enabled && " (badges off)"}
                   </SelectItem>
                 ))}
               </SelectContent>

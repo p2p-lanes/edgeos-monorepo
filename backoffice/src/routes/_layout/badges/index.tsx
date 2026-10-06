@@ -6,6 +6,7 @@ import { useState } from "react"
 import { type BadgePublic, BadgesService } from "@/client"
 import { BadgeArt } from "@/components/Badges/BadgeAwardsList"
 import { BadgeStylesDialog } from "@/components/Badges/BadgeStylesDialog"
+import { BadgesOffNotice } from "@/components/Badges/BadgesOffNotice"
 import { EmptyState } from "@/components/Common/EmptyState"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -141,6 +142,7 @@ function BadgesPage() {
         </p>
       ) : (
         <>
+          <BadgesOffNotice />
           <div className="flex flex-wrap items-center gap-4">
             <Input
               value={search}

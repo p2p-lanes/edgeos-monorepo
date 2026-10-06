@@ -12,6 +12,7 @@ import { BadgesService } from "@/client"
 import { BadgeAwardsList } from "@/components/Badges/BadgeAwardsList"
 import { BadgeForm } from "@/components/Badges/BadgeForm"
 import { BadgeRulesCard } from "@/components/Badges/BadgeRules"
+import { BadgesOffNotice } from "@/components/Badges/BadgesOffNotice"
 import { GiveBadgeDialog } from "@/components/Badges/GiveBadgeDialog"
 import { IssuerPoliciesCard } from "@/components/Badges/IssuerPolicies"
 import { DangerZone } from "@/components/Common/DangerZone"
@@ -128,6 +129,7 @@ function BadgeDetailContent({ badgeId }: { badgeId: string }) {
 
   return (
     <div className="space-y-6">
+      <BadgesOffNotice className="mx-auto max-w-2xl" />
       {badge.archived_at && (
         <Alert className="mx-auto max-w-2xl">
           <AlertDescription className="flex flex-wrap items-center justify-between gap-2">

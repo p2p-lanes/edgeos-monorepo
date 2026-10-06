@@ -5164,6 +5164,7 @@ export type PopupAdmin = {
     checkin_pass_lead_days?: (number | null);
     accommodation_min_stay?: number;
     show_attendee_directory?: boolean;
+    badges_enabled?: boolean;
     edit_passes_enabled?: boolean;
     invites_enabled?: boolean;
     referrals_enabled?: boolean;
@@ -5253,6 +5254,7 @@ export type PopupCreate = {
     events_enabled?: boolean;
     self_check_in_enabled?: boolean;
     show_attendee_directory?: boolean;
+    badges_enabled?: boolean;
     edit_passes_enabled?: boolean;
     installments_enabled?: boolean;
     installments_deadline?: (string | null);
@@ -5339,6 +5341,7 @@ export type PopupPublic = {
     events_enabled?: boolean;
     accommodation_min_stay?: number;
     show_attendee_directory?: boolean;
+    badges_enabled?: boolean;
     edit_passes_enabled?: boolean;
     invites_enabled?: boolean;
     referrals_enabled?: boolean;
@@ -5439,6 +5442,7 @@ export type PopupUpdate = {
     events_enabled?: (boolean | null);
     self_check_in_enabled?: (boolean | null);
     show_attendee_directory?: (boolean | null);
+    badges_enabled?: (boolean | null);
     edit_passes_enabled?: (boolean | null);
     installments_enabled?: (boolean | null);
     installments_deadline?: (string | null);

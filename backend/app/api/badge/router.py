@@ -81,6 +81,24 @@ def _conflict(detail: str) -> HTTPException:
     return HTTPException(status_code=status.HTTP_409_CONFLICT, detail=detail)
 
 
+BADGES_OFF = "Badges are off for this popup. Turn them on in its settings first."
+
+
+def _badges_popup(db: Session, popup_id: uuid.UUID):
+    from app.api.popup.models import Popups
+
+    popup = db.get(Popups, popup_id)
+    if not popup:
+        raise _not_found("Popup")
+    return popup
+
+
+def _require_badges_on(db: Session, popup_id: uuid.UUID) -> None:
+    """404 for an unknown popup, 409 for one with badges turned off."""
+    if not _badges_popup(db, popup_id).badges_enabled:
+        raise _conflict(BADGES_OFF)
+
+
 def _tenant_id(current_user, x_tenant_id: str | None) -> uuid.UUID:
     """Own tenant for admins and API keys, X-Tenant-Id for a superadmin."""
     if current_user.role == UserRole.SUPERADMIN:
@@ -315,6 +333,11 @@ async def list_issuable_badges(
 ) -> list[IssuableBadge]:
     """With ``attendee_id``, flags the badges that attendee already holds."""
     from app.api.attendee.models import Attendees
+    from app.api.popup.models import Popups
+
+    popup = db.get(Popups, popup_id)
+    if not popup or not popup.badges_enabled:
+        return []
 
     recipient_id = None
     if attendee_id is not None:
@@ -345,6 +368,9 @@ async def give_badge_as_human(
     from app.api.attendee.models import Attendees
     from app.api.event_participant.crud import event_participants_crud
 
+    popup = _badges_popup(db, body.popup_id)
+    if not popup.badges_enabled:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=BADGES_OFF)
     badge = _get_badge_or_404(db, body.badge_id)
     attendee = db.get(Attendees, body.attendee_id)
     if not attendee or attendee.popup_id != body.popup_id or not attendee.human_id:
@@ -628,10 +654,7 @@ async def award_badge(
     if not recipient:
         raise _not_found("Human")
     if award_in.popup_id:
-        from app.api.popup.crud import popups_crud
-
-        if not popups_crud.get(db, award_in.popup_id):
-            raise _not_found("Popup")
+        _require_badges_on(db, award_in.popup_id)
 
     try:
         award = crud.create_award(
@@ -671,10 +694,7 @@ async def award_badge_bulk(
     if badge.archived_at is not None:
         raise _conflict("This badge is archived")
     if award_in.popup_id:
-        from app.api.popup.crud import popups_crud
-
-        if not popups_crud.get(db, award_in.popup_id):
-            raise _not_found("Popup")
+        _require_badges_on(db, award_in.popup_id)
 
     by_id: dict[uuid.UUID, Humans] = {}
     if award_in.recipient_human_ids:
@@ -770,11 +790,13 @@ def _resolve_policy_links(
     badge_ids: list[uuid.UUID] | None,
     human_ids: list[uuid.UUID] | None,
     popup_id: uuid.UUID | None,
+    *,
+    popup_changed: bool = True,
 ) -> tuple[list[Badges] | None, list[Humans] | None]:
-    from app.api.popup.crud import popups_crud
-
-    if popup_id and not popups_crud.get(db, popup_id):
-        raise _not_found("Popup")
+    # A policy can't be pointed at a popup with badges off, but one that
+    # already is (badges turned off later) stays editable.
+    if popup_id and popup_changed:
+        _require_badges_on(db, popup_id)
     badges = None
     if badge_ids is not None:
         badges = [_get_badge_or_404(db, b) for b in dict.fromkeys(badge_ids)]
@@ -925,7 +947,11 @@ async def update_issuer_policy(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)
         )
     badges, humans = _resolve_policy_links(
-        db, data.get("badge_ids"), data.get("human_ids"), popup_id
+        db,
+        data.get("badge_ids"),
+        data.get("human_ids"),
+        popup_id,
+        popup_changed=popup_id != policy.popup_id,
     )
 
     if data.get("name"):
@@ -996,10 +1022,27 @@ def _get_rule_or_404(db: Session, rule_id: uuid.UUID) -> BadgeRules:
     return rule
 
 
+def _rule_popup_ids(config: dict | None) -> set[uuid.UUID]:
+    """Popups a stored rule config names, read leniently."""
+    ids: set[uuid.UUID] = set()
+    for condition in (config or {}).get("conditions") or []:
+        popup_id = ((condition or {}).get("filters") or {}).get("popup_id")
+        if popup_id:
+            ids.add(uuid.UUID(str(popup_id)))
+    return ids
+
+
 def _check_rule_target(
-    db: Session, tenant_id: uuid.UUID, config: BadgeRuleConfig
+    db: Session,
+    tenant_id: uuid.UUID,
+    config: BadgeRuleConfig,
+    already_named: set[uuid.UUID] | None = None,
 ) -> None:
-    """Every popup, track, venue and event a rule names must exist here."""
+    """Every popup, track, venue and event a rule names must exist here.
+
+    Newly named popups must also have badges on; ones the rule already
+    named (badges turned off later) don't block editing it.
+    """
     from app.api.event.models import Events
     from app.api.event_venue.models import EventVenues
     from app.api.popup.models import Popups
@@ -1028,6 +1071,8 @@ def _check_rule_target(
         ).one()
         if found != len(ids):
             raise _not_found(label)
+    for popup_id in wanted["Popup"][1] - (already_named or set()):
+        _require_badges_on(db, popup_id)
 
 
 def _sorted_unique(values) -> list[str]:
@@ -1156,7 +1201,9 @@ async def update_badge_rule(
     """Edit a rule. Awards already given stay; run evaluate to apply it now."""
     rule = _get_rule_or_404(db, rule_id)
     if body.config is not None:
-        _check_rule_target(db, rule.tenant_id, body.config)
+        _check_rule_target(
+            db, rule.tenant_id, body.config, _rule_popup_ids(rule.config)
+        )
         rule.type = rules.RULE_CONFIG_TYPE
         rule.config = body.config.model_dump(mode="json")
     if body.is_active is not None:
