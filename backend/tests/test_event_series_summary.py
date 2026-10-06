@@ -8,7 +8,6 @@ from sqlmodel import select
 
 from app.api.event.models import Events
 from app.api.event_participant.models import EventParticipants
-from app.api.event_participant.schemas import ParticipantStatus
 from app.api.popup.models import Popups
 from app.core.security import create_access_token
 from tests.test_event_occurrence_context import series as _series_fixture
@@ -44,7 +43,6 @@ def test_calendar_contains_zero_rsvp_dates(client, series, admin_token_tenant_a)
     assert [
         datetime.fromisoformat(row["occurrence_start"]) for row in body["occurrences"]
     ] == [start + timedelta(days=d) for d in range(3)]
-    assert body["outside_schedule"] == []
 
 
 def test_hosts_and_cancelled_do_not_count(client, db, series, admin_token_tenant_a):
@@ -95,79 +93,6 @@ def test_detached_child_owns_its_date_and_counts(
         assert row["attendee_count"] == 1
 
 
-def test_obsolete_and_null_rsvps_are_separate_and_named(
-    client, db, series, admin_token_tenant_a
-):
-    event, humans, start = series
-    old = start - timedelta(minutes=30)
-    event.host_id = humans[2].id
-    db.add(event)
-    for human, occurrence, state in [
-        (humans[0], old, ParticipantStatus.REGISTERED),
-        (humans[1], None, ParticipantStatus.CHECKED_IN),
-        (humans[2], old, ParticipantStatus.REGISTERED),
-        (humans[1], old, ParticipantStatus.CANCELLED),
-    ]:
-        db.add(
-            EventParticipants(
-                tenant_id=event.tenant_id,
-                event_id=event.id,
-                profile_id=human.id,
-                occurrence_start=occurrence,
-                status=state,
-            )
-        )
-    db.commit()
-    before = [
-        (r.id, r.occurrence_start, r.status)
-        for r in db.exec(
-            select(EventParticipants).where(EventParticipants.event_id == event.id)
-        ).all()
-    ]
-    body = summary(client, event.id, admin_token_tenant_a).json()
-    assert len(body["outside_schedule"]) == 2
-    assert [row["attendee_count"] for row in body["occurrences"]] == [1, 2, 0]
-    for group in body["outside_schedule"]:
-        assert group["attendee_count"] == 1
-        assert group["participants"][0]["first_name"].startswith("Attendee")
-    db.expire_all()
-    after = [
-        (r.id, r.occurrence_start, r.status)
-        for r in db.exec(
-            select(EventParticipants).where(EventParticipants.event_id == event.id)
-        ).all()
-    ]
-    assert before == after
-
-
-def test_scheduled_rsvp_outside_window_is_not_an_orphan(
-    client, series, admin_token_tenant_a
-):
-    event, _, start = series
-    body = summary(
-        client,
-        event.id,
-        admin_token_tenant_a,
-        window_start=(start + timedelta(days=2)).isoformat(),
-        window_end=(start + timedelta(days=3)).isoformat(),
-    ).json()
-    assert len(body["occurrences"]) == 1
-    assert body["occurrences"][0]["attendee_count"] == 0
-    assert body["outside_schedule"] == []
-
-
-def test_removed_date_with_rsvps_is_outside_schedule(
-    client, db, series, admin_token_tenant_a
-):
-    event, _, start = series
-    event.recurrence_exdates = [(start + timedelta(days=1)).isoformat()]
-    db.add(event)
-    db.commit()
-    body = summary(client, event.id, admin_token_tenant_a).json()
-    assert len(body["occurrences"]) == 2
-    assert body["outside_schedule"][0]["attendee_count"] == 2
-
-
 def test_gathering_dates_bound_unending_series_and_include_empty_dates(
     client, db, series, admin_token_tenant_a
 ):
@@ -196,24 +121,6 @@ def test_calendar_is_not_truncated_at_default_expansion_cap(
     body = summary(client, event.id, admin_token_tenant_a).json()
     assert len(body["occurrences"]) == 150
     assert body["occurrences"][-1]["attendee_count"] == 0
-
-
-def test_gathering_range_does_not_follow_the_viewed_occurrence(
-    client, db, series, admin_token_tenant_a
-):
-    event, _, start = series
-    event.rrule = "FREQ=DAILY"
-    db.add(event)
-    db.commit()
-    body = summary(client, event.id, admin_token_tenant_a).json()
-    distant = summary(
-        client,
-        event.id,
-        admin_token_tenant_a,
-        anchor=(start + timedelta(days=500)).isoformat(),
-    ).json()
-    assert len(body["occurrences"]) == 3
-    assert distant == body
 
 
 def test_full_gathering_over_one_year_is_not_truncated(
@@ -266,24 +173,6 @@ def test_invalid_gathering_range_is_a_controlled_error(
     response = summary(client, event.id, admin_token_tenant_a)
     assert response.status_code == 400
     assert response.json()["detail"] == "The gathering has an invalid date range"
-
-
-@pytest.mark.parametrize(
-    "params",
-    [
-        {"window_start": "2031-03-03T00:00:00Z"},
-        {"anchor": "2031-03-03T00:00:00"},
-        {"window_start": "2031-03-03T00:00:00", "window_end": "2031-03-04T00:00:00Z"},
-        {"window_start": "2031-03-03T00:00:00Z", "window_end": "2031-03-03T00:00:00Z"},
-        {"window_start": "2031-03-04T00:00:00Z", "window_end": "2031-03-03T00:00:00Z"},
-        {"window_start": "2031-03-03T00:00:00Z", "window_end": "2033-03-03T00:00:00Z"},
-    ],
-)
-def test_invalid_or_unbounded_window_rejected(
-    client, series, admin_token_tenant_a, params
-):
-    event, _, _ = series
-    assert summary(client, event.id, admin_token_tenant_a, **params).status_code == 400
 
 
 def test_dst_occurrences_use_local_wall_clock(client, db, series, admin_token_tenant_a):
@@ -383,3 +272,47 @@ def test_child_in_another_gathering_is_not_part_of_the_view(
     assert summary(client, child.id, admin_token_tenant_a).status_code == 404
     rows = summary(client, master.id, admin_token_tenant_a).json()["occurrences"]
     assert all(row["event_id"] != str(child.id) for row in rows)
+
+
+def test_summary_only_projects_scheduled_rows_and_does_not_modify_registrations(
+    client, db, series, admin_token_tenant_a
+):
+    event, humans, start = series
+    event.recurrence_exdates = [start.isoformat()]
+    db.add(event)
+    db.add_all(
+        [
+            EventParticipants(
+                tenant_id=event.tenant_id,
+                event_id=event.id,
+                profile_id=humans[1].id,
+                occurrence_start=None,
+            ),
+            EventParticipants(
+                tenant_id=event.tenant_id,
+                event_id=event.id,
+                profile_id=humans[1].id,
+                occurrence_start=start - timedelta(days=1),
+            ),
+        ]
+    )
+    db.commit()
+
+    def snapshot():
+        return sorted(
+            (str(row.id), row.occurrence_start, row.status, row.updated_at)
+            for row in db.exec(
+                select(EventParticipants).where(EventParticipants.event_id == event.id)
+            ).all()
+        )
+
+    before = snapshot()
+    response = summary(client, event.id, admin_token_tenant_a)
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert [row["attendee_count"] for row in body["occurrences"]] == [2, 0]
+    assert "outside_schedule" not in body
+    db.expire_all()
+    assert snapshot() == before
+    assert db.get(Events, event.id).start_time == start
+    assert db.get(Events, event.id).recurrence_exdates == [start.isoformat()]

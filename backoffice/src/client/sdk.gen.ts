@@ -5267,14 +5267,17 @@ export class EventMessagesService {
 export class EventParticipantsService {
     /**
      * List Participants
-     * List participants, optionally scoped to one recurring occurrence.
+     * Read participants for the backoffice, optionally scoped to one date.
      *
-     * Omitting occurrence_start preserves the backoffice's series-wide listing.
+     * A timestamp selects that occurrence. scope_to_occurrence without a
+     * timestamp selects NULL registrations (one-offs and detached children).
+     * Requests without either option retain the existing series-wide listing.
      * @param data The data for the request.
      * @param data.eventId
      * @param data.skip Number of items to skip
      * @param data.limit Maximum number of items to return
      * @param data.occurrenceStart
+     * @param data.scopeToOccurrence
      * @param data.xTenantId
      * @returns ListModel_EventParticipantPublic_ Successful Response
      * @throws ApiError
@@ -5290,7 +5293,8 @@ export class EventParticipantsService {
                 event_id: data.eventId,
                 skip: data.skip,
                 limit: data.limit,
-                occurrence_start: data.occurrenceStart
+                occurrence_start: data.occurrenceStart,
+                scope_to_occurrence: data.scopeToOccurrence
             },
             errors: {
                 422: 'Validation Error'
@@ -6004,10 +6008,8 @@ export class EventsService {
 
     /**
      * Get Event
-     * Read one occurrence; an omitted date selects the first instance.
      * @param data The data for the request.
      * @param data.eventId
-     * @param data.occurrenceStart
      * @param data.xTenantId
      * @returns EventPublic Successful Response
      * @throws ApiError
@@ -6021,9 +6023,6 @@ export class EventsService {
             },
             headers: {
                 'X-Tenant-Id': data.xTenantId
-            },
-            query: {
-                occurrence_start: data.occurrenceStart
             },
             errors: {
                 422: 'Validation Error'
@@ -6084,16 +6083,12 @@ export class EventsService {
 
     /**
      * Get Event Series Summary
-     * Read the series calendar and counts, including dates with zero RSVPs.
+     * Read scheduled dates and RSVP counts for the backoffice series view.
      *
-     * Detached children resolve to their master. The date window is half-open;
-     * absent bounds always use the complete gathering date range.
-     * This endpoint never writes participants, schedules or attendance.
+     * Uses the gathering date range and resolves detached children to their
+     * master. This projection never changes event details or registrations.
      * @param data The data for the request.
      * @param data.eventId
-     * @param data.windowStart
-     * @param data.windowEnd
-     * @param data.anchor
      * @param data.xTenantId
      * @returns EventSeriesSummary Successful Response
      * @throws ApiError
@@ -6107,11 +6102,6 @@ export class EventsService {
             },
             headers: {
                 'X-Tenant-Id': data.xTenantId
-            },
-            query: {
-                window_start: data.windowStart,
-                window_end: data.windowEnd,
-                anchor: data.anchor
             },
             errors: {
                 422: 'Validation Error'
@@ -6859,9 +6849,9 @@ export class EventsService {
      * Get Portal Event
      * Fetch a single event for the portal.
      *
-     * ``occurrence_start`` scopes dates, capacity and the user's RSVP to one
-     * scheduled instance. Omitting it selects the first recurring instance.
-     * Detached children own their registrations as one-off events.
+     * ``occurrence_start`` scopes the user's RSVP lookup to a specific
+     * instance of a recurring event so the detail page reflects the
+     * occurrence's status (not the series' first instance).
      * @param data The data for the request.
      * @param data.eventId
      * @param data.occurrenceStart

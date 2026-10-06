@@ -291,9 +291,6 @@ class EventPublic(EventBase):
     # master. Format: ``{master_id}_{yyyymmddTHHMMSS}``. ``None`` for real
     # (persisted) rows.
     occurrence_id: str | None = None
-    # Detail endpoints resolve an omitted date to the first recurring instance.
-    # NULL for one-off events and detached children, which own their RSVPs.
-    resolved_occurrence_start: datetime | None = None
     # Denormalized venue fields so portal clients can render a card without
     # a follow-up call to /event-venues/{id} (that endpoint requires user
     # auth the portal doesn't have). Populated by list/get helpers; None
@@ -320,8 +317,8 @@ class EventPublic(EventBase):
     my_rsvp_status: str | None = None
     # Number of active (non-cancelled) registrations, i.e. the count that
     # capacity is enforced against. Includes attendees who hid their name, so
-    # the displayed count stays consistent with "Event is full". Scoped to
-    # the displayed occurrence in detail/list endpoints; None when not computed.
+    # the displayed count stays consistent with "Event is full". Populated by
+    # the portal detail endpoint; None when not computed.
     attendee_count: int | None = None
 
     model_config = ConfigDict(from_attributes=True)

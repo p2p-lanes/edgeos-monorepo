@@ -13,7 +13,6 @@ from sqlmodel import Session
 from app.api.audit_log.actor import actor_from_human, actor_from_user
 from app.api.audit_log.snapshot import compute_changes
 from app.api.event import crud
-from app.api.event.occurrence import resolve_detail_occurrence
 from app.api.event.recurrence import (
     DEFAULT_MAX_OCCURRENCES,
     expand,
@@ -459,7 +458,7 @@ def _to_public(
     event,
     venue_map: dict[uuid.UUID, VenueInfo] | None = None,
     track_map: dict[uuid.UUID, str] | None = None,
-    count_map: dict[tuple[uuid.UUID, datetime | None], int] | None = None,
+    count_map: dict[uuid.UUID, int] | None = None,
 ) -> EventPublic:
     """Convert an Events row (or expanded pseudo-row) to EventPublic.
 
@@ -493,27 +492,10 @@ def _to_public(
         elif track_map is None and getattr(event, "track", None) is not None:
             updates["track_title"] = event.track.name
     if count_map is not None:
-        updates["attendee_count"] = count_map.get(_rsvp_lookup_key(event), 0)
+        updates["attendee_count"] = count_map.get(event.id, 0)
     if updates:
         data = data.model_copy(update=updates)
     return data
-
-
-def _to_occurrence_public(db, event, occurrence_start: datetime | None) -> EventPublic:
-    """Keep displayed dates and capacity on the same registration identity."""
-    from app.api.event_participant.check_in import resolve_occurrence_window
-    from app.api.event_participant.crud import event_participants_crud
-
-    start, end = resolve_occurrence_window(event, occurrence_start)
-    counts = event_participants_crud.count_active_for_occurrences(db, [event.id])
-    return _to_public(event).model_copy(
-        update={
-            "start_time": start,
-            "end_time": end,
-            "resolved_occurrence_start": occurrence_start,
-            "attendee_count": counts.get((event.id, occurrence_start), 0),
-        }
-    )
 
 
 def _venue_map_for_events(db, events: list) -> dict[uuid.UUID, VenueInfo]:
@@ -1240,7 +1222,7 @@ async def list_events(
     track_map = _track_map_for_events(db, events)
     from app.api.event_participant.crud import event_participants_crud
 
-    count_map = event_participants_crud.count_active_for_occurrences(
+    count_map = event_participants_crud.count_active_for_events(
         db, [e.id for e in events]
     )
     return ListModel[EventPublic](
@@ -1270,18 +1252,13 @@ async def get_event(
     event_id: uuid.UUID,
     db: AdminOrApiKeySession_EventsRead,
     _: AdminOrApiKey_EventsRead,
-    occurrence_start: datetime | None = None,
 ) -> EventPublic:
-    """Read one occurrence; an omitted date selects the first instance."""
     event = crud.events_crud.get(db, event_id)
     if not event:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Event not found"
         )
-    occ = resolve_detail_occurrence(event, occurrence_start)
-    return _with_collaborators(
-        db, _to_occurrence_public(db, event, occ), event, include_email=True
-    )
+    return _with_collaborators(db, _to_public(event), event, include_email=True)
 
 
 @router.get("/{event_id}/series-summary", response_model=EventSeriesSummary)
@@ -1290,15 +1267,11 @@ async def get_event_series_summary(
     db: AdminOrApiKeySession_EventsRead,
     _: AdminOrApiKey_EventsRead,
     token_payload: CallerToken,
-    window_start: datetime | None = None,
-    window_end: datetime | None = None,
-    anchor: datetime | None = None,
 ) -> EventSeriesSummary:
-    """Read the series calendar and counts, including dates with zero RSVPs.
+    """Read scheduled dates and RSVP counts for the backoffice series view.
 
-    Detached children resolve to their master. The date window is half-open;
-    absent bounds always use the complete gathering date range.
-    This endpoint never writes participants, schedules or attendance.
+    Uses the gathering date range and resolves detached children to their
+    master. This projection never changes event details or registrations.
     """
     event = crud.events_crud.get(db, event_id)
     if not event:
@@ -1316,13 +1289,7 @@ async def get_event_series_summary(
     ):
         raise HTTPException(404, "Series not found")
     ensure_api_key_popup(token_payload, master.popup_id)
-    return build_series_summary(
-        db,
-        master,
-        window_start=window_start,
-        window_end=window_end,
-        anchor=anchor,
-    )
+    return build_series_summary(db, master)
 
 
 # ---------------------------------------------------------------------------
@@ -3016,15 +2983,17 @@ def _rsvp_lookup_key(e) -> tuple[uuid.UUID, datetime | None]:
     """Build the ``(event_id, occurrence_start)`` key used to locate the
     human's RSVP row.
 
-    Generated instances and the recurring master use their start_time.
-    One-offs and materialized children own registrations with a NULL
-    occurrence_start, even when they retain a recurrence_master_id.
+    RSVPs for recurring events are per-occurrence, so every recurring row
+    — expanded pseudo-rows, detached override children, and the master
+    itself — maps to its own occurrence's ``start_time``.  The master's
+    ``start_time`` IS the first occurrence's dtstart, so it shares the
+    same key as its expanded siblings.
     """
     is_expanded = e.__dict__.get("_occurrence_id") is not None
     if is_expanded:
         return (e.id, e.start_time)
-    # Materialized children own one-off RSVPs; only generated instances
-    # retain the master's event id and a non-NULL occurrence_start.
+    if getattr(e, "recurrence_master_id", None):
+        return (e.recurrence_master_id, e.start_time)
     if getattr(e, "rrule", None):
         return (e.id, e.start_time)
     return (e.id, None)
@@ -3160,11 +3129,6 @@ async def list_portal_events(
 
     venue_map = _venue_map_for_events(db, visible)
     track_map = _track_map_for_events(db, visible)
-    from app.api.event_participant.crud import event_participants_crud
-
-    count_map = event_participants_crud.count_active_for_occurrences(
-        db, [e.id for e in visible]
-    )
 
     # RSVP status of current human per event, so cards can render the right
     # inline button without an extra batch call from the client.
@@ -3187,7 +3151,7 @@ async def list_portal_events(
             rsvp_status_map = {(row[0], row[1]): row[2] for row in rows}
 
     def _publicize(e) -> EventPublic:
-        pub = _to_public(e, venue_map, track_map, count_map)
+        pub = _to_public(e, venue_map, track_map)
         updates: dict = {}
         if hidden_ids and (
             e.id in hidden_ids
@@ -3408,9 +3372,9 @@ async def get_portal_event(
 ) -> EventPublic:
     """Fetch a single event for the portal.
 
-    ``occurrence_start`` scopes dates, capacity and the user's RSVP to one
-    scheduled instance. Omitting it selects the first recurring instance.
-    Detached children own their registrations as one-off events.
+    ``occurrence_start`` scopes the user's RSVP lookup to a specific
+    instance of a recurring event so the detail page reflects the
+    occurrence's status (not the series' first instance).
     """
     from sqlmodel import select
 
@@ -3427,11 +3391,17 @@ async def get_portal_event(
 
     from app.api.event_participant.models import EventParticipants
 
-    occurrence_start = resolve_detail_occurrence(event, occurrence_start)
+    rsvp_event_id = event.recurrence_master_id or event.id
+    # RSVPs for recurring events are per-occurrence. When the detail page
+    # lands on a series master without ?occ=, treat it as the first
+    # occurrence (the master's own start_time IS the first occurrence's
+    # dtstart) so we find the RSVP row the portal just created.
+    if occurrence_start is None and event.rrule:
+        occurrence_start = event.start_time
     rsvp_q = (
         select(EventParticipants.status)
         .where(EventParticipants.profile_id == current_human.id)
-        .where(EventParticipants.event_id == event.id)
+        .where(EventParticipants.event_id == rsvp_event_id)
     )
     if occurrence_start is None:
         rsvp_q = rsvp_q.where(
@@ -3441,9 +3411,23 @@ async def get_portal_event(
         rsvp_q = rsvp_q.where(EventParticipants.occurrence_start == occurrence_start)
     rsvp = db.exec(rsvp_q).first()
 
-    pub = _to_occurrence_public(db, event, occurrence_start)
+    # Active-registration count for the capacity badge. Mirrors the "Event is
+    # full" guard exactly: keys on this event's own id (the same path param the
+    # register endpoint counts against, NOT the recurrence master) and the same
+    # occurrence, counting non-cancelled rows with no privacy filtering. Keeps
+    # the badge consistent with what registration actually allows, even for a
+    # detached occurrence that carries its own capacity.
+    from app.api.event_participant.crud import event_participants_crud
+
+    attendee_count = event_participants_crud.count_active_for_event(
+        db, event.id, occurrence_start=occurrence_start
+    )
+
+    pub = _to_public(event)
+    updates: dict[str, object] = {"attendee_count": attendee_count}
     if rsvp:
-        pub = pub.model_copy(update={"my_rsvp_status": rsvp})
+        updates["my_rsvp_status"] = rsvp
+    pub = pub.model_copy(update=updates)
     return _with_collaborators(db, pub, event)
 
 

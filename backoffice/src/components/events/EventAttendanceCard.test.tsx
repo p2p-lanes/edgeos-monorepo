@@ -99,8 +99,6 @@ describe("EventAttendanceCard", () => {
     getAttendance.mockResolvedValue(roster())
     markPresent.mockResolvedValue({ entry: entry() } as never)
     renderCard(OCC)
-    expect(await screen.findByText("RSVP'd")).toBeTruthy()
-    expect(screen.queryByText("RSVPed")).toBeNull()
 
     await userEvent.click(
       await screen.findByRole("button", { name: "Mark present" }),

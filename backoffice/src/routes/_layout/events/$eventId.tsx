@@ -23,8 +23,6 @@ import { useRef, useState } from "react"
 import QRCode from "react-qr-code"
 
 import {
-  type EventParticipantPublic,
-  EventParticipantsService,
   type EventPublic,
   EventsService,
   PopupsService,
@@ -36,6 +34,7 @@ import { StatusBadge } from "@/components/Common/StatusBadge"
 import { CoverImage } from "@/components/events/CoverImage"
 import { EventAttendanceCard } from "@/components/events/EventAttendanceCard"
 import { OtherSeriesOccurrences } from "@/components/events/OtherSeriesOccurrences"
+import { loadOccurrenceParticipants } from "@/components/events/occurrenceParticipants"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import {
@@ -126,20 +125,21 @@ function EventViewContent() {
   const [editChoiceOpen, setEditChoiceOpen] = useState(false)
 
   const { data: event } = useQuery({
-    queryKey: ["event", eventId, occ],
-    queryFn: () => EventsService.getEvent({ eventId, occurrenceStart: occ }),
-    // Invalid/stale occurrence links must reach the error boundary, not leave
-    // the page on its loading skeleton indefinitely.
-    throwOnError: true,
-    retry: false,
+    queryKey: ["event", eventId],
+    queryFn: () => EventsService.getEvent({ eventId }),
   })
 
-  const occurrenceStart = event?.resolved_occurrence_start ?? undefined
-
-  const { data: participantsData } = useQuery({
-    queryKey: ["event-participants", eventId, occurrenceStart],
-    queryFn: () =>
-      EventParticipantsService.listParticipants({ eventId, occurrenceStart }),
+  // Resolve the selected date for presentation only. Keep getEvent's raw
+  // definition and the existing edit/check-in behavior unchanged.
+  const occurrenceStart = event?.rrule ? (occ ?? event.start_time) : null
+  const {
+    data: activeParticipants = [],
+    isPending: participantsLoading,
+    isError: participantsError,
+    refetch: refetchParticipants,
+  } = useQuery({
+    queryKey: ["event-participants", eventId, "occurrence", occurrenceStart],
+    queryFn: () => loadOccurrenceParticipants(eventId, occurrenceStart),
     enabled: !!event,
   })
 
@@ -160,7 +160,7 @@ function EventViewContent() {
     mutationFn: () =>
       EventsService.detachOccurrence({
         eventId,
-        requestBody: { occurrence_start: occurrenceStart! },
+        requestBody: { occurrence_start: occ! },
       }),
     onSuccess: (child: EventPublic) => {
       showSuccessToast("Detached occurrence for editing")
@@ -174,7 +174,7 @@ function EventViewContent() {
 
   if (!event) return <Skeleton className="h-96 w-full" />
 
-  const isRecurringOccurrence = !!event.rrule && !!occurrenceStart
+  const isRecurringOccurrence = !!event.rrule && !!occ
   const goToEditSeries = () =>
     navigate({ to: "/events/$eventId/edit", params: { eventId } })
   const onEdit = () => {
@@ -188,13 +188,13 @@ function EventViewContent() {
   const portalUrl =
     portalBase && popup?.slug
       ? `${getPopupPortalUrl(portalBase, popup.slug)}/events/${event.id}${
-          occurrenceStart ? `?occ=${encodeURIComponent(occurrenceStart)}` : ""
+          occ ? `?occ=${encodeURIComponent(occ)}` : ""
         }`
       : null
 
   // A recurring master viewed without ?occ= is its own first occurrence, so
   // the QR still pins a single date rather than the whole series.
-  const checkInOcc = occurrenceStart ?? null
+  const checkInOcc = event.rrule ? (occ ?? event.start_time) : null
   const checkInUrl =
     portalBase && popup?.slug
       ? getEventCheckInUrl(portalBase, popup.slug, event.id, checkInOcc)
@@ -236,22 +236,23 @@ function EventViewContent() {
     }
   }
 
-  const participants = participantsData?.results ?? []
-  const activeParticipants = participants.filter(
-    (p: EventParticipantPublic) => p.status !== "cancelled",
-  )
-  const goingCount = event.attendee_count ?? activeParticipants.length
+  const goingCount = activeParticipants.length
+  const displayStart =
+    occurrenceStart && Number.isFinite(Date.parse(occurrenceStart))
+      ? occurrenceStart
+      : event.start_time
+  const displayEnd = new Date(
+    Date.parse(displayStart) +
+      Date.parse(event.end_time) -
+      Date.parse(event.start_time),
+  ).toISOString()
 
   const coverSrc = event.cover_url || event.venue_image_url || null
 
   return (
     <FormPageLayout
       title={event.title || "Untitled event"}
-      description={formatRange(
-        event.start_time,
-        event.end_time,
-        event.timezone,
-      )}
+      description={formatRange(displayStart, displayEnd, event.timezone)}
       backTo="/events"
       actions={
         <div className="flex items-center gap-2">
@@ -308,7 +309,7 @@ function EventViewContent() {
 
         <div className="space-y-2 rounded-xl border bg-card p-4">
           <DetailRow icon={Clock}>
-            {formatRange(event.start_time, event.end_time, event.timezone)}
+            {formatRange(displayStart, displayEnd, event.timezone)}
             {event.timezone ? (
               <span className="text-muted-foreground"> · {event.timezone}</span>
             ) : null}
@@ -482,15 +483,28 @@ function EventViewContent() {
             <div>
               <h3 className="text-sm font-semibold">Participants</h3>
               <p className="mt-1 text-xs text-muted-foreground">
-                {formatRange(event.start_time, event.end_time, event.timezone)}
+                {formatRange(displayStart, displayEnd, event.timezone)}
               </p>
             </div>
             <span className="text-sm text-muted-foreground">
-              {goingCount}
+              {participantsLoading || participantsError ? "—" : goingCount}
               {event.max_participant ? ` / ${event.max_participant}` : ""}
             </span>
           </div>
-          {activeParticipants.length === 0 ? (
+          {participantsLoading ? (
+            <Skeleton className="h-12 w-full" />
+          ) : participantsError ? (
+            <div role="alert" className="text-sm">
+              Couldn't load participants.{" "}
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => refetchParticipants()}
+              >
+                Retry
+              </Button>
+            </div>
+          ) : activeParticipants.length === 0 ? (
             <p className="text-sm text-muted-foreground">No participants yet</p>
           ) : (
             <div className="space-y-2">
@@ -527,6 +541,7 @@ function EventViewContent() {
           <OtherSeriesOccurrences
             key={`${event.id}:${occurrenceStart ?? "oneoff"}`}
             event={event}
+            occurrenceStart={occurrenceStart}
             formatRange={formatRange}
           />
         )}

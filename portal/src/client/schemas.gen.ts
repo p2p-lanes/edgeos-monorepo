@@ -13839,18 +13839,6 @@ export const EventPublicSchema = {
             ],
             title: 'Occurrence Id'
         },
-        resolved_occurrence_start: {
-            anyOf: [
-                {
-                    type: 'string',
-                    format: 'date-time'
-                },
-                {
-                    type: 'null'
-                }
-            ],
-            title: 'Resolved Occurrence Start'
-        },
         venue_title: {
             anyOf: [
                 {
@@ -14343,62 +14331,11 @@ export const EventSeriesSummarySchema = {
             },
             type: 'array',
             title: 'Occurrences'
-        },
-        outside_schedule: {
-            items: {
-                '$ref': '#/components/schemas/EventSeriesUnscheduledRsvps'
-            },
-            type: 'array',
-            title: 'Outside Schedule'
         }
     },
     type: 'object',
-    required: ['series_id', 'series_title', 'timezone', 'window_start', 'window_end', 'occurrences', 'outside_schedule'],
+    required: ['series_id', 'series_title', 'timezone', 'window_start', 'window_end', 'occurrences'],
     title: 'EventSeriesSummary'
-} as const;
-
-export const EventSeriesUnscheduledRsvpsSchema = {
-    properties: {
-        event_id: {
-            type: 'string',
-            format: 'uuid',
-            title: 'Event Id'
-        },
-        occurrence_start: {
-            anyOf: [
-                {
-                    type: 'string',
-                    format: 'date-time'
-                },
-                {
-                    type: 'null'
-                }
-            ],
-            title: 'Occurrence Start'
-        },
-        title: {
-            type: 'string',
-            title: 'Title'
-        },
-        timezone: {
-            type: 'string',
-            title: 'Timezone'
-        },
-        attendee_count: {
-            type: 'integer',
-            title: 'Attendee Count'
-        },
-        participants: {
-            items: {
-                '$ref': '#/components/schemas/EventParticipantPublic'
-            },
-            type: 'array',
-            title: 'Participants'
-        }
-    },
-    type: 'object',
-    required: ['event_id', 'occurrence_start', 'title', 'timezone', 'attendee_count', 'participants'],
-    title: 'EventSeriesUnscheduledRsvps'
 } as const;
 
 export const EventSettingsCreateSchema = {

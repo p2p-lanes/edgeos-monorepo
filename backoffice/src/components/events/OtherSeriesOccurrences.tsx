@@ -6,11 +6,11 @@ import { useState } from "react"
 import {
   ApiError,
   type EventParticipantPublic,
-  EventParticipantsService,
   type EventPublic,
   type EventSeriesOccurrence,
   EventsService,
 } from "@/client"
+import { loadOccurrenceParticipants } from "@/components/events/occurrenceParticipants"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import {
@@ -66,34 +66,14 @@ function OccurrenceGroup({
     queryKey: [
       "event-participants",
       occurrence.event_id,
+      "occurrence",
       occurrence.occurrence_start,
-      "series-roster",
     ],
-    queryFn: async () => {
-      const request = {
-        eventId: occurrence.event_id,
-        occurrenceStart: occurrence.occurrence_start ?? undefined,
-      }
-      let page = await EventParticipantsService.listParticipants(request)
-      const results = [...page.results]
-      while (
-        page.paging &&
-        page.paging.total > page.paging.offset + page.results.length
-      ) {
-        page = await EventParticipantsService.listParticipants({
-          ...request,
-          skip: page.paging.offset + page.paging.limit,
-        })
-        results.push(...page.results)
-      }
-      return results
-        .filter((p) => p.status !== "cancelled")
-        .sort((a, b) =>
-          `${a.first_name ?? ""} ${a.last_name ?? ""}`.localeCompare(
-            `${b.first_name ?? ""} ${b.last_name ?? ""}`,
-          ),
-        )
-    },
+    queryFn: () =>
+      loadOccurrenceParticipants(
+        occurrence.event_id,
+        occurrence.occurrence_start,
+      ),
     enabled: occurrence.attendee_count > 0,
     retry: false,
   })
@@ -152,9 +132,11 @@ function OccurrenceGroup({
 
 export function OtherSeriesOccurrences({
   event,
+  occurrenceStart,
   formatRange,
 }: {
   event: EventPublic
+  occurrenceStart: string | null
   formatRange: FormatRange
 }) {
   const [open, setOpen] = useState(false)
@@ -165,7 +147,7 @@ export function OtherSeriesOccurrences({
     enabled: open,
     retry: false,
   })
-  const currentStart = event.resolved_occurrence_start
+  const currentStart = occurrenceStart
   const occurrences =
     data?.occurrences.filter(
       (row) =>
@@ -249,44 +231,6 @@ export function OtherSeriesOccurrences({
                 <p className="text-sm text-muted-foreground">
                   No other occurrences in this date range.
                 </p>
-              )}
-              {!!data.outside_schedule.length && (
-                <section className="space-y-2 rounded-lg border border-amber-500/40 p-3">
-                  <h4 className="text-sm font-semibold">
-                    RSVPs outside the current schedule
-                  </h4>
-                  <p className="text-xs text-muted-foreground">
-                    These registrations do not match a scheduled occurrence.
-                    They are shown separately and cannot be opened as a
-                    scheduled date.
-                  </p>
-                  {data.outside_schedule.map((group) => (
-                    <section
-                      key={`${group.event_id}:${group.occurrence_start ?? "legacy"}`}
-                      className="rounded-lg border"
-                    >
-                      <div className="flex items-center justify-between gap-2 p-3 text-sm">
-                        <h5>
-                          {group.title} ·{" "}
-                          {group.occurrence_start
-                            ? new Intl.DateTimeFormat("en-US", {
-                                timeZone: group.timezone,
-                                dateStyle: "medium",
-                                timeStyle: "short",
-                              }).format(new Date(group.occurrence_start))
-                            : "No occurrence date (legacy RSVP)"}
-                        </h5>
-                        <span className="shrink-0 text-xs text-muted-foreground">
-                          {group.attendee_count}{" "}
-                          {group.attendee_count === 1 ? "RSVP" : "RSVPs"}
-                        </span>
-                      </div>
-                      <div className="border-t px-3 py-2">
-                        <ParticipantNames participants={group.participants} />
-                      </div>
-                    </section>
-                  ))}
-                </section>
               )}
             </>
           )

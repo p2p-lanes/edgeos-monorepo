@@ -16,9 +16,6 @@ from app.api.event_participant.check_in import (
     resolve_occurrence_window,
     user_display_name,
 )
-from app.api.event_participant.presentation import (
-    participants_with_names as _participants_with_names,
-)
 from app.api.event_participant.schemas import (
     AttendanceEntry,
     AttendanceLookupResult,
@@ -56,6 +53,36 @@ from app.core.dependencies.users import (
 router = APIRouter(prefix="/event-participants", tags=["event-participants"])
 
 
+def _participants_with_names(db, participants: list) -> list[EventParticipantPublic]:
+    """Serialize participants, joining Humans to fill in first/last names.
+
+    Runs a single ``profile_id IN (...)`` query so the list endpoints remain
+    O(1) in DB round-trips regardless of how many participants an event has.
+    """
+    from sqlmodel import select
+
+    from app.api.event.models import Events
+    from app.api.human.models import Humans
+
+    if not participants:
+        return []
+    profile_ids = {p.profile_id for p in participants}
+    event_ids = {p.event_id for p in participants}
+    rows = db.exec(select(Humans).where(Humans.id.in_(profile_ids))).all()
+    events = db.exec(select(Events).where(Events.id.in_(event_ids))).all()
+    names = {h.id: (h.first_name, h.last_name) for h in rows}
+    popup_ids = {event.id: event.popup_id for event in events}
+    out: list[EventParticipantPublic] = []
+    for p in participants:
+        public = EventParticipantPublic.model_validate(p)
+        public.popup_id = popup_ids.get(p.event_id)
+        first, last = names.get(p.profile_id, (None, None))
+        public.first_name = first
+        public.last_name = last
+        out.append(public)
+    return out
+
+
 # ---------------------------------------------------------------------------
 # Backoffice endpoints (user token)
 # ---------------------------------------------------------------------------
@@ -65,29 +92,35 @@ router = APIRouter(prefix="/event-participants", tags=["event-participants"])
 async def list_participants(
     db: AdminOrApiKeySession_EventsRead,
     _: AdminOrApiKey_EventsRead,
+    token_payload: CallerToken,
     event_id: uuid.UUID | None = None,
     skip: PaginationSkip = 0,
     limit: PaginationLimit = 100,
     occurrence_start: datetime | None = None,
+    scope_to_occurrence: bool = False,
 ) -> ListModel[EventParticipantPublic]:
-    """List participants, optionally scoped to one recurring occurrence.
+    """Read participants for the backoffice, optionally scoped to one date.
 
-    Omitting occurrence_start preserves the backoffice's series-wide listing.
+    A timestamp selects that occurrence. scope_to_occurrence without a
+    timestamp selects NULL registrations (one-offs and detached children).
+    Requests without either option retain the existing series-wide listing.
     """
-    if occurrence_start is not None and event_id is None:
-        raise HTTPException(status_code=400, detail="event_id is required")
+    scoped = scope_to_occurrence or occurrence_start is not None
     host_id = None
-    if event_id:
+    if scoped:
+        if event_id is None:
+            raise HTTPException(400, "event_id is required for occurrence filtering")
+        if occurrence_start is not None:
+            if occurrence_start.tzinfo is None:
+                raise HTTPException(400, "occurrence_start must include a timezone")
+            occurrence_start = occurrence_start.astimezone(UTC)
         from app.api.event.crud import events_crud
-        from app.api.event.occurrence import resolve_detail_occurrence
 
         event = events_crud.get(db, event_id)
-        if event:
-            host_id = event.host_id
-        if occurrence_start is not None:
-            if not event:
-                raise HTTPException(status_code=404, detail="Event not found")
-            occurrence_start = resolve_detail_occurrence(event, occurrence_start)
+        if not event:
+            raise HTTPException(404, "Event not found")
+        ensure_api_key_popup(token_payload, event.popup_id)
+        host_id = event.host_id
     if event_id:
         participants, total = crud.event_participants_crud.find_by_event(
             db,
@@ -95,7 +128,7 @@ async def list_participants(
             skip=skip,
             limit=limit,
             occurrence_start=occurrence_start,
-            scope_to_occurrence=occurrence_start is not None,
+            scope_to_occurrence=scoped,
             exclude_profile_id=host_id,
         )
     else:
@@ -299,10 +332,6 @@ async def list_portal_participants(
     from app.services.event_visibility import ensure_event_visible_to_human
 
     ensure_event_visible_to_human(db, event, current_human)
-    if occurrence_start is not None:
-        from app.api.event.occurrence import resolve_detail_occurrence
-
-        occurrence_start = resolve_detail_occurrence(event, occurrence_start)
 
     participants, total = crud.event_participants_crud.find_by_event(
         db,
@@ -365,10 +394,6 @@ async def list_portal_attendee_emails(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Only the event's host or collaborators can view attendees",
         )
-    if occurrence_start is not None:
-        from app.api.event.occurrence import resolve_detail_occurrence
-
-        occurrence_start = resolve_detail_occurrence(event, occurrence_start)
 
     participants, _ = crud.event_participants_crud.find_by_event(
         db,
