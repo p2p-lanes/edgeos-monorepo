@@ -19040,6 +19040,24 @@ export const ListModel_PopupAdmin_Schema = {
     title: 'ListModel[PopupAdmin]'
 } as const;
 
+export const ListModel_PopupCheckInPublic_Schema = {
+    properties: {
+        results: {
+            items: {
+                '$ref': '#/components/schemas/PopupCheckInPublic'
+            },
+            type: 'array',
+            title: 'Results'
+        },
+        paging: {
+            '$ref': '#/components/schemas/Paging'
+        }
+    },
+    type: 'object',
+    required: ['results', 'paging'],
+    title: 'ListModel[PopupCheckInPublic]'
+} as const;
+
 export const ListModel_PopupReviewerPublic_Schema = {
     properties: {
         results: {
@@ -22460,6 +22478,93 @@ export const PopupAdminSchema = {
     required: ['name', 'slug', 'tenant_id', 'id'],
     title: 'PopupAdmin',
     description: 'Admin popup schema — all fields including sensitive ones.'
+} as const;
+
+export const PopupCheckInPublicSchema = {
+    properties: {
+        id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Id'
+        },
+        name: {
+            type: 'string',
+            title: 'Name'
+        },
+        tagline: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Tagline'
+        },
+        location: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Location'
+        },
+        slug: {
+            type: 'string',
+            title: 'Slug'
+        },
+        status: {
+            '$ref': '#/components/schemas/PopupStatus'
+        },
+        start_date: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Start Date'
+        },
+        end_date: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'End Date'
+        },
+        image_url: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Image Url'
+        },
+        self_check_in_enabled: {
+            type: 'boolean',
+            title: 'Self Check In Enabled',
+            default: false
+        }
+    },
+    type: 'object',
+    required: ['id', 'name', 'slug', 'status'],
+    title: 'PopupCheckInPublic',
+    description: 'Allowlisted operational data for scanners, independent of admin schemas.'
 } as const;
 
 export const PopupCreateSchema = {
