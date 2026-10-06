@@ -704,13 +704,15 @@ export default function EventDetailPage() {
 
       {/* Details card */}
       <div className="relative rounded-xl border bg-card p-4 space-y-3">
-        {/* Fixed-width slot: the "RSVP" button and the wider
-            "Going + Cancel RSVP" group both land inside it, so switching
-            states never reflows the card. The rows below reserve the
-            matching horizontal padding. */}
+        {/* From sm up this is a fixed-width slot: the "RSVP" button and the
+            wider "Going + Cancel RSVP" group both land inside it, so
+            switching states never reflows the card, and the rows below
+            reserve the matching horizontal padding. On phones the slot would
+            squeeze those rows to a sliver, so it sits in flow as its own row
+            at the top of the card instead. */}
         {event.status === "published" && !isEventHost && (
-          <div className="absolute top-3 right-3 w-48 sm:w-60">
-            <div className="flex flex-col items-end gap-1.5">
+          <div className="sm:absolute sm:top-3 sm:right-3 sm:w-60">
+            <div className="flex flex-col items-start gap-1.5 sm:items-end">
               {isRsvped ? (
                 // Attendance is recorded by scanning the organizer's QR
                 // (see events/[eventId]/check-in), never from a button here:
@@ -781,7 +783,7 @@ export default function EventDetailPage() {
             </div>
           </div>
         )}
-        <div className="flex items-center gap-2.5 pr-48 sm:pr-60">
+        <div className="flex items-center gap-2.5 sm:pr-60">
           <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
             <Clock className="h-4 w-4 text-primary" />
           </div>
@@ -807,7 +809,7 @@ export default function EventDetailPage() {
             event.host_display_name?.trim() || city?.name?.trim() || null
           if (!hostName) return null
           return (
-            <div className="flex items-center gap-2.5 pr-48 sm:pr-60">
+            <div className="flex items-center gap-2.5 sm:pr-60">
               <div className="h-8 w-8 rounded-lg bg-amber-500/10 flex items-center justify-center shrink-0">
                 <User className="h-4 w-4 text-amber-600" />
               </div>
@@ -821,7 +823,7 @@ export default function EventDetailPage() {
           )
         })()}
         {event.rrule && (
-          <div className="flex items-center gap-2.5 pr-48 sm:pr-60">
+          <div className="flex items-center gap-2.5 sm:pr-60">
             <div className="h-8 w-8 rounded-lg bg-blue-500/10 flex items-center justify-center shrink-0">
               <Repeat className="h-4 w-4 text-blue-600" />
             </div>

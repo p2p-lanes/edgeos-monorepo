@@ -158,14 +158,17 @@ const HeaderBar = () => {
   return (
     <header
       className={cn(
-        "portal-chrome flex h-14 shrink-0 items-center gap-4 border-b bg-sidebar/95 px-6 text-nav-text backdrop-blur transition-[height,transform] duration-300 ease-out",
+        "portal-chrome flex h-14 shrink-0 items-center gap-2 border-b bg-sidebar/95 px-3 text-nav-text sm:gap-4 sm:px-6 backdrop-blur transition-[height,transform] duration-300 ease-out",
         hidden && "h-0 -translate-y-full overflow-hidden border-b-0",
       )}
     >
       <SidebarTrigger />
-      <Breadcrumb>
-        <BreadcrumbList>
-          <BreadcrumbItem>
+      {/* Below md only the current page shows (truncated) so the trail never
+          wraps out of the fixed-height header; the sidebar and the page's own
+          back link cover navigation up the tree. */}
+      <Breadcrumb className="min-w-0 flex-1">
+        <BreadcrumbList className="flex-nowrap">
+          <BreadcrumbItem className="hidden shrink-0 md:inline-flex">
             <BreadcrumbLink asChild>
               <button type="button" onClick={handleClickCity}>
                 {city?.name}
@@ -181,13 +184,16 @@ const HeaderBar = () => {
                 : undefined
             return (
               <Fragment key={path}>
-                <BreadcrumbSeparator>
+                <BreadcrumbSeparator className="hidden shrink-0 md:block">
                   <ChevronRight className="h-4 w-4" />
                 </BreadcrumbSeparator>
                 <BreadcrumbSegment
                   path={path}
                   href={href}
                   isCurrent={isCurrent}
+                  className={
+                    isCurrent ? "min-w-0" : "hidden shrink-0 md:inline-flex"
+                  }
                   isLoading={isLoading}
                   nameMapping={nameMapping}
                 />
@@ -196,7 +202,7 @@ const HeaderBar = () => {
           })}
         </BreadcrumbList>
       </Breadcrumb>
-      <div className="ml-auto flex items-center gap-2">
+      <div className="ml-auto flex shrink-0 items-center gap-2">
         <MobilePopupSwitcher />
         <CartBadge />
         <LanguageSwitcher portalContentClassName="portal-chrome" />
