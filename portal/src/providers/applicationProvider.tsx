@@ -21,6 +21,8 @@ import { useCityProvider } from "./cityProvider"
 interface ApplicationContextProps {
   applications: ApplicationPortalPublic[] | null
   participation: ApplicationsGetMyParticipationResponse | null
+  applicationsLoading: boolean
+  participationLoading: boolean
   /**
    * The application on screen.
    *
@@ -43,13 +45,13 @@ export const ApplicationContext = createContext<ApplicationContextProps | null>(
 )
 
 const ApplicationProvider = ({ children }: { children: ReactNode }) => {
-  const { data: applications = null } = useApplicationsQuery()
+  const { data: applications = null, isPending: applicationsLoading } =
+    useApplicationsQuery()
   const { getCity } = useCityProvider()
   const queryClient = useQueryClient()
   const city = getCity()
-  const { data: participation = null } = useParticipationQuery(
-    city?.id ? String(city.id) : null,
-  )
+  const { data: participation = null, isPending: participationLoading } =
+    useParticipationQuery(city?.id ? String(city.id) : null)
 
   const updateApplication = useCallback(
     (application: ApplicationPortalPublic): void => {
@@ -112,6 +114,8 @@ const ApplicationProvider = ({ children }: { children: ReactNode }) => {
     () => ({
       applications,
       participation,
+      applicationsLoading,
+      participationLoading,
       getRelevantApplication,
       getApplicationsForPopup,
       getAttendees,
@@ -120,6 +124,8 @@ const ApplicationProvider = ({ children }: { children: ReactNode }) => {
     [
       applications,
       participation,
+      applicationsLoading,
+      participationLoading,
       getRelevantApplication,
       getApplicationsForPopup,
       getAttendees,

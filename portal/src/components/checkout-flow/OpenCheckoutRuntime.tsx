@@ -242,6 +242,8 @@ export function OpenCheckoutRuntime({
             // accessor answers empty rather than guessing.
             applications: null,
             participation: null,
+            applicationsLoading: false,
+            participationLoading: false,
             getRelevantApplication: () => null,
             getApplicationsForPopup: () => [],
             getAttendees: () => [],
