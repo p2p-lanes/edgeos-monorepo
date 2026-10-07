@@ -61,4 +61,21 @@ describe("EventsApiAccessGate", () => {
       screen.getByText("events.api_access.unavailable_heading"),
     ).toBeTruthy()
   })
+
+  it("allows a ticket holder in a direct-sale popup to use Agentic access", () => {
+    mocks.city = {
+      id: "popup-1",
+      takes_applications: false,
+      events_enabled: true,
+    }
+    mocks.access = { state: "allowed" }
+
+    render(
+      <EventsApiAccessGate>
+        <div>agentic-access-content</div>
+      </EventsApiAccessGate>,
+    )
+
+    expect(screen.getByText("agentic-access-content")).toBeTruthy()
+  })
 })
