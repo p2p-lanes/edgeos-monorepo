@@ -514,6 +514,7 @@ describe("Passes page", () => {
   })
 
   it("uses the popup primary flow for a backoffice-granted ticket without an application", () => {
+    mocks.access = { state: "allowed", source: "attendee" }
     mocks.applications = []
     mocks.applicationFlows = [attendeeFlow]
     mocks.primaryFlowSlug = attendeeFlow.slug

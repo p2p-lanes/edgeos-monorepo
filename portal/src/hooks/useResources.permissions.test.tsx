@@ -172,6 +172,23 @@ describe("useResources permission readiness", () => {
     expect(directoryStatus(result.current.resources)).toBeUndefined()
   })
 
+  it("shows Agentic access to a ticket holder when nobody applies", () => {
+    state.city!.takes_applications = false
+    state.access = "allowed"
+
+    const { result } = renderHook(() => useResources())
+    const events = result.current.resources.find(
+      (resource) => resource.name === "sidebar.events",
+    )
+
+    expect(events?.status).toBe("active")
+    expect(
+      events?.children?.find(
+        (resource) => resource.path === "/portal/agentic-access",
+      )?.status,
+    ).toBe("active")
+  })
+
   it("waits for the existing access query when the popup has ended", () => {
     state.city!.status = "ended"
     state.access = "loading"

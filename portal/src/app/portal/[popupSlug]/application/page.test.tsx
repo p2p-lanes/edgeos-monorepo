@@ -20,6 +20,13 @@ const mocks = vi.hoisted(() => ({
   portalFlows: undefined as
     | Array<{ id: string; slug: string; name: string }>
     | undefined,
+  primaryFlowSlug: null as string | null,
+  popupAccess: { state: "denied" } as
+    | {
+        state: "allowed"
+        source: "application" | "attendee" | "payment" | "companion"
+      }
+    | { state: "denied" | "loading" },
   flowState: {
     isPending: false,
     isFetching: false,
@@ -82,6 +89,18 @@ vi.mock("@/hooks/usePortalSalesFlows", () => ({
   usePortalSalesFlows: () => ({ data: mocks.portalFlows, ...mocks.flowState }),
 }))
 
+vi.mock("@/hooks/usePortalPrimarySalesFlow", () => ({
+  usePortalPrimarySalesFlow: () => ({
+    data: mocks.primaryFlowSlug
+      ? { flow_slug: mocks.primaryFlowSlug }
+      : undefined,
+  }),
+}))
+
+vi.mock("@/hooks/useHumanPopupAccess", () => ({
+  useHumanPopupAccess: () => mocks.popupAccess,
+}))
+
 vi.mock("@/hooks/useApplicationSchema", () => ({
   useApplicationSchema: (popupId: string, flowId: string | null) => {
     mocks.schemaHook(popupId, flowId)
@@ -129,6 +148,8 @@ describe("application flow routing", () => {
     mocks.flowIdentifier = "flow-a"
     mocks.checkoutSuccess = false
     mocks.portalFlows = MULTI_FLOWS
+    mocks.primaryFlowSlug = null
+    mocks.popupAccess = { state: "denied" }
     mocks.applicationsQueryState = {
       isPending: false,
       isFetching: false,
@@ -219,6 +240,23 @@ describe("application flow routing", () => {
     expect(mocks.schemaHook).toHaveBeenCalledWith("popup-1", "flow-a")
     expect(mocks.dynamicForm).toHaveBeenCalledWith(
       expect.objectContaining({ salesFlowId: "flow-a" }),
+    )
+  })
+
+  it("returns a ticket holder without an application to passes instead of showing a new application form", async () => {
+    mocks.applications = []
+    mocks.getRelevantApplication.mockReturnValue(null)
+    mocks.primaryFlowSlug = "attendee"
+    mocks.popupAccess = { state: "allowed", source: "attendee" }
+
+    render(<FormPage />)
+
+    expect(screen.getByTestId("loader")).toBeTruthy()
+    expect(screen.queryByTestId("application-form")).toBeNull()
+    await waitFor(() =>
+      expect(mocks.replace).toHaveBeenCalledWith(
+        "/portal/gathering/passes?flow=flow-a",
+      ),
     )
   })
 

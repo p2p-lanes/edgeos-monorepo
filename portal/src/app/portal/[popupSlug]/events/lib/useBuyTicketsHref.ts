@@ -1,6 +1,8 @@
 "use client"
 
+import { useHumanPopupAccess } from "@/hooks/useHumanPopupAccess"
 import { usePortalDirectSalesFlows } from "@/hooks/usePortalDirectSalesFlows"
+import { usePortalPrimarySalesFlow } from "@/hooks/usePortalPrimarySalesFlow"
 import { usePortalSalesFlows } from "@/hooks/usePortalSalesFlows"
 import { usePortalUpsaleFlows } from "@/hooks/usePortalUpsaleFlows"
 import {
@@ -46,10 +48,15 @@ export function useBuyTicketsHref(): string | null {
 
   const city = getCity()
   const popupId = city?.id ? String(city.id) : undefined
+  const popupAccess = useHumanPopupAccess(popupId)
+  const hasTicketAccess =
+    popupAccess.state === "allowed" &&
+    (popupAccess.source === "attendee" || popupAccess.source === "payment")
 
   const applicationFlows = usePortalSalesFlows(popupId).data ?? []
   const directFlows = usePortalDirectSalesFlows(popupId).data ?? []
   const upsaleFlows = usePortalUpsaleFlows(popupId).data ?? []
+  const primaryFlowSlug = usePortalPrimarySalesFlow(city?.slug).data?.flow_slug
 
   const applications = getApplicationsForPopup()
   const approvedApplicationFlowIds = new Set<string>(
@@ -65,6 +72,7 @@ export function useBuyTicketsHref(): string | null {
     direct: directFlows,
     upsale: upsaleFlows,
     approvedApplicationFlowIds,
+    primaryFlowSlug: hasTicketAccess ? primaryFlowSlug : null,
   })
   const eligibleFlowIds = new Set(eligibleFlows.map((flow) => flow.id))
 
@@ -81,6 +89,10 @@ export function useBuyTicketsHref(): string | null {
     eligibleDirectFlows: directFlows.filter((flow) =>
       eligibleFlowIds.has(flow.id),
     ),
+    primaryFlowId: hasTicketAccess
+      ? (eligibleFlows.find((flow) => flow.slug === primaryFlowSlug)?.id ??
+        null)
+      : null,
   })
 
   return buildBuyTicketsHref(city?.slug, flowSlug)
