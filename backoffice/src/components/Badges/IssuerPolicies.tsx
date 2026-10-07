@@ -57,7 +57,10 @@ const AUDIENCE_LABELS: Record<BadgeAudienceType, string> = {
 const EMAIL_SHAPE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/
 
 /** Emails pasted as a list: any mix of commas, semicolons, spaces, lines. */
-function parseEmails(text: string): { valid: string[]; invalid: string[] } {
+export function parseEmails(text: string): {
+  valid: string[]
+  invalid: string[]
+} {
   const valid = new Set<string>()
   const invalid = new Set<string>()
   for (const token of text.split(/[\s,;]+/)) {
@@ -385,8 +388,14 @@ function PolicyDialog({
                   <SelectItem value="__any__">Any gathering</SelectItem>
                 )}
                 {(popups?.results ?? []).map((p) => (
-                  <SelectItem key={p.id} value={p.id}>
+                  <SelectItem
+                    key={p.id}
+                    value={p.id}
+                    // Nobody can give badges there; a saved choice stays.
+                    disabled={!p.badges_enabled && p.id !== source?.popup_id}
+                  >
                     {p.name}
+                    {!p.badges_enabled && " (badges off)"}
                   </SelectItem>
                 ))}
               </SelectContent>

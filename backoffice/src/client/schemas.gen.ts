@@ -7785,6 +7785,84 @@ export const BadgeAwardRevokeSchema = {
     title: 'BadgeAwardRevoke'
 } as const;
 
+export const BadgeBulkAwardCreateSchema = {
+    properties: {
+        recipient_human_ids: {
+            items: {
+                type: 'string',
+                format: 'uuid'
+            },
+            type: 'array',
+            maxItems: 500,
+            title: 'Recipient Human Ids'
+        },
+        recipient_emails: {
+            items: {
+                type: 'string'
+            },
+            type: 'array',
+            maxItems: 500,
+            title: 'Recipient Emails'
+        },
+        popup_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Popup Id'
+        },
+        message: {
+            anyOf: [
+                {
+                    type: 'string',
+                    maxLength: 2000
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Message'
+        }
+    },
+    type: 'object',
+    title: 'BadgeBulkAwardCreate',
+    description: 'Give a badge to many people at once, by id and/or by email.'
+} as const;
+
+export const BadgeBulkAwardResultSchema = {
+    properties: {
+        awarded: {
+            items: {
+                '$ref': '#/components/schemas/BadgeAwardPublic'
+            },
+            type: 'array',
+            title: 'Awarded'
+        },
+        already_had: {
+            items: {
+                '$ref': '#/components/schemas/BadgeAwardRecipient'
+            },
+            type: 'array',
+            title: 'Already Had'
+        },
+        unknown_emails: {
+            items: {
+                type: 'string'
+            },
+            type: 'array',
+            title: 'Unknown Emails'
+        }
+    },
+    type: 'object',
+    required: ['awarded', 'already_had', 'unknown_emails'],
+    title: 'BadgeBulkAwardResult'
+} as const;
+
 export const BadgeCreateSchema = {
     properties: {
         name: {
@@ -20751,6 +20829,24 @@ export const ListModel_PopupAdmin_Schema = {
     title: 'ListModel[PopupAdmin]'
 } as const;
 
+export const ListModel_PopupCheckInPublic_Schema = {
+    properties: {
+        results: {
+            items: {
+                '$ref': '#/components/schemas/PopupCheckInPublic'
+            },
+            type: 'array',
+            title: 'Results'
+        },
+        paging: {
+            '$ref': '#/components/schemas/Paging'
+        }
+    },
+    type: 'object',
+    required: ['results', 'paging'],
+    title: 'ListModel[PopupCheckInPublic]'
+} as const;
+
 export const ListModel_PopupReviewerPublic_Schema = {
     properties: {
         results: {
@@ -24058,6 +24154,11 @@ export const PopupAdminSchema = {
             title: 'Show Attendee Directory',
             default: false
         },
+        badges_enabled: {
+            type: 'boolean',
+            title: 'Badges Enabled',
+            default: false
+        },
         edit_passes_enabled: {
             type: 'boolean',
             title: 'Edit Passes Enabled',
@@ -24246,6 +24347,93 @@ export const PopupAdminSchema = {
     required: ['name', 'slug', 'tenant_id', 'id'],
     title: 'PopupAdmin',
     description: 'Admin popup schema — all fields including sensitive ones.'
+} as const;
+
+export const PopupCheckInPublicSchema = {
+    properties: {
+        id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Id'
+        },
+        name: {
+            type: 'string',
+            title: 'Name'
+        },
+        tagline: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Tagline'
+        },
+        location: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Location'
+        },
+        slug: {
+            type: 'string',
+            title: 'Slug'
+        },
+        status: {
+            '$ref': '#/components/schemas/PopupStatus'
+        },
+        start_date: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Start Date'
+        },
+        end_date: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'End Date'
+        },
+        image_url: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Image Url'
+        },
+        self_check_in_enabled: {
+            type: 'boolean',
+            title: 'Self Check In Enabled',
+            default: false
+        }
+    },
+    type: 'object',
+    required: ['id', 'name', 'slug', 'status'],
+    title: 'PopupCheckInPublic',
+    description: 'Allowlisted operational data for scanners, independent of admin schemas.'
 } as const;
 
 export const PopupCreateSchema = {
@@ -24676,6 +24864,11 @@ export const PopupCreateSchema = {
         show_attendee_directory: {
             type: 'boolean',
             title: 'Show Attendee Directory',
+            default: false
+        },
+        badges_enabled: {
+            type: 'boolean',
+            title: 'Badges Enabled',
             default: false
         },
         edit_passes_enabled: {
@@ -25278,6 +25471,11 @@ export const PopupPublicSchema = {
         show_attendee_directory: {
             type: 'boolean',
             title: 'Show Attendee Directory',
+            default: false
+        },
+        badges_enabled: {
+            type: 'boolean',
+            title: 'Badges Enabled',
             default: false
         },
         edit_passes_enabled: {
@@ -26025,6 +26223,17 @@ export const PopupUpdateSchema = {
                 }
             ],
             title: 'Show Attendee Directory'
+        },
+        badges_enabled: {
+            anyOf: [
+                {
+                    type: 'boolean'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Badges Enabled'
         },
         edit_passes_enabled: {
             anyOf: [

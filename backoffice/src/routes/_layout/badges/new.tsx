@@ -2,6 +2,7 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router"
 import { useEffect } from "react"
 
 import { BadgeForm } from "@/components/Badges/BadgeForm"
+import { BadgesOffNotice } from "@/components/Badges/BadgesOffNotice"
 import { FormPageLayout } from "@/components/Common/FormPageLayout"
 import useAuth from "@/hooks/useAuth"
 import { useGoBack } from "@/hooks/useGoBack"
@@ -34,7 +35,10 @@ function NewBadge() {
       description="Add a badge to your collection"
       backTo="/badges"
     >
-      <BadgeForm onSuccess={goBack} />
+      <div className="space-y-6">
+        <BadgesOffNotice className="mx-auto max-w-2xl" />
+        <BadgeForm onSuccess={goBack} />
+      </div>
     </FormPageLayout>
   )
 }

@@ -108,7 +108,10 @@ def style(client: TestClient, headers) -> dict:
 @pytest.fixture(scope="module")
 def popup(db: Session, tenant: Tenants) -> Popups:
     popup = Popups(
-        tenant_id=tenant.id, name="Peer fest", slug=f"peer-{uuid.uuid4().hex[:8]}"
+        tenant_id=tenant.id,
+        name="Peer fest",
+        slug=f"peer-{uuid.uuid4().hex[:8]}",
+        badges_enabled=True,
     )
     db.add(popup)
     db.commit()
@@ -272,6 +275,66 @@ def test_policy_crud(client: TestClient, headers, style, person, popup):
         client.delete(f"{POLICIES}/{policy['id']}", headers=headers).status_code == 204
     )
     assert client.get(f"{POLICIES}/{policy['id']}", headers=headers).status_code == 404
+
+
+def test_popup_with_badges_off_shows_and_takes_nothing(
+    client: TestClient, headers, style, person, popup
+):
+    badge = _badge(client, headers, style, name="Off star")
+    sender, recipient = person("Sol"), person("Rio")
+    policy = _policy(
+        client,
+        headers,
+        name="Attendees",
+        audience_type="popup_attendees",
+        popup_id=str(popup.id),
+        badge_ids=[badge["id"]],
+    )
+    resp = client.patch(
+        f"/api/v1/popups/{popup.id}", json={"badges_enabled": False}, headers=headers
+    )
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["badges_enabled"] is False
+    try:
+        issuable = client.get(
+            f"{BADGES}/portal/issuable",
+            params={"popup_id": str(popup.id)},
+            headers=sender.headers,
+        )
+        assert issuable.status_code == 200
+        assert issuable.json() == []
+        assert _send(client, sender, recipient, badge, popup).status_code == 403
+
+        # Nothing new can point at it, but what already does stays editable.
+        refused = client.post(
+            POLICIES,
+            json={
+                "name": "Late",
+                "audience_type": "popup_attendees",
+                "popup_id": str(popup.id),
+                "badge_ids": [badge["id"]],
+            },
+            headers=headers,
+        )
+        assert refused.status_code == 409
+        renamed = client.patch(
+            f"{POLICIES}/{policy['id']}", json={"name": "Renamed"}, headers=headers
+        )
+        assert renamed.status_code == 200, renamed.text
+        award = client.post(
+            f"{BADGES}/{badge['id']}/awards",
+            json={
+                "recipient_human_id": str(recipient.human.id),
+                "popup_id": str(popup.id),
+            },
+            headers=headers,
+        )
+        assert award.status_code == 409
+    finally:
+        # The popup is shared by this module's tests.
+        client.patch(
+            f"/api/v1/popups/{popup.id}", json={"badges_enabled": True}, headers=headers
+        )
 
 
 # ---------------------------------------------------------------------------

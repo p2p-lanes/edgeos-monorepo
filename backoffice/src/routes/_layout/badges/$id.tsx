@@ -5,18 +5,21 @@ import {
   useSuspenseQuery,
 } from "@tanstack/react-query"
 import { createFileRoute, useNavigate } from "@tanstack/react-router"
-import { ArchiveRestore } from "lucide-react"
-import { Suspense } from "react"
+import { ArchiveRestore, Plus } from "lucide-react"
+import { Suspense, useState } from "react"
 
 import { BadgesService } from "@/client"
 import { BadgeAwardsList } from "@/components/Badges/BadgeAwardsList"
 import { BadgeForm } from "@/components/Badges/BadgeForm"
 import { BadgeRulesCard } from "@/components/Badges/BadgeRules"
+import { BadgesOffNotice } from "@/components/Badges/BadgesOffNotice"
+import { GiveBadgeDialog } from "@/components/Badges/GiveBadgeDialog"
 import { IssuerPoliciesCard } from "@/components/Badges/IssuerPolicies"
 import { DangerZone } from "@/components/Common/DangerZone"
 import { FormPageLayout } from "@/components/Common/FormPageLayout"
 import { QueryErrorBoundary } from "@/components/Common/QueryErrorBoundary"
 import { Alert, AlertDescription } from "@/components/ui/alert"
+import { Button } from "@/components/ui/button"
 import {
   Card,
   CardContent,
@@ -45,7 +48,14 @@ function getBadgeQueryOptions(badgeId: string) {
   }
 }
 
-function Recipients({ badgeId }: { badgeId: string }) {
+function Recipients({
+  badgeId,
+  canGive,
+}: {
+  badgeId: string
+  canGive: boolean
+}) {
+  const [giving, setGiving] = useState(false)
   const { data } = useQuery({
     queryKey: ["badge-awards", { badgeId }],
     queryFn: () => BadgesService.listBadgeAwards({ badgeId, limit: 200 }),
@@ -54,11 +64,26 @@ function Recipients({ badgeId }: { badgeId: string }) {
 
   return (
     <Card className="mx-auto max-w-2xl">
-      <CardHeader>
-        <CardTitle>Recipients</CardTitle>
-        <CardDescription>
-          Give this badge from a person's page in Humans.
-        </CardDescription>
+      <CardHeader className="flex flex-row items-start justify-between gap-4 space-y-0">
+        <div className="space-y-1.5">
+          <CardTitle>Recipients</CardTitle>
+          <CardDescription>
+            Who has it. You can also give it from a person's page in Humans.
+          </CardDescription>
+        </div>
+        {canGive && (
+          <>
+            <Button size="sm" onClick={() => setGiving(true)}>
+              <Plus className="h-4 w-4" />
+              Give badge
+            </Button>
+            <GiveBadgeDialog
+              badgeId={badgeId}
+              open={giving}
+              onOpenChange={setGiving}
+            />
+          </>
+        )}
       </CardHeader>
       <CardContent>
         {awards.length === 0 ? (
@@ -104,6 +129,7 @@ function BadgeDetailContent({ badgeId }: { badgeId: string }) {
 
   return (
     <div className="space-y-6">
+      <BadgesOffNotice className="mx-auto max-w-2xl" />
       {badge.archived_at && (
         <Alert className="mx-auto max-w-2xl">
           <AlertDescription className="flex flex-wrap items-center justify-between gap-2">
@@ -133,7 +159,10 @@ function BadgeDetailContent({ badgeId }: { badgeId: string }) {
 
       <BadgeRulesCard badgeId={badgeId} />
 
-      <Recipients badgeId={badgeId} />
+      <Recipients
+        badgeId={badgeId}
+        canGive={isOperatorOrAbove && !badge.archived_at}
+      />
 
       {isOperatorOrAbove && !badge.archived_at && (
         <div className="mx-auto max-w-2xl">

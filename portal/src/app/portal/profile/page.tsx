@@ -11,6 +11,7 @@ import { Card } from "@/components/ui/card"
 import { Loader } from "@/components/ui/Loader"
 import useGetProfile from "@/hooks/useGetProfile"
 import useGetProfileStats from "@/hooks/useGetProfileStats"
+import { useCityProvider } from "@/providers/cityProvider"
 
 export default function ProfileContent() {
   const { t } = useTranslation()
@@ -24,6 +25,8 @@ export default function ProfileContent() {
     refresh,
   } = useGetProfile()
   const { stats, isLoading: isStatsLoading } = useGetProfileStats()
+  // Badges (and the public link that shows them) follow the popup in use.
+  const badgesEnabled = useCityProvider().getCity()?.badges_enabled ?? false
   const [userData, setUserData] = useState(profile)
   const [isEditing, setIsEditing] = useState(false)
   const [editForm, setEditForm] = useState({
@@ -137,7 +140,7 @@ export default function ProfileContent() {
 
           <StatsCards stats={stats} isLoading={isStatsLoading} />
 
-          <BadgesSection />
+          {badgesEnabled && <BadgesSection />}
 
           <PopupsHistory popups={stats?.popups ?? []} />
         </div>
