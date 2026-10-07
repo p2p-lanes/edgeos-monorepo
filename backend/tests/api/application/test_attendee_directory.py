@@ -485,15 +485,15 @@ def test_unlinked_attendee_entry_uses_identity_snapshot(
     assert entry.email == "taylor@example.com"
 
 
-def test_directory_excludes_non_accepted_application(
+def test_directory_excludes_pending_application_without_ticket(
     db: Session, tenant_a: Tenants
 ) -> None:
-    """A ticket-holding attendee under a non-accepted application is hidden."""
+    """An attendee without a ticket is hidden, even if they applied."""
     popup = _popup(db, tenant_a)
     main = _category(db, popup, "main", is_primary=True)
     human = _human(db, tenant_a, "Pending", "Person")
     app = _application(db, popup, human, status=ApplicationStatus.IN_REVIEW.value)
-    _attendee(db, popup, app, human, main, tickets=1)
+    _attendee(db, popup, app, human, main, tickets=0)
     results, total = applications_crud.find_directory(db, popup_id=popup.id)
     assert total == 0
     assert results == []
