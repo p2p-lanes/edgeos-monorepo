@@ -14,6 +14,7 @@ import { Loader } from "@/components/ui/Loader"
 import { useGatheringDoors } from "@/hooks/useGatheringDoors"
 import { useHumanPopupAccess } from "@/hooks/useHumanPopupAccess"
 import { usePortalDirectSalesFlows } from "@/hooks/usePortalDirectSalesFlows"
+import { usePortalPrimarySalesFlow } from "@/hooks/usePortalPrimarySalesFlow"
 import { useApplication } from "@/providers/applicationProvider"
 import { useCityProvider } from "@/providers/cityProvider"
 
@@ -27,8 +28,10 @@ export default function DefaultPopupHome() {
     : null
   const city = getCity()
   const access = useHumanPopupAccess(city?.id)
-  const hasAssignedTickets =
-    access.state === "allowed" && access.source === "attendee"
+  const primaryFlowQuery = usePortalPrimarySalesFlow(city?.slug)
+  const hasTicketAccess =
+    access.state === "allowed" &&
+    (access.source === "attendee" || access.source === "payment")
   const {
     doors,
     isLoading: doorsLoading,
@@ -47,8 +50,8 @@ export default function DefaultPopupHome() {
   const nobodyApplies = city?.takes_applications === false
   const listedDirectFlow = directFlowsQuery.data?.[0]
 
-  if (!nobodyApplies && !hasAssignedTickets && doorsLoading) return <Loader />
-  if (!nobodyApplies && !hasAssignedTickets && doorsError)
+  if (!nobodyApplies && !hasTicketAccess && doorsLoading) return <Loader />
+  if (!nobodyApplies && !hasTicketAccess && doorsError)
     return <ApplicationUnavailable />
 
   // One relationship is unambiguous, so nothing has to be named and the
@@ -95,7 +98,7 @@ export default function DefaultPopupHome() {
               <EventCard.Tagline />
               <EventCard.Location />
               <EventCard.DateRange />
-              {hasAssignedTickets && (
+              {hasTicketAccess && (
                 <EventCard.ApplyButton
                   onClick={() => router.push(`/portal/${city.slug}/passes`)}
                   labelKey="cta.accepted"
@@ -104,14 +107,24 @@ export default function DefaultPopupHome() {
             </EventCard.Content>
           </EventCard>
           <div className="grid gap-4 sm:grid-cols-2">
-            {doors.map((door) => (
-              <GatheringDoorCard
-                key={door.flowId}
-                door={door}
-                popupSlug={city.slug}
-                showName
-              />
-            ))}
+            {doors.map((door) => {
+              const ticketGrantedPrimaryDoor =
+                hasTicketAccess &&
+                !door.application &&
+                door.slug === primaryFlowQuery.data?.flow_slug
+              return (
+                <GatheringDoorCard
+                  key={door.flowId}
+                  door={
+                    ticketGrantedPrimaryDoor
+                      ? { ...door, status: "accepted" as const }
+                      : door
+                  }
+                  popupSlug={city.slug}
+                  showName
+                />
+              )
+            })}
           </div>
         </div>
       </section>
@@ -120,10 +133,12 @@ export default function DefaultPopupHome() {
 
   const status: EventStatus = nobodyApplies
     ? "not_started"
-    : ((relevantApplication?.status as EventStatus) ?? "not_started")
+    : hasTicketAccess
+      ? "accepted"
+      : ((relevantApplication?.status as EventStatus) ?? "not_started")
 
   const onClickApply = () => {
-    if (hasAssignedTickets) {
+    if (hasTicketAccess) {
       router.push(`/portal/${city.slug}/passes`)
       return
     }
@@ -151,7 +166,7 @@ export default function DefaultPopupHome() {
             <EventCard.Tagline />
             <EventCard.Location />
             <EventCard.DateRange />
-            {!nobodyApplies && (!hasAssignedTickets || relevantApplication) && (
+            {!nobodyApplies && (!hasTicketAccess || relevantApplication) && (
               <EventCard.Progress />
             )}
             {!nobodyApplies && relevantApplication && (
@@ -160,13 +175,13 @@ export default function DefaultPopupHome() {
                 popup={city}
               />
             )}
-            {(hasAssignedTickets ||
+            {(hasTicketAccess ||
               (city.status !== "ended" &&
                 (!nobodyApplies || listedDirectFlow))) && (
               <EventCard.ApplyButton
                 onClick={onClickApply}
                 labelKey={
-                  hasAssignedTickets
+                  hasTicketAccess
                     ? "cta.accepted"
                     : nobodyApplies
                       ? "cta.buy_tickets"

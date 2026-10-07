@@ -40,6 +40,9 @@ export default function HomePasses() {
   const city = getCity()
   const popupId = city?.id ? String(city.id) : undefined
   const access = useHumanPopupAccess(popupId ?? null)
+  const hasTicketAccess =
+    access.state === "allowed" &&
+    (access.source === "attendee" || access.source === "payment")
   const nobodyApplies = city?.takes_applications === false
   const attendeesQuery = useHumanAttendeesQuery(popupId ?? null)
   const paymentsQuery = useHumanPaymentsQuery(popupId, { limit: 100 })
@@ -64,7 +67,7 @@ export default function HomePasses() {
     direct: directFlows,
     upsale: upsaleFlows,
     approvedApplicationFlowIds,
-    primaryFlowSlug,
+    primaryFlowSlug: hasTicketAccess ? primaryFlowSlug : null,
   })
   const eligibleFlowIds = new Set(eligibleFlows.map((flow) => flow.id))
   const eligibleApplicationFlows = applicationFlows.filter((flow) =>

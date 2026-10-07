@@ -4,7 +4,12 @@ import { beforeEach, describe, expect, it, vi } from "vitest"
 import HomePasses from "./page"
 
 const mocks = vi.hoisted(() => ({
-  access: { state: "allowed" } as { state: "loading" | "denied" | "allowed" },
+  access: { state: "allowed" } as
+    | {
+        state: "allowed"
+        source?: "application" | "attendee" | "payment" | "companion"
+      }
+    | { state: "loading" | "denied" },
   applications: [] as Array<{
     id: string
     sales_flow_id: string
@@ -514,6 +519,7 @@ describe("Passes page", () => {
   })
 
   it("uses the popup primary flow for a backoffice-granted ticket without an application", () => {
+    mocks.access = { state: "allowed", source: "attendee" }
     mocks.applications = []
     mocks.applicationFlows = [attendeeFlow]
     mocks.primaryFlowSlug = attendeeFlow.slug
