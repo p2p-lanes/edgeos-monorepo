@@ -37,6 +37,15 @@ export interface TemplateSection {
   description?: string
 }
 
+export function getBuyerPurchasedProductIds(
+  attendees: CheckoutRecipientPassState[],
+): Set<string> {
+  const buyer = attendees.find((attendee) => attendee.recipient?.human_id)
+  return new Set(
+    buyer?.products.filter((product) => product.purchased).map((p) => p.id),
+  )
+}
+
 // ---------------------------------------------------------------------------
 // parseSections
 // ---------------------------------------------------------------------------
@@ -59,23 +68,65 @@ export function parseSections(
 
 /**
  * True when the section's visible_if condition matches the application's form
- * answers. No visible_if -> always visible. Missing or null customFields ->
- * visible (open-ticketing fallback: the form hasn't been answered yet, treat
- * as no-gate). An application that never answered the gating field also passes:
- * hiding every gated section would leave the attendee unable to buy those
- * passes at all.
+ * answers. No visible_if -> always visible. Missing or null customFields keep
+ * the open-ticketing fallback unless the caller identifies a ticket grant with
+ * no application; then only a gated section containing a product already owned
+ * by the buyer can establish the correct segment.
  */
 export function isSectionVisibleForApp(
   section: TemplateSection,
   customFields: Record<string, unknown> | null | undefined,
+  fallback?: {
+    applicationExists: boolean
+    purchasedProductIds?: ReadonlySet<string>
+    hasTicketSegmentEvidence?: boolean
+  },
 ): boolean {
   const cond = section.visible_if
   if (!cond?.field_id) return true
-  if (!customFields) return true
+  const wasPurchased =
+    fallback?.purchasedProductIds?.size &&
+    section.product_ids.some((productId) =>
+      fallback.purchasedProductIds?.has(productId),
+    )
+  if (!customFields) {
+    if (!fallback?.applicationExists && fallback?.hasTicketSegmentEvidence) {
+      return !!wasPurchased
+    }
+    return true
+  }
   const answer = customFields[cond.field_id]
-  if (answer == null || answer === "") return true
+  if (answer == null || answer === "") {
+    if (!fallback?.applicationExists && fallback?.hasTicketSegmentEvidence) {
+      return !!wasPurchased
+    }
+    return true
+  }
   const expected = Array.isArray(cond.value) ? cond.value : [cond.value]
   return expected.includes(answer as string)
+}
+
+export function filterTicketSectionsForRecipient(
+  sections: TemplateSection[],
+  customFields: Record<string, unknown> | null | undefined,
+  applicationExists: boolean,
+  purchasedProductIds: ReadonlySet<string>,
+): TemplateSection[] {
+  const hasTicketSegmentEvidence =
+    !applicationExists &&
+    sections.some((section) =>
+      section.product_ids.some((productId) =>
+        purchasedProductIds.has(productId),
+      ),
+    )
+
+  return sections.filter((section) =>
+    isSectionVisibleForApp(section, customFields, {
+      applicationExists,
+      purchasedProductIds,
+      hasTicketSegmentEvidence,
+    }),
+  )
 }
 
 // ---------------------------------------------------------------------------
@@ -88,7 +139,8 @@ export function isSectionVisibleForApp(
  * - Sections gated by attendee_categories are filtered to the current attendee.
  * - Note: visible_if (per-application gating) must be evaluated upstream;
  *   by the time sections reach this function they should already be filtered
- *   by isSectionVisibleForApp.
+ *   by isSectionVisibleForApp, which can use owned tickets to resolve the
+ *   segment when a granted ticket has no application answers.
  * - Patreon products are excluded from section groups.
  * - Falls back to duration-type grouping when no sections are configured.
  */
