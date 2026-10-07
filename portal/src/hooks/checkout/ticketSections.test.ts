@@ -329,6 +329,7 @@ describe("getBuyerPurchasedProductIds", () => {
         recipient: {
           recipient_key: "human:human-1",
           human_id: "human-1",
+          name: "Main",
         },
       },
       {
@@ -339,6 +340,7 @@ describe("getBuyerPurchasedProductIds", () => {
         recipient: {
           recipient_key: "attendee:spouse",
           existing_attendee_id: "spouse",
+          name: "Spouse",
         },
       },
     ])
