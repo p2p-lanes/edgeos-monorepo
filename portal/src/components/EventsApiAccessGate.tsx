@@ -3,6 +3,7 @@
 import { CalendarDays } from "lucide-react"
 import type * as React from "react"
 import { useTranslation } from "react-i18next"
+import { useHumanPopupAccess } from "@/hooks/useHumanPopupAccess"
 import { hasAcceptedPopupParticipation } from "@/lib/popup-participation"
 import { useApplication } from "@/providers/applicationProvider"
 import { useCityProvider } from "@/providers/cityProvider"
@@ -16,6 +17,7 @@ export function useEventsApiAccess(): { allowed: boolean } {
   const { getCity } = useCityProvider()
   const { getApplicationsForPopup, participation } = useApplication()
   const city = getCity()
+  const popupAccess = useHumanPopupAccess(city?.id ? String(city.id) : null)
 
   // Agentic access hangs off an accepted application, so it is gated on
   // whether anybody applies here rather than on how the popup sells.
@@ -27,7 +29,10 @@ export function useEventsApiAccess(): { allowed: boolean } {
   )
 
   return {
-    allowed: !nobodyApplies && eventsEnabled && applicationAccepted,
+    allowed:
+      !nobodyApplies &&
+      eventsEnabled &&
+      (applicationAccepted || popupAccess.state === "allowed"),
   }
 }
 

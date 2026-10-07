@@ -60,6 +60,10 @@ vi.mock("@/hooks/usePortalDirectSalesFlows", () => ({
 vi.mock("@/hooks/usePortalUpsaleFlows", () => ({
   usePortalUpsaleFlows: () => ({ data: undefined, isPending: true }),
 }))
+
+vi.mock("@/hooks/usePortalPrimarySalesFlow", () => ({
+  usePortalPrimarySalesFlow: () => ({ data: undefined, isPending: true }),
+}))
 vi.mock("@/hooks/useCanShareReferrals", () => ({
   useCanShareReferrals: () => false,
 }))
