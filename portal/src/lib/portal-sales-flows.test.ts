@@ -112,7 +112,7 @@ const attendee = (
   }) as AttendeePassState
 
 describe("groupPassesBySalesFlow", () => {
-  it("keeps manual assignments outside flows even when the attendee has an application", () => {
+  it("uses the attendee application flow for a manual assignment", () => {
     const applicationAttendee = attendee(
       "attendee-application",
       "application-attendee",
@@ -128,14 +128,15 @@ describe("groupPassesBySalesFlow", () => {
       payments: [],
     })
 
-    expect(result.sections).toEqual([])
-    expect(result.unassignedAttendees[0].ticket_entries).toEqual(
+    expect(result.sections).toHaveLength(1)
+    expect(result.sections[0].flow).toEqual(attendeeFlow)
+    expect(result.sections[0].attendees[0].ticket_entries).toEqual(
       applicationAttendee.ticket_entries,
     )
-    expect(result.unassignedAttendees[0].products).toEqual([
+    expect(result.sections[0].attendees[0].products).toEqual([
       applicationAttendee.products[0],
     ])
-    expect(result.unassignedAttendees).toHaveLength(1)
+    expect(result.unassignedAttendees).toEqual([])
   })
 
   it("uses ticket payment flow provenance before attendee application ownership", () => {
@@ -163,15 +164,16 @@ describe("groupPassesBySalesFlow", () => {
       ],
     })
 
-    expect(result.sections).toHaveLength(1)
-    expect(result.unassignedAttendees[0].ticket_entries?.[0].id).toBe(
+    expect(result.sections).toHaveLength(2)
+    expect(result.sections[0].flow).toEqual(attendeeFlow)
+    expect(result.sections[0].attendees[0].ticket_entries?.[0].id).toBe(
       "ticket-a",
     )
-    expect(result.sections[0].flow).toEqual(volunteerFlow)
-    expect(result.sections[0].attendees[0].ticket_entries?.[0].id).toBe(
+    expect(result.sections[1].flow).toEqual(volunteerFlow)
+    expect(result.sections[1].attendees[0].ticket_entries?.[0].id).toBe(
       "ticket-b",
     )
-    expect(result.unassignedAttendees).toHaveLength(1)
+    expect(result.unassignedAttendees).toEqual([])
   })
 
   it("splits a direct attendee's tickets by authoritative payment flow", () => {
