@@ -84,6 +84,9 @@ const useResources = () => {
       ? (doors.find((door) => door.flowId === flowId)?.name ?? null)
       : null
   const popupAccess = useHumanPopupAccess(popupId)
+  const hasTicketAccess =
+    popupAccess.state === "allowed" &&
+    (popupAccess.source === "attendee" || popupAccess.source === "payment")
   const endedAccess = useHumanPopupAccess(
     city?.status === "ended" && city?.id ? String(city.id) : null,
   )
@@ -160,7 +163,7 @@ const useResources = () => {
     direct: directFlows,
     upsale: upsaleFlows,
     approvedApplicationFlowIds,
-    primaryFlowSlug,
+    primaryFlowSlug: hasTicketAccess ? primaryFlowSlug : null,
   })
   const flowResources: Resource[] = eligibleFlows.map((flow) => ({
     name: flow.name,
@@ -199,6 +202,39 @@ const useResources = () => {
         group: "commerce",
       },
       ...flowResources,
+      ...(hasPopupAccess && eventsEnabled
+        ? [
+            {
+              name: t("sidebar.events"),
+              icon: CalendarDays,
+              status: "active" as const,
+              path: `/portal/${city.slug}/events`,
+              group: "community" as const,
+              children: [
+                {
+                  name: t("sidebar.tracks", { defaultValue: "Tracks" }),
+                  icon: Layers,
+                  status: "active" as const,
+                  path: `/portal/${city.slug}/events/tracks`,
+                },
+                {
+                  name: t("sidebar.venues"),
+                  icon: MapPin,
+                  status: "active" as const,
+                  path: `/portal/${city.slug}/events/venues`,
+                },
+                {
+                  name: t("sidebar.agentic_access", {
+                    defaultValue: "Agentic access",
+                  }),
+                  icon: OpenClaw,
+                  status: "active" as const,
+                  path: "/portal/agentic-access",
+                },
+              ],
+            },
+          ]
+        : []),
     ]
 
     return { resources, doorName: null, permissionsLoading }

@@ -8,20 +8,15 @@ import { hasAcceptedPopupParticipation } from "@/lib/popup-participation"
 import { useApplication } from "@/providers/applicationProvider"
 import { useCityProvider } from "@/providers/cityProvider"
 
-// Mirrors the sidebar's exposure rule for Agentic Access in
-// useResources.ts: shown once the human has any accepted popup participation
-// (application or companion) and the events module is enabled. Direct-sale
-// popups never expose this subsection, so navigating to
-// /portal/agentic-access by URL must fall through to the unavailable state.
+// Mirrors the sidebar's exposure rule for Agentic Access in useResources.ts:
+// accepted application/companion participation or ticket-based popup access,
+// with the events module enabled.
 export function useEventsApiAccess(): { allowed: boolean } {
   const { getCity } = useCityProvider()
   const { getApplicationsForPopup, participation } = useApplication()
   const city = getCity()
   const popupAccess = useHumanPopupAccess(city?.id ? String(city.id) : null)
 
-  // Agentic access hangs off an accepted application, so it is gated on
-  // whether anybody applies here rather than on how the popup sells.
-  const nobodyApplies = city?.takes_applications === false
   const eventsEnabled = city?.events_enabled ?? true
   const applicationAccepted = hasAcceptedPopupParticipation(
     getApplicationsForPopup(),
@@ -30,9 +25,7 @@ export function useEventsApiAccess(): { allowed: boolean } {
 
   return {
     allowed:
-      !nobodyApplies &&
-      eventsEnabled &&
-      (applicationAccepted || popupAccess.state === "allowed"),
+      eventsEnabled && (applicationAccepted || popupAccess.state === "allowed"),
   }
 }
 

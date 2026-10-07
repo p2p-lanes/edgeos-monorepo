@@ -10,6 +10,8 @@ import { ApplicationUnavailable } from "@/components/Portal/ApplicationUnavailab
 import { Loader } from "@/components/ui/Loader"
 import { useApplicationSchema } from "@/hooks/useApplicationSchema"
 import { useApplicationsQuery } from "@/hooks/useGetApplications"
+import { useHumanPopupAccess } from "@/hooks/useHumanPopupAccess"
+import { usePortalPrimarySalesFlow } from "@/hooks/usePortalPrimarySalesFlow"
 import { usePortalSalesFlows } from "@/hooks/usePortalSalesFlows"
 import { useInitialQueryResolution } from "@/lib/initial-query-resolution"
 import { useApplication } from "@/providers/applicationProvider"
@@ -75,6 +77,8 @@ export default function FormPage() {
   const { getRelevantApplication } = useApplication()
   const applicationsQuery = useApplicationsQuery()
   const city = getCity()
+  const popupAccess = useHumanPopupAccess(city?.id ?? null)
+  const primaryFlowQuery = usePortalPrimarySalesFlow(city?.slug)
   const router = useRouter()
   const searchParams = useSearchParams()
   // Older provider checkouts still return here. Forward them to the overview,
@@ -107,6 +111,14 @@ export default function FormPage() {
     }
     return resolveApplicationFlowId(flowIdentifier, portalFlows)
   }, [flowIdentifier, initialFlowsReady, portalFlows])
+  const primaryFlowId = portalFlows?.find(
+    (flow) => flow.slug === primaryFlowQuery.data?.flow_slug,
+  )?.id
+  const hasTicketForPrimaryFlow =
+    selectedFlowId != null &&
+    selectedFlowId === primaryFlowId &&
+    popupAccess.state === "allowed" &&
+    (popupAccess.source === "attendee" || popupAccess.source === "payment")
   // Declared after the door, not before it: asking which application this
   // is without saying which way in used to answer with whichever came last.
   const application = selectedFlowId
@@ -158,6 +170,23 @@ export default function FormPage() {
   }, [application, city, isReturnFromCheckout, router, selectedFlowId])
 
   useEffect(() => {
+    if (
+      !hasTicketForPrimaryFlow ||
+      isReturnFromCheckout ||
+      !city ||
+      !selectedFlowId
+    )
+      return
+    router.replace(`/portal/${city.slug}/passes?flow=${selectedFlowId}`)
+  }, [
+    city,
+    hasTicketForPrimaryFlow,
+    isReturnFromCheckout,
+    router,
+    selectedFlowId,
+  ])
+
+  useEffect(() => {
     if (city?.takes_applications === false) {
       router.replace(`/portal/${city.slug}`)
     }
@@ -200,6 +229,8 @@ export default function FormPage() {
   if (city.status === "ended") {
     return <Loader />
   }
+
+  if (hasTicketForPrimaryFlow && !isReturnFromCheckout) return <Loader />
 
   // Resolved applications never render the form. The effect above
   // redirects to the portal home; show a loader meanwhile so it does not
