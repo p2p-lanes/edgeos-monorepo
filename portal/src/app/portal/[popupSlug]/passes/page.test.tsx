@@ -4,7 +4,12 @@ import { beforeEach, describe, expect, it, vi } from "vitest"
 import HomePasses from "./page"
 
 const mocks = vi.hoisted(() => ({
-  access: { state: "allowed" } as { state: "loading" | "denied" | "allowed" },
+  access: { state: "allowed" } as
+    | {
+        state: "allowed"
+        source?: "application" | "attendee" | "payment" | "companion"
+      }
+    | { state: "loading" | "denied" },
   applications: [] as Array<{
     id: string
     sales_flow_id: string
