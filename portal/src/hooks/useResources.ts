@@ -19,6 +19,7 @@ import { useCanShareReferrals } from "@/hooks/useCanShareReferrals"
 import { useGatheringDoors } from "@/hooks/useGatheringDoors"
 import { useHumanPopupAccess } from "@/hooks/useHumanPopupAccess"
 import { usePortalDirectSalesFlows } from "@/hooks/usePortalDirectSalesFlows"
+import { usePortalPrimarySalesFlow } from "@/hooks/usePortalPrimarySalesFlow"
 import { usePortalSalesFlows } from "@/hooks/usePortalSalesFlows"
 import { usePortalUpsaleFlows } from "@/hooks/usePortalUpsaleFlows"
 import { hasAcceptedPopupParticipation } from "@/lib/popup-participation"
@@ -74,6 +75,7 @@ const useResources = () => {
   const applicationFlows = usePortalSalesFlows(popupId).data ?? []
   const directFlows = usePortalDirectSalesFlows(popupId).data ?? []
   const upsaleFlows = usePortalUpsaleFlows(popupId).data ?? []
+  const primaryFlowSlug = usePortalPrimarySalesFlow(city?.slug).data?.flow_slug
   const { doors } = useGatheringDoors(city?.id ? String(city.id) : null)
   // Named only when there is more than one way in. With a single door the
   // sidebar has nothing to disambiguate and saying its name would be noise.
@@ -158,6 +160,7 @@ const useResources = () => {
     direct: directFlows,
     upsale: upsaleFlows,
     approvedApplicationFlowIds,
+    primaryFlowSlug,
   })
   const flowResources: Resource[] = eligibleFlows.map((flow) => ({
     name: flow.name,

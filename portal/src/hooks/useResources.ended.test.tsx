@@ -54,6 +54,10 @@ vi.mock("@/hooks/usePortalUpsaleFlows", () => ({
   usePortalUpsaleFlows: () => ({ data: [] }),
 }))
 
+vi.mock("@/hooks/usePortalPrimarySalesFlow", () => ({
+  usePortalPrimarySalesFlow: () => ({ data: undefined }),
+}))
+
 vi.mock("@/providers/applicationProvider", () => ({
   useApplication: () => ({
     getApplicationsForPopup: () => [],

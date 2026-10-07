@@ -38,6 +38,7 @@ const mocks = vi.hoisted(() => ({
   },
   directFlows: [] as Array<{ id: string; slug: string; name: string }>,
   participation: null as null | { type: string },
+  primaryFlowSlug: null as string | null,
   payments: [] as Array<{
     id: string
     application_id: string | null
@@ -122,6 +123,15 @@ vi.mock("@/hooks/usePortalDirectSalesFlows", () => ({
 
 vi.mock("@/hooks/usePortalUpsaleFlows", () => ({
   usePortalUpsaleFlows: () => ({ data: mocks.upsaleFlows }),
+}))
+
+vi.mock("@/hooks/usePortalPrimarySalesFlow", () => ({
+  usePortalPrimarySalesFlow: () => ({
+    data: mocks.primaryFlowSlug
+      ? { flow_slug: mocks.primaryFlowSlug }
+      : undefined,
+    isLoading: false,
+  }),
 }))
 
 vi.mock("@/providers/applicationProvider", () => ({
@@ -246,6 +256,7 @@ describe("Passes page", () => {
     }
     mocks.directFlows = []
     mocks.participation = null
+    mocks.primaryFlowSlug = null
     mocks.payments = []
     mocks.paymentsLoading = false
     mocks.products = [{ id: "product-1" }]
@@ -407,7 +418,7 @@ describe("Passes page", () => {
     expect(push).toHaveBeenCalledWith("/portal/festival/shop/volunteer")
   })
 
-  it("renders unassigned-only passes directly without a purchase action", () => {
+  it("offers the only eligible direct flow for a manually assigned ticket", () => {
     mocks.applications = []
     mocks.applicationFlows = []
     mocks.directFlows = [directFlow]
@@ -431,10 +442,13 @@ describe("Passes page", () => {
     render(<HomePasses />)
 
     expect(screen.getByText("Historical ticket")).toBeTruthy()
-    expect(screen.queryByRole("button", { name: /Buy passes/ })).toBeNull()
+    fireEvent.click(
+      screen.getByRole("button", { name: "Buy passes flow-direct" }),
+    )
+    expect(push).toHaveBeenCalledWith("/portal/festival/shop/weekend-pass")
   })
 
-  it("shows a manually assigned ticket without a payment or application when only an application flow exists", () => {
+  it("keeps unassigned tickets without an eligible purchase flow read-only", () => {
     mocks.applications = []
     mocks.products = []
     mocks.participation = { type: "none" }
@@ -465,7 +479,75 @@ describe("Passes page", () => {
     expect(replace).not.toHaveBeenCalled()
   })
 
-  it("renders Other passes as a separate section without a purchase action", () => {
+  it("uses an approved application flow for a ticket granted from backoffice", () => {
+    mocks.attendeePasses = [
+      {
+        id: "granted-attendee",
+        application_id: "application-1",
+        products: [{ id: "product-1", purchased: true }],
+        ticket_entries: [
+          {
+            id: "granted-ticket",
+            attendee_id: "granted-attendee",
+            product_id: "product-1",
+            payment_id: null,
+            check_in_code: "GRANTEDQR",
+            product_name: "Backoffice-granted ticket",
+          },
+        ],
+      },
+    ]
+
+    render(<HomePasses />)
+
+    expect(screen.getByTestId("selected-sales-flow").textContent).toBe(
+      attendeeFlow.id,
+    )
+    expect(screen.getByText("Backoffice-granted ticket")).toBeTruthy()
+    expect(
+      screen.queryByRole("heading", { name: "passes.other_passes" }),
+    ).toBeNull()
+    fireEvent.click(
+      screen.getByRole("button", { name: "Buy passes flow-attendee" }),
+    )
+    expect(push).toHaveBeenCalledWith("/portal/festival/shop/attendee")
+  })
+
+  it("uses the popup primary flow for a backoffice-granted ticket without an application", () => {
+    mocks.applications = []
+    mocks.applicationFlows = [attendeeFlow]
+    mocks.primaryFlowSlug = attendeeFlow.slug
+    mocks.attendeePasses = [
+      {
+        id: "granted-attendee-no-application",
+        application_id: null,
+        products: [{ id: "product-1", purchased: true }],
+        ticket_entries: [
+          {
+            id: "granted-ticket-no-application",
+            attendee_id: "granted-attendee-no-application",
+            product_id: "product-1",
+            payment_id: null,
+            check_in_code: "GRANTEDQR",
+            product_name: "Backoffice-granted ticket",
+          },
+        ],
+      },
+    ]
+
+    render(<HomePasses />)
+
+    expect(screen.getByTestId("selected-sales-flow").textContent).toBe(
+      attendeeFlow.id,
+    )
+    expect(screen.getByText("Backoffice-granted ticket")).toBeTruthy()
+    fireEvent.click(
+      screen.getByRole("button", { name: "Buy passes flow-attendee" }),
+    )
+    expect(push).toHaveBeenCalledWith("/portal/festival/shop/attendee")
+  })
+
+  it("offers the sole eligible direct flow for unassigned tickets", () => {
     mocks.directFlows = [directFlow]
     mocks.attendeePasses.push({
       id: "attendee-direct",
@@ -491,11 +573,12 @@ describe("Passes page", () => {
     expect(screen.getByText("attendee-1")).toBeTruthy()
     expect(screen.getByText("Unassigned ticket")).toBeTruthy()
     expect(screen.getAllByTestId("selected-sales-flow")[1].textContent).toBe(
-      "other",
+      directFlow.id,
     )
-    expect(
-      screen.queryByRole("button", { name: "Buy passes passes.other_passes" }),
-    ).toBeNull()
+    fireEvent.click(
+      screen.getByRole("button", { name: "Buy passes passes.other_passes" }),
+    )
+    expect(push).toHaveBeenCalledWith("/portal/festival/shop/weekend-pass")
   })
 
   it("shows approved ownerless products below passes and links to Payments", () => {
