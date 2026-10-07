@@ -24,31 +24,30 @@ export default function EventsLayout({
   const isEnded = city?.status === "ended"
   const endedAccess = useHumanPopupAccess(isEnded ? popupId : null)
 
-  // Subscribe to the same queries the sidebar reads so this route gate matches
-  // nav visibility exactly (see useResources `canSeeAttendees`). For a live
-  // popup this means getRelevantApplication (not-ended path below); for an
-  // ended popup it means useHumanPopupAccess, the backend access ladder, via
-  // `endedAccess`. Either way this stays in lockstep with the popup root
-  // redirect, so the two can never disagree and bounce the user back and
-  // forth.
+  // Keep the route gate aligned with sidebar visibility. The backend access
+  // ladder grants access to active ticket holders even when a ticket was
+  // granted without creating an accepted application.
   const applicationsQuery = useApplicationsQuery()
   const participationQuery = useParticipationQuery(popupId)
+  const popupAccess = useHumanPopupAccess(popupId)
 
   const nobodyApplies = city?.takes_applications === false
   // Events are popup-wide, not owned by one application flow. Any accepted
   // application for this popup (or accepted companion participation) grants
   // access, even when a shared/direct URL has no `flow` query parameter.
   // Direct-sale popups don't run the application flow, so their events access
-  // is left untouched. Ended-popup eligibility comes from the backend ladder.
+  // and ticket grants are resolved by the backend access ladder.
   const isEligible = isEnded
     ? endedAccess.state === "allowed"
-    : hasAcceptedPopupParticipation(getApplicationsForPopup(), participation)
+    : popupAccess.state === "allowed" ||
+      hasAcceptedPopupParticipation(getApplicationsForPopup(), participation)
 
   const stillLoading =
     !city ||
     applicationsQuery.isLoading ||
     participationQuery.isLoading ||
-    (isEnded && endedAccess.state === "loading")
+    (isEnded && endedAccess.state === "loading") ||
+    (!isEnded && !nobodyApplies && popupAccess.state === "loading")
 
   const blocked = !nobodyApplies && !stillLoading && !isEligible
 

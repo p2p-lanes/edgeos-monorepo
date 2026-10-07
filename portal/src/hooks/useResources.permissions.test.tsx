@@ -80,7 +80,7 @@ beforeEach(() => {
   state.participationLoading = false
   state.applications = []
   state.participation = null
-  state.access = "loading"
+  state.access = "denied"
 })
 
 const directoryStatus = (
@@ -125,6 +125,18 @@ describe("useResources permission readiness", () => {
     expect(directoryStatus(result.current.resources)).toBe("active")
   })
 
+  it("shows events and directory to an attendee with ticket-based popup access", () => {
+    state.access = "allowed"
+    const { result } = renderHook(() => useResources())
+    expect(result.current.permissionsLoading).toBe(false)
+    expect(directoryStatus(result.current.resources)).toBe("active")
+    expect(
+      result.current.resources.find(
+        (resource) => resource.path === "/portal/india/events",
+      )?.status,
+    ).toBe("active")
+  })
+
   it("allows an accepted companion after their participation resolves", () => {
     state.participationLoading = true
     const { result, rerender } = renderHook(() => useResources())
@@ -158,6 +170,7 @@ describe("useResources permission readiness", () => {
 
   it("waits for the existing access query when the popup has ended", () => {
     state.city!.status = "ended"
+    state.access = "loading"
     const { result, rerender } = renderHook(() => useResources())
     expect(result.current.permissionsLoading).toBe(true)
     state.access = "allowed"
