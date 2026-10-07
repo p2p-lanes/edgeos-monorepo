@@ -96,7 +96,9 @@ const useResources = () => {
       (city.status === "ended"
         ? endedAccess.state === "loading"
         : city.takes_applications !== false &&
-          (applicationsLoading || participationLoading)))
+          (applicationsLoading ||
+            participationLoading ||
+            popupAccess.state === "loading")))
 
   if (!city) {
     return { resources: [], doorName: null, permissionsLoading }
@@ -137,9 +139,6 @@ const useResources = () => {
     !nobodyApplies && (city?.show_attendee_directory ?? false)
 
   const isCompanion = participation?.type === "companion"
-  const companionApplicationAccepted =
-    participation?.type === "companion" &&
-    participation?.application_status === "accepted"
   const acceptedApplications = getApplicationsForPopup().filter(
     (item) => item.status === "accepted",
   )
@@ -147,6 +146,8 @@ const useResources = () => {
     acceptedApplications,
     participation,
   )
+  const hasPopupAccess =
+    popupParticipationAccepted || popupAccess.state === "allowed"
   const approvedApplicationFlowIds = new Set<string>(
     acceptedApplications.flatMap((item) =>
       item.sales_flow_id ? [item.sales_flow_id] : [],
@@ -201,7 +202,7 @@ const useResources = () => {
   }
 
   if (isCompanion) {
-    const companionEventsVisible = companionApplicationAccepted && eventsEnabled
+    const companionEventsVisible = hasPopupAccess && eventsEnabled
     const resources: Resource[] = [
       ...(hasCustomHome ? [homeResource] : []),
       {
@@ -265,7 +266,7 @@ const useResources = () => {
       buildDirectoryResource({
         t,
         slug: city.slug,
-        hasAcceptedParticipation: popupParticipationAccepted,
+        hasAcceptedParticipation: hasPopupAccess,
         attendeeDirectoryEnabled,
       }),
     ]
@@ -303,35 +304,32 @@ const useResources = () => {
     buildDirectoryResource({
       t,
       slug: city?.slug,
-      hasAcceptedParticipation: popupParticipationAccepted,
+      hasAcceptedParticipation: hasPopupAccess,
       attendeeDirectoryEnabled,
     }),
     {
       name: t("sidebar.events"),
       icon: CalendarDays,
-      status: popupParticipationAccepted && eventsEnabled ? "active" : "hidden",
+      status: hasPopupAccess && eventsEnabled ? "active" : "hidden",
       path: `/portal/${city?.slug}/events${flowQuery}`,
       group: "community",
       children: [
         {
           name: t("sidebar.tracks", { defaultValue: "Tracks" }),
           icon: Layers,
-          status:
-            popupParticipationAccepted && eventsEnabled ? "active" : "hidden",
+          status: hasPopupAccess && eventsEnabled ? "active" : "hidden",
           path: `/portal/${city?.slug}/events/tracks${flowQuery}`,
         },
         {
           name: t("sidebar.venues"),
           icon: MapPin,
-          status:
-            popupParticipationAccepted && eventsEnabled ? "active" : "hidden",
+          status: hasPopupAccess && eventsEnabled ? "active" : "hidden",
           path: `/portal/${city?.slug}/events/venues${flowQuery}`,
         },
         {
           name: t("sidebar.agentic_access", { defaultValue: "Agentic access" }),
           icon: OpenClaw,
-          status:
-            popupParticipationAccepted && eventsEnabled ? "active" : "hidden",
+          status: hasPopupAccess && eventsEnabled ? "active" : "hidden",
           path: "/portal/agentic-access",
         },
       ],
