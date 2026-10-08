@@ -6,7 +6,12 @@
 import "@/i18n/config"
 
 import { CalendarDays, Filter } from "lucide-react"
-import { notFound, useRouter } from "next/navigation"
+import {
+  notFound,
+  usePathname,
+  useRouter,
+  useSearchParams,
+} from "next/navigation"
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { useTranslation } from "react-i18next"
 import { CalendarBody } from "@/app/portal/[popupSlug]/events/lib/CalendarBody"
@@ -27,6 +32,10 @@ import { useIsAuthenticated } from "@/hooks/useIsAuthenticated"
 import { cn } from "@/lib/utils"
 import { useTenant } from "@/providers/tenantProvider"
 
+import {
+  parsePublicCalendarView,
+  publicCalendarDefaultDate,
+} from "./publicCalendarState"
 import { usePublicCalendarEvents } from "./usePublicCalendarEvents"
 
 interface PublicCalendarClientProps {
@@ -44,9 +53,16 @@ export function PublicCalendarClient({ popupSlug }: PublicCalendarClientProps) {
   const { t } = useTranslation()
   const { tenantId } = useTenant()
   const router = useRouter()
+  const pathname = usePathname()
+  const searchParams = useSearchParams()
   const isAuthenticated = useIsAuthenticated()
 
-  const [view, setView] = useState<EventsView>("list")
+  const view = parsePublicCalendarView(searchParams.get("view"))
+  const setView = (next: EventsView) => {
+    const params = new URLSearchParams(searchParams.toString())
+    params.set("view", next)
+    router.replace(`${pathname}?${params.toString()}`, { scroll: false })
+  }
   const [search, setSearch] = useState("")
   const [selectedTags, setSelectedTags] = useState<string[]>([])
   const [selectedTrackIds, setSelectedTrackIds] = useState<string[]>([])
@@ -55,34 +71,10 @@ export function PublicCalendarClient({ popupSlug }: PublicCalendarClientProps) {
     null,
   )
 
-  // Default window: 180 days from today. The endpoint expands recurring
-  // events server-side when ``start_after`` is set, so we always pass it.
-  //
-  // We pad one day on each side of the UTC window so events near the popup's
-  // local-day boundary are never missed regardless of the popup's UTC offset
-  // (the backend filters in UTC). The list is then trimmed to "today onward"
-  // in popup time once the timezone is known — see ``events`` below.
-  const window = useMemo(() => {
-    const start = new Date()
-    start.setUTCHours(0, 0, 0, 0)
-    start.setUTCDate(start.getUTCDate() - 1)
-    const end = new Date(start)
-    end.setUTCDate(end.getUTCDate() + 182)
-    return {
-      startAfter: start.toISOString(),
-      startBefore: end.toISOString(),
-    }
-  }, [])
-
-  const query = usePublicCalendarEvents({
-    popupSlug,
-    tenantId,
-    startAfter: window.startAfter,
-    startBefore: window.startBefore,
-    search,
-    tags: selectedTags,
-    trackIds: selectedTrackIds,
-  })
+  // Let the API use the gathering's date range, including past gatherings
+  // and those more than 180 days away. Keep the complete schedule here:
+  // filters must not change the first/last event used for the initial day.
+  const query = usePublicCalendarEvents({ popupSlug, tenantId })
 
   // Translate a 404 from the API into a Next "not found" — the slug
   // either doesn't exist or doesn't belong to this tenant.
@@ -113,16 +105,7 @@ export function PublicCalendarClient({ popupSlug }: PublicCalendarClientProps) {
   // (which our calls pass), so undefined fields never get rendered.
   const events = useMemo<EventPublic[]>(() => {
     const rows = query.data?.results ?? []
-    // The fetch window is padded a day on each side and the backend filters
-    // in UTC, so an event that starts after 00:00Z can still be "yesterday"
-    // in the popup's timezone. Trim to events whose start day is today or
-    // later *in popup time* (day-keys are YYYY-MM-DD, so a string compare is
-    // chronological).
-    const todayKey = timezone ? formatDayKey(new Date().toISOString()) : null
-    const visibleRows = todayKey
-      ? rows.filter((r) => formatDayKey(r.start_time) >= todayKey)
-      : rows
-    return visibleRows.map(
+    return rows.map(
       (r) =>
         ({
           id: r.id,
@@ -165,7 +148,54 @@ export function PublicCalendarClient({ popupSlug }: PublicCalendarClientProps) {
           my_rsvp_status: null,
         }) as unknown as EventPublic,
     )
-  }, [query.data, meta?.popup_id, timezone, formatDayKey])
+  }, [query.data, meta?.popup_id])
+
+  const defaultDate = useMemo(
+    () => (meta ? publicCalendarDefaultDate(meta, events) : null),
+    [meta, events],
+  )
+  const filteredEvents = useMemo(() => {
+    const todayKey = timezone ? formatDayKey(new Date().toISOString()) : null
+    const ended =
+      meta?.popup_ended ||
+      (!!meta?.popup_end_date &&
+        !!todayKey &&
+        todayKey > meta.popup_end_date.slice(0, 10))
+    return events.filter((event) => {
+      if (
+        search &&
+        !event.title.toLocaleLowerCase().includes(search.toLocaleLowerCase())
+      )
+        return false
+      if (
+        selectedTags.length &&
+        !selectedTags.some((tag) => event.tags?.includes(tag))
+      )
+        return false
+      if (
+        selectedTrackIds.length &&
+        (!event.track_id || !selectedTrackIds.includes(event.track_id))
+      )
+        return false
+      // Preserve the upcoming-only list for live gatherings, but allow the
+      // grid/day views to browse the full schedule and ended lists to show history.
+      return (
+        view !== "list" ||
+        ended ||
+        !todayKey ||
+        formatDayKey(event.start_time) >= todayKey
+      )
+    })
+  }, [
+    events,
+    search,
+    selectedTags,
+    selectedTrackIds,
+    view,
+    meta,
+    timezone,
+    formatDayKey,
+  ])
 
   const handleEventClick = useCallback(
     (event: EventPublic) => {
@@ -203,7 +233,10 @@ export function PublicCalendarClient({ popupSlug }: PublicCalendarClientProps) {
   // Derive venues from the loaded events. Memoized on ``events`` so the
   // DayBody useMemo deps that read ``venuesOverride`` only invalidate
   // when the underlying event set actually changes.
-  const venuesOverride = useMemo(() => collectVenues(events), [events])
+  const venuesOverride = useMemo(
+    () => collectVenues(filteredEvents),
+    [filteredEvents],
+  )
 
   // Measure the sticky toolbar so the list's per-day headers freeze right
   // below it (the toolbar grows a row when its filter chips wrap).
@@ -281,9 +314,9 @@ export function PublicCalendarClient({ popupSlug }: PublicCalendarClientProps) {
             rsvpedOnly={false}
             tags={selectedTags}
             trackIds={selectedTrackIds}
-            defaultDate={selectedDate}
+            defaultDate={selectedDate ?? defaultDate}
             mode="public"
-            eventsOverride={events}
+            eventsOverride={filteredEvents}
             onEventClick={handleEventClick}
             timezoneOverride={timezone}
             placeholderUrl={meta?.placeholder_url}
@@ -296,15 +329,15 @@ export function PublicCalendarClient({ popupSlug }: PublicCalendarClientProps) {
             rsvpedOnly={false}
             tags={selectedTags}
             trackIds={selectedTrackIds}
-            selectedDate={selectedDate}
+            selectedDate={selectedDate ?? defaultDate}
             onSelectedDateChange={setSelectedDate}
             mode="public"
-            eventsOverride={events}
+            eventsOverride={filteredEvents}
             venuesOverride={venuesOverride}
             onEventClick={handleEventClick}
             timezoneOverride={timezone}
           />
-        ) : events.length === 0 ? (
+        ) : filteredEvents.length === 0 ? (
           <div className="text-center py-20">
             <Filter className="mx-auto h-10 w-10 text-muted-foreground/50 mb-3" />
             <p className="text-muted-foreground">
@@ -313,7 +346,7 @@ export function PublicCalendarClient({ popupSlug }: PublicCalendarClientProps) {
           </div>
         ) : (
           <ListBody
-            events={events}
+            events={filteredEvents}
             slug={popupSlug}
             formatTime={formatTime}
             formatDateShort={formatDateShort}

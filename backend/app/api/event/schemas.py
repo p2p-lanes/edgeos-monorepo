@@ -9,6 +9,8 @@ from sqlalchemy.dialects.postgresql import ARRAY, JSONB
 from sqlalchemy.dialects.postgresql import UUID as PgUUID
 from sqlmodel import Column, DateTime, Field, SQLModel
 
+from app.api.shared.response import Paging
+
 
 class EventStatus(str, Enum):
     DRAFT = "draft"
@@ -457,6 +459,10 @@ class EventCalendarMeta(BaseModel):
     popup_id: uuid.UUID
     popup_slug: str
     popup_name: str
+    # Nominal calendar dates (stored at UTC midnight), not event instants.
+    popup_start_date: datetime | None = None
+    popup_end_date: datetime | None = None
+    popup_ended: bool = False
     # Popup-scoped fallback image used by the portal when an event has no
     # cover/venue image. Surfaced here so the anonymous calendar can apply
     # the same fallback without calling the authenticated settings endpoint.
@@ -468,6 +474,7 @@ class EventPublicCalendarResponse(BaseModel):
 
     results: list[EventPublicCalendarItem]
     meta: EventCalendarMeta
+    paging: Paging
 
 
 def _enforce_group_id_rules(
