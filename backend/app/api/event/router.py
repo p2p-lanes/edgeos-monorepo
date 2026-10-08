@@ -231,6 +231,17 @@ def _find_venue_open_hours_issue(
             .where(VenueExceptions.end_datetime > start_time)
         ).all()
     )
+    closed_exceptions = list(
+        db.exec(
+            select(VenueExceptions)
+            .where(VenueExceptions.venue_id == venue.id)
+            .where(VenueExceptions.is_closed == True)  # noqa: E712
+            .where(VenueExceptions.start_datetime < end_time)
+            .where(VenueExceptions.end_datetime > start_time)
+        ).all()
+    )
+    if closed_exceptions:
+        return (400, "Selected time falls outside the venue's open hours.")
     if not weekly_rows and not open_exceptions:
         return None  # no schedule configured = always open
 

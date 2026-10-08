@@ -267,6 +267,34 @@ class TestVenueAvailability:
         assert datetime.fromisoformat(busy["start"]) == exc_start
         assert datetime.fromisoformat(busy["end"]) == exc_end
 
+    def test_closed_exception_rejects_booking_even_without_weekly_hours(
+        self,
+        db: Session,
+        tenant_a: Tenants,
+    ) -> None:
+        """A special closure must override the default always-open schedule."""
+        from app.api.event.router import _find_venue_open_hours_issue
+
+        popup = _make_popup(db, tenant_a, tz="UTC")
+        venue = _make_venue(db, tenant_a, popup)
+        exc_start = datetime(2026, 4, 13, 12, 0, tzinfo=UTC)
+        exc_end = datetime(2026, 4, 13, 14, 0, tzinfo=UTC)
+        db.add(
+            VenueExceptions(
+                tenant_id=tenant_a.id,
+                venue_id=venue.id,
+                start_datetime=exc_start,
+                end_datetime=exc_end,
+                is_closed=True,
+                reason="Maintenance",
+            )
+        )
+        db.commit()
+
+        issue = _find_venue_open_hours_issue(db, venue, exc_start, exc_end)
+
+        assert issue == (400, "Selected time falls outside the venue's open hours.")
+
     def test_open_exception_on_day_without_weekly_hours(
         self,
         client: TestClient,
