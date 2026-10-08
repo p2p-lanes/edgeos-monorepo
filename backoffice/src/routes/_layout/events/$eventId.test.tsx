@@ -12,6 +12,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 const mocks = vi.hoisted(() => ({
   occ: undefined as string | undefined,
   getEvent: vi.fn(),
+  getPopup: vi.fn(),
   summary: vi.fn(),
   participants: vi.fn(),
   attendance: vi.fn((_props: { occurrenceStart: string | null }) => null),
@@ -41,7 +42,7 @@ vi.mock("@/client", () => ({
   },
   EventParticipantsService: { listParticipants: mocks.participants },
   TenantsService: { getTenant: vi.fn(async () => ({ slug: "festival" })) },
-  PopupsService: { getPopup: vi.fn(async () => ({ slug: "festival" })) },
+  PopupsService: { getPopup: mocks.getPopup },
 }))
 vi.mock("@/contexts/WorkspaceContext", () => ({
   useWorkspace: () => ({ effectiveTenantId: "tenant-1" }),
@@ -92,6 +93,36 @@ beforeEach(() => {
   vi.clearAllMocks()
   mocks.occ = undefined
   mocks.participants.mockResolvedValue({ results: [] })
+  mocks.getPopup.mockResolvedValue({ slug: "festival" })
+})
+
+describe("backoffice event host", () => {
+  it.each([
+    [" Ada Lovelace ", "Gathering", "Host: Ada Lovelace"],
+    ["   ", " Gathering ", "Host: Gathering"],
+    [null, null, null],
+  ])("renders host %s with gathering %s", async (host, gathering, expected) => {
+    mocks.getEvent.mockResolvedValue({
+      id: "event-1",
+      popup_id: "popup-1",
+      title: "One-off",
+      start_time: FIRST,
+      end_time: "2031-03-03T11:00:00Z",
+      timezone: "UTC",
+      status: "draft",
+      visibility: "public",
+      host_display_name: host,
+    })
+    mocks.getPopup.mockResolvedValue({ slug: "festival", name: gathering })
+    renderPage()
+    await screen.findByRole("heading", { name: "Participants" })
+    if (expected) {
+      const hostName = await screen.findByText(expected.replace("Host: ", ""))
+      expect(hostName.textContent).toBe(expected)
+    } else {
+      expect(screen.queryByText(/Host:/)).toBeNull()
+    }
+  })
 })
 
 describe("backoffice participants by occurrence", () => {
