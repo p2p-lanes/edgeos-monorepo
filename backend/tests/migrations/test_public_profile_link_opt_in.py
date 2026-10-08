@@ -22,6 +22,8 @@ def test_migration_changes_only_default_and_preserves_sharing(migration_test_eng
     ):
         config = Config("alembic.ini")
         config.attributes["connection"] = connection
+        # Other migration tests may leave this shared database at an older revision.
+        command.upgrade(config, "head")
         command.downgrade(config, migration.down_revision)
 
         tenant_id = uuid.uuid4()
