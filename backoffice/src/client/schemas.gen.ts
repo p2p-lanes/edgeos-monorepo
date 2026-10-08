@@ -14298,6 +14298,14 @@ export const EventPublicSchema = {
             format: 'uuid',
             title: 'Id'
         },
+        warnings: {
+            items: {
+                type: 'string'
+            },
+            type: 'array',
+            title: 'Warnings',
+            default: []
+        },
         occurrence_id: {
             anyOf: [
                 {

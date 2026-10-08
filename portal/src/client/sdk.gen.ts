@@ -1971,8 +1971,9 @@ export class ApplicationsService {
      * List the attendees directory for a popup
      * List attendees directory for a popup (Portal).
      *
-     * Returns ticket-holding attendees of accepted applications in the popup's
-     * primary sales flow only. Respects that application's info_not_shared masking.
+     * Returns ticket-holding attendees in the popup's primary sales flow (or
+     * without an application). A ticket grants directory eligibility regardless
+     * of application status. Respects application info_not_shared masking.
      * When hide_empty_rows is true, excludes entries without shared, nonblank
      * name, email, Telegram, role or organization. Residence, age and gender remain
      * in the response but do not determine portal row visibility. The default

@@ -267,6 +267,33 @@ class TestVenueAvailability:
         assert datetime.fromisoformat(busy["start"]) == exc_start
         assert datetime.fromisoformat(busy["end"]) == exc_end
 
+    def test_closed_exception_blocks_one_off_booking(
+        self,
+        db: Session,
+        tenant_a: Tenants,
+    ) -> None:
+        from app.api.event.router import _find_venue_open_hours_issue
+
+        popup = _make_popup(db, tenant_a, tz="UTC")
+        venue = _make_venue(db, tenant_a, popup)
+        start = datetime(2026, 4, 13, 12, 0, tzinfo=UTC)
+        end = start + timedelta(hours=1)
+        db.add(
+            VenueExceptions(
+                tenant_id=tenant_a.id,
+                venue_id=venue.id,
+                start_datetime=start,
+                end_datetime=end,
+                is_closed=True,
+            )
+        )
+        db.commit()
+
+        assert _find_venue_open_hours_issue(db, venue, start, end) == (
+            400,
+            "Selected time falls outside the venue's open hours.",
+        )
+
     def test_open_exception_on_day_without_weekly_hours(
         self,
         client: TestClient,

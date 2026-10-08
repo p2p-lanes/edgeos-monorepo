@@ -3111,6 +3111,7 @@ export type EventPublic = {
     created_at?: string;
     updated_at?: string;
     id: string;
+    warnings?: Array<(string)>;
     occurrence_id?: (string | null);
     venue_title?: (string | null);
     venue_location?: (string | null);
