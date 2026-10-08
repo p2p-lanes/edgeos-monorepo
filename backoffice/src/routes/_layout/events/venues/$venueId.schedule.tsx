@@ -51,7 +51,7 @@ function VenueScheduleContent({ venueId }: { venueId: string }) {
   const [exceptionReason, setExceptionReason] = useState<string | null>(null)
 
   const { data: activeEvent } = useQuery({
-    queryKey: ["event", activeEventId],
+    queryKey: ["events", activeEventId],
     queryFn: () => EventsService.getEvent({ eventId: activeEventId as string }),
     enabled: !!activeEventId,
   })

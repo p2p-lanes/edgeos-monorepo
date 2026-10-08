@@ -108,7 +108,7 @@ export function EventAttendanceCard({
     onSuccess: () => {
       showSuccessToast("Attendance mode updated")
       refresh()
-      queryClient.invalidateQueries({ queryKey: ["event", eventId] })
+      queryClient.invalidateQueries({ queryKey: ["events", eventId] })
     },
     onError,
   })
