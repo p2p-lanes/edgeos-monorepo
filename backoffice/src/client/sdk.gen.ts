@@ -5069,6 +5069,7 @@ export class EventsService {
      * @param data.search
      * @param data.tags
      * @param data.trackIds
+     * @param data.skip Number of items to skip
      * @param data.limit Maximum number of items to return
      * @param data.xTenantId
      * @param data.xEdgeOsPublishableKey
@@ -5090,6 +5091,7 @@ export class EventsService {
                 search: data.search,
                 tags: data.tags,
                 track_ids: data.trackIds,
+                skip: data.skip,
                 limit: data.limit
             },
             errors: {

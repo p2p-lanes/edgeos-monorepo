@@ -2500,6 +2500,9 @@ export type EventCalendarMeta = {
     popup_id: string;
     popup_slug: string;
     popup_name: string;
+    popup_start_date?: (string | null);
+    popup_end_date?: (string | null);
+    popup_ended?: boolean;
     placeholder_url?: (string | null);
 };
 
@@ -2809,6 +2812,7 @@ export type EventPublicCalendarItem = {
 export type EventPublicCalendarResponse = {
     results: Array<EventPublicCalendarItem>;
     meta: EventCalendarMeta;
+    paging: Paging;
 };
 
 /**
@@ -8301,6 +8305,10 @@ export type EventsListPublicCalendarData = {
     limit?: number;
     popupSlug: string;
     search?: (string | null);
+    /**
+     * Number of items to skip
+     */
+    skip?: number;
     startAfter?: (string | null);
     startBefore?: (string | null);
     tags?: (Array<(string)> | null);
