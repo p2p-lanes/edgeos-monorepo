@@ -467,7 +467,6 @@ def _to_public(
     event,
     venue_map: dict[uuid.UUID, VenueInfo] | None = None,
     track_map: dict[uuid.UUID, str] | None = None,
-    count_map: dict[uuid.UUID, int] | None = None,
 ) -> EventPublic:
     """Convert an Events row (or expanded pseudo-row) to EventPublic.
 
@@ -475,8 +474,7 @@ def _to_public(
     :func:`app.api.event.crud._clone_as_occurrence`.
 
     ``venue_map``/``track_map`` let callers pre-fetch venues/tracks in a
-    single query and avoid N+1 when serializing a list. ``count_map`` does the
-    same for the RSVP ``attendee_count`` shown in the backoffice event list.
+    single query and avoid N+1 when serializing a list.
     """
     # ``custom_location_name``/``custom_location_url`` live on EventBase and
     # are picked up automatically by ``model_validate`` — no extra plumbing.
@@ -500,8 +498,6 @@ def _to_public(
             updates["track_title"] = track_map[event.track_id]
         elif track_map is None and getattr(event, "track", None) is not None:
             updates["track_title"] = event.track.name
-    if count_map is not None:
-        updates["attendee_count"] = count_map.get(event.id, 0)
     if updates:
         data = data.model_copy(update=updates)
     return data
@@ -1304,13 +1300,52 @@ async def list_events(
     track_map = _track_map_for_events(db, events)
     from app.api.event_participant.crud import event_participants_crud
 
-    count_map = event_participants_crud.count_active_for_events(
+    occurrence_counts = event_participants_crud.count_active_for_events(
         db, [e.id for e in events]
     )
+    # Mirrors ``find_by_popup``'s ``want_expansion``: a date window expands
+    # each series into one row per date, so each row counts only its date.
+    per_date = popup_id is not None and (
+        start_after is not None or start_before is not None
+    )
+    event_totals: dict[uuid.UUID, int] = {}
+    for (event_id, _occurrence_start), count in occurrence_counts.items():
+        event_totals[event_id] = event_totals.get(event_id, 0) + count
     return ListModel[EventPublic](
-        results=[_to_public(e, venue_map, track_map, count_map) for e in events],
+        results=[
+            _to_public(e, venue_map, track_map).model_copy(
+                update={
+                    "attendee_count": _attendee_count(
+                        e, occurrence_counts, event_totals, per_date=per_date
+                    )
+                }
+            )
+            for e in events
+        ],
         paging=Paging(offset=skip, limit=limit, total=total),
     )
+
+
+def _attendee_count(
+    event,
+    occurrence_counts: dict[tuple[uuid.UUID, datetime | None], int],
+    event_totals: dict[uuid.UUID, int],
+    *,
+    per_date: bool,
+) -> int:
+    """An event list row's active RSVP count.
+
+    When the list is expanded (``per_date``), every row of a series (the
+    master's own first date and each occurrence clone, which carries the
+    master's id) counts only the RSVPs for its own ``start_time``. Summing
+    the series instead showed the series total on every date. Otherwise a row
+    counts all of its RSVPs, like the detail page: an unexpanded master stands
+    for the whole series, and one-offs and detached children register with no
+    occurrence_start.
+    """
+    if per_date and event.rrule:
+        return occurrence_counts.get((event.id, event.start_time), 0)
+    return event_totals.get(event.id, 0)
 
 
 @router.get("/hosts", response_model=list[EventHostOption])
