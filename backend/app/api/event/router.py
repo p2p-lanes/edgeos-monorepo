@@ -966,6 +966,7 @@ async def list_public_calendar(
     search: str | None = None,
     tags: list[str] | None = Query(default=None),
     track_ids: list[uuid.UUID] | None = Query(default=None),
+    skip: PaginationSkip = 0,
     limit: PaginationLimit = 200,
 ) -> EventPublicCalendarResponse:
     """Anonymous calendar feed for a popup.
@@ -990,16 +991,61 @@ async def list_public_calendar(
     from app.api.track.models import Tracks
 
     popup = popups_crud.get_by_slug(db, popup_slug)
-    if not popup or popup.tenant_id != tenant.id or popup.status != PopupStatus.active:
+    if (
+        not popup
+        or popup.tenant_id != tenant.id
+        or popup.status not in {PopupStatus.active, PopupStatus.ended}
+    ):
         # Opaque 404 — never confirm sibling-tenant popups exist.
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Popup not found"
         )
 
-    events, _ = crud.events_crud.find_by_popup(
+    settings = event_settings_crud.get_by_popup_id(db, popup.id)
+    timezone = settings.timezone if settings else "UTC"
+
+    # A public calendar must also work before and after the gathering, not
+    # just in the next 180 days. Popup dates are nominal days stored at UTC
+    # midnight; interpret their date component in the gathering's timezone.
+    # Explicit query bounds retain their existing instant-based semantics.
+    if start_after is None and start_before is None:
+        tz = ZoneInfo(timezone)
+        if popup.start_date:
+            start_after = datetime.combine(
+                popup.start_date.date(), datetime.min.time(), tz
+            )
+        if popup.end_date:
+            start_before = datetime.combine(
+                popup.end_date.date() + timedelta(days=1), datetime.min.time(), tz
+            ) - timedelta(microseconds=1)
+        # Bound open-ended recurrence expansion without excluding dated
+        # gatherings merely because they are far in the past or future.
+        if start_after is not None and start_before is None:
+            start_before = start_after + timedelta(days=181)
+        elif start_before is not None and start_after is None:
+            start_after = start_before - timedelta(days=181)
+
+    # Supported rules emit at most one occurrence per day. A bounded
+    # gathering can exceed the usual 100-occurrence soft cap; expand its
+    # whole schedule while retaining expand()'s global hard safety cap.
+    max_occurrences = DEFAULT_MAX_OCCURRENCES
+    if start_after is not None and start_before is not None:
+        start_utc = (
+            start_after.replace(tzinfo=UTC)
+            if start_after.tzinfo is None
+            else start_after.astimezone(UTC)
+        )
+        end_utc = (
+            start_before.replace(tzinfo=UTC)
+            if start_before.tzinfo is None
+            else start_before.astimezone(UTC)
+        )
+        max_occurrences = max(max_occurrences, (end_utc - start_utc).days + 2)
+
+    events, total = crud.events_crud.find_by_popup(
         db,
         popup_id=popup.id,
-        skip=0,
+        skip=skip,
         limit=limit,
         event_status=EventStatus.PUBLISHED,
         visibility=EventVisibility.PUBLIC,
@@ -1009,13 +1055,13 @@ async def list_public_calendar(
         search=search,
         tags=tags,
         track_ids=track_ids,
+        expand_occurrences=True,
+        max_occurrences=max_occurrences,
     )
 
     venue_map = _venue_map_for_events(db, events)
     track_map = _track_map_for_events(db, events)
 
-    settings = event_settings_crud.get_by_popup_id(db, popup.id)
-    timezone = settings.timezone if settings else "UTC"
     placeholder_url = settings.placeholder_url if settings else None
     # Distinct tags actually present on the popup's published+public events,
     # not the curated ``event_settings.allowed_tags`` list — creators can use
@@ -1036,8 +1082,12 @@ async def list_public_calendar(
             popup_id=popup.id,
             popup_slug=popup.slug,
             popup_name=popup.name,
+            popup_start_date=popup.start_date,
+            popup_end_date=popup.end_date,
+            popup_ended=popup.status == PopupStatus.ended,
             placeholder_url=placeholder_url,
         ),
+        paging=Paging(offset=skip, limit=limit, total=total),
     )
 
 

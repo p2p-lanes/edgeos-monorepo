@@ -13045,6 +13045,35 @@ export const EventCalendarMetaSchema = {
             type: 'string',
             title: 'Popup Name'
         },
+        popup_start_date: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Popup Start Date'
+        },
+        popup_end_date: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Popup End Date'
+        },
+        popup_ended: {
+            type: 'boolean',
+            title: 'Popup Ended',
+            default: false
+        },
         placeholder_url: {
             anyOf: [
                 {
@@ -14592,10 +14621,13 @@ export const EventPublicCalendarResponseSchema = {
         },
         meta: {
             '$ref': '#/components/schemas/EventCalendarMeta'
+        },
+        paging: {
+            '$ref': '#/components/schemas/Paging'
         }
     },
     type: 'object',
-    required: ['results', 'meta'],
+    required: ['results', 'meta', 'paging'],
     title: 'EventPublicCalendarResponse',
     description: 'Wrapper response for ``GET /events/public/calendar``.'
 } as const;

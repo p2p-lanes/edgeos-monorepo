@@ -1,4 +1,5 @@
 import type { Metadata } from "next"
+import { Suspense } from "react"
 
 import { PublicCalendarClient } from "./PublicCalendarClient"
 
@@ -28,5 +29,9 @@ export default async function PublicCalendarPage({
   params,
 }: PublicCalendarPageProps) {
   const { popupSlug } = await params
-  return <PublicCalendarClient popupSlug={popupSlug} />
+  return (
+    <Suspense fallback={null}>
+      <PublicCalendarClient key={popupSlug} popupSlug={popupSlug} />
+    </Suspense>
+  )
 }

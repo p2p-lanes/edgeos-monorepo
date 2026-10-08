@@ -69,6 +69,7 @@ class EventsCRUD(BaseCRUD[Events, EventCreate, EventUpdate]):
         exclude_statuses: list[EventStatus] | None = None,
         expand_occurrences: bool | None = None,
         include_outside_window: bool = False,
+        max_occurrences: int = DEFAULT_MAX_OCCURRENCES,
     ) -> tuple[list[Events], int]:
         """Return events for a popup.
 
@@ -172,6 +173,7 @@ class EventsCRUD(BaseCRUD[Events, EventCreate, EventUpdate]):
                 window_start=start_after,
                 window_end=start_before,
                 include_outside_window=include_outside_window,
+                max_occurrences=max_occurrences,
             )
             expanded.sort(key=lambda e: (e.start_time, str(e.id)))
             total = len(expanded)
@@ -467,6 +469,7 @@ def _expand_rows_in_window(
     window_start: datetime | None,
     window_end: datetime | None,
     include_outside_window: bool = False,
+    max_occurrences: int = DEFAULT_MAX_OCCURRENCES,
 ) -> list[Events]:
     """Return ``rows`` with series masters expanded to occurrences.
 
@@ -525,7 +528,7 @@ def _expand_rows_in_window(
             window_start=window_start,
             window_end=window_end,
             exdates=list(ev.recurrence_exdates or []),
-            max_occurrences=DEFAULT_MAX_OCCURRENCES,
+            max_occurrences=max_occurrences,
             timezone=ev.timezone,
         )
         closed_starts = closed_occurrence_starts(

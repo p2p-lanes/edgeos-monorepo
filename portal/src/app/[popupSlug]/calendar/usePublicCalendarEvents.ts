@@ -4,7 +4,7 @@ import { useQuery } from "@tanstack/react-query"
 
 import { type EventPublicCalendarResponse, EventsService } from "@/client"
 
-interface UsePublicCalendarEventsArgs {
+export interface UsePublicCalendarEventsArgs {
   popupSlug: string
   tenantId?: string | null
   startAfter?: string | null
@@ -42,17 +42,48 @@ export function usePublicCalendarEvents({
       trackIds,
     ],
     queryFn: () =>
-      EventsService.listPublicCalendar({
+      fetchAllPublicCalendarEvents({
         popupSlug,
-        xTenantId: tenantId ?? undefined,
-        startAfter: startAfter ?? undefined,
-        startBefore: startBefore ?? undefined,
-        search: search || undefined,
-        tags: tags?.length ? tags : undefined,
-        trackIds: trackIds?.length ? trackIds : undefined,
-        limit: 200,
+        tenantId,
+        startAfter,
+        startBefore,
+        search,
+        tags,
+        trackIds,
       }),
     enabled: !!popupSlug && !!tenantId,
     staleTime: 60 * 1000,
   })
+}
+
+/** Fetch every occurrence so a busy popup's last day is never truncated. */
+export async function fetchAllPublicCalendarEvents({
+  popupSlug,
+  tenantId,
+  startAfter,
+  startBefore,
+  search,
+  tags,
+  trackIds,
+}: UsePublicCalendarEventsArgs): Promise<EventPublicCalendarResponse> {
+  const limit = 200
+  let skip = 0
+  let response: EventPublicCalendarResponse
+  const results: EventPublicCalendarResponse["results"] = []
+  do {
+    response = await EventsService.listPublicCalendar({
+      popupSlug,
+      xTenantId: tenantId ?? undefined,
+      startAfter: startAfter ?? undefined,
+      startBefore: startBefore ?? undefined,
+      search: search || undefined,
+      tags: tags?.length ? tags : undefined,
+      trackIds: trackIds?.length ? trackIds : undefined,
+      skip,
+      limit,
+    })
+    results.push(...response.results)
+    skip += response.results.length
+  } while (response.results.length > 0 && skip < response.paging.total)
+  return { ...response, results }
 }
