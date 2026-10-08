@@ -135,7 +135,8 @@ export function EventForm({
 }: EventFormProps) {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
-  const { showSuccessToast, showErrorToast } = useCustomToast()
+  const { showSuccessToast, showErrorToast, showWarningToast } =
+    useCustomToast()
   const { selectedPopupId } = useWorkspace()
   const { user, isOperatorOrAbove } = useAuth()
   const readOnly = !isOperatorOrAbove
@@ -267,8 +268,11 @@ export function EventForm({
   const createMutation = useMutation({
     mutationFn: (data: EventCreate) =>
       EventsService.createEvent({ requestBody: data }),
-    onSuccess: () => {
+    onSuccess: (event) => {
       showSuccessToast("Event created successfully")
+      for (const warning of event.warnings ?? []) {
+        showWarningToast("Some occurrences were skipped", warning)
+      }
       queryClient.invalidateQueries({ queryKey: ["events"] })
       skipBlockerRef.current = true
       form.reset()

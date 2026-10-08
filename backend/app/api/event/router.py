@@ -231,6 +231,15 @@ def _find_venue_open_hours_issue(
             .where(VenueExceptions.end_datetime > start_time)
         ).all()
     )
+    closed_exception = db.exec(
+        select(VenueExceptions)
+        .where(VenueExceptions.venue_id == venue.id)
+        .where(VenueExceptions.is_closed == True)  # noqa: E712
+        .where(VenueExceptions.start_datetime < end_time)
+        .where(VenueExceptions.end_datetime > start_time)
+    ).first()
+    if closed_exception is not None:
+        return (400, "Selected time falls outside the venue's open hours.")
     if not weekly_rows and not open_exceptions:
         return None  # no schedule configured = always open
 
@@ -662,7 +671,7 @@ def _check_recurrence_conflicts(
     exclude_event_id: uuid.UUID | None = None,
     timezone: str = "UTC",
     allow_unbookable: bool = False,
-) -> None:
+) -> list[datetime]:
     """For recurring events, expand each instance and run the anti-overlap
     venue check. Bails out on first conflict with 409.
 
@@ -670,7 +679,7 @@ def _check_recurrence_conflicts(
     only the base window is checked via :func:`_check_venue_availability`.
     """
     if venue_id is None:
-        return
+        return []
     if not rrule_str:
         _check_venue_availability(
             db,
@@ -680,7 +689,7 @@ def _check_recurrence_conflicts(
             exclude_event_id=exclude_event_id,
             allow_unbookable=allow_unbookable,
         )
-        return
+        return []
 
     try:
         rule = parse_rrule(rrule_str)
@@ -695,7 +704,7 @@ def _check_recurrence_conflicts(
             exclude_event_id=exclude_event_id,
             allow_unbookable=allow_unbookable,
         )
-        return
+        return []
 
     duration = end_time - start_time
     occurrences = expand(
@@ -710,7 +719,20 @@ def _check_recurrence_conflicts(
             status_code=400,
             detail="Recurrence expands to zero occurrences",
         )
+    closed_starts = crud.closed_occurrence_starts(
+        db,
+        venue_id=venue_id,
+        starts=occurrences,
+        duration=duration,
+    )
     for occ_start in occurrences:
+        occurrence_key = (
+            occ_start.replace(tzinfo=UTC)
+            if occ_start.tzinfo is None
+            else occ_start.astimezone(UTC)
+        ).replace(tzinfo=None)
+        if occurrence_key in closed_starts:
+            continue
         issue = _find_venue_availability_issue(
             db,
             venue_id=venue_id,
@@ -727,6 +749,16 @@ def _check_recurrence_conflicts(
             status_code=code,
             detail=_decorate_recurrence_detail(code, detail, label),
         )
+    return [
+        occ_start
+        for occ_start in occurrences
+        if (
+            occ_start.replace(tzinfo=UTC)
+            if occ_start.tzinfo is None
+            else occ_start.astimezone(UTC)
+        ).replace(tzinfo=None)
+        in closed_starts
+    ]
 
 
 def _ics_utc_stamp(dt: datetime) -> str:
@@ -1368,9 +1400,10 @@ async def create_event(
         )
 
     rrule_str = format_rrule(event_in.recurrence) if event_in.recurrence else None
+    skipped_closed_occurrences: list[datetime] = []
 
     if event_in.venue_id is not None:
-        _check_recurrence_conflicts(
+        skipped_closed_occurrences = _check_recurrence_conflicts(
             db,
             venue_id=event_in.venue_id,
             start_time=event_in.start_time,
@@ -1455,7 +1488,16 @@ async def create_event(
         actor=actor_from_user(current_user),
     )
 
-    return _with_collaborators(db, _to_public(event), event, include_email=True)
+    response = _with_collaborators(db, _to_public(event), event, include_email=True)
+    if skipped_closed_occurrences:
+        labels = [
+            _format_occurrence_label(occurrence, event.timezone)
+            for occurrence in skipped_closed_occurrences
+        ]
+        response.warnings = [
+            "No occurrence was scheduled on venue-closed dates: " + ", ".join(labels)
+        ]
+    return response
 
 
 @router.patch("/{event_id}", response_model=EventPublic)

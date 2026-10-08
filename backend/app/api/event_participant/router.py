@@ -482,6 +482,19 @@ async def register_for_event(
     occ_start = _resolve_occurrence_start(
         event, body.occurrence_start if body else None, require_scheduled=True
     )
+    if event.venue_id is not None and occ_start is not None:
+        from app.api.event.crud import closed_occurrence_starts
+
+        if closed_occurrence_starts(
+            db,
+            venue_id=event.venue_id,
+            starts=[occ_start],
+            duration=event.end_time - event.start_time,
+        ):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="This occurrence falls on a venue closure.",
+            )
 
     # Serialize the read-modify-write below against every other seat-taking
     # write for this event (another RSVP, or a QR check-in that creates the
