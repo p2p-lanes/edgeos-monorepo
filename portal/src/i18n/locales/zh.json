@@ -705,18 +705,22 @@
     "top_five": "前 5 名",
     "no_calendar_activity": "暂无日历活动",
     "badges": {
-      "title": "徽章",
+      "title": "我的徽章",
       "subtitle": "你获得的认可",
       "empty": "还没有徽章。有人送你徽章后会显示在这里。",
-      "link_title": "公开个人资料链接",
+      "close": "关闭",
+      "recognition": "认可记录",
+      "received_count": "已获得 {{count}} 次",
+      "share": "分享",
+      "share_title": "分享我的徽章",
       "link_description": "任何拥有链接的人都能看到你的名字、照片和徽章，但看不到你的邮箱。",
-      "link_toggle": "公开个人资料链接",
+      "link_activate": "启用链接",
+      "link_deactivate": "关闭链接",
       "link_copy": "复制链接",
       "link_copied": "链接已复制",
       "link_copy_failed": "无法复制链接",
-      "link_reset": "重置链接",
-      "link_reset_confirm": "要创建新链接吗？当前链接将失效。",
-      "link_off": "你的链接已关闭，任何人都无法打开。"
+      "link_enable_description": "启用公开链接，分享你的名字、照片和徽章。你的邮箱仍然保密。",
+      "link_update_failed": "无法更新分享设置，请重试。"
     }
   },
   "sidebar": {

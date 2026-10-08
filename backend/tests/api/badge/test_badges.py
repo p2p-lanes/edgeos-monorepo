@@ -432,12 +432,27 @@ def test_public_profile_shows_only_safe_fields(
     )
     assert settings.status_code == 200, settings.text
     token = settings.json()["token"]
-    assert settings.json()["enabled"] is True
-    # Stable across reads.
+    assert settings.json()["enabled"] is False
+    # Reading settings creates a stable token, but does not publish the profile.
     again = client.get(
         "/api/v1/humans/me/public-profile", headers=_human_headers(human)
     )
     assert again.json()["token"] == token
+    assert again.json()["enabled"] is False
+    assert (
+        client.get(
+            f"/api/v1/humans/public/profiles/{token}",
+            headers={"X-Tenant-Id": str(tenant.id)},
+        ).status_code
+        == 404
+    )
+    enabled = client.patch(
+        "/api/v1/humans/me/public-profile",
+        json={"enabled": True},
+        headers=_human_headers(human),
+    )
+    assert enabled.status_code == 200
+    assert enabled.json() == {"enabled": True, "token": token}
 
     resp = client.get(
         f"/api/v1/humans/public/profiles/{token}",
@@ -470,6 +485,11 @@ def test_public_profile_404s(
     url = f"/api/v1/humans/public/profiles/{token}"
     own = {"X-Tenant-Id": str(tenant.id)}
 
+    assert client.get(url, headers=own).status_code == 404
+    enabled = client.patch(
+        "/api/v1/humans/me/public-profile", json={"enabled": True}, headers=hh
+    )
+    assert enabled.status_code == 200
     assert client.get(url, headers=own).status_code == 200
     # Sibling tenant cannot resolve it.
     assert client.get(url, headers={"X-Tenant-Id": str(tenant_b.id)}).status_code == 404
