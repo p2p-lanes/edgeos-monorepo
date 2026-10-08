@@ -35,6 +35,7 @@ from sqlmodel import Session
 
 from app.api.event.models import Events
 from app.api.event.schemas import EventStatus, EventVisibility
+from app.api.event_venue.models import EventVenues, VenueExceptions
 from app.api.popup.models import Popups
 from app.api.tenant.models import Tenants
 
@@ -157,6 +158,55 @@ class TestCreateEvent:
         assert resp.status_code == 201, resp.text
         body = resp.json()
         assert body["rrule"] == "FREQ=WEEKLY;INTERVAL=1;BYDAY=TU,TH;COUNT=4"
+
+    def test_create_recurring_event_warns_and_skips_closed_dates(
+        self,
+        client: TestClient,
+        db: Session,
+        tenant_a: Tenants,
+        admin_token_tenant_a: str,
+    ) -> None:
+        popup = _make_popup(db, tenant_a)
+        venue = EventVenues(
+            tenant_id=tenant_a.id,
+            popup_id=popup.id,
+            owner_id=uuid.uuid4(),
+            title="Closed Schedule Venue",
+        )
+        db.add(venue)
+        db.commit()
+        db.refresh(venue)
+        start = datetime.now(UTC) + timedelta(days=3)
+        closed_start = start + timedelta(days=1)
+        db.add(
+            VenueExceptions(
+                tenant_id=tenant_a.id,
+                venue_id=venue.id,
+                start_datetime=closed_start,
+                end_datetime=closed_start + timedelta(hours=1),
+                is_closed=True,
+            )
+        )
+        db.commit()
+
+        resp = client.post(
+            "/api/v1/events",
+            headers=_auth(admin_token_tenant_a),
+            json={
+                "popup_id": str(popup.id),
+                "title": "Three dates",
+                "start_time": start.isoformat(),
+                "end_time": (start + timedelta(hours=1)).isoformat(),
+                "venue_id": str(venue.id),
+                "recurrence": {"freq": "DAILY", "count": 3},
+            },
+        )
+
+        assert resp.status_code == 201, resp.text
+        body = resp.json()
+        assert body["rrule"] == "FREQ=DAILY;INTERVAL=1;COUNT=3"
+        assert len(body["warnings"]) == 1
+        assert closed_start.strftime("%b %d") in body["warnings"][0]
 
 
 # ---------------------------------------------------------------------------
@@ -437,6 +487,62 @@ class TestListExpansion:
         assert len(master_rows) == 1
         # COUNT=3 → master (day 0) + 2 generated pseudos (day 1, day 2).
         assert len(pseudos) == 2
+
+    def test_closed_exception_suppresses_occurrence_during_dynamic_expansion(
+        self,
+        client: TestClient,
+        db: Session,
+        tenant_a: Tenants,
+        admin_token_tenant_a: str,
+    ) -> None:
+        popup = _make_popup(db, tenant_a)
+        venue = EventVenues(
+            tenant_id=tenant_a.id,
+            popup_id=popup.id,
+            owner_id=uuid.uuid4(),
+            title="Closed Schedule Venue",
+        )
+        db.add(venue)
+        db.commit()
+        db.refresh(venue)
+        start = datetime(2026, 5, 5, 14, 0, tzinfo=UTC)
+        closed_start = start + timedelta(days=1)
+        db.add(
+            VenueExceptions(
+                tenant_id=tenant_a.id,
+                venue_id=venue.id,
+                start_datetime=closed_start,
+                end_datetime=closed_start + timedelta(hours=1),
+                is_closed=True,
+            )
+        )
+        master = _make_event(
+            db,
+            tenant_a,
+            popup,
+            start=start,
+            rrule="FREQ=DAILY;INTERVAL=1;COUNT=3",
+        )
+        master.venue_id = venue.id
+        db.add(master)
+        db.commit()
+
+        resp = client.get(
+            "/api/v1/events",
+            headers=_auth(admin_token_tenant_a),
+            params={
+                "popup_id": str(popup.id),
+                "start_after": start.isoformat(),
+                "start_before": (start + timedelta(days=3)).isoformat(),
+            },
+        )
+
+        assert resp.status_code == 200, resp.text
+        results = [row for row in resp.json()["results"] if row["id"] == str(master.id)]
+        assert [
+            datetime.fromisoformat(row["start_time"].replace("Z", "+00:00"))
+            for row in results
+        ] == [start, start + timedelta(days=2)]
 
     def test_override_suppresses_matching_pseudo(
         self,

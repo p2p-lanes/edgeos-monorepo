@@ -10,6 +10,7 @@ from fastapi import HTTPException
 from sqlalchemy import func, or_
 from sqlmodel import Session, select
 
+from app.api.event.crud import closed_occurrence_starts
 from app.api.event.models import Events
 from app.api.event.recurrence import HARD_MAX_OCCURRENCES, expand, parse_rrule
 from app.api.event.series_schemas import EventSeriesOccurrence, EventSeriesSummary
@@ -103,6 +104,12 @@ def build_series_summary(db: Session, master: Events) -> EventSeriesSummary:
     else:
         dates = [master.start_time]
 
+    closed_starts = closed_occurrence_starts(
+        db,
+        venue_id=master.venue_id,
+        starts=dates,
+        duration=master.end_time - master.start_time,
+    )
     occurrences = [
         EventSeriesOccurrence(
             event_id=master.id,
@@ -117,6 +124,7 @@ def build_series_summary(db: Session, master: Events) -> EventSeriesSummary:
         )
         for date in dates
         if window_start <= _utc(date) < window_end
+        and _strip_tz(date) not in closed_starts
     ]
     occurrences.extend(
         EventSeriesOccurrence(
@@ -142,3 +150,7 @@ def build_series_summary(db: Session, master: Events) -> EventSeriesSummary:
         window_end=window_end,
         occurrences=occurrences,
     )
+
+
+def _strip_tz(value: datetime) -> datetime:
+    return _utc(value).replace(tzinfo=None)
