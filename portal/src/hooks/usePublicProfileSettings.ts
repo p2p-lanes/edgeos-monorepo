@@ -5,7 +5,7 @@ import { HumansService, type PublicProfileSettings } from "@/client"
 import { useIsAuthenticated } from "@/hooks/useIsAuthenticated"
 import { queryKeys } from "@/lib/query-keys"
 
-/** The caller's public profile share link: token, on/off, and reset. */
+/** The caller's public profile share link and its visibility setting. */
 const usePublicProfileSettings = () => {
   const isAuthenticated = useIsAuthenticated()
   const queryClient = useQueryClient()
@@ -25,16 +25,10 @@ const usePublicProfileSettings = () => {
     onSuccess: store,
   })
 
-  const regenerate = useMutation({
-    mutationFn: () => HumansService.regenerateMyPublicProfile(),
-    onSuccess: store,
-  })
-
   return {
     settings: query.data ?? null,
     isLoading: query.isLoading,
     setEnabled,
-    regenerate,
   }
 }
 

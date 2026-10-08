@@ -701,18 +701,23 @@
     "top_five": "Top 5",
     "no_calendar_activity": "Engin dagatalsvirkni ennþá",
     "badges": {
-      "title": "Merki",
+      "title": "Merkin mín",
       "subtitle": "Viðurkenningar sem þú hefur safnað",
       "empty": "Engin merki enn. Þau birtast hér þegar einhver gefur þér merki.",
-      "link_title": "Opinber prófílhlekkur",
+      "close": "Loka",
+      "recognition": "Viðurkenningar",
+      "received_count_one": "Móttekið {{count}} sinni",
+      "received_count_other": "Móttekið {{count}} sinnum",
+      "share": "Deila",
+      "share_title": "Deila merkjunum mínum",
       "link_description": "Allir með hlekkinn sjá nafnið þitt, mynd og merki. Aldrei netfangið þitt.",
-      "link_toggle": "Opinber prófílhlekkur",
+      "link_activate": "Virkja hlekk",
+      "link_deactivate": "Slökkva á hlekk",
       "link_copy": "Afrita hlekk",
       "link_copied": "Hlekkur afritaður",
       "link_copy_failed": "Ekki tókst að afrita hlekkinn",
-      "link_reset": "Endurstilla hlekk",
-      "link_reset_confirm": "Búa til nýjan hlekk? Núverandi hlekkur hættir að virka.",
-      "link_off": "Slökkt er á hlekknum þínum, enginn getur opnað hann."
+      "link_enable_description": "Virkjaðu opinberan hlekk til að deila nafni þínu, mynd og merkjum. Netfangið þitt er áfram einkamál.",
+      "link_update_failed": "Ekki tókst að uppfæra deilingu. Reyndu aftur."
     }
   },
   "sidebar": {

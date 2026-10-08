@@ -830,18 +830,23 @@
     "top_five": "Top 5",
     "no_calendar_activity": "No calendar activity yet",
     "badges": {
-      "title": "Badges",
+      "title": "My badges",
       "subtitle": "Recognition you have collected",
       "empty": "No badges yet. They show up here when someone gives you one.",
-      "link_title": "Public profile link",
+      "close": "Close",
+      "recognition": "Recognition",
+      "received_count_one": "Received {{count}} time",
+      "received_count_other": "Received {{count}} times",
+      "share": "Share",
+      "share_title": "Share my badges",
       "link_description": "Anyone with the link sees your name, photo and badges. Never your email.",
-      "link_toggle": "Public profile link",
+      "link_activate": "Activate link",
+      "link_deactivate": "Deactivate link",
       "link_copy": "Copy link",
       "link_copied": "Link copied",
       "link_copy_failed": "Could not copy the link",
-      "link_reset": "Reset link",
-      "link_reset_confirm": "Create a new link? The current one will stop working.",
-      "link_off": "Your link is off, so nobody can open it."
+      "link_enable_description": "Activate a public link to share your name, photo and badges. Your email stays private.",
+      "link_update_failed": "Could not update sharing. Please try again."
     }
   },
   "sidebar": {
