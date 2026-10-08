@@ -4108,6 +4108,53 @@ async def cancel_portal_event(
     return _to_public(updated)
 
 
+@router.delete("/portal/events/{event_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_portal_event(
+    event_id: uuid.UUID,
+    db: HumanTenantSession,
+    current_human: CurrentHuman,
+    token_payload: CallerToken,
+) -> None:
+    """Permanently delete an event (the whole series for a recurring master).
+
+    Owner only: unlike edit/cancel, the host and collaborators can't delete,
+    since it's irreversible. Never on an ended popup. Mirrors the admin
+    ``DELETE /events/{id}``.
+    """
+    event = crud.events_crud.get(db, event_id)
+    if not event:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Event not found"
+        )
+    ensure_api_key_popup(token_payload, event.popup_id)
+    if event.owner_id != current_human.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only the event owner can delete",
+        )
+    from app.api.popup.crud import popups_crud
+
+    ensure_popup_writable(popups_crud.get(db, event.popup_id))
+
+    # Send CANCEL to every attendee *before* we drop the row so they get a
+    # clean tombstone in their calendar. A cancelled event already sent it.
+    if event.status != EventStatus.CANCELLED:
+        try:
+            await _bump_and_dispatch_itip_cancel(db, event)
+        except Exception as exc:  # pragma: no cover - defensive
+            logger.warning(
+                "iTIP CANCEL on portal event delete {} failed: {}", event_id, exc
+            )
+    record_event_audit(
+        db,
+        event=event,
+        action=EventAuditAction.DELETED,
+        actor=actor_from_human(current_human),
+        commit=False,
+    )
+    crud.events_crud.delete(db, event)
+
+
 @router.get(
     "/portal/events/{event_id}/check-in-link",
     response_model=EventCheckInLink,

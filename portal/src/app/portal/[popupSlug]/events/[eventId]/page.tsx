@@ -174,8 +174,12 @@ export default function EventDetailPage() {
   // Rebuild the originating list state and retain the selected gathering door.
   // Access is popup-wide, but keeping `flow` avoids changing the user's sidebar
   // context when they return from a detail page.
-  const backParams = new URLSearchParams(fromSearch)
-  if (flowId) backParams.set("flow", flowId)
+  const listParams = new URLSearchParams(fromSearch)
+  if (flowId) listParams.set("flow", flowId)
+  // Same list state without `focus=`, for when the event no longer exists.
+  const listQs = listParams.toString()
+  const listHref = `/portal/${city?.slug}/events${listQs ? `?${listQs}` : ""}`
+  const backParams = new URLSearchParams(listParams)
   backParams.set("focus", params.eventId)
   // Stamp focusOcc alongside focus so the list can scroll to the *specific*
   // occurrence card on return — without it, all occurrences of a recurring
@@ -251,6 +255,9 @@ export default function EventDetailPage() {
 
   const canManage = !!event && canManageEvent(event, currentHuman?.id)
   const isEventHost = !!event && event.host_id === currentHuman?.id
+  // Deleting is irreversible, so only the creator gets it, not hosts or
+  // collaborators. Mirrors the backend's owner-only delete.
+  const isEventOwner = !!event && event.owner_id === currentHuman?.id
 
   // Ended popups are read-only in the portal: every write affordance (RSVP,
   // check-in, edit, cancel, invitations) is hidden. Mirrors the backend
@@ -356,6 +363,32 @@ export default function EventDetailPage() {
     },
     onError: (err: unknown) => {
       const fallback = t("events.detail.cancel_event_error") as string
+      let detail = fallback
+      if (err instanceof ApiError && err.body && typeof err.body === "object") {
+        const body = err.body as { detail?: unknown }
+        if (typeof body.detail === "string") detail = body.detail
+      }
+      toast.error(detail)
+    },
+  })
+
+  const [deleteEventOpen, setDeleteEventOpen] = useState(false)
+  const deleteEventMutation = useMutation({
+    mutationFn: () =>
+      EventsService.deletePortalEvent({ eventId: params.eventId }),
+    onSuccess: () => {
+      toast.success(t("events.detail.delete_event_success"))
+      // Drop (not invalidate) this event's detail so the page doesn't refetch
+      // a row that no longer exists on its way out.
+      queryClient.removeQueries({ queryKey: ["portal-event", params.eventId] })
+      queryClient.invalidateQueries({ queryKey: ["portal-events"] })
+      queryClient.invalidateQueries({ queryKey: ["portal-events-day"] })
+      queryClient.invalidateQueries({ queryKey: ["portal-events-calendar"] })
+      setDeleteEventOpen(false)
+      router.push(listHref)
+    },
+    onError: (err: unknown) => {
+      const fallback = t("events.detail.delete_event_error") as string
       let detail = fallback
       if (err instanceof ApiError && err.body && typeof err.body === "object") {
         const body = err.body as { detail?: unknown }
@@ -560,7 +593,7 @@ export default function EventDetailPage() {
         >
           <ArrowLeft className="h-4 w-4" /> {t("events.common.back_to_events")}
         </Link>
-        <div className="flex items-center gap-2 shrink-0">
+        <div className="flex flex-wrap items-center justify-end gap-2">
           {canManage && !isEnded && event.status !== "cancelled" && (
             <Dialog open={cancelEventOpen} onOpenChange={setCancelEventOpen}>
               <DialogTrigger asChild>
@@ -600,6 +633,54 @@ export default function EventDetailPage() {
                     {cancelEventMutation.isPending
                       ? t("events.detail.cancel_event_dialog_loading")
                       : t("events.detail.cancel_event_dialog_confirm")}
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+          )}
+          {isEventOwner && !isEnded && (
+            <Dialog open={deleteEventOpen} onOpenChange={setDeleteEventOpen}>
+              <DialogTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="text-destructive hover:text-destructive"
+                  disabled={deleteEventMutation.isPending}
+                  aria-label={t("events.detail.delete_event_button")}
+                >
+                  <Trash2 className="mr-2 h-3.5 w-3.5" />
+                  {t("events.detail.delete_event_button")}
+                </Button>
+              </DialogTrigger>
+              <DialogContent hasCloseButton={false}>
+                <DialogHeader>
+                  <DialogTitle>
+                    {t("events.detail.delete_event_dialog_title")}
+                  </DialogTitle>
+                  <DialogDescription>
+                    {event.rrule
+                      ? t(
+                          "events.detail.delete_event_dialog_description_recurring",
+                        )
+                      : t("events.detail.delete_event_dialog_description")}
+                  </DialogDescription>
+                </DialogHeader>
+                <DialogFooter>
+                  <Button
+                    variant="outline"
+                    onClick={() => setDeleteEventOpen(false)}
+                    disabled={deleteEventMutation.isPending}
+                  >
+                    {t("events.detail.delete_event_dialog_keep")}
+                  </Button>
+                  <Button
+                    variant="destructive"
+                    onClick={() => deleteEventMutation.mutate()}
+                    disabled={deleteEventMutation.isPending}
+                  >
+                    {deleteEventMutation.isPending
+                      ? t("events.detail.delete_event_dialog_loading")
+                      : t("events.detail.delete_event_dialog_confirm")}
                   </Button>
                 </DialogFooter>
               </DialogContent>

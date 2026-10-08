@@ -9316,6 +9316,12 @@ export type EventsUpdatePortalEventData = {
 
 export type EventsUpdatePortalEventResponse = (EventPublic);
 
+export type EventsDeletePortalEventData = {
+    eventId: string;
+};
+
+export type EventsDeletePortalEventResponse = (void);
+
 export type EventsDetachPortalOccurrenceData = {
     eventId: string;
     requestBody: OccurrenceRef;
