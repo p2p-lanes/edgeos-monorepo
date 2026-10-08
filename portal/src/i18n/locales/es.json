@@ -829,18 +829,23 @@
     "top_five": "Top 5",
     "no_calendar_activity": "Todavía no hay actividad en el calendario",
     "badges": {
-      "title": "Insignias",
+      "title": "Mis insignias",
       "subtitle": "El reconocimiento que fuiste juntando",
       "empty": "Todavía no tenés insignias. Aparecen acá cuando alguien te da una.",
-      "link_title": "Enlace público del perfil",
+      "close": "Cerrar",
+      "recognition": "Reconocimientos",
+      "received_count_one": "Recibida {{count}} vez",
+      "received_count_other": "Recibida {{count}} veces",
+      "share": "Compartir",
+      "share_title": "Compartir mis insignias",
       "link_description": "Quien tenga el enlace ve tu nombre, tu foto y tus insignias. Nunca tu email.",
-      "link_toggle": "Enlace público del perfil",
+      "link_activate": "Activar enlace",
+      "link_deactivate": "Desactivar enlace",
       "link_copy": "Copiar enlace",
       "link_copied": "Enlace copiado",
       "link_copy_failed": "No se pudo copiar el enlace",
-      "link_reset": "Cambiar enlace",
-      "link_reset_confirm": "¿Crear un enlace nuevo? El actual va a dejar de funcionar.",
-      "link_off": "Tu enlace está desactivado, nadie puede abrirlo."
+      "link_enable_description": "Activa un enlace público para compartir tu nombre, foto e insignias. Tu email sigue siendo privado.",
+      "link_update_failed": "No se pudo actualizar el enlace. Inténtalo de nuevo."
     }
   },
   "sidebar": {
