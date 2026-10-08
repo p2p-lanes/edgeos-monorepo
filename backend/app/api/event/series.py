@@ -58,8 +58,8 @@ def build_series_summary(db: Session, master: Events) -> EventSeriesSummary:
     if window_end <= window_start:
         raise HTTPException(400, "The gathering has an invalid date range")
 
-    # Group existing records for this view only. Keep the event list's existing
-    # series-wide counts and all registration/capacity behavior unchanged.
+    # Group existing records for this view only. Registration/capacity
+    # behavior stays unchanged.
     counts_query = (
         select(
             EventParticipants.event_id,

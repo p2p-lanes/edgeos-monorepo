@@ -125,8 +125,11 @@ function EventViewContent() {
   const qrRef = useRef<HTMLDivElement>(null)
   const [editChoiceOpen, setEditChoiceOpen] = useState(false)
 
+  // Shares the edit page's key so every `["events"]` invalidation (save,
+  // calendar reschedule, approve...) refreshes this view too. A separate
+  // `["event", id]` key left it showing pre-edit data for up to staleTime.
   const { data: event } = useQuery({
-    queryKey: ["event", eventId],
+    queryKey: ["events", eventId],
     queryFn: () => EventsService.getEvent({ eventId }),
   })
 
