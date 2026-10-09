@@ -2,7 +2,7 @@ import {
   CUSTOM_HOME_HTML_MAX_BYTES,
   popupHomeHtmlByteLength,
 } from "@edgeos/shared-form-ui/popup-home"
-import { useForm } from "@tanstack/react-form"
+import { useForm, useStore } from "@tanstack/react-form"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { useNavigate } from "@tanstack/react-router"
 import {
@@ -26,7 +26,7 @@ import {
   ShoppingCart,
   Users,
 } from "lucide-react"
-import { useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import {
   ApprovalStrategiesService,
   type CheckoutMode,
@@ -44,6 +44,10 @@ import { FieldError } from "@/components/Common/FieldError"
 import { FormErrorSummary } from "@/components/Common/FormErrorSummary"
 import { ApprovalStrategyForm } from "@/components/forms/ApprovalStrategyForm"
 import { PopupHomeEditor } from "@/components/forms/PopupHomeEditor"
+import {
+  type PopupSidebarConfig,
+  PopupSidebarEditor,
+} from "@/components/forms/PopupSidebarEditor"
 import { PopupThirdPartyApps } from "@/components/forms/PopupThirdPartyApps"
 import { applicationReviewVisibility } from "@/components/forms/popupApplicationReviewVisibility"
 import { getMissingLaunchFields } from "@/components/forms/popupLaunchChecklist"
@@ -77,7 +81,7 @@ import useAuth from "@/hooks/useAuth"
 import useCustomToast from "@/hooks/useCustomToast"
 import {
   UnsavedChangesDialog,
-  useUnsavedChanges,
+  useDirtyBlocker,
 } from "@/hooks/useUnsavedChanges"
 import { createErrorHandler } from "@/utils"
 
@@ -148,6 +152,31 @@ export function PopupForm({
   initialTab = "general",
 }: PopupFormProps) {
   const [activeTab, setActiveTab] = useState(initialTab)
+  const [sidebarConfig, setSidebarConfig] = useState<PopupSidebarConfig | null>(
+    (defaultValues?.sidebar_config as PopupSidebarConfig | null | undefined) ??
+      null,
+  )
+  const [savedSidebarConfig, setSavedSidebarConfig] =
+    useState<PopupSidebarConfig | null>(sidebarConfig)
+  const sidebarConfigRef = useRef(sidebarConfig)
+  const savedSidebarConfigRef = useRef(savedSidebarConfig)
+  sidebarConfigRef.current = sidebarConfig
+  savedSidebarConfigRef.current = savedSidebarConfig
+  useEffect(() => {
+    const loadedConfig =
+      (defaultValues?.sidebar_config as
+        | PopupSidebarConfig
+        | null
+        | undefined) ?? null
+    if (
+      JSON.stringify(sidebarConfigRef.current) !==
+      JSON.stringify(savedSidebarConfigRef.current)
+    ) {
+      return
+    }
+    setSidebarConfig(loadedConfig)
+    setSavedSidebarConfig(loadedConfig)
+  }, [defaultValues?.sidebar_config])
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const { showSuccessToast, showErrorToast, showWarningToast } =
@@ -155,6 +184,7 @@ export function PopupForm({
   const { isOperatorOrAbove, isAdmin } = useAuth()
   const isEdit = !!defaultValues
   const readOnly = !isOperatorOrAbove
+  const canCustomizeSidebar = isAdmin
   // Does anybody apply to this event? Answered by its doors, because one of
   // them can review applicants while another sells. On a new event there are
   // no doors yet, so the choice made below in the form is the answer.
@@ -201,8 +231,13 @@ export function PopupForm({
         requestBody: popup,
       })
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
+      const persistedSidebarConfig =
+        (data.sidebar_config as PopupSidebarConfig | null | undefined) ?? null
+      setSidebarConfig(persistedSidebarConfig)
+      setSavedSidebarConfig(persistedSidebarConfig)
       showSuccessToast("Gathering updated successfully")
+      queryClient.setQueryData(["popups", defaultValues!.id], data)
       queryClient.invalidateQueries({ queryKey: ["popups"] })
       queryClient.invalidateQueries({
         queryKey: ["popup-home", defaultValues!.id],
@@ -329,6 +364,19 @@ export function PopupForm({
           (isEdit ? takesApplications : value.sale_type === "application") &&
           value.show_attendee_directory,
         group_private_events_enabled: value.group_private_events_enabled,
+        ...(isEdit && canCustomizeSidebar
+          ? {
+              sidebar_config: sidebarConfig
+                ? {
+                    sections: sidebarConfig.sections.filter(
+                      (section) =>
+                        section.kind !== "external" ||
+                        (section.links?.length ?? 0) > 0,
+                    ),
+                  }
+                : null,
+            }
+          : {}),
       }
       if (value.status === "active") {
         const missing = getMissingLaunchFields(value)
@@ -369,7 +417,10 @@ export function PopupForm({
     },
   })
 
-  const blocker = useUnsavedChanges(form)
+  const formIsDirty = useStore(form.store, (state) => state.isDirty)
+  const sidebarIsDirty =
+    JSON.stringify(sidebarConfig) !== JSON.stringify(savedSidebarConfig)
+  const blocker = useDirtyBlocker(formIsDirty || sidebarIsDirty)
   const isPending = createMutation.isPending || updateMutation.isPending
 
   return (
@@ -414,6 +465,9 @@ export function PopupForm({
               Features
             </TabsTrigger>
             <TabsTrigger value="branding">Branding</TabsTrigger>
+            {isEdit && canCustomizeSidebar && (
+              <TabsTrigger value="sidebar">Portal sidebar</TabsTrigger>
+            )}
             {isEdit && <TabsTrigger value="home">Home page</TabsTrigger>}
             <TabsTrigger value="languages">Languages</TabsTrigger>
           </TabsList>
@@ -1080,6 +1134,18 @@ export function PopupForm({
               </form.Field>
             </InlineSection>
           </TabsContent>
+
+          {isEdit && canCustomizeSidebar && (
+            <TabsContent value="sidebar" className="space-y-6">
+              <InlineSection title="Portal navigation">
+                <PopupSidebarEditor
+                  value={sidebarConfig}
+                  onChange={setSidebarConfig}
+                  disabled={false}
+                />
+              </InlineSection>
+            </TabsContent>
+          )}
 
           {/* ─── Branding ────────────────────────────────────────────── */}
           <TabsContent

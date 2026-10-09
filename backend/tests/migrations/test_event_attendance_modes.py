@@ -81,10 +81,12 @@ def test_backfill_marks_events_with_check_ins_and_logs_them():
             config = Config("alembic.ini")
             config.attributes["connection"] = connection
             command.upgrade(config, PREVIOUS_REVISION)
-            # The ORM model already has the later popup badges flag.
+            # The ORM model also includes columns introduced after this revision.
             connection.execute(
                 text(
-                    "ALTER TABLE popups ADD COLUMN badges_enabled BOOLEAN NOT NULL DEFAULT false"
+                    "ALTER TABLE popups "
+                    "ADD COLUMN badges_enabled BOOLEAN NOT NULL DEFAULT false, "
+                    "ADD COLUMN sidebar_config JSONB"
                 )
             )
 

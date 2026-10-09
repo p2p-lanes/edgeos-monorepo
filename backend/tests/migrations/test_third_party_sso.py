@@ -5,7 +5,8 @@ from alembic.config import Config
 from alembic.script import ScriptDirectory
 from sqlalchemy import inspect, text
 
-REVISION = "b5e7a9c1d3f2"
+HEAD_REVISION = "f0fbedba955c"
+SSO_REVISION = "b5e7a9c1d3f2"
 PREVIOUS_REVISION = "a4f6b8d2c9e1"
 TABLES = ("popup_third_party_apps", "third_party_authorization_codes")
 URL_COLUMNS = {"sso_start_url", "sso_redirect_uri"}
@@ -13,12 +14,12 @@ URL_COLUMNS = {"sso_start_url", "sso_redirect_uri"}
 
 def test_sso_schema_and_tenant_permissions(migration_test_engine):
     script = ScriptDirectory.from_config(Config("alembic.ini"))
-    assert script.get_heads() == [REVISION]
-    assert script.get_revision(REVISION).down_revision == PREVIOUS_REVISION
+    assert script.get_heads() == [HEAD_REVISION]
+    assert script.get_revision(SSO_REVISION).down_revision == PREVIOUS_REVISION
     with migration_test_engine.begin() as connection:
         config = Config("alembic.ini")
         config.attributes["connection"] = connection
-        command.upgrade(config, REVISION)
+        command.upgrade(config, HEAD_REVISION)
         columns = {
             column["name"]: column
             for column in inspect(connection).get_columns("third_party_apps")
@@ -63,7 +64,7 @@ def test_sso_downgrade_and_upgrade_preserve_app_table(migration_test_engine):
     with migration_test_engine.begin() as connection:
         config = Config("alembic.ini")
         config.attributes["connection"] = connection
-        command.upgrade(config, REVISION)
+        command.upgrade(config, HEAD_REVISION)
         try:
             command.downgrade(config, PREVIOUS_REVISION)
             names = inspect(connection).get_table_names()
@@ -75,7 +76,7 @@ def test_sso_downgrade_and_upgrade_preserve_app_table(migration_test_engine):
             }
             assert not URL_COLUMNS & columns
         finally:
-            command.upgrade(config, REVISION)
+            command.upgrade(config, HEAD_REVISION)
         assert set(TABLES) <= set(inspect(connection).get_table_names())
         assert URL_COLUMNS <= {
             column["name"]
