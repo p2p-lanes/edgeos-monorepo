@@ -102,6 +102,10 @@
     "definitive_total": "Total"
   },
   "orders": {
+    "show_unit_qr": "Ver QR",
+    "show_unit_qr_label": "Ver QR de {{product}}, unidad {{number}}",
+    "unit_qr_title": "{{product}} · QR {{number}}",
+    "unit_qr_description": "Mostrá este QR al operador para validar esta unidad.",
     "title": "Pagos",
     "description": "Tu historial de pagos para este evento.",
     "empty_title": "Todavía no hay pagos",
