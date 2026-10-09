@@ -143,10 +143,10 @@ def _with_flow_kinds(db, popups: list, models: list) -> list:
 @router.get("/public/list", response_model=list[PopupPublic])
 async def list_public_popups(
     session: SessionDep,
-    x_tenant_id: Annotated[str, Header(alias="X-Tenant-Id")],
+    x_tenant_id: Annotated[uuid.UUID, Header(alias="X-Tenant-Id")],
 ) -> list[PopupPublic]:
     """List active popups for a tenant (public, no auth required). Used by checkout flow."""
-    tenant_id = uuid.UUID(x_tenant_id)
+    tenant_id = x_tenant_id
     popups, _ = crud.find(session, status=PopupStatus.active, tenant_id=tenant_id)
     return _with_flow_kinds(
         session, popups, [PopupPublic.model_validate(p) for p in popups]
