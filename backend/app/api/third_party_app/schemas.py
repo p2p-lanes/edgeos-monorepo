@@ -23,7 +23,19 @@ from app.core.security import (
 )
 
 
-class ThirdPartyAppCreate(BaseModel):
+class SSOSettings(BaseModel):
+    sso_start_url: str | None = Field(default=None, max_length=2048)
+    sso_redirect_uri: str | None = Field(default=None, max_length=2048)
+
+    @field_validator("sso_start_url", "sso_redirect_uri")
+    @classmethod
+    def _sso_url(cls, value: str | None) -> str | None:
+        from app.api.third_party_app.sso_urls import validate_sso_url
+
+        return validate_sso_url(value)
+
+
+class ThirdPartyAppCreate(SSOSettings):
     """Request body for creating a third-party app."""
 
     name: str = Field(min_length=1, max_length=100)
@@ -51,7 +63,7 @@ class ThirdPartyAppCreate(BaseModel):
         return v
 
 
-class ThirdPartyAppUpdate(BaseModel):
+class ThirdPartyAppUpdate(SSOSettings):
     """Request body for PATCH /third-party-apps/{id}.
 
     All fields are optional. Scope validators only fire when the field is
@@ -102,6 +114,8 @@ class ThirdPartyAppPublic(BaseModel):
     allowed_token_scopes: list[str]
     allowed_api_key_scopes: list[str]
     active: bool
+    sso_start_url: str | None = None
+    sso_redirect_uri: str | None = None
     last_used_at: datetime | None
     revoked_at: datetime | None
     created_at: datetime

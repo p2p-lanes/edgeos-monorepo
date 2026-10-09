@@ -1,6 +1,6 @@
 """Admin CRUD router for /third-party-apps.
 
-All endpoints require CurrentAdmin (ADMIN or SUPERADMIN).
+All endpoints require an ADMIN or SUPERADMIN JWT; API keys are not accepted.
 
 Tenant scoping:
   ADMIN — operates on their own tenant (enforced by RLS + explicit tenant_id check).
@@ -14,7 +14,7 @@ Route ordering note:
 import uuid
 from typing import Annotated
 
-from fastapi import APIRouter, Header, HTTPException, Response, status
+from fastapi import APIRouter, Depends, Header, HTTPException, Response, status
 from sqlalchemy.exc import IntegrityError
 
 from app.api.shared.enums import UserRole
@@ -30,13 +30,19 @@ from app.api.third_party_app.schemas import (
 from app.core.dependencies.users import (
     CurrentAdmin,
     TenantSession,
+    get_admin_jwt_only,
 )
 from app.core.security import (
     THIRD_PARTY_API_KEY_SCOPES_MAX,
     THIRD_PARTY_TOKEN_SCOPES_MAX,
 )
 
-router = APIRouter(prefix="/third-party-apps", tags=["third-party-apps"])
+# Check JWT-only authority before resolving any tenant-scoped DB session.
+router = APIRouter(
+    prefix="/third-party-apps",
+    tags=["third-party-apps"],
+    dependencies=[Depends(get_admin_jwt_only)],
+)
 
 _NAME_CONFLICT_MSG = "App name already in use for this tenant"
 _REVOKED_EDIT_MSG = "Cannot edit a revoked app"
@@ -129,6 +135,8 @@ async def create_third_party_app(
             name=body.name.strip(),
             allowed_token_scopes=list(body.allowed_token_scopes),
             allowed_api_key_scopes=list(body.allowed_api_key_scopes),
+            sso_start_url=body.sso_start_url,
+            sso_redirect_uri=body.sso_redirect_uri,
         )
     except IntegrityError:
         db.rollback()
