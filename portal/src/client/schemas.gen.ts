@@ -14303,8 +14303,7 @@ export const EventPublicSchema = {
                 type: 'string'
             },
             type: 'array',
-            title: 'Warnings',
-            default: []
+            title: 'Warnings'
         },
         occurrence_id: {
             anyOf: [
@@ -24078,6 +24077,18 @@ export const PopupAdminSchema = {
             ],
             title: 'Theme Config'
         },
+        sidebar_config: {
+            anyOf: [
+                {
+                    additionalProperties: true,
+                    type: 'object'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Sidebar Config'
+        },
         favicon_url: {
             anyOf: [
                 {
@@ -24801,6 +24812,18 @@ export const PopupCreateSchema = {
             ],
             title: 'Theme Config'
         },
+        sidebar_config: {
+            anyOf: [
+                {
+                    additionalProperties: true,
+                    type: 'object'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Sidebar Config'
+        },
         favicon_url: {
             anyOf: [
                 {
@@ -25413,6 +25436,18 @@ export const PopupPublicSchema = {
                 }
             ],
             title: 'Theme Config'
+        },
+        sidebar_config: {
+            anyOf: [
+                {
+                    additionalProperties: true,
+                    type: 'object'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Sidebar Config'
         },
         favicon_url: {
             anyOf: [
@@ -26110,6 +26145,18 @@ export const PopupUpdateSchema = {
                 }
             ],
             title: 'Theme Config'
+        },
+        sidebar_config: {
+            anyOf: [
+                {
+                    additionalProperties: true,
+                    type: 'object'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Sidebar Config'
         },
         favicon_url: {
             anyOf: [

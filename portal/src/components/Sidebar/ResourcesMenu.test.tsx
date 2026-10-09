@@ -58,6 +58,14 @@ const resources = [
 ]
 
 let includeCheckoutResources = true
+let configuredSidebar: {
+  sections?: {
+    id: string
+    kind: "commerce" | "checkouts" | "community" | "external"
+    title?: string
+    links?: { id: string; label: string; url: string }[]
+  }[]
+} | null = null
 
 vi.mock("next/navigation", () => ({
   usePathname: () => "/portal/summit/shop/attendee",
@@ -69,8 +77,17 @@ vi.mock("react-i18next", () => ({
     t: (key: string) =>
       ({
         "sidebar.navigation": "Portal navigation",
-        "sidebar.commerce": "Commerce",
-        "sidebar.checkouts": "Checkouts",
+        "sidebar.home": "Home",
+        "sidebar.application": "Application",
+        "sidebar.overview": "Overview",
+        "sidebar.passes": "Passes",
+        "sidebar.orders": "Payments",
+        "sidebar.events": "Events",
+        "sidebar.attendee_directory": "Attendee Directory",
+        "sidebar.referrals": "Referrals",
+        "sidebar.commerce": "General",
+        "sidebar.general": "General",
+        "sidebar.checkouts": "Commerce",
         "sidebar.community": "Community",
         "sidebar.mobile_navigation": "Portal navigation menu",
       })[key] ?? key,
@@ -83,6 +100,12 @@ vi.mock("@/hooks/useResources", () => ({
       ? resources
       : resources.filter((resource) => resource.group !== "checkouts"),
     doorName: null,
+  }),
+}))
+
+vi.mock("@/providers/cityProvider", () => ({
+  useCityProvider: () => ({
+    getCity: () => ({ sidebar_config: configuredSidebar }),
   }),
 }))
 
@@ -140,6 +163,9 @@ vi.mock("./SidebarComponents", () => ({
   SidebarMenuItem: ({ children }: { children: React.ReactNode }) => (
     <div>{children}</div>
   ),
+  SidebarMenuButton: ({ children }: { children: React.ReactNode }) => (
+    <div>{children}</div>
+  ),
   SidebarMenuSub: ({ children }: { children: React.ReactNode }) => (
     <div>{children}</div>
   ),
@@ -150,27 +176,28 @@ import ResourcesMenu from "./ResourcesMenu"
 describe("ResourcesMenu", () => {
   beforeEach(() => {
     includeCheckoutResources = true
+    configuredSidebar = null
   })
 
-  it("renders Commerce, translated Checkouts, and Community in order", () => {
+  it("renders General, Commerce, and Community in order", () => {
     render(<ResourcesMenu />)
 
     expect(
       screen.getByRole("navigation", { name: "Portal navigation" }),
     ).toBeTruthy()
+    expect(screen.getByRole("heading", { name: "General" })).toBeTruthy()
     expect(screen.getByRole("heading", { name: "Commerce" })).toBeTruthy()
-    expect(screen.getByRole("heading", { name: "Checkouts" })).toBeTruthy()
     expect(screen.getByRole("heading", { name: "Community" })).toBeTruthy()
     expect(
       screen.getAllByRole("heading").map((heading) => heading.textContent),
-    ).toEqual(["Commerce", "Checkouts", "Community"])
+    ).toEqual(["General", "Commerce", "Community"])
     expect(screen.queryByText("People")).toBeNull()
     expect(screen.queryByText("Shop")).toBeNull()
     expect(screen.queryByText("Orders")).toBeNull()
     expect(screen.getAllByText("Payments")).not.toHaveLength(0)
     expect(screen.getAllByText("Merch Store")).not.toHaveLength(0)
-    const commerce = screen.getByRole("region", { name: "Commerce" })
-    const checkouts = screen.getByRole("region", { name: "Checkouts" })
+    const commerce = screen.getByRole("region", { name: "General" })
+    const checkouts = screen.getByRole("region", { name: "Commerce" })
     expect(
       within(commerce)
         .getAllByRole("link")
@@ -205,14 +232,58 @@ describe("ResourcesMenu", () => {
     ).toBeNull()
   })
 
-  it("does not render an empty Checkouts group", () => {
+  it("does not render an empty Commerce group", () => {
     includeCheckoutResources = false
 
     render(<ResourcesMenu />)
 
-    expect(screen.queryByRole("heading", { name: "Checkouts" })).toBeNull()
-    expect(screen.getByRole("heading", { name: "Commerce" })).toBeTruthy()
+    expect(screen.queryByRole("heading", { name: "Commerce" })).toBeNull()
+    expect(screen.getByRole("heading", { name: "General" })).toBeTruthy()
     expect(screen.getByRole("heading", { name: "Community" })).toBeTruthy()
+  })
+
+  it("reorders existing sections and renders an external-link section", () => {
+    configuredSidebar = {
+      sections: [
+        {
+          id: "checkouts",
+          kind: "checkouts",
+        },
+        {
+          id: "commerce",
+          kind: "commerce",
+        },
+        {
+          id: "external",
+          kind: "external",
+          title: "Venue links",
+          links: [
+            {
+              id: "external",
+              label: "Venue website",
+              url: "https://example.com",
+            },
+          ],
+        },
+      ],
+    }
+
+    render(<ResourcesMenu />)
+
+    expect(
+      screen.getAllByRole("heading").map((heading) => heading.textContent),
+    ).toEqual(["Commerce", "General", "Venue links", "Community"])
+    const section = screen.getByRole("region", { name: "General" })
+    expect(
+      within(section)
+        .getAllByRole("link")
+        .map((link) => link.textContent),
+    ).toEqual(["Home", "Application", "Passes", "Payments"])
+    expect(
+      screen
+        .getByRole("link", { name: "Venue website" })
+        .getAttribute("target"),
+    ).toBe("_blank")
   })
 
   it("uses the localized name for the mobile navigation sheet", () => {

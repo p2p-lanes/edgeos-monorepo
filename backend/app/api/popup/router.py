@@ -301,6 +301,15 @@ async def create_popup(
     current_user: CurrentOperatorJwtOnly,
     x_tenant_id: Annotated[str | None, Header(alias="X-Tenant-Id")] = None,
 ) -> PopupAdmin:
+    if popup_in.sidebar_config is not None and current_user.role not in {
+        UserRole.SUPERADMIN,
+        UserRole.ADMIN,
+    }:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only admins can customize the portal sidebar",
+        )
+
     if current_user.role == UserRole.SUPERADMIN:
         if x_tenant_id:
             popup_in.tenant_id = uuid.UUID(x_tenant_id)
@@ -381,8 +390,17 @@ async def update_popup(
     popup_id: uuid.UUID,
     popup_in: PopupUpdate,
     db: TenantSession,
-    _current_user: CurrentOperatorJwtOnly,
+    current_user: CurrentOperatorJwtOnly,
 ) -> PopupAdmin:
+    if "sidebar_config" in popup_in.model_fields_set and current_user.role not in {
+        UserRole.SUPERADMIN,
+        UserRole.ADMIN,
+    }:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only admins can customize the portal sidebar",
+        )
+
     popup = crud.get(db, popup_id)
 
     if not popup:

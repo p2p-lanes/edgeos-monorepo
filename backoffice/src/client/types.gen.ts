@@ -5154,6 +5154,9 @@ export type PopupAdmin = {
     theme_config?: ({
     [key: string]: unknown;
 } | null);
+    sidebar_config?: ({
+    [key: string]: unknown;
+} | null);
     favicon_url?: (string | null);
     default_language?: string;
     supported_languages?: Array<(string)>;
@@ -5246,6 +5249,9 @@ export type PopupCreate = {
     theme_config?: ({
     [key: string]: unknown;
 } | null);
+    sidebar_config?: ({
+    [key: string]: unknown;
+} | null);
     favicon_url?: (string | null);
     default_language?: string;
     supported_languages?: Array<(string)>;
@@ -5331,6 +5337,9 @@ export type PopupPublic = {
     requires_application_fee?: boolean;
     application_fee_amount?: (string | null);
     theme_config?: ({
+    [key: string]: unknown;
+} | null);
+    sidebar_config?: ({
     [key: string]: unknown;
 } | null);
     favicon_url?: (string | null);
@@ -5432,6 +5441,9 @@ export type PopupUpdate = {
     requires_application_fee?: (boolean | null);
     application_fee_amount?: (number | string | null);
     theme_config?: ({
+    [key: string]: unknown;
+} | null);
+    sidebar_config?: ({
     [key: string]: unknown;
 } | null);
     favicon_url?: (string | null);
