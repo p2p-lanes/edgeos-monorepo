@@ -53,7 +53,7 @@ const PrivacySettings = () => {
         popupId: city!.id,
         primaryFlowOnly: true,
       }),
-    enabled: !!city?.id && open,
+    enabled: !!city?.id,
   })
 
   const updateMutation = useMutation({
@@ -92,6 +92,8 @@ const PrivacySettings = () => {
   useEffect(() => {
     if (application) setHiddenFields(application.info_not_shared ?? [])
   }, [application])
+
+  if (applicationQuery.isFetched && !application) return null
 
   return (
     <Dialog

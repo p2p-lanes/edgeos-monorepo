@@ -143,10 +143,10 @@ def _with_flow_kinds(db, popups: list, models: list) -> list:
 @router.get("/public/list", response_model=list[PopupPublic])
 async def list_public_popups(
     session: SessionDep,
-    x_tenant_id: Annotated[str, Header(alias="X-Tenant-Id")],
+    x_tenant_id: Annotated[uuid.UUID, Header(alias="X-Tenant-Id")],
 ) -> list[PopupPublic]:
     """List active popups for a tenant (public, no auth required). Used by checkout flow."""
-    tenant_id = uuid.UUID(x_tenant_id)
+    tenant_id = x_tenant_id
     popups, _ = crud.find(session, status=PopupStatus.active, tenant_id=tenant_id)
     return _with_flow_kinds(
         session, popups, [PopupPublic.model_validate(p) for p in popups]
@@ -301,6 +301,15 @@ async def create_popup(
     current_user: CurrentOperatorJwtOnly,
     x_tenant_id: Annotated[str | None, Header(alias="X-Tenant-Id")] = None,
 ) -> PopupAdmin:
+    if popup_in.sidebar_config is not None and current_user.role not in {
+        UserRole.SUPERADMIN,
+        UserRole.ADMIN,
+    }:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only admins can customize the portal sidebar",
+        )
+
     if current_user.role == UserRole.SUPERADMIN:
         if x_tenant_id:
             popup_in.tenant_id = uuid.UUID(x_tenant_id)
@@ -381,8 +390,17 @@ async def update_popup(
     popup_id: uuid.UUID,
     popup_in: PopupUpdate,
     db: TenantSession,
-    _current_user: CurrentOperatorJwtOnly,
+    current_user: CurrentOperatorJwtOnly,
 ) -> PopupAdmin:
+    if "sidebar_config" in popup_in.model_fields_set and current_user.role not in {
+        UserRole.SUPERADMIN,
+        UserRole.ADMIN,
+    }:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only admins can customize the portal sidebar",
+        )
+
     popup = crud.get(db, popup_id)
 
     if not popup:
@@ -580,35 +598,12 @@ async def get_portal_popup_home(
     if_none_match: Annotated[str | None, Header(alias="If-None-Match")] = None,
 ) -> PopupHomePublic | Response:
     """Return only a published home document, never an admin draft."""
-    from app.api.application.crud import applications_crud  # noqa: PLC0415
+    from app.api.popup.home import get_accessible_home
 
-    popup = crud.get_by_slug(db, slug)
-    if not popup or popup.status not in (PopupStatus.active, PopupStatus.ended):
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Home page not found",
-        )
+    popup, home = get_accessible_home(
+        db, slug, current_human.tenant_id, current_human.id
+    )
     ensure_api_key_popup(token_payload, popup.id)
-
-    if popup.status == PopupStatus.ended:
-        access = applications_crud.resolve_popup_access(db, current_human.id, popup.id)
-        if not access.allowed:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Home page not found",
-            )
-
-    home = db.get(PopupHomePages, popup.id)
-    if (
-        not popup.custom_home_enabled
-        or home is None
-        or home.html is None
-        or not home.html.strip()
-    ):
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Home page not found",
-        )
 
     etag = f'"{home.version}"'
     cache_control = "private, max-age=0, must-revalidate"

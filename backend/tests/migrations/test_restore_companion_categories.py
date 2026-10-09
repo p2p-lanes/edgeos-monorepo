@@ -31,8 +31,8 @@ def test_backfill_preserves_buyers_existing_categories_and_ambiguous_history(
         command.upgrade(config, migration.revision)
         command.downgrade(config, migration.down_revision)
         # This test intentionally runs at the migration's parent revision,
-        # while the ORM model reflects the later SimpleFi-key and badges
-        # (public profile link, popup flag) migrations.
+        # while the ORM model reflects later SimpleFi-key, profile, badge, and
+        # sidebar configuration fields.
         connection.execute(
             text("ALTER TABLE sales_flows ADD COLUMN simplefi_api_key VARCHAR")
         )
@@ -44,7 +44,9 @@ def test_backfill_preserves_buyers_existing_categories_and_ambiguous_history(
         )
         connection.execute(
             text(
-                "ALTER TABLE popups ADD COLUMN badges_enabled BOOLEAN NOT NULL DEFAULT false"
+                "ALTER TABLE popups "
+                "ADD COLUMN badges_enabled BOOLEAN NOT NULL DEFAULT false, "
+                "ADD COLUMN sidebar_config JSONB"
             )
         )
         with Session(bind=connection, join_transaction_mode="create_savepoint") as db:

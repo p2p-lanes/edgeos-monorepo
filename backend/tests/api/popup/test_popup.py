@@ -67,6 +67,58 @@ def test_create_popup_409_on_same_tenant_slug_conflict(
     assert "slug" in body["detail"].lower()
 
 
+def test_sidebar_config_is_admin_only(
+    client: TestClient,
+    admin_token_tenant_a: str,
+    operator_token_tenant_a: str,
+) -> None:
+    popup = client.post(
+        "/api/v1/popups",
+        headers=_admin_headers(admin_token_tenant_a),
+        json=_create_popup_payload(f"Sidebar {uuid.uuid4().hex[:8]}"),
+    )
+    assert popup.status_code == 201, popup.text
+    popup_id = popup.json()["id"]
+    config = {
+        "sections": [
+            {
+                "id": "venue-links",
+                "kind": "external",
+                "title": "Explore",
+                "links": [
+                    {
+                        "id": "venue-site",
+                        "label": "Venue website",
+                        "url": "https://example.com",
+                    }
+                ],
+            }
+        ]
+    }
+
+    operator_response = client.patch(
+        f"/api/v1/popups/{popup_id}",
+        headers=_admin_headers(operator_token_tenant_a),
+        json={"sidebar_config": config},
+    )
+    assert operator_response.status_code == 403, operator_response.text
+
+    admin_response = client.patch(
+        f"/api/v1/popups/{popup_id}",
+        headers=_admin_headers(admin_token_tenant_a),
+        json={"sidebar_config": config},
+    )
+    assert admin_response.status_code == 200, admin_response.text
+    assert admin_response.json()["sidebar_config"] == config
+
+    reload_response = client.get(
+        f"/api/v1/popups/{popup_id}",
+        headers=_admin_headers(admin_token_tenant_a),
+    )
+    assert reload_response.status_code == 200, reload_response.text
+    assert reload_response.json()["sidebar_config"] == config
+
+
 def test_create_popup_201_on_cross_tenant_slug(
     client: TestClient,
     admin_token_tenant_a: str,

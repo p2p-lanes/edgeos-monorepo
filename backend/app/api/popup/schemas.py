@@ -281,6 +281,12 @@ class PopupBase(SQLModel):
         default=None,
         sa_column=Column(JSONB, nullable=True),
     )
+    # Per-gathering portal navigation layout. Items are resource identifiers
+    # plus custom external links; permissions are still computed independently.
+    sidebar_config: dict | None = Field(
+        default=None,
+        sa_column=Column(JSONB, nullable=True),
+    )
     favicon_url: str | None = None
     default_language: str = Field(default="en")
     supported_languages: list[str] = Field(
@@ -433,6 +439,7 @@ class PopupCreate(SQLModel):
     requires_application_fee: bool = False
     application_fee_amount: Decimal | None = None
     theme_config: dict | None = None
+    sidebar_config: dict | None = None
     favicon_url: str | None = None
     default_language: str = "en"
     supported_languages: list[str] = ["en"]
@@ -562,6 +569,7 @@ class PopupUpdate(SQLModel):
     requires_application_fee: bool | None = None
     application_fee_amount: Decimal | None = None
     theme_config: dict | None = None
+    sidebar_config: dict | None = None
     favicon_url: str | None = None
     default_language: str | None = None
     supported_languages: list[str] | None = None
@@ -725,6 +733,7 @@ class PopupPublic(SQLModel):
     requires_application_fee: bool = False
     application_fee_amount: Decimal | None = None
     theme_config: dict | None = None
+    sidebar_config: dict | None = None
     favicon_url: str | None = None
     default_language: str = "en"
     supported_languages: list[str] = ["en"]

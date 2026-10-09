@@ -59,6 +59,9 @@ class ThirdPartyApps(SQLModel, table=True):
         sa_column=Column(JSONB, nullable=False, server_default="[]"),
     )
 
+    sso_start_url: str | None = Field(default=None, max_length=2048)
+    sso_redirect_uri: str | None = Field(default=None, max_length=2048)
+
     active: bool = Field(default=True, nullable=False)
     last_used_at: datetime | None = Field(
         default=None,
