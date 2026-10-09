@@ -36,9 +36,19 @@ def test_invalid_tenant_header_returns_422_without_querying_popups(
 def test_valid_tenant_header_preserves_tenant_isolation(
     client: TestClient,
     db: Session,
-    tenant_a: Tenants,
-    tenant_b: Tenants,
 ) -> None:
+    # Shared fixture tenants may already have more than the endpoint's
+    # 100-row limit when the full suite runs. Use dedicated tenants.
+    tenants = [
+        Tenants(
+            name="Public list header test", slug=f"header-tenant-{uuid.uuid4().hex}"
+        )
+        for _ in range(2)
+    ]
+    db.add_all(tenants)
+    db.commit()
+    tenant_a, tenant_b = tenants
+
     popups = [
         Popups(
             name="Public list header test",
