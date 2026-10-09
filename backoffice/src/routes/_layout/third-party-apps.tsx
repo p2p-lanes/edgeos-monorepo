@@ -15,6 +15,7 @@ import {
 import { DataTable } from "@/components/Common/DataTable"
 import { EmptyState } from "@/components/Common/EmptyState"
 import { QueryErrorBoundary } from "@/components/Common/QueryErrorBoundary"
+import { ThirdPartySSOFields } from "@/components/forms/ThirdPartySSOFields"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import {
@@ -169,6 +170,7 @@ function CreateAppDialog({
   const queryClient = useQueryClient()
 
   const [name, setName] = useState("")
+  const [sso, setSSO] = useState({ start: "", callback: "" })
   const [tokenScopes, setTokenScopes] = useState<string[]>([])
   const [apiKeyScopes, setApiKeyScopes] = useState<string[]>([])
   const [nameError, setNameError] = useState("")
@@ -179,6 +181,8 @@ function CreateAppDialog({
       ThirdPartyAppsService.createThirdPartyApp({
         requestBody: {
           name: name.trim(),
+          sso_start_url: sso.start.trim() || null,
+          sso_redirect_uri: sso.callback.trim() || null,
           allowed_token_scopes:
             tokenScopes as ThirdPartyAppCreate["allowed_token_scopes"],
           allowed_api_key_scopes:
@@ -233,6 +237,11 @@ function CreateAppDialog({
           </DialogHeader>
 
           <div className="space-y-5 py-4">
+            <ThirdPartySSOFields
+              id="create-sso"
+              value={sso}
+              onChange={setSSO}
+            />
             <div className="space-y-2">
               <Label htmlFor="app-name">Name</Label>
               <Input
@@ -320,6 +329,10 @@ function EditAppDialog({
   )
 
   const [name, setName] = useState(app.name)
+  const [sso, setSSO] = useState({
+    start: app.sso_start_url ?? "",
+    callback: app.sso_redirect_uri ?? "",
+  })
   const [tokenScopes, setTokenScopes] = useState<string[]>(() =>
     app.allowed_token_scopes.filter((s) => validTokenScopes.has(s)),
   )
@@ -332,6 +345,10 @@ function EditAppDialog({
   const updateMutation = useMutation({
     mutationFn: () => {
       const requestBody: ThirdPartyAppUpdate = {}
+      if ((sso.start.trim() || null) !== app.sso_start_url)
+        requestBody.sso_start_url = sso.start.trim() || null
+      if ((sso.callback.trim() || null) !== app.sso_redirect_uri)
+        requestBody.sso_redirect_uri = sso.callback.trim() || null
       const trimmedName = name.trim()
       if (trimmedName !== app.name) {
         requestBody.name = trimmedName
@@ -380,6 +397,8 @@ function EditAppDialog({
     addedTokenScopes.length > 0 || addedApiKeyScopes.length > 0
 
   const hasChanges =
+    (sso.start.trim() || null) !== app.sso_start_url ||
+    (sso.callback.trim() || null) !== app.sso_redirect_uri ||
     name.trim() !== app.name ||
     !sameScopes(tokenScopes, app.allowed_token_scopes) ||
     !sameScopes(apiKeyScopes, app.allowed_api_key_scopes)
@@ -461,6 +480,8 @@ function EditAppDialog({
                 onToggle={(s) => toggleScope(s, apiKeyScopes, setApiKeyScopes)}
               />
             </div>
+
+            <ThirdPartySSOFields id="edit-sso" value={sso} onChange={setSSO} />
 
             {(legacyTokenScopes.length > 0 ||
               legacyApiKeyScopes.length > 0) && (

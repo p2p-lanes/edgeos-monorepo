@@ -48,6 +48,7 @@ import {
   type PopupSidebarConfig,
   PopupSidebarEditor,
 } from "@/components/forms/PopupSidebarEditor"
+import { PopupThirdPartyApps } from "@/components/forms/PopupThirdPartyApps"
 import { applicationReviewVisibility } from "@/components/forms/popupApplicationReviewVisibility"
 import { getMissingLaunchFields } from "@/components/forms/popupLaunchChecklist"
 import { ReviewersManager } from "@/components/forms/ReviewersManager"
@@ -180,11 +181,10 @@ export function PopupForm({
   const queryClient = useQueryClient()
   const { showSuccessToast, showErrorToast, showWarningToast } =
     useCustomToast()
-  const { isOperatorOrAbove, user } = useAuth()
+  const { isOperatorOrAbove, isAdmin } = useAuth()
   const isEdit = !!defaultValues
   const readOnly = !isOperatorOrAbove
-  const canCustomizeSidebar =
-    user?.role === "superadmin" || user?.role === "admin"
+  const canCustomizeSidebar = isAdmin
   // Does anybody apply to this event? Answered by its doors, because one of
   // them can review applicants while another sells. On a new event there are
   // no doors yet, so the choice made below in the form is the answer.
@@ -1344,6 +1344,7 @@ export function PopupForm({
 
           {isEdit && (
             <TabsContent value="home" className="space-y-6">
+              {isAdmin && <PopupThirdPartyApps popupId={defaultValues!.id} />}
               <form.Subscribe selector={(state) => state.values}>
                 {(values) => (
                   <PopupHomeEditor

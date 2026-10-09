@@ -452,6 +452,11 @@ The API uses JWT tokens. Authenticate via:
 2. `POST /v1/auth/verify` - Verify code and receive JWT token
 3. Include token in requests: `Authorization: Bearer <token>`
 
+### Third-Party SSO
+
+- **Partner developers and coding agents:** [SSO integration guide](examples/third-party-sso/INTEGRATION.md) — exact protocol, configuration inputs, credential boundaries, security requirements and acceptance checklist.
+- **Local demo:** [SSO quickstart](examples/third-party-sso/README.md) — isolated PostgreSQL/Mailpit setup and a dependency-free Node partner mock.
+
 ### Multi-Tenant Headers
 
 For tenant-scoped endpoints:
