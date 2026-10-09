@@ -4313,11 +4313,16 @@ export class CheckInService {
 
     /**
      * List Check Ins
-     * List check-ins with attendee + product names (BO only).
+     * List check-ins with attendee, buyer, product and flow context (BO only).
      *
      * Filters:
      * - attendee_product_id: exact match on the ticket UUID
      * - popup_id: exact match on the popup the scan happened in
+     * - search: attendee or buyer name/email, check-in code, product name
+     * - filters: JSON filter group
+     * (``{"match": "all"|"any", "conditions": [{"field", "op", "value"}]}``)
+     * over sales_flow_id, product_id, product_category, source,
+     * has_attendee and occurred_at
      *
      * Ordered by occurred_at DESC. Tenant isolation is enforced both via the
      * TenantSession (separate DB connection per tenant) and by an explicit
@@ -4325,6 +4330,8 @@ export class CheckInService {
      * @param data The data for the request.
      * @param data.attendeeProductId
      * @param data.popupId
+     * @param data.search
+     * @param data.filters
      * @param data.skip Number of items to skip
      * @param data.limit Maximum number of items to return
      * @param data.xTenantId
@@ -4341,6 +4348,8 @@ export class CheckInService {
             query: {
                 attendee_product_id: data.attendeeProductId,
                 popup_id: data.popupId,
+                search: data.search,
+                filters: data.filters,
                 skip: data.skip,
                 limit: data.limit
             },

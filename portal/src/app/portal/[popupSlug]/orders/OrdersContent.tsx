@@ -1,6 +1,6 @@
 "use client"
 
-import { Download, FileText, Loader2 } from "lucide-react"
+import { Download, FileText, Loader2, QrCode } from "lucide-react"
 import { useState } from "react"
 import { useTranslation } from "react-i18next"
 import { toast } from "sonner"
@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { formatDate } from "@/helpers/dates"
 import { formatCurrency } from "@/types/checkout"
+import QRcode from "../passes/components/common/QRcode"
 import { type OrderStatus, projectOrders } from "./ordersProjection"
 
 const statusVariant: Record<
@@ -38,6 +39,20 @@ export function OrdersContent({
   const { t } = useTranslation()
   const [downloadingId, setDownloadingId] = useState<string | null>(null)
   const orders = projectOrders(payments, invoiceAvailable)
+  const [selectedUnit, setSelectedUnit] = useState<{
+    orderId: string
+    unitId: string
+  } | null>(null)
+  // Resolve the selection from current data, never a cached code: refreshing
+  // a cancelled payment or revoked unit must also close its QR.
+  const activeOrder = orders.find((order) => order.id === selectedUnit?.orderId)
+  const activeLine = activeOrder?.lines.find((line) =>
+    line.units.some((unit) => unit.id === selectedUnit?.unitId),
+  )
+  const activeUnitIndex =
+    activeLine?.units.findIndex((unit) => unit.id === selectedUnit?.unitId) ??
+    -1
+  const activeUnit = activeLine?.units[activeUnitIndex]
 
   const downloadInvoice = async (paymentId: string) => {
     setDownloadingId(paymentId)
@@ -157,7 +172,31 @@ export function OrdersContent({
                         {line.category}
                       </p>
                     </div>
-                    <p>{formattedAmount(line.unitPrice, line.currency)}</p>
+                    <div className="flex shrink-0 flex-col items-end gap-2">
+                      <p>{formattedAmount(line.unitPrice, line.currency)}</p>
+                      {line.units.map((unit, index) => (
+                        <Button
+                          key={unit.id}
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          aria-label={t("orders.show_unit_qr_label", {
+                            product: line.name,
+                            number: index + 1,
+                          })}
+                          onClick={() =>
+                            setSelectedUnit({
+                              orderId: order.id,
+                              unitId: unit.id,
+                            })
+                          }
+                        >
+                          <QrCode className="size-4" />
+                          {t("orders.show_unit_qr")}
+                          {line.units.length > 1 && ` ${index + 1}`}
+                        </Button>
+                      ))}
+                    </div>
                   </li>
                 ))}
               </ul>
@@ -189,6 +228,19 @@ export function OrdersContent({
           ))}
         </div>
       )}
+
+      <QRcode
+        check_in_code={activeUnit?.checkInCode ?? ""}
+        isOpen={activeUnit != null}
+        onOpenChange={(open) => {
+          if (!open) setSelectedUnit(null)
+        }}
+        title={t("orders.unit_qr_title", {
+          product: activeLine?.name,
+          number: activeUnitIndex + 1,
+        })}
+        description={t("orders.unit_qr_description")}
+      />
     </section>
   )
 }

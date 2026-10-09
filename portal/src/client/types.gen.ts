@@ -2360,6 +2360,14 @@ export type CheckInListItem = {
     payload?: ({
     [key: string]: unknown;
 } | null);
+    check_in_code?: (string | null);
+    product_category?: (string | null);
+    unit_index?: (number | null);
+    unit_count?: (number | null);
+    buyer_name?: (string | null);
+    buyer_email?: (string | null);
+    sales_flow_id?: (string | null);
+    sales_flow_name?: (string | null);
 };
 
 /**
@@ -8567,11 +8575,13 @@ export type CheckInConfirmMyCheckInResponse = (SelfCheckInResult);
 
 export type CheckInListCheckInsData = {
     attendeeProductId?: (string | null);
+    filters?: (string | null);
     /**
      * Maximum number of items to return
      */
     limit?: number;
     popupId?: (string | null);
+    search?: (string | null);
     /**
      * Number of items to skip
      */

@@ -1,11 +1,12 @@
 import { Download } from "lucide-react"
-import { useEffect, useRef, useState } from "react"
+import { useRef } from "react"
 import { useTranslation } from "react-i18next"
 import QRCodeReact from "react-qr-code"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
@@ -17,21 +18,19 @@ const QRcode = ({
   isOpen,
   onOpenChange,
   lastScanAt,
+  title = "Check-in Code",
+  description = "Use this code to check in",
 }: {
   check_in_code: string
   isOpen: boolean
   onOpenChange: (open: boolean) => void
   lastScanAt?: string | null
+  title?: string
+  description?: string
 }) => {
   const { t, i18n } = useTranslation()
   const qrCodeRef = useRef<HTMLDivElement>(null)
-  const [qrValue, setQrValue] = useState("")
-
-  useEffect(() => {
-    if (check_in_code) {
-      setQrValue(JSON.stringify({ code: check_in_code }))
-    }
-  }, [check_in_code])
+  const qrValue = JSON.stringify({ code: check_in_code })
 
   const handleDownload = () => {
     downloadQrPng(
@@ -47,7 +46,7 @@ const QRcode = ({
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md bg-card">
         <DialogHeader>
-          <DialogTitle>Check-in Code</DialogTitle>
+          <DialogTitle>{title}</DialogTitle>
         </DialogHeader>
         {lastScanAt ? (
           <div className="flex items-center gap-2 rounded-md bg-yellow-50 px-3 py-2 text-sm text-yellow-700">
@@ -69,9 +68,9 @@ const QRcode = ({
               </div>
               <div className="text-center space-y-2">
                 <p className="text-lg font-mono">{check_in_code}</p>
-                <p className="text-sm text-pass-text">
-                  Use this code to check in
-                </p>
+                <DialogDescription className="text-sm text-pass-text">
+                  {description}
+                </DialogDescription>
               </div>
               <Button
                 onClick={handleDownload}

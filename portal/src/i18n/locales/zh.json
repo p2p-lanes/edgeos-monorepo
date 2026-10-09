@@ -88,6 +88,10 @@
     "definitive_total": "总额"
   },
   "orders": {
+    "show_unit_qr": "查看二维码",
+    "show_unit_qr_label": "查看{{product}}第{{number}}件的二维码",
+    "unit_qr_title": "{{product}} · 第{{number}}件二维码",
+    "unit_qr_description": "请向工作人员出示此二维码以核验此件商品。",
     "title": "付款",
     "description": "您在此活动中的付款记录。",
     "empty_title": "暂无付款记录",

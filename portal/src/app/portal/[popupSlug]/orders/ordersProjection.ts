@@ -75,7 +75,13 @@ export function projectOrders(
           units: (
             (line as typeof line & { units?: ProductUnitWire[] }).units ?? []
           )
-            .filter((unit) => unit.active && unit.requires_check_in)
+            .filter(
+              (unit) =>
+                payment.status === "approved" &&
+                unit.active &&
+                unit.requires_check_in &&
+                unit.check_in_code,
+            )
             .map((unit) => ({ id: unit.id, checkInCode: unit.check_in_code })),
         })),
       },
