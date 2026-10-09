@@ -297,6 +297,7 @@ async def list_check_ins(
                 attendee_name=attendee.name if attendee else None,
                 attendee_email=attendee.email if attendee else None,
                 product_name=product.name if product else None,
+                product_category=product.category if product else None,
                 actor_user_id=event.actor_user_id,
                 actor_user_name=actor.full_name if actor else None,
                 actor_user_email=actor.email if actor else None,

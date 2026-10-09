@@ -89,6 +89,8 @@ class CheckInListItem(BaseModel):
     attendee_name: str | None = None
     attendee_email: str | None = None
     product_name: str | None = None
+    # Lets scanners tell entry scans (tickets) from item pickups (merch).
+    product_category: str | None = None
     actor_user_id: uuid.UUID | None = None
     actor_user_name: str | None = None
     actor_user_email: str | None = None

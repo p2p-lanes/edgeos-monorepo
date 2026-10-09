@@ -180,6 +180,7 @@ class TestListCheckIns:
         assert "occurred_at" in row
         assert "attendee_name" in row
         assert "product_name" in row
+        assert row["product_category"] == "ticket"
 
     def test_filter_by_attendee_product_id(
         self,
