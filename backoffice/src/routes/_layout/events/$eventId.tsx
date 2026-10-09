@@ -16,6 +16,7 @@ import {
   Repeat,
   Share2,
   Tag,
+  User,
   Users,
   Video,
 } from "lucide-react"
@@ -124,8 +125,11 @@ function EventViewContent() {
   const qrRef = useRef<HTMLDivElement>(null)
   const [editChoiceOpen, setEditChoiceOpen] = useState(false)
 
+  // Shares the edit page's key so every `["events"]` invalidation (save,
+  // calendar reschedule, approve...) refreshes this view too. A separate
+  // `["event", id]` key left it showing pre-edit data for up to staleTime.
   const { data: event } = useQuery({
-    queryKey: ["event", eventId],
+    queryKey: ["events", eventId],
     queryFn: () => EventsService.getEvent({ eventId }),
   })
 
@@ -248,6 +252,7 @@ function EventViewContent() {
   ).toISOString()
 
   const coverSrc = event.cover_url || event.venue_image_url || null
+  const hostName = event.host_display_name?.trim() || popup?.name?.trim()
 
   return (
     <FormPageLayout
@@ -314,6 +319,13 @@ function EventViewContent() {
               <span className="text-muted-foreground"> · {event.timezone}</span>
             ) : null}
           </DetailRow>
+
+          {hostName && (
+            <DetailRow icon={User}>
+              <span className="text-muted-foreground">Host: </span>
+              {hostName}
+            </DetailRow>
+          )}
 
           {event.venue_title ? (
             <DetailRow icon={MapPin}>

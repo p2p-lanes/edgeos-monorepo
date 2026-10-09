@@ -23,8 +23,11 @@ export function summarizeRrule(
   if (kv.FREQ === "DAILY") {
     base = t("events.recurrence.daily", { count: interval })
   } else if (kv.FREQ === "WEEKLY") {
+    // Drop empty codes before translating: an rrule without BYDAY splits to
+    // [""], which would otherwise render the raw "weekday_" key.
     const byDay = (kv.BYDAY ?? "")
       .split(",")
+      .filter(Boolean)
       .map((c) => t(`events.recurrence.weekday_${c.toUpperCase()}`))
       .filter(Boolean)
     if (byDay.length > 0) {

@@ -31,9 +31,21 @@ def test_backfill_preserves_buyers_existing_categories_and_ambiguous_history(
         command.upgrade(config, migration.revision)
         command.downgrade(config, migration.down_revision)
         # This test intentionally runs at the migration's parent revision,
-        # while the ORM model reflects the later SimpleFi-key migration.
+        # while the ORM model reflects the later SimpleFi-key and badges
+        # (public profile link, popup flag) migrations.
         connection.execute(
             text("ALTER TABLE sales_flows ADD COLUMN simplefi_api_key VARCHAR")
+        )
+        connection.execute(
+            text(
+                "ALTER TABLE humans ADD COLUMN public_profile_token VARCHAR(64), "
+                "ADD COLUMN public_profile_enabled BOOLEAN NOT NULL DEFAULT true"
+            )
+        )
+        connection.execute(
+            text(
+                "ALTER TABLE popups ADD COLUMN badges_enabled BOOLEAN NOT NULL DEFAULT false"
+            )
         )
         with Session(bind=connection, join_transaction_mode="create_savepoint") as db:
             tenant = Tenants(name="Repair test", slug=f"repair-{uuid.uuid4()}")

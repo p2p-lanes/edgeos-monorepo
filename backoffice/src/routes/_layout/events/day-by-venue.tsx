@@ -65,7 +65,7 @@ function DayByVenueContent({ popupId }: { popupId: string }) {
       }),
     onSuccess: (_data, vars) => {
       queryClient.invalidateQueries({ queryKey: ["venue-availability"] })
-      queryClient.invalidateQueries({ queryKey: ["event", vars.eventId] })
+      queryClient.invalidateQueries({ queryKey: ["events", vars.eventId] })
       toast.success(vars.next ? "Event highlighted" : "Highlight removed")
     },
     onError: () => {
@@ -86,7 +86,7 @@ function DayByVenueContent({ popupId }: { popupId: string }) {
   const [exceptionReason, setExceptionReason] = useState<string | null>(null)
 
   const { data: activeEvent } = useQuery({
-    queryKey: ["event", activeEventId],
+    queryKey: ["events", activeEventId],
     queryFn: () => EventsService.getEvent({ eventId: activeEventId as string }),
     enabled: !!activeEventId,
   })

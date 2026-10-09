@@ -1,5 +1,6 @@
 from alembic import command
 from alembic.config import Config
+from sqlalchemy import text
 from sqlmodel import Session, create_engine, select
 from testcontainers.postgres import PostgresContainer
 
@@ -18,6 +19,12 @@ def test_backfill_adds_only_missing_settings_and_preserves_them_on_downgrade():
             config = Config("alembic.ini")
             config.attributes["connection"] = connection
             command.upgrade(config, PREVIOUS_REVISION)
+            # The ORM model already has the later popup badges flag.
+            connection.execute(
+                text(
+                    "ALTER TABLE popups ADD COLUMN badges_enabled BOOLEAN NOT NULL DEFAULT false"
+                )
+            )
             with Session(connection) as session:
                 tenants = [
                     Tenants(name=f"Tenant {i}", slug=f"tenant-{i}") for i in range(2)

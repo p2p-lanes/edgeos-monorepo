@@ -737,6 +737,36 @@
       "telegram": "Telegram",
       "role": "Rol",
       "organization": "Organización"
+    },
+    "badges": {
+      "give": "Dar insignia",
+      "this_person": "esta persona",
+      "dialog_title": "Dale una insignia a {{name}}",
+      "dialog_description": "Aparece en su perfil. Tu mensaje solo lo ve esa persona.",
+      "remaining_one": "Te queda {{count}}",
+      "remaining_other": "Te quedan {{count}}",
+      "unlimited": "Sin límite",
+      "none_left": "No te quedan",
+      "already_has": "Ya la tiene",
+      "back_at": "Vuelven {{when}}",
+      "step_message": "2. Agregá una nota (opcional)",
+      "message_example": "Ej.: ¡Gracias por la sesión!",
+      "send": "Enviar insignia",
+      "sent": "Insignia enviada a {{name}}",
+      "error_exhausted": "Por ahora no te quedan más de esta insignia para dar.",
+      "error_forbidden": "No podés darle esta insignia a esta persona.",
+      "error_generic": "No se pudo enviar la insignia. Probá de nuevo.",
+      "step_choose": "1. Elegí la insignia que querés dar",
+      "step_choose_hint": "Tocá una insignia para seleccionarla.",
+      "step_choose_single": "Esta es la insignia que tenés para dar.",
+      "search_placeholder": "Buscar entre tus insignias",
+      "search_empty": "Ninguna insignia coincide.",
+      "choose_first": "Elegí una insignia",
+      "banner_title_one": "Tenés {{count}} insignia para dar",
+      "banner_title_other": "Tenés {{count}} insignias para dar",
+      "banner_hint": "Buscá a alguien abajo y tocá Dar insignia en su fila.",
+      "banner_all_used": "Por ahora ya diste todas tus insignias",
+      "banner_all_used_hint": "Vas a poder dar más cuando se renueve tu cupo."
     }
   },
   "checkin": {
@@ -797,7 +827,26 @@
     "hosted_events_count_one": "{{count}} evento",
     "hosted_events_count_other": "{{count}} eventos",
     "top_five": "Top 5",
-    "no_calendar_activity": "Todavía no hay actividad en el calendario"
+    "no_calendar_activity": "Todavía no hay actividad en el calendario",
+    "badges": {
+      "title": "Mis insignias",
+      "subtitle": "El reconocimiento que fuiste juntando",
+      "empty": "Todavía no tenés insignias. Aparecen acá cuando alguien te da una.",
+      "close": "Cerrar",
+      "recognition": "Reconocimientos",
+      "received_count_one": "Recibida {{count}} vez",
+      "received_count_other": "Recibida {{count}} veces",
+      "share": "Compartir",
+      "share_title": "Compartir mis insignias",
+      "link_description": "Quien tenga el enlace ve tu nombre, tu foto y tus insignias. Nunca tu email.",
+      "link_activate": "Activar enlace",
+      "link_deactivate": "Desactivar enlace",
+      "link_copy": "Copiar enlace",
+      "link_copied": "Enlace copiado",
+      "link_copy_failed": "No se pudo copiar el enlace",
+      "link_enable_description": "Activa un enlace público para compartir tu nombre, foto e insignias. Tu email sigue siendo privado.",
+      "link_update_failed": "No se pudo actualizar el enlace. Inténtalo de nuevo."
+    }
   },
   "sidebar": {
     "your_participation": "Tu Participación",
@@ -1240,6 +1289,15 @@
       "cancel_event_dialog_loading": "Cancelando…",
       "cancel_event_success": "Evento cancelado",
       "cancel_event_error": "No se pudo cancelar el evento",
+      "delete_event_button": "Eliminar evento",
+      "delete_event_dialog_title": "¿Eliminar este evento?",
+      "delete_event_dialog_description": "El evento se eliminará de forma permanente. Se notificará por email a los registrados e invitados, y el evento se quitará de sus calendarios. Esta acción no se puede deshacer.",
+      "delete_event_dialog_description_recurring": "Se eliminarán de forma permanente todas las fechas de este evento recurrente. Se notificará por email a los registrados e invitados, y el evento se quitará de sus calendarios. Esta acción no se puede deshacer.",
+      "delete_event_dialog_keep": "Mantener evento",
+      "delete_event_dialog_confirm": "Sí, eliminar evento",
+      "delete_event_dialog_loading": "Eliminando…",
+      "delete_event_success": "Evento eliminado",
+      "delete_event_error": "No se pudo eliminar el evento",
       "pending_approval_banner_title": "Pendiente de aprobación",
       "pending_approval_banner_message": "Tu evento está pendiente de aprobación y aún no es visible para otros.",
       "open_in_maps": "Abrir en Google Maps",
@@ -1495,5 +1553,12 @@
       "error_host": "El host del evento no puede hacer check-in como asistente.",
       "error_not_checked_in": "Esta persona no tiene check-in."
     }
+  },
+  "publicProfile": {
+    "community": "Comunidad de {{tenant}}",
+    "anonymous": "Miembro de la comunidad",
+    "badge_count_one": "{{count}} insignia",
+    "badge_count_other": "{{count}} insignias",
+    "no_badges": "Todavía no tiene insignias."
   }
 }

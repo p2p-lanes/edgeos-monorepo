@@ -2,6 +2,9 @@
 @import "tw-animate-css";
 @plugin "@tailwindcss/typography";
 
+/* Scan only the shared Markdown styles used by descriptions and the editor. */
+@source "../../../packages/shared-form-ui/src/components/MarkdownContent.tsx";
+
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {

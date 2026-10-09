@@ -618,6 +618,35 @@
       "telegram": "Telegram",
       "role": "职位",
       "organization": "组织"
+    },
+    "badges": {
+      "give": "送徽章",
+      "this_person": "此人",
+      "dialog_title": "送 {{name}} 一枚徽章",
+      "dialog_description": "徽章会显示在对方的个人资料上。你的留言只有对方能看到。",
+      "remaining_one": "剩余 {{count}} 枚",
+      "remaining_other": "剩余 {{count}} 枚",
+      "unlimited": "不限数量",
+      "none_left": "已用完",
+      "already_has": "已拥有",
+      "back_at": "{{when}} 恢复",
+      "step_message": "2. 添加留言（可选）",
+      "message_example": "例如：谢谢你精彩的分享！",
+      "send": "发送徽章",
+      "sent": "已将徽章送给 {{name}}",
+      "error_exhausted": "你暂时没有这种徽章可以送了。",
+      "error_forbidden": "你不能把这枚徽章送给此人。",
+      "error_generic": "徽章发送失败，请重试。",
+      "step_choose": "1. 选择要送出的徽章",
+      "step_choose_hint": "点击徽章即可选中。",
+      "step_choose_single": "这是你可以送出的徽章。",
+      "search_placeholder": "搜索你的徽章",
+      "search_empty": "没有匹配的徽章。",
+      "choose_first": "请选择徽章",
+      "banner_title_other": "你有 {{count}} 枚徽章可以送出",
+      "banner_hint": "在下方找到对方，点击其所在行的“送徽章”。",
+      "banner_all_used": "你暂时已送完所有徽章",
+      "banner_all_used_hint": "额度恢复后即可继续赠送。"
     }
   },
   "checkin": {
@@ -674,7 +703,25 @@
     "shared_events_count": "共同参加 {{count}} 场",
     "hosted_events_count": "参加 {{count}} 场",
     "top_five": "前 5 名",
-    "no_calendar_activity": "暂无日历活动"
+    "no_calendar_activity": "暂无日历活动",
+    "badges": {
+      "title": "我的徽章",
+      "subtitle": "你获得的认可",
+      "empty": "还没有徽章。有人送你徽章后会显示在这里。",
+      "close": "关闭",
+      "recognition": "认可记录",
+      "received_count": "已获得 {{count}} 次",
+      "share": "分享",
+      "share_title": "分享我的徽章",
+      "link_description": "任何拥有链接的人都能看到你的名字、照片和徽章，但看不到你的邮箱。",
+      "link_activate": "启用链接",
+      "link_deactivate": "关闭链接",
+      "link_copy": "复制链接",
+      "link_copied": "链接已复制",
+      "link_copy_failed": "无法复制链接",
+      "link_enable_description": "启用公开链接，分享你的名字、照片和徽章。你的邮箱仍然保密。",
+      "link_update_failed": "无法更新分享设置，请重试。"
+    }
   },
   "sidebar": {
     "your_participation": "您的参与",
@@ -1088,6 +1135,15 @@
       "cancel_event_dialog_loading": "正在取消…",
       "cancel_event_success": "活动已取消",
       "cancel_event_error": "无法取消活动",
+      "delete_event_button": "删除活动",
+      "delete_event_dialog_title": "删除此活动？",
+      "delete_event_dialog_description": "此活动将被永久删除。已报名和被邀请的参与者将收到邮件通知，活动也会从他们的日历中移除。此操作无法撤销。",
+      "delete_event_dialog_description_recurring": "此重复活动的所有场次都将被永久删除。已报名和被邀请的参与者将收到邮件通知，活动也会从他们的日历中移除。此操作无法撤销。",
+      "delete_event_dialog_keep": "保留活动",
+      "delete_event_dialog_confirm": "是的，删除活动",
+      "delete_event_dialog_loading": "正在删除…",
+      "delete_event_success": "活动已删除",
+      "delete_event_error": "无法删除活动",
       "pending_approval_banner_title": "等待审批",
       "pending_approval_banner_message": "你的活动正在等待审批,其他人暂时无法查看。",
       "open_in_maps": "在 Google 地图中打开",
@@ -1330,5 +1386,12 @@
       "error_host": "活动主持人不能作为参与者签到。",
       "error_not_checked_in": "此人尚未签到。"
     }
+  },
+  "publicProfile": {
+    "community": "{{tenant}} 社区",
+    "anonymous": "社区成员",
+    "badge_count_one": "{{count}} 枚徽章",
+    "badge_count_other": "{{count}} 枚徽章",
+    "no_badges": "还没有徽章。"
   }
 }

@@ -10,6 +10,7 @@ from datetime import UTC, datetime
 import sqlalchemy as sa
 from alembic import command
 from alembic.config import Config
+from sqlalchemy import text
 from sqlmodel import Session, create_engine
 from testcontainers.postgres import PostgresContainer
 
@@ -80,6 +81,12 @@ def test_backfill_marks_events_with_check_ins_and_logs_them():
             config = Config("alembic.ini")
             config.attributes["connection"] = connection
             command.upgrade(config, PREVIOUS_REVISION)
+            # The ORM model already has the later popup badges flag.
+            connection.execute(
+                text(
+                    "ALTER TABLE popups ADD COLUMN badges_enabled BOOLEAN NOT NULL DEFAULT false"
+                )
+            )
 
             with Session(connection) as session:
                 tenant = Tenants(name="Tenant", slug="tenant")

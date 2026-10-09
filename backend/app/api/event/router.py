@@ -231,6 +231,15 @@ def _find_venue_open_hours_issue(
             .where(VenueExceptions.end_datetime > start_time)
         ).all()
     )
+    closed_exception = db.exec(
+        select(VenueExceptions)
+        .where(VenueExceptions.venue_id == venue.id)
+        .where(VenueExceptions.is_closed == True)  # noqa: E712
+        .where(VenueExceptions.start_datetime < end_time)
+        .where(VenueExceptions.end_datetime > start_time)
+    ).first()
+    if closed_exception is not None:
+        return (400, "Selected time falls outside the venue's open hours.")
     if not weekly_rows and not open_exceptions:
         return None  # no schedule configured = always open
 
@@ -458,7 +467,6 @@ def _to_public(
     event,
     venue_map: dict[uuid.UUID, VenueInfo] | None = None,
     track_map: dict[uuid.UUID, str] | None = None,
-    count_map: dict[uuid.UUID, int] | None = None,
 ) -> EventPublic:
     """Convert an Events row (or expanded pseudo-row) to EventPublic.
 
@@ -466,8 +474,7 @@ def _to_public(
     :func:`app.api.event.crud._clone_as_occurrence`.
 
     ``venue_map``/``track_map`` let callers pre-fetch venues/tracks in a
-    single query and avoid N+1 when serializing a list. ``count_map`` does the
-    same for the RSVP ``attendee_count`` shown in the backoffice event list.
+    single query and avoid N+1 when serializing a list.
     """
     # ``custom_location_name``/``custom_location_url`` live on EventBase and
     # are picked up automatically by ``model_validate`` — no extra plumbing.
@@ -491,8 +498,6 @@ def _to_public(
             updates["track_title"] = track_map[event.track_id]
         elif track_map is None and getattr(event, "track", None) is not None:
             updates["track_title"] = event.track.name
-    if count_map is not None:
-        updates["attendee_count"] = count_map.get(event.id, 0)
     if updates:
         data = data.model_copy(update=updates)
     return data
@@ -662,7 +667,7 @@ def _check_recurrence_conflicts(
     exclude_event_id: uuid.UUID | None = None,
     timezone: str = "UTC",
     allow_unbookable: bool = False,
-) -> None:
+) -> list[datetime]:
     """For recurring events, expand each instance and run the anti-overlap
     venue check. Bails out on first conflict with 409.
 
@@ -670,7 +675,7 @@ def _check_recurrence_conflicts(
     only the base window is checked via :func:`_check_venue_availability`.
     """
     if venue_id is None:
-        return
+        return []
     if not rrule_str:
         _check_venue_availability(
             db,
@@ -680,7 +685,7 @@ def _check_recurrence_conflicts(
             exclude_event_id=exclude_event_id,
             allow_unbookable=allow_unbookable,
         )
-        return
+        return []
 
     try:
         rule = parse_rrule(rrule_str)
@@ -695,7 +700,7 @@ def _check_recurrence_conflicts(
             exclude_event_id=exclude_event_id,
             allow_unbookable=allow_unbookable,
         )
-        return
+        return []
 
     duration = end_time - start_time
     occurrences = expand(
@@ -710,7 +715,20 @@ def _check_recurrence_conflicts(
             status_code=400,
             detail="Recurrence expands to zero occurrences",
         )
+    closed_starts = crud.closed_occurrence_starts(
+        db,
+        venue_id=venue_id,
+        starts=occurrences,
+        duration=duration,
+    )
     for occ_start in occurrences:
+        occurrence_key = (
+            occ_start.replace(tzinfo=UTC)
+            if occ_start.tzinfo is None
+            else occ_start.astimezone(UTC)
+        ).replace(tzinfo=None)
+        if occurrence_key in closed_starts:
+            continue
         issue = _find_venue_availability_issue(
             db,
             venue_id=venue_id,
@@ -727,6 +745,16 @@ def _check_recurrence_conflicts(
             status_code=code,
             detail=_decorate_recurrence_detail(code, detail, label),
         )
+    return [
+        occ_start
+        for occ_start in occurrences
+        if (
+            occ_start.replace(tzinfo=UTC)
+            if occ_start.tzinfo is None
+            else occ_start.astimezone(UTC)
+        ).replace(tzinfo=None)
+        in closed_starts
+    ]
 
 
 def _ics_utc_stamp(dt: datetime) -> str:
@@ -1272,13 +1300,52 @@ async def list_events(
     track_map = _track_map_for_events(db, events)
     from app.api.event_participant.crud import event_participants_crud
 
-    count_map = event_participants_crud.count_active_for_events(
+    occurrence_counts = event_participants_crud.count_active_for_events(
         db, [e.id for e in events]
     )
+    # Mirrors ``find_by_popup``'s ``want_expansion``: a date window expands
+    # each series into one row per date, so each row counts only its date.
+    per_date = popup_id is not None and (
+        start_after is not None or start_before is not None
+    )
+    event_totals: dict[uuid.UUID, int] = {}
+    for (event_id, _occurrence_start), count in occurrence_counts.items():
+        event_totals[event_id] = event_totals.get(event_id, 0) + count
     return ListModel[EventPublic](
-        results=[_to_public(e, venue_map, track_map, count_map) for e in events],
+        results=[
+            _to_public(e, venue_map, track_map).model_copy(
+                update={
+                    "attendee_count": _attendee_count(
+                        e, occurrence_counts, event_totals, per_date=per_date
+                    )
+                }
+            )
+            for e in events
+        ],
         paging=Paging(offset=skip, limit=limit, total=total),
     )
+
+
+def _attendee_count(
+    event,
+    occurrence_counts: dict[tuple[uuid.UUID, datetime | None], int],
+    event_totals: dict[uuid.UUID, int],
+    *,
+    per_date: bool,
+) -> int:
+    """An event list row's active RSVP count.
+
+    When the list is expanded (``per_date``), every row of a series (the
+    master's own first date and each occurrence clone, which carries the
+    master's id) counts only the RSVPs for its own ``start_time``. Summing
+    the series instead showed the series total on every date. Otherwise a row
+    counts all of its RSVPs, like the detail page: an unexpanded master stands
+    for the whole series, and one-offs and detached children register with no
+    occurrence_start.
+    """
+    if per_date and event.rrule:
+        return occurrence_counts.get((event.id, event.start_time), 0)
+    return event_totals.get(event.id, 0)
 
 
 @router.get("/hosts", response_model=list[EventHostOption])
@@ -1418,9 +1485,10 @@ async def create_event(
         )
 
     rrule_str = format_rrule(event_in.recurrence) if event_in.recurrence else None
+    skipped_closed_occurrences: list[datetime] = []
 
     if event_in.venue_id is not None:
-        _check_recurrence_conflicts(
+        skipped_closed_occurrences = _check_recurrence_conflicts(
             db,
             venue_id=event_in.venue_id,
             start_time=event_in.start_time,
@@ -1505,7 +1573,16 @@ async def create_event(
         actor=actor_from_user(current_user),
     )
 
-    return _with_collaborators(db, _to_public(event), event, include_email=True)
+    response = _with_collaborators(db, _to_public(event), event, include_email=True)
+    if skipped_closed_occurrences:
+        labels = [
+            _format_occurrence_label(occurrence, event.timezone)
+            for occurrence in skipped_closed_occurrences
+        ]
+        response.warnings = [
+            "No occurrence was scheduled on venue-closed dates: " + ", ".join(labels)
+        ]
+    return response
 
 
 @router.patch("/{event_id}", response_model=EventPublic)
@@ -4064,6 +4141,53 @@ async def cancel_portal_event(
         actor=actor_from_human(current_human),
     )
     return _to_public(updated)
+
+
+@router.delete("/portal/events/{event_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_portal_event(
+    event_id: uuid.UUID,
+    db: HumanTenantSession,
+    current_human: CurrentHuman,
+    token_payload: CallerToken,
+) -> None:
+    """Permanently delete an event (the whole series for a recurring master).
+
+    Owner only: unlike edit/cancel, the host and collaborators can't delete,
+    since it's irreversible. Never on an ended popup. Mirrors the admin
+    ``DELETE /events/{id}``.
+    """
+    event = crud.events_crud.get(db, event_id)
+    if not event:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Event not found"
+        )
+    ensure_api_key_popup(token_payload, event.popup_id)
+    if event.owner_id != current_human.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only the event owner can delete",
+        )
+    from app.api.popup.crud import popups_crud
+
+    ensure_popup_writable(popups_crud.get(db, event.popup_id))
+
+    # Send CANCEL to every attendee *before* we drop the row so they get a
+    # clean tombstone in their calendar. A cancelled event already sent it.
+    if event.status != EventStatus.CANCELLED:
+        try:
+            await _bump_and_dispatch_itip_cancel(db, event)
+        except Exception as exc:  # pragma: no cover - defensive
+            logger.warning(
+                "iTIP CANCEL on portal event delete {} failed: {}", event_id, exc
+            )
+    record_event_audit(
+        db,
+        event=event,
+        action=EventAuditAction.DELETED,
+        actor=actor_from_human(current_human),
+        commit=False,
+    )
+    crud.events_crud.delete(db, event)
 
 
 @router.get(

@@ -183,7 +183,13 @@ def test_read_filters_do_not_resolve_or_rewrite_event_details(
     assert after == before
     assert datetime.fromisoformat(after["start_time"]) == start
     assert "resolved_occurrence_start" not in after
-    # The existing list still uses its series-wide RSVP counter.
+
+
+def test_list_counts_rsvps_per_occurrence(client, series, admin_token_tenant_a):
+    event, _, start = series
+    headers = {"Authorization": f"Bearer {admin_token_tenant_a}"}
+    # Each expanded date counts only its own active RSVPs (the cancelled one
+    # on day 2 is excluded), not the series total on every card.
     events = client.get(
         "/api/v1/events",
         headers=headers,
@@ -193,7 +199,15 @@ def test_read_filters_do_not_resolve_or_rewrite_event_details(
             "start_before": (start + timedelta(days=3)).isoformat(),
         },
     ).json()["results"]
-    assert [row["attendee_count"] for row in events] == [3, 3, 3]
+    assert [row["attendee_count"] for row in events] == [1, 2, 0]
+
+    # Listed without a window, the master row stands for the whole series.
+    events = client.get(
+        "/api/v1/events",
+        headers=headers,
+        params={"popup_id": str(event.popup_id)},
+    ).json()["results"]
+    assert [row["attendee_count"] for row in events] == [3]
 
 
 def test_occurrence_filter_requires_event_and_timezone(

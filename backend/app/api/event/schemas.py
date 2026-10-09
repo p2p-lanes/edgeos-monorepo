@@ -289,6 +289,7 @@ class EventPublic(EventBase):
     """Event schema for API responses."""
 
     id: uuid.UUID
+    warnings: list[str] = Field(default_factory=list)
     # Virtual field populated when an instance is expanded from a series
     # master. Format: ``{master_id}_{yyyymmddTHHMMSS}``. ``None`` for real
     # (persisted) rows.
