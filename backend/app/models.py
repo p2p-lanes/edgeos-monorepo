@@ -184,6 +184,11 @@ from app.api.task.schemas import (
 from app.api.tenant.credential_models import TenantCredentials
 from app.api.tenant.models import Tenants
 from app.api.tenant.schemas import TenantCreate, TenantPublic, TenantUpdate
+from app.api.third_party_app.models import ThirdPartyApps
+from app.api.third_party_sso.models import (
+    PopupThirdPartyApps,
+    ThirdPartyAuthorizationCodes,
+)
 
 # Ticketing steps
 from app.api.ticketing_step.models import TicketingSteps
@@ -203,6 +208,9 @@ from app.api.user.models import Users
 from app.api.user.schemas import UserCreate, UserPublic, UserUpdate
 
 __all__ = [
+    "ThirdPartyApps",
+    "PopupThirdPartyApps",
+    "ThirdPartyAuthorizationCodes",
     "EventMessages",
     "SQLModel",
     # Accommodations

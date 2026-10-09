@@ -44,6 +44,7 @@ import { FieldError } from "@/components/Common/FieldError"
 import { FormErrorSummary } from "@/components/Common/FormErrorSummary"
 import { ApprovalStrategyForm } from "@/components/forms/ApprovalStrategyForm"
 import { PopupHomeEditor } from "@/components/forms/PopupHomeEditor"
+import { PopupThirdPartyApps } from "@/components/forms/PopupThirdPartyApps"
 import { applicationReviewVisibility } from "@/components/forms/popupApplicationReviewVisibility"
 import { getMissingLaunchFields } from "@/components/forms/popupLaunchChecklist"
 import { ReviewersManager } from "@/components/forms/ReviewersManager"
@@ -151,7 +152,7 @@ export function PopupForm({
   const queryClient = useQueryClient()
   const { showSuccessToast, showErrorToast, showWarningToast } =
     useCustomToast()
-  const { isOperatorOrAbove } = useAuth()
+  const { isOperatorOrAbove, isAdmin } = useAuth()
   const isEdit = !!defaultValues
   const readOnly = !isOperatorOrAbove
   // Does anybody apply to this event? Answered by its doors, because one of
@@ -1277,6 +1278,7 @@ export function PopupForm({
 
           {isEdit && (
             <TabsContent value="home" className="space-y-6">
+              {isAdmin && <PopupThirdPartyApps popupId={defaultValues!.id} />}
               <form.Subscribe selector={(state) => state.values}>
                 {(values) => (
                   <PopupHomeEditor
