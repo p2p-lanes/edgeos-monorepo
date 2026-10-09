@@ -6,7 +6,9 @@ import { useEffect } from "react"
 import { useTranslation } from "react-i18next"
 import CheckoutPageClient from "@/app/checkout/[popupSlug]/CheckoutPageClient"
 import { Loader } from "@/components/ui/Loader"
+import { useHumanPopupAccess } from "@/hooks/useHumanPopupAccess"
 import { usePortalDirectSalesFlows } from "@/hooks/usePortalDirectSalesFlows"
+import { usePortalPrimarySalesFlow } from "@/hooks/usePortalPrimarySalesFlow"
 import { usePortalSalesFlows } from "@/hooks/usePortalSalesFlows"
 import { usePortalUpsaleFlows } from "@/hooks/usePortalUpsaleFlows"
 import { resolvePortalFlowSlug } from "@/lib/portal-sales-flows"
@@ -31,6 +33,8 @@ export function ShopCheckoutContent({
   const applicationQuery = usePortalSalesFlows(popupId)
   const directQuery = usePortalDirectSalesFlows(popupId)
   const upsaleQuery = usePortalUpsaleFlows(popupId)
+  const primaryFlowQuery = usePortalPrimarySalesFlow(popupSlug)
+  const popupAccess = useHumanPopupAccess(popupId)
   const application = applicationQuery.data ?? []
   const direct = directQuery.data ?? []
   const upsale = upsaleQuery.data ?? []
@@ -42,6 +46,14 @@ export function ShopCheckoutContent({
   const { getRelevantApplication } = useApplication()
   const currentApplication = getRelevantApplication(applicationFlow?.id)
   const isApplicationApproved = currentApplication?.status === "accepted"
+  const ticketHasPrimaryFlowAccess =
+    primaryFlowQuery.data?.flow_slug === canonicalSlug &&
+    popupAccess.state === "allowed" &&
+    (popupAccess.source === "attendee" || popupAccess.source === "payment")
+  const isApprovalPending =
+    applicationFlow &&
+    !isApplicationApproved &&
+    (primaryFlowQuery.isLoading || popupAccess.state === "loading")
   const collectionsLoading =
     applicationQuery.isLoading || directQuery.isLoading || upsaleQuery.isLoading
 
@@ -65,7 +77,13 @@ export function ShopCheckoutContent({
     return <Loader />
   }
 
-  if (applicationFlow && !isApplicationApproved) {
+  if (isApprovalPending) return <Loader />
+
+  if (
+    applicationFlow &&
+    !isApplicationApproved &&
+    !ticketHasPrimaryFlowAccess
+  ) {
     return (
       <section className="mx-auto max-w-5xl p-6">
         <h1 className="text-2xl font-semibold">

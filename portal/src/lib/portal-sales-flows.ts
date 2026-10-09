@@ -6,6 +6,7 @@ interface PortalFlowCollections {
   direct: SalesFlowPortalPublic[]
   upsale: SalesFlowPortalPublic[]
   approvedApplicationFlowIds: ReadonlySet<string>
+  primaryFlowSlug?: string | null
 }
 
 export function getEligiblePortalFlows({
@@ -13,9 +14,14 @@ export function getEligiblePortalFlows({
   direct,
   upsale,
   approvedApplicationFlowIds,
+  primaryFlowSlug,
 }: PortalFlowCollections): SalesFlowPortalPublic[] {
   const flows = [
-    ...application.filter((flow) => approvedApplicationFlowIds.has(flow.id)),
+    ...application.filter(
+      (flow) =>
+        approvedApplicationFlowIds.has(flow.id) ||
+        flow.slug === primaryFlowSlug,
+    ),
     ...direct,
     ...upsale,
   ]
@@ -53,6 +59,7 @@ interface PassPurchaseFlow {
 interface PassPurchaseFlowResolution {
   explicitFlowIdentifier?: string | null
   attendeeApplicationId?: string | null
+  primaryFlowId?: string | null
   applications: PassPurchaseApplication[]
   eligibleFlows: PassPurchaseFlow[]
   eligibleApplicationFlows: PassPurchaseFlow[]
@@ -65,6 +72,7 @@ interface PassPurchaseFlowResolution {
 export function resolvePassPurchaseFlowSlug({
   explicitFlowIdentifier,
   attendeeApplicationId,
+  primaryFlowId,
   applications,
   eligibleFlows,
   eligibleApplicationFlows,
@@ -91,8 +99,13 @@ export function resolvePassPurchaseFlowSlug({
     if (attendeeFlow) return attendeeFlow.slug
   }
 
+  if (primaryFlowId) {
+    const primaryFlow = eligibleFlows.find((flow) => flow.id === primaryFlowId)
+    if (primaryFlow) return primaryFlow.slug
+  }
+
   if (attendeeApplicationId === null) {
-    return eligibleDirectFlows.length === 1 ? eligibleDirectFlows[0].slug : null
+    if (eligibleDirectFlows.length === 1) return eligibleDirectFlows[0].slug
   }
 
   if (eligibleApplicationFlows.length === 1) {
@@ -126,6 +139,7 @@ interface PassesFlowGroupingInput {
   applications: PassesApplication[]
   eligibleFlows: PassesFlow[]
   payments: PassesPayment[]
+  primaryFlowId?: string | null
 }
 
 export interface PassesFlowSection {
@@ -153,14 +167,16 @@ function projectAttendeeTickets(
 /**
  * Groups Passes records only when the API exposes an authoritative ownership
  * chain. Tickets use their payment's flow when present. Manual assignments
- * have no flow, even if the attendee has an application. Attendees without
- * tickets can use their application ownership to find a purchase action.
+ * can use the attendee's application flow when a BO assignment has no payment
+ * ownership chain. Attendees without tickets also use application ownership
+ * to find a purchase action.
  */
 export function groupPassesBySalesFlow({
   attendees,
   applications,
   eligibleFlows,
   payments,
+  primaryFlowId,
 }: PassesFlowGroupingInput): PassesFlowGrouping {
   const flowsById = new Map(eligibleFlows.map((flow) => [flow.id, flow]))
   const applicationFlowIds = new Map(
@@ -207,10 +223,21 @@ export function groupPassesBySalesFlow({
         }
       }
 
-      if (paymentFlowId && flowsById.has(paymentFlowId)) {
-        const flowTickets = ticketsByFlowId.get(paymentFlowId) ?? []
+      const ticketFlowId =
+        ticket.payment_id == null
+          ? (paymentFlowId ??
+            (attendeeApplicationFlowId &&
+            flowsById.has(attendeeApplicationFlowId)
+              ? attendeeApplicationFlowId
+              : primaryFlowId && flowsById.has(primaryFlowId)
+                ? primaryFlowId
+                : undefined))
+          : paymentFlowId
+
+      if (ticketFlowId && flowsById.has(ticketFlowId)) {
+        const flowTickets = ticketsByFlowId.get(ticketFlowId) ?? []
         flowTickets.push(ticket)
-        ticketsByFlowId.set(paymentFlowId, flowTickets)
+        ticketsByFlowId.set(ticketFlowId, flowTickets)
       } else {
         unassignedTickets.push(ticket)
       }
@@ -230,6 +257,8 @@ export function groupPassesBySalesFlow({
         flowsById.has(attendeeApplicationFlowId)
       ) {
         assign(attendeeApplicationFlowId, attendee)
+      } else if (primaryFlowId && flowsById.has(primaryFlowId)) {
+        assign(primaryFlowId, attendee)
       } else {
         unassignedAttendees.push(attendee)
       }

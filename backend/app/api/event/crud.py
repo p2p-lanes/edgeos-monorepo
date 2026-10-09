@@ -1,6 +1,6 @@
 import uuid
 from collections.abc import Iterable
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 
 from sqlalchemy import asc, or_, text
 from sqlmodel import Session, col, delete, func, select
@@ -13,6 +13,7 @@ from app.api.event.recurrence import (
     synthetic_occurrence_id,
 )
 from app.api.event.schemas import EventCreate, EventStatus, EventUpdate, EventVisibility
+from app.api.event_venue.models import VenueExceptions
 from app.api.human.models import Humans
 from app.api.shared.crud import BaseCRUD
 
@@ -68,6 +69,7 @@ class EventsCRUD(BaseCRUD[Events, EventCreate, EventUpdate]):
         exclude_statuses: list[EventStatus] | None = None,
         expand_occurrences: bool | None = None,
         include_outside_window: bool = False,
+        max_occurrences: int = DEFAULT_MAX_OCCURRENCES,
     ) -> tuple[list[Events], int]:
         """Return events for a popup.
 
@@ -171,6 +173,7 @@ class EventsCRUD(BaseCRUD[Events, EventCreate, EventUpdate]):
                 window_start=start_after,
                 window_end=start_before,
                 include_outside_window=include_outside_window,
+                max_occurrences=max_occurrences,
             )
             expanded.sort(key=lambda e: (e.start_time, str(e.id)))
             total = len(expanded)
@@ -436,7 +439,7 @@ class EventsCRUD(BaseCRUD[Events, EventCreate, EventUpdate]):
             recurring = recurring.where(Events.id != exclude_event_id)
 
         for master in session.exec(recurring).all():
-            if _series_overlaps(master, window_start, window_end):
+            if _series_overlaps(session, master, window_start, window_end):
                 conflicts.append(master)
         return conflicts
 
@@ -466,6 +469,7 @@ def _expand_rows_in_window(
     window_start: datetime | None,
     window_end: datetime | None,
     include_outside_window: bool = False,
+    max_occurrences: int = DEFAULT_MAX_OCCURRENCES,
 ) -> list[Events]:
     """Return ``rows`` with series masters expanded to occurrences.
 
@@ -506,8 +510,6 @@ def _expand_rows_in_window(
         # Recurring master: only include the row itself if its own start
         # falls in the window — otherwise we'd show a stale "first instance"
         # marker for a series whose visible occurrences are all pseudo-rows.
-        if ev_in_window or include_outside_window:
-            result.append(ev)
         try:
             rule = parse_rrule(ev.rrule)
         except ValueError:
@@ -526,12 +528,24 @@ def _expand_rows_in_window(
             window_start=window_start,
             window_end=window_end,
             exdates=list(ev.recurrence_exdates or []),
-            max_occurrences=DEFAULT_MAX_OCCURRENCES,
+            max_occurrences=max_occurrences,
             timezone=ev.timezone,
         )
+        closed_starts = closed_occurrence_starts(
+            session,
+            venue_id=ev.venue_id,
+            starts=occurrences,
+            duration=duration,
+        )
+        if (ev_in_window or include_outside_window) and _strip_tz(
+            ev.start_time
+        ) not in closed_starts:
+            result.append(ev)
         for occ_start in occurrences:
             # Skip the master's own first-instance (returned as the real row).
             if _strip_tz(occ_start) == _strip_tz(ev.start_time):
+                continue
+            if _strip_tz(occ_start) in closed_starts:
                 continue
             key = (ev.id, _strip_tz(occ_start))
             if key in override_keys:
@@ -543,6 +557,43 @@ def _expand_rows_in_window(
     # client-side calendars.
     result.sort(key=lambda e: e.start_time)
     return result
+
+
+def closed_occurrence_starts(
+    session: Session,
+    *,
+    venue_id: uuid.UUID | None,
+    starts: list[datetime],
+    duration: timedelta,
+) -> set[datetime]:
+    """Return recurrence starts whose event window overlaps a venue closure.
+
+    Closures are queried on every expansion so schedule edits take effect
+    without rewriting or materializing the event series.
+    """
+    if venue_id is None or not starts:
+        return set()
+    starts_utc = [
+        start if start.tzinfo is not None else start.replace(tzinfo=UTC)
+        for start in starts
+    ]
+    earliest = min(starts_utc)
+    latest = max(starts_utc) + duration
+    closures = session.exec(
+        select(VenueExceptions)
+        .where(VenueExceptions.venue_id == venue_id)
+        .where(VenueExceptions.is_closed == True)  # noqa: E712
+        .where(VenueExceptions.start_datetime < latest)
+        .where(VenueExceptions.end_datetime > earliest)
+    ).all()
+    return {
+        _strip_tz(start)
+        for start in starts_utc
+        if any(
+            closure.start_datetime < start + duration and closure.end_datetime > start
+            for closure in closures
+        )
+    }
 
 
 def _clone_as_occurrence(
@@ -572,6 +623,7 @@ def _clone_as_occurrence(
 
 
 def _series_overlaps(
+    session: Session,
     master: Events,
     window_start: datetime,
     window_end: datetime,
@@ -596,7 +648,15 @@ def _series_overlaps(
         exdates=list(master.recurrence_exdates or []),
         timezone=master.timezone,
     )
+    closed_starts = closed_occurrence_starts(
+        session,
+        venue_id=master.venue_id,
+        starts=occurrences,
+        duration=duration,
+    )
     for occ in occurrences:
+        if _strip_tz(occ) in closed_starts:
+            continue
         if occ < window_end and (occ + duration) > window_start:
             return True
     return False

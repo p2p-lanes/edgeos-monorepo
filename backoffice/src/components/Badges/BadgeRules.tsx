@@ -45,7 +45,7 @@ const rulesKey = ["badge-rules"]
 const MAX_CONDITIONS = 5
 
 function useNames(): RuleNames & {
-  popups: { value: string; label: string }[]
+  popups: { value: string; label: string; badgesOff: boolean }[]
 } {
   const { data: popups } = useQuery({
     queryKey: ["popups", { limit: 100 }],
@@ -63,6 +63,7 @@ function useNames(): RuleNames & {
     popups: (popups?.results ?? []).map((p) => ({
       value: p.id,
       label: p.name,
+      badgesOff: !p.badges_enabled,
     })),
     popup: (id) =>
       popups?.results.find((p) => p.id === id)?.name ?? "a gathering",

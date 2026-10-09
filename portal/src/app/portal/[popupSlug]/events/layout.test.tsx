@@ -7,6 +7,7 @@ const mocks = vi.hoisted(() => ({
     type: "companion"
     application_status: string
   },
+  access: "denied" as "loading" | "denied" | "allowed",
   replace: vi.fn(),
 }))
 
@@ -24,7 +25,7 @@ vi.mock("@/hooks/useParticipationQuery", () => ({
 }))
 
 vi.mock("@/hooks/useHumanPopupAccess", () => ({
-  useHumanPopupAccess: () => ({ state: "loading" }),
+  useHumanPopupAccess: () => ({ state: mocks.access }),
 }))
 
 vi.mock("@/providers/applicationProvider", () => ({
@@ -51,6 +52,7 @@ describe("EventsLayout", () => {
   beforeEach(() => {
     mocks.applications = []
     mocks.participation = null
+    mocks.access = "denied"
     mocks.replace.mockReset()
   })
 
@@ -80,5 +82,19 @@ describe("EventsLayout", () => {
     await waitFor(() =>
       expect(mocks.replace).toHaveBeenCalledWith("/portal/summit"),
     )
+  })
+
+  it("allows an attendee with a granted ticket and no accepted application", () => {
+    mocks.applications = [{ status: "in review" }]
+    mocks.access = "allowed"
+
+    render(
+      <EventsLayout>
+        <div>Calendar content</div>
+      </EventsLayout>,
+    )
+
+    expect(screen.getByText("Calendar content")).toBeTruthy()
+    expect(mocks.replace).not.toHaveBeenCalled()
   })
 })

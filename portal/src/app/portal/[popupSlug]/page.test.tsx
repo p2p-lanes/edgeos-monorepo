@@ -19,7 +19,13 @@ const mocks = vi.hoisted(() => ({
     status: string
     takes_applications: boolean
   } | null,
-  doors: [] as Array<{ flowId: string }>,
+  doors: [] as Array<{
+    flowId: string
+    slug?: string
+    application?: unknown | null
+    status?: string
+  }>,
+  primaryFlowSlug: null as string | null,
   doorsLoading: false,
   doorsError: false,
   participation: null as { type: string } | null,
@@ -63,6 +69,14 @@ vi.mock("@/hooks/usePortalDirectSalesFlows", () => ({
   usePortalDirectSalesFlows: () => ({ data: mocks.directFlows }),
 }))
 
+vi.mock("@/hooks/usePortalPrimarySalesFlow", () => ({
+  usePortalPrimarySalesFlow: () => ({
+    data: mocks.primaryFlowSlug
+      ? { flow_slug: mocks.primaryFlowSlug }
+      : undefined,
+  }),
+}))
+
 vi.mock("@/hooks/useHumanPopupAccess", () => ({
   useHumanPopupAccess: () => mocks.access,
 }))
@@ -97,7 +111,13 @@ vi.mock("@/components/Card/EventCard", () => {
 })
 
 vi.mock("@/components/Portal/GatheringDoorCard", () => ({
-  GatheringDoorCard: () => <div data-testid="application-door" />,
+  GatheringDoorCard: ({
+    door,
+  }: {
+    door: { flowId: string; status: string }
+  }) => (
+    <div data-testid={`application-door-${door.flowId}`}>{door.status}</div>
+  ),
 }))
 
 vi.mock("@/components/CompanionView", () => ({
@@ -132,6 +152,7 @@ describe("portal event overview", () => {
       takes_applications: false,
     }
     mocks.doors = []
+    mocks.primaryFlowSlug = null
     mocks.doorsLoading = false
     mocks.doorsError = false
     mocks.participation = null
@@ -204,7 +225,36 @@ describe("portal event overview", () => {
 
     render(<Home />)
 
-    expect(screen.getAllByTestId("application-door")).toHaveLength(2)
+    expect(screen.getAllByTestId(/^application-door-/)).toHaveLength(2)
+  })
+
+  it("shows a no-application ticket holder as accepted on the primary door", () => {
+    if (mocks.city) mocks.city.takes_applications = true
+    mocks.access = { state: "allowed", source: "attendee" }
+    mocks.primaryFlowSlug = "attendee"
+    mocks.doors = [
+      {
+        flowId: "application-1",
+        slug: "attendee",
+        application: null,
+        status: "none",
+      },
+      {
+        flowId: "application-2",
+        slug: "volunteer",
+        application: null,
+        status: "none",
+      },
+    ]
+
+    render(<Home />)
+
+    expect(
+      screen.getByTestId("application-door-application-1").textContent,
+    ).toBe("accepted")
+    expect(
+      screen.getByTestId("application-door-application-2").textContent,
+    ).toBe("none")
   })
 
   it("shows only the canonical loader while application flows are unresolved", () => {
@@ -253,7 +303,7 @@ describe("portal event overview", () => {
     render(<Home />)
 
     expect(screen.queryByTestId("loader")).toBeNull()
-    expect(screen.getAllByTestId("application-door")).toHaveLength(2)
+    expect(screen.getAllByTestId(/^application-door-/)).toHaveLength(2)
     expect(screen.queryByTestId("application-progress")).toBeNull()
   })
 
@@ -296,7 +346,9 @@ describe("portal event overview", () => {
       isReturnFromCheckout: true,
     })
     if (flowCount > 1) {
-      expect(screen.getAllByTestId("application-door")).toHaveLength(flowCount)
+      expect(screen.getAllByTestId(/^application-door-/)).toHaveLength(
+        flowCount,
+      )
     }
   })
 

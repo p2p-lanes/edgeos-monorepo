@@ -3,6 +3,8 @@ import type { AttendeePassState } from "@/types/Attendee"
 import type { ProductsPass } from "@/types/Products"
 import {
   buildSectionGroups,
+  filterTicketSectionsForRecipient,
+  getBuyerPurchasedProductIds,
   isSectionVisibleForApp,
   parseSections,
 } from "./ticketSections"
@@ -156,6 +158,121 @@ describe("isSectionVisibleForApp", () => {
     expect(isSectionVisibleForApp(sectionGated, null)).toBe(true)
   })
 
+  it("uses the buyer's owned product to resolve the segment without an application", () => {
+    const standardSection = {
+      ...sectionGated,
+      product_ids: ["standard-pass"],
+    }
+    const indianSection = {
+      ...sectionGated,
+      product_ids: ["indian-pass"],
+    }
+    const ticketGrantFallback = {
+      applicationExists: false,
+      purchasedProductIds: new Set(["standard-pass"]),
+      hasTicketSegmentEvidence: true,
+    }
+
+    expect(
+      isSectionVisibleForApp(standardSection, null, ticketGrantFallback),
+    ).toBe(true)
+    expect(
+      isSectionVisibleForApp(indianSection, null, ticketGrantFallback),
+    ).toBe(false)
+  })
+
+  it("keeps the matching conditional segment for an owned granted ticket", () => {
+    expect(
+      isSectionVisibleForApp(
+        { ...sectionGated, product_ids: ["speaker-ticket"] },
+        null,
+        {
+          applicationExists: false,
+          purchasedProductIds: new Set(["speaker-ticket"]),
+          hasTicketSegmentEvidence: true,
+        },
+      ),
+    ).toBe(true)
+  })
+
+  it("shows only the owned product segment when the grant has no form answers", () => {
+    const standardSection = {
+      key: "standard",
+      label: "Standard",
+      order: 1,
+      product_ids: ["standard-pass"],
+      visible_if: { field_id: "indian_citizen", value: "No" },
+    }
+    const indianSection = {
+      key: "indian-citizen",
+      label: "Indian Citizen",
+      order: 2,
+      product_ids: ["indian-pass"],
+      visible_if: { field_id: "indian_citizen", value: "Yes" },
+    }
+
+    expect(
+      filterTicketSectionsForRecipient(
+        [standardSection, indianSection],
+        null,
+        false,
+        new Set(["standard-pass"]),
+      ).map((section) => section.key),
+    ).toEqual(["standard"])
+  })
+
+  it("hides the conditional citizen section beside an unconditioned owned standard pass", () => {
+    const sections = [
+      {
+        key: "standard",
+        label: "Standard",
+        order: 1,
+        product_ids: ["standard-pass"],
+      },
+      {
+        key: "indian-citizen",
+        label: "Indian Citizen",
+        order: 2,
+        product_ids: ["indian-pass"],
+        visible_if: { field_id: "indian_citizen", value: "Yes" },
+      },
+    ]
+
+    expect(
+      filterTicketSectionsForRecipient(
+        sections,
+        null,
+        false,
+        new Set(["standard-pass"]),
+      ).map((section) => section.key),
+    ).toEqual(["standard"])
+  })
+
+  it("preserves open-ticketing visibility when no owned product indicates a segment", () => {
+    const sections = [
+      {
+        key: "standard",
+        label: "Standard",
+        order: 1,
+        product_ids: ["standard-pass"],
+        visible_if: { field_id: "indian_citizen", value: "No" },
+      },
+      {
+        key: "indian-citizen",
+        label: "Indian Citizen",
+        order: 2,
+        product_ids: ["indian-pass"],
+        visible_if: { field_id: "indian_citizen", value: "Yes" },
+      },
+    ]
+
+    expect(
+      filterTicketSectionsForRecipient(sections, null, false, new Set()).map(
+        (section) => section.key,
+      ),
+    ).toEqual(["standard", "indian-citizen"])
+  })
+
   it("visible when customFields is undefined", () => {
     expect(isSectionVisibleForApp(sectionGated, undefined)).toBe(true)
   })
@@ -197,6 +314,38 @@ describe("isSectionVisibleForApp", () => {
     expect(
       isSectionVisibleForApp(sectionMultiValue, { role: "attendee" }),
     ).toBe(false)
+  })
+})
+
+describe("getBuyerPurchasedProductIds", () => {
+  it("uses only purchased products on the buyer attendee", () => {
+    const result = getBuyerPurchasedProductIds([
+      {
+        ...makeAttendee("main", [
+          makeProduct("standard", { purchased: true }),
+          makeProduct("unowned", { purchased: false }),
+        ]),
+        human_id: "human-1",
+        recipient: {
+          recipient_key: "human:human-1",
+          human_id: "human-1",
+          name: "Main",
+        },
+      },
+      {
+        ...makeAttendee("spouse", [
+          makeProduct("companion-indian", { purchased: true }),
+        ]),
+        human_id: "human-2",
+        recipient: {
+          recipient_key: "attendee:spouse",
+          existing_attendee_id: "spouse",
+          name: "Spouse",
+        },
+      },
+    ])
+
+    expect(result).toEqual(new Set(["standard"]))
   })
 })
 

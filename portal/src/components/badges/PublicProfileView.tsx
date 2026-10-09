@@ -69,14 +69,14 @@ export function PublicProfileView({
           </div>
 
           {profile.badges.length > 0 ? (
-            <div className="mt-8 grid grid-cols-2 gap-6 sm:grid-cols-3">
+            <div className="mt-8 grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4">
               {profile.badges.map((badge) => (
                 <BadgeTile
                   key={badge.name}
                   name={badge.name}
                   imageUrl={badge.image_url}
                   count={badge.count}
-                  caption={badge.description}
+                  description={badge.description}
                 />
               ))}
             </div>

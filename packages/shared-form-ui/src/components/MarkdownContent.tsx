@@ -6,9 +6,11 @@ import { cn } from "../utils"
 // Tailwind's typography plugin isn't installed in this repo, so style the
 // rendered markdown with explicit child-selector utilities instead of `prose`.
 // Descendant selectors (`[&_ul]`) cover nested lists produced by the editor.
+// Match paragraph spacing to the 20px line height so paragraph breaks read as
+// one blank line in both the editor and rendered descriptions.
 export const markdownContentClass =
   "text-sm leading-5 " +
-  "[&_p]:my-0 [&_p+p]:mt-2 " +
+  "[&_p]:my-0 [&_p+p]:mt-5 " +
   "[&_ul]:my-1 [&_ul]:list-disc [&_ul]:pl-5 " +
   "[&_ol]:my-1 [&_ol]:list-decimal [&_ol]:pl-5 " +
   "[&_li]:my-0.5 " +

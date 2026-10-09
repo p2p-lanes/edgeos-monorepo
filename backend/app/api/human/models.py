@@ -33,14 +33,14 @@ class Humans(HumanBase, table=True):
     )
 
     # Public profile share link (SIM-108). The token is opaque, generated on
-    # first read and regenerable; the link is on unless the human turns it off.
+    # first read and regenerable; sharing is off until the human opts in.
     public_profile_token: str | None = Field(
         default=None,
         sa_column=Column(String(64), nullable=True),
     )
     public_profile_enabled: bool = Field(
-        default=True,
-        sa_column=Column(Boolean, nullable=False, server_default="true"),
+        default=False,
+        sa_column=Column(Boolean, nullable=False, server_default="false"),
     )
 
     tenant: "Tenants" = Relationship(back_populates="humans")

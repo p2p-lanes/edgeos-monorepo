@@ -13,14 +13,14 @@ from app.api.custom_export.service import (
     generate_export,
     preview_export,
 )
-from app.core.dependencies.users import CurrentOperator, TenantSession
+from app.core.dependencies.users import CurrentOperatorJwtOnly, TenantSession
 
 router = APIRouter(prefix="/custom-exports", tags=["custom-exports"])
 
 
 @router.get("/catalog", response_model=ExportCatalogPublic)
 async def get_export_catalog(
-    _: CurrentOperator,
+    _: CurrentOperatorJwtOnly,
 ) -> ExportCatalogPublic:
     """List the server-owned datasets and fields available to custom exports."""
     return export_catalog()
@@ -30,7 +30,7 @@ async def get_export_catalog(
 async def preview_custom_export(
     spec: CustomExportSpec,
     db: TenantSession,
-    _: CurrentOperator,
+    _: CurrentOperatorJwtOnly,
 ) -> ExportPreview:
     """Validate an export plan and count its exact result without creating a file."""
     return preview_export(db, spec)
@@ -54,7 +54,7 @@ async def preview_custom_export(
 async def download_custom_export(
     request: ExportDownloadRequest,
     db: TenantSession,
-    current_user: CurrentOperator,
+    current_user: CurrentOperatorJwtOnly,
 ) -> Response:
     """Generate the exact previously previewed CSV or XLSX export."""
     content, media_type, filename = generate_export(

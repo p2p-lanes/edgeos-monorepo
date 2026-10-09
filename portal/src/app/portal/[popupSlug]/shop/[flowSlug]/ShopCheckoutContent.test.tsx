@@ -17,6 +17,13 @@ const mocks = vi.hoisted(() => ({
   loading: { application: false, direct: false, upsale: false },
   applicationStatus: "accepted" as string | null,
   approvedApplicationFlowId: "application-1" as string | null,
+  primaryFlowSlug: null as string | null,
+  popupAccess: { state: "denied" } as
+    | {
+        state: "allowed"
+        source: "application" | "attendee" | "payment" | "companion"
+      }
+    | { state: "denied" | "loading" },
 }))
 
 vi.mock("@/hooks/usePortalSalesFlows", () => ({
@@ -36,6 +43,17 @@ vi.mock("@/hooks/usePortalUpsaleFlows", () => ({
     data: mocks.upsale,
     isLoading: mocks.loading.upsale,
   }),
+}))
+vi.mock("@/hooks/usePortalPrimarySalesFlow", () => ({
+  usePortalPrimarySalesFlow: () => ({
+    data: mocks.primaryFlowSlug
+      ? { flow_slug: mocks.primaryFlowSlug }
+      : undefined,
+    isLoading: false,
+  }),
+}))
+vi.mock("@/hooks/useHumanPopupAccess", () => ({
+  useHumanPopupAccess: () => mocks.popupAccess,
 }))
 vi.mock("@/providers/applicationProvider", () => ({
   useApplication: () => ({
@@ -88,6 +106,8 @@ describe("ShopCheckoutContent", () => {
     mocks.loading = { application: false, direct: false, upsale: false }
     mocks.applicationStatus = "accepted"
     mocks.approvedApplicationFlowId = "application-1"
+    mocks.primaryFlowSlug = null
+    mocks.popupAccess = { state: "denied" }
   })
 
   it("mounts checkout without a Commerce or flow-name header", () => {
@@ -232,6 +252,29 @@ describe("ShopCheckoutContent", () => {
 
     expect(screen.getByText("shop.approval_required_title")).toBeTruthy()
     expect(screen.queryByText("checkout:attendee")).toBeNull()
+  })
+
+  it("allows a ticket holder without an application to use the primary application flow", () => {
+    mocks.application = [
+      { id: "application-1", slug: "attendee", name: "Attendee" },
+    ]
+    mocks.approvedApplicationFlowId = null
+    mocks.applicationStatus = null
+    mocks.primaryFlowSlug = "attendee"
+    mocks.popupAccess = { state: "allowed", source: "attendee" }
+
+    render(
+      <ShopCheckoutContent
+        popupId="popup-1"
+        popupSlug="summer-camp"
+        flowSlug="attendee"
+      />,
+    )
+
+    expect(
+      screen.getByText("application-checkout:application-1:attendee"),
+    ).toBeTruthy()
+    expect(screen.queryByText("shop.approval_required_title")).toBeNull()
   })
 
   it.each([

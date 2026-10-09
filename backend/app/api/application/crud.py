@@ -873,18 +873,21 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
     ) -> tuple[list[Attendees], int]:
         """Find attendees for the attendees directory.
 
-        Returns ticket-holding attendees whose parent application is accepted
-        and belongs to the popup's primary flow — one entry per attendee,
-        sourced from that attendee's own Human record.
+        Returns ticket-holding attendees whose parent application belongs to
+        the popup's primary flow, plus attendees with no parent application.
+        Ticket ownership grants directory eligibility regardless of application
+        status. There is one entry per attendee, sourced from that attendee's
+        own Human record.
         Only the main applicant and spouse categories are listed; kids (and any
         other categories) are excluded. Supports text search across the
         attendee's own human fields.
         """
 
         # Root on attendees so the spouse appears as their own row, not just
-        # nested under the main applicant. Gate on an accepted parent
-        # application, on the attendee holding at least one product, and on the
-        # category being directory-visible (main/spouse — kids are excluded).
+        # nested under the main applicant. A product grant can create an
+        # attendee without creating an application, so application status
+        # cannot be an eligibility gate. Keep linked attendees scoped to the
+        # popup's designated primary flow.
         has_products = exists().where(
             AttendeeProducts.attendee_id == Attendees.id,
             AttendeeProducts.revoked_at.is_(None),
@@ -892,14 +895,18 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
         )
         base_statement = (
             select(Attendees)
-            .join(Applications, Attendees.application_id == Applications.id)  # type: ignore[arg-type]
+            .outerjoin(Applications, Attendees.application_id == Applications.id)  # type: ignore[arg-type]
             .join(
                 AttendeeCategories,
                 Attendees.category_id == AttendeeCategories.id,  # type: ignore[arg-type]
             )
             .where(Attendees.popup_id == popup_id)
-            .where(_application_is_in_primary_flow(popup_id))
-            .where(Applications.status == ApplicationStatus.ACCEPTED.value)
+            .where(
+                or_(
+                    Applications.id.is_(None),
+                    _application_is_in_primary_flow(popup_id),
+                )
+            )
             .where(has_products)
             .where(_directory_category_key().in_(DIRECTORY_VISIBLE_CATEGORY_KEYS))
         )
@@ -977,8 +984,8 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
     ) -> tuple[list["Humans"], int]:
         """Find humans in the Portal attendee directory who share their name.
 
-        Same population as ``find_directory`` (accepted primary-flow application,
-        the attendee holds at least one product, main/spouse category) but
+        Same population as ``find_directory`` (primary-flow application when
+        present, active ticket product, main/spouse category) but
         returns the distinct underlying Humans instead of Attendee rows. Powers
         the event host picker: a creator may only pick a host who actually
         attends this popup AND has not hidden their name for it.
@@ -1004,14 +1011,18 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
         base_statement = (
             select(Humans)
             .join(Attendees, Attendees.human_id == Humans.id)  # type: ignore[arg-type]
-            .join(Applications, Attendees.application_id == Applications.id)  # type: ignore[arg-type]
+            .outerjoin(Applications, Attendees.application_id == Applications.id)  # type: ignore[arg-type]
             .join(
                 AttendeeCategories,
                 Attendees.category_id == AttendeeCategories.id,  # type: ignore[arg-type]
             )
             .where(Attendees.popup_id == popup_id)
-            .where(_application_is_in_primary_flow(popup_id))
-            .where(Applications.status == ApplicationStatus.ACCEPTED.value)
+            .where(
+                or_(
+                    Applications.id.is_(None),
+                    _application_is_in_primary_flow(popup_id),
+                )
+            )
             .where(has_products)
             .where(_directory_category_key().in_(DIRECTORY_VISIBLE_CATEGORY_KEYS))
             .where(_directory_field_is_shared("first_name"))

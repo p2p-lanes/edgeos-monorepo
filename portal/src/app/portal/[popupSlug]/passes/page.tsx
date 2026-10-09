@@ -12,6 +12,7 @@ import useHumanAttendeesQuery from "@/hooks/useHumanAttendeesQuery"
 import useHumanPaymentsQuery from "@/hooks/useHumanPaymentsQuery"
 import { useHumanPopupAccess } from "@/hooks/useHumanPopupAccess"
 import { usePortalDirectSalesFlows } from "@/hooks/usePortalDirectSalesFlows"
+import { usePortalPrimarySalesFlow } from "@/hooks/usePortalPrimarySalesFlow"
 import { usePortalSalesFlows } from "@/hooks/usePortalSalesFlows"
 import { usePortalUpsaleFlows } from "@/hooks/usePortalUpsaleFlows"
 import {
@@ -39,15 +40,20 @@ export default function HomePasses() {
   const city = getCity()
   const popupId = city?.id ? String(city.id) : undefined
   const access = useHumanPopupAccess(popupId ?? null)
+  const hasTicketAccess =
+    access.state === "allowed" &&
+    (access.source === "attendee" || access.source === "payment")
   const nobodyApplies = city?.takes_applications === false
   const attendeesQuery = useHumanAttendeesQuery(popupId ?? null)
   const paymentsQuery = useHumanPaymentsQuery(popupId, { limit: 100 })
   const applicationFlowsQuery = usePortalSalesFlows(popupId)
   const directFlowsQuery = usePortalDirectSalesFlows(popupId)
   const upsaleFlowsQuery = usePortalUpsaleFlows(popupId)
+  const primaryFlowQuery = usePortalPrimarySalesFlow(params.popupSlug)
   const applicationFlows = applicationFlowsQuery.data ?? []
   const directFlows = directFlowsQuery.data ?? []
   const upsaleFlows = upsaleFlowsQuery.data ?? []
+  const primaryFlowSlug = primaryFlowQuery.data?.flow_slug ?? null
   const applications = getApplicationsForPopup()
   const approvedApplicationFlowIds = new Set<string>(
     applications.flatMap((application) =>
@@ -61,6 +67,7 @@ export default function HomePasses() {
     direct: directFlows,
     upsale: upsaleFlows,
     approvedApplicationFlowIds,
+    primaryFlowSlug: hasTicketAccess ? primaryFlowSlug : null,
   })
   const eligibleFlowIds = new Set(eligibleFlows.map((flow) => flow.id))
   const eligibleApplicationFlows = applicationFlows.filter((flow) =>
@@ -79,7 +86,11 @@ export default function HomePasses() {
     applications: purchaseApplications,
     eligibleFlows,
     payments: paymentsQuery.data ?? [],
+    primaryFlowId:
+      eligibleFlows.find((flow) => flow.slug === primaryFlowSlug)?.id ?? null,
   })
+  const primaryFlowId =
+    eligibleFlows.find((flow) => flow.slug === primaryFlowSlug)?.id ?? null
 
   useEffect(() => {
     if (!nobodyApplies && access.state === "denied") {
@@ -135,6 +146,7 @@ export default function HomePasses() {
     const flowSlug = resolvePassPurchaseFlowSlug({
       explicitFlowIdentifier,
       attendeeApplicationId: attendee?.application_id,
+      primaryFlowId,
       applications: purchaseApplications,
       eligibleFlows,
       eligibleApplicationFlows,
@@ -147,6 +159,21 @@ export default function HomePasses() {
   const openPurchase = (attendee?: AttendeePassState) => {
     router.push(getPurchasePath(attendee))
   }
+  const unassignedPurchaseAttendee = groupedPasses.unassignedAttendees[0]
+  const unassignedPurchaseSlug = unassignedPurchaseAttendee
+    ? resolvePassPurchaseFlowSlug({
+        explicitFlowIdentifier,
+        attendeeApplicationId: unassignedPurchaseAttendee.application_id,
+        primaryFlowId,
+        applications: purchaseApplications,
+        eligibleFlows,
+        eligibleApplicationFlows,
+        eligibleDirectFlows,
+      })
+    : null
+  const unassignedPurchaseFlow = eligibleFlows.find(
+    (flow) => flow.slug === unassignedPurchaseSlug,
+  )
   const emptyState = (
     <div className="w-full md:mt-0 mx-auto items-center max-w-3xl p-6 bg-transparent">
       <div className="flex flex-col items-center justify-center rounded-2xl border bg-card p-10 text-center shadow-sm">
@@ -184,7 +211,8 @@ export default function HomePasses() {
   if (
     applicationFlowsQuery.isLoading ||
     directFlowsQuery.isLoading ||
-    upsaleFlowsQuery.isLoading
+    upsaleFlowsQuery.isLoading ||
+    primaryFlowQuery.isLoading
   ) {
     return <Loader />
   }
@@ -206,8 +234,11 @@ export default function HomePasses() {
             id: "other",
             title: t("passes.other_passes"),
             attendees: groupedPasses.unassignedAttendees,
-            salesFlowId: null,
-            onSwitchToBuy: undefined,
+            salesFlowId: unassignedPurchaseFlow?.id ?? null,
+            onSwitchToBuy: unassignedPurchaseFlow
+              ? (attendee?: AttendeePassState) =>
+                  openPurchase(attendee ?? unassignedPurchaseAttendee)
+              : undefined,
           },
         ]
       : []),

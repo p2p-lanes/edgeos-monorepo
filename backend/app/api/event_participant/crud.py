@@ -216,13 +216,15 @@ class EventParticipantsCRUD(
         self,
         session: Session,
         event_ids: list[uuid.UUID],
-    ) -> dict[uuid.UUID, int]:
+    ) -> dict[tuple[uuid.UUID, datetime | None], int]:
         """Active (non-cancelled) RSVP counts for many events in one query.
 
-        Returns a ``{event_id: count}`` map; event_ids with no active
-        participants are omitted (callers should default missing keys to 0).
-        Used by the backoffice event list so operators can see RSVP counts
-        without opening each event, avoiding an N+1 of ``count_active_for_event``.
+        Returns a ``{(event_id, occurrence_start): count}`` map, so each date
+        of a recurring series gets its own count (one-offs and detached
+        children key on ``None``). Pairs with no active participants are
+        omitted (callers should default missing keys to 0). Used by the
+        backoffice event list so operators can see RSVP counts without opening
+        each event, avoiding an N+1 of ``count_active_for_event``.
         """
         from app.api.event.models import Events
 
@@ -231,6 +233,7 @@ class EventParticipantsCRUD(
         statement = (
             select(
                 EventParticipants.event_id,
+                EventParticipants.occurrence_start,
                 func.count().label("count"),
             )
             .join(Events, Events.id == EventParticipants.event_id)
@@ -242,9 +245,9 @@ class EventParticipantsCRUD(
                     EventParticipants.profile_id != Events.host_id,
                 ),
             )
-            .group_by(EventParticipants.event_id)
+            .group_by(EventParticipants.event_id, EventParticipants.occurrence_start)
         )
-        return {row[0]: int(row[1]) for row in session.exec(statement).all()}
+        return {(row[0], row[1]): int(row[2]) for row in session.exec(statement).all()}
 
     def cancel_all_for_event(
         self,

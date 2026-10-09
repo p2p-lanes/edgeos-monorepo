@@ -60,6 +60,10 @@ vi.mock("@/hooks/usePortalDirectSalesFlows", () => ({
 vi.mock("@/hooks/usePortalUpsaleFlows", () => ({
   usePortalUpsaleFlows: () => ({ data: undefined, isPending: true }),
 }))
+
+vi.mock("@/hooks/usePortalPrimarySalesFlow", () => ({
+  usePortalPrimarySalesFlow: () => ({ data: undefined, isPending: true }),
+}))
 vi.mock("@/hooks/useCanShareReferrals", () => ({
   useCanShareReferrals: () => false,
 }))
@@ -80,7 +84,7 @@ beforeEach(() => {
   state.participationLoading = false
   state.applications = []
   state.participation = null
-  state.access = "loading"
+  state.access = "denied"
 })
 
 const directoryStatus = (
@@ -125,6 +129,18 @@ describe("useResources permission readiness", () => {
     expect(directoryStatus(result.current.resources)).toBe("active")
   })
 
+  it("shows events and directory to an attendee with ticket-based popup access", () => {
+    state.access = "allowed"
+    const { result } = renderHook(() => useResources())
+    expect(result.current.permissionsLoading).toBe(false)
+    expect(directoryStatus(result.current.resources)).toBe("active")
+    expect(
+      result.current.resources.find(
+        (resource) => resource.path === "/portal/india/events",
+      )?.status,
+    ).toBe("active")
+  })
+
   it("allows an accepted companion after their participation resolves", () => {
     state.participationLoading = true
     const { result, rerender } = renderHook(() => useResources())
@@ -156,8 +172,26 @@ describe("useResources permission readiness", () => {
     expect(directoryStatus(result.current.resources)).toBeUndefined()
   })
 
+  it("shows Agentic access to a ticket holder when nobody applies", () => {
+    state.city!.takes_applications = false
+    state.access = "allowed"
+
+    const { result } = renderHook(() => useResources())
+    const events = result.current.resources.find(
+      (resource) => resource.name === "sidebar.events",
+    )
+
+    expect(events?.status).toBe("active")
+    expect(
+      events?.children?.find(
+        (resource) => resource.path === "/portal/agentic-access",
+      )?.status,
+    ).toBe("active")
+  })
+
   it("waits for the existing access query when the popup has ended", () => {
     state.city!.status = "ended"
+    state.access = "loading"
     const { result, rerender } = renderHook(() => useResources())
     expect(result.current.permissionsLoading).toBe(true)
     state.access = "allowed"

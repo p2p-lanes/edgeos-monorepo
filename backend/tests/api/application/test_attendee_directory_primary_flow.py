@@ -153,6 +153,49 @@ def test_directory_human_picker_cannot_use_a_sibling_to_bypass_primary_privacy(
     assert rows == [] and total == 0
 
 
+def test_directory_includes_ticket_grants_without_application(
+    db: Session, tenant_a: Tenants, primary_flow_world
+) -> None:
+    world = primary_flow_world
+    granted_human = _human(db, tenant_a, "Granted", "Ticket")
+    granted = _attendee(
+        db,
+        world["popup"],
+        world["primary_app"],
+        granted_human,
+        _category(db, world["popup"], "main", is_primary=True),
+        tickets=1,
+    )
+    granted.application_id = None
+    db.add(granted)
+    db.commit()
+
+    rows, total = applications_crud.find_directory(db, world["popup"].id)
+    assert total == 2
+    assert {row.id for row in rows} == {world["primary_attendee"].id, granted.id}
+
+    humans, total = applications_crud.find_directory_humans(db, world["popup"].id)
+    assert total == 2
+    assert {human.id for human in humans} == {world["person"].id, granted_human.id}
+
+
+def test_directory_api_includes_product_when_application_is_pending(
+    client: TestClient, db: Session, primary_flow_world
+) -> None:
+    world = primary_flow_world
+    world["primary_app"].status = "in_review"
+    db.add(world["primary_app"])
+    db.commit()
+
+    response = client.get(
+        f"/api/v1/applications/my/directory/{world['popup'].id}",
+        headers=world["headers"],
+    )
+    assert response.status_code == 200, response.text
+    assert response.json()["paging"]["total"] == 1
+    assert response.json()["results"][0]["id"] == str(world["primary_attendee"].id)
+
+
 def test_directory_api_and_csv_use_primary_application_data(
     client: TestClient, primary_flow_world
 ) -> None:
@@ -317,7 +360,9 @@ def test_primary_scope_is_explicit_not_status_or_visibility_based(
         assert response.status_code == 200, response.text
         assert response.json()["id"] == str(world["primary_app"].id)
     rows, total = applications_crud.find_directory(db, world["popup"].id)
-    expected_ids = [world["primary_attendee"].id] if primary_state == "closed" else []
+    expected_ids = (
+        [] if primary_state == "not_designated" else [world["primary_attendee"].id]
+    )
     assert [row.id for row in rows] == expected_ids
     assert total == len(expected_ids)
 

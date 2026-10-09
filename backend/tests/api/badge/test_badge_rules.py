@@ -28,12 +28,22 @@ from tests.test_event_qr_check_in import (
     _give_ticket,
     _make_event,
     _make_human,
-    _make_popup,
 )
+from tests.test_event_qr_check_in import _make_popup as _make_plain_popup
 
 BADGES = "/api/v1/badges"
 RULES = "/api/v1/badge-rules"
 SETTLED = timedelta(hours=3)
+
+
+def _make_popup(db: Session, tenant: Tenants) -> Popups:
+    """A popup with badges on: only those count toward rules."""
+    popup = _make_plain_popup(db, tenant)
+    popup.badges_enabled = True
+    db.add(popup)
+    db.commit()
+    db.refresh(popup)
+    return popup
 
 
 @pytest.fixture(scope="module")
@@ -221,6 +231,51 @@ def test_voided_check_ins_never_count(
     assert rule["award_count"] == 1
     assert len(_awards(db, badge["id"], regular.id)) == 1
     assert _awards(db, badge["id"], voided.id) == []
+
+
+def test_popups_with_badges_off_never_count(
+    client: TestClient, db: Session, tenant_a: Tenants, admin, style
+):
+    on, off = _make_popup(db, tenant_a), _make_plain_popup(db, tenant_a)
+    human = _make_human(db, tenant_a)
+    _mark(db, tenant_a, human, _past_event(db, tenant_a, on, _days_ago(3)))
+    _mark(db, tenant_a, human, _past_event(db, tenant_a, off, _days_ago(2)))
+
+    # A rule over every popup only sees the one with badges on.
+    assert _qualifies(db, tenant_a, human, {"threshold": 1})
+    assert not _qualifies(db, tenant_a, human, {"threshold": 2})
+
+    # Naming a popup with badges off is refused outright.
+    badge = _badge(client, admin, style)
+    resp = client.post(
+        RULES,
+        json={
+            "badge_id": badge["id"],
+            "config": {
+                "conditions": [{"threshold": 1, "filters": {"popup_id": str(off.id)}}]
+            },
+        },
+        headers=admin,
+    )
+    assert resp.status_code == 409, resp.text
+
+    # One already naming it (badges turned off later) can still be edited.
+    rule = _rule(
+        client, admin, badge, {"threshold": 1, "filters": {"popup_id": str(on.id)}}
+    )
+    on.badges_enabled = False
+    db.add(on)
+    db.commit()
+    resp = client.patch(
+        f"{RULES}/{rule['id']}",
+        json={
+            "config": {
+                "conditions": [{"threshold": 2, "filters": {"popup_id": str(on.id)}}]
+            }
+        },
+        headers=admin,
+    )
+    assert resp.status_code == 200, resp.text
 
 
 # ---------------------------------------------------------------------------

@@ -274,7 +274,7 @@ export function ConditionEditor({
   index: number
   condition: Condition
   shown: FilterKey[]
-  popups: Option[]
+  popups: (Option & { badgesOff?: boolean })[]
   onChange: (condition: Condition) => void
   onShownChange: (shown: FilterKey[]) => void
   onRemove?: () => void
@@ -523,10 +523,18 @@ export function ConditionEditor({
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="__any__">Any gathering</SelectItem>
+              <SelectItem value="__any__">
+                Any gathering with badges on
+              </SelectItem>
               {popups.map((p) => (
-                <SelectItem key={p.value} value={p.value}>
+                <SelectItem
+                  key={p.value}
+                  value={p.value}
+                  // Check-ins there never count; one already picked stays.
+                  disabled={p.badgesOff && p.value !== filters.popup_id}
+                >
                   {p.label}
+                  {p.badgesOff && " (badges off)"}
                 </SelectItem>
               ))}
             </SelectContent>

@@ -1633,6 +1633,22 @@ export type BadgeAwardRevoke = {
     reason?: (string | null);
 };
 
+/**
+ * Give a badge to many people at once, by id and/or by email.
+ */
+export type BadgeBulkAwardCreate = {
+    recipient_human_ids?: Array<(string)>;
+    recipient_emails?: Array<(string)>;
+    popup_id?: (string | null);
+    message?: (string | null);
+};
+
+export type BadgeBulkAwardResult = {
+    awarded: Array<BadgeAwardPublic>;
+    already_had: Array<BadgeAwardRecipient>;
+    unknown_emails: Array<(string)>;
+};
+
 export type BadgeCreate = {
     name: string;
     slug?: (string | null);
@@ -2832,6 +2848,9 @@ export type EventCalendarMeta = {
     popup_id: string;
     popup_slug: string;
     popup_name: string;
+    popup_start_date?: (string | null);
+    popup_end_date?: (string | null);
+    popup_ended?: boolean;
     placeholder_url?: (string | null);
 };
 
@@ -3092,6 +3111,7 @@ export type EventPublic = {
     created_at?: string;
     updated_at?: string;
     id: string;
+    warnings?: Array<(string)>;
     occurrence_id?: (string | null);
     venue_title?: (string | null);
     venue_location?: (string | null);
@@ -3141,6 +3161,7 @@ export type EventPublicCalendarItem = {
 export type EventPublicCalendarResponse = {
     results: Array<EventPublicCalendarItem>;
     meta: EventCalendarMeta;
+    paging: Paging;
 };
 
 /**
@@ -3166,6 +3187,27 @@ export type EventRecurringAvailabilityResult = {
     checked_occurrences: number;
     conflicts?: Array<OccurrenceConflict>;
     truncated?: boolean;
+};
+
+export type EventSeriesOccurrence = {
+    event_id: string;
+    occurrence_start: (string | null);
+    start_time: string;
+    end_time: string;
+    timezone: string;
+    title: string;
+    status: EventStatus;
+    is_detached: boolean;
+    attendee_count: number;
+};
+
+export type EventSeriesSummary = {
+    series_id: string;
+    series_title: string;
+    timezone: string;
+    window_start: string;
+    window_end: string;
+    occurrences: Array<EventSeriesOccurrence>;
 };
 
 /**
@@ -4467,6 +4509,11 @@ export type ListModel_PopupAdmin_ = {
     paging: Paging;
 };
 
+export type ListModel_PopupCheckInPublic_ = {
+    results: Array<PopupCheckInPublic>;
+    paging: Paging;
+};
+
 export type ListModel_PopupReviewerPublic_ = {
     results: Array<PopupReviewerPublic>;
     paging: Paging;
@@ -5122,6 +5169,7 @@ export type PopupAdmin = {
     checkin_pass_lead_days?: (number | null);
     accommodation_min_stay?: number;
     show_attendee_directory?: boolean;
+    badges_enabled?: boolean;
     edit_passes_enabled?: boolean;
     invites_enabled?: boolean;
     referrals_enabled?: boolean;
@@ -5144,6 +5192,22 @@ export type PopupAdmin = {
     id: string;
     takes_applications?: boolean;
     sells_directly?: boolean;
+};
+
+/**
+ * Allowlisted operational data for scanners, independent of admin schemas.
+ */
+export type PopupCheckInPublic = {
+    id: string;
+    name: string;
+    tagline?: (string | null);
+    location?: (string | null);
+    slug: string;
+    status: PopupStatus;
+    start_date?: (string | null);
+    end_date?: (string | null);
+    image_url?: (string | null);
+    self_check_in_enabled?: boolean;
 };
 
 export type PopupCreate = {
@@ -5195,6 +5259,7 @@ export type PopupCreate = {
     events_enabled?: boolean;
     self_check_in_enabled?: boolean;
     show_attendee_directory?: boolean;
+    badges_enabled?: boolean;
     edit_passes_enabled?: boolean;
     installments_enabled?: boolean;
     installments_deadline?: (string | null);
@@ -5281,6 +5346,7 @@ export type PopupPublic = {
     events_enabled?: boolean;
     accommodation_min_stay?: number;
     show_attendee_directory?: boolean;
+    badges_enabled?: boolean;
     edit_passes_enabled?: boolean;
     invites_enabled?: boolean;
     referrals_enabled?: boolean;
@@ -5381,6 +5447,7 @@ export type PopupUpdate = {
     events_enabled?: (boolean | null);
     self_check_in_enabled?: (boolean | null);
     show_attendee_directory?: (boolean | null);
+    badges_enabled?: (boolean | null);
     edit_passes_enabled?: (boolean | null);
     installments_enabled?: (boolean | null);
     installments_deadline?: (string | null);
@@ -8242,6 +8309,14 @@ export type BadgesAwardBadgeData = {
 
 export type BadgesAwardBadgeResponse = (BadgeAwardPublic);
 
+export type BadgesAwardBadgeBulkData = {
+    badgeId: string;
+    requestBody: BadgeBulkAwardCreate;
+    xTenantId?: (string | null);
+};
+
+export type BadgesAwardBadgeBulkResponse = (BadgeBulkAwardResult);
+
 export type BadgesListBadgeStylesData = {
     xTenantId?: (string | null);
 };
@@ -8760,6 +8835,8 @@ export type EventParticipantsListParticipantsData = {
      * Maximum number of items to return
      */
     limit?: number;
+    occurrenceStart?: (string | null);
+    scopeToOccurrence?: boolean;
     /**
      * Number of items to skip
      */
@@ -8916,6 +8993,10 @@ export type EventsListPublicCalendarData = {
     limit?: number;
     popupSlug: string;
     search?: (string | null);
+    /**
+     * Number of items to skip
+     */
+    skip?: number;
     startAfter?: (string | null);
     startBefore?: (string | null);
     tags?: (Array<(string)> | null);
@@ -9002,6 +9083,13 @@ export type EventsDeleteEventData = {
 };
 
 export type EventsDeleteEventResponse = (void);
+
+export type EventsGetEventSeriesSummaryData = {
+    eventId: string;
+    xTenantId?: (string | null);
+};
+
+export type EventsGetEventSeriesSummaryResponse = (EventSeriesSummary);
 
 export type EventsGetEventAdminNotesData = {
     eventId: string;
@@ -9227,6 +9315,12 @@ export type EventsUpdatePortalEventData = {
 };
 
 export type EventsUpdatePortalEventResponse = (EventPublic);
+
+export type EventsDeletePortalEventData = {
+    eventId: string;
+};
+
+export type EventsDeletePortalEventResponse = (void);
 
 export type EventsDetachPortalOccurrenceData = {
     eventId: string;
@@ -10224,6 +10318,28 @@ export type PopupReviewersRemoveReviewerData = {
 };
 
 export type PopupReviewersRemoveReviewerResponse = (void);
+
+export type PopupsListCheckInPopupsData = {
+    /**
+     * Maximum number of items to return
+     */
+    limit?: number;
+    search?: (string | null);
+    /**
+     * Number of items to skip
+     */
+    skip?: number;
+    xTenantId?: (string | null);
+};
+
+export type PopupsListCheckInPopupsResponse = (ListModel_PopupCheckInPublic_);
+
+export type PopupsGetCheckInPopupData = {
+    popupId: string;
+    xTenantId?: (string | null);
+};
+
+export type PopupsGetCheckInPopupResponse = (PopupCheckInPublic);
 
 export type PopupsListPopupsData = {
     /**

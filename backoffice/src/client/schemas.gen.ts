@@ -7785,6 +7785,84 @@ export const BadgeAwardRevokeSchema = {
     title: 'BadgeAwardRevoke'
 } as const;
 
+export const BadgeBulkAwardCreateSchema = {
+    properties: {
+        recipient_human_ids: {
+            items: {
+                type: 'string',
+                format: 'uuid'
+            },
+            type: 'array',
+            maxItems: 500,
+            title: 'Recipient Human Ids'
+        },
+        recipient_emails: {
+            items: {
+                type: 'string'
+            },
+            type: 'array',
+            maxItems: 500,
+            title: 'Recipient Emails'
+        },
+        popup_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Popup Id'
+        },
+        message: {
+            anyOf: [
+                {
+                    type: 'string',
+                    maxLength: 2000
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Message'
+        }
+    },
+    type: 'object',
+    title: 'BadgeBulkAwardCreate',
+    description: 'Give a badge to many people at once, by id and/or by email.'
+} as const;
+
+export const BadgeBulkAwardResultSchema = {
+    properties: {
+        awarded: {
+            items: {
+                '$ref': '#/components/schemas/BadgeAwardPublic'
+            },
+            type: 'array',
+            title: 'Awarded'
+        },
+        already_had: {
+            items: {
+                '$ref': '#/components/schemas/BadgeAwardRecipient'
+            },
+            type: 'array',
+            title: 'Already Had'
+        },
+        unknown_emails: {
+            items: {
+                type: 'string'
+            },
+            type: 'array',
+            title: 'Unknown Emails'
+        }
+    },
+    type: 'object',
+    required: ['awarded', 'already_had', 'unknown_emails'],
+    title: 'BadgeBulkAwardResult'
+} as const;
+
 export const BadgeCreateSchema = {
     properties: {
         name: {
@@ -12967,6 +13045,35 @@ export const EventCalendarMetaSchema = {
             type: 'string',
             title: 'Popup Name'
         },
+        popup_start_date: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Popup Start Date'
+        },
+        popup_end_date: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Popup End Date'
+        },
+        popup_ended: {
+            type: 'boolean',
+            title: 'Popup Ended',
+            default: false
+        },
         placeholder_url: {
             anyOf: [
                 {
@@ -14191,6 +14298,14 @@ export const EventPublicSchema = {
             format: 'uuid',
             title: 'Id'
         },
+        warnings: {
+            items: {
+                type: 'string'
+            },
+            type: 'array',
+            title: 'Warnings',
+            default: []
+        },
         occurrence_id: {
             anyOf: [
                 {
@@ -14506,10 +14621,13 @@ export const EventPublicCalendarResponseSchema = {
         },
         meta: {
             '$ref': '#/components/schemas/EventCalendarMeta'
+        },
+        paging: {
+            '$ref': '#/components/schemas/Paging'
         }
     },
     type: 'object',
-    required: ['results', 'meta'],
+    required: ['results', 'meta', 'paging'],
     title: 'EventPublicCalendarResponse',
     description: 'Wrapper response for ``GET /events/public/calendar``.'
 } as const;
@@ -14607,6 +14725,98 @@ export const EventRecurringAvailabilityResultSchema = {
     type: 'object',
     required: ['available', 'total_occurrences', 'checked_occurrences'],
     title: 'EventRecurringAvailabilityResult'
+} as const;
+
+export const EventSeriesOccurrenceSchema = {
+    properties: {
+        event_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Event Id'
+        },
+        occurrence_start: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Occurrence Start'
+        },
+        start_time: {
+            type: 'string',
+            format: 'date-time',
+            title: 'Start Time'
+        },
+        end_time: {
+            type: 'string',
+            format: 'date-time',
+            title: 'End Time'
+        },
+        timezone: {
+            type: 'string',
+            title: 'Timezone'
+        },
+        title: {
+            type: 'string',
+            title: 'Title'
+        },
+        status: {
+            '$ref': '#/components/schemas/EventStatus'
+        },
+        is_detached: {
+            type: 'boolean',
+            title: 'Is Detached'
+        },
+        attendee_count: {
+            type: 'integer',
+            title: 'Attendee Count'
+        }
+    },
+    type: 'object',
+    required: ['event_id', 'occurrence_start', 'start_time', 'end_time', 'timezone', 'title', 'status', 'is_detached', 'attendee_count'],
+    title: 'EventSeriesOccurrence'
+} as const;
+
+export const EventSeriesSummarySchema = {
+    properties: {
+        series_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Series Id'
+        },
+        series_title: {
+            type: 'string',
+            title: 'Series Title'
+        },
+        timezone: {
+            type: 'string',
+            title: 'Timezone'
+        },
+        window_start: {
+            type: 'string',
+            format: 'date-time',
+            title: 'Window Start'
+        },
+        window_end: {
+            type: 'string',
+            format: 'date-time',
+            title: 'Window End'
+        },
+        occurrences: {
+            items: {
+                '$ref': '#/components/schemas/EventSeriesOccurrence'
+            },
+            type: 'array',
+            title: 'Occurrences'
+        }
+    },
+    type: 'object',
+    required: ['series_id', 'series_title', 'timezone', 'window_start', 'window_end', 'occurrences'],
+    title: 'EventSeriesSummary'
 } as const;
 
 export const EventSettingsCreateSchema = {
@@ -20659,6 +20869,24 @@ export const ListModel_PopupAdmin_Schema = {
     title: 'ListModel[PopupAdmin]'
 } as const;
 
+export const ListModel_PopupCheckInPublic_Schema = {
+    properties: {
+        results: {
+            items: {
+                '$ref': '#/components/schemas/PopupCheckInPublic'
+            },
+            type: 'array',
+            title: 'Results'
+        },
+        paging: {
+            '$ref': '#/components/schemas/Paging'
+        }
+    },
+    type: 'object',
+    required: ['results', 'paging'],
+    title: 'ListModel[PopupCheckInPublic]'
+} as const;
+
 export const ListModel_PopupReviewerPublic_Schema = {
     properties: {
         results: {
@@ -23966,6 +24194,11 @@ export const PopupAdminSchema = {
             title: 'Show Attendee Directory',
             default: false
         },
+        badges_enabled: {
+            type: 'boolean',
+            title: 'Badges Enabled',
+            default: false
+        },
         edit_passes_enabled: {
             type: 'boolean',
             title: 'Edit Passes Enabled',
@@ -24154,6 +24387,93 @@ export const PopupAdminSchema = {
     required: ['name', 'slug', 'tenant_id', 'id'],
     title: 'PopupAdmin',
     description: 'Admin popup schema — all fields including sensitive ones.'
+} as const;
+
+export const PopupCheckInPublicSchema = {
+    properties: {
+        id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Id'
+        },
+        name: {
+            type: 'string',
+            title: 'Name'
+        },
+        tagline: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Tagline'
+        },
+        location: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Location'
+        },
+        slug: {
+            type: 'string',
+            title: 'Slug'
+        },
+        status: {
+            '$ref': '#/components/schemas/PopupStatus'
+        },
+        start_date: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Start Date'
+        },
+        end_date: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'End Date'
+        },
+        image_url: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Image Url'
+        },
+        self_check_in_enabled: {
+            type: 'boolean',
+            title: 'Self Check In Enabled',
+            default: false
+        }
+    },
+    type: 'object',
+    required: ['id', 'name', 'slug', 'status'],
+    title: 'PopupCheckInPublic',
+    description: 'Allowlisted operational data for scanners, independent of admin schemas.'
 } as const;
 
 export const PopupCreateSchema = {
@@ -24584,6 +24904,11 @@ export const PopupCreateSchema = {
         show_attendee_directory: {
             type: 'boolean',
             title: 'Show Attendee Directory',
+            default: false
+        },
+        badges_enabled: {
+            type: 'boolean',
+            title: 'Badges Enabled',
             default: false
         },
         edit_passes_enabled: {
@@ -25186,6 +25511,11 @@ export const PopupPublicSchema = {
         show_attendee_directory: {
             type: 'boolean',
             title: 'Show Attendee Directory',
+            default: false
+        },
+        badges_enabled: {
+            type: 'boolean',
+            title: 'Badges Enabled',
             default: false
         },
         edit_passes_enabled: {
@@ -25933,6 +26263,17 @@ export const PopupUpdateSchema = {
                 }
             ],
             title: 'Show Attendee Directory'
+        },
+        badges_enabled: {
+            anyOf: [
+                {
+                    type: 'boolean'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Badges Enabled'
         },
         edit_passes_enabled: {
             anyOf: [
