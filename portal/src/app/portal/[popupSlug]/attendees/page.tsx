@@ -49,13 +49,15 @@ const Page = () => {
             </p>
           </div>
 
-          <div className="mt-6 flex items-center gap-3">
+          {/* Phones give the search its own row; squeezed beside the two
+              buttons it shrank to a few characters. */}
+          <div className="mt-6 flex flex-wrap items-center gap-3 sm:flex-nowrap">
             <Input
               aria-label="Search in directory"
               placeholder={t("attendees.search_placeholder")}
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="bg-card"
+              className="basis-full bg-card sm:basis-auto"
             />
             <PrivacySettings />
 

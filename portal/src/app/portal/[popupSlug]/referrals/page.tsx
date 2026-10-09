@@ -403,8 +403,8 @@ const ReferralsPage = () => {
 
   return (
     <div className="max-w-2xl mx-auto p-6 space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
+        <div className="min-w-0">
           <h1 className="text-2xl font-semibold tracking-tight">
             {t("referrals.title")}
           </h1>
@@ -414,6 +414,7 @@ const ReferralsPage = () => {
         </div>
         {!hasReferral && (
           <Button
+            className="self-start sm:shrink-0 sm:self-auto"
             onClick={() => createMutation.mutate()}
             disabled={createMutation.isPending}
           >

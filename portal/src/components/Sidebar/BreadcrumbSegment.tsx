@@ -13,6 +13,7 @@ interface BreadcrumbSegmentProps {
   isCurrent?: boolean
   isLoading?: boolean
   nameMapping?: Record<string, string>
+  className?: string
 }
 
 const KNOWN_SEGMENTS: Record<string, string> = {
@@ -34,6 +35,7 @@ const BreadcrumbSegment = ({
   isCurrent,
   isLoading,
   nameMapping,
+  className,
 }: BreadcrumbSegmentProps) => {
   const { t } = useTranslation()
   const isMappedId = nameMapping && Object.keys(nameMapping).includes(path)
@@ -52,7 +54,7 @@ const BreadcrumbSegment = ({
   // Mapping still resolving: show a spinner, no link.
   if (isLoading && isMappedId) {
     return (
-      <BreadcrumbItem>
+      <BreadcrumbItem className={className}>
         <div className="flex items-center">
           <Loader2 className="h-3 w-3 mr-1 animate-spin" />
           <BreadcrumbLink>{t("common.loading")}</BreadcrumbLink>
@@ -64,22 +66,22 @@ const BreadcrumbSegment = ({
   // Last segment is the current page — non-clickable by convention.
   if (isCurrent) {
     return (
-      <BreadcrumbItem>
-        <BreadcrumbPage>{formattedText}</BreadcrumbPage>
+      <BreadcrumbItem className={className}>
+        <BreadcrumbPage className="truncate">{formattedText}</BreadcrumbPage>
       </BreadcrumbItem>
     )
   }
 
   if (!href) {
     return (
-      <BreadcrumbItem>
+      <BreadcrumbItem className={className}>
         <span>{formattedText}</span>
       </BreadcrumbItem>
     )
   }
 
   return (
-    <BreadcrumbItem>
+    <BreadcrumbItem className={className}>
       <BreadcrumbLink asChild>
         <Link href={href}>{formattedText}</Link>
       </BreadcrumbLink>
