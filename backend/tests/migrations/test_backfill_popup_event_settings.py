@@ -19,10 +19,12 @@ def test_backfill_adds_only_missing_settings_and_preserves_them_on_downgrade():
             config = Config("alembic.ini")
             config.attributes["connection"] = connection
             command.upgrade(config, PREVIOUS_REVISION)
-            # The ORM model already has the later popup badges flag.
+            # The ORM model also includes columns introduced after this revision.
             connection.execute(
                 text(
-                    "ALTER TABLE popups ADD COLUMN badges_enabled BOOLEAN NOT NULL DEFAULT false"
+                    "ALTER TABLE popups "
+                    "ADD COLUMN badges_enabled BOOLEAN NOT NULL DEFAULT false, "
+                    "ADD COLUMN sidebar_config JSONB"
                 )
             )
             with Session(connection) as session:

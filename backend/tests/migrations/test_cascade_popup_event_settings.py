@@ -18,10 +18,12 @@ def test_settings_follow_popup_deletion_and_fk_downgrade_preserves_rows():
             config = Config("alembic.ini")
             config.attributes["connection"] = connection
             command.upgrade(config, "a9d3e7f2b6c4")
-            # The ORM model already has the later popup badges flag.
+            # The ORM model also includes columns introduced after this revision.
             connection.execute(
                 text(
-                    "ALTER TABLE popups ADD COLUMN badges_enabled BOOLEAN NOT NULL DEFAULT false"
+                    "ALTER TABLE popups "
+                    "ADD COLUMN badges_enabled BOOLEAN NOT NULL DEFAULT false, "
+                    "ADD COLUMN sidebar_config JSONB"
                 )
             )
             with Session(connection) as session:
