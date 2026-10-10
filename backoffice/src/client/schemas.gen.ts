@@ -28957,6 +28957,21 @@ export const RecurrenceUpdateSchema = {
 \`\`recurrence=None\`\` clears the RRULE (series becomes a one-off).`
 } as const;
 
+export const RefreshTokenRequestSchema = {
+    properties: {
+        refresh_token: {
+            type: 'string',
+            maxLength: 50,
+            minLength: 50,
+            pattern: '^eos_rt_[A-Za-z0-9_-]{43}$',
+            title: 'Refresh Token'
+        }
+    },
+    type: 'object',
+    required: ['refresh_token'],
+    title: 'RefreshTokenRequest'
+} as const;
+
 export const RegisterRequestSchema = {
     properties: {
         role: {
@@ -29139,17 +29154,37 @@ export const SSOExchangePublicSchema = {
         },
         token_type: {
             type: 'string',
+            const: 'bearer',
             title: 'Token Type',
             default: 'bearer'
         },
         expires_in: {
             type: 'integer',
             title: 'Expires In'
+        },
+        refresh_token: {
+            type: 'string',
+            title: 'Refresh Token'
+        },
+        refresh_expires_in: {
+            type: 'integer',
+            title: 'Refresh Expires In'
+        },
+        grant_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Grant Id'
+        },
+        grant_expires_at: {
+            type: 'string',
+            format: 'date-time',
+            title: 'Grant Expires At'
         }
     },
     type: 'object',
-    required: ['access_token', 'expires_in'],
-    title: 'SSOExchangePublic'
+    required: ['access_token', 'expires_in', 'refresh_token', 'refresh_expires_in', 'grant_id', 'grant_expires_at'],
+    title: 'SSOExchangePublic',
+    description: 'SSO and OTP issue the same renewable third-party grant.'
 } as const;
 
 export const SSOExchangeRequestSchema = {
@@ -33880,6 +33915,74 @@ All fields are optional. Scope validators only fire when the field is
 provided (not-None).`
 } as const;
 
+export const ThirdPartyGrantPublicSchema = {
+    properties: {
+        id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Id'
+        },
+        app_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'App Id'
+        },
+        app_name: {
+            type: 'string',
+            title: 'App Name'
+        },
+        popup_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Popup Id'
+        },
+        origin: {
+            type: 'string',
+            enum: ['sso', 'otp'],
+            title: 'Origin'
+        },
+        scopes: {
+            items: {
+                type: 'string'
+            },
+            type: 'array',
+            title: 'Scopes'
+        },
+        created_at: {
+            type: 'string',
+            format: 'date-time',
+            title: 'Created At'
+        },
+        expires_at: {
+            type: 'string',
+            format: 'date-time',
+            title: 'Expires At'
+        },
+        revoked_at: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Revoked At'
+        }
+    },
+    type: 'object',
+    required: ['id', 'app_id', 'app_name', 'popup_id', 'origin', 'scopes', 'created_at', 'expires_at', 'revoked_at'],
+    title: 'ThirdPartyGrantPublic'
+} as const;
+
 export const ThirdPartyHumanLoginSchema = {
     properties: {
         email: {
@@ -33919,6 +34022,46 @@ export const ThirdPartyHumanVerifySchema = {
 
 The API key comes from the X-Third-Party-Api-Key header; the tenant is
 resolved server-side from the key.`
+} as const;
+
+export const ThirdPartyTokenPairSchema = {
+    properties: {
+        access_token: {
+            type: 'string',
+            title: 'Access Token'
+        },
+        token_type: {
+            type: 'string',
+            const: 'bearer',
+            title: 'Token Type',
+            default: 'bearer'
+        },
+        expires_in: {
+            type: 'integer',
+            title: 'Expires In'
+        },
+        refresh_token: {
+            type: 'string',
+            title: 'Refresh Token'
+        },
+        refresh_expires_in: {
+            type: 'integer',
+            title: 'Refresh Expires In'
+        },
+        grant_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Grant Id'
+        },
+        grant_expires_at: {
+            type: 'string',
+            format: 'date-time',
+            title: 'Grant Expires At'
+        }
+    },
+    type: 'object',
+    required: ['access_token', 'expires_in', 'refresh_token', 'refresh_expires_in', 'grant_id', 'grant_expires_at'],
+    title: 'ThirdPartyTokenPair'
 } as const;
 
 export const TicketAttendeeSnapshotSchema = {

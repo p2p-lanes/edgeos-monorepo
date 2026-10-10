@@ -185,6 +185,7 @@ from app.api.tenant.credential_models import TenantCredentials
 from app.api.tenant.models import Tenants
 from app.api.tenant.schemas import TenantCreate, TenantPublic, TenantUpdate
 from app.api.third_party_app.models import ThirdPartyApps
+from app.api.third_party_auth.models import ThirdPartyGrants, ThirdPartyRefreshTokens
 from app.api.third_party_sso.models import (
     PopupThirdPartyApps,
     ThirdPartyAuthorizationCodes,
@@ -209,6 +210,8 @@ from app.api.user.schemas import UserCreate, UserPublic, UserUpdate
 
 __all__ = [
     "ThirdPartyApps",
+    "ThirdPartyGrants",
+    "ThirdPartyRefreshTokens",
     "PopupThirdPartyApps",
     "ThirdPartyAuthorizationCodes",
     "EventMessages",

@@ -1,6 +1,6 @@
 # Third-party SSO: local example
 
-Minimal partner app: **Node built-ins only**, no packages, frontend build, database or login framework. It prepares state/PKCE, exchanges the code server-side, calls the real `/humans/me`, and displays the result without exposing the token.
+Minimal partner app: **Node built-ins only**, no packages, frontend build, database or login framework. It prepares state/PKCE, exchanges the code server-side, calls the real `/humans/me`, revokes the identity-only grant, and displays the result without exposing either token.
 
 ## Choose a document
 
@@ -49,7 +49,7 @@ node examples/third-party-sso/mock.mjs
 4. The mock prepares state and PKCE, returns through the authenticated portal, and exchanges the code using its private key.
 5. You arrive at **http://localhost:4000/auth/result**. It shows `sso@example.com`, app ID, `portal:profile:read`, TTL 900 seconds, and `GET /humans/me → 200`.
 
-There is no second OTP. The iframe remains scriptless. The result URL contains neither code nor state, and the page never contains the raw access token.
+There is no second OTP. The iframe remains scriptless. The result URL contains neither code nor state, and the page never contains the raw access or refresh token. The demo revokes its grant after identity lookup; a production app needing later API calls should implement the server-side refresh lifecycle described in the integration guide.
 
 Backoffice: **http://localhost:5173**, initial admin **admin@example.com**, OTP in Mailpit. Select organization **Demo** and gathering **SSO test**.
 
@@ -72,7 +72,7 @@ node --test examples/third-party-sso/mock.test.mjs
 
 # Backend tests use a disposable PostgreSQL testcontainer, not the example DB
 export DOCKER_HOST="$(docker context inspect --format '{{.Endpoints.docker.Host}}')"
-(cd backend && uv run pytest tests/api/auth/test_third_party_sso.py tests/api/third_party_app/test_sso_configuration.py -q)
+(cd backend && uv run pytest tests/api/auth/test_third_party_sso.py tests/api/auth/test_third_party_refresh.py tests/api/third_party_app/test_sso_configuration.py -q)
 
 # Portal: StrictMode must not duplicate the code-issuance POST
 pnpm --dir portal test src/components/Portal/ThirdPartyAppLaunch.test.tsx

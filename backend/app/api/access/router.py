@@ -75,10 +75,10 @@ def _require_third_party_session(
     """
     # Path 1 — JWT path
     if token:
-        from app.core.security import decode_access_token
+        from app.core.security import resolve_access_token
 
         try:
-            payload = decode_access_token(token)
+            payload = resolve_access_token(token)
         except HTTPException:
             raise
         if payload.issued_by_app_id is not None:
@@ -226,6 +226,9 @@ _ALWAYS_ALLOWED_THIRD_PARTY: frozenset[tuple[str, str]] = frozenset(
     {
         ("post", "/api/v1/auth/human/third-party/login"),
         ("post", "/api/v1/auth/human/third-party/authenticate"),
+        ("post", "/api/v1/auth/human/third-party/sso/exchange"),
+        ("post", "/api/v1/auth/human/third-party/refresh"),
+        ("post", "/api/v1/auth/human/third-party/revoke"),
         ("get", "/api/v1/third-party-apps/whoami"),
         ("get", "/api/v1/third-party-apps/docs"),
         ("get", "/api/v1/third-party-apps/openapi.json"),

@@ -57,16 +57,28 @@ export function createMockApp(config) {
         const response = await fetch(`${config.apiUrl}/api/v1/auth/human/third-party/sso/exchange`, {
           method: "POST", headers: { "Content-Type": "application/json", "X-Third-Party-Api-Key": config.appKey },
           body: JSON.stringify({ code, redirect_uri: config.callbackUrl, code_verifier: session.verifier }),
-          signal: AbortSignal.timeout(10_000),
+          redirect: "error", signal: AbortSignal.timeout(10_000),
         })
         if (!response.ok) return page(400, "Intercambio rechazado", `<p>EdgeOS respondió HTTP ${response.status}. Volvé a iniciar desde la home.</p>`)
         const token = await response.json()
         // Validate identity by using the actual API, not by trusting decoded JWT claims.
-        const me = await fetch(`${config.apiUrl}/api/v1/humans/me`, { headers: { Authorization: `Bearer ${token.access_token}` }, signal: AbortSignal.timeout(10_000) })
-        if (!me.ok) return page(400, "Token sin acceso al perfil", `<p>/humans/me respondió HTTP ${me.status}.</p>`)
-        const profile = await me.json()
+        let profile
+        try {
+          const me = await fetch(`${config.apiUrl}/api/v1/humans/me`, { headers: { Authorization: `Bearer ${token.access_token}` }, redirect: "error", signal: AbortSignal.timeout(10_000) })
+          if (!me.ok) return page(400, "Token sin acceso al perfil", `<p>/humans/me respondió HTTP ${me.status}.</p>`)
+          profile = await me.json()
+        } finally {
+          // Identity-only example: revoke instead of retaining an unused grant.
+          // Apps making later API calls must securely store and rotate the pair.
+          const revoked = await fetch(`${config.apiUrl}/api/v1/auth/human/third-party/revoke`, {
+            method: "POST", headers: { "Content-Type": "application/json", "X-Third-Party-Api-Key": config.appKey },
+            body: JSON.stringify({ refresh_token: token.refresh_token }),
+            redirect: "error", signal: AbortSignal.timeout(10_000),
+          })
+          if (!revoked.ok) throw new Error("Grant revocation failed")
+        }
         const claims = JSON.parse(Buffer.from(token.access_token.split(".")[1], "base64url"))
-        session.result = { email: profile.email, human_id: profile.id, issued_by_app_id: claims.issued_by_app_id, scopes: claims.scopes, expires_in: token.expires_in, profile_request: "GET /humans/me → 200" }
+        session.result = { email: profile.email, human_id: profile.id, issued_by_app_id: claims.issued_by_app_id, scopes: claims.scopes, expires_in: token.expires_in, grant_revoked: true, profile_request: "GET /humans/me → 200" }
         delete session.verifier
         delete session.state
         return redirect("/auth/result") // Remove code/state from the current URL.
@@ -74,7 +86,7 @@ export function createMockApp(config) {
       if (url.pathname === "/auth/result" && session?.result) return page(200, "Conectado con EdgeOS", `<p>Token canjeado y perfil obtenido desde la API, sin un segundo OTP.</p><pre>${escape(JSON.stringify(session.result, null, 2))}</pre><p>Mock local: no muestra ni guarda el access token en el navegador.</p>`)
       return page(200, "Third-party app mock", "<p>Iniciá el acceso desde el botón de la custom home de la popup.</p>")
     } catch {
-      // Never print transaction URLs, codes, credentials or access tokens.
+      // Never print transaction URLs, codes, credentials or access/refresh tokens.
       return page(502, "No se pudo completar el flujo", "<p>Revisá que el backend esté disponible y volvé a iniciar desde la home.</p>")
     }
   })
