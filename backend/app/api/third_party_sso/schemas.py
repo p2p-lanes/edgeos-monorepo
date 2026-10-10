@@ -2,6 +2,8 @@ import uuid
 
 from pydantic import BaseModel, Field
 
+from app.api.third_party_auth.schemas import ThirdPartyTokenPair
+
 
 class PopupAppUpdate(BaseModel):
     enabled: bool
@@ -40,7 +42,5 @@ class SSOExchangeRequest(BaseModel):
     )
 
 
-class SSOExchangePublic(BaseModel):
-    access_token: str
-    token_type: str = "bearer"
-    expires_in: int
+class SSOExchangePublic(ThirdPartyTokenPair):
+    """SSO and OTP issue the same renewable third-party grant."""

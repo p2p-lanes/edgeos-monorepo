@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Header, HTTPException
+from fastapi import APIRouter, Header, HTTPException, Response
 from loguru import logger
 
 from app.api.auth.crud import (
@@ -18,7 +18,9 @@ from app.api.auth.schemas import (
     UserVerify,
 )
 from app.api.shared.enums import UserRole
-from app.api.third_party_app.crud import touch_last_used, validate_third_party_key
+from app.api.third_party_app.crud import validate_third_party_key
+from app.api.third_party_auth.schemas import ThirdPartyTokenPair
+from app.api.third_party_auth.service import issue_pair
 from app.core.dependencies.users import SessionDep
 from app.core.security import THIRD_PARTY_TOKEN_SCOPES_MAX, Token, create_access_token
 
@@ -209,12 +211,13 @@ async def third_party_human_login(
     )
 
 
-@router.post("/human/third-party/authenticate", response_model=Token)
+@router.post("/human/third-party/authenticate", response_model=ThirdPartyTokenPair)
 async def third_party_human_authenticate(
     request: ThirdPartyHumanVerify,
     session: SessionDep,
+    response: Response,
     x_third_party_api_key: str = Header(..., alias="X-Third-Party-Api-Key"),
-) -> Token:
+) -> ThirdPartyTokenPair:
     """Verify OTP and mint a third-party JWT for an existing human.
 
     The tenant is resolved server-side from the third-party API key alone.
@@ -243,14 +246,16 @@ async def third_party_human_authenticate(
         expected_origin="third_party",
     )
 
-    access_token = create_access_token(
-        subject=human.id,
-        token_type="human",
-        scopes=list(app.allowed_token_scopes),
-        issued_via="third_party",
-        issued_by_app_id=app.id,
+    pair = issue_pair(
+        session,
+        app,
+        human,
+        list(app.allowed_token_scopes),
+        origin="otp",
     )
-    touch_last_used(session, app)
+    session.commit()
+    response.headers["Cache-Control"] = "no-store"
+    response.headers["Pragma"] = "no-cache"
     logger.info(f"Third-party human authenticated: {human.email} via app={app.id}")
 
-    return Token(access_token=access_token)
+    return pair

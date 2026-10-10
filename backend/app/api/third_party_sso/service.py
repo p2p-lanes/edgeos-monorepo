@@ -15,6 +15,7 @@ from app.api.popup.home import get_accessible_home
 from app.api.popup.models import Popups
 from app.api.third_party_app.models import ThirdPartyApps
 from app.api.third_party_app.sso_urls import validate_sso_pair
+from app.api.third_party_auth.service import issue_pair
 from app.api.third_party_sso.models import (
     PopupThirdPartyApps,
     ThirdPartyAuthorizationCodes,
@@ -25,7 +26,7 @@ from app.api.third_party_sso.schemas import (
     SSOExchangeRequest,
 )
 from app.core.config import settings
-from app.core.security import THIRD_PARTY_TOKEN_SCOPES_MAX, create_access_token
+from app.core.security import THIRD_PARTY_TOKEN_SCOPES_MAX
 
 
 def code_hash(code: str) -> str:
@@ -153,14 +154,14 @@ def exchange_code(
         & set(current_app.allowed_token_scopes)
         & set(THIRD_PARTY_TOKEN_SCOPES_MAX)
     )
-    lifetime = timedelta(minutes=settings.SSO_ACCESS_TOKEN_EXPIRE_MINUTES)
-    token = create_access_token(
-        subject=human.id,
-        token_type="human",
-        expires_delta=lifetime,
-        scopes=scopes,
-        issued_via="third_party",
-        issued_by_app_id=app.id,
+    pair = issue_pair(
+        db,
+        current_app,
+        human,
+        scopes,
+        origin="sso",
+        popup_id=popup.id,
+        redirect_uri=row.redirect_uri,
     )
     row.consumed_at = now
     app.last_used_at = now
@@ -168,6 +169,4 @@ def exchange_code(
     db.add(app)
     db.commit()  # Never return the token before the consumption is committed.
     logger.info("SSO authorization exchanged: app={} human={}", app.id, human.id)
-    return SSOExchangePublic(
-        access_token=token, expires_in=int(lifetime.total_seconds())
-    )
+    return SSOExchangePublic(**pair.model_dump())

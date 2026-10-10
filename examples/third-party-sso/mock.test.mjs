@@ -11,6 +11,8 @@ async function listen(server) {
 
 test("mock binds state to the browser and exchanges with PKCE only once", async (t) => {
   const exchanges = []
+  const revocations = []
+  const refreshToken = `eos_rt_${"r".repeat(43)}`
   const claims = { issued_by_app_id: "test-app", scopes: ["portal:profile:read"] }
   const token = `header.${Buffer.from(JSON.stringify(claims)).toString("base64url")}.signature`
   const api = createServer(async (req, res) => {
@@ -20,7 +22,14 @@ test("mock binds state to the browser and exchanges with PKCE only once", async 
       for await (const chunk of req) chunks.push(chunk)
       exchanges.push(JSON.parse(Buffer.concat(chunks)))
       assert.equal(req.headers["x-third-party-api-key"], "test-key")
-      res.end(JSON.stringify({ access_token: token, expires_in: 900 }))
+      res.end(JSON.stringify({ access_token: token, expires_in: 900, refresh_token: refreshToken }))
+    } else if (req.url.endsWith("/revoke")) {
+      const chunks = []
+      for await (const chunk of req) chunks.push(chunk)
+      revocations.push(JSON.parse(Buffer.concat(chunks)))
+      assert.equal(req.headers["x-third-party-api-key"], "test-key")
+      res.writeHead(204)
+      res.end()
     } else {
       assert.equal(req.headers.authorization, `Bearer ${token}`)
       res.end(JSON.stringify({ id: "human-1", email: "ana@example.com" }))
@@ -54,6 +63,8 @@ test("mock binds state to the browser and exchanges with PKCE only once", async 
   assert.match(html, /ana@example.com/)
   assert.match(html, /portal:profile:read/)
   assert.ok(!html.includes(token))
+  assert.ok(!html.includes(refreshToken))
+  assert.deepEqual(revocations, [{ refresh_token: refreshToken }])
   assert.equal(page.headers.get("cache-control"), "no-store")
   assert.equal(page.headers.get("referrer-policy"), "no-referrer")
   assert.equal((await fetch(callback, { headers: { Cookie: cookie }, redirect: "manual" })).status, 400)

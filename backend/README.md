@@ -299,8 +299,39 @@ See the root `.env.example` for a complete list with defaults. Key variables:
 | `STORAGE_BUCKET` | `edgeos` | S3 bucket name |
 | `REDIS_URL` | `redis://redis:6379` | Redis connection URL |
 | `SENTRY_DSN` | - | Sentry DSN for error tracking |
+| `THIRD_PARTY_ACCESS_TOKEN_EXPIRE_MINUTES` | `15` | SSO and third-party OTP JWT lifetime (1–60 minutes); old `SSO_ACCESS_TOKEN_EXPIRE_MINUTES` env name accepted as fallback |
+| `THIRD_PARTY_REFRESH_TOKEN_IDLE_DAYS` | `8` | Refresh inactivity window (1–30 days), capped at absolute grant expiry |
+| `THIRD_PARTY_GRANT_EXPIRE_DAYS` | `30` | Absolute third-party authorization lifetime (1–90 days), never extended by refresh |
 
 For local development with Docker, all defaults work out of the box. For production, see the main README.
+
+### Third-party refresh tokens
+
+SSO exchange and third-party OTP authentication issue a short-lived JWT plus a
+rotating refresh token. Normal portal/backoffice JWT lifetimes are unchanged.
+See the [partner integration contract](../examples/third-party-sso/INTEGRATION.md)
+for response fields, refresh/revoke routes, portal disconnect controls and
+client rollout requirements.
+
+Apply migration `a1d3f5b7c9e2` before deploying. Grant and refresh storage is
+backend-private, with forced tenant RLS and no tenant application/viewer role
+privileges. Only hashes of refresh credentials are persisted. Authentication of
+new grant-bound JWTs performs online checks (no revocation cache), so the
+database must be available; failures do not fall back to trusting JWTs alone.
+Existing JWTs without a grant ID retain their previous expiry behavior and
+cannot be converted into refresh credentials.
+
+Run the retention job daily in the intended environment:
+
+```bash
+cd backend
+uv run python scripts/purge_third_party_grants.py
+```
+
+It deletes grants more than one day past their **absolute** expiry in bounded
+batches and cascades their refresh history. Consumed ancestors of a live grant
+must remain available for replay detection. Revoking a grant does not revoke
+separate personal/agent API keys; those keep their own lifecycle.
 
 ## Scheduled jobs
 
