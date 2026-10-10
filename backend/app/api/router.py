@@ -57,6 +57,7 @@ from app.api.accommodation.portal_router import (
 from app.api.application.router import portal_router
 from app.api.check_in import router as check_in_router
 from app.api.group.router import portal_router as group_portal_router
+from app.api.third_party_auth.router import router as third_party_auth_router
 from app.api.third_party_sso.router import router as third_party_sso_router
 
 api_router = APIRouter()
@@ -77,6 +78,7 @@ api_router.include_router(ai_execution.router)
 api_router.include_router(access.router.router)
 api_router.include_router(third_party_app.router)
 api_router.include_router(third_party_sso_router)
+api_router.include_router(third_party_auth_router)
 api_router.include_router(popup.router)
 api_router.include_router(attendee_category.router)
 

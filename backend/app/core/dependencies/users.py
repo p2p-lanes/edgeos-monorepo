@@ -13,8 +13,8 @@ from app.core.security import (
     ApiKeyScope,
     HumanScope,
     TokenPayload,
-    decode_access_token,
     get_token_payload,
+    resolve_access_token,
 )
 
 if TYPE_CHECKING:
@@ -154,7 +154,7 @@ def get_optional_human(
     if not token:
         return None
     try:
-        payload = decode_access_token(token)
+        payload = resolve_access_token(token)
     except Exception:  # noqa: BLE001 — optional auth: any bad token degrades to anonymous
         return None
     if payload.token_type != "human":

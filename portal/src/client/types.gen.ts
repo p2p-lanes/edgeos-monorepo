@@ -5967,6 +5967,10 @@ export type RecurrenceUpdate = {
     recurrence?: (RecurrenceRule | null);
 };
 
+export type RefreshTokenRequest = {
+    refresh_token: string;
+};
+
 /**
  * Request body for self-registration.
  */
@@ -6481,10 +6485,17 @@ export type SentBadgeAward = {
  */
 export type SimpleFiSuccessBehavior = 'manual' | 'automatic';
 
+/**
+ * SSO and OTP issue the same renewable third-party grant.
+ */
 export type SSOExchangePublic = {
     access_token: string;
-    token_type?: string;
+    token_type?: "bearer";
     expires_in: number;
+    refresh_token: string;
+    refresh_expires_in: number;
+    grant_id: string;
+    grant_expires_at: string;
 };
 
 export type SSOExchangeRequest = {
@@ -6868,6 +6879,20 @@ export type ThirdPartyAppUpdate = {
     allowed_api_key_scopes?: (Array<('events:read' | 'events:write' | 'rsvp:write' | 'venues:read' | 'venues:write' | 'applications:read' | 'applications:write' | 'attendees:read' | 'attendees:write' | 'humans:read' | 'humans:write' | 'groups:read' | 'groups:write' | 'products:read' | 'products:write' | 'accommodations:read' | 'accommodations:write' | 'coupons:read' | 'coupons:write' | 'forms:read' | 'forms:write' | 'payments:read' | 'tracks:read' | 'tracks:write' | 'ticketing_steps:read' | 'ticketing_steps:write' | 'translations:read' | 'translations:write' | 'badges:read' | 'badges:write')> | null);
 };
 
+export type ThirdPartyGrantPublic = {
+    id: string;
+    app_id: string;
+    app_name: string;
+    popup_id: (string | null);
+    origin: 'sso' | 'otp';
+    scopes: Array<(string)>;
+    created_at: string;
+    expires_at: string;
+    revoked_at: (string | null);
+};
+
+export type origin = 'sso' | 'otp';
+
 /**
  * Request body for POST /auth/human/third-party/login.
  *
@@ -6887,6 +6912,16 @@ export type ThirdPartyHumanLogin = {
 export type ThirdPartyHumanVerify = {
     email: string;
     code: string;
+};
+
+export type ThirdPartyTokenPair = {
+    access_token: string;
+    token_type?: "bearer";
+    expires_in: number;
+    refresh_token: string;
+    refresh_expires_in: number;
+    grant_id: string;
+    grant_expires_at: string;
 };
 
 /**
@@ -8256,7 +8291,7 @@ export type AuthThirdPartyHumanAuthenticateData = {
     xThirdPartyApiKey: string;
 };
 
-export type AuthThirdPartyHumanAuthenticateResponse = (Token);
+export type AuthThirdPartyHumanAuthenticateResponse = (ThirdPartyTokenPair);
 
 export type BadgesListBadgeAwardsData = {
     badgeId?: (string | null);
@@ -10978,6 +11013,28 @@ export type ThirdPartyAppsRotateThirdPartyAppData = {
 };
 
 export type ThirdPartyAppsRotateThirdPartyAppResponse = (ThirdPartyAppCreated);
+
+export type ThirdPartyAuthRefreshData = {
+    requestBody: RefreshTokenRequest;
+    xThirdPartyApiKey: string;
+};
+
+export type ThirdPartyAuthRefreshResponse = (ThirdPartyTokenPair);
+
+export type ThirdPartyAuthRevokeData = {
+    requestBody: RefreshTokenRequest;
+    xThirdPartyApiKey: string;
+};
+
+export type ThirdPartyAuthRevokeResponse = (void);
+
+export type ThirdPartyAuthListGrantsResponse = (Array<ThirdPartyGrantPublic>);
+
+export type ThirdPartyAuthDisconnectData = {
+    grantId: string;
+};
+
+export type ThirdPartyAuthDisconnectResponse = (void);
 
 export type ThirdPartyDiscoveryGetThirdPartyWhoamiData = {
     xThirdPartyApiKey?: (string | null);

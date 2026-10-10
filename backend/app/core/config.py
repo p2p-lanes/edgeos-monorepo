@@ -4,6 +4,7 @@ from urllib.parse import quote
 
 from dotenv import load_dotenv
 from pydantic import (
+    AliasChoices,
     EmailStr,
     Field,
     HttpUrl,
@@ -33,7 +34,18 @@ class Settings(BaseSettings):
     # 60 minutes * 24 hours * 8 days = 8 days
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24 * 8
     SSO_CODE_EXPIRE_SECONDS: int = Field(default=60, ge=10, le=300)
-    SSO_ACCESS_TOKEN_EXPIRE_MINUTES: int = Field(default=15, ge=1, le=60)
+    # SSO and third-party OTP share the same short access-token policy.
+    # Accept the old deployment variable during rollout.
+    THIRD_PARTY_ACCESS_TOKEN_EXPIRE_MINUTES: int = Field(
+        default=15,
+        ge=1,
+        le=60,
+        validation_alias=AliasChoices(
+            "THIRD_PARTY_ACCESS_TOKEN_EXPIRE_MINUTES", "SSO_ACCESS_TOKEN_EXPIRE_MINUTES"
+        ),
+    )
+    THIRD_PARTY_REFRESH_TOKEN_IDLE_DAYS: int = Field(default=8, ge=1, le=30)
+    THIRD_PARTY_GRANT_EXPIRE_DAYS: int = Field(default=30, ge=1, le=90)
     BACKOFFICE_URL: str = "http://localhost:5173"
     ENVIRONMENT: Environment = Environment.DEV
     # Minimum level emitted by the loguru stdout sink. Set to DEBUG for verbose
