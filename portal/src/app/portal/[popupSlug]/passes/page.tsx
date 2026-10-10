@@ -11,6 +11,7 @@ import { Loader } from "@/components/ui/Loader"
 import useHumanAttendeesQuery from "@/hooks/useHumanAttendeesQuery"
 import useHumanPaymentsQuery from "@/hooks/useHumanPaymentsQuery"
 import { useHumanPopupAccess } from "@/hooks/useHumanPopupAccess"
+import useMyTicketsQuery from "@/hooks/useMyTicketsQuery"
 import { usePortalDirectSalesFlows } from "@/hooks/usePortalDirectSalesFlows"
 import { usePortalPrimarySalesFlow } from "@/hooks/usePortalPrimarySalesFlow"
 import { usePortalSalesFlows } from "@/hooks/usePortalSalesFlows"
@@ -25,7 +26,9 @@ import { useCityProvider } from "@/providers/cityProvider"
 import { usePassesProvider } from "@/providers/passesProvider"
 import type { AttendeePassState } from "@/types/Attendee"
 import { OtherPurchasedProducts } from "./components/OtherPurchasedProducts"
+import { PersonalTicketPasses } from "./components/PersonalTicketPasses"
 import { projectOtherPurchasedProducts } from "./otherProductsProjection"
+import { projectPersonalTickets } from "./personalTicketsProjection"
 import YourPasses from "./Tabs/YourPasses"
 
 export default function HomePasses() {
@@ -45,6 +48,7 @@ export default function HomePasses() {
     (access.source === "attendee" || access.source === "payment")
   const nobodyApplies = city?.takes_applications === false
   const attendeesQuery = useHumanAttendeesQuery(popupId ?? null)
+  const personalTicketsQuery = useMyTicketsQuery()
   const paymentsQuery = useHumanPaymentsQuery(popupId, { limit: 100 })
   const applicationFlowsQuery = usePortalSalesFlows(popupId)
   const directFlowsQuery = usePortalDirectSalesFlows(popupId)
@@ -92,14 +96,81 @@ export default function HomePasses() {
   const primaryFlowId =
     eligibleFlows.find((flow) => flow.slug === primaryFlowSlug)?.id ?? null
 
+  const personalTickets = projectPersonalTickets(
+    personalTicketsQuery.data ?? [],
+    popupId ?? "",
+  )
+  const representedAttendeeIds = new Set(
+    (attendeesQuery.data ?? []).map((attendee) => attendee.id),
+  )
+  if (participation?.type === "companion" && participation.attendee?.id) {
+    representedAttendeeIds.add(participation.attendee.id)
+  }
+  const supplementalTickets = projectPersonalTickets(
+    personalTicketsQuery.data ?? [],
+    popupId ?? "",
+    representedAttendeeIds,
+  )
+  const hasPersonalTickets = personalTickets.length > 0
+  const personalReadFailed =
+    personalTicketsQuery.isError && personalTicketsQuery.data === undefined
+
   useEffect(() => {
-    if (!nobodyApplies && access.state === "denied") {
+    if (
+      !nobodyApplies &&
+      access.state === "denied" &&
+      !personalTicketsQuery.isLoading &&
+      !personalReadFailed &&
+      !hasPersonalTickets
+    ) {
       router.replace(`/portal/${params.popupSlug}`)
     }
-  }, [access.state, nobodyApplies, params.popupSlug, router])
+  }, [
+    access.state,
+    nobodyApplies,
+    params.popupSlug,
+    router,
+    personalTicketsQuery.isLoading,
+    personalReadFailed,
+    hasPersonalTickets,
+  ])
 
-  if (!city || access.state === "loading") return <Loader />
-  if (!nobodyApplies && access.state === "denied") return <Loader />
+  if (!city || access.state === "loading" || personalTicketsQuery.isLoading)
+    return <Loader />
+
+  const personalTicketContent = personalReadFailed ? (
+    <div role="alert" className="rounded-xl border border-border bg-card p-5">
+      <p className="text-sm text-pass-text">
+        {t("passes.personal_tickets_error")}
+      </p>
+      <Button
+        variant="outline"
+        className="mt-3"
+        onClick={() => personalTicketsQuery.refetch()}
+        disabled={personalTicketsQuery.isFetching}
+      >
+        <RefreshCw className="size-4" />
+        {t("passes.error_retry", { defaultValue: "Try again" })}
+      </Button>
+    </div>
+  ) : (
+    <PersonalTicketPasses attendees={supplementalTickets} />
+  )
+
+  // A personal read allows displaying the pass, not purchasing or editing an
+  // attendee. Keep email-matched rows out of the provider/checkout data entirely.
+  if (!nobodyApplies && access.state === "denied") {
+    if (!hasPersonalTickets && !personalReadFailed) return <Loader />
+    return (
+      <div className="mx-auto max-w-3xl space-y-6 p-6">
+        {personalReadFailed ? (
+          personalTicketContent
+        ) : (
+          <PersonalTicketPasses attendees={personalTickets} />
+        )}
+      </div>
+    )
+  }
 
   if (attendeesQuery.isError && attendeesQuery.data === undefined) {
     return (
@@ -138,6 +209,7 @@ export default function HomePasses() {
         <CompanionPasses
           participation={participation as CompanionParticipation}
         />
+        <div className="mt-6">{personalTicketContent}</div>
       </div>
     )
   }
@@ -219,21 +291,40 @@ export default function HomePasses() {
 
   if (paymentsQuery.isLoading) return <Loader />
 
+  // Do not tell a ticketless primary row to buy a pass when this account
+  // already holds a personal spouse ticket. This only changes presentation.
+  const personalEmails = new Set(
+    supplementalTickets
+      .map((attendee) => (attendee.email ?? "").trim().toLowerCase())
+      .filter(Boolean),
+  )
+  const displayAttendees = (rows: AttendeePassState[]) =>
+    supplementalTickets.length > 0
+      ? rows.filter(
+          (attendee) =>
+            !personalEmails.has((attendee.email ?? "").trim().toLowerCase()) ||
+            (attendee.ticket_entries ?? []).length > 0 ||
+            attendee.products.some((product) => product.purchased),
+        )
+      : rows
+  const unassignedDisplayAttendees = displayAttendees(
+    groupedPasses.unassignedAttendees,
+  )
   const passSections = [
     ...groupedPasses.sections.map(({ flow, attendees: flowAttendees }) => ({
       id: flow.id,
       title: flow.name,
-      attendees: flowAttendees,
+      attendees: displayAttendees(flowAttendees),
       salesFlowId: flow.id,
       onSwitchToBuy: () =>
         router.push(`/portal/${params.popupSlug}/shop/${flow.slug}`),
     })),
-    ...(groupedPasses.unassignedAttendees.length > 0
+    ...(unassignedDisplayAttendees.length > 0
       ? [
           {
             id: "other",
             title: t("passes.other_passes"),
-            attendees: groupedPasses.unassignedAttendees,
+            attendees: unassignedDisplayAttendees,
             salesFlowId: unassignedPurchaseFlow?.id ?? null,
             onSwitchToBuy: unassignedPurchaseFlow
               ? (attendee?: AttendeePassState) =>
@@ -242,7 +333,7 @@ export default function HomePasses() {
           },
         ]
       : []),
-  ]
+  ].filter((section) => section.attendees.length > 0)
   const visiblePasses = [
     ...groupedPasses.sections.flatMap((section) => section.attendees),
     ...groupedPasses.unassignedAttendees,
@@ -261,7 +352,13 @@ export default function HomePasses() {
     visiblePasses,
   )
 
-  if (passSections.length === 0 && otherProducts.length === 0) return emptyState
+  if (
+    passSections.length === 0 &&
+    otherProducts.length === 0 &&
+    supplementalTickets.length === 0 &&
+    !personalReadFailed
+  )
+    return emptyState
 
   return (
     <div className="w-full md:mt-0 mx-auto items-center max-w-3xl p-6 bg-transparent">
@@ -278,6 +375,9 @@ export default function HomePasses() {
       </div>
 
       <div>
+        {(supplementalTickets.length > 0 || personalReadFailed) && (
+          <div className="mb-8">{personalTicketContent}</div>
+        )}
         {passSections.map((section, index) => (
           <div
             key={section.id}

@@ -524,6 +524,9 @@
     "passes_cta": "查看我的通行证"
   },
   "passes": {
+    "assigned_tickets": "分配给您的票",
+    "assigned_tickets_description": "在这里查看您的票和签到码。",
+    "personal_tickets_error": "无法加载分配给您的票，请重试。",
     "your_passes": "我的通行证",
     "your_purchases": "我的购买",
     "your_purchases_description": "在这里查看您的通行证和其他已购商品。",

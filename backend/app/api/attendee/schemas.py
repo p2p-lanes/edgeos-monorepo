@@ -377,6 +377,16 @@ class AttendeeWithTickets(BaseModel):
     products: list[TicketProduct]
 
 
+class PersonalTicketsPublic(AttendeeWithTickets):
+    """Personal read-only ticket view, including individual check-in codes.
+
+    The grouped products contract is preserved. Detailed units are exposed only
+    on the authenticated personal endpoint, not the backoffice email lookup.
+    """
+
+    tickets: list[AttendeeProductPublic] = Field(default_factory=list)
+
+
 class AttendeeWithOriginPublic(AttendeePublic):
     """Attendee response with an origin discriminator field.
 

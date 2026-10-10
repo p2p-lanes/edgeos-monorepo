@@ -5107,6 +5107,24 @@ export type PendingReleaseResponse = {
 };
 
 /**
+ * Personal read-only ticket view, including individual check-in codes.
+ *
+ * The grouped products contract is preserved. Detailed units are exposed only
+ * on the authenticated personal endpoint, not the backoffice email lookup.
+ */
+export type PersonalTicketsPublic = {
+    id: string;
+    name: string;
+    email: (string | null);
+    category?: (string | null);
+    popup_id: string;
+    popup_name: string;
+    popup_slug?: (string | null);
+    products: Array<TicketProduct>;
+    tickets?: Array<AttendeeProductPublic>;
+};
+
+/**
  * One row of the admin bulk-grant CSV: a person to grant tickets to.
  */
 export type PersonGrantItem = {
@@ -7868,7 +7886,7 @@ export type ApplicationsListMyApplicationsData = {
 
 export type ApplicationsListMyApplicationsResponse = (ListModel_ApplicationPortalPublic_);
 
-export type ApplicationsListMyTicketsResponse = (Array<AttendeeWithTickets>);
+export type ApplicationsListMyTicketsResponse = (Array<PersonalTicketsPublic>);
 
 export type ApplicationsGetMyParticipationData = {
     popupId: string;

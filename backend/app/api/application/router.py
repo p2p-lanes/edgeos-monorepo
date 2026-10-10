@@ -52,7 +52,7 @@ from app.api.attendee.schemas import (
     AttendeePublic,
     AttendeePurchases,
     AttendeeUpdate,
-    AttendeeWithTickets,
+    PersonalTicketsPublic,
 )
 from app.api.shared.enums import UserRole
 from app.api.shared.response import ListModel, PaginationLimit, PaginationSkip, Paging
@@ -710,27 +710,45 @@ async def list_my_applications(
 
 @router.get(
     "/my/tickets",
-    response_model=list[AttendeeWithTickets],
+    response_model=list[PersonalTicketsPublic],
     summary="List your tickets",
     dependencies=[needs("portal:applications:read")],
 )
 async def list_my_tickets(
     db: HumanTenantSession,
     current_human: CurrentHuman,
-) -> list[AttendeeWithTickets]:
+) -> list[PersonalTicketsPublic]:
     """List all tickets for the current human (Portal).
 
-    Returns all attendee records linked to this human, including:
-    - Attendees from applications they submitted (main attendee)
-    - Attendees created by others with their email (e.g., spouse tickets)
+    Returns attendee records linked to this human, plus unlinked recipients
+    with the authenticated human's email in the same tenant (e.g., a spouse
+    ticket purchased by someone else). Email matching is case-insensitive;
+    attendees linked to another human are never included through this fallback.
 
-    Each attendee includes their check-in code and purchased products.
+    Products are active allocated ticket units, grouped by product with quantity.
+    Tickets also expose each unit's check-in code and last scan for the portal.
+    This is read-only: it does not claim attendees or grant write permissions.
     """
     from app.api.attendee.crud import attendees_crud
-    from app.api.attendee.schemas import TicketProduct
+    from app.api.attendee.schemas import AttendeeProductPublic, TicketProduct
+    from app.api.check_in.crud import get_last_scan_by_tickets
 
-    attendees, _ = attendees_crud.find_by_human(
-        db, human_id=current_human.id, limit=1000
+    attendees = attendees_crud.find_ticket_attendees_for_human(
+        db,
+        human_id=current_human.id,
+        tenant_id=current_human.tenant_id,
+        email=current_human.email,
+    )
+    last_scan_by_ticket = get_last_scan_by_tickets(
+        db,
+        [
+            ap.id
+            for attendee in attendees
+            for ap in attendee.attendee_products
+            if ap.attendee_id is not None
+            and ap.revoked_at is None
+            and ap.product_category_snapshot == "ticket"
+        ],
     )
 
     results = []
@@ -761,7 +779,7 @@ async def list_my_tickets(
         ]
 
         results.append(
-            AttendeeWithTickets(
+            PersonalTicketsPublic(
                 id=attendee.id,
                 name=attendee.name,
                 email=attendee.email,
@@ -770,6 +788,27 @@ async def list_my_tickets(
                 popup_name=popup.name,
                 popup_slug=popup.slug,
                 products=products,
+                tickets=[
+                    AttendeeProductPublic(
+                        id=ap.id,
+                        attendee_id=ap.attendee_id,
+                        product_id=ap.product_id,
+                        check_in_code=ap.check_in_code,
+                        payment_id=ap.payment_id,
+                        product_name=ap.product.name,
+                        product_category=ap.product.category,
+                        product_category_snapshot=ap.product_category_snapshot,
+                        duration_type=ap.product.duration_type,
+                        requires_check_in=(
+                            ap.requires_check_in_snapshot
+                            if ap.requires_check_in_snapshot is not None
+                            else ap.product.requires_check_in
+                        ),
+                        requires_check_in_snapshot=ap.requires_check_in_snapshot,
+                        last_scan_at=last_scan_by_ticket.get(ap.id),
+                    )
+                    for ap in ticket_units
+                ],
             )
         )
 

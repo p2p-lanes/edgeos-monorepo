@@ -643,6 +643,9 @@
     "passes_cta": "View my passes"
   },
   "passes": {
+    "assigned_tickets": "Tickets assigned to you",
+    "assigned_tickets_description": "View your tickets and use their check-in codes here.",
+    "personal_tickets_error": "Couldn't load tickets assigned to you. Try again.",
     "your_passes": "Your Passes",
     "your_purchases": "Your purchases",
     "your_purchases_description": "View your passes and other purchased products here.",

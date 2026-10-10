@@ -160,6 +160,65 @@ async def list_products(
     )
 ```
 
+## Personal tickets (including spouse recipients)
+
+`GET /api/v1/applications/my/tickets` accepts a human bearer token. Third-party
+sessions need the `portal:applications:read` scope. Identity and tenant come from
+the authenticated account; callers cannot select another recipient by email.
+
+The endpoint includes attendees linked to the account and unlinked attendees
+whose email matches the account in the same tenant (case-insensitive, ignoring
+surrounding spaces). This covers spouse tickets bought by a partner even before
+the attendee has been linked to the spouse's account. An attendee already linked
+to another account is never included just because its email matches.
+
+The response is a list of `PersonalTicketsPublic`, preserving the existing
+`AttendeeWithTickets` fields: popup identifiers and active ticket products grouped
+by product with `quantity`. The additional `tickets` array exposes individual
+active ticket units with their check-in codes, unit-level check-in requirements
+and last scan timestamps. Those codes are not added to the backoffice email
+lookup response. Revoked units and non-ticket products are excluded from both
+lists. For compatibility, attendees with no active tickets can have empty
+`products` and `tickets` lists. To check ticket ownership for a popup, look for
+its `popup_id` and at least one product with `quantity > 0`, not merely an attendee
+row.
+
+This read does not claim attendees, transfer tickets, or grant management/write
+permissions. It lists personal tickets, not every ticket purchased for a party.
+The portal passes page consumes this endpoint through `useMyTicketsQuery`, with
+its cache scoped by tenant and authenticated human. It displays additional
+personal tickets in a read-only section with the existing QR dialog, filtered to
+the current popup and deduplicated against managed/companion attendees. It does
+not insert email-matched attendees into checkout, attendee management, or the
+passes provider. A ticketless legacy self row is hidden when the personal view
+already contains that account's ticket; other managed attendees remain visible.
+Personal tickets also have a display-only path when general popup access is
+denied; that does not grant access to other pages or purchase/edit operations.
+
+Deploy the backend before the portal so individual QR data is available. The
+portal can render the older grouped-product summary without inventing a QR while
+the two versions overlap.
+
+### Local spouse-ticket QA
+
+After starting the local stack, seed synthetic accounts and an approved payment
+with both a linked buyer and an unlinked spouse recipient:
+
+```bash
+docker compose cp backend/scripts/seed_spouse_ticket_qa.py \
+  backend:/tmp/seed_spouse_ticket_qa.py
+docker compose exec -T backend python /tmp/seed_spouse_ticket_qa.py
+.venv/bin/python scripts/validate-spouse-ticket-qa.py
+```
+
+Run the last command from the repository root; it requires `agent-browser` and
+uses real local OTP authentication via Mailpit. It validates API behavior,
+visible personal tickets and QR controls for all three accounts, and opens
+authenticated QA browser sessions without writing tokens to files. The
+seed only accepts dev/local database hosts and leaves existing QA data intact.
+Accounts are `jon.spouse.qa@example.com`, `lucy.spouse.qa@example.com` and
+`linked.spouse.qa@example.com`, in the Demo tenant's `spouse-ticket-qa` popup.
+
 ## Database
 
 ### Migrations

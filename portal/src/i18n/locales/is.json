@@ -515,6 +515,9 @@
     "passes_cta": "Skoða passana mína"
   },
   "passes": {
+    "assigned_tickets": "Miðar úthlutaðir þér",
+    "assigned_tickets_description": "Skoðaðu miðana þína og innritunarkóða hér.",
+    "personal_tickets_error": "Ekki tókst að hlaða miðunum þínum. Reyndu aftur.",
     "your_passes": "Passarnir þínir",
     "your_purchases": "Kaupin þín",
     "your_purchases_description": "Skoðaðu passana þína og aðrar keyptar vörur hér.",

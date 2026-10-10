@@ -644,6 +644,46 @@ class AttendeesCRUD(BaseCRUD[Attendees, AttendeeCreate, AttendeeUpdate]):
 
         return results, total
 
+    def find_ticket_attendees_for_human(
+        self,
+        session: Session,
+        *,
+        human_id: uuid.UUID,
+        tenant_id: uuid.UUID,
+        email: str,
+        limit: int = 1000,
+    ) -> list[Attendees]:
+        """Read ticket recipients without claiming or changing their identity.
+
+        Include linked attendees and unlinked recipients addressed to the
+        authenticated human's email in the same tenant. An explicit human_id
+        always wins over an email match. Do not broaden management/write
+        authorization or include the rest of the purchaser's party.
+        """
+        statement = (
+            select(Attendees)
+            .where(
+                Attendees.tenant_id == tenant_id,
+                or_(
+                    Attendees.human_id == human_id,
+                    and_(
+                        Attendees.human_id.is_(None),  # type: ignore[union-attr]
+                        func.lower(func.trim(Attendees.email)) == email.strip().lower(),
+                    ),
+                ),
+            )
+            .options(
+                selectinload(Attendees.attendee_products).selectinload(  # type: ignore[arg-type]
+                    AttendeeProducts.product  # ty: ignore[invalid-argument-type]
+                ),
+                selectinload(Attendees.popup),  # type: ignore[arg-type]
+                selectinload(Attendees.category_ref),  # type: ignore[arg-type]
+            )
+            .order_by(Attendees.created_at, Attendees.id)
+            .limit(limit)
+        )
+        return list(session.exec(statement).all())
+
     def find_companion_for_popup(
         self,
         session: Session,
