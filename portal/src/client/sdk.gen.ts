@@ -1796,12 +1796,15 @@ export class ApplicationsService {
      * List your tickets
      * List all tickets for the current human (Portal).
      *
-     * Returns all attendee records linked to this human, including:
-     * - Attendees from applications they submitted (main attendee)
-     * - Attendees created by others with their email (e.g., spouse tickets)
+     * Returns attendee records linked to this human, plus unlinked recipients
+     * with the authenticated human's email in the same tenant (e.g., a spouse
+     * ticket purchased by someone else). Email matching is case-insensitive;
+     * attendees linked to another human are never included through this fallback.
      *
-     * Each attendee includes their check-in code and purchased products.
-     * @returns AttendeeWithTickets Successful Response
+     * Products are active allocated ticket units, grouped by product with quantity.
+     * Tickets also expose each unit's check-in code and last scan for the portal.
+     * This is read-only: it does not claim attendees or grant write permissions.
+     * @returns PersonalTicketsPublic Successful Response
      * @throws ApiError
      */
     public static listMyTickets(): CancelablePromise<ApplicationsListMyTicketsResponse> {

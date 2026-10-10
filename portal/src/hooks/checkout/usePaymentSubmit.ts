@@ -408,6 +408,7 @@ export function usePaymentSubmit({
           queryClient.invalidateQueries({
             queryKey: queryKeys.payments.all,
           }),
+          queryClient.invalidateQueries({ queryKey: ["tickets", "mine"] }),
           popupId
             ? queryClient.invalidateQueries({
                 queryKey: queryKeys.purchases.byPopup(popupId),

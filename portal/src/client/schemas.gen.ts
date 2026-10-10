@@ -23852,6 +23852,83 @@ export const PersonGrantItemSchema = {
     description: 'One row of the admin bulk-grant CSV: a person to grant tickets to.'
 } as const;
 
+export const PersonalTicketsPublicSchema = {
+    properties: {
+        id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Id'
+        },
+        name: {
+            type: 'string',
+            title: 'Name'
+        },
+        email: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Email'
+        },
+        category: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Category'
+        },
+        popup_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Popup Id'
+        },
+        popup_name: {
+            type: 'string',
+            title: 'Popup Name'
+        },
+        popup_slug: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Popup Slug'
+        },
+        products: {
+            items: {
+                '$ref': '#/components/schemas/TicketProduct'
+            },
+            type: 'array',
+            title: 'Products'
+        },
+        tickets: {
+            items: {
+                '$ref': '#/components/schemas/AttendeeProductPublic'
+            },
+            type: 'array',
+            title: 'Tickets'
+        }
+    },
+    type: 'object',
+    required: ['id', 'name', 'email', 'popup_id', 'popup_name', 'products'],
+    title: 'PersonalTicketsPublic',
+    description: `Personal read-only ticket view, including individual check-in codes.
+
+The grouped products contract is preserved. Detailed units are exposed only
+on the authenticated personal endpoint, not the backoffice email lookup.`
+} as const;
+
 export const PopupAccessResponseSchema = {
     properties: {
         allowed: {

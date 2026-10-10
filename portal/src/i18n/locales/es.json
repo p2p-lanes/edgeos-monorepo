@@ -643,6 +643,9 @@
     "passes_cta": "Ver mis pases"
   },
   "passes": {
+    "assigned_tickets": "Tickets asignados a vos",
+    "assigned_tickets_description": "Consultá tus tickets y sus códigos de check-in acá.",
+    "personal_tickets_error": "No pudimos cargar los tickets asignados a vos. Intentá de nuevo.",
     "your_passes": "Tus Pases",
     "your_purchases": "Tus compras",
     "your_purchases_description": "Consultá tus pases y otros productos adquiridos acá.",
