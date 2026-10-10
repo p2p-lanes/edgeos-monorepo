@@ -1,7 +1,7 @@
 # EdgeOS third-party SSO integration guide
 
 **Audience:** partner developers and coding agents implementing a server-side integration.
-**Contract:** v1, introduced in [PR #757](https://github.com/p2p-lanes/edgeos-monorepo/pull/757). Verify that your target environment has deployed this feature before using these routes. Merging into `dev` does not imply a production deployment.
+**Contract:** renewable third-party grants, extending the SSO flow introduced in [PR #757](https://github.com/p2p-lanes/edgeos-monorepo/pull/757). Verify that your target environment has deployed refresh support before using these routes. Merging into `dev` does not imply a production deployment.
 
 This document is self-contained: a partner does not need the EdgeOS repository to implement the flow. For a runnable reference, use the [local quickstart](README.md) and [dependency-free Node mock](mock.mjs).
 
@@ -11,8 +11,9 @@ An authenticated EdgeOS portal user clicks an ordinary link in a popup's custom 
 
 - This is a custom authorization-code integration, **not a complete OAuth/OIDC provider**. Do not use an OAuth SDK's default endpoints, `grant_type`, discovery document or ID-token assumptions.
 - Supported: confidential clients with a backend and a private registered app credential.
-- Not supported in v1: public/SPA-only clients, refresh tokens, discovery or ID tokens.
-- The existing OTP integration remains unchanged. This flow does not request an OTP; if the user's portal session has expired, the portal may require its normal login first.
+- Supported: rotating, revocable refresh tokens, for backend-only integrations.
+- Not supported: public/SPA-only clients, OIDC discovery or ID tokens.
+- SSO and third-party OTP now return the same token-pair response and use short-lived access tokens. The normal portal/backoffice login is unchanged. This SSO flow does not request an OTP; if the user's portal session has expired, the portal may require its normal login first.
 - An admin enabling the popup–app association preauthorizes access. No additional consent screen is shown.
 - A user must be allowed to view that custom home. An accepted application is not an additional SSO requirement; ended-popup access follows the existing home visibility policy.
 - Token scopes retain existing tenant-wide app semantics, subject to the API's user/resource authorization. A launch from one popup does **not** constrain the token to that popup.
@@ -162,7 +163,11 @@ Success: **200**:
 {
   "access_token": "<SERVER_ONLY_BEARER_TOKEN>",
   "token_type": "bearer",
-  "expires_in": 900
+  "expires_in": 900,
+  "refresh_token": "<SERVER_ONLY_REFRESH_TOKEN>",
+  "refresh_expires_in": 691200,
+  "grant_id": "<GRANT_UUID>",
+  "grant_expires_at": "<ABSOLUTE_EXPIRY_ISO_8601>"
 }
 ```
 
@@ -177,10 +182,10 @@ Authorization: Bearer <ACCESS_TOKEN_FROM_EXCHANGE>
 
 This requires `portal:profile:read`. Use the API's human `id` as the stable identity key, namespaced to the configured environment/tenant; email is a profile attribute. Do not authenticate a user by decoding an unverified JWT payload. The reference displays selected claims only **after** a successful authenticated profile request.
 
-6. Establish/rotate the partner's own application session. Keep the EdgeOS token server-side only if the app needs subsequent EdgeOS API calls; otherwise discard it after identity lookup.
+6. Establish/rotate the partner's own application session. Keep the EdgeOS token pair in secure server-side storage only if the app needs subsequent EdgeOS API calls. Otherwise revoke the grant after identity lookup and discard both tokens. Never include either token in a browser cookie, localStorage, page, URL or log.
 7. Remove temporary state/verifier, and redirect to a clean application URL without `code` or `state`. Do not load analytics or third-party assets on the callback page.
 
-The local reference is a protocol demonstration, not a production session framework. Its in-memory transactions and result snapshot must be replaced with appropriate server-side storage/session handling when deploying across workers or instances.
+The local reference is identity-only: it revokes the grant after profile lookup and never retains either token. It is a protocol demonstration, not a production session framework. Its in-memory transactions and result snapshot must be replaced with appropriate server-side storage/session handling when deploying across workers or instances.
 
 ## 5. Wire constraints and guarantees
 
@@ -192,14 +197,16 @@ The local reference is a protocol demonstration, not a production session framew
 | `code_verifier` | 43–128 ASCII unreserved characters, same character set as state |
 | `code` | Opaque 43-character base64url string; not an OTP or JWT |
 | Code expiry | Default 60 seconds after issuance; operator setting `SSO_CODE_EXPIRE_SECONDS`, range 10–300 |
-| Token expiry | Default 15 minutes; operator setting `SSO_ACCESS_TOKEN_EXPIRE_MINUTES`, range 1–60 |
+| Access token expiry (SSO + third-party OTP) | Default 15 minutes; `THIRD_PARTY_ACCESS_TOKEN_EXPIRE_MINUTES`, range 1–60. Legacy env name `SSO_ACCESS_TOKEN_EXPIRE_MINUTES` is accepted as a fallback. |
+| Refresh inactivity window | Default 8 days; `THIRD_PARTY_REFRESH_TOKEN_IDLE_DAYS`, range 1–30, capped by grant expiry |
+| Absolute grant expiry | Default 30 days from authentication; `THIRD_PARTY_GRANT_EXPIRE_DAYS`, range 1–90; rotation never extends it |
 
 - Codes are hashed in PostgreSQL, bound to app, tenant, human, popup, callback, challenge and a scope snapshot.
 - Successful exchange commits single-use consumption before returning a token. Parallel valid exchanges cannot both succeed.
 - Invalid exchange attempts do not consume the code; expiry still applies. Do not build blind retry loops: after a timeout the successful response may have been lost while the code was already consumed. Start a fresh browser transaction when success is uncertain.
 - Exchange revalidates home access, app status, association and callback. Changing the registered callback invalidates outstanding codes.
 - Issued scopes are the intersection of scopes captured at authorization and current allowed app scopes, within the platform ceiling. Scope additions cannot expand a pending grant.
-- Disabling an association or revoking the app blocks new issuance/exchange. **Do not assume universal immediate revocation of an already-issued JWT**; existing API revocation semantics apply until expiry.
+- New JWTs carry a server-side grant ID. API authentication revalidates the grant, app/tenant/person and current scope ceilings. SSO also revalidates the original popup home, enabled association and callback. Disconnect, replay detection and app revocation reject already-issued grant-bound access tokens immediately on subsequent authenticated requests. Legacy JWTs without a grant ID retain their previous expiry/revocation semantics.
 - Key rotation invalidates the old app credential. Update the partner's secret storage; never retrieve a key from list/read responses.
 
 ## 6. Authentication reference
@@ -213,6 +220,48 @@ The local reference is a protocol demonstration, not a production session framew
 | `POST /api/v1/popups/portal/{POPUP_SLUG}/apps/{APP_ID}/authorization-codes` | Human **portal** JWT | Portal submits state/challenge/method, receives `redirect_url` |
 | `POST /api/v1/auth/human/third-party/sso/exchange` | `X-Third-Party-Api-Key` | Partner backend exchanges code/verifier/callback |
 | `GET /api/v1/humans/me` | Exchanged human bearer token with profile-read scope | Partner verifies user identity |
+
+### Refresh, disconnect and client rollout
+
+The same response fields are returned by `POST /api/v1/auth/human/third-party/authenticate` after OTP verification.
+
+To refresh, send **only from your backend**:
+
+```http
+POST /api/v1/auth/human/third-party/refresh
+X-Third-Party-Api-Key: <CURRENT_PRIVATE_APP_CREDENTIAL>
+Content-Type: application/json
+
+{"refresh_token": "<LATEST_REFRESH_TOKEN>"}
+```
+
+Success is **200** with a complete replacement token pair. No live access token or OTP is required. Use returned `expires_in` and `refresh_expires_in` as authoritative, in seconds. `grant_expires_at` is absolute and does not slide.
+
+- Each refresh is single-use. Store the replacement access and refresh tokens atomically.
+- Serialize refreshes **across workers** for each grant, for example with a distributed lock and rereading shared storage after acquiring it. Schedule refresh before access expiry; do not refresh on every API request.
+- Reusing any consumed refresh token revokes the **entire grant**, including newer refresh tokens and already-issued grant-bound JWTs. A concurrent duplicate is treated as replay, not as an idempotent retry.
+- If a refresh times out or its response is lost, **do not retry with the old token**: the server may already have consumed it. Revoke the grant and start fresh SSO/OTP authentication.
+- Refresh cannot broaden the original scope snapshot. Scope reductions observed at refresh are permanent for that grant; newly added/reinstated scopes require new authentication.
+- After 8 days without a successful refresh, or at absolute expiry, reauthenticate. Refresh always requires the current private app credential; app-key rotation does not itself revoke grants.
+- A 401 means the session/credential/grant can no longer be used. Stop refresh loops; reestablish authorization.
+
+On partner logout/disconnect:
+
+```http
+POST /api/v1/auth/human/third-party/revoke
+X-Third-Party-Api-Key: <CURRENT_PRIVATE_APP_CREDENTIAL>
+Content-Type: application/json
+
+{"refresh_token": "<REFRESH_TOKEN_FROM_THIS_GRANT>"}
+```
+
+Returns **204**. Revocation is idempotent and accepts a consumed ancestor; unknown or other-app tokens also return 204 without affecting any grant.
+
+A human's **portal JWT** can list their authorizations with `GET /api/v1/auth/human/third-party/grants` and disconnect one with `DELETE /api/v1/auth/human/third-party/grants/{grant_id}`. Third-party JWTs and API keys cannot use these portal-only controls. Disconnect revokes one authorization family; another login creates a separate grant.
+
+**Rollout:** apply migration `a1d3f5b7c9e2` before deploying the backend. Update partner clients to handle the new fields and refresh lifecycle before shortening third-party OTP sessions in the deployed environment. Existing JWTs are not rewritten and cannot be upgraded into refresh grants: the next SSO/OTP authentication issues a new pair. Do not pass them to the refresh route. Normal portal/backoffice sessions are unaffected.
+
+**Separate agent API keys:** a key already minted has its own expiry/revocation and is not linked to this grant. Disconnecting a grant does not revoke that key. Revoke the agent key explicitly if disconnect should also stop its automation; personal API keys still cannot replace JWTs for directory access.
 
 A delegated third-party token cannot issue another SSO code. Admin JWTs and API keys are not substitutes for a human portal session. No new browser CORS/key-exposure scheme is required: the partner performs exchange and resource calls server-side.
 
@@ -242,20 +291,23 @@ API error descriptions are intentionally not a user-discovery mechanism. Handle 
 - [ ] Success: one existing portal login, custom-home click, correct human returned, no additional OTP, no exchanged token in the browser.
 - [ ] Reject missing/mismatched state or browser cookie before exchange; reject replay and concurrent duplicate callbacks.
 - [ ] Test expired code, wrong verifier, wrong app/callback, disabled link, revoked app and missing profile scope.
+- [ ] Test refresh rotation, ancestor replay, cross-worker serialization, lost responses, expiry, scope reduction and disconnect. Verify neither token reaches browser output or logs.
 - [ ] Test a user who can view the home but has no accepted application; do not add an extra acceptance gate.
 - [ ] Leave custom-home HTML and iframe sandbox unchanged beyond the ordinary link.
 
 ### Copyable implementation brief
 
 ```text
-Implement EdgeOS third-party SSO v1 using this guide as the contract.
+Implement EdgeOS third-party SSO with renewable grants using this guide as the contract.
 Inputs must be supplied by the administrator; ask for missing configuration.
 Build only server-side start/callback handlers, browser-bound state + S256
 PKCE transactions, code exchange, authenticated identity lookup and a normal
 partner session. Use the exact allowlisted portal authorize URL and registered
 callback. Never request the portal JWT or expose app credentials/verifiers/
-access tokens to the browser. Do not add OIDC, refresh tokens, SPA exchange,
-new OTP requests, custom-home JavaScript or an accepted-application gate.
+access/refresh tokens to the browser. If subsequent API calls are needed,
+implement server-side rotating refresh, cross-worker serialization and revoke
+on disconnect. Do not add OIDC, SPA exchange, new OTP requests in the SSO flow,
+custom-home JavaScript or an accepted-application gate.
 Verify the acceptance checklist and report exact tests and limitations.
 Use the local mock only as a reference, not production session infrastructure.
 ```
@@ -267,6 +319,7 @@ If wire behavior differs, inspect the deployed API's `/api/v1/openapi.json` and 
 - [SSO schemas](../../backend/app/api/third_party_sso/schemas.py): exact request/response fields.
 - [SSO routes](../../backend/app/api/third_party_sso/router.py): routes and credential requirements.
 - [SSO service](../../backend/app/api/third_party_sso/service.py): code lifetime, revalidation, scope intersection and atomic consumption.
+- [Refresh schemas](../../backend/app/api/third_party_auth/schemas.py), [routes](../../backend/app/api/third_party_auth/router.py) and [service](../../backend/app/api/third_party_auth/service.py): shared OTP/SSO token lifecycle and revocation.
 - [URL validation](../../backend/app/api/third_party_app/sso_urls.py): registered destination rules.
 - [Local quickstart](README.md): isolated fixtures, setup, tests and cleanup.
 

@@ -16,7 +16,7 @@ one popup it names, for 15 minutes.
 import uuid
 from datetime import UTC, datetime, timedelta
 
-from app.core.security import create_access_token, decode_access_token
+from app.core.security import create_access_token, resolve_access_token
 
 #: ``token_type`` claim that marks a JWT as a checkout preview token.
 CHECKOUT_PREVIEW_TOKEN_TYPE = "checkout_preview"
@@ -45,7 +45,7 @@ def resolve_preview_popup_id(token: str | None) -> uuid.UUID | None:
 
     None means "no preview requested" — the caller keeps the public behaviour.
     A malformed, expired or non-preview token raises 401 via
-    :func:`decode_access_token` rather than silently degrading, so a stale
+    :func:`resolve_access_token` rather than silently degrading, so a stale
     iframe reports the real reason instead of an unrelated 403.
 
     The token is not tenant-bound: the caller resolves the popup by slug within
@@ -55,7 +55,7 @@ def resolve_preview_popup_id(token: str | None) -> uuid.UUID | None:
     if not token:
         return None
 
-    payload = decode_access_token(token)
+    payload = resolve_access_token(token)
     if payload.token_type != CHECKOUT_PREVIEW_TOKEN_TYPE:
         return None
 

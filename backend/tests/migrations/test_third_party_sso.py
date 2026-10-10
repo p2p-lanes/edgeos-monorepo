@@ -5,7 +5,7 @@ from alembic.config import Config
 from alembic.script import ScriptDirectory
 from sqlalchemy import inspect, text
 
-HEAD_REVISION = "f0fbedba955c"
+HEAD_REVISION = "a1d3f5b7c9e2"
 SSO_REVISION = "b5e7a9c1d3f2"
 PREVIOUS_REVISION = "a4f6b8d2c9e1"
 TABLES = ("popup_third_party_apps", "third_party_authorization_codes")

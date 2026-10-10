@@ -191,6 +191,8 @@ class TokenPayload(BaseModel):
     # is None, the JWT is a legacy v1 token and its embedded scopes are
     # authoritative.
     issued_by_app_id: uuid.UUID | None = None
+    # New third-party tokens are bound to a revocable, server-side grant.
+    third_party_grant_id: uuid.UUID | None = None
 
 
 # Each entry: (route, exact_match, scopes_any_of). The api key must carry at
@@ -279,6 +281,7 @@ def create_access_token(
     via_api_key: bool = False,
     api_key_id: str | None = None,
     issued_by_app_id: uuid.UUID | None = None,
+    third_party_grant_id: uuid.UUID | None = None,
 ) -> str:
     """Mint a signed JWT.
 
@@ -317,6 +320,9 @@ def create_access_token(
         to_encode["api_key_id"] = api_key_id
     if issued_by_app_id is not None:
         to_encode["issued_by_app_id"] = str(issued_by_app_id)
+
+    if third_party_grant_id is not None:
+        to_encode["third_party_grant_id"] = str(third_party_grant_id)
 
     return jwt.encode(to_encode, settings.SECRET_KEY, algorithm=ALGORITHM)
 
@@ -360,6 +366,7 @@ def decode_access_token(token: str) -> TokenPayload:
             via_api_key=via_api_key,
             api_key_id=api_key_id,
             issued_by_app_id=issued_by_app_id,
+            third_party_grant_id=payload.get("third_party_grant_id"),
         )
     except jwt.ExpiredSignatureError:
         raise HTTPException(
@@ -367,7 +374,7 @@ def decode_access_token(token: str) -> TokenPayload:
             detail="Token has expired",
             headers={"WWW-Authenticate": "Bearer"},
         )
-    except jwt.InvalidTokenError:
+    except (jwt.InvalidTokenError, ValueError, KeyError):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid token",
@@ -465,4 +472,19 @@ def get_token_payload(
         payload = _resolve_api_key(token)
         _enforce_api_key_policy(request, payload)
         return payload
-    return decode_access_token(token)
+    return resolve_access_token(token)
+
+
+def resolve_access_token(token: str) -> TokenPayload:
+    """Authenticate a JWT, including online revocation of new third-party grants.
+
+    Keep decode_access_token pure for logging and offline signature inspection.
+    Every authentication path must use this resolver rather than decode alone.
+    """
+    payload = decode_access_token(token)
+    if payload.third_party_grant_id is not None:
+        from app.api.third_party_auth.service import validate_access_grant
+
+        with Session(engine) as session:
+            payload = validate_access_grant(session, payload)
+    return payload
