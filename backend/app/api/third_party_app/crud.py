@@ -29,6 +29,7 @@ from sqlmodel import Session, select
 
 from app.api.api_key.crud import hash_key as hash_api_key
 from app.api.third_party_app.models import ThirdPartyApps
+from app.api.third_party_app.sso_urls import validate_sso_pair
 
 if TYPE_CHECKING:
     from app.api.tenant.models import Tenants
@@ -124,12 +125,18 @@ def create(
     name: str,
     allowed_token_scopes: list[str],
     allowed_api_key_scopes: list[str],
+    sso_start_url: str | None = None,
+    sso_redirect_uri: str | None = None,
 ) -> tuple[ThirdPartyApps, str]:
     """Mint a raw key, hash it, persist the app row.
 
     Returns (ThirdPartyApps row, raw_key). The raw key is shown once — the
     caller is responsible for returning it to the client; it is not stored.
     """
+    try:
+        validate_sso_pair(sso_start_url, sso_redirect_uri)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
     raw_key = _generate_raw_key()
     key_hash = hash_api_key(raw_key)
     prefix = raw_key[:8]
@@ -141,6 +148,8 @@ def create(
         prefix=prefix,
         allowed_token_scopes=allowed_token_scopes,
         allowed_api_key_scopes=allowed_api_key_scopes,
+        sso_start_url=sso_start_url,
+        sso_redirect_uri=sso_redirect_uri,
     )
     session.add(app)
     session.commit()
@@ -178,7 +187,23 @@ def update(
     app: ThirdPartyApps,
     data: ThirdPartyAppUpdate,
 ) -> ThirdPartyApps:
-    """Apply ThirdPartyAppUpdate fields. Only provided (non-None) fields are changed."""
+    """Apply provided fields; the SSO URL pair can be explicitly cleared to None."""
+    start = (
+        data.sso_start_url
+        if "sso_start_url" in data.model_fields_set
+        else app.sso_start_url
+    )
+    callback = (
+        data.sso_redirect_uri
+        if "sso_redirect_uri" in data.model_fields_set
+        else app.sso_redirect_uri
+    )
+    try:
+        validate_sso_pair(start, callback)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    app.sso_start_url = start
+    app.sso_redirect_uri = callback
     if data.name is not None:
         app.name = data.name
     if data.allowed_token_scopes is not None:

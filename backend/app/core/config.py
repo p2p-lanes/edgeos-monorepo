@@ -32,6 +32,8 @@ class Settings(BaseSettings):
     SECRET_KEY: str = Field(...)
     # 60 minutes * 24 hours * 8 days = 8 days
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24 * 8
+    SSO_CODE_EXPIRE_SECONDS: int = Field(default=60, ge=10, le=300)
+    SSO_ACCESS_TOKEN_EXPIRE_MINUTES: int = Field(default=15, ge=1, le=60)
     BACKOFFICE_URL: str = "http://localhost:5173"
     ENVIRONMENT: Environment = Environment.DEV
     # Minimum level emitted by the loguru stdout sink. Set to DEBUG for verbose

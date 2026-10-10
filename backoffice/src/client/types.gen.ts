@@ -1579,6 +1579,16 @@ export type AuthCodeSentResponse = {
     expires_in_minutes?: number;
 };
 
+export type AuthorizationCodePublic = {
+    redirect_url: string;
+};
+
+export type AuthorizationCodeRequest = {
+    state: string;
+    code_challenge: string;
+    code_challenge_method: string;
+};
+
 /**
  * Static response for GET /third-party-apps/available-scopes.
  *
@@ -2350,6 +2360,14 @@ export type CheckInListItem = {
     payload?: ({
     [key: string]: unknown;
 } | null);
+    check_in_code?: (string | null);
+    product_category?: (string | null);
+    unit_index?: (number | null);
+    unit_count?: (number | null);
+    buyer_name?: (string | null);
+    buyer_email?: (string | null);
+    sales_flow_id?: (string | null);
+    sales_flow_name?: (string | null);
 };
 
 /**
@@ -5154,6 +5172,9 @@ export type PopupAdmin = {
     theme_config?: ({
     [key: string]: unknown;
 } | null);
+    sidebar_config?: ({
+    [key: string]: unknown;
+} | null);
     favicon_url?: (string | null);
     default_language?: string;
     supported_languages?: Array<(string)>;
@@ -5192,6 +5213,18 @@ export type PopupAdmin = {
     id: string;
     takes_applications?: boolean;
     sells_directly?: boolean;
+};
+
+export type PopupAppPublic = {
+    app_id: string;
+    name: string;
+    enabled: boolean;
+    sso_configured: boolean;
+    launch_path: string;
+};
+
+export type PopupAppUpdate = {
+    enabled: boolean;
 };
 
 /**
@@ -5244,6 +5277,9 @@ export type PopupCreate = {
     requires_application_fee?: boolean;
     application_fee_amount?: (number | string | null);
     theme_config?: ({
+    [key: string]: unknown;
+} | null);
+    sidebar_config?: ({
     [key: string]: unknown;
 } | null);
     favicon_url?: (string | null);
@@ -5331,6 +5367,9 @@ export type PopupPublic = {
     requires_application_fee?: boolean;
     application_fee_amount?: (string | null);
     theme_config?: ({
+    [key: string]: unknown;
+} | null);
+    sidebar_config?: ({
     [key: string]: unknown;
 } | null);
     favicon_url?: (string | null);
@@ -5432,6 +5471,9 @@ export type PopupUpdate = {
     requires_application_fee?: (boolean | null);
     application_fee_amount?: (number | string | null);
     theme_config?: ({
+    [key: string]: unknown;
+} | null);
+    sidebar_config?: ({
     [key: string]: unknown;
 } | null);
     favicon_url?: (string | null);
@@ -6439,6 +6481,23 @@ export type SentBadgeAward = {
  */
 export type SimpleFiSuccessBehavior = 'manual' | 'automatic';
 
+export type SSOExchangePublic = {
+    access_token: string;
+    token_type?: string;
+    expires_in: number;
+};
+
+export type SSOExchangeRequest = {
+    code: string;
+    redirect_uri: string;
+    code_verifier: string;
+};
+
+export type SSOLaunchPublic = {
+    app_name: string;
+    start_url: string;
+};
+
 export type StaffTicketPublic = {
     id: string;
     check_in_code: string;
@@ -6745,6 +6804,8 @@ export type TenantUpdate = {
  * Request body for creating a third-party app.
  */
 export type ThirdPartyAppCreate = {
+    sso_start_url?: (string | null);
+    sso_redirect_uri?: (string | null);
     name: string;
     allowed_token_scopes?: Array<('portal:*' | 'portal:profile:read' | 'portal:profile:write' | 'portal:applications:read' | 'portal:applications:write' | 'portal:attendees:write' | 'portal:payments:read' | 'portal:directory:read' | 'portal:api_keys:manage' | 'portal:badges:write')>;
     allowed_api_key_scopes?: Array<('events:read' | 'events:write' | 'rsvp:write' | 'venues:read' | 'venues:write' | 'applications:read' | 'applications:write' | 'attendees:read' | 'attendees:write' | 'humans:read' | 'humans:write' | 'groups:read' | 'groups:write' | 'products:read' | 'products:write' | 'accommodations:read' | 'accommodations:write' | 'coupons:read' | 'coupons:write' | 'forms:read' | 'forms:write' | 'payments:read' | 'tracks:read' | 'tracks:write' | 'ticketing_steps:read' | 'ticketing_steps:write' | 'translations:read' | 'translations:write' | 'badges:read' | 'badges:write')>;
@@ -6763,6 +6824,8 @@ export type ThirdPartyAppCreated = {
     allowed_token_scopes: Array<(string)>;
     allowed_api_key_scopes: Array<(string)>;
     active: boolean;
+    sso_start_url?: (string | null);
+    sso_redirect_uri?: (string | null);
     last_used_at: (string | null);
     revoked_at: (string | null);
     created_at: string;
@@ -6783,6 +6846,8 @@ export type ThirdPartyAppPublic = {
     allowed_token_scopes: Array<(string)>;
     allowed_api_key_scopes: Array<(string)>;
     active: boolean;
+    sso_start_url?: (string | null);
+    sso_redirect_uri?: (string | null);
     last_used_at: (string | null);
     revoked_at: (string | null);
     created_at: string;
@@ -6796,6 +6861,8 @@ export type ThirdPartyAppPublic = {
  * provided (not-None).
  */
 export type ThirdPartyAppUpdate = {
+    sso_start_url?: (string | null);
+    sso_redirect_uri?: (string | null);
     name?: (string | null);
     allowed_token_scopes?: (Array<('portal:*' | 'portal:profile:read' | 'portal:profile:write' | 'portal:applications:read' | 'portal:applications:write' | 'portal:attendees:write' | 'portal:payments:read' | 'portal:directory:read' | 'portal:api_keys:manage' | 'portal:badges:write')> | null);
     allowed_api_key_scopes?: (Array<('events:read' | 'events:write' | 'rsvp:write' | 'venues:read' | 'venues:write' | 'applications:read' | 'applications:write' | 'attendees:read' | 'attendees:write' | 'humans:read' | 'humans:write' | 'groups:read' | 'groups:write' | 'products:read' | 'products:write' | 'accommodations:read' | 'accommodations:write' | 'coupons:read' | 'coupons:write' | 'forms:read' | 'forms:write' | 'payments:read' | 'tracks:read' | 'tracks:write' | 'ticketing_steps:read' | 'ticketing_steps:write' | 'translations:read' | 'translations:write' | 'badges:read' | 'badges:write')> | null);
@@ -8508,11 +8575,13 @@ export type CheckInConfirmMyCheckInResponse = (SelfCheckInResult);
 
 export type CheckInListCheckInsData = {
     attendeeProductId?: (string | null);
+    filters?: (string | null);
     /**
      * Maximum number of items to return
      */
     limit?: number;
     popupId?: (string | null);
+    search?: (string | null);
     /**
      * Number of items to skip
      */
@@ -10930,6 +10999,44 @@ export type ThirdPartyDiscoveryGetThirdPartyOpenapiData = {
 export type ThirdPartyDiscoveryGetThirdPartyOpenapiResponse = ({
     [key: string]: unknown;
 });
+
+export type ThirdPartySsoListPopupAppsData = {
+    popupId: string;
+    xTenantId?: (string | null);
+};
+
+export type ThirdPartySsoListPopupAppsResponse = (Array<PopupAppPublic>);
+
+export type ThirdPartySsoSetPopupAppData = {
+    appId: string;
+    popupId: string;
+    requestBody: PopupAppUpdate;
+    xTenantId?: (string | null);
+};
+
+export type ThirdPartySsoSetPopupAppResponse = (PopupAppPublic);
+
+export type ThirdPartySsoGetSsoLaunchData = {
+    appId: string;
+    slug: string;
+};
+
+export type ThirdPartySsoGetSsoLaunchResponse = (SSOLaunchPublic);
+
+export type ThirdPartySsoCreateSsoCodeData = {
+    appId: string;
+    requestBody: AuthorizationCodeRequest;
+    slug: string;
+};
+
+export type ThirdPartySsoCreateSsoCodeResponse = (AuthorizationCodePublic);
+
+export type ThirdPartySsoExchangeSsoCodeData = {
+    requestBody: SSOExchangeRequest;
+    xThirdPartyApiKey: string;
+};
+
+export type ThirdPartySsoExchangeSsoCodeResponse = (SSOExchangePublic);
 
 export type TicketingStepsListPortalTicketingStepsData = {
     acceptLanguage?: (string | null);

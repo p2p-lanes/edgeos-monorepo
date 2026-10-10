@@ -3,6 +3,7 @@ import { useCallback } from "react"
 import { useTranslation } from "react-i18next"
 import useResources from "@/hooks/useResources"
 import { trackPortalTelemetry } from "@/lib/portal-telemetry"
+import { useCityProvider } from "@/providers/cityProvider"
 import type { Resource, ResourceGroup } from "@/types/resources"
 import { Separator } from "../ui/separator"
 import { Tooltip, TooltipContent, TooltipTrigger } from "../ui/tooltip"
@@ -13,6 +14,7 @@ import {
   SidebarGroupContent,
   SidebarGroupLabel,
   SidebarMenu,
+  SidebarMenuButton,
   SidebarMenuItem,
   SidebarMenuSub,
 } from "./SidebarComponents"
@@ -80,6 +82,18 @@ const ResourceItem: React.FC<{
 const ResourcesMenu = () => {
   const { t } = useTranslation()
   const { resources, doorName } = useResources()
+  const city = useCityProvider().getCity()
+  const sidebarConfig = city?.sidebar_config as
+    | {
+        sections?: {
+          id: string
+          kind: "commerce" | "checkouts" | "community" | "external"
+          title?: string
+          links?: { id: string; label: string; url: string }[]
+        }[]
+      }
+    | null
+    | undefined
   const router = useRouter()
   const pathname = usePathname()
 
@@ -91,53 +105,109 @@ const ResourcesMenu = () => {
     [router],
   )
 
+  const configuredSections = sidebarConfig?.sections
+    ? [
+        ...sidebarConfig.sections,
+        ...resourceGroups
+          .filter(
+            (group) =>
+              !sidebarConfig.sections?.some(
+                (section) => section.kind === group,
+              ),
+          )
+          .map((group) => ({ id: group, kind: group })),
+      ]
+    : null
+
+  const renderResourceSection = (group: ResourceGroup) => {
+    const groupResources = resources.filter(
+      (resource) =>
+        resource.status !== "hidden" && (resource.group ?? "general") === group,
+    )
+    if (groupResources.length === 0) return null
+
+    const groupLabelId = `portal-navigation-${group}`
+    return (
+      <SidebarGroup key={group} aria-labelledby={groupLabelId}>
+        <SidebarGroupLabel asChild>
+          <h2
+            id={groupLabelId}
+            className="px-2 text-[11px] font-semibold tracking-[0.08em] text-sidebar-foreground/60 uppercase"
+          >
+            {group === "general" && doorName ? doorName : t(`sidebar.${group}`)}
+          </h2>
+        </SidebarGroupLabel>
+        <SidebarGroupContent className="pt-1">
+          <SidebarMenu>
+            {groupResources.map((resource) => (
+              <ResourceItem
+                key={resource.path ?? resource.name}
+                resource={resource}
+                onNavigate={handleNavigate}
+                pathname={pathname}
+              />
+            ))}
+            {group === "community" && (
+              <>
+                <Separator className="my-4" />
+                <GroupsResources onNavigate={handleNavigate} />
+              </>
+            )}
+          </SidebarMenu>
+        </SidebarGroupContent>
+      </SidebarGroup>
+    )
+  }
+
+  const renderExternalSection = (section: {
+    id: string
+    title?: string
+    links?: { id: string; label: string; url: string }[]
+  }) => {
+    const links = (section.links ?? []).filter(
+      (link) =>
+        link.url.trim() !== "" &&
+        !/^(javascript|data|vbscript):/i.test(link.url.trim()),
+    )
+    if (links.length === 0) return null
+    const labelId = `portal-navigation-${section.id}`
+    return (
+      <SidebarGroup key={section.id} aria-labelledby={labelId}>
+        <SidebarGroupLabel asChild>
+          <h2
+            id={labelId}
+            className="px-2 text-[11px] font-semibold tracking-[0.08em] text-sidebar-foreground/60 uppercase"
+          >
+            {section.title}
+          </h2>
+        </SidebarGroupLabel>
+        <SidebarGroupContent className="pt-1">
+          <SidebarMenu>
+            {links.map((link) => (
+              <SidebarMenuItem key={link.id}>
+                <SidebarMenuButton asChild tooltip={link.label}>
+                  <a href={link.url} target="_blank" rel="noopener noreferrer">
+                    <span>{link.label}</span>
+                  </a>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+            ))}
+          </SidebarMenu>
+        </SidebarGroupContent>
+      </SidebarGroup>
+    )
+  }
+
   return (
     <SidebarContent>
       <nav aria-label={t("sidebar.navigation")}>
-        {resourceGroups.map((group) => {
-          const groupResources = resources.filter(
-            (resource) =>
-              resource.status !== "hidden" &&
-              (resource.group ?? "general") === group,
-          )
-
-          if (groupResources.length === 0) return null
-
-          const groupLabelId = `portal-navigation-${group}`
-
-          return (
-            <SidebarGroup key={group} aria-labelledby={groupLabelId}>
-              <SidebarGroupLabel asChild>
-                <h2
-                  id={groupLabelId}
-                  className="px-2 text-[11px] font-semibold tracking-[0.08em] text-sidebar-foreground/60 uppercase"
-                >
-                  {group === "general" && doorName
-                    ? doorName
-                    : t(`sidebar.${group}`)}
-                </h2>
-              </SidebarGroupLabel>
-              <SidebarGroupContent className="pt-1">
-                <SidebarMenu>
-                  {groupResources.map((resource) => (
-                    <ResourceItem
-                      key={resource.path ?? resource.name}
-                      resource={resource}
-                      onNavigate={handleNavigate}
-                      pathname={pathname}
-                    />
-                  ))}
-                  {group === "community" && (
-                    <>
-                      <Separator className="my-4" />
-                      <GroupsResources onNavigate={handleNavigate} />
-                    </>
-                  )}
-                </SidebarMenu>
-              </SidebarGroupContent>
-            </SidebarGroup>
-          )
-        })}
+        {configuredSections
+          ? configuredSections.map((section) =>
+              section.kind === "external"
+                ? renderExternalSection(section)
+                : renderResourceSection(section.kind),
+            )
+          : resourceGroups.map(renderResourceSection)}
       </nav>
     </SidebarContent>
   )

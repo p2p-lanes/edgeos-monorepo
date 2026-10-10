@@ -241,6 +241,23 @@ CurrentWriter = Annotated["UserPublic", Depends(require_write_permission)]
 CurrentCheckInOperator = Annotated["UserPublic", Depends(get_check_in_operator)]
 
 
+def get_admin_jwt_only(
+    token_payload: Annotated[TokenPayload, Depends(get_token_payload)],
+    current_user: CurrentAdmin,
+) -> "UserPublic":
+    """Require an admin/superadmin JWT, never delegated API-key authority.
+
+    Register as a router/route dependency so API keys are rejected before
+    TenantSession can resolve a tenant from X-Tenant-Id.
+    """
+    if token_payload.via_api_key:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="This endpoint requires a JWT session; API keys are not accepted.",
+        )
+    return current_user
+
+
 def get_operator_jwt_only(
     token_payload: Annotated["TokenPayload", Depends(get_token_payload)],
     current_user: Annotated["UserPublic", Depends(get_operator)],

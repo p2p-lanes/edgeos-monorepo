@@ -1,15 +1,17 @@
 """Router for the backoffice scan-history endpoint.
 
-Provides GET /check-ins with optional filtering by attendee_product_id and
-popup_id. One row per scan event with full history.
+Provides GET /check-ins with optional filtering by attendee_product_id,
+popup_id, free-text search and the shared ``filters`` JSON group. One row
+per scan event with full history.
 """
 
 import uuid
 from datetime import datetime
 
 from fastapi import APIRouter, HTTPException, status
+from sqlalchemy import and_, not_, or_
 from sqlalchemy.orm import selectinload
-from sqlmodel import Session, func, select
+from sqlmodel import Session, col, func, select
 from sqlmodel import select as sa_select
 
 from app.api.application.models import Applications
@@ -18,6 +20,8 @@ from app.api.attendee.models import AttendeeProducts, Attendees
 from app.api.check_in.crud import record_check_in
 from app.api.check_in.models import CheckIn
 from app.api.check_in.schemas import (
+    CHECK_IN_PRODUCT_CATEGORIES,
+    CheckInFilterCondition,
     CheckInListItem,
     CheckInPayload,
     SelfCheckInOptions,
@@ -25,10 +29,13 @@ from app.api.check_in.schemas import (
     SelfCheckInRequest,
     SelfCheckInResult,
     SelfCheckInTicket,
+    parse_check_in_filters,
 )
+from app.api.human.models import Humans
 from app.api.payment.models import PaymentProducts, Payments
 from app.api.popup.models import Popups
 from app.api.product.models import Products
+from app.api.sales_flow.models import SalesFlows
 from app.api.shared.response import ListModel, PaginationLimit, PaginationSkip, Paging
 from app.api.user.models import Users
 from app.core.db import engine
@@ -37,6 +44,13 @@ from app.core.dependencies.users import (
     CurrentHuman,
     HumanTenantSession,
     TenantSession,
+)
+from app.core.filters import (
+    VALUELESS_OPS,
+    build_filter_expression,
+    escape_like,
+    text_condition_expression,
+    uuid_condition_expression,
 )
 
 router = APIRouter(prefix="/check-ins", tags=["check_in"])
@@ -203,71 +217,187 @@ async def confirm_my_check_in(
     )
 
 
+# ── Scan history ──────────────────────────────────────────────────────────────
+
+# Immutable snapshot first; legacy units minted before snapshots fall back to
+# the live product category.
+_CHECK_IN_CATEGORY = func.lower(
+    func.coalesce(AttendeeProducts.product_category_snapshot, Products.category)
+)
+# The flow the unit was sold through. Units with no payment (comped or
+# manually granted tickets) inherit the attendee's application flow.
+_CHECK_IN_SALES_FLOW_ID = func.coalesce(
+    Payments.sales_flow_id, Applications.sales_flow_id
+)
+_CHECK_IN_SOURCE = col(CheckIn.payload)["source"].astext
+
+
+def _join_check_in_context(statement):
+    """Join every table the scan-history filters, search and rows read.
+
+    All joins are many-to-one from check_ins, so they never duplicate rows
+    and the same joined statement serves both the page query and the count.
+    Humans is joined once, as the payment's buyer.
+    """
+    return (
+        statement.join(
+            AttendeeProducts,
+            col(AttendeeProducts.id) == col(CheckIn.attendee_product_id),
+        )
+        .join(Products, col(Products.id) == col(AttendeeProducts.product_id))
+        .outerjoin(Attendees, col(Attendees.id) == col(AttendeeProducts.attendee_id))
+        .outerjoin(Applications, col(Applications.id) == col(Attendees.application_id))
+        .outerjoin(Payments, col(Payments.id) == col(AttendeeProducts.payment_id))
+        .outerjoin(Humans, col(Humans.id) == col(Payments.buyer_human_id))
+        .outerjoin(
+            PaymentProducts,
+            col(PaymentProducts.id) == col(AttendeeProducts.payment_product_id),
+        )
+        .outerjoin(SalesFlows, col(SalesFlows.id) == _CHECK_IN_SALES_FLOW_ID)
+    )
+
+
+def _check_in_condition_expression(condition: CheckInFilterCondition):
+    """Scan-history conditions over joined columns; occurred_at uses the default."""
+    if condition.field == "product_id":
+        return uuid_condition_expression(
+            col(AttendeeProducts.product_id), condition.op, condition.uuid_value
+        )
+    if condition.field == "sales_flow_id":
+        value = None if condition.op in VALUELESS_OPS else condition.uuid_value
+        return uuid_condition_expression(_CHECK_IN_SALES_FLOW_ID, condition.op, value)
+    if condition.field == "product_category":
+        if condition.value == "other":
+            matches = and_(
+                _CHECK_IN_CATEGORY.is_not(None),
+                _CHECK_IN_CATEGORY.not_in(sorted(CHECK_IN_PRODUCT_CATEGORIES)),
+            )
+        else:
+            matches = _CHECK_IN_CATEGORY == condition.value
+        if condition.op == "eq":
+            return matches
+        return or_(_CHECK_IN_CATEGORY.is_(None), not_(matches))
+    if condition.field == "source":
+        return text_condition_expression(
+            _CHECK_IN_SOURCE, condition.op, condition.value
+        )
+    if condition.field == "has_attendee":
+        attendee_id = col(AttendeeProducts.attendee_id)
+        return attendee_id.is_not(None) if condition.value else attendee_id.is_(None)
+    return None
+
+
+def _check_in_search_expression(search: str):
+    """Case-insensitive match on who the unit belongs to, its code and product."""
+    term = f"%{escape_like(search.strip())}%"
+    columns = [
+        col(Attendees.name),
+        col(Attendees.email),
+        func.concat_ws(" ", Humans.first_name, Humans.last_name),
+        Humans.email,
+        col(Payments.buyer_snapshot)["buyer_name"].astext,
+        col(Payments.buyer_snapshot)["buyer_email"].astext,
+        col(AttendeeProducts.check_in_code),
+        col(Products.name),
+    ]
+    return or_(*(column.ilike(term, escape="\\") for column in columns))
+
+
+def _buyer_identity(
+    human: Humans | None, snapshot: dict | None
+) -> tuple[str | None, str | None]:
+    """Buyer name/email from the buyer Human, else the checkout snapshot."""
+    if human is not None:
+        return human.display_name, human.email
+    if snapshot:
+        name = snapshot.get("buyer_name")
+        email = snapshot.get("buyer_email")
+        return (str(name) if name else None, str(email) if email else None)
+    return None, None
+
+
 @router.get("", response_model=ListModel[CheckInListItem])
 async def list_check_ins(
     db: TenantSession,
     current_user: CurrentCheckInOperator,
     attendee_product_id: uuid.UUID | None = None,
     popup_id: uuid.UUID | None = None,
+    search: str | None = None,
+    filters: str | None = None,
     skip: PaginationSkip = 0,
     limit: PaginationLimit = 50,
 ) -> ListModel[CheckInListItem]:
-    """List check-ins with attendee + product names (BO only).
+    """List check-ins with attendee, buyer, product and flow context (BO only).
 
     Filters:
     - attendee_product_id: exact match on the ticket UUID
     - popup_id: exact match on the popup the scan happened in
+    - search: attendee or buyer name/email, check-in code, product name
+    - filters: JSON filter group
+      (``{"match": "all"|"any", "conditions": [{"field", "op", "value"}]}``)
+      over sales_flow_id, product_id, product_category, source,
+      has_attendee and occurred_at
 
     Ordered by occurred_at DESC. Tenant isolation is enforced both via the
     TenantSession (separate DB connection per tenant) and by an explicit
     tenant_id filter (defence-in-depth).
     """
+    parsed_filters = parse_check_in_filters(filters)
+
     # Tenant filter — explicit defence-in-depth on top of TenantSession/RLS.
     # current_user.tenant_id is None only for superadmins, who get their own
     # TenantSession for the X-Tenant-Id header's tenant anyway.
-    tenant_id_filter = current_user.tenant_id
-
-    # Build base statement with eager loads to avoid N+1
-    statement = select(CheckIn).options(
-        selectinload(CheckIn.attendee_product).selectinload(AttendeeProducts.attendee),  # type: ignore[arg-type]  # type: ignore[arg-type]
-        selectinload(CheckIn.attendee_product).selectinload(AttendeeProducts.product),  # type: ignore[arg-type]  # type: ignore[arg-type]
-    )
-
-    if tenant_id_filter is not None:
-        statement = statement.where(CheckIn.tenant_id == tenant_id_filter)
-
+    conditions = []
+    if current_user.tenant_id is not None:
+        conditions.append(CheckIn.tenant_id == current_user.tenant_id)
     if attendee_product_id is not None:
-        statement = statement.where(CheckIn.attendee_product_id == attendee_product_id)
-
+        conditions.append(CheckIn.attendee_product_id == attendee_product_id)
     if popup_id is not None:
-        statement = statement.where(CheckIn.popup_id == popup_id)
-
-    # Count total rows for pagination
-    count_statement = sa_select(func.count(CheckIn.id))
-    if tenant_id_filter is not None:
-        count_statement = count_statement.where(CheckIn.tenant_id == tenant_id_filter)
-    if attendee_product_id is not None:
-        count_statement = count_statement.where(
-            CheckIn.attendee_product_id == attendee_product_id
+        conditions.append(CheckIn.popup_id == popup_id)
+    if search and search.strip():
+        conditions.append(_check_in_search_expression(search))
+    if parsed_filters is not None:
+        expression = build_filter_expression(
+            parsed_filters, CheckIn, _check_in_condition_expression
         )
-    if popup_id is not None:
-        count_statement = count_statement.where(CheckIn.popup_id == popup_id)
+        if expression is not None:
+            conditions.append(expression)
 
+    count_statement = _join_check_in_context(
+        sa_select(func.count(CheckIn.id)).select_from(CheckIn)  # type: ignore[arg-type]
+    ).where(*conditions)
     total = db.exec(count_statement).one()
 
-    # Apply ordering and pagination to main statement
     statement = (
-        statement.order_by(CheckIn.occurred_at.desc())  # type: ignore[union-attr]
+        _join_check_in_context(
+            select(
+                CheckIn,
+                Humans,
+                Payments.buyer_snapshot,
+                PaymentProducts.quantity,
+                SalesFlows.id,
+                SalesFlows.name,
+            )
+        )
+        .where(*conditions)
+        .options(
+            selectinload(CheckIn.attendee_product).selectinload(
+                AttendeeProducts.attendee
+            ),  # type: ignore[arg-type]
+            selectinload(CheckIn.attendee_product).selectinload(
+                AttendeeProducts.product
+            ),  # type: ignore[arg-type]
+        )
+        .order_by(col(CheckIn.occurred_at).desc())
         .offset(skip)
         .limit(limit)
     )
-
-    events = list(db.exec(statement).all())
+    rows = list(db.exec(statement).all())
 
     # Resolve actor user details via the main engine — tenant_role lacks SELECT
     # on the users table by design. Mirrors the pattern used in
     # application_review/router._get_reviewer_details.
-    actor_ids = {e.actor_user_id for e in events if e.actor_user_id is not None}
+    actor_ids = {row[0].actor_user_id for row in rows if row[0].actor_user_id}
     actors_by_id: dict[uuid.UUID, Users] = {}
     if actor_ids:
         with Session(engine) as main_session:
@@ -278,15 +408,20 @@ async def list_check_ins(
             actors_by_id = {u.id: u for u in actor_rows}
 
     results = []
-    for event in events:
+    for event, buyer, buyer_snapshot, unit_count, flow_id, flow_name in rows:
         ap: AttendeeProducts | None = event.attendee_product  # type: ignore[attr-defined]
         attendee: Attendees | None = ap.attendee if ap else None  # type: ignore[union-attr]
         product: Products | None = ap.product if ap else None  # type: ignore[union-attr]
         actor = actors_by_id.get(event.actor_user_id) if event.actor_user_id else None
+        buyer_name, buyer_email = _buyer_identity(buyer, buyer_snapshot)
 
         source: str | None = None
         if event.payload and isinstance(event.payload, dict):
             source = event.payload.get("source")
+
+        category = (ap.product_category_snapshot if ap else None) or (
+            product.category if product else None
+        )
 
         results.append(
             CheckInListItem(
@@ -301,6 +436,14 @@ async def list_check_ins(
                 actor_user_name=actor.full_name if actor else None,
                 actor_user_email=actor.email if actor else None,
                 payload=event.payload,
+                check_in_code=ap.check_in_code if ap else None,
+                product_category=category.lower() if category else None,
+                unit_index=ap.unit_index if ap else None,
+                unit_count=unit_count,
+                buyer_name=buyer_name,
+                buyer_email=buyer_email,
+                sales_flow_id=flow_id,
+                sales_flow_name=flow_name,
             )
         )
 

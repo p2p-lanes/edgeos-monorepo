@@ -2,9 +2,12 @@
 
 import uuid
 from datetime import datetime
-from typing import Any, Literal
+from typing import Any, ClassVar, Literal
 
 from pydantic import BaseModel, ConfigDict
+from pydantic import Field as PydanticField
+
+from app.core.filters import FilterCondition, FilterField, FilterGroup, parse_filters
 
 
 class CheckInPayload(BaseModel):
@@ -93,5 +96,56 @@ class CheckInListItem(BaseModel):
     actor_user_name: str | None = None
     actor_user_email: str | None = None
     payload: dict | None = None  # full payload for expandable detail view
+    # Unit context. Ownerless units (merch with no participant) have no
+    # attendee, so the buyer is what identifies who the unit belongs to.
+    check_in_code: str | None = None
+    product_category: str | None = None
+    unit_index: int | None = None  # 0-based position within the order line
+    unit_count: int | None = None  # quantity of the order line
+    buyer_name: str | None = None
+    buyer_email: str | None = None
+    sales_flow_id: uuid.UUID | None = None
+    sales_flow_name: str | None = None
 
     model_config = ConfigDict(from_attributes=True)
+
+
+# Complex list filters (BO scan history), built on the shared engine in
+# app.core.filters. Every field is resolved through joins in the router:
+# product_category reads the unit's immutable snapshot, sales_flow_id the
+# purchasing payment's flow (falling back to the attendee's application).
+CHECK_IN_PRODUCT_CATEGORIES = frozenset({"ticket", "housing", "merch", "patreon"})
+
+CHECK_IN_FILTER_FIELDS: dict[str, FilterField] = {
+    "sales_flow_id": FilterField(
+        "uuid", frozenset({"eq", "neq", "is_empty", "not_empty"})
+    ),
+    "product_id": FilterField("uuid", frozenset({"eq", "neq"})),
+    "product_category": FilterField(
+        "select",
+        frozenset({"eq", "neq"}),
+        CHECK_IN_PRODUCT_CATEGORIES | {"other"},
+    ),
+    "source": FilterField(
+        "select", frozenset({"eq", "neq"}), frozenset({"qr", "manual", "self_service"})
+    ),
+    "has_attendee": FilterField("boolean", frozenset({"eq"})),
+    "occurred_at": FilterField("date", frozenset({"before", "after"})),
+}
+
+
+class CheckInFilterCondition(FilterCondition):
+    """One condition of the scan-history filter group."""
+
+    field_registry: ClassVar[dict[str, FilterField]] = CHECK_IN_FILTER_FIELDS
+
+
+class CheckInFilters(FilterGroup):
+    """Filter group for the BO scan-history list."""
+
+    conditions: list[CheckInFilterCondition] = PydanticField(default_factory=list)
+
+
+def parse_check_in_filters(raw: str | None) -> CheckInFilters | None:
+    """Parse the ``filters`` query param JSON into CheckInFilters (422 on bad input)."""
+    return parse_filters(raw, CheckInFilters)

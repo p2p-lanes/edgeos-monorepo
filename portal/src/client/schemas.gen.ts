@@ -7543,6 +7543,45 @@ export const AuthCodeSentResponseSchema = {
     description: 'Response after successfully sending auth code.'
 } as const;
 
+export const AuthorizationCodePublicSchema = {
+    properties: {
+        redirect_url: {
+            type: 'string',
+            title: 'Redirect Url'
+        }
+    },
+    type: 'object',
+    required: ['redirect_url'],
+    title: 'AuthorizationCodePublic'
+} as const;
+
+export const AuthorizationCodeRequestSchema = {
+    properties: {
+        state: {
+            type: 'string',
+            maxLength: 512,
+            minLength: 16,
+            pattern: '^[A-Za-z0-9._~-]+$',
+            title: 'State'
+        },
+        code_challenge: {
+            type: 'string',
+            maxLength: 43,
+            minLength: 43,
+            pattern: '^[A-Za-z0-9_-]+$',
+            title: 'Code Challenge'
+        },
+        code_challenge_method: {
+            type: 'string',
+            pattern: '^S256$',
+            title: 'Code Challenge Method'
+        }
+    },
+    type: 'object',
+    required: ['state', 'code_challenge', 'code_challenge_method'],
+    title: 'AuthorizationCodeRequest'
+} as const;
+
 export const AvailableScopesSchema = {
     properties: {
         token_scopes: {
@@ -11003,6 +11042,95 @@ export const CheckInListItemSchema = {
                 }
             ],
             title: 'Payload'
+        },
+        check_in_code: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Check In Code'
+        },
+        product_category: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Product Category'
+        },
+        unit_index: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Unit Index'
+        },
+        unit_count: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Unit Count'
+        },
+        buyer_name: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Buyer Name'
+        },
+        buyer_email: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Buyer Email'
+        },
+        sales_flow_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Sales Flow Id'
+        },
+        sales_flow_name: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Sales Flow Name'
         }
     },
     type: 'object',
@@ -14303,8 +14431,7 @@ export const EventPublicSchema = {
                 type: 'string'
             },
             type: 'array',
-            title: 'Warnings',
-            default: []
+            title: 'Warnings'
         },
         occurrence_id: {
             anyOf: [
@@ -24078,6 +24205,18 @@ export const PopupAdminSchema = {
             ],
             title: 'Theme Config'
         },
+        sidebar_config: {
+            anyOf: [
+                {
+                    additionalProperties: true,
+                    type: 'object'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Sidebar Config'
+        },
         favicon_url: {
             anyOf: [
                 {
@@ -24387,6 +24526,47 @@ export const PopupAdminSchema = {
     required: ['name', 'slug', 'tenant_id', 'id'],
     title: 'PopupAdmin',
     description: 'Admin popup schema — all fields including sensitive ones.'
+} as const;
+
+export const PopupAppPublicSchema = {
+    properties: {
+        app_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'App Id'
+        },
+        name: {
+            type: 'string',
+            title: 'Name'
+        },
+        enabled: {
+            type: 'boolean',
+            title: 'Enabled'
+        },
+        sso_configured: {
+            type: 'boolean',
+            title: 'Sso Configured'
+        },
+        launch_path: {
+            type: 'string',
+            title: 'Launch Path'
+        }
+    },
+    type: 'object',
+    required: ['app_id', 'name', 'enabled', 'sso_configured', 'launch_path'],
+    title: 'PopupAppPublic'
+} as const;
+
+export const PopupAppUpdateSchema = {
+    properties: {
+        enabled: {
+            type: 'boolean',
+            title: 'Enabled'
+        }
+    },
+    type: 'object',
+    required: ['enabled'],
+    title: 'PopupAppUpdate'
 } as const;
 
 export const PopupCheckInPublicSchema = {
@@ -24800,6 +24980,18 @@ export const PopupCreateSchema = {
                 }
             ],
             title: 'Theme Config'
+        },
+        sidebar_config: {
+            anyOf: [
+                {
+                    additionalProperties: true,
+                    type: 'object'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Sidebar Config'
         },
         favicon_url: {
             anyOf: [
@@ -25413,6 +25605,18 @@ export const PopupPublicSchema = {
                 }
             ],
             title: 'Theme Config'
+        },
+        sidebar_config: {
+            anyOf: [
+                {
+                    additionalProperties: true,
+                    type: 'object'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Sidebar Config'
         },
         favicon_url: {
             anyOf: [
@@ -26110,6 +26314,18 @@ export const PopupUpdateSchema = {
                 }
             ],
             title: 'Theme Config'
+        },
+        sidebar_config: {
+            anyOf: [
+                {
+                    additionalProperties: true,
+                    type: 'object'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Sidebar Config'
         },
         favicon_url: {
             anyOf: [
@@ -28913,6 +29129,70 @@ export const RuleMeasureSchema = {
     type: 'string',
     enum: ['count', 'distinct_days', 'streak_days'],
     title: 'RuleMeasure'
+} as const;
+
+export const SSOExchangePublicSchema = {
+    properties: {
+        access_token: {
+            type: 'string',
+            title: 'Access Token'
+        },
+        token_type: {
+            type: 'string',
+            title: 'Token Type',
+            default: 'bearer'
+        },
+        expires_in: {
+            type: 'integer',
+            title: 'Expires In'
+        }
+    },
+    type: 'object',
+    required: ['access_token', 'expires_in'],
+    title: 'SSOExchangePublic'
+} as const;
+
+export const SSOExchangeRequestSchema = {
+    properties: {
+        code: {
+            type: 'string',
+            maxLength: 43,
+            minLength: 43,
+            pattern: '^[A-Za-z0-9_-]+$',
+            title: 'Code'
+        },
+        redirect_uri: {
+            type: 'string',
+            maxLength: 2048,
+            title: 'Redirect Uri'
+        },
+        code_verifier: {
+            type: 'string',
+            maxLength: 128,
+            minLength: 43,
+            pattern: '^[A-Za-z0-9._~-]+$',
+            title: 'Code Verifier'
+        }
+    },
+    type: 'object',
+    required: ['code', 'redirect_uri', 'code_verifier'],
+    title: 'SSOExchangeRequest'
+} as const;
+
+export const SSOLaunchPublicSchema = {
+    properties: {
+        app_name: {
+            type: 'string',
+            title: 'App Name'
+        },
+        start_url: {
+            type: 'string',
+            title: 'Start Url'
+        }
+    },
+    type: 'object',
+    required: ['app_name', 'start_url'],
+    title: 'SSOLaunchPublic'
 } as const;
 
 export const SaleTypeSchema = {
@@ -33259,6 +33539,30 @@ export const TenantUpdateSchema = {
 
 export const ThirdPartyAppCreateSchema = {
     properties: {
+        sso_start_url: {
+            anyOf: [
+                {
+                    type: 'string',
+                    maxLength: 2048
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Sso Start Url'
+        },
+        sso_redirect_uri: {
+            anyOf: [
+                {
+                    type: 'string',
+                    maxLength: 2048
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Sso Redirect Uri'
+        },
         name: {
             type: 'string',
             maxLength: 100,
@@ -33325,6 +33629,28 @@ export const ThirdPartyAppCreatedSchema = {
         active: {
             type: 'boolean',
             title: 'Active'
+        },
+        sso_start_url: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Sso Start Url'
+        },
+        sso_redirect_uri: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Sso Redirect Uri'
         },
         last_used_at: {
             anyOf: [
@@ -33411,6 +33737,28 @@ export const ThirdPartyAppPublicSchema = {
             type: 'boolean',
             title: 'Active'
         },
+        sso_start_url: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Sso Start Url'
+        },
+        sso_redirect_uri: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Sso Redirect Uri'
+        },
         last_used_at: {
             anyOf: [
                 {
@@ -33456,6 +33804,30 @@ NEVER includes key_hash or any raw key material.`
 
 export const ThirdPartyAppUpdateSchema = {
     properties: {
+        sso_start_url: {
+            anyOf: [
+                {
+                    type: 'string',
+                    maxLength: 2048
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Sso Start Url'
+        },
+        sso_redirect_uri: {
+            anyOf: [
+                {
+                    type: 'string',
+                    maxLength: 2048
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Sso Redirect Uri'
+        },
         name: {
             anyOf: [
                 {

@@ -35,14 +35,18 @@ const siblingApplication = {
   info_not_shared: [],
 }
 
-function setup(hiddenFields: string[] = []) {
+function setup(hiddenFields: string[] = [], noApplication = false) {
   let serverApplication = {
     id: "primary-app",
     popup_id: "popup-1",
     sales_flow_id: "primary-flow",
     info_not_shared: hiddenFields,
   }
-  mocks.get.mockImplementation(async () => structuredClone(serverApplication))
+  mocks.get.mockImplementation(() =>
+    noApplication
+      ? Promise.reject(new Error("Application not found"))
+      : Promise.resolve(structuredClone(serverApplication)),
+  )
   mocks.update.mockImplementation(async ({ requestBody }) => {
     serverApplication = {
       ...serverApplication,
@@ -94,7 +98,6 @@ beforeEach(() => vi.clearAllMocks())
 describe("primary-flow directory sharing settings", () => {
   it("loads only the primary application and updates its explicit flow", async () => {
     setup(["email", "Residence"])
-    expect(mocks.get).not.toHaveBeenCalled()
     await open()
     expect(mocks.get).toHaveBeenCalledWith({
       popupId: "popup-1",
@@ -110,17 +113,13 @@ describe("primary-flow directory sharing settings", () => {
     })
   })
 
-  it("does not fall back to a sibling when no primary application exists", async () => {
-    setup()
-    mocks.get.mockRejectedValue(new Error("Application not found"))
-    fireEvent.click(
-      screen.getByRole("button", { name: "attendees.privacy_button" }),
+  it("hides sharing settings when no primary application exists", async () => {
+    setup([], true)
+    await waitFor(() =>
+      expect(
+        screen.queryByRole("button", { name: "attendees.privacy_button" }),
+      ).toBeNull(),
     )
-    await screen.findByText("attendees.privacy_no_application")
-    const saveButton = screen.getByRole("button", {
-      name: "attendees.privacy_save",
-    })
-    expect(saveButton.hasAttribute("disabled")).toBe(true)
     expect(screen.queryByRole("checkbox")).toBeNull()
     expect(mocks.update).not.toHaveBeenCalled()
   })
