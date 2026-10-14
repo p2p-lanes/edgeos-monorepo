@@ -71,6 +71,8 @@
     "buy_tickets": "Buy Tickets"
   },
   "portal": {
+    "complete_profile_reminder": "Add your first and last name to complete your profile.",
+    "complete_profile_action": "Complete profile",
     "no_active_popups": "No Active Popups",
     "no_active_popups_description": "There are no active popups available at the moment. Please check back later.",
     "no_profile": "No profile data available.",
@@ -733,6 +735,8 @@
     "privacy_button": "Sharing settings",
     "privacy_title": "Choose what you share",
     "privacy_description": "Choose which details other attendees can see in the directory.",
+    "directory_listed": "Show my profile in this directory",
+    "share_field": "Share {{field}}",
     "privacy_save": "Save settings",
     "privacy_saved": "Your sharing settings were saved.",
     "privacy_error": "Could not save your sharing settings.",

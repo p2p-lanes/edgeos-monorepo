@@ -57,6 +57,8 @@
     "buy_tickets": "购买门票"
   },
   "portal": {
+    "complete_profile_reminder": "请填写您的名字和姓氏以完善个人资料。",
+    "complete_profile_action": "完善个人资料",
     "no_active_popups": "暂无活动",
     "no_active_popups_description": "目前没有可用的活动。请稍后再来查看。",
     "no_profile": "没有可用的个人资料数据。",
@@ -613,6 +615,8 @@
     "privacy_button": "共享设置",
     "privacy_title": "选择要共享的信息",
     "privacy_description": "选择其他参与者可以在名录中看到哪些信息。",
+    "directory_listed": "在此名录中显示我的资料",
+    "share_field": "分享{{field}}",
     "privacy_save": "保存设置",
     "privacy_saved": "共享设置已保存。",
     "privacy_error": "无法保存共享设置。",

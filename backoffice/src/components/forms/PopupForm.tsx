@@ -43,6 +43,10 @@ import { DangerZone } from "@/components/Common/DangerZone"
 import { FieldError } from "@/components/Common/FieldError"
 import { FormErrorSummary } from "@/components/Common/FormErrorSummary"
 import { ApprovalStrategyForm } from "@/components/forms/ApprovalStrategyForm"
+import {
+  type DirectoryFieldConfig,
+  DirectoryFieldsEditor,
+} from "@/components/forms/DirectoryFieldsEditor"
 import { PopupHomeEditor } from "@/components/forms/PopupHomeEditor"
 import {
   type PopupSidebarConfig,
@@ -307,6 +311,8 @@ export function PopupForm({
       edit_passes_enabled: defaultValues?.edit_passes_enabled ?? false,
       self_check_in_enabled: defaultValues?.self_check_in_enabled ?? false,
       show_attendee_directory: defaultValues?.show_attendee_directory ?? false,
+      directory_fields: (defaultValues?.directory_fields ??
+        []) as DirectoryFieldConfig[],
       badges_enabled: defaultValues?.badges_enabled ?? false,
       group_private_events_enabled:
         defaultValues?.group_private_events_enabled ?? false,
@@ -363,6 +369,7 @@ export function PopupForm({
         show_attendee_directory:
           (isEdit ? takesApplications : value.sale_type === "application") &&
           value.show_attendee_directory,
+        directory_fields: value.directory_fields,
         group_private_events_enabled: value.group_private_events_enabled,
         ...(isEdit && canCustomizeSidebar
           ? {
@@ -1034,6 +1041,15 @@ export function PopupForm({
                               disabled={readOnly}
                             />
                           </InlineRow>
+                        )}
+                      </form.Field>
+                      <form.Field name="directory_fields">
+                        {(field) => (
+                          <DirectoryFieldsEditor
+                            fields={field.state.value}
+                            onChange={field.handleChange}
+                            disabled={readOnly}
+                          />
                         )}
                       </form.Field>
                     </InlineSection>

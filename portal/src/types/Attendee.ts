@@ -57,6 +57,7 @@ export interface AttendeeDirectory {
   residence: string | null
   age: string | null
   gender: string | null
+  fields?: Array<{ id: string; label: string; value: string | null }>
   picture_url: string | null
   participation: DirectoryProduct[]
   check_in: string | null

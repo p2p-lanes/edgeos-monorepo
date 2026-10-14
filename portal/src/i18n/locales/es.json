@@ -71,6 +71,8 @@
     "buy_tickets": "Comprar tickets"
   },
   "portal": {
+    "complete_profile_reminder": "Agregá tu nombre y apellido para completar tu perfil.",
+    "complete_profile_action": "Completar perfil",
     "no_active_popups": "Sin eventos activos",
     "no_active_popups_description": "No hay eventos activos disponibles en este momento. Por favor, vuelve más tarde.",
     "no_profile": "No hay datos de perfil disponibles.",
@@ -732,6 +734,8 @@
     "privacy_button": "Configurar datos compartidos",
     "privacy_title": "Elegí qué datos compartir",
     "privacy_description": "Elegí qué información pueden ver otros asistentes en el directorio.",
+    "directory_listed": "Mostrar mi perfil en este directorio",
+    "share_field": "Compartir {{field}}",
     "privacy_save": "Guardar preferencias",
     "privacy_saved": "Se guardaron tus preferencias de privacidad.",
     "privacy_error": "No se pudieron guardar tus preferencias.",

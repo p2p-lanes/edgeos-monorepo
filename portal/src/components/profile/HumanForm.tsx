@@ -42,6 +42,9 @@ const HumanForm = ({
   const [isHovering, setIsHovering] = useState(false)
   const [isUploading, setIsUploading] = useState(false)
   const [showLinkedEmails, setShowLinkedEmails] = useState(false)
+  const hasRequiredNames = Boolean(
+    editForm.first_name?.trim() && editForm.last_name?.trim(),
+  )
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const profileFieldLabel = (field: "gender" | "age" | "residence") =>
@@ -173,6 +176,7 @@ const HumanForm = ({
             <Button
               size="sm"
               onClick={handleSave}
+              disabled={!hasRequiredNames}
               className="bg-primary hover:bg-primary/90 text-primary-foreground"
             >
               <Save className="w-4 h-4 mr-2" />
@@ -271,6 +275,7 @@ const HumanForm = ({
                 </Label>
                 <Input
                   id="first_name"
+                  required
                   value={editForm.first_name ?? ""}
                   onChange={(e) =>
                     setEditForm({ ...editForm, first_name: e.target.value })
@@ -287,6 +292,7 @@ const HumanForm = ({
                 </Label>
                 <Input
                   id="last_name"
+                  required
                   value={editForm.last_name ?? ""}
                   onChange={(e) =>
                     setEditForm({ ...editForm, last_name: e.target.value })

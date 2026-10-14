@@ -12,6 +12,10 @@ vi.mock("@/components/Authentication", () => ({
   default: ({ children }: { children: React.ReactNode }) => <>{children}</>,
 }))
 
+vi.mock("@/components/profile/ProfileCompletionReminder", () => ({
+  default: () => null,
+}))
+
 vi.mock("@/components/Providers", () => ({
   default: ({ children }: { children: React.ReactNode }) => <>{children}</>,
 }))

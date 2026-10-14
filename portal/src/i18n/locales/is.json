@@ -57,6 +57,8 @@
     "buy_tickets": "Kaupa miða"
   },
   "portal": {
+    "complete_profile_reminder": "Skráðu fornafn og eftirnafn til að ljúka prófílnum þínum.",
+    "complete_profile_action": "Ljúka prófíl",
     "no_active_popups": "Engir virkir viðburðir",
     "no_active_popups_description": "Engir virkir viðburðir eru í boði núna. Vinsamlegast athugaðu aftur síðar.",
     "no_profile": "Engar prófílupplýsingar í boði.",
@@ -604,6 +606,8 @@
     "privacy_button": "Stillingar miðlunar",
     "privacy_title": "Veldu hvað þú deilir",
     "privacy_description": "Veldu hvaða upplýsingar aðrir þátttakendur geta séð í skránni.",
+    "directory_listed": "Sýna prófílinn minn í þessari skrá",
+    "share_field": "Deila {{field}}",
     "privacy_save": "Vista stillingar",
     "privacy_saved": "Stillingar þínar voru vistaðar.",
     "privacy_error": "Ekki tókst að vista stillingarnar þínar.",
