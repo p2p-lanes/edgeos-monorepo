@@ -1,7 +1,7 @@
 """Add popup-scoped directory privacy and category eligibility.
 
 Revision ID: df42b9a8c107
-Revises: c9f4a2b7d1e6
+Revises: e8a4f1c7d2b6
 """
 
 import sqlalchemy as sa
@@ -14,7 +14,7 @@ from app.alembic.utils import (
 )
 
 revision = "df42b9a8c107"
-down_revision = "c9f4a2b7d1e6"
+down_revision = "e8a4f1c7d2b6"
 branch_labels = None
 depends_on = None
 
