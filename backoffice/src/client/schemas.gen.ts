@@ -5526,6 +5526,11 @@ export const AttendeeCategoryCreateSchema = {
             title: 'Sort Order',
             default: 0
         },
+        directory_eligible: {
+            type: 'boolean',
+            title: 'Directory Eligible',
+            default: false
+        },
         max_per_application: {
             anyOf: [
                 {
@@ -5588,6 +5593,11 @@ export const AttendeeCategoryPublicSchema = {
         is_primary: {
             type: 'boolean',
             title: 'Is Primary',
+            default: false
+        },
+        directory_eligible: {
+            type: 'boolean',
+            title: 'Directory Eligible',
             default: false
         },
         sort_order: {
@@ -5676,6 +5686,17 @@ export const AttendeeCategoryUpdateSchema = {
                 }
             ],
             title: 'Sort Order'
+        },
+        directory_eligible: {
+            anyOf: [
+                {
+                    type: 'boolean'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Directory Eligible'
         },
         max_per_application: {
             anyOf: [
@@ -7270,6 +7291,24 @@ export const AttendeesDirectoryEntrySchema = {
                 }
             ],
             title: 'Category'
+        },
+        fields: {
+            items: {
+                additionalProperties: {
+                    anyOf: [
+                        {
+                            type: 'string'
+                        },
+                        {
+                            type: 'null'
+                        }
+                    ]
+                },
+                type: 'object'
+            },
+            type: 'array',
+            title: 'Fields',
+            default: []
         },
         participation: {
             items: {
@@ -12587,6 +12626,22 @@ export const DirectoryProductSchema = {
     required: ['id', 'name', 'slug'],
     title: 'DirectoryProduct',
     description: 'Minimal product info for directory participation display.'
+} as const;
+
+export const DirectoryValuesUpdateSchema = {
+    properties: {
+        values: {
+            additionalProperties: {
+                type: 'string'
+            },
+            type: 'object',
+            title: 'Values'
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    required: ['values'],
+    title: 'DirectoryValuesUpdate'
 } as const;
 
 export const DistributionSchema = {
@@ -19081,6 +19136,58 @@ export const HumanCreateSchema = {
     description: 'Human schema for creation.'
 } as const;
 
+export const HumanDirectorySettingsPublicSchema = {
+    properties: {
+        popup_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Popup Id'
+        },
+        listed: {
+            type: 'boolean',
+            title: 'Listed'
+        },
+        shared_fields: {
+            items: {
+                type: 'string'
+            },
+            type: 'array',
+            title: 'Shared Fields'
+        },
+        available_fields: {
+            items: {
+                additionalProperties: true,
+                type: 'object'
+            },
+            type: 'array',
+            title: 'Available Fields'
+        }
+    },
+    type: 'object',
+    required: ['popup_id', 'listed', 'shared_fields', 'available_fields'],
+    title: 'HumanDirectorySettingsPublic'
+} as const;
+
+export const HumanDirectorySettingsUpdateSchema = {
+    properties: {
+        listed: {
+            type: 'boolean',
+            title: 'Listed'
+        },
+        shared_fields: {
+            items: {
+                type: 'string'
+            },
+            type: 'array',
+            title: 'Shared Fields'
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    required: ['listed', 'shared_fields'],
+    title: 'HumanDirectorySettingsUpdate'
+} as const;
+
 export const HumanEnrichmentFactCreateSchema = {
     properties: {
         field: {
@@ -24646,6 +24753,14 @@ export const PopupAdminSchema = {
             title: 'Show Attendee Directory',
             default: false
         },
+        directory_fields: {
+            items: {
+                additionalProperties: true,
+                type: 'object'
+            },
+            type: 'array',
+            title: 'Directory Fields'
+        },
         badges_enabled: {
             type: 'boolean',
             title: 'Badges Enabled',
@@ -26030,6 +26145,15 @@ export const PopupPublicSchema = {
             title: 'Show Attendee Directory',
             default: false
         },
+        directory_fields: {
+            items: {
+                additionalProperties: true,
+                type: 'object'
+            },
+            type: 'array',
+            title: 'Directory Fields',
+            default: []
+        },
         badges_enabled: {
             type: 'boolean',
             title: 'Badges Enabled',
@@ -26792,6 +26916,21 @@ export const PopupUpdateSchema = {
                 }
             ],
             title: 'Show Attendee Directory'
+        },
+        directory_fields: {
+            anyOf: [
+                {
+                    items: {
+                        additionalProperties: true,
+                        type: 'object'
+                    },
+                    type: 'array'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Directory Fields'
         },
         badges_enabled: {
             anyOf: [

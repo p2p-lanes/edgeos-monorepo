@@ -33,6 +33,7 @@ from app.api.application.schemas import (
     CompanionParticipation,
     DetachCompanionRequest,
     DirectoryProduct,
+    DirectoryValuesUpdate,
     GrantCreditRequest,
     GrantCreditResponse,
     NoParticipation,
@@ -1392,14 +1393,126 @@ def _build_directory_entry(attendee) -> AttendeesDirectoryEntry:
     # info_not_shared masking belongs to the main applicant's own application.
     # Forms store labels like "Email", while directory keys are lowercase.
     # Normalize on read without changing the stored form selections.
-    info_hidden = (
-        {field.strip().casefold() for field in (application.info_not_shared or [])}
-        if (is_main and application)
+    directory_settings = next(
+        (
+            setting
+            for setting in (human.directory_settings if human else [])
+            if setting.popup_id == attendee.popup_id
+        ),
+        None,
+    )
+    shared_fields = (
+        set(directory_settings.shared_fields) if directory_settings else set()
+    )
+    from app.api.application.directory import directory_fields_for_popup
+
+    directory_fields = directory_fields_for_popup(getattr(attendee, "popup", None))
+    enabled_fields = {
+        field["id"]
+        for field in directory_fields
+        if isinstance(field, dict)
+        and isinstance(field.get("id"), str)
+        and field.get("shareable", True)
+    }
+    legacy_hidden = (
+        {
+            {
+                "role_in_the_organization": "role",
+                "organization_you_represent": "organization",
+            }.get(item.strip().casefold(), item.strip().casefold())
+            for item in (application.info_not_shared or [])
+        }
+        if is_main and application
         else set()
     )
 
+    def resolve_field(field: dict) -> str | None:
+        source = field.get("source")
+        key = field.get("key")
+        if not isinstance(key, str):
+            return None
+        if (
+            source == "human"
+            and human
+            and key
+            in {
+                "first_name",
+                "last_name",
+                "email",
+                "telegram",
+                "residence",
+                "age",
+                "gender",
+            }
+        ):
+            value = getattr(human, key, None)
+        elif source == "application" and application and is_main:
+            value = (application.custom_fields or {}).get(key)
+        elif source == "attendee":
+            value = (attendee.additional_data or {}).get(key)
+        else:
+            value = None
+        return value if isinstance(value, str) and value.strip() else None
+
+    dynamic_fields = [
+        {
+            "id": field["id"],
+            "label": field.get("label", field["id"]),
+            "value": (
+                resolve_field(field)
+                if field["id"] in shared_fields and field["id"] not in legacy_hidden
+                else None
+            ),
+        }
+        for field in directory_fields
+        if isinstance(field, dict)
+        and isinstance(field.get("id"), str)
+        and field.get("shareable", True)
+    ]
+
+    field_aliases = {
+        "role": {"role", "role_in_the_organization"},
+        "organization": {"organization", "organization_you_represent"},
+    }
+
+    def matching_configured_ids(field: str) -> set[str]:
+        aliases = field_aliases.get(field, {field})
+        return {
+            configured["id"]
+            for configured in directory_fields
+            if isinstance(configured, dict)
+            and configured.get("source")
+            in {
+                "human"
+                if field
+                in {
+                    "first_name",
+                    "last_name",
+                    "email",
+                    "telegram",
+                    "residence",
+                    "age",
+                    "gender",
+                }
+                else "application"
+            }
+            and configured.get("key") in aliases
+            and isinstance(configured.get("id"), str)
+            and configured.get("shareable", True)
+        }
+
+    def is_enabled(field: str) -> bool:
+        return field in enabled_fields or bool(matching_configured_ids(field))
+
+    def is_shared(field: str) -> bool:
+        return field in shared_fields or bool(
+            matching_configured_ids(field) & shared_fields
+        )
+
     def mask(field: str, value: str | None) -> str | None:
-        return "*" if field.casefold() in info_hidden else value
+        if not is_enabled(field):
+            return None
+        return value if is_shared(field) and field not in legacy_hidden else "*"
 
     # Each AttendeeProducts row is one ticket — dedupe by product_id so the
     # directory shows each product once even if the attendee holds several
@@ -1454,6 +1567,7 @@ def _build_directory_entry(attendee) -> AttendeesDirectoryEntry:
         picture_url=human.picture_url if human else None,
         participation=products,
         category=attendee.category,
+        fields=dynamic_fields,
         associated_attendees=[],
     )
 
@@ -1533,6 +1647,45 @@ async def list_attendees_directory(
     )
 
 
+@router.put(
+    "/my/directory/{popup_id}/profile-data",
+    response_model=dict[str, str],
+    summary="Update your popup-specific directory data",
+    dependencies=[needs("portal:profile:write")],
+)
+async def update_my_directory_values(
+    popup_id: uuid.UUID,
+    body: DirectoryValuesUpdate,
+    db: HumanTenantSession,
+    current_human: CurrentHuman,
+) -> dict[str, str]:
+    try:
+        return crud.applications_crud.update_directory_values(
+            db, popup_id, current_human.id, body.values
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
+@router.get(
+    "/my/directory/{popup_id}/profile-data",
+    response_model=dict[str, str],
+    summary="Get your popup-specific directory data",
+    dependencies=[needs("portal:profile:read")],
+)
+async def get_my_directory_values(
+    popup_id: uuid.UUID,
+    db: HumanTenantSession,
+    current_human: CurrentHuman,
+) -> dict[str, str]:
+    try:
+        return crud.applications_crud.get_directory_values(
+            db, popup_id, current_human.id
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
 @router.get(
     "/my/directory/{popup_id}/csv",
     summary="Export the attendees directory for a popup as CSV",
@@ -1569,6 +1722,30 @@ async def export_attendees_directory_csv(
 
     output = io.StringIO()
     writer = csv.writer(output)
+    from app.api.popup.crud import popups_crud
+
+    popup = popups_crud.get(db, popup_id)
+    from app.api.application.directory import directory_fields_for_popup
+
+    configured_fields = [
+        field
+        for field in (directory_fields_for_popup(popup) if popup else [])
+        if isinstance(field, dict)
+        and isinstance(field.get("id"), str)
+        and field.get("shareable", True)
+        and field["id"]
+        not in {
+            "first_name",
+            "last_name",
+            "email",
+            "telegram",
+            "role",
+            "organization",
+            "residence",
+            "age",
+            "gender",
+        }
+    ]
     writer.writerow(
         [
             "First Name",
@@ -1580,9 +1757,11 @@ async def export_attendees_directory_csv(
             "Residence",
             "Age",
             "Gender",
+            *(field.get("label", field["id"]) for field in configured_fields),
         ]
     )
     for e in entries:
+        values = {field["id"]: field["value"] for field in e.fields}
         writer.writerow(
             [
                 e.first_name or "",
@@ -1594,6 +1773,7 @@ async def export_attendees_directory_csv(
                 e.residence or "",
                 e.age or "",
                 e.gender or "",
+                *(values.get(field["id"]) or "" for field in configured_fields),
             ]
         )
 

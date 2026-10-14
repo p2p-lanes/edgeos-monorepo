@@ -882,6 +882,10 @@ class AttendeesDirectoryEntry(BaseModel):
     # Attendee category key (main/spouse/kid/...) so the UI can badge companions
     category: str | None = None
 
+    # Configurable popup fields, masked with the same per-human preferences as
+    # the standard compatibility properties above.
+    fields: list[dict[str, str | None]] = []
+
     # Participation
     participation: list[DirectoryProduct] = []
 
@@ -890,3 +894,9 @@ class AttendeesDirectoryEntry(BaseModel):
     associated_attendees: list[AssociatedAttendee] = []
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class DirectoryValuesUpdate(BaseModel):
+    values: dict[str, str]
+
+    model_config = ConfigDict(extra="forbid")

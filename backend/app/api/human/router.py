@@ -26,6 +26,8 @@ from app.api.human.schemas import (
     HumanCommentPublic,
     HumanCommentUpdate,
     HumanCreate,
+    HumanDirectorySettingsPublic,
+    HumanDirectorySettingsUpdate,
     HumanEnrichmentFactCreate,
     HumanEnrichmentFactPublic,
     HumanPortalPublic,
@@ -208,6 +210,75 @@ async def update_current_human(
 
     updated = crud.update(db, human, human_in)
     return HumanSelfPublic.model_validate(updated)
+
+
+@router.get(
+    "/me/directory/{popup_id}",
+    response_model=HumanDirectorySettingsPublic,
+    summary="Get your directory privacy settings for a popup",
+    dependencies=[needs("portal:profile:read")],
+)
+async def get_my_directory_settings(
+    popup_id: uuid.UUID,
+    current_human: CurrentHuman,
+    db: HumanTenantSession,
+) -> HumanDirectorySettingsPublic:
+    human = crud.get(db, current_human.id)
+    if not human:
+        raise HTTPException(status_code=404, detail="Human not found")
+    try:
+        settings = crud.get_directory_settings(db, human, popup_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    from app.api.application.directory import directory_fields_for_popup
+    from app.api.popup.models import Popups
+
+    popup = db.get(Popups, popup_id)
+    return HumanDirectorySettingsPublic(
+        popup_id=popup_id,
+        listed=settings.listed,
+        shared_fields=settings.shared_fields,
+        available_fields=[
+            field
+            for field in (directory_fields_for_popup(popup) if popup else [])
+            if isinstance(field, dict) and field.get("shareable", True)
+        ],
+    )
+
+
+@router.put(
+    "/me/directory/{popup_id}",
+    response_model=HumanDirectorySettingsPublic,
+    summary="Update your directory privacy settings for a popup",
+    dependencies=[needs("portal:profile:write")],
+)
+async def update_my_directory_settings(
+    popup_id: uuid.UUID,
+    data: HumanDirectorySettingsUpdate,
+    current_human: CurrentHuman,
+    db: HumanTenantSession,
+) -> HumanDirectorySettingsPublic:
+    human = crud.get(db, current_human.id)
+    if not human:
+        raise HTTPException(status_code=404, detail="Human not found")
+    try:
+        settings = crud.update_directory_settings(db, human, popup_id, data)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    from app.api.application.directory import directory_fields_for_popup
+    from app.api.popup.models import Popups
+
+    popup = db.get(Popups, popup_id)
+    return HumanDirectorySettingsPublic(
+        popup_id=popup_id,
+        listed=settings.listed,
+        shared_fields=settings.shared_fields,
+        available_fields=[
+            field
+            for field in (directory_fields_for_popup(popup) if popup else [])
+            if isinstance(field, dict) and field.get("shareable", True)
+        ],
+    )
 
 
 def _ensure_public_profile_token(db, human) -> str:

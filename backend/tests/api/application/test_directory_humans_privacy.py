@@ -26,7 +26,7 @@ from app.api.event.models import Events
 from app.api.event.schemas import EventStatus
 from app.api.event_participant.models import EventParticipants
 from app.api.event_participant.schemas import ParticipantStatus
-from app.api.human.models import Humans
+from app.api.human.models import HumanDirectorySettings, Humans
 from app.api.popup.models import Popups
 from app.api.product.models import Products
 from app.api.tenant.models import Tenants
@@ -58,6 +58,9 @@ def _category(
     if is_primary:
         existing = attendee_categories_crud.get_primary_for_flow(db, flow_id)
         if existing is not None:
+            existing.directory_eligible = True
+            db.add(existing)
+            db.commit()
             return existing
     cat = AttendeeCategories(
         tenant_id=popup.tenant_id,
@@ -66,6 +69,7 @@ def _category(
         key=key,
         label=key.capitalize(),
         is_primary=is_primary,
+        directory_eligible=is_primary or key == "spouse",
     )
     db.add(cat)
     db.commit()
@@ -151,6 +155,25 @@ def _attendee(
     db.add(attendee)
     db.commit()
     db.refresh(attendee)
+    hidden_fields = (
+        {item.strip().casefold() for item in app.info_not_shared or []}
+        if app.human_id == human.id
+        else set()
+    )
+    db.add(
+        HumanDirectorySettings(
+            tenant_id=popup.tenant_id,
+            human_id=human.id,
+            popup_id=popup.id,
+            listed=True,
+            shared_fields=[
+                field
+                for field in ("first_name", "last_name", "email", "telegram")
+                if field not in hidden_fields
+            ],
+        )
+    )
+    db.commit()
     if tickets:
         prod = product or _product(db, popup)
         for _ in range(tickets):
