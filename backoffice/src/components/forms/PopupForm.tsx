@@ -1046,6 +1046,7 @@ export function PopupForm({
                       <form.Field name="directory_fields">
                         {(field) => (
                           <DirectoryFieldsEditor
+                            popupId={defaultValues?.id}
                             fields={field.state.value}
                             onChange={field.handleChange}
                             disabled={readOnly}

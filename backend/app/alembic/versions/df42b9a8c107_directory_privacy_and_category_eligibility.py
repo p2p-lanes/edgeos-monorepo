@@ -39,14 +39,58 @@ def upgrade() -> None:
         ),
     )
     op.execute(
-        "UPDATE popups SET directory_fields = '["
-        '{"id":"first_name","label":"First name","source":"human","key":"first_name"},'
-        '{"id":"last_name","label":"Last name","source":"human","key":"last_name"},'
-        '{"id":"email","label":"Email","source":"human","key":"email"},'
-        '{"id":"telegram","label":"Telegram","source":"human","key":"telegram"},'
-        '{"id":"role","label":"Role","source":"application","key":"role"},'
-        '{"id":"organization","label":"Organization","source":"application","key":"organization"}'
-        "]'::jsonb WHERE show_attendee_directory = true"
+        sa.text(
+            """
+            UPDATE popups AS popup
+            SET directory_fields = '[
+                {"id":"first_name","label":"First name","source":"human","key":"first_name"},
+                {"id":"last_name","label":"Last name","source":"human","key":"last_name"},
+                {"id":"email","label":"Email","source":"human","key":"email"},
+                {"id":"telegram","label":"Telegram","source":"human","key":"telegram"}
+            ]'::jsonb || COALESCE((
+                SELECT jsonb_agg(jsonb_build_object(
+                    'id', field.canonical_id,
+                    'label', CASE field.canonical_id
+                        WHEN 'role' THEN 'Role'
+                        WHEN 'organization' THEN 'Organization'
+                    END,
+                    'source', 'application',
+                    'key', field.name
+                ) ORDER BY field.position)
+                FROM (
+                    SELECT DISTINCT ON (candidate.canonical_id)
+                        candidate.name,
+                        candidate.position,
+                        candidate.canonical_id
+                    FROM (
+                        SELECT
+                            form_field.name,
+                            form_field.position,
+                            CASE
+                                WHEN form_field.name IN ('role', 'role_in_the_organization')
+                                    THEN 'role'
+                                WHEN form_field.name IN ('organization', 'organization_you_represent')
+                                    THEN 'organization'
+                            END AS canonical_id
+                        FROM formfields AS form_field
+                        JOIN sales_flows AS flow
+                          ON flow.id = form_field.sales_flow_id
+                        WHERE form_field.popup_id = popup.id
+                          AND flow.is_default IS TRUE
+                          AND flow.type = 'application'
+                          AND form_field.name IN (
+                              'role', 'role_in_the_organization',
+                              'organization', 'organization_you_represent'
+                          )
+                    ) AS candidate
+                    ORDER BY candidate.canonical_id,
+                             (candidate.name = candidate.canonical_id) DESC,
+                             candidate.position
+                ) AS field
+            ), '[]'::jsonb)
+            WHERE popup.show_attendee_directory IS TRUE
+            """
+        )
     )
     # Preserve the legacy directory population during rollout. Future
     # eligibility is an explicit category setting, not inferred from its key.
@@ -96,7 +140,7 @@ def upgrade() -> None:
         "(id, tenant_id, human_id, popup_id, listed, shared_fields) "
         "SELECT gen_random_uuid(), at.tenant_id, at.human_id, at.popup_id, true, "
         "ARRAY(SELECT field FROM unnest(ARRAY['first_name','last_name','email',"
-        "'telegram','role','organization']::text[]) AS field "
+        "'telegram']::text[]) AS field "
         "WHERE NOT EXISTS (SELECT 1 FROM applications a "
         "CROSS JOIN unnest(a.info_not_shared) AS hidden "
         "WHERE a.human_id = at.human_id AND a.popup_id = at.popup_id "

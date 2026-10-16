@@ -13,7 +13,7 @@ vi.mock("@/components/Authentication", () => ({
 }))
 
 vi.mock("@/components/profile/ProfileCompletionReminder", () => ({
-  default: () => null,
+  default: () => <div data-testid="profile-completion-reminder" />,
 }))
 
 vi.mock("@/components/Providers", () => ({
@@ -127,6 +127,9 @@ describe("PortalShell", () => {
     )
 
     expect(document.querySelector("header")).toBeNull()
+    expect(
+      document.querySelector("[data-testid='profile-completion-reminder']"),
+    ).toBeNull()
     expectPortalBoundary(getByTestId)
   })
 

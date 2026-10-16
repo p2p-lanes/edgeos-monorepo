@@ -1447,7 +1447,19 @@ def _build_directory_entry(attendee) -> AttendeesDirectoryEntry:
         ):
             value = getattr(human, key, None)
         elif source == "application" and application and is_main:
-            value = (application.custom_fields or {}).get(key)
+            aliases = {
+                "role": ("role", "role_in_the_organization"),
+                "organization": ("organization", "organization_you_represent"),
+            }.get(key, (key,))
+            custom_fields = application.custom_fields or {}
+            value = next(
+                (
+                    custom_fields.get(alias)
+                    for alias in aliases
+                    if custom_fields.get(alias)
+                ),
+                None,
+            )
         elif source == "attendee":
             value = (attendee.additional_data or {}).get(key)
         else:

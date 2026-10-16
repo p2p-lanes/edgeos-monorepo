@@ -57,7 +57,8 @@
     "buy_tickets": "购买门票"
   },
   "portal": {
-    "complete_profile_reminder": "请填写您的名字和姓氏以完善个人资料。",
+    "complete_profile_title": "完善个人资料",
+    "complete_profile_reminder": "请填写您的名字和姓氏以补充基本信息。",
     "complete_profile_action": "完善个人资料",
     "no_active_popups": "暂无活动",
     "no_active_popups_description": "目前没有可用的活动。请稍后再来查看。",
@@ -682,6 +683,10 @@
     "header_subtitle": "管理您在 {{tenant}} 的体验和历史",
     "invoices": "发票",
     "edit_profile": "编辑资料",
+    "basic_information": "基本信息",
+    "basic_information_description": "完善个人资料需要填写名字和姓氏。",
+    "name_required_hint": "请填写名字和姓氏后保存个人资料。",
+    "additional_details": "补充信息",
     "age": "年龄",
     "residence": "居住地",
     "hide_linked_emails": "隐藏关联邮箱",

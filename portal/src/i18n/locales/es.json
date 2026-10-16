@@ -71,7 +71,8 @@
     "buy_tickets": "Comprar tickets"
   },
   "portal": {
-    "complete_profile_reminder": "Agregá tu nombre y apellido para completar tu perfil.",
+    "complete_profile_title": "Completá tu perfil",
+    "complete_profile_reminder": "Agregá tu nombre y apellido para completar los datos básicos.",
     "complete_profile_action": "Completar perfil",
     "no_active_popups": "Sin eventos activos",
     "no_active_popups_description": "No hay eventos activos disponibles en este momento. Por favor, vuelve más tarde.",
@@ -802,6 +803,10 @@
     "header_subtitle": "Administrá tu experiencia e historial en {{tenant}}",
     "invoices": "Facturas",
     "edit_profile": "Editar perfil",
+    "basic_information": "Datos básicos",
+    "basic_information_description": "Tu nombre y apellido son necesarios para completar tu perfil.",
+    "name_required_hint": "Ingresá ambos nombres para guardar tu perfil.",
+    "additional_details": "Datos adicionales",
     "age": "Edad",
     "residence": "Lugar de residencia",
     "hide_linked_emails": "Ocultar emails vinculados",

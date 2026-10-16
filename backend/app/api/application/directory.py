@@ -7,13 +7,6 @@ DEFAULT_DIRECTORY_FIELDS: list[dict[str, Any]] = [
     {"id": "last_name", "label": "Last name", "source": "human", "key": "last_name"},
     {"id": "email", "label": "Email", "source": "human", "key": "email"},
     {"id": "telegram", "label": "Telegram", "source": "human", "key": "telegram"},
-    {"id": "role", "label": "Role", "source": "application", "key": "role"},
-    {
-        "id": "organization",
-        "label": "Organization",
-        "source": "application",
-        "key": "organization",
-    },
 ]
 
 

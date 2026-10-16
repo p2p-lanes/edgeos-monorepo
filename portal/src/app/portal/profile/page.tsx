@@ -51,6 +51,9 @@ export default function ProfileContent() {
       residence: profile.residence,
       picture_url: profile.picture_url,
     })
+    if (!profile.first_name?.trim() || !profile.last_name?.trim()) {
+      setIsEditing(true)
+    }
   }, [profile])
 
   useEffect(() => {

@@ -264,80 +264,102 @@ const HumanForm = ({
             )}
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
-            <div className="space-y-4">
+          <div className="space-y-5">
+            <section className="space-y-4 rounded-lg border border-border bg-background p-4">
               <div>
-                <Label
-                  htmlFor="first_name"
-                  className="text-sm font-medium text-foreground"
-                >
-                  {t("form.first_name")}
-                </Label>
-                <Input
-                  id="first_name"
-                  required
-                  value={editForm.first_name ?? ""}
-                  onChange={(e) =>
-                    setEditForm({ ...editForm, first_name: e.target.value })
-                  }
-                  className="mt-1"
-                />
+                <h3 className="text-sm font-semibold text-foreground">
+                  {t("profile.basic_information")}
+                </h3>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  {t("profile.basic_information_description")}
+                </p>
               </div>
-              <div>
-                <Label
-                  htmlFor="last_name"
-                  className="text-sm font-medium text-foreground"
-                >
-                  {t("form.last_name")}
-                </Label>
-                <Input
-                  id="last_name"
-                  required
-                  value={editForm.last_name ?? ""}
-                  onChange={(e) =>
-                    setEditForm({ ...editForm, last_name: e.target.value })
-                  }
-                  className="mt-1"
-                />
-              </div>
-              {(["gender", "age", "residence"] as const).map((field) => (
-                <div key={field}>
-                  <Label
-                    htmlFor={field}
-                    className="text-sm font-medium text-foreground"
-                  >
-                    {profileFieldLabel(field)}
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                <div className="space-y-1.5">
+                  <Label htmlFor="first_name">
+                    {t("form.first_name")}
+                    <span className="ml-1 text-destructive" aria-hidden="true">
+                      *
+                    </span>
                   </Label>
                   <Input
-                    id={field}
-                    value={editForm[field] ?? ""}
-                    onChange={(e) =>
-                      setEditForm({ ...editForm, [field]: e.target.value })
+                    id="first_name"
+                    autoComplete="given-name"
+                    required
+                    aria-required="true"
+                    value={editForm.first_name ?? ""}
+                    onChange={(event) =>
+                      setEditForm({
+                        ...editForm,
+                        first_name: event.target.value,
+                      })
                     }
-                    className="mt-1"
                   />
                 </div>
-              ))}
-            </div>
-            <div className="space-y-4">
-              {/* LEGACY: x_user removed from API – review for deletion */}
-              <div>
-                <Label
-                  htmlFor="telegram"
-                  className="text-sm font-medium text-foreground"
-                >
-                  {t("form.telegram")}
-                </Label>
-                <Input
-                  id="telegram"
-                  value={editForm.telegram ?? ""}
-                  onChange={(e) =>
-                    setEditForm({ ...editForm, telegram: e.target.value })
-                  }
-                  className="mt-1"
-                />
+                <div className="space-y-1.5">
+                  <Label htmlFor="last_name">
+                    {t("form.last_name")}
+                    <span className="ml-1 text-destructive" aria-hidden="true">
+                      *
+                    </span>
+                  </Label>
+                  <Input
+                    id="last_name"
+                    autoComplete="family-name"
+                    required
+                    aria-required="true"
+                    value={editForm.last_name ?? ""}
+                    onChange={(event) =>
+                      setEditForm({
+                        ...editForm,
+                        last_name: event.target.value,
+                      })
+                    }
+                  />
+                </div>
               </div>
-            </div>
+              {!hasRequiredNames && (
+                <output className="text-xs text-muted-foreground">
+                  {t("profile.name_required_hint")}
+                </output>
+              )}
+            </section>
+
+            <section className="space-y-4 rounded-lg border border-border bg-background p-4">
+              <div>
+                <h3 className="text-sm font-semibold text-foreground">
+                  {t("profile.additional_details")}
+                </h3>
+              </div>
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                <div className="space-y-1.5">
+                  <Label htmlFor="telegram">{t("form.telegram")}</Label>
+                  <Input
+                    id="telegram"
+                    autoComplete="off"
+                    value={editForm.telegram ?? ""}
+                    onChange={(event) =>
+                      setEditForm({ ...editForm, telegram: event.target.value })
+                    }
+                  />
+                </div>
+                {(["gender", "age", "residence"] as const).map((field) => (
+                  <div key={field} className="space-y-1.5">
+                    <Label htmlFor={field}>{profileFieldLabel(field)}</Label>
+                    <Input
+                      id={field}
+                      value={editForm[field] ?? ""}
+                      onChange={(event) =>
+                        setEditForm({
+                          ...editForm,
+                          [field]: event.target.value,
+                        })
+                      }
+                    />
+                  </div>
+                ))}
+              </div>
+            </section>
           </div>
         )}
       </div>

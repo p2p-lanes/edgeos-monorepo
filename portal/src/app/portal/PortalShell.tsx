@@ -29,7 +29,7 @@ export default function PortalShell({
         <BackofficeSidebar collapsible="icon" />
         <SidebarInset className="portal-chrome max-h-svh overflow-hidden bg-muted/30 text-foreground">
           {!isProfilePage && !isCheckoutPage && <HeaderBar />}
-          {!isCheckoutPage && <ProfileCompletionReminder />}
+          {!isProfilePage && !isCheckoutPage && <ProfileCompletionReminder />}
           {/* `id` lets pages target this exact element for scroll-position
               save/restore. `document.querySelector("main")` would resolve to
               the outer <main> rendered by SidebarInset, which has
