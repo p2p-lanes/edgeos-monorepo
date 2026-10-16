@@ -116,13 +116,62 @@ def current_fields(
         FormFields.tenant_id == payment.tenant_id,
     )
     sections = select(FormSections).where(
-        FormSections.sales_flow_id == payment.sales_flow_id
+        FormSections.sales_flow_id == payment.sales_flow_id,
+        FormSections.popup_id == payment.popup_id,
+        FormSections.tenant_id == payment.tenant_id,
     )
     if lock:
         query = query.with_for_update(read=True)
         sections = sections.with_for_update(read=True)
-    hidden = {s.id for s in db.exec(sections).all() if s.hidden}
-    return {str(f.id): f for f in db.exec(query).all() if f.section_id not in hidden}
+    available_sections = {
+        s.id for s in db.exec(sections).all() if not s.hidden and s.kind == "standard"
+    }
+    return {
+        str(f.id): f
+        for f in db.exec(query.order_by(FormFields.position, FormFields.id)).all()
+        if f.section_id is None or f.section_id in available_sections
+    }
+
+
+def field_snapshot(field: FormFields) -> dict[str, Any]:
+    """Metadata for a question first answered after purchase."""
+    return {
+        "field_id": str(field.id),
+        "field_name": field.name,
+        "field_label": field.label,
+        "field_type": field.field_type,
+        "value": None,
+    }
+
+
+def accepts_answer(field: FormFields) -> bool:
+    return field.field_type != "rich_text" or bool(
+        (field.config or {}).get("is_checkbox")
+    )
+
+
+def append_snapshot_field(
+    db: Session, snapshot: dict[str, Any], definition: FormFields
+) -> dict[str, Any]:
+    section_id = str(definition.section_id) if definition.section_id else None
+    sections = snapshot.setdefault("sections", [])
+    section = next((s for s in sections if s.get("section_id") == section_id), None)
+    if section is None:
+        current = (
+            db.get(FormSections, definition.section_id)
+            if definition.section_id
+            else None
+        )
+        section = {
+            "section_id": section_id,
+            "section_label": current.label if current else "Form details",
+            "section_order": current.order if current else len(sections),
+            "fields": [],
+        }
+        sections.append(section)
+    saved = field_snapshot(definition)
+    section.setdefault("fields", []).append(saved)
+    return saved
 
 
 def can_edit(payment: Payments, step: TicketingSteps | None) -> bool:
@@ -139,15 +188,22 @@ def read_responses(db: Session, payment: Payments) -> PaymentFormResponsesPublic
     step = buyer_step(db, payment)
     definitions = current_fields(db, payment)
     fields = []
-    for saved in snapshot_fields(payment):
+    saved_fields = snapshot_fields(payment)
+    existing_ids = {f["field_id"] for f in saved_fields}
+    # Opt-in also covers questions introduced after this payment. Reads never
+    # backfill stored snapshots; an unanswered question is represented as null.
+    if step and step.allow_response_editing:
+        saved_fields = saved_fields + [
+            field_snapshot(f)
+            for key, f in definitions.items()
+            if key not in existing_ids and accepts_answer(f)
+        ]
+    for saved in saved_fields:
         definition = definitions.get(saved["field_id"])
         editable = (
             definition is not None
             and definition.field_type == saved.get("field_type")
-            and (
-                definition.field_type != "rich_text"
-                or bool((definition.config or {}).get("is_checkbox"))
-            )
+            and accepts_answer(definition)
         )
         schema = {
             "type": saved.get("field_type", "text"),
@@ -301,13 +357,18 @@ def edit_responses(
         key = str(field_id)
         field = definitions.get(key)
         if (
-            key not in saved
-            or field is None
-            or field.field_type != saved[key].get("field_type")
+            field is None
+            or not accepts_answer(field)
+            or key in saved
+            and field.field_type != saved[key].get("field_type")
         ):
             raise HTTPException(422, "Unknown or unavailable form field")
         validate_answer(field, value)
         validated[field.name] = value
+    # A partial PATCH cannot omit a newly introduced required question.
+    for key, field in definitions.items():
+        if key not in saved and field.required and accepts_answer(field):
+            validate_answer(field, changes.answers.get(field.id))
     valid, errors = form_fields_crud.validate_custom_fields(
         db,
         payment.popup_id,
@@ -324,7 +385,20 @@ def edit_responses(
     # All validation precedes writes, so a rejected batch changes nothing.
     changed = False
     for field_id, value in changes.answers.items():
-        field = saved[str(field_id)]
+        key = str(field_id)
+        field = saved.get(key)
+        if field is None:
+            # Optional unanswered questions remain absent; persist only answers.
+            if (
+                value is None
+                or value == ""
+                or value == []
+                or isinstance(value, str)
+                and not value.strip()
+            ):
+                continue
+            field = append_snapshot_field(db, snapshot, definitions[key])
+            saved[key] = field
         if field.get("value") == value:
             continue
         db.add(

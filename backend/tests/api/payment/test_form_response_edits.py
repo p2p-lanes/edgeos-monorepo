@@ -12,6 +12,7 @@ from app.api.event_settings.models import EventSettings
 from app.api.form_field.models import FormFields
 from app.api.human.models import Humans
 from app.api.payment.models import PaymentFormResponseChanges, Payments
+from app.api.popup.models import Popups
 from app.api.ticketing_step.models import TicketingSteps
 from app.core.security import create_access_token
 from tests.api.checkout.test_flow_scoped_runtime import _make_flow
@@ -409,3 +410,220 @@ def test_response_timezone_follows_popup_settings(
     assert response.status_code == 200, response.text
     assert response.json()["timezone"] == expected
     assert response.json()["deadline"] is not None
+
+
+@pytest.mark.parametrize(
+    "original", [None, {}, {"buyer_name": "Historical buyer", "sections": []}]
+)
+def test_historical_purchase_can_complete_missing_question(
+    client, db, purchase, original
+):
+    payment, buyer, step, field = purchase
+    payment.buyer_snapshot = deepcopy(original)
+    db.add(payment)
+    db.commit()
+    read = client.get(endpoint(payment), headers=headers(buyer))
+    assert read.status_code == 200, read.text
+    assert read.json()["can_edit"] is True
+    assert read.json()["fields"][0]["value"] is None
+    db.refresh(payment)
+    assert payment.buyer_snapshot == original  # GET must not backfill.
+    response = client.patch(
+        endpoint(payment),
+        headers=headers(buyer),
+        json={
+            "version": 0,
+            "answers": {str(field.id): "Circle Coworking"},
+        },
+    )
+    assert response.status_code == 200, response.text
+    db.refresh(payment)
+    assert payment.form_response_version == 1
+    assert payment.buyer_snapshot.get("buyer_name") == (original or {}).get(
+        "buyer_name"
+    )
+    saved = payment.buyer_snapshot["sections"][0]
+    assert saved["section_label"] == "Form details"
+    assert saved["fields"][0]["field_label"] == "Current label"
+    assert saved["fields"][0]["value"] == "Circle Coworking"
+    rows = history(db, payment)
+    assert len(rows) == 1 and rows[0].old_value is None
+    assert rows[0].new_value == "Circle Coworking"
+    assert rows[0].changed_by_human_id == buyer.id
+    assert (
+        client.patch(
+            endpoint(payment),
+            headers=headers(buyer),
+            json={
+                "version": 0,
+                "answers": {str(field.id): "Riva Resort"},
+            },
+        ).status_code
+        == 409
+    )
+
+
+@pytest.mark.parametrize(
+    "scenario,expected",
+    [
+        ("disabled", 403),
+        ("deadline", 403),
+        ("pending", 403),
+        ("wrong_buyer", 404),
+        ("invalid_option", 422),
+        ("empty", 422),
+        ("unknown", 422),
+        ("read_scope", 403),
+    ],
+)
+def test_missing_questions_enforce_policy_and_validation(
+    client, db, purchase, scenario, expected
+):
+    payment, buyer, step, field = purchase
+    payment.buyer_snapshot = None
+    auth = headers(buyer)
+    value = "Riva Resort"
+    field_id = field.id
+    if scenario == "disabled":
+        step.allow_response_editing = False
+    if scenario == "deadline":
+        step.response_edit_deadline = datetime.now(UTC) - timedelta(seconds=1)
+    if scenario == "pending":
+        payment.status = "pending"
+    if scenario == "wrong_buyer":
+        other = Humans(
+            tenant_id=buyer.tenant_id, email=f"other-{uuid.uuid4()}@test.com"
+        )
+        db.add(other)
+        db.flush()
+        auth = headers(other)
+    if scenario == "read_scope":
+        auth = headers(buyer, scopes=["portal:payments:read"])
+    if scenario == "invalid_option":
+        value = "Unknown option"
+    if scenario == "empty":
+        value = ""
+    if scenario == "unknown":
+        field_id = uuid.uuid4()
+    db.add_all([payment, step])
+    db.commit()
+    response = client.patch(
+        endpoint(payment),
+        headers=auth,
+        json={"version": 0, "answers": {str(field_id): value}},
+    )
+    assert response.status_code == expected, response.text
+    db.refresh(payment)
+    assert payment.buyer_snapshot is None and payment.form_response_version == 0
+    assert not history(db, payment)
+
+
+def test_new_questions_keep_sections_and_preserve_old_snapshot(client, db, purchase):
+    from app.api.form_section.models import FormSections
+
+    payment, buyer, step, field = purchase
+    original = deepcopy(payment.buyer_snapshot)
+    section = FormSections(
+        tenant_id=payment.tenant_id,
+        popup_id=payment.popup_id,
+        sales_flow_id=payment.sales_flow_id,
+        label="Additional details",
+        order=3,
+    )
+    db.add(section)
+    db.flush()
+    added = FormFields(
+        tenant_id=payment.tenant_id,
+        popup_id=payment.popup_id,
+        sales_flow_id=payment.sales_flow_id,
+        section_id=section.id,
+        name="new_question",
+        label="A new question",
+        field_type="text",
+        required=True,
+    )
+    db.add(added)
+    db.commit()
+    response = client.patch(
+        endpoint(payment),
+        headers=headers(buyer),
+        json={"version": 0, "answers": {str(field.id): "Riva Resort"}},
+    )
+    assert response.status_code == 422  # Cannot skip the new required question.
+    response = client.patch(
+        endpoint(payment),
+        headers=headers(buyer),
+        json={"version": 0, "answers": {str(added.id): "An answer"}},
+    )
+    assert response.status_code == 200, response.text
+    db.refresh(payment)
+    assert payment.buyer_snapshot["sections"][0] == original["sections"][0]
+    assert (
+        payment.buyer_snapshot["sections"][1]["section_label"] == "Additional details"
+    )
+    assert payment.buyer_snapshot["sections"][1]["section_id"] == str(section.id)
+    assert len(history(db, payment)) == 1
+
+
+def test_missing_hidden_and_other_flow_questions_are_unavailable(client, db, purchase):
+    from app.api.form_section.models import FormSections
+
+    payment, buyer, step, field = purchase
+    payment.buyer_snapshot = None
+    section = FormSections(
+        tenant_id=payment.tenant_id,
+        popup_id=payment.popup_id,
+        sales_flow_id=payment.sales_flow_id,
+        label="Hidden",
+        hidden=True,
+    )
+    db.add(section)
+    db.flush()
+    field.section_id = section.id
+    other_flow = _make_flow(db, db.get(Popups, payment.popup_id), slug="other-answers")
+    other = FormFields(
+        tenant_id=payment.tenant_id,
+        popup_id=payment.popup_id,
+        sales_flow_id=other_flow.id,
+        name="other_field",
+        label="Other flow",
+        field_type="text",
+    )
+    db.add_all([payment, field, other])
+    db.commit()
+    read = client.get(endpoint(payment), headers=headers(buyer))
+    assert read.json()["fields"] == [] and not read.json()["can_edit"]
+    for id in [field.id, other.id]:
+        response = client.patch(
+            endpoint(payment),
+            headers=headers(buyer),
+            json={"version": 0, "answers": {str(id): "A value"}},
+        )
+        assert response.status_code == 422, response.text
+    assert not history(db, payment)
+
+
+@pytest.mark.parametrize(
+    "kind,value", [("select", None), ("select", ""), ("multiselect", [])]
+)
+def test_unanswered_optional_new_question_is_not_persisted(
+    client, db, purchase, kind, value
+):
+    payment, buyer, step, field = purchase
+    payment.buyer_snapshot = None
+    field.required = False
+    field.field_type = kind
+    db.add_all([payment, field])
+    db.commit()
+    response = client.patch(
+        endpoint(payment),
+        headers=headers(buyer),
+        json={
+            "version": 0,
+            "answers": {str(field.id): value},
+        },
+    )
+    assert response.status_code == 200, response.text
+    db.refresh(payment)
+    assert payment.buyer_snapshot is None and payment.form_response_version == 0
+    assert not history(db, payment)
