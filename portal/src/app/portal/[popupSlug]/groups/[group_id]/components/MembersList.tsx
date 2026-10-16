@@ -4,13 +4,14 @@ import MemberItem from "./MemberItem"
 interface MembersListProps {
   members: GroupMemberPublic[]
   onMemberUpdated?: () => void
-  isLeader?: boolean
+  /** Whether the viewer leads the group and may edit or remove members. */
+  canManageMembers?: boolean
 }
 
 const MembersList = ({
   members,
   onMemberUpdated,
-  isLeader,
+  canManageMembers,
 }: MembersListProps) => {
   if (members.length === 0) {
     return (
@@ -27,7 +28,7 @@ const MembersList = ({
           key={member.id}
           member={member}
           onMemberUpdated={onMemberUpdated}
-          isLeader={isLeader}
+          canManageMembers={canManageMembers}
         />
       ))}
     </div>

@@ -992,7 +992,17 @@
     "update_member": "Actualizar miembro",
     "send_invitation": "Enviar invitación",
     "updating": "Actualizando...",
-    "sending": "Enviando..."
+    "sending": "Enviando...",
+    "organization": "Organización",
+    "role": "Rol",
+    "pass_holder": "Con pase",
+    "edit": "Editar",
+    "remove": "Quitar",
+    "remove_member": "Quitar miembro",
+    "member_has_active_ticket": "Este miembro ya tiene un ticket activo.",
+    "toggle_member_details": "Mostrar u ocultar detalles de {{name}}",
+    "expand": "Expandir",
+    "collapse": "Contraer"
   },
   "referrals": {
     "title": "Referidos",

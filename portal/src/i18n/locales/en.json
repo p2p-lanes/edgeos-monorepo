@@ -994,7 +994,17 @@
     "update_member": "Update member",
     "send_invitation": "Send invitation",
     "updating": "Updating...",
-    "sending": "Sending..."
+    "sending": "Sending...",
+    "organization": "Organization",
+    "role": "Role",
+    "pass_holder": "Pass holder",
+    "edit": "Edit",
+    "remove": "Remove",
+    "remove_member": "Remove member",
+    "member_has_active_ticket": "This member already has an active ticket.",
+    "toggle_member_details": "Toggle details for {{name}}",
+    "expand": "Expand",
+    "collapse": "Collapse"
   },
   "referrals": {
     "title": "Referrals",

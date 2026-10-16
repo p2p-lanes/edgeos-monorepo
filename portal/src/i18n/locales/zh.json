@@ -863,7 +863,17 @@
     "update_member": "更新成员",
     "send_invitation": "发送邀请",
     "updating": "更新中...",
-    "sending": "发送中..."
+    "sending": "发送中...",
+    "organization": "组织",
+    "role": "角色",
+    "pass_holder": "持有通行证",
+    "edit": "编辑",
+    "remove": "移除",
+    "remove_member": "移除成员",
+    "member_has_active_ticket": "该成员已有有效门票。",
+    "toggle_member_details": "展开或收起 {{name}} 的详情",
+    "expand": "展开",
+    "collapse": "收起"
   },
   "referrals": {
     "title": "Referrals",
