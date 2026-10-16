@@ -17,6 +17,7 @@ import {
 } from "@/components/ui/table"
 import { formatDate } from "@/helpers/dates"
 import useAuth from "@/hooks/useAuth"
+import { formatCurrency } from "@/types/checkout"
 import type { PaymentsProps } from "@/types/passes"
 
 const PaymentHistory = ({ payments }: { payments: PaymentsProps[] }) => {
@@ -113,7 +114,8 @@ const PaymentHistory = ({ payments }: { payments: PaymentsProps[] }) => {
                 {formatDate(payment.created_at)}
               </TableCell>
               <TableCell className="font-mono font-medium">
-                ${payment.amount} {payment.currency}
+                {formatCurrency(Number(payment.amount), payment.currency)}{" "}
+                {payment.currency}
               </TableCell>
               <TableCell>
                 <Badge variant="secondary" className="font-normal">

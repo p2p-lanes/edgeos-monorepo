@@ -342,7 +342,10 @@ export function formatCurrency(amount: number, currency?: string): string {
   return new Intl.NumberFormat(locale, {
     style: "currency",
     currency: normalized,
-    minimumFractionDigits: 0,
+// Prices always carry two decimals ($324.10, $0.00): dropping trailing zeros
+// read as a different precision per row ($324.1 next to $463) once discounts
+// started producing cents.
+    minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   }).format(amount)
 }

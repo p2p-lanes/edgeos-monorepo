@@ -231,7 +231,7 @@ describe("YourPasses selected projection", () => {
 
     expect(screen.getByText("Historical ticket")).toBeTruthy()
     expect(screen.getByText("Historical Suite")).toBeTruthy()
-    expect(screen.getByText("$321")).toBeTruthy()
+    expect(screen.getByText("$321.00")).toBeTruthy()
     expect(productsQuery).toHaveBeenCalledTimes(1)
     for (const call of productsQuery.mock.calls) {
       expect(call).toEqual(["popup-1", null, false])
@@ -317,9 +317,9 @@ describe("YourPasses selected projection", () => {
     )
 
     expect(screen.getByText("Attendee Suite")).toBeTruthy()
-    expect(screen.getByText("$111")).toBeTruthy()
+    expect(screen.getByText("$111.00")).toBeTruthy()
     expect(screen.queryByText("Volunteer Cabin")).toBeNull()
-    expect(screen.queryByText("$222")).toBeNull()
+    expect(screen.queryByText("$222.00")).toBeNull()
 
     rerender(
       <YourPasses
@@ -329,9 +329,9 @@ describe("YourPasses selected projection", () => {
     )
 
     expect(screen.getByText("Volunteer Cabin")).toBeTruthy()
-    expect(screen.getByText("$222")).toBeTruthy()
+    expect(screen.getByText("$222.00")).toBeTruthy()
     expect(screen.queryByText("Attendee Suite")).toBeNull()
-    expect(screen.queryByText("$111")).toBeNull()
+    expect(screen.queryByText("$111.00")).toBeNull()
   })
 
   it("opens the detail sheet of the purchase that was tapped", () => {

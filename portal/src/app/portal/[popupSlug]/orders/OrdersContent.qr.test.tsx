@@ -143,7 +143,7 @@ describe("OrdersContent product QR", () => {
 
     expect(screen.getByText("Conference T-Shirt")).toBeTruthy()
     expect(screen.getByText(/Quantity: 2/)).toBeTruthy()
-    expect(screen.getByText("$35")).toBeTruthy()
+    expect(screen.getByText("$35.00")).toBeTruthy()
     expect(screen.queryByRole("button", { name: /View QR for/ })).toBeNull()
   })
 
