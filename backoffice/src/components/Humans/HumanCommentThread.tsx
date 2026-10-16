@@ -10,6 +10,7 @@ import { LoadingButton } from "@/components/ui/loading-button"
 import { Textarea } from "@/components/ui/textarea"
 import useAuth from "@/hooks/useAuth"
 import useCustomToast from "@/hooks/useCustomToast"
+import { useSubmitShortcut } from "@/hooks/useSubmitShortcut"
 import { createErrorHandler } from "@/utils"
 
 function commentsQueryKey(humanId: string) {
@@ -66,6 +67,11 @@ function CommentRow({
     onError: createErrorHandler(showErrorToast),
   })
 
+  const saveShortcut = useSubmitShortcut({
+    onSubmit: () => updateMutation.mutate(),
+    canSubmit: !!draft.trim() && !updateMutation.isPending,
+  })
+
   return (
     <div className="rounded-lg border bg-card p-3">
       <div className="mb-1 flex items-center justify-between gap-2">
@@ -84,8 +90,9 @@ function CommentRow({
             rows={3}
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
+            onKeyDown={saveShortcut.onKeyDown}
           />
-          <div className="flex gap-2">
+          <div className="flex items-center gap-2">
             <LoadingButton
               size="sm"
               loading={updateMutation.isPending}
@@ -104,6 +111,9 @@ function CommentRow({
             >
               Cancel
             </Button>
+            <span className="text-xs text-muted-foreground">
+              {saveShortcut.shortcutLabel} to save
+            </span>
           </div>
         </div>
       ) : (
@@ -182,6 +192,11 @@ export function HumanCommentThread({ humanId }: { humanId: string }) {
     onError: createErrorHandler(showErrorToast),
   })
 
+  const sendShortcut = useSubmitShortcut({
+    onSubmit: () => createMutation.mutate(),
+    canSubmit: !!body.trim() && !createMutation.isPending,
+  })
+
   const comments = data?.results ?? []
 
   return (
@@ -209,15 +224,21 @@ export function HumanCommentThread({ humanId }: { humanId: string }) {
           placeholder="Write a comment…"
           value={body}
           onChange={(e) => setBody(e.target.value)}
+          onKeyDown={sendShortcut.onKeyDown}
         />
-        <LoadingButton
-          size="sm"
-          loading={createMutation.isPending}
-          disabled={!body.trim()}
-          onClick={() => createMutation.mutate()}
-        >
-          Comment
-        </LoadingButton>
+        <div className="flex items-center gap-2">
+          <LoadingButton
+            size="sm"
+            loading={createMutation.isPending}
+            disabled={!body.trim()}
+            onClick={() => createMutation.mutate()}
+          >
+            Comment
+          </LoadingButton>
+          <span className="text-xs text-muted-foreground">
+            {sendShortcut.shortcutLabel} to send
+          </span>
+        </div>
       </div>
     </div>
   )
