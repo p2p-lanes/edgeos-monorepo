@@ -25,6 +25,8 @@ class HumanActivityKind(str, Enum):
     NOTE_ADDED = "note.added"
     RATING_CHANGED = "rating.changed"
     COMMENT_ADDED = "comment.added"
+    # A reviewer comment on one of the human's applications.
+    APPLICATION_COMMENT_ADDED = "application.comment_added"
 
     # Credit movements (grant, debit at purchase, restore on expire/cancel).
     CREDIT_GRANTED = "credit.granted"
@@ -59,6 +61,10 @@ class HumanActivityItem(BaseModel):
     popup_id: uuid.UUID | None = None
     popup_label: str | None = None
 
+    # Application context (set for application-derived items: submitted,
+    # accepted and application comments) so the UI can link to it.
+    application_id: uuid.UUID | None = None
+
     # Per-kind payload.
     note: str | None = None
     amount: Decimal | None = None
@@ -76,7 +82,7 @@ class HumanActivityItem(BaseModel):
     balance_after: Decimal | None = None
 
     # Actor — set for items a backoffice user performed: manual notes, rating
-    # changes and comments.
+    # changes and comments (human and application).
     actor_id: uuid.UUID | None = None
     actor_name: str | None = None
     actor_email: str | None = None

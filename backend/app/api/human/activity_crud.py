@@ -27,6 +27,7 @@ from app.api.human.activity_schemas import (
 )
 
 if TYPE_CHECKING:
+    from app.api.application.models import ApplicationComment
     from app.api.human.models import HumanComment
 
 # Snapshot event value emitted when an application is accepted.
@@ -163,6 +164,27 @@ def comment_to_item(comment: "HumanComment") -> HumanActivityItem:
     )
 
 
+def application_comment_to_item(
+    comment: "ApplicationComment", popup_id: uuid.UUID
+) -> HumanActivityItem:
+    """Map a (non-deleted) application review comment to a timeline item.
+
+    Same shape as a human comment, plus the application + popup it was left on
+    so the timeline can say where it came from and link back to it.
+    """
+    return HumanActivityItem(
+        id=f"application-comment:{comment.id}",
+        kind=HumanActivityKind.APPLICATION_COMMENT_ADDED,
+        occurred_at=_as_utc(comment.created_at),
+        popup_id=popup_id,
+        application_id=comment.application_id,
+        note=comment.body,
+        actor_id=comment.author_user_id,
+        actor_name=comment.author_name,
+        actor_email=comment.author_email,
+    )
+
+
 def build_human_activity(
     session: Session,
     human_id: uuid.UUID,
@@ -180,7 +202,7 @@ def build_human_activity(
     """
     # Imported lazily to avoid a circular import: the human router (which loads
     # this module) is imported while application.models is still initializing.
-    from app.api.application.models import Applications
+    from app.api.application.models import ApplicationComment, Applications
     from app.api.attendee.models import Attendees
     from app.api.payment.models import Payments
     from app.api.payment.schemas import PaymentStatus
@@ -204,6 +226,7 @@ def build_human_activity(
                     kind=HumanActivityKind.APPLICATION_SUBMITTED,
                     occurred_at=_as_utc(submitted_at),
                     popup_id=app.popup_id,
+                    application_id=app.id,
                 )
             )
 
@@ -220,6 +243,7 @@ def build_human_activity(
                     kind=HumanActivityKind.APPLICATION_ACCEPTED,
                     occurred_at=_as_utc(snap.created_at),
                     popup_id=app.popup_id,
+                    application_id=app.id,
                 )
             )
 
@@ -315,7 +339,24 @@ def build_human_activity(
         for comment in humans_crud.list_comments(session, human_id)
     )
 
-    # 6. Popup labels — one query for all referenced popups (avoid N+1).
+    # 6. Application review comments on any of the human's applications. Same
+    # RLS-scoped `session` and same soft-delete rule as human comments.
+    popup_by_application = {app.id: app.popup_id for app in applications}
+    if popup_by_application:
+        application_comments = session.exec(
+            select(ApplicationComment).where(
+                col(ApplicationComment.application_id).in_(popup_by_application),
+                col(ApplicationComment.deleted_at).is_(None),
+            )
+        ).all()
+        items.extend(
+            application_comment_to_item(
+                comment, popup_by_application[comment.application_id]
+            )
+            for comment in application_comments
+        )
+
+    # 7. Popup labels: one query for all referenced popups (avoid N+1).
     popup_ids = {item.popup_id for item in items if item.popup_id is not None}
     if popup_ids:
         rows = session.exec(
@@ -326,7 +367,7 @@ def build_human_activity(
             if item.popup_id is not None:
                 item.popup_label = labels.get(item.popup_id)
 
-    # 7. Merge: newest-first by effective timestamp, then page.
+    # 8. Merge: newest-first by effective timestamp, then page.
     items.sort(key=lambda i: i.occurred_at, reverse=True)
     total = len(items)
     return items[skip : skip + limit], total
