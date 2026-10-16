@@ -2,8 +2,9 @@ import uuid
 from datetime import datetime
 from decimal import Decimal
 from enum import Enum
+from typing import Annotated
 
-from pydantic import BaseModel, ConfigDict, model_validator
+from pydantic import AfterValidator, BaseModel, ConfigDict, model_validator
 from sqlalchemy import Boolean, Numeric, Text
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlmodel import Column, DateTime, Field, SQLModel
@@ -22,6 +23,23 @@ KNOWN_PRODUCT_CATEGORIES = [
     CATEGORY_MERCH,
     CATEGORY_OTHER,
     CATEGORY_PATREON,
+]
+
+
+# Long enough for a sentence or two, short enough to fit a popover on a phone.
+PRODUCT_INFO_NOTE_MAX_LENGTH = 500
+
+
+def _blank_to_none(value: str | None) -> str | None:
+    return value or None
+
+
+# Write-side shape of `info_note`. An emptied note means "no icon" and is
+# stored as NULL rather than ''.
+InfoNoteInput = Annotated[
+    str | None,
+    Field(max_length=PRODUCT_INFO_NOTE_MAX_LENGTH),
+    AfterValidator(_blank_to_none),
 ]
 
 
@@ -46,6 +64,12 @@ class ProductBase(SQLModel):
         default=None, sa_column=Column(Numeric(10, 2), nullable=True)
     )
     description: str | None = Field(default=None, nullable=True, sa_type=Text())
+    # Short admin-written context the checkout reveals behind an info icon next
+    # to the product name, e.g. "A passport will be requested for this
+    # product". NULL = no icon.
+    info_note: str | None = Field(
+        default=None, nullable=True, max_length=PRODUCT_INFO_NOTE_MAX_LENGTH
+    )
     image_url: str | None = Field(default=None, nullable=True)
     # Additional images shown after `image_url` (the cover) in the housing
     # grid/showcase carousel. Empty for single-image products.
@@ -128,6 +152,7 @@ class ProductCreate(BaseModel):
     price: Decimal = Field(ge=0)
     compare_price: Decimal | None = Field(default=None, ge=0)
     description: str | None = None
+    info_note: InfoNoteInput = None
     image_url: str | None = None
     images: list[str] = Field(default_factory=list)
     category: str = Field(default="ticket", min_length=1)
@@ -209,6 +234,7 @@ class ProductUpdate(BaseModel):
     price: Decimal | None = Field(default=None, ge=0)
     compare_price: Decimal | None = Field(default=None, ge=0)
     description: str | None = None
+    info_note: InfoNoteInput = None
     image_url: str | None = None
     images: list[str] | None = None
     category: str | None = Field(default=None, min_length=1)
@@ -277,6 +303,7 @@ class ProductBatchItem(BaseModel):
     price: Decimal = Field(ge=0)
     compare_price: Decimal | None = Field(default=None, ge=0)
     description: str | None = None
+    info_note: InfoNoteInput = None
     image_url: str | None = None
     images: list[str] = Field(default_factory=list)
     category: str = Field(default="ticket", min_length=1)
