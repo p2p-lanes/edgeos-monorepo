@@ -175,6 +175,20 @@ async def get_current_human_info(
 
 
 @router.get(
+    "/me/popups/{popup_id}/has-active-ticket",
+    response_model=bool,
+    summary="Check whether you have an active ticket for a popup",
+    dependencies=[needs("portal:profile:read")],
+)
+async def has_current_human_active_ticket(
+    popup_id: uuid.UUID,
+    current_human: CurrentHuman,
+    db: HumanTenantSession,
+) -> bool:
+    return crud.has_active_ticket(db, current_human.id, popup_id)
+
+
+@router.get(
     "/me/profile-stats",
     response_model=HumanProfileStats,
     summary="Get your profile stats",

@@ -10102,6 +10102,12 @@ export type HumansUpdateCurrentHumanData = {
 
 export type HumansUpdateCurrentHumanResponse = (HumanSelfPublic);
 
+export type HumansHasCurrentHumanActiveTicketData = {
+    popupId: string;
+};
+
+export type HumansHasCurrentHumanActiveTicketResponse = (boolean);
+
 export type HumansGetCurrentHumanProfileStatsResponse = (HumanProfileStats);
 
 export type HumansGetMyDirectorySettingsData = {

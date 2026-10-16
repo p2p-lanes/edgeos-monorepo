@@ -84,6 +84,27 @@ class HumansCRUD(BaseCRUD[Humans, HumanCreate, HumanUpdate]):
     def __init__(self) -> None:
         super().__init__(Humans)
 
+    def has_active_ticket(
+        self, session: Session, human_id: uuid.UUID, popup_id: uuid.UUID
+    ) -> bool:
+        from app.api.attendee.models import AttendeeProducts, Attendees
+
+        return (
+            session.exec(
+                select(AttendeeProducts.id)
+                .join(Attendees, Attendees.id == AttendeeProducts.attendee_id)
+                .where(
+                    Attendees.human_id == human_id,
+                    Attendees.popup_id == popup_id,
+                    AttendeeProducts.attendee_id.is_not(None),
+                    AttendeeProducts.product_category_snapshot == CATEGORY_TICKET,
+                    AttendeeProducts.revoked_at.is_(None),
+                )
+                .limit(1)
+            ).first()
+            is not None
+        )
+
     def get_directory_settings(
         self, session: Session, human: Humans, popup_id: uuid.UUID
     ) -> HumanDirectorySettings:
