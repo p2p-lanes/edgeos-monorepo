@@ -24,7 +24,8 @@ interface UseVenueAvailabilityOptions {
   displayTz: string
   startIso: string
   endIso: string
-  durationMinutes: number
+  /** Null while the duration input is invalid; start-time checks then pause. */
+  durationMinutes: number | null
   /**
    * When set, the availability check passes `exclude_event_id` so the event
    * being edited does not conflict with itself. Backend also enforces this
@@ -164,11 +165,13 @@ export function useVenueAvailability(
     )
   }, [availabilityData, dayBounds])
 
+  // Without a valid duration, list every open start so the "no open hours"
+  // hint keeps working; the duration field shows its own error meanwhile.
   const startOptions = useMemo(
     () =>
       availableStartOptionsForDuration(
         freeIntervals,
-        durationMinutes,
+        durationMinutes ?? 1,
         30,
         displayTz,
       ),
@@ -192,6 +195,7 @@ export function useVenueAvailability(
   const withinOpenHours = useMemo(() => {
     if (!venueId) return true
     if (!startIso) return true
+    if (durationMinutes == null) return true
     if (openOnlyIntervals.length === 0) return true
     const ms = Date.parse(startIso)
     if (Number.isNaN(ms)) return true

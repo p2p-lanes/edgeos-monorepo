@@ -63,12 +63,20 @@ import {
   UnsavedChangesDialog,
   useUnsavedChanges,
 } from "@/hooks/useUnsavedChanges"
+import {
+  draftFromMinutes,
+  parseDurationDraft,
+} from "@/lib/events/eventDuration"
 import { createErrorHandler } from "@/utils"
 import {
   AvailabilityIndicator,
   type AvailabilityState,
 } from "./EventForm/AvailabilityIndicator"
 import { ChipInput } from "./EventForm/ChipInput"
+import {
+  DURATION_ERROR_MESSAGES,
+  DurationInput,
+} from "./EventForm/DurationInput"
 import {
   buildRecurrence,
   parseRruleToState,
@@ -338,30 +346,19 @@ export function EventForm({
     return utcToLocalTzNaive(dt, tz || "UTC")
   }
 
-  // Compute initial duration (in minutes) from the default values (edit mode).
-  const initialDurationMinutes = (() => {
-    if (!defaultValues?.start_time || !defaultValues?.end_time) return 60
-    const diff =
-      new Date(defaultValues.end_time).getTime() -
-      new Date(defaultValues.start_time).getTime()
-    const mins = Math.round(diff / 60000)
-    return mins > 0 ? mins : 60
-  })()
+  // Initial duration (in minutes) from the default values (edit mode). Not
+  // clamped: a stored range that is empty or reversed surfaces as a duration
+  // error to fix, rather than silently becoming a different length.
+  const initialDuration = draftFromMinutes(
+    defaultValues?.start_time && defaultValues?.end_time
+      ? Math.round(
+          (new Date(defaultValues.end_time).getTime() -
+            new Date(defaultValues.start_time).getTime()) /
+            60_000,
+        )
+      : 60,
+  )
 
-  type DurationUnit = "minutes" | "hours"
-  const initialDurationUnit: DurationUnit =
-    initialDurationMinutes % 60 === 0 && initialDurationMinutes >= 60
-      ? "hours"
-      : "minutes"
-  const initialDurationValue =
-    initialDurationUnit === "hours"
-      ? initialDurationMinutes / 60
-      : initialDurationMinutes
-
-  const [durationUnit, setDurationUnit] =
-    useState<DurationUnit>(initialDurationUnit)
-  const [durationValue, setDurationValue] =
-    useState<number>(initialDurationValue)
   const [venueDialogOpen, setVenueDialogOpen] = useState(false)
   // True when the user picked the "Custom location" sentinel in the venue
   // dropdown — the event has no Venue row, but stores an ad-hoc place name
@@ -374,10 +371,6 @@ export function EventForm({
   // a meeting, so legacy data stays editable without forcing a venue pick.
   const allowMeeting =
     isEdit && !defaultValues?.venue_id && !defaultValues?.custom_location_name
-  const durationMinutes = Math.max(
-    1,
-    Math.round(durationUnit === "hours" ? durationValue * 60 : durationValue),
-  )
 
   const form = useForm({
     defaultValues: {
@@ -410,11 +403,20 @@ export function EventForm({
       host_id: defaultValues?.host_id ?? null,
       collaborator_ids: defaultValues?.collaborator_ids ?? [],
       tags: defaultValues?.tags ?? [],
+      // Raw Hours / Minutes text. Kept in form state (not local state) so a
+      // duration-only change marks the form dirty for the unsaved-changes
+      // guard; the total in minutes is derived via parseDurationDraft.
+      duration_hours: initialDuration.hours,
+      duration_minutes: initialDuration.minutes,
     },
     onSubmit: ({ value }) => {
       if (readOnly) return
-      if (!durationMinutes || durationMinutes <= 0) {
-        showErrorToast("Duration must be greater than zero")
+      const duration = parseDurationDraft({
+        hours: value.duration_hours,
+        minutes: value.duration_minutes,
+      })
+      if (!duration.ok) {
+        showErrorToast(DURATION_ERROR_MESSAGES[duration.error])
         return
       }
       if (!selectedPopupId) {
@@ -428,7 +430,7 @@ export function EventForm({
       // not the browser's. Otherwise round-tripping through the calendars
       // (which render in popup tz) drifts by the browser↔popup tz delta.
       const startDate = localTzNaiveToUtc(value.start_time, value.timezone)
-      const endDate = new Date(startDate.getTime() + durationMinutes * 60_000)
+      const endDate = new Date(startDate.getTime() + duration.minutes * 60_000)
 
       // Block creating an event that starts in the past. Hosts have repeatedly
       // booked events on a past date by mistake (e.g. created Jun 15, scheduled
@@ -547,6 +549,23 @@ export function EventForm({
     form.store,
     (s) => s.values.max_participant,
   )
+  const durationHoursValue = useStore(
+    form.store,
+    (s) => s.values.duration_hours,
+  )
+  const durationMinutesValue = useStore(
+    form.store,
+    (s) => s.values.duration_minutes,
+  )
+  // Total duration in minutes, or null while the Hours / Minutes input is
+  // invalid. Availability checks pause until it's valid again.
+  const durationMinutes = useMemo(() => {
+    const parsed = parseDurationDraft({
+      hours: durationHoursValue,
+      minutes: durationMinutesValue,
+    })
+    return parsed.ok ? parsed.minutes : null
+  }, [durationHoursValue, durationMinutesValue])
 
   // Convert the form's naive datetime (wall time in `timezoneValue`) to a
   // UTC Date for backend calls / derived math.
@@ -558,7 +577,7 @@ export function EventForm({
 
   // End time derived from start + duration (used for backend checks).
   const endTimeIso = useMemo(() => {
-    if (!startUtc) return ""
+    if (!startUtc || durationMinutes == null) return ""
     return new Date(startUtc.getTime() + durationMinutes * 60_000).toISOString()
   }, [startUtc, durationMinutes])
 
@@ -871,7 +890,7 @@ export function EventForm({
     () =>
       availableStartOptionsForDuration(
         freeIntervals,
-        durationMinutes,
+        durationMinutes ?? 1,
         30,
         popupTz,
       ),
@@ -889,7 +908,7 @@ export function EventForm({
         freeIntervals,
         dayBounds.start,
         dayBounds.end,
-        durationMinutes,
+        durationMinutes ?? 1,
         30,
         popupTz,
       ).map((o) => ({ label: o.label, free: o.free }))
@@ -914,6 +933,8 @@ export function EventForm({
   const fitnessIssue = useMemo<string | null>(() => {
     if (!venueIdValue) return null
     if (!startUtc) return null
+    // The duration field reports its own error while it's invalid.
+    if (durationMinutes == null) return null
     // No availability data yet — let the server check decide. Once
     // dayAvailability resolves, an empty open_ranges *truly* means the
     // venue is closed and we should block.
@@ -1454,47 +1475,19 @@ export function EventForm({
         </InlineRow>
 
         <InlineRow label="Duration" description="How long the event lasts">
-          <div className="flex items-center gap-2">
-            <Input
-              type="number"
-              min={1}
-              value={durationValue}
-              onChange={(e) => {
-                const n = parseInt(e.target.value, 10)
-                setDurationValue(Number.isNaN(n) ? 0 : n)
-              }}
-              className="w-24"
-              disabled={readOnly}
-            />
-            <Select
-              value={durationUnit}
-              onValueChange={(v) => {
-                const next = v as DurationUnit
-                // Preserve the real duration when switching units.
-                if (next !== durationUnit) {
-                  const totalMinutes =
-                    durationUnit === "hours"
-                      ? durationValue * 60
-                      : durationValue
-                  setDurationUnit(next)
-                  setDurationValue(
-                    next === "hours"
-                      ? Math.max(1, Math.round(totalMinutes / 60))
-                      : Math.max(1, Math.round(totalMinutes)),
-                  )
-                }
-              }}
-              disabled={readOnly}
-            >
-              <SelectTrigger className="w-28">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="minutes">Minutes</SelectItem>
-                <SelectItem value="hours">Hours</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
+          <DurationInput
+            draft={{
+              hours: durationHoursValue,
+              minutes: durationMinutesValue,
+            }}
+            onChange={(next) => {
+              form.setFieldValue("duration_hours", next.hours)
+              form.setFieldValue("duration_minutes", next.minutes)
+            }}
+            startIso={startUtc?.toISOString() ?? ""}
+            timeZone={timezoneValue || popupTz || "UTC"}
+            disabled={readOnly}
+          />
         </InlineRow>
 
         <InlineRow label="Start time" description="Pick or type a time">
