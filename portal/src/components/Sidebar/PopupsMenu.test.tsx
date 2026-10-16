@@ -1,4 +1,5 @@
-import { render, screen } from "@testing-library/react"
+import { fireEvent, render, screen } from "@testing-library/react"
+import { useEffect } from "react"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 
 const providerState = vi.hoisted(() => ({
@@ -18,10 +19,11 @@ const providerState = vi.hoisted(() => ({
     { name: "Valley", slug: "valley", status: "ended" },
   ],
   popupsLoaded: true,
+  replace: vi.fn(),
 }))
 
 vi.mock("next/navigation", () => ({
-  useRouter: () => ({ replace: vi.fn() }),
+  useRouter: () => ({ replace: providerState.replace }),
 }))
 
 vi.mock("react-i18next", () => ({
@@ -60,7 +62,18 @@ vi.mock("./DropdownMenu", () => ({
 }))
 
 import PopupsMenu from "./PopupsMenu"
-import { SidebarProvider } from "./SidebarComponents"
+import { SidebarProvider, useSidebar } from "./SidebarComponents"
+
+// Opens the mobile sheet on mount and exposes its state for assertions.
+const MobileSheetProbe = () => {
+  const { openMobile, setOpenMobile } = useSidebar()
+
+  useEffect(() => {
+    setOpenMobile(true)
+  }, [setOpenMobile])
+
+  return <output data-testid="open-mobile">{String(openMobile)}</output>
+}
 
 describe("PopupsMenu", () => {
   beforeEach(() => {
@@ -75,6 +88,22 @@ describe("PopupsMenu", () => {
       { name: "Valley", slug: "valley", status: "ended" },
     ]
     providerState.popupsLoaded = true
+    providerState.replace.mockClear()
+  })
+
+  it("closes the mobile sheet when switching popups", () => {
+    render(
+      <SidebarProvider>
+        <MobileSheetProbe />
+        <PopupsMenu />
+      </SidebarProvider>,
+    )
+    expect(screen.getByTestId("open-mobile").textContent).toBe("true")
+
+    fireEvent.click(screen.getByRole("menuitem", { name: /valley/i }))
+
+    expect(screen.getByTestId("open-mobile").textContent).toBe("false")
+    expect(providerState.replace).toHaveBeenCalledWith("/portal/valley")
   })
 
   it("does not render a popup selector after an empty list has loaded", () => {

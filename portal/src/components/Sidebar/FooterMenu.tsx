@@ -7,6 +7,7 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
+  useSidebar,
 } from "./SidebarComponents"
 
 const REPO_URL = "https://github.com/p2p-lanes/EdgeOS"
@@ -27,6 +28,7 @@ async function getGitHubStars() {
 const FooterMenu = () => {
   const { t } = useTranslation()
   const router = useRouter()
+  const { setOpenMobile } = useSidebar()
   const [stars, setStars] = useState<number | null>(null)
 
   useEffect(() => {
@@ -62,7 +64,10 @@ const FooterMenu = () => {
         <SidebarMenuItem>
           <SidebarMenuButton
             className="mb-4 mt-4"
-            onClick={() => router.push("/portal/profile")}
+            onClick={() => {
+              setOpenMobile(false)
+              router.push("/portal/profile")
+            }}
           >
             <User className="size-4" />
             <span className="text-sm font-medium">

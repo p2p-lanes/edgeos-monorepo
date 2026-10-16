@@ -25,7 +25,7 @@ import {
 
 const PopupsMenu = () => {
   const { getCity, getPopups, popupsLoaded } = useCityProvider()
-  const { state } = useSidebar()
+  const { state, setOpenMobile } = useSidebar()
   const router = useRouter()
   const { t } = useTranslation()
   const isCollapsed = state === "collapsed"
@@ -38,9 +38,10 @@ const PopupsMenu = () => {
 
   const handleClickCity = useCallback(
     (popup: PopupPublic) => {
+      setOpenMobile(false)
       router.replace(`/portal/${popup.slug}`)
     },
-    [router],
+    [router, setOpenMobile],
   )
 
   if (popupsLoaded && popups.length === 0) return null
