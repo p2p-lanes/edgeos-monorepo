@@ -1608,6 +1608,7 @@
     "no_badges": "No badges yet."
   },
   "form_responses": {
+    "not_answered": "Not answered",
     "title": "Form responses",
     "edit": "Edit responses",
     "edit_action": "Edit",

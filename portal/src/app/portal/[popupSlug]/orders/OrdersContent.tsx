@@ -226,11 +226,10 @@ export function OrdersContent({
                   </Button>
                 )}
               </div>
-              {payments.find((p) => p.id === order.id)?.buyer_snapshot && (
-                <div className="sm:col-span-3">
-                  <PaymentFormResponses paymentId={order.id} />
-                </div>
-              )}
+              <PaymentFormResponses
+                paymentId={order.id}
+                className="sm:col-span-3"
+              />
             </article>
           ))}
         </div>

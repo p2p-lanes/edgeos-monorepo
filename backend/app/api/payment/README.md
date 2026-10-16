@@ -33,8 +33,10 @@ Example PATCH body:
 }
 ```
 
-Only custom fields present in the payment snapshot and still belonging to its
-original flow may be edited. Required values, types, available options and date
+Custom fields still belonging to the payment’s original flow may be edited,
+including questions absent from historical snapshots. When editing is enabled,
+GET represents missing, visible standard-form questions as unanswered without
+changing stored data. Display-only content is not offered for completion. Required values, types, available options and date
 bounds are validated against current field definitions. Deleted, hidden or
 retyped fields remain readable but cannot be changed. Identity, product details,
 amounts, payment status, labels and sections cannot be updated through this API.
@@ -43,8 +45,11 @@ deadline violations return 403; unavailable payments return 404.
 
 ## Storage and audit
 
-`payments.buyer_snapshot` retains purchase-time labels and structure; only
-`sections[].fields[].value` changes. `payments.form_response_version` advances
+`payments.buyer_snapshot` retains existing purchase-time labels and structure.
+Existing questions update only `sections[].fields[].value`; a question absent at
+purchase is appended on its first answer with its current label, type and section.
+Only answered fields are added, and all newly missing required questions must be
+completed when saving. The audit records null → answer for each new response. `payments.form_response_version` advances
 once per successful, nonempty change set. No-op saves create no history.
 
 `payment_form_response_changes` stores the payment, field ID and original label,
@@ -56,5 +61,6 @@ remain purchase-time records and are not rewritten.
 
 Migration `f6b2a9d1c804` adds the settings, version and history table without
 rewriting existing payments. Existing snapshot answers can be edited once a
-policy is enabled; missing historical answers cannot be reconstructed. New
+policy is enabled. Buyers can supply missing answers under that same live policy;
+prior answers that were never saved cannot be reconstructed. New
 checkout snapshots include unsectioned fields and only the selected flow.

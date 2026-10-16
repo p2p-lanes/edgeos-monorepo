@@ -4,7 +4,7 @@ import Image from "next/image"
 import Link from "next/link"
 import { useState } from "react"
 import { useTranslation } from "react-i18next"
-import { TicketingStepsService } from "@/client"
+import { PaymentsService, TicketingStepsService } from "@/client"
 import { PaymentFormResponses } from "@/components/payments/PaymentFormResponses"
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog"
 import { imageOptimization } from "@/lib/image-optimization"
@@ -31,7 +31,6 @@ export function OtherPurchasedProducts({
   const [selectedKey, setSelectedKey] = useState<string | null>(null)
   // Resolve the selection from current data, so a unit revoked on refetch
   // also closes its QR.
-  const active = products.find((product) => product.key === selectedKey)
   const flowIds = [...new Set(products.map((product) => product.salesFlowId))]
   // Same key as the checkout's own step query, so a buyer who just paid
   // reads these from cache.
@@ -51,6 +50,33 @@ export function OtherPurchasedProducts({
       flowId,
       stepQueries[index]?.data?.results ?? [],
     ]),
+  )
+
+  // A payment ID alone does not imply that the detail popup has content.
+  const paymentIds = [
+    ...new Set(
+      products
+        .filter((product) => !product.checkInCode && product.paymentId)
+        .map((product) => product.paymentId!),
+    ),
+  ]
+  const responseQueries = useQueries({
+    queries: paymentIds.map((paymentId) => ({
+      queryKey: ["payment-form-responses", paymentId],
+      queryFn: () => PaymentsService.getMyFormResponses({ paymentId }),
+      retry: false,
+    })),
+  })
+  const paymentsWithForm = new Set(
+    paymentIds.filter(
+      (_, index) => !!responseQueries[index]?.data?.fields.length,
+    ),
+  )
+  const hasDetails = (product: OtherPurchasedProduct) =>
+    !!product.checkInCode ||
+    (!!product.paymentId && paymentsWithForm.has(product.paymentId))
+  const active = products.find(
+    (product) => product.key === selectedKey && hasDetails(product),
   )
 
   if (products.length === 0) return null
@@ -147,7 +173,7 @@ export function OtherPurchasedProducts({
                 </p>
               </div>
 
-              {!product.checkInCode && product.paymentId && (
+              {!product.checkInCode && hasDetails(product) && (
                 <ChevronRight
                   className="size-4 shrink-0 text-muted-foreground"
                   aria-hidden="true"
@@ -169,7 +195,7 @@ export function OtherPurchasedProducts({
 
           return (
             <li key={product.key}>
-              {product.checkInCode || product.paymentId ? (
+              {hasDetails(product) ? (
                 <button
                   type="button"
                   onClick={() => setSelectedKey(product.key)}

@@ -83,6 +83,10 @@ const orders = (payments: PaymentPortalPublic[]) => (
 
 afterEach(cleanup)
 
+vi.mock("@/components/payments/PaymentFormResponses", () => ({
+  PaymentFormResponses: () => null,
+}))
+
 describe("OrdersContent product QR", () => {
   it("opens one QR per merchandise unit without requiring a participant", () => {
     render(orders([payment()]))
