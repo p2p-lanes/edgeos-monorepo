@@ -20,6 +20,23 @@ function isNonDiscountableProduct(product: {
   return product.discountable === false
 }
 
+/**
+ * What one cart line is actually charged: its full amount minus the active
+ * discount, unless the product is non-discountable. Uses the same eligibility
+ * as the discount base below, so lines rendered with it add up to the total
+ * (plus insurance and fees, minus credit) without a separate discount row.
+ * Lines with no product (booked rooms) are discountable.
+ */
+export function chargedLineAmount(
+  amount: number,
+  product: { discountable?: boolean | null } | null | undefined,
+  discountPercent: number,
+): number {
+  if (!discountPercent || discountPercent <= 0) return amount
+  if (product && isNonDiscountableProduct(product)) return amount
+  return amount * (1 - discountPercent / 100)
+}
+
 interface UseCartSummaryParams {
   selectedPasses: SelectedPassItem[]
   housing: SelectedHousingItem | null
@@ -187,6 +204,7 @@ export function useCartSummary({
       dynamicSubtotal,
       subtotal: originalSubtotal,
       discount: promoDiscount,
+      discountPercent: discountValue,
       credit,
       creditApplied,
       grandTotal,

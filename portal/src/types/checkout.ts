@@ -284,6 +284,12 @@ export interface CheckoutCartSummary {
   dynamicSubtotal: number
   subtotal: number
   discount: number
+  /**
+   * Percentage behind `discount` (0 when none is active). Lets per-line
+   * displays show what each item is actually charged without re-deriving the
+   * discount source; pair it with `chargedLineAmount`.
+   */
+  discountPercent: number
   /** Total credit available to spend (account balance + edit give-up). */
   credit: number
   /**
@@ -336,15 +342,15 @@ export function setActiveCurrency(currency: string | null | undefined): void {
   _activeCurrency = (currency || "USD").toUpperCase()
 }
 
+// Prices always carry two decimals ($324.10, $0.00): dropping trailing zeros
+// read as a different precision per row ($324.1 next to $463) once discounts
+// started producing cents.
 export function formatCurrency(amount: number, currency?: string): string {
   const normalized = (currency || _activeCurrency).toUpperCase()
   const locale = CURRENCY_LOCALES[normalized] ?? "en-US"
   return new Intl.NumberFormat(locale, {
     style: "currency",
     currency: normalized,
-// Prices always carry two decimals ($324.10, $0.00): dropping trailing zeros
-// read as a different precision per row ($324.1 next to $463) once discounts
-// started producing cents.
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   }).format(amount)
@@ -430,6 +436,7 @@ export function createInitialSummary(): CheckoutCartSummary {
     dynamicSubtotal: 0,
     subtotal: 0,
     discount: 0,
+    discountPercent: 0,
     credit: 0,
     creditApplied: 0,
     grandTotal: 0,

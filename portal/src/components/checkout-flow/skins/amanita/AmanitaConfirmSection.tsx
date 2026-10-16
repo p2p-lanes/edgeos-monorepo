@@ -389,6 +389,9 @@ export default function AmanitaConfirmSection({
                             )}
                           </div>
                           <div className="flex items-center gap-2 shrink-0">
+                            {/* Full price on purpose: the lines sum to the
+                                Subtotal below, which the discount row
+                                reduces on its way to the Total. */}
                             <span className="font-medium text-deep">
                               {formatCurrency(pass.originalPrice ?? pass.price)}
                             </span>
