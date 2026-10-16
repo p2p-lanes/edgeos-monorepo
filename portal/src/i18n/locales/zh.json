@@ -87,6 +87,10 @@
     "estimated_total": "预估总额",
     "definitive_total": "总额"
   },
+  "ticketSales": {
+    "coming_soon_title": "门票即将开售",
+    "coming_soon_description": "本活动的门票尚未开售，请稍后再来查看。"
+  },
   "orders": {
     "show_unit_qr_label": "查看{{product}}第{{number}}件的二维码",
     "unit_qr_title": "{{product}} · 第{{number}}件二维码",

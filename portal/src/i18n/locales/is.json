@@ -87,6 +87,10 @@
     "estimated_total": "Áætluð heildarupphæð",
     "definitive_total": "Heildarupphæð"
   },
+  "ticketSales": {
+    "coming_soon_title": "Miðar væntanlegir",
+    "coming_soon_description": "Miðasala á þennan viðburð er ekki hafin enn. Kíktu aftur fljótlega."
+  },
   "orders": {
     "show_unit_qr_label": "Sjá QR-kóða fyrir {{product}}, einingu {{number}}",
     "unit_qr_title": "{{product}} · QR {{number}}",

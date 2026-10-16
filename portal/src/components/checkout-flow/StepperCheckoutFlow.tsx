@@ -28,6 +28,7 @@ import { AmanitaBackground } from "./skins/amanita/AmanitaBackground"
 import AmanitaBuyerStep from "./skins/amanita/AmanitaBuyerStep"
 import AmanitaCatalogSection from "./skins/amanita/AmanitaCatalogSection"
 import AmanitaConfirmSection from "./skins/amanita/AmanitaConfirmSection"
+import { TicketSalesComingSoon } from "./TicketSalesComingSoon"
 import "./skins/amanita/amanita-skin.css"
 import AmanitaStepFaqs from "./skins/amanita/AmanitaStepFaqs"
 import FaqsDrawer, { type FaqDrawerItem } from "./skins/amanita/FaqsDrawer"
@@ -257,6 +258,7 @@ export default function StepperCheckoutFlow({
     submitPayment,
     isInitialLoading,
     previewMode,
+    flowConfig,
     flowConfigError,
     markStepVisited,
     hasAnyCartItems,
@@ -459,6 +461,14 @@ export default function StepperCheckoutFlow({
 
   if (isInitialLoading) return <Loader />
   if (flowConfigError) return <CheckoutConfigError />
+  if (flowConfig?.ticket_sales_status === "coming_soon") {
+    return (
+      <TicketSalesComingSoon
+        title={flowConfig.coming_soon_title}
+        message={flowConfig.coming_soon_message}
+      />
+    )
+  }
 
   const current = sections[active]
   const isLast = active === last

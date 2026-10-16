@@ -101,6 +101,10 @@
     "estimated_total": "Total estimado",
     "definitive_total": "Total"
   },
+  "ticketSales": {
+    "coming_soon_title": "Entradas muy pronto",
+    "coming_soon_description": "La venta de entradas para este evento todavía no está abierta. Vuelve a consultar pronto."
+  },
   "orders": {
     "show_unit_qr_label": "Ver QR de {{product}}, unidad {{number}}",
     "unit_qr_title": "{{product}} · QR {{number}}",
