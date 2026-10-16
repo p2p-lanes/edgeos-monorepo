@@ -2493,6 +2493,7 @@ export type CheckoutRuntimeProduct = {
     name: string;
     slug: string;
     description?: (string | null);
+    info_note?: (string | null);
     price: string;
     compare_price?: (string | null);
     image_url?: (string | null);
@@ -3963,6 +3964,7 @@ export type HumanActivityItem = {
     occurred_at: string;
     popup_id?: (string | null);
     popup_label?: (string | null);
+    application_id?: (string | null);
     note?: (string | null);
     amount?: (string | null);
     currency?: (string | null);
@@ -3980,7 +3982,7 @@ export type HumanActivityItem = {
 /**
  * The kind of event a timeline item represents.
  */
-export type HumanActivityKind = 'application.submitted' | 'application.accepted' | 'payment.completed' | 'ticket.added' | 'note.added' | 'rating.changed' | 'comment.added' | 'credit.granted' | 'credit.applied' | 'credit.restored' | 'passes.edited';
+export type HumanActivityKind = 'application.submitted' | 'application.accepted' | 'payment.completed' | 'ticket.added' | 'note.added' | 'rating.changed' | 'comment.added' | 'application.comment_added' | 'credit.granted' | 'credit.applied' | 'credit.restored' | 'passes.edited';
 
 /**
  * One purchased line in a `payment.completed` item (snapshot at purchase).
@@ -5664,6 +5666,7 @@ export type ProductBatchItem = {
     price: (number | string);
     compare_price?: (number | string | null);
     description?: (string | null);
+    info_note?: (string | null);
     image_url?: (string | null);
     images?: Array<(string)>;
     category?: string;
@@ -5691,6 +5694,7 @@ export type ProductBatchResult = {
     price: string;
     compare_price?: (string | null);
     description?: (string | null);
+    info_note?: (string | null);
     image_url?: (string | null);
     images?: Array<(string)>;
     category?: string;
@@ -5735,6 +5739,7 @@ export type ProductCreate = {
     price: (number | string);
     compare_price?: (number | string | null);
     description?: (string | null);
+    info_note?: (string | null);
     image_url?: (string | null);
     images?: Array<(string)>;
     category?: string;
@@ -5779,6 +5784,7 @@ export type ProductPublic = {
     price: string;
     compare_price?: (string | null);
     description?: (string | null);
+    info_note?: (string | null);
     image_url?: (string | null);
     images?: Array<(string)>;
     category?: string;
@@ -5815,6 +5821,7 @@ export type ProductUpdate = {
     price?: (number | string | null);
     compare_price?: (number | string | null);
     description?: (string | null);
+    info_note?: (string | null);
     image_url?: (string | null);
     images?: (Array<(string)> | null);
     category?: (string | null);
@@ -5842,6 +5849,7 @@ export type ProductWithQuantity = {
     price: string;
     compare_price?: (string | null);
     description?: (string | null);
+    info_note?: (string | null);
     image_url?: (string | null);
     images?: Array<(string)>;
     category?: string;
@@ -6078,6 +6086,9 @@ export type SalesFlowApplicationEntryPublic = {
     type: SalesFlowType;
     price_summary?: (SalesFlowPriceSummary | null);
     theme_config?: (SalesFlowPortalThemeConfig | null);
+    ticket_sales_status?: SalesFlowTicketSalesStatus;
+    coming_soon_title?: (string | null);
+    coming_soon_message?: (string | null);
     requires_application_fee: boolean;
     application_fee_amount: (string | null);
     application_layout: ApplicationLayout;
@@ -6105,6 +6116,9 @@ export type SalesFlowCheckoutConfig = {
     contribution_percentage?: (string | null);
     contribution_label?: (string | null);
     contribution_description?: (string | null);
+    ticket_sales_status?: SalesFlowTicketSalesStatus;
+    coming_soon_title?: (string | null);
+    coming_soon_message?: (string | null);
 };
 
 /**
@@ -6192,6 +6206,9 @@ export type SalesFlowPortalPublic = {
     type: SalesFlowType;
     price_summary?: (SalesFlowPriceSummary | null);
     theme_config?: (SalesFlowPortalThemeConfig | null);
+    ticket_sales_status?: SalesFlowTicketSalesStatus;
+    coming_soon_title?: (string | null);
+    coming_soon_message?: (string | null);
 };
 
 /**
@@ -6264,6 +6281,9 @@ export type SalesFlowPublic = {
     reviewers_mode?: SalesFlowReviewersMode;
     identity_mode?: SalesFlowIdentityMode;
     status?: (string | null);
+    ticket_sales_status?: SalesFlowTicketSalesStatus;
+    coming_soon_title?: (string | null);
+    coming_soon_message?: (string | null);
     restriction_rule?: ({
     [key: string]: unknown;
 } | null);
@@ -6347,6 +6367,17 @@ export type SalesFlowReviewersMode = 'inherit' | 'override';
 export type SalesFlowStatus = 'closed';
 
 /**
+ * Whether this way in is selling yet.
+ *
+ * Separate from `status` on purpose. A closed flow is out of circulation:
+ * it takes no applications and nobody reaches it. A flow whose sales are
+ * `coming_soon` keeps taking applications and accepting people, who then
+ * see the flow's coming-soon message instead of a checkout until the
+ * organiser opens sales. Every purchase path refuses while it is not open.
+ */
+export type SalesFlowTicketSalesStatus = 'open' | 'coming_soon';
+
+/**
  * Sale model of a flow. Mirrors PopupBase.sale_type plus 'upsale'.
  */
 export type SalesFlowType = 'application' | 'direct' | 'upsale';
@@ -6356,6 +6387,9 @@ export type SalesFlowType = 'application' | 'direct' | 'upsale';
  */
 export type SalesFlowUpdate = {
     status?: (SalesFlowStatus | null);
+    ticket_sales_status?: (SalesFlowTicketSalesStatus | null);
+    coming_soon_title?: (string | null);
+    coming_soon_message?: (string | null);
     type?: (SalesFlowType | null);
     slug?: (string | null);
     name?: (string | null);
