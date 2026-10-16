@@ -41,7 +41,7 @@ from app.api.payment.schemas import PaymentStatus
 from app.api.popup.models import Popups
 from app.api.sales_flow.crud import sales_flows_crud
 from app.api.sales_flow.models import SalesFlows
-from app.api.sales_flow.schemas import SalesFlowCreate
+from app.api.sales_flow.schemas import SalesFlowCreate, SalesFlowTicketSalesStatus
 from app.api.tenant.models import Tenants
 from app.services.reminder_dispatch import dispatch_reminders
 
@@ -336,3 +336,65 @@ def test_legacy_null_flow_log_counts_for_default_flow_only(
 
     assert default_stats[0] == 1
     assert flow_b_stats[0] == 0
+
+
+# ---------------------------------------------------------------------------
+# A flow whose ticket sales are held (SIM-48)
+# ---------------------------------------------------------------------------
+
+
+def test_held_sales_skip_purchase_nudges_but_not_application_ones(
+    db: Session, test_engine, tenant_a: Tenants
+) -> None:
+    """Nobody can buy through a flow whose sales are coming soon, so telling
+    an accepted applicant to complete their purchase would only land them on
+    the coming-soon screen. Reminders to finish an application still go out."""
+    now = datetime.now(UTC)
+    popup, default_flow = _make_popup(
+        db,
+        tenant_a,
+        purchase_reminder_delay_days=1,
+        abandoned_application_delay_days=1,
+    )
+    default_flow.purchase_reminder_delay_days = 1
+    default_flow.abandoned_application_delay_days = 1
+    default_flow.ticket_sales_status = SalesFlowTicketSalesStatus.coming_soon
+    db.add(default_flow)
+    db.commit()
+
+    accepted_human = _make_human(db, tenant_a)
+    accepted = _make_application(
+        db,
+        tenant_a,
+        popup,
+        accepted_human,
+        sales_flow_id=default_flow.id,
+        status=ApplicationStatus.ACCEPTED,
+        now=now,
+    )
+    accepted.accepted_at = now - timedelta(days=3)
+    db.add(accepted)
+    db.commit()
+    draft_human = _make_human(db, tenant_a)
+    _make_application(
+        db,
+        tenant_a,
+        popup,
+        draft_human,
+        sales_flow_id=default_flow.id,
+        updated_days_ago=3,
+        now=now,
+    )
+
+    _, held = _run(db, test_engine, now=now)
+
+    assert _sent_to(held, accepted_human.email) == 0
+    assert _sent_to(held, draft_human.email) == 1
+
+    default_flow.ticket_sales_status = SalesFlowTicketSalesStatus.open
+    db.add(default_flow)
+    db.commit()
+
+    _, opened = _run(db, test_engine, now=now)
+
+    assert _sent_to(opened, accepted_human.email) == 1

@@ -27,6 +27,7 @@ from app.api.sales_flow.schemas import (
     EFFECTIVE_CONFIG_FIELDS,
     EffectiveFlowConfig,
     SalesFlowCheckoutConfig,
+    SalesFlowTicketSalesStatus,
     SalesFlowType,
 )
 from app.api.shared.enums import SaleType
@@ -215,4 +216,22 @@ def build_checkout_config(flow: SalesFlows) -> SalesFlowCheckoutConfig:
         contribution_percentage=config.contribution_percentage,
         contribution_label=config.contribution_label,
         contribution_description=config.contribution_description,
+        ticket_sales_status=flow.ticket_sales_status,
+        coming_soon_title=flow.coming_soon_title,
+        coming_soon_message=flow.coming_soon_message,
     )
+
+
+def assert_ticket_sales_open(flow: SalesFlows) -> None:
+    """Refuse a purchase through a flow whose sales are not open yet.
+
+    The portal shows the coming-soon message instead of a checkout, but a
+    hidden button is not a closed door: every purchase and quote path calls
+    this, so a kept link or a scripted request cannot buy early either.
+    Applications are untouched; only buying waits.
+    """
+    if flow.ticket_sales_status != SalesFlowTicketSalesStatus.open:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Ticket sales are not open yet",
+        )

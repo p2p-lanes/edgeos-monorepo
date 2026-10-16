@@ -29,6 +29,8 @@ from tests._flow_helpers import provision_default_flow
 # What a buyer legitimately needs to pick a way in and list them in order,
 # plus `type`, an optional price summary, and public theme overrides — the
 # display facts needed to select and describe this way in before checkout.
+# Also whether it sells yet, with the coming-soon copy the organiser wrote for
+# buyers to read while it does not.
 #
 # Every entry here was added on purpose. That is the point of asserting the
 # exact set: the next field to leak has not been added yet, and this test is
@@ -41,6 +43,9 @@ ALLOWED_KEYS = {
     "type",
     "price_summary",
     "theme_config",
+    "ticket_sales_status",
+    "coming_soon_title",
+    "coming_soon_message",
 }
 
 

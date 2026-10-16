@@ -31,10 +31,15 @@ def test_backfill_preserves_buyers_existing_categories_and_ambiguous_history(
         command.upgrade(config, migration.revision)
         command.downgrade(config, migration.down_revision)
         # This test intentionally runs at the migration's parent revision,
-        # while the ORM model reflects later SimpleFi-key, profile, badge, and
-        # sidebar configuration fields.
+        # while the ORM model reflects later SimpleFi-key, ticket-sales, profile,
+        # badge, and sidebar configuration fields.
         connection.execute(
-            text("ALTER TABLE sales_flows ADD COLUMN simplefi_api_key VARCHAR")
+            text(
+                "ALTER TABLE sales_flows ADD COLUMN simplefi_api_key VARCHAR, "
+                "ADD COLUMN ticket_sales_status VARCHAR NOT NULL DEFAULT 'open', "
+                "ADD COLUMN coming_soon_title VARCHAR, "
+                "ADD COLUMN coming_soon_message TEXT"
+            )
         )
         connection.execute(
             text(

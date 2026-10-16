@@ -2166,6 +2166,28 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
                 detail="Application must be accepted before purchasing products",
             )
 
+    def _validate_ticket_sales_open(
+        self, session: Session, application: Applications
+    ) -> None:
+        """An accepted applicant still waits while the flow's sales are not open.
+
+        Runs on preview and on create (create previews first), so neither a
+        quote nor a purchase gets through before the organiser opens sales.
+        """
+        from app.api.sales_flow.crud import sales_flows_crud  # noqa: PLC0415
+        from app.api.sales_flow.models import SalesFlows  # noqa: PLC0415
+        from app.api.sales_flow.resolver import (  # noqa: PLC0415
+            assert_ticket_sales_open,
+        )
+
+        flow = (
+            session.get(SalesFlows, application.sales_flow_id)
+            if application.sales_flow_id is not None
+            else sales_flows_crud.get_default_flow(session, application.popup_id)
+        )
+        if flow is not None:
+            assert_ticket_sales_open(flow)
+
     def _validate_products(
         self,
         session: Session,
@@ -3155,6 +3177,7 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
             )
 
         self._validate_application(application)
+        self._validate_ticket_sales_open(session, application)
         valid_products = self._validate_products(session, obj.products, application)
         self._validate_attendees(session, obj.products, application)
         self._validate_recipient_requests(
