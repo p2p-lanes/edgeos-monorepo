@@ -211,6 +211,19 @@ describe("StepperCheckoutFlow", () => {
     expect(pay.disabled).toBe(true)
   })
 
+  // With nothing in the cart the total is $0, which used to resolve to
+  // "Claim Pass": a disabled button offering a free pass. It names what is
+  // missing instead.
+  it("asks for a ticket instead of offering Claim Pass on an empty cart", () => {
+    hasAnyCartItemsOverride = false
+    render(<StepperCheckoutFlow />)
+    fireEvent.click(screen.getByTestId("stepper-next")) // → confirm (last)
+
+    const pay = screen.getByTestId("stepper-next")
+    expect(pay.textContent).toBe("checkout.actions.select_ticket")
+    expect(pay.textContent).not.toContain("checkout.actions.claim_pass")
+  })
+
   it("renders only the first section initially", () => {
     render(<StepperCheckoutFlow />)
     expect(screen.getByText("pass-step")).toBeTruthy()
@@ -763,6 +776,18 @@ describe("StepperCheckoutFlow", () => {
 
       expect(screen.getByTestId("stepper-next").textContent).toBe("Comprar ya")
       expect(amanitaConfirmProps?.payLabel).toBe("Comprar ya")
+    })
+
+    it("does not put the authored label on an empty cart", () => {
+      hasAnyCartItemsOverride = false
+      cityOverride = AMANITA_CITY
+      stepConfigsOverride = [confirmStep({ cta_label: "Comprar ya" })]
+      render(<StepperCheckoutFlow />)
+      fireEvent.click(screen.getByTestId("stepper-next")) // → confirm (last)
+
+      const pay = screen.getByTestId("stepper-next") as HTMLButtonElement
+      expect(pay.textContent).toBe("checkout.actions.select_ticket")
+      expect(pay.disabled).toBe(true)
     })
 
     it("falls back to the built-in wording when the organizer wrote none", () => {

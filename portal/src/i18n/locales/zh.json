@@ -359,7 +359,8 @@
       "confirm_edit": "确认编辑",
       "pay_and_confirm_edit": "支付并确认编辑",
       "continue_to": "继续到 {{step}}",
-      "review": "审核"
+      "review": "审核",
+      "select_ticket": "选择门票以继续"
     },
     "step_short": {
       "passes": "通行证",

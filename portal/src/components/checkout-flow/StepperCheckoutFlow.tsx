@@ -508,11 +508,15 @@ export default function StepperCheckoutFlow({
     (section) => section.stepType === "confirm",
   )?.config?.template_config ?? {}) as { cta_label?: string }
   const authoredPayLabel = confirmTemplateConfig.cta_label?.trim()
-  const payLabel =
-    authoredPayLabel ||
-    (summary.grandTotal === 0
-      ? t("checkout.actions.claim_pass")
-      : t("checkout.actions.pay"))
+  // An empty cart is the one case the authored label does not cover: the
+  // button is disabled there, and "Claim Pass" (what a $0 total used to fall
+  // into) read as an offer of a free pass. It says what is missing instead.
+  const payLabel = !hasAnyCartItems
+    ? t("checkout.actions.select_ticket")
+    : authoredPayLabel ||
+      (summary.grandTotal === 0
+        ? t("checkout.actions.claim_pass")
+        : t("checkout.actions.pay"))
 
   // The first section is an "intro" when it's a content-only template (a hero
   // or similar): nothing has been priced yet, so the bar drops Back and Total

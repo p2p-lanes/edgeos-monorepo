@@ -375,7 +375,8 @@
       "confirm_edit": "Confirm Edit",
       "pay_and_confirm_edit": "Pay & Confirm Edit",
       "continue_to": "Continue to {{step}}",
-      "review": "Review"
+      "review": "Review",
+      "select_ticket": "Select a ticket to continue"
     },
     "step_short": {
       "passes": "Passes",
