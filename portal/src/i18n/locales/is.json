@@ -271,6 +271,7 @@
     "sold_out": "Uppselt",
     "sale_upcoming": "Væntanlegt",
     "sale_ended": "Lokið",
+    "product_info_note_label": "Nánari upplýsingar um {{name}}",
     "loading_info": "Hleður upplýsingum þínum",
     "processing": "Vinn úr skráningu þinni",
     "processing_subtitle": "Þetta gæti tekið nokkur augnablik",

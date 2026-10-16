@@ -40,6 +40,7 @@ import Image from "next/image"
 import { Fragment, useState } from "react"
 import { useTranslation } from "react-i18next"
 import type { TicketingStepPublic } from "@/client"
+import { ProductInfoNote } from "@/components/checkout-flow/shared/ProductInfoNote"
 import {
   type TicketRowVM,
   type TicketSectionVM,
@@ -139,9 +140,16 @@ function VariantRow({
       style={{ borderColor: ROW_BORDER }}
     >
       <div className="min-w-0">
-        <p className="text-sm font-semibold leading-snug text-deep">
-          {product.name}
-        </p>
+        <div className="flex items-center gap-1.5">
+          <p className="text-sm font-semibold leading-snug text-deep">
+            {product.name}
+          </p>
+          <ProductInfoNote
+            note={product.info_note}
+            productName={product.name}
+            className="text-primary hover:text-deep"
+          />
+        </div>
         <p className="mt-0.5 font-condensed text-lg leading-none text-primary">
           {formatCurrency(product.price)}
         </p>
