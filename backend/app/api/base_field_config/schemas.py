@@ -1,22 +1,35 @@
 import uuid
 
 from pydantic import BaseModel, ConfigDict
-from sqlalchemy import String
-from sqlalchemy.dialects.postgresql import ARRAY
+from sqlalchemy import ForeignKey, String
+from sqlalchemy.dialects.postgresql import ARRAY, UUID
 from sqlmodel import Column, Field, SQLModel
 
 
 class BaseFieldConfigBase(SQLModel):
-    tenant_id: uuid.UUID = Field(foreign_key="tenants.id", index=True)
-    popup_id: uuid.UUID = Field(foreign_key="popups.id", index=True)
+    tenant_id: uuid.UUID = Field(
+        sa_column=Column(
+            UUID(as_uuid=True), ForeignKey("tenants.id", ondelete="CASCADE"), index=True
+        )
+    )
+    popup_id: uuid.UUID = Field(
+        sa_column=Column(
+            UUID(as_uuid=True), ForeignKey("popups.id", ondelete="CASCADE"), index=True
+        )
+    )
     # sdd/sales-flows-rediseno slice 3: belongs to exactly one flow.
     # There is no popup-shared tier and nothing is inherited.
     sales_flow_id: uuid.UUID = Field(
-        foreign_key="sales_flows.id", nullable=False, index=True
+        sa_column=Column(UUID(as_uuid=True), nullable=False, index=True)
     )
     field_name: str = Field(index=True)
     section_id: uuid.UUID | None = Field(
-        default=None, nullable=True, foreign_key="formsections.id"
+        default=None,
+        sa_column=Column(
+            UUID(as_uuid=True),
+            ForeignKey("formsections.id", ondelete="SET NULL"),
+            nullable=True,
+        ),
     )
     position: int = Field(default=0)
     required: bool = Field(default=False)

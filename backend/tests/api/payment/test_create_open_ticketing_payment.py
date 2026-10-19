@@ -359,6 +359,62 @@ def test_create_open_ticketing_payment_one_attendee_n_tickets(
     assert snapshot_fields[1]["value"] == ["vegetarian", "gluten_free"]
 
 
+def test_open_ticketing_purchase_preserves_sections_owned_by_other_flows(
+    db: Session,
+    tenant_a: Tenants,
+) -> None:
+    popup = _make_popup(db, tenant_a, slug_prefix="flow-form-isolation")
+    product = _make_product(db, popup, name="Merch", price="25.00")
+    flow_id = default_flow_id(db, popup.id)
+    default_flow = db.get(SalesFlows, flow_id)
+    assert default_flow is not None
+
+    event_flow = SalesFlows(
+        tenant_id=popup.tenant_id,
+        popup_id=popup.id,
+        slug="event-tickets",
+        name="Event Tickets",
+        type="direct",
+    )
+    db.add(event_flow)
+    db.flush()
+    protected_section = FormSections(
+        tenant_id=popup.tenant_id,
+        popup_id=popup.id,
+        sales_flow_id=event_flow.id,
+        label="Personal Information",
+        protected=True,
+    )
+    db.add(protected_section)
+    db.commit()
+
+    obj = _purchase_create(
+        email="flow-isolation@test.com",
+        first_name="Flow",
+        last_name="Buyer",
+        products=[(product, 1)],
+        form_data={},
+    )
+    provider_response = SimpleNamespace(
+        id="sf_flow_form_isolation",
+        status="pending",
+        checkout_url="https://simplefi.test/flow-form-isolation",
+        is_installment_plan=False,
+    )
+
+    with patch("app.services.simplefi.get_simplefi_client") as mock_get_client:
+        mock_get_client.return_value.create_payment.return_value = provider_response
+        payments_crud.create_open_ticketing_payment(
+            db,
+            obj=obj,
+            popup=popup,
+            tenant=tenant_a,
+            flow_slug=default_flow.slug,
+        )
+
+    assert db.get(FormSections, protected_section.id) is not None
+
+
 def test_create_open_ticketing_payment_second_purchase_reuses_attendee(
     db: Session,
     tenant_a: Tenants,

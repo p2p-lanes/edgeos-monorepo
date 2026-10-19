@@ -3,10 +3,8 @@ GET /checkout/{slug}/{flow_slug}/runtime.
 
 Design: sdd/sales-flows D6 URL scheme, the Flow-Resolution Contract, and the
 Threat Matrix's "URL segment resolution" / "Cross-tenant / cross-popup flow
-reference" rows. Also closes two disclosed slice-8 gaps for this endpoint:
-- risk-001: buyer_form fields must come from the tier-filtered
-  `find_for_flow` list, never the unfiltered `FormSections.form_fields` ORM
-  relationship (which ignores `sales_flow_id` entirely).
+reference" rows. Flow ownership is enforced by database constraints and by
+reading only the selected flow's form definitions.
 - res-001: the runtime path never applied translation overlays to
   buyer_form/form_schema, unlike `form_field/router.py`'s own portal schema
   endpoint — this closes that mismatch.
@@ -16,7 +14,9 @@ TDD: RED -> GREEN.
 
 import uuid
 
+import pytest
 from fastapi.testclient import TestClient
+from sqlalchemy.exc import IntegrityError
 from sqlmodel import Session
 
 from app.api.form_field.models import FormFields
@@ -257,13 +257,11 @@ class TestFlowSlugRouting:
         assert response.status_code == 401, response.text
 
 
-class TestSectionFieldTierParity:
-    """risk-001: fields must resolve through the flow's own `find_by_flow`
-    list, never the unfiltered `FormSections.form_fields` ORM relationship
-    (which ignores `sales_flow_id`)."""
+class TestSectionFieldFlowOwnership:
+    """A form field cannot point at a section owned by another flow."""
 
-    def test_a_shared_section_id_never_leaks_another_flows_field(
-        self, client: TestClient, db: Session, tenant_a: Tenants
+    def test_cross_flow_section_assignment_is_rejected_by_database(
+        self, db: Session, tenant_a: Tenants
     ) -> None:
         popup = _make_direct_popup(db, tenant_a)
         flow_a = _make_flow(db, popup, slug="flow-a")
@@ -278,28 +276,16 @@ class TestSectionFieldTierParity:
             label="Flow A Field",
             sales_flow_id=flow_a.id,
         )
-        # flow_b owns a field pointing at the SAME section_id. Nothing stops
-        # that at the DB level, so the read path is what must not confuse
-        # "shares a section id" with "belongs to this flow".
-        _make_field(
-            db,
-            popup,
-            section,
-            name="flow_b_field",
-            label="Flow B Field",
-            sales_flow_id=flow_b.id,
-        )
-        db.commit()
-
-        response = client.get(
-            f"/api/v1/checkout/{popup.slug}/{flow_a.slug}/runtime",
-            headers={"X-Tenant-Id": str(tenant_a.id)},
-        )
-        assert response.status_code == 200, response.text
-        body = response.json()
-        assert len(body["buyer_form"]) == 1
-        field_labels = [f["label"] for f in body["buyer_form"][0]["form_fields"]]
-        assert field_labels == ["Flow A Field"]
+        with pytest.raises(IntegrityError):
+            _make_field(
+                db,
+                popup,
+                section,
+                name="flow_b_field",
+                label="Flow B Field",
+                sales_flow_id=flow_b.id,
+            )
+        db.rollback()
 
 
 class TestTranslationParity:

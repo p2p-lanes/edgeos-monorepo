@@ -522,6 +522,23 @@ async def delete_popup(
     from app.api.audit_log.actor import actor_from_user
     from app.api.audit_log.constants import AuditAction, AuditEntityType
     from app.api.audit_log.crud import audit_logs_crud
+    from app.api.base_field_config.crud import base_field_configs_crud
+    from app.api.base_field_config.models import BaseFieldConfigs
+    from app.api.form_field.crud import form_fields_crud
+    from app.api.form_field.models import FormFields
+    from app.api.form_section.crud import form_sections_crud
+
+    popup_sections, _ = form_sections_crud.find_by_popup(
+        db, popup_id=popup.id, limit=None
+    )
+    popup_fields = list(
+        db.exec(select(FormFields).where(FormFields.popup_id == popup.id)).all()
+    )
+    popup_base_field_configs = list(
+        db.exec(
+            select(BaseFieldConfigs).where(BaseFieldConfigs.popup_id == popup.id)
+        ).all()
+    )
 
     audit_logs_crud.record(
         db,
@@ -533,22 +550,27 @@ async def delete_popup(
         entity_label=popup.name,
         popup_id=popup.id,
         details={
-            "form_sections_deleted": len(popup.form_sections),
-            "custom_fields_deleted": len(popup.form_fields),
-            "base_fields_deleted": len(popup.base_field_configs),
+            "form_sections_deleted": len(popup_sections),
+            "custom_fields_deleted": len(popup_fields),
+            "base_fields_deleted": len(popup_base_field_configs),
         },
     )
 
     # Clean up translations for the popup and its child entities
-    for field in popup.form_fields:
+    for field in popup_fields:
         delete_translations_for_entity(db, "form_field", field.id)
-    for section in popup.form_sections:
+    for section in popup_sections:
         delete_translations_for_entity(db, "form_section", section.id)
     for product in popup.products:
         delete_translations_for_entity(db, "product", product.id)
     for group in popup.groups:
         delete_translations_for_entity(db, "group", group.id)
     delete_translations_for_entity(db, "popup", popup.id)
+
+    for field_config in popup_base_field_configs:
+        base_field_configs_crud.delete(db, field_config)
+    for field in popup_fields:
+        form_fields_crud.delete(db, field)
 
     crud.delete(db, popup)
 

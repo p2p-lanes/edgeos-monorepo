@@ -107,6 +107,7 @@ class TestOurOwnConfigurationDoesNotBlock:
             order=0,
         )
         db.add(section)
+        db.flush()
         db.add(
             FormFields(
                 tenant_id=tenant_a.id,

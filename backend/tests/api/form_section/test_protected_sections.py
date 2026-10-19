@@ -1,16 +1,59 @@
 import uuid
 from io import StringIO
 
+import pytest
 from fastapi.testclient import TestClient
 from loguru import logger
+from sqlalchemy import text
+from sqlalchemy.exc import IntegrityError
 from sqlmodel import Session, select
 
 from app.api.audit_log.models import AuditLog
 from app.api.form_field.models import FormFields
+from app.api.form_section.models import FormSections
 from app.api.popup.models import Popups
 from app.api.sales_flow.crud import sales_flows_crud
 from app.api.tenant.models import Tenants
 from tests._flow_helpers import default_flow_id
+
+
+def test_database_rejects_direct_delete_of_protected_section(
+    db: Session,
+    tenant_a: Tenants,
+) -> None:
+    slug = f"protected-db-section-{uuid.uuid4().hex[:8]}"
+    popup = Popups(tenant_id=tenant_a.id, name=f"Popup {slug}", slug=slug)
+    db.add(popup)
+    db.flush()
+    flow = sales_flows_crud.provision_default_flow(
+        db, popup_id=popup.id, tenant_id=tenant_a.id, sale_type="application"
+    )
+    section = FormSections(
+        tenant_id=tenant_a.id,
+        popup_id=popup.id,
+        sales_flow_id=flow.id,
+        label="Protected section",
+        protected=True,
+    )
+    db.add(section)
+    db.commit()
+    section_id = section.id
+
+    with pytest.raises(IntegrityError, match="Cannot delete a protected form section"):
+        db.exec(
+            text("DELETE FROM formsections WHERE id = :section_id").bindparams(
+                section_id=section_id
+            )
+        )
+    db.rollback()
+
+    assert db.get(FormSections, section_id) is not None
+
+    db.exec(
+        text("DELETE FROM popups WHERE id = :popup_id").bindparams(popup_id=popup.id)
+    )
+    db.commit()
+    assert db.get(FormSections, section_id) is None
 
 
 def test_protected_section_cannot_be_deleted_until_unprotected(
