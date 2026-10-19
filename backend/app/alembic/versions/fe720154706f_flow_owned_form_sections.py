@@ -212,9 +212,7 @@ def downgrade() -> None:
             ("popup_id", "popups"),
             ("tenant_id", "tenants"),
         ):
-            op.drop_constraint(
-                f"{table}_{column}_fkey", table, type_="foreignkey"
-            )
+            op.drop_constraint(f"{table}_{column}_fkey", table, type_="foreignkey")
             op.create_foreign_key(
                 f"{table}_{column}_fkey",
                 table,
