@@ -1,7 +1,7 @@
 """Enforce form definition ownership and section-flow consistency.
 
 Revision ID: fe720154706f
-Revises: f6b2a9d1c804
+Revises: a91d4b7e2306
 Create Date: 2026-10-16
 """
 
@@ -9,7 +9,7 @@ import sqlalchemy as sa
 from alembic import op
 
 revision = "fe720154706f"
-down_revision = "f6b2a9d1c804"
+down_revision = "a91d4b7e2306"
 branch_labels = None
 depends_on = None
 
