@@ -1,4 +1,5 @@
 import uuid
+from collections import Counter
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from decimal import ROUND_HALF_UP, Decimal
@@ -4590,6 +4591,7 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
                     )
                     .order_by(AttendeeProducts.id)
                     .with_for_update()
+                    .execution_options(populate_existing=True)
                 ).all()
             )
             if line_ids
@@ -4617,6 +4619,10 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
                 ticket = by_lineage.get(key) or (
                     candidates.pop(0) if candidates else None
                 )
+                # An old approval replay must not resurrect a replaced pass
+                # whose inventory is already available to another buyer.
+                if ticket is not None and ticket.stock_released_at is not None:
+                    continue
                 if ticket is None:
                     ticket = AttendeeProducts(
                         tenant_id=payment.tenant_id,
@@ -4689,7 +4695,9 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
         payment_line_ids: set[uuid.UUID],
         attendee_ids: set[uuid.UUID],
     ) -> None:
-        """Revoke prior active access holdings for one edit-passes settlement."""
+        """Revoke prior access and release inventory once, in this transaction."""
+        from app.api.product.crud import products_crud
+
         if not attendee_ids:
             return
 
@@ -4710,10 +4718,14 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
                 ),
             )
             .with_for_update()
+            .execution_options(populate_existing=True)
         )
         holdings = list(session.exec(statement).all())
         revoked_at = datetime.now(UTC)
         for holding in holdings:
+            if holding.stock_released_at is None:
+                products_crud.restore_total_stock(session, holding.product_id, 1)
+                holding.stock_released_at = revoked_at
             holding.revoked_at = revoked_at
             session.add(holding)
 
@@ -4802,9 +4814,33 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
                 PaymentProducts.payment_id == locked_payment.id
             )
         ).all()
+        # Revocation alone is not evidence of a return: pre-migration swaps
+        # revoked passes without restoring inventory. Only subtract explicitly
+        # released units, retaining snapshot quantities for missing unit rows.
+        released = session.exec(
+            select(AttendeeProducts).where(
+                AttendeeProducts.payment_id == locked_payment.id,
+                AttendeeProducts.stock_released_at.is_not(None),
+            )
+        ).all()
+        released_by_line = Counter(
+            unit.payment_product_id
+            for unit in released
+            if unit.payment_product_id is not None
+        )
+        # Legacy units can carry payment_id without payment_product_id. Allocate
+        # their returns across matching snapshot lines only once.
+        legacy_returns = Counter(
+            unit.product_id for unit in released if unit.payment_product_id is None
+        )
         for pp in products:
+            remaining = max(0, pp.quantity - released_by_line[pp.id])
+            legacy_returned = min(remaining, legacy_returns[pp.product_id])
+            legacy_returns[pp.product_id] -= legacy_returned
+            remaining -= legacy_returned
             # Restore per-product total stock counter (no-op for unlimited products).
-            products_crud.restore_total_stock(session, pp.product_id, pp.quantity)
+            if remaining:
+                products_crud.restore_total_stock(session, pp.product_id, remaining)
 
     # ------------------------------------------------------------------
     # ADR-2 / ADR-3 / ADR-4  — supersede helpers

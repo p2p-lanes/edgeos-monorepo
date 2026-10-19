@@ -66,6 +66,59 @@ function buildProducts(
 }
 
 describe("buildPaymentProducts", () => {
+  it.each([
+    "edit",
+    "month-upgrade",
+  ])("does not resubmit owned extras during %s replacement", (mode) => {
+    const oldPass = createProduct({
+      id: "old-week",
+      duration_type: "week",
+      purchased: true,
+      quantity: 1,
+    })
+    oldPass.edit = true
+    const newPass = createProduct({
+      id: "new-full",
+      duration_type: "full",
+      selected: true,
+      quantity: 1,
+    })
+    const attendee = createAttendee([
+      oldPass,
+      newPass,
+      createProduct({
+        id: "owned-room",
+        category: "housing",
+        purchased: true,
+        quantity: 0,
+      }),
+      createProduct({
+        id: "owned-shirt",
+        category: "merch",
+        purchased: true,
+        quantity: 2,
+      }),
+    ])
+    const result = buildProducts({
+      attendeePasses: [attendee],
+      selectedPasses: [
+        {
+          productId: newPass.id,
+          product: newPass,
+          attendeeId: attendee.id,
+          attendee,
+          quantity: 1,
+          price: 100,
+        },
+      ],
+      isEditing: mode === "edit",
+      editPassesEnabled: true,
+    })
+    expect(result.products).toEqual([
+      { product_id: newPass.id, attendee_id: attendee.id, quantity: 1 },
+    ])
+  })
+
   it("keeps simple_quantity payloads linear and disables month upgrades", () => {
     const purchasedWeek = createProduct({
       id: "week-owned",
