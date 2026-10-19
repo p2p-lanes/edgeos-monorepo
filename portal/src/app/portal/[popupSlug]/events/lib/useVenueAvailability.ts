@@ -13,6 +13,7 @@ import {
   EventsService,
   type EventVenuePublic,
   EventVenuesService,
+  type VenueBookingMode,
 } from "@/client"
 
 type Availability = "idle" | "checking" | "ok" | "conflict"
@@ -57,7 +58,7 @@ export interface UseVenueAvailabilityResult {
    * callers should fall back to a conservative venue-wide hint in that
    * window so the user isn't left without context.
    */
-  effectiveBookingMode: string | null
+  effectiveBookingMode: VenueBookingMode | null
 }
 
 /**
@@ -199,9 +200,8 @@ export function useVenueAvailability(
   }, [venueId, startIso, openOnlyIntervals, durationMinutes])
 
   const [availability, setAvailability] = useState<Availability>("idle")
-  const [effectiveBookingMode, setEffectiveBookingMode] = useState<
-    string | null
-  >(null)
+  const [effectiveBookingMode, setEffectiveBookingMode] =
+    useState<VenueBookingMode | null>(null)
 
   useEffect(() => {
     if (!venueId || !startIso || !endIso) {
