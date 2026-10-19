@@ -379,10 +379,8 @@ def test_new_snapshots_include_unsectioned_fields_only_from_the_selected_flow(
     )
     db.add(other)
     db.commit()
-    # Reload relationships to model a fresh checkout request.
-    db.expire(popup)
     snapshot = payments_crud._build_buyer_snapshot(
-        popup, {field.name: "Riva Resort"}, sales_flow_id=payment.sales_flow_id
+        [], [field], {field.name: "Riva Resort"}
     )
     fields = [f for s in snapshot["sections"] for f in s["fields"]]
     assert [f["field_id"] for f in fields] == [str(field.id)]

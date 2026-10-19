@@ -1,7 +1,7 @@
 import uuid
 from typing import TYPE_CHECKING, Optional
 
-from sqlalchemy import Index, text
+from sqlalchemy import ForeignKeyConstraint, Index
 from sqlalchemy.dialects.postgresql import UUID
 from sqlmodel import Column, Field, Relationship
 
@@ -9,33 +9,34 @@ from app.api.base_field_config.schemas import BaseFieldConfigBase
 
 if TYPE_CHECKING:
     from app.api.form_section.models import FormSections
-    from app.api.popup.models import Popups
-    from app.api.tenant.models import Tenants
+    from app.api.sales_flow.models import SalesFlows
 
 
 class BaseFieldConfigs(BaseFieldConfigBase, table=True):
-    """sdd/sales-flows slice 6: two-tier uniqueness on `field_name`.
-
-    `uq_base_field_config_flow_field` covers flow-owned rows;
-    `uq_base_field_config_popup_field_shared` re-scopes the original
-    popup-wide constraint to the NULL (popup-shared) tier. See migration
-    `597d9a2019ba_add_flow_id_form_definitions.py`.
-    """
+    """Base-field presentation configuration owned by one sales flow."""
 
     __table_args__ = (
+        ForeignKeyConstraint(
+            ["sales_flow_id", "popup_id", "tenant_id"],
+            ["sales_flows.id", "sales_flows.popup_id", "sales_flows.tenant_id"],
+            name="fk_basefieldconfigs_flow_scope",
+            ondelete="CASCADE",
+        ),
+        ForeignKeyConstraint(
+            ["section_id", "sales_flow_id", "popup_id", "tenant_id"],
+            [
+                "formsections.id",
+                "formsections.sales_flow_id",
+                "formsections.popup_id",
+                "formsections.tenant_id",
+            ],
+            name="fk_basefieldconfigs_section_flow_scope",
+        ),
         Index(
             "uq_base_field_config_flow_field",
             "sales_flow_id",
             "field_name",
             unique=True,
-            postgresql_where=text("sales_flow_id IS NOT NULL"),
-        ),
-        Index(
-            "uq_base_field_config_popup_field_shared",
-            "popup_id",
-            "field_name",
-            unique=True,
-            postgresql_where=text("sales_flow_id IS NULL"),
         ),
     )
 
@@ -47,8 +48,14 @@ class BaseFieldConfigs(BaseFieldConfigBase, table=True):
         ),
     )
 
-    tenant: "Tenants" = Relationship(back_populates="base_field_configs")
-    popup: "Popups" = Relationship(back_populates="base_field_configs")
+    sales_flow: "SalesFlows" = Relationship(
+        back_populates="base_field_configs",
+        sa_relationship_kwargs={"foreign_keys": "BaseFieldConfigs.sales_flow_id"},
+    )
     section: Optional["FormSections"] = Relationship(
-        back_populates="base_field_configs"
+        back_populates="base_field_configs",
+        sa_relationship_kwargs={
+            "foreign_keys": "BaseFieldConfigs.section_id",
+            "viewonly": True,
+        },
     )

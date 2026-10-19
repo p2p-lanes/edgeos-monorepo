@@ -23,6 +23,8 @@ if TYPE_CHECKING:
         CheckoutPreviewResponse,
         OpenTicketingPurchaseCreate,
     )
+    from app.api.form_field.models import FormFields
+    from app.api.form_section.models import FormSections
     from app.api.human.models import Humans
     from app.api.human.schemas import HumanPublic
     from app.api.popup.models import Popups
@@ -910,7 +912,7 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
 
     def _validate_open_ticketing_form_data(
         self,
-        popup: "Popups",
+        form_sections: list["FormSections"],
         form_data: dict[str, Any],
     ) -> None:
         """Validate required custom buyer fields. form_data is keyed by raw field name; base fields (email/first_name/last_name) live top-level on BuyerInfo and are validated by Pydantic."""
@@ -919,7 +921,7 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
         # can't be required here.
         required_field_names = {
             field.name
-            for section in popup.form_sections
+            for section in form_sections
             for field in section.form_fields
             if section.kind == "standard" and not section.hidden and field.required
         }
@@ -937,7 +939,7 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
 
         popup_field_names = {
             field.name
-            for section in popup.form_sections
+            for section in form_sections
             for field in section.form_fields
             if section.kind == "standard"
         }
@@ -954,10 +956,10 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
 
     def _build_buyer_snapshot(
         self,
-        popup: "Popups",
+        form_sections: list["FormSections"],
+        form_fields: list["FormFields"],
         form_data: dict[str, Any],
         attribution: dict[str, Any] | None = None,
-        sales_flow_id: uuid.UUID | None = None,
     ) -> dict[str, Any]:
         """Capture purchase-time labels and answer values for checkout payments.
 
@@ -969,12 +971,7 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
         sections_snapshot: list[dict[str, Any]] = []
 
         ordered_sections = sorted(
-            [
-                section
-                for section in popup.form_sections
-                if section.kind == "standard"
-                and (sales_flow_id is None or section.sales_flow_id == sales_flow_id)
-            ],
+            [section for section in form_sections if section.kind == "standard"],
             key=lambda section: section.order,
         )
 
@@ -1004,12 +1001,7 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
             )
 
         unsectioned = sorted(
-            [
-                field
-                for field in popup.form_fields
-                if field.section_id is None
-                and (sales_flow_id is None or field.sales_flow_id == sales_flow_id)
-            ],
+            [field for field in form_fields if field.section_id is None],
             key=lambda field: field.position,
         )
         if unsectioned:
@@ -1197,6 +1189,21 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
         if obj.quote_token:
             assert_quote_current(obj.quote_token, gate)
 
+        from app.api.form_field.models import FormFields
+        from app.api.form_section.models import FormSections
+
+        flow_sections_statement = (
+            select(FormSections)
+            .where(FormSections.sales_flow_id == target_flow.id)
+            .options(selectinload(FormSections.form_fields))  # ty: ignore[invalid-argument-type]
+            .order_by(FormSections.order)  # type: ignore[arg-type]
+        )
+        flow_form_sections = list(session.exec(flow_sections_statement).all())
+        flow_form_fields = list(
+            session.exec(
+                select(FormFields).where(FormFields.sales_flow_id == target_flow.id)
+            ).all()
+        )
         buyer = humans_crud.find_or_create(
             session,
             email=obj.buyer.email,
@@ -1257,9 +1264,9 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
         # Filter inside the snapshot builder: replacing popup.form_sections
         # would cascade-delete sections belonging to other flows.
         buyer_snapshot = self._build_buyer_snapshot(
-            popup,
+            flow_form_sections,
+            flow_form_fields,
             obj.buyer.form_data,
-            sales_flow_id=target_flow.id,
             attribution=(
                 obj.attribution.model_dump(exclude_none=True)
                 if obj.attribution
