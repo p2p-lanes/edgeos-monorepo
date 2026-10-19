@@ -1013,6 +1013,79 @@ class TestEventEditReapproval:
         assert resp.status_code == 200, resp.text
         assert resp.json()["status"] == EventStatus.PUBLISHED.value
 
+    @pytest.mark.parametrize("popup_requires_approval", [False, True])
+    def test_pending_event_move_to_free_venue_rechecks_approval(
+        self, client, db, tenant_a, popup_requires_approval
+    ):
+        popup = _make_popup(db, tenant_a)
+        settings = _set_event_settings(db, tenant_a, popup)
+        settings.events_require_approval = popup_requires_approval
+        db.add(settings)
+        db.commit()
+        owner = _make_human(db, tenant_a)
+        approval_venue = _make_venue(
+            db, tenant_a, popup, booking_mode=VenueBookingMode.APPROVAL_REQUIRED
+        )
+        free_venue = _make_venue(db, tenant_a, popup)
+        free_venue.capacity = 20
+        db.add(free_venue)
+        db.commit()
+        created = client.post(
+            "/api/v1/events/portal/events",
+            headers=_human_auth(owner),
+            json=_event_payload(
+                popup, venue_id=approval_venue.id, status=EventStatus.PUBLISHED
+            ),
+        )
+        assert created.status_code == 201, created.text
+        assert created.json()["status"] == "pending_approval"
+        event_id = created.json()["id"]
+
+        moved = self._patch(client, event_id, owner, {"venue_id": str(free_venue.id)})
+        expected = "pending_approval" if popup_requires_approval else "published"
+        assert moved.status_code == 200, moved.text
+        assert moved.json()["status"] == expected
+        assert moved.json()["venue_id"] == str(free_venue.id)
+        assert moved.json()["max_participant"] == 20
+
+        for changes in (
+            {"title": "Updated after moving"},
+            {
+                "start_time": "2026-05-06T14:00:00+00:00",
+                "end_time": "2026-05-06T15:00:00+00:00",
+            },
+        ):
+            edited = self._patch(client, event_id, owner, changes)
+            assert edited.status_code == 200, edited.text
+            assert edited.json()["status"] == expected
+
+    @pytest.mark.parametrize(
+        "initial", [EventStatus.REJECTED, EventStatus.CANCELLED, EventStatus.DRAFT]
+    )
+    def test_move_to_free_venue_does_not_publish_other_statuses(
+        self, client, db, tenant_a, initial
+    ):
+        popup = _make_popup(db, tenant_a)
+        settings = _set_event_settings(db, tenant_a, popup)
+        settings.events_require_approval = False
+        db.add(settings)
+        db.commit()
+        owner = _make_human(db, tenant_a)
+        approval_venue = _make_venue(
+            db, tenant_a, popup, booking_mode=VenueBookingMode.APPROVAL_REQUIRED
+        )
+        free_venue = _make_venue(db, tenant_a, popup)
+        event = self._published_event(
+            db, tenant_a, popup, owner, venue_id=approval_venue.id
+        )
+        event.status = initial
+        db.add(event)
+        db.commit()
+
+        moved = self._patch(client, event.id, owner, {"venue_id": str(free_venue.id)})
+        assert moved.status_code == 200, moved.text
+        assert moved.json()["status"] == initial.value
+
     def test_pending_event_edit_does_not_double_escalate(
         self,
         client: TestClient,

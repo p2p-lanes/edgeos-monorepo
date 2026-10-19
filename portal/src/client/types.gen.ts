@@ -2891,7 +2891,7 @@ export type EventAvailabilityResult = {
     available: boolean;
     conflicts?: Array<(string)>;
     reason?: (string | null);
-    effective_booking_mode?: (string | null);
+    effective_booking_mode?: (VenueBookingMode | null);
     opaque_conflicts?: Array<EventOpaque>;
 };
 
@@ -4762,7 +4762,7 @@ export type OccurrenceConflict = {
     reason: string;
     conflicting_event_ids?: Array<(string)>;
     conflicting_titles?: Array<(string)>;
-    effective_booking_mode?: (string | null);
+    effective_booking_mode?: (VenueBookingMode | null);
 };
 
 /**

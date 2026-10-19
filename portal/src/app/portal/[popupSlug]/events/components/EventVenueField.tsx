@@ -4,7 +4,7 @@ import { AlertTriangle, Images } from "lucide-react"
 import Image from "next/image"
 import { useMemo, useState } from "react"
 import { useTranslation } from "react-i18next"
-import type { EventVenuePublic } from "@/client"
+import type { EventVenuePublic, VenueBookingMode } from "@/client"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
@@ -39,7 +39,7 @@ interface EventVenueFieldProps {
    * window. ``null`` when no time is picked yet — in that case the banner
    * falls back to a conservative venue-wide hint.
    */
-  effectiveBookingMode?: string | null
+  effectiveBookingMode?: VenueBookingMode | null
 }
 
 export function EventVenueField({
