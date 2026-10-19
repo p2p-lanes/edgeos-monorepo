@@ -20,10 +20,12 @@ import uuid
 from datetime import UTC, datetime, time, timedelta
 from zoneinfo import ZoneInfo
 
+import pytest
 from fastapi.testclient import TestClient
 from sqlmodel import Session
 
 from app.api.event.models import Events
+from app.api.event.router import _resolve_effective_booking_mode
 from app.api.event.schemas import EventStatus, EventVisibility
 from app.api.event_settings.models import EventSettings
 from app.api.event_venue.models import (
@@ -34,6 +36,35 @@ from app.api.event_venue.models import (
 from app.api.event_venue.schemas import VenueBookingMode, VenueStatus
 from app.api.popup.models import Popups
 from app.api.tenant.models import Tenants
+
+
+@pytest.mark.parametrize("mode", list(VenueBookingMode))
+@pytest.mark.parametrize("use_slot_override", [False, True])
+def test_effective_booking_mode_returns_enum(db, tenant_a, mode, use_slot_override):
+    popup = _make_popup(db, tenant_a)
+    venue = _make_venue(db, tenant_a, popup)
+    venue.booking_mode = VenueBookingMode.FREE if use_slot_override else mode
+    db.add(venue)
+    if use_slot_override:
+        db.add(
+            VenueWeeklyHours(
+                tenant_id=tenant_a.id,
+                venue_id=venue.id,
+                day_of_week=1,
+                open_time=time(14),
+                close_time=time(16),
+                booking_mode=mode,
+            )
+        )
+    db.commit()
+
+    result = _resolve_effective_booking_mode(
+        db,
+        venue,
+        datetime(2026, 5, 5, 14, tzinfo=UTC),
+        datetime(2026, 5, 5, 15, tzinfo=UTC),
+    )
+    assert result is mode
 
 
 def _make_popup(db: Session, tenant: Tenants, *, tz: str = "UTC") -> Popups:

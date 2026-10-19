@@ -55,6 +55,7 @@ from app.api.event.series import build_series_summary
 from app.api.event.series_schemas import EventSeriesSummary
 from app.api.event_audit.crud import build_event_snapshot, record_event_audit
 from app.api.event_audit.schemas import EventAuditAction
+from app.api.event_venue.schemas import VenueBookingMode
 from app.api.popup.guards import (
     CallerToken,
     ensure_api_key_popup,
@@ -321,7 +322,7 @@ def _resolve_effective_booking_mode(
     venue,
     start_time: datetime,
     end_time: datetime,
-) -> str:
+) -> VenueBookingMode:
     """Return the most restrictive booking_mode that applies to
     [start_time, end_time]. Considers every venue_weekly_hours slot that
     overlaps the window (in the popup's timezone); slots with NULL
@@ -336,11 +337,8 @@ def _resolve_effective_booking_mode(
 
     from app.api.event_venue.models import VenueWeeklyHours
     from app.api.event_venue.router import _resolve_popup_timezone
-    from app.api.event_venue.schemas import VenueBookingMode
 
-    venue_default = venue.booking_mode
-    if isinstance(venue_default, VenueBookingMode):
-        venue_default = venue_default.value
+    venue_default = VenueBookingMode(venue.booking_mode)
 
     weekly_rows = list(
         db.exec(
@@ -366,23 +364,24 @@ def _resolve_effective_booking_mode(
 
     expanded = _expand_weekly_slots(weekly_rows, tz, s, e)
     precedence = {
-        VenueBookingMode.UNBOOKABLE.value: 3,
-        VenueBookingMode.APPROVAL_REQUIRED.value: 2,
-        VenueBookingMode.FREE.value: 1,
+        VenueBookingMode.UNBOOKABLE: 3,
+        VenueBookingMode.APPROVAL_REQUIRED: 2,
+        VenueBookingMode.FREE: 1,
     }
 
-    overlapping_modes: list[str] = []
+    overlapping_modes: list[VenueBookingMode] = []
     for r_s, r_e, row in expanded:
         if r_s < e and r_e > s:
-            row_mode = row.booking_mode
-            if isinstance(row_mode, VenueBookingMode):
-                row_mode = row_mode.value
-            overlapping_modes.append(row_mode or venue_default)
+            overlapping_modes.append(
+                VenueBookingMode(row.booking_mode)
+                if row.booking_mode is not None
+                else venue_default
+            )
 
     if not overlapping_modes:
         return venue_default
 
-    return max(overlapping_modes, key=lambda m: precedence.get(m, 0))
+    return max(overlapping_modes, key=precedence.__getitem__)
 
 
 def _find_venue_availability_issue(
@@ -407,13 +406,12 @@ def _find_venue_availability_issue(
     open-hours and conflict gates still apply.
     """
     from app.api.event_venue.models import EventVenues
-    from app.api.event_venue.schemas import VenueBookingMode
 
     venue = db.get(EventVenues, venue_id)
     if not venue:
         return (404, "Venue not found")
     effective_mode = _resolve_effective_booking_mode(db, venue, start_time, end_time)
-    if not allow_unbookable and effective_mode == VenueBookingMode.UNBOOKABLE.value:
+    if not allow_unbookable and effective_mode == VenueBookingMode.UNBOOKABLE:
         return (409, "Venue is not bookable at the selected time")
 
     open_hours_issue = _find_venue_open_hours_issue(db, venue, start_time, end_time)
@@ -2085,7 +2083,6 @@ def _run_availability_check(
     conflict scan still runs so admins still see overlapping bookings.
     """
     from app.api.event_venue.models import EventVenues
-    from app.api.event_venue.schemas import VenueBookingMode
 
     venue = db.get(EventVenues, payload.venue_id)
     if not venue:
@@ -2093,7 +2090,7 @@ def _run_availability_check(
     effective_mode = _resolve_effective_booking_mode(
         db, venue, payload.start_time, payload.end_time
     )
-    if not allow_unbookable and effective_mode == VenueBookingMode.UNBOOKABLE.value:
+    if not allow_unbookable and effective_mode == VenueBookingMode.UNBOOKABLE:
         return EventAvailabilityResult(
             available=False,
             conflicts=[],
@@ -2154,7 +2151,6 @@ async def check_availability_portal(
 
     from app.api.event.models import EventInvitations as _EventInvitations
     from app.api.event_venue.models import EventVenues as _EventVenues
-    from app.api.event_venue.schemas import VenueBookingMode as _VenueBookingMode
     from app.api.group.crud import groups_crud
     from app.services.event_visibility import project_event_for
 
@@ -2167,7 +2163,7 @@ async def check_availability_portal(
     effective_mode = _resolve_effective_booking_mode(
         db, venue, payload.start_time, payload.end_time
     )
-    if effective_mode == _VenueBookingMode.UNBOOKABLE.value:
+    if effective_mode == VenueBookingMode.UNBOOKABLE:
         return EventAvailabilityResult(
             available=False,
             conflicts=[],
@@ -3900,7 +3896,7 @@ async def create_portal_event(
             effective_mode = _resolve_effective_booking_mode(
                 db, venue, event_in.start_time, event_in.end_time
             )
-            if effective_mode == "approval_required":
+            if effective_mode == VenueBookingMode.APPROVAL_REQUIRED:
                 requires_approval = True
                 approval_reason = "Venue requires admin approval at the selected time."
         if (
@@ -4065,9 +4061,8 @@ async def update_portal_event(
     # resulting venue requires approval at the resulting time. Editing the
     # description or any other attribute never re-triggers approval, and
     # backoffice edits use a different handler so they are never gated. We only
-    # escalate a live (``published``) event back to ``pending_approval`` — we
-    # never auto-publish a pending/rejected/cancelled one on edit, nor re-notify
-    # an event that is already pending.
+    # escalate a live (``published``) event back to ``pending_approval`` here;
+    # already-pending events are not re-notified.
     reapproval_reason: str | None = None
     if timing_or_venue_changed and event.status == EventStatus.PUBLISHED:
         reapproval_venue_id = patch_dict.get("venue_id", event.venue_id)
@@ -4079,12 +4074,36 @@ async def update_portal_event(
                 _resolve_effective_booking_mode(
                     db, reapproval_venue, new_start, new_end
                 )
-                == "approval_required"
+                == VenueBookingMode.APPROVAL_REQUIRED
             ):
                 patch_dict["status"] = EventStatus.PENDING_APPROVAL
                 reapproval_reason = (
                     "Venue requires admin approval at the selected time."
                 )
+
+    # Moving a pending event to a different, freely bookable venue removes
+    # the venue approval gate. Publish only if no popup/capacity gate remains.
+    # Other edits and rejected/cancelled events must not auto-publish.
+    if (
+        event.status == EventStatus.PENDING_APPROVAL
+        and patch_dict.get("venue_id") is not None
+        and patch_dict["venue_id"] != event.venue_id
+    ):
+        from app.api.event_settings.crud import event_settings_crud
+        from app.api.event_venue import crud as venue_crud
+
+        settings = event_settings_crud.get_by_popup_id(db, event.popup_id)
+        venue = venue_crud.event_venues_crud.get(db, patch_dict["venue_id"])
+        capacity = patch_dict.get("max_participant", event.max_participant)
+        if (
+            settings is not None
+            and not settings.events_require_approval
+            and venue is not None
+            and _resolve_effective_booking_mode(db, venue, new_start, new_end)
+            == VenueBookingMode.FREE
+            and not (venue.capacity and capacity and capacity > venue.capacity)
+        ):
+            patch_dict["status"] = EventStatus.PUBLISHED
 
     event_in = EventUpdate(**patch_dict)
 

@@ -9,6 +9,7 @@ from sqlalchemy.dialects.postgresql import ARRAY, JSONB
 from sqlalchemy.dialects.postgresql import UUID as PgUUID
 from sqlmodel import Column, DateTime, Field, SQLModel
 
+from app.api.event_venue.schemas import VenueBookingMode
 from app.api.shared.response import Paging
 
 
@@ -726,7 +727,7 @@ class EventAvailabilityResult(BaseModel):
     # end_time]. Takes per-slot ``venue_weekly_hours.booking_mode`` overrides
     # into account so the portal can show a precise warning ("this time
     # requires approval") instead of a venue-wide hint.
-    effective_booking_mode: str | None = None
+    effective_booking_mode: VenueBookingMode | None = None
     # Opaque conflict shapes for PRIVATE events the viewer cannot fully see.
     # Only populated by portal-authenticated endpoints (check_availability_portal).
     # Backoffice/admin callers always have full visibility and this list stays empty.
@@ -762,7 +763,7 @@ class OccurrenceConflict(BaseModel):
     # Up to three titles (mirrors the 409 message). Empty when the conflict
     # is not a booking clash (e.g. open hours, unbookable slot).
     conflicting_titles: list[str] = []
-    effective_booking_mode: str | None = None
+    effective_booking_mode: VenueBookingMode | None = None
 
 
 class EventRecurringAvailabilityResult(BaseModel):

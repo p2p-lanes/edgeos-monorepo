@@ -13416,13 +13416,12 @@ export const EventAvailabilityResultSchema = {
         effective_booking_mode: {
             anyOf: [
                 {
-                    type: 'string'
+                    '$ref': '#/components/schemas/VenueBookingMode'
                 },
                 {
                     type: 'null'
                 }
-            ],
-            title: 'Effective Booking Mode'
+            ]
         },
         opaque_conflicts: {
             items: {
@@ -22115,13 +22114,12 @@ export const OccurrenceConflictSchema = {
         effective_booking_mode: {
             anyOf: [
                 {
-                    type: 'string'
+                    '$ref': '#/components/schemas/VenueBookingMode'
                 },
                 {
                     type: 'null'
                 }
-            ],
-            title: 'Effective Booking Mode'
+            ]
         }
     },
     type: 'object',
