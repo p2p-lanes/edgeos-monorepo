@@ -4,7 +4,30 @@ vi.mock("@/client", () => ({
   CheckoutService: { previewOpenTicketing: vi.fn() },
 }))
 
-import { buildOpenCheckoutPreviewRequest } from "./useOpenCheckoutQuote"
+import {
+  buildOpenCheckoutBuyer,
+  buildOpenCheckoutPreviewRequest,
+} from "./useOpenCheckoutQuote"
+
+describe("buildOpenCheckoutBuyer", () => {
+  it("keeps session identity separate from raw custom form answers", () => {
+    expect(
+      buildOpenCheckoutBuyer({
+        email: "buyer@example.com",
+        first_name: "Test",
+        last_name: "Buyer",
+        custom_location: "Test location",
+        custom_count: 0,
+        custom_opt_in: false,
+      }),
+    ).toEqual({
+      email: "buyer@example.com",
+      first_name: "Test",
+      last_name: "Buyer",
+      form_data: { location: "Test location", count: 0, opt_in: false },
+    })
+  })
+})
 
 describe("buildOpenCheckoutPreviewRequest", () => {
   it("combines selected checkout products into one selected-flow quote request", () => {

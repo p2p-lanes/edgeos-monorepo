@@ -10,6 +10,8 @@ interface EmailVerificationProps {
   verificationCode: string
   setVerificationCode: (code: string) => void
   verificationError: string | null
+  requiresNewCode: boolean
+  verificationNotice: string | null
   countdown: number
   handleEmailChange: (value: string) => void
   handleSendCode: () => void
@@ -25,12 +27,14 @@ const EmailVerification = ({
   verificationCode,
   setVerificationCode,
   verificationError,
+  requiresNewCode,
+  verificationNotice,
   countdown,
   handleEmailChange,
   handleSendCode: _handleSendCode,
   handleResendCode,
   handleChangeEmail,
-  isDisabled: _isDisabled,
+  isDisabled,
   emailError,
 }: EmailVerificationProps) => {
   const { t } = useTranslation()
@@ -62,6 +66,7 @@ const EmailVerification = ({
             size="default"
             className="mt-[21px]"
             onClick={handleChangeEmail}
+            disabled={isDisabled}
           >
             {t("form.change_email")}
           </Button>
@@ -78,27 +83,35 @@ const EmailVerification = ({
               value={verificationCode}
               onChange={setVerificationCode}
               error={verificationError || undefined}
+              disabled={isDisabled || requiresNewCode}
             />
 
             <div className="flex mt-2">
               <Button
                 type="button"
-                variant="ghost"
+                variant={requiresNewCode ? "default" : "ghost"}
                 size="sm"
                 onClick={handleResendCode}
-                disabled={countdown > 0}
+                disabled={isDisabled || (!requiresNewCode && countdown > 0)}
                 className="text-xs ml-auto"
               >
-                {countdown > 0
-                  ? t("checkout.resend_code_countdown", { countdown })
-                  : t("checkout.resend_code")}
+                {requiresNewCode
+                  ? t("checkout.verification.request_new_code")
+                  : countdown > 0
+                    ? t("checkout.resend_code_countdown", { countdown })
+                    : t("checkout.resend_code")}
               </Button>
             </div>
 
             {verificationError && (
-              <p className="text-sm text-red-500 text-center">
+              <p role="alert" className="text-sm text-red-500 text-center">
                 {verificationError}
               </p>
+            )}
+            {verificationNotice && (
+              <output className="text-sm text-center">
+                {verificationNotice}
+              </output>
             )}
             <p className="text-xs text-muted-foreground text-center mt-1">
               {t("checkout.resend_hint")}

@@ -1,5 +1,5 @@
 import { Download } from "lucide-react"
-import { useRef } from "react"
+import { type ReactNode, useRef } from "react"
 import { useTranslation } from "react-i18next"
 import QRCodeReact from "react-qr-code"
 import { Button } from "@/components/ui/button"
@@ -18,12 +18,14 @@ const QRcode = ({
   isOpen,
   onOpenChange,
   lastScanAt,
+  children,
   title = "Check-in Code",
   description = "Use this code to check in",
 }: {
   check_in_code: string
   isOpen: boolean
   onOpenChange: (open: boolean) => void
+  children?: ReactNode
   lastScanAt?: string | null
   title?: string
   description?: string
@@ -46,7 +48,7 @@ const QRcode = ({
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
       {/* Inset from the screen edges on phones, where the base dialog is
           full width and square. */}
-      <DialogContent className="w-[calc(100%-2rem)] max-w-sm gap-3 rounded-2xl bg-card p-5 sm:max-w-md sm:gap-4 sm:p-6">
+      <DialogContent className="max-h-[85dvh] overflow-y-auto w-[calc(100%-2rem)] max-w-sm gap-3 rounded-2xl bg-card p-5 sm:max-w-md sm:gap-4 sm:p-6">
         <DialogHeader className="px-6">
           <DialogTitle className="text-base leading-snug sm:text-lg">
             {title}
@@ -95,6 +97,7 @@ const QRcode = ({
             </p>
           )}
         </div>
+        {children}
       </DialogContent>
     </Dialog>
   )

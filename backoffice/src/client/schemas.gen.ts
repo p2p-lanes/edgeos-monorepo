@@ -6253,6 +6253,28 @@ export const AttendeeProductPublicSchema = {
             ],
             title: 'Duration Type'
         },
+        product_image_url: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Product Image Url'
+        },
+        product_description: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Product Description'
+        },
         last_scan_at: {
             anyOf: [
                 {
@@ -6325,6 +6347,11 @@ product_name, product_category, and duration_type are denormalized from the
 related Product at response-build time (current product state, not
 snapshot-at-purchase). All are optional with None defaults for backward
 compatibility with old clients that do not read them.
+
+product_image_url and product_description are also read from the live
+product so the portal can show a purchased ticket's detail without going
+through the product catalog, which filters out products the buyer can no
+longer purchase.
 
 last_scan_at is the most recent occurred_at from check_ins for this ticket
 (None when the ticket has never been scanned). Populated by the router from
@@ -13444,13 +13471,12 @@ export const EventAvailabilityResultSchema = {
         effective_booking_mode: {
             anyOf: [
                 {
-                    type: 'string'
+                    '$ref': '#/components/schemas/VenueBookingMode'
                 },
                 {
                     type: 'null'
                 }
-            ],
-            title: 'Effective Booking Mode'
+            ]
         },
         opaque_conflicts: {
             items: {
@@ -17299,6 +17325,92 @@ export const FormFieldUpdateSchema = {
     },
     type: 'object',
     title: 'FormFieldUpdate'
+} as const;
+
+export const FormResponseChangePublicSchema = {
+    properties: {
+        field_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Field Id'
+        },
+        field_label: {
+            type: 'string',
+            title: 'Field Label'
+        },
+        old_value: {
+            title: 'Old Value'
+        },
+        new_value: {
+            title: 'New Value'
+        },
+        changed_by_human_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Changed By Human Id'
+        },
+        changed_at: {
+            type: 'string',
+            format: 'date-time',
+            title: 'Changed At'
+        },
+        version: {
+            type: 'integer',
+            title: 'Version'
+        }
+    },
+    type: 'object',
+    required: ['field_id', 'field_label', 'old_value', 'new_value', 'changed_by_human_id', 'changed_at', 'version'],
+    title: 'FormResponseChangePublic'
+} as const;
+
+export const FormResponseEditSchema = {
+    properties: {
+        version: {
+            type: 'integer',
+            minimum: 0,
+            title: 'Version'
+        },
+        answers: {
+            additionalProperties: true,
+            propertyNames: {
+                format: 'uuid'
+            },
+            type: 'object',
+            maxProperties: 100,
+            minProperties: 1,
+            title: 'Answers'
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    required: ['version', 'answers'],
+    title: 'FormResponseEdit'
+} as const;
+
+export const FormResponseFieldPublicSchema = {
+    properties: {
+        id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Id'
+        },
+        value: {
+            title: 'Value'
+        },
+        editable: {
+            type: 'boolean',
+            title: 'Editable'
+        },
+        definition: {
+            additionalProperties: true,
+            type: 'object',
+            title: 'Definition'
+        }
+    },
+    type: 'object',
+    required: ['id', 'value', 'editable', 'definition'],
+    title: 'FormResponseFieldPublic'
 } as const;
 
 export const FormSectionCreateSchema = {
@@ -22109,13 +22221,12 @@ export const OccurrenceConflictSchema = {
         effective_booking_mode: {
             anyOf: [
                 {
-                    type: 'string'
+                    '$ref': '#/components/schemas/VenueBookingMode'
                 },
                 {
                     type: 'null'
                 }
-            ],
-            title: 'Effective Booking Mode'
+            ]
         }
     },
     type: 'object',
@@ -22514,6 +22625,60 @@ Either application_id (application-based flow) or popup_id must be
 provided — at least one source is required.`
 } as const;
 
+export const PaymentFormResponsesPublicSchema = {
+    properties: {
+        version: {
+            type: 'integer',
+            title: 'Version'
+        },
+        title: {
+            type: 'string',
+            title: 'Title'
+        },
+        can_edit: {
+            type: 'boolean',
+            title: 'Can Edit'
+        },
+        editing_enabled: {
+            type: 'boolean',
+            title: 'Editing Enabled'
+        },
+        deadline: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Deadline'
+        },
+        timezone: {
+            type: 'string',
+            title: 'Timezone'
+        },
+        fields: {
+            items: {
+                '$ref': '#/components/schemas/FormResponseFieldPublic'
+            },
+            type: 'array',
+            title: 'Fields'
+        },
+        history: {
+            items: {
+                '$ref': '#/components/schemas/FormResponseChangePublic'
+            },
+            type: 'array',
+            title: 'History'
+        }
+    },
+    type: 'object',
+    required: ['version', 'title', 'can_edit', 'editing_enabled', 'deadline', 'timezone', 'fields', 'history'],
+    title: 'PaymentFormResponsesPublic'
+} as const;
+
 export const PaymentPortalPublicSchema = {
     properties: {
         tenant_id: {
@@ -22657,6 +22822,11 @@ export const PaymentPortalPublicSchema = {
                 }
             ],
             title: 'Checkout Url'
+        },
+        form_response_version: {
+            type: 'integer',
+            title: 'Form Response Version',
+            default: 0
         },
         buyer_snapshot: {
             anyOf: [
@@ -23461,6 +23631,11 @@ export const PaymentPublicSchema = {
                 }
             ],
             title: 'Checkout Url'
+        },
+        form_response_version: {
+            type: 'integer',
+            title: 'Form Response Version',
+            default: 0
         },
         buyer_snapshot: {
             anyOf: [
@@ -29693,6 +29868,74 @@ export const SaleTypeSchema = {
 Enum is extensible for future types (e.g. waitlist, lottery, registration).`
 } as const;
 
+export const SalesFlowApplicationEntryPublicSchema = {
+    properties: {
+        id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Id'
+        },
+        slug: {
+            type: 'string',
+            title: 'Slug'
+        },
+        name: {
+            type: 'string',
+            title: 'Name'
+        },
+        order: {
+            type: 'integer',
+            title: 'Order'
+        },
+        type: {
+            '$ref': '#/components/schemas/SalesFlowType'
+        },
+        price_summary: {
+            anyOf: [
+                {
+                    '$ref': '#/components/schemas/SalesFlowPriceSummary'
+                },
+                {
+                    type: 'null'
+                }
+            ]
+        },
+        theme_config: {
+            anyOf: [
+                {
+                    '$ref': '#/components/schemas/SalesFlowPortalThemeConfig'
+                },
+                {
+                    type: 'null'
+                }
+            ]
+        },
+        requires_application_fee: {
+            type: 'boolean',
+            title: 'Requires Application Fee'
+        },
+        application_fee_amount: {
+            anyOf: [
+                {
+                    type: 'string',
+                    pattern: '^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Application Fee Amount'
+        },
+        application_layout: {
+            '$ref': '#/components/schemas/ApplicationLayout'
+        }
+    },
+    type: 'object',
+    required: ['id', 'slug', 'name', 'order', 'type', 'requires_application_fee', 'application_fee_amount', 'application_layout'],
+    title: 'SalesFlowApplicationEntryPublic',
+    description: 'Display settings for the selected application, including its own fee.'
+} as const;
+
 export const SalesFlowCheckoutConfigSchema = {
     properties: {
         allows_coupons: {
@@ -34059,7 +34302,7 @@ export const ThirdPartyAppCreateSchema = {
         allowed_token_scopes: {
             items: {
                 type: 'string',
-                enum: ['portal:*', 'portal:profile:read', 'portal:profile:write', 'portal:applications:read', 'portal:applications:write', 'portal:attendees:write', 'portal:payments:read', 'portal:directory:read', 'portal:api_keys:manage', 'portal:badges:write']
+                enum: ['portal:*', 'portal:profile:read', 'portal:profile:write', 'portal:applications:read', 'portal:applications:write', 'portal:attendees:write', 'portal:payments:read', 'portal:payments:write', 'portal:directory:read', 'portal:api_keys:manage', 'portal:badges:write']
             },
             type: 'array',
             title: 'Allowed Token Scopes'
@@ -34333,7 +34576,7 @@ export const ThirdPartyAppUpdateSchema = {
                 {
                     items: {
                         type: 'string',
-                        enum: ['portal:*', 'portal:profile:read', 'portal:profile:write', 'portal:applications:read', 'portal:applications:write', 'portal:attendees:write', 'portal:payments:read', 'portal:directory:read', 'portal:api_keys:manage', 'portal:badges:write']
+                        enum: ['portal:*', 'portal:profile:read', 'portal:profile:write', 'portal:applications:read', 'portal:applications:write', 'portal:attendees:write', 'portal:payments:read', 'portal:payments:write', 'portal:directory:read', 'portal:api_keys:manage', 'portal:badges:write']
                     },
                     type: 'array'
                 },
@@ -34675,6 +34918,23 @@ export const TicketProductSnapshotSchema = {
 
 export const TicketingStepCreateSchema = {
     properties: {
+        allow_response_editing: {
+            type: 'boolean',
+            title: 'Allow Response Editing',
+            default: false
+        },
+        response_edit_deadline: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Response Edit Deadline'
+        },
         popup_id: {
             type: 'string',
             format: 'uuid',
@@ -34842,6 +35102,23 @@ export const TicketingStepPublicSchema = {
             title: 'Is Enabled',
             default: true
         },
+        allow_response_editing: {
+            type: 'boolean',
+            title: 'Allow Response Editing',
+            default: false
+        },
+        response_edit_deadline: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Response Edit Deadline'
+        },
         protected: {
             type: 'boolean',
             title: 'Protected',
@@ -34926,6 +35203,29 @@ export const TicketingStepPublicSchema = {
 
 export const TicketingStepUpdateSchema = {
     properties: {
+        allow_response_editing: {
+            anyOf: [
+                {
+                    type: 'boolean'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Allow Response Editing'
+        },
+        response_edit_deadline: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Response Edit Deadline'
+        },
         title: {
             anyOf: [
                 {

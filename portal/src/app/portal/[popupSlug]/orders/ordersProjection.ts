@@ -24,15 +24,7 @@ export interface OrderProjection {
     quantity: number
     unitPrice: string
     currency: string
-    units: Array<{ id: string; checkInCode: string }>
   }>
-}
-
-type ProductUnitWire = {
-  id: string
-  check_in_code: string
-  active: boolean
-  requires_check_in: boolean
 }
 
 const knownStatuses = new Set<OrderStatus>([
@@ -72,17 +64,6 @@ export function projectOrders(
           quantity: line.quantity,
           unitPrice: line.effective_unit_price ?? line.product_price,
           currency: line.product_currency,
-          units: (
-            (line as typeof line & { units?: ProductUnitWire[] }).units ?? []
-          )
-            .filter(
-              (unit) =>
-                payment.status === "approved" &&
-                unit.active &&
-                unit.requires_check_in &&
-                unit.check_in_code,
-            )
-            .map((unit) => ({ id: unit.id, checkInCode: unit.check_in_code })),
         })),
       },
     }))

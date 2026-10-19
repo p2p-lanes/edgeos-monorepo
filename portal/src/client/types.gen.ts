@@ -1277,6 +1277,11 @@ export type AttendeePortalPublic = {
  * snapshot-at-purchase). All are optional with None defaults for backward
  * compatibility with old clients that do not read them.
  *
+ * product_image_url and product_description are also read from the live
+ * product so the portal can show a purchased ticket's detail without going
+ * through the product catalog, which filters out products the buyer can no
+ * longer purchase.
+ *
  * last_scan_at is the most recent occurred_at from check_ins for this ticket
  * (None when the ticket has never been scanned). Populated by the router from
  * a batched aggregation so portal UIs can flag already-used QR codes.
@@ -1291,6 +1296,8 @@ export type AttendeeProductPublic = {
     product_name?: (string | null);
     product_category?: (string | null);
     duration_type?: (string | null);
+    product_image_url?: (string | null);
+    product_description?: (string | null);
     last_scan_at?: (string | null);
     purchase_metadata?: ({
     [key: string]: unknown;
@@ -2896,7 +2903,7 @@ export type EventAvailabilityResult = {
     available: boolean;
     conflicts?: Array<(string)>;
     reason?: (string | null);
-    effective_booking_mode?: (string | null);
+    effective_booking_mode?: (VenueBookingMode | null);
     opaque_conflicts?: Array<EventOpaque>;
 };
 
@@ -3626,6 +3633,32 @@ export type FormFieldUpdate = {
     [key: string]: unknown;
 } | null);
     width?: ('full' | 'half' | 'half_row' | null);
+};
+
+export type FormResponseChangePublic = {
+    field_id: string;
+    field_label: string;
+    old_value: unknown;
+    new_value: unknown;
+    changed_by_human_id: string;
+    changed_at: string;
+    version: number;
+};
+
+export type FormResponseEdit = {
+    version: number;
+    answers: {
+        [key: string]: unknown;
+    };
+};
+
+export type FormResponseFieldPublic = {
+    id: string;
+    value: unknown;
+    editable: boolean;
+    definition: {
+        [key: string]: unknown;
+    };
 };
 
 export type FormSectionCreate = {
@@ -4755,7 +4788,7 @@ export type OccurrenceConflict = {
     reason: string;
     conflicting_event_ids?: Array<(string)>;
     conflicting_titles?: Array<(string)>;
-    effective_booking_mode?: (string | null);
+    effective_booking_mode?: (VenueBookingMode | null);
 };
 
 /**
@@ -4852,6 +4885,17 @@ export type PaymentCreate = {
     return_context?: 'direct' | 'portal';
 };
 
+export type PaymentFormResponsesPublic = {
+    version: number;
+    title: string;
+    can_edit: boolean;
+    editing_enabled: boolean;
+    deadline: (string | null);
+    timezone: string;
+    fields: Array<FormResponseFieldPublic>;
+    history: Array<FormResponseChangePublic>;
+};
+
 /**
  * Human-facing payment response without internal recipient metadata.
  */
@@ -4872,6 +4916,7 @@ export type PaymentPortalPublic = {
     rate?: (string | null);
     source?: (string | null);
     checkout_url?: (string | null);
+    form_response_version?: number;
     buyer_snapshot?: ({
     [key: string]: unknown;
 } | null);
@@ -4997,6 +5042,7 @@ export type PaymentPublic = {
     rate?: (string | null);
     source?: (string | null);
     checkout_url?: (string | null);
+    form_response_version?: number;
     buyer_snapshot?: ({
     [key: string]: unknown;
 } | null);
@@ -6096,6 +6142,22 @@ export type RuleActivity = 'attend' | 'host';
 export type RuleMeasure = 'count' | 'distinct_days' | 'streak_days';
 
 /**
+ * Display settings for the selected application, including its own fee.
+ */
+export type SalesFlowApplicationEntryPublic = {
+    id: string;
+    slug: string;
+    name: string;
+    order: number;
+    type: SalesFlowType;
+    price_summary?: (SalesFlowPriceSummary | null);
+    theme_config?: (SalesFlowPortalThemeConfig | null);
+    requires_application_fee: boolean;
+    application_fee_amount: (string | null);
+    application_layout: ApplicationLayout;
+};
+
+/**
  * What a door's checkout screen needs to know about its own settings.
  *
  * The portal used to read these off `PopupPublic`, whose columns stopped
@@ -6889,7 +6951,7 @@ export type ThirdPartyAppCreate = {
     sso_start_url?: (string | null);
     sso_redirect_uri?: (string | null);
     name: string;
-    allowed_token_scopes?: Array<('portal:*' | 'portal:profile:read' | 'portal:profile:write' | 'portal:applications:read' | 'portal:applications:write' | 'portal:attendees:write' | 'portal:payments:read' | 'portal:directory:read' | 'portal:api_keys:manage' | 'portal:badges:write')>;
+    allowed_token_scopes?: Array<('portal:*' | 'portal:profile:read' | 'portal:profile:write' | 'portal:applications:read' | 'portal:applications:write' | 'portal:attendees:write' | 'portal:payments:read' | 'portal:payments:write' | 'portal:directory:read' | 'portal:api_keys:manage' | 'portal:badges:write')>;
     allowed_api_key_scopes?: Array<('events:read' | 'events:write' | 'rsvp:write' | 'venues:read' | 'venues:write' | 'applications:read' | 'applications:write' | 'attendees:read' | 'attendees:write' | 'humans:read' | 'humans:write' | 'groups:read' | 'groups:write' | 'products:read' | 'products:write' | 'accommodations:read' | 'accommodations:write' | 'coupons:read' | 'coupons:write' | 'forms:read' | 'forms:write' | 'payments:read' | 'tracks:read' | 'tracks:write' | 'ticketing_steps:read' | 'ticketing_steps:write' | 'translations:read' | 'translations:write' | 'badges:read' | 'badges:write')>;
 };
 
@@ -6946,7 +7008,7 @@ export type ThirdPartyAppUpdate = {
     sso_start_url?: (string | null);
     sso_redirect_uri?: (string | null);
     name?: (string | null);
-    allowed_token_scopes?: (Array<('portal:*' | 'portal:profile:read' | 'portal:profile:write' | 'portal:applications:read' | 'portal:applications:write' | 'portal:attendees:write' | 'portal:payments:read' | 'portal:directory:read' | 'portal:api_keys:manage' | 'portal:badges:write')> | null);
+    allowed_token_scopes?: (Array<('portal:*' | 'portal:profile:read' | 'portal:profile:write' | 'portal:applications:read' | 'portal:applications:write' | 'portal:attendees:write' | 'portal:payments:read' | 'portal:payments:write' | 'portal:directory:read' | 'portal:api_keys:manage' | 'portal:badges:write')> | null);
     allowed_api_key_scopes?: (Array<('events:read' | 'events:write' | 'rsvp:write' | 'venues:read' | 'venues:write' | 'applications:read' | 'applications:write' | 'attendees:read' | 'attendees:write' | 'humans:read' | 'humans:write' | 'groups:read' | 'groups:write' | 'products:read' | 'products:write' | 'accommodations:read' | 'accommodations:write' | 'coupons:read' | 'coupons:write' | 'forms:read' | 'forms:write' | 'payments:read' | 'tracks:read' | 'tracks:write' | 'ticketing_steps:read' | 'ticketing_steps:write' | 'translations:read' | 'translations:write' | 'badges:read' | 'badges:write')> | null);
 };
 
@@ -7011,6 +7073,8 @@ export type TicketAttendeeSnapshot = {
 export type TicketDuration = 'day' | 'week' | 'month' | 'full';
 
 export type TicketingStepCreate = {
+    allow_response_editing?: boolean;
+    response_edit_deadline?: (string | null);
     popup_id: string;
     sales_flow_id: string;
     step_type: string;
@@ -7040,6 +7104,8 @@ export type TicketingStepPublic = {
     description?: (string | null);
     order?: number;
     is_enabled?: boolean;
+    allow_response_editing?: boolean;
+    response_edit_deadline?: (string | null);
     protected?: boolean;
     product_category?: (string | null);
     template?: (string | null);
@@ -7054,6 +7120,8 @@ export type TicketingStepPublic = {
 };
 
 export type TicketingStepUpdate = {
+    allow_response_editing?: (boolean | null);
+    response_edit_deadline?: (string | null);
     title?: (string | null);
     description?: (string | null);
     order?: (number | null);
@@ -10369,6 +10437,26 @@ export type InvitesDeleteMyLinkData = {
 
 export type InvitesDeleteMyLinkResponse = (void);
 
+export type PaymentsGetMyFormResponsesData = {
+    paymentId: string;
+};
+
+export type PaymentsGetMyFormResponsesResponse = (PaymentFormResponsesPublic);
+
+export type PaymentsEditMyFormResponsesData = {
+    paymentId: string;
+    requestBody: FormResponseEdit;
+};
+
+export type PaymentsEditMyFormResponsesResponse = (PaymentFormResponsesPublic);
+
+export type PaymentsGetPaymentFormResponsesData = {
+    paymentId: string;
+    xTenantId?: (string | null);
+};
+
+export type PaymentsGetPaymentFormResponsesResponse = (PaymentFormResponsesPublic);
+
 export type PaymentsListPaymentsData = {
     applicationId?: (string | null);
     externalId?: (string | null);
@@ -10776,6 +10864,13 @@ export type SalesFlowsListPortalSalesFlowsData = {
 };
 
 export type SalesFlowsListPortalSalesFlowsResponse = (ListModel_SalesFlowPortalPublic_);
+
+export type SalesFlowsResolvePortalApplicationFlowData = {
+    identifier: string;
+    popupId: string;
+};
+
+export type SalesFlowsResolvePortalApplicationFlowResponse = (SalesFlowApplicationEntryPublic);
 
 export type SalesFlowsListPortalUpsaleFlowsData = {
     popupId: string;

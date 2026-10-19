@@ -486,6 +486,14 @@ class SalesFlowPortalPublic(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
+class SalesFlowApplicationEntryPublic(SalesFlowPortalPublic):
+    """Display settings for the selected application, including its own fee."""
+
+    requires_application_fee: bool
+    application_fee_amount: Decimal | None
+    application_layout: ApplicationLayout
+
+
 class SalesFlowCheckoutConfig(BaseModel):
     """What a door's checkout screen needs to know about its own settings.
 

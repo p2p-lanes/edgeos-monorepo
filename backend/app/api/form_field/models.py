@@ -1,7 +1,7 @@
 import uuid
 from typing import TYPE_CHECKING, Optional
 
-from sqlalchemy import Index, text
+from sqlalchemy import ForeignKeyConstraint, Index
 from sqlalchemy.dialects.postgresql import UUID
 from sqlmodel import Column, Field, Relationship
 
@@ -9,32 +9,34 @@ from app.api.form_field.schemas import FormFieldBase
 
 if TYPE_CHECKING:
     from app.api.form_section.models import FormSections
-    from app.api.popup.models import Popups
-    from app.api.tenant.models import Tenants
+    from app.api.sales_flow.models import SalesFlows
 
 
 class FormFields(FormFieldBase, table=True):
-    """sdd/sales-flows slice 6: two-tier uniqueness on `name`.
-
-    `uq_form_field_name_flow` covers flow-owned rows; `uq_form_field_name_popup_shared`
-    re-scopes the original popup-wide constraint to the NULL (popup-shared)
-    tier. See migration `597d9a2019ba_add_flow_id_form_definitions.py`.
-    """
+    """Custom field definition owned by one sales flow."""
 
     __table_args__ = (
+        ForeignKeyConstraint(
+            ["sales_flow_id", "popup_id", "tenant_id"],
+            ["sales_flows.id", "sales_flows.popup_id", "sales_flows.tenant_id"],
+            name="fk_formfields_flow_scope",
+            ondelete="CASCADE",
+        ),
+        ForeignKeyConstraint(
+            ["section_id", "sales_flow_id", "popup_id", "tenant_id"],
+            [
+                "formsections.id",
+                "formsections.sales_flow_id",
+                "formsections.popup_id",
+                "formsections.tenant_id",
+            ],
+            name="fk_formfields_section_flow_scope",
+        ),
         Index(
             "uq_form_field_name_flow",
             "name",
             "sales_flow_id",
             unique=True,
-            postgresql_where=text("sales_flow_id IS NOT NULL"),
-        ),
-        Index(
-            "uq_form_field_name_popup_shared",
-            "name",
-            "popup_id",
-            unique=True,
-            postgresql_where=text("sales_flow_id IS NULL"),
         ),
     )
 
@@ -46,6 +48,14 @@ class FormFields(FormFieldBase, table=True):
         ),
     )
 
-    tenant: "Tenants" = Relationship(back_populates="form_fields")
-    popup: "Popups" = Relationship(back_populates="form_fields")
-    section: Optional["FormSections"] = Relationship(back_populates="form_fields")
+    sales_flow: "SalesFlows" = Relationship(
+        back_populates="form_fields",
+        sa_relationship_kwargs={"foreign_keys": "FormFields.sales_flow_id"},
+    )
+    section: Optional["FormSections"] = Relationship(
+        back_populates="form_fields",
+        sa_relationship_kwargs={
+            "foreign_keys": "FormFields.section_id",
+            "viewonly": True,
+        },
+    )

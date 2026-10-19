@@ -237,6 +237,11 @@ class AttendeeProductPublic(BaseModel):
     snapshot-at-purchase). All are optional with None defaults for backward
     compatibility with old clients that do not read them.
 
+    product_image_url and product_description are also read from the live
+    product so the portal can show a purchased ticket's detail without going
+    through the product catalog, which filters out products the buyer can no
+    longer purchase.
+
     last_scan_at is the most recent occurred_at from check_ins for this ticket
     (None when the ticket has never been scanned). Populated by the router from
     a batched aggregation so portal UIs can flag already-used QR codes.
@@ -251,6 +256,8 @@ class AttendeeProductPublic(BaseModel):
     product_name: str | None = None
     product_category: str | None = None
     duration_type: str | None = None
+    product_image_url: str | None = None
+    product_description: str | None = None
     last_scan_at: datetime | None = None
     purchase_metadata: dict | None = None
     product_category_snapshot: str | None = None

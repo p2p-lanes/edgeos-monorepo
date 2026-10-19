@@ -10,6 +10,7 @@ from app.api.ticketing_step import crud
 from app.api.ticketing_step.schemas import (
     CopyStepsToFlowRequest,
     CopyStepsToFlowResponse,
+    ResponseEditingSettings,
     TicketingStepCreate,
     TicketingStepPublic,
     TicketingStepUpdate,
@@ -316,6 +317,12 @@ async def create_ticketing_step(
             db, step_in.sales_flow_id
         )
 
+    if step_in.allow_response_editing and step_in.step_type != "buyer":
+        raise HTTPException(
+            status_code=422,
+            detail="Response editing is only supported for buyer form steps",
+        )
+
     # FK existence check for attendee_categories in template_config (Pattern B, ADR-5)
     _validate_template_config_fk(
         step_in.template,
@@ -369,6 +376,34 @@ async def update_ticketing_step(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Ticketing step not found",
         )
+
+    # Validate the effective state: a partial PATCH cannot bypass the deadline.
+    editing_keys = {
+        "allow_response_editing",
+        "response_edit_deadline",
+    }
+    if editing_keys & step_in.model_fields_set:
+        from pydantic import ValidationError
+
+        try:
+            settings = ResponseEditingSettings.model_validate(
+                {
+                    key: getattr(step_in, key)
+                    if key in step_in.model_fields_set
+                    else getattr(step, key)
+                    for key in editing_keys
+                }
+            )
+        except ValidationError as exc:
+            raise HTTPException(
+                status_code=422,
+                detail="Invalid response editing settings: a deadline and valid time zone are required",
+            ) from exc
+        if settings.allow_response_editing and step.step_type != "buyer":
+            raise HTTPException(
+                status_code=422,
+                detail="Response editing is only supported for buyer form steps",
+            )
 
     # Cannot disable a protected step
     if step.protected and step_in.is_enabled is False:

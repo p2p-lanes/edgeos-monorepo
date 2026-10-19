@@ -395,11 +395,14 @@ def test_purchase_validation_ignores_required_fields_in_hidden_sections(
     db.refresh(popup)
 
     # Hidden required field missing → accepted.
-    payments_crud._validate_open_ticketing_form_data(popup, {visible_field.name: "ok"})
+    form_sections = [hidden, visible]
+    payments_crud._validate_open_ticketing_form_data(
+        form_sections, {visible_field.name: "ok"}
+    )
 
     # Visible required field missing → still rejected.
     with pytest.raises(HTTPException) as exc_info:
-        payments_crud._validate_open_ticketing_form_data(popup, {})
+        payments_crud._validate_open_ticketing_form_data(form_sections, {})
     assert exc_info.value.status_code == 422
 
 

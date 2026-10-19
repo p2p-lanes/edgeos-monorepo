@@ -16,6 +16,7 @@ import ScrollyCheckoutFlow from "@/components/checkout-flow/ScrollyCheckoutFlow"
 import StepperCheckoutFlow from "@/components/checkout-flow/StepperCheckoutFlow"
 import { LanguageSwitcher } from "@/components/common/LanguageSwitcher"
 import { captureAttribution } from "@/lib/attribution"
+import { buyerFormDisplaySchema } from "@/lib/buyerFormDisplay"
 import { resolveCheckoutShell } from "@/lib/checkout-shell"
 import { trackGAViewItem } from "@/lib/google-analytics"
 import { trackMetaViewContent } from "@/lib/meta-pixel"
@@ -206,6 +207,10 @@ export function OpenCheckoutRuntime({
     () => buildOpenBuyerSchema(runtime, t),
     [runtime, t],
   )
+  const buyerFormDisplay = buyerFormDisplaySchema(
+    buyerFormSchema,
+    prefilledBuyer,
+  )
 
   setActiveCurrency(popup.currency ?? "USD")
 
@@ -282,6 +287,7 @@ export function OpenCheckoutRuntime({
                 configuredStepsOverride={runtime.ticketing_steps}
                 accountCreditOverride={0}
                 buyerFormSchema={buyerFormSchema}
+                buyerFormDisplaySchema={buyerFormDisplay}
                 initialBuyerValues={
                   buyerFormSchema
                     ? buildInitialBuyerValues(buyerFormSchema, prefilledBuyer)

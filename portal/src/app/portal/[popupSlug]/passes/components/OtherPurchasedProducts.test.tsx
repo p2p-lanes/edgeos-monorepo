@@ -4,10 +4,12 @@ import {
   fireEvent,
   render,
   screen,
+  waitFor,
   within,
 } from "@testing-library/react"
 import type { ReactNode } from "react"
-import { afterEach, describe, expect, it, vi } from "vitest"
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
+import { PaymentsService } from "@/client"
 import en from "@/i18n/locales/en.json"
 import type { OtherPurchasedProduct } from "../otherProductsProjection"
 import { OtherPurchasedProducts } from "./OtherPurchasedProducts"
@@ -25,7 +27,14 @@ vi.mock("react-i18next", () => ({
   }),
 }))
 
+vi.mock("@/components/payments/PaymentFormResponses", () => ({
+  PaymentFormResponses: ({ paymentId }: { paymentId: string }) => (
+    <div data-testid="response-payment">{paymentId}</div>
+  ),
+}))
+
 vi.mock("@/client", () => ({
+  PaymentsService: { getMyFormResponses: vi.fn() },
   TicketingStepsService: {
     listPortalTicketingSteps: vi.fn(async () => ({ results: [] })),
   },
@@ -78,9 +87,80 @@ function renderProducts(products: OtherPurchasedProduct[]) {
   )
 }
 
+beforeEach(() => {
+  vi.mocked(PaymentsService.getMyFormResponses).mockReset()
+  vi.mocked(PaymentsService.getMyFormResponses).mockResolvedValue({
+    fields: [],
+  } as never)
+})
 afterEach(cleanup)
 
 describe("OtherPurchasedProducts", () => {
+  it("opens the answers of the selected order even when it has no QR", async () => {
+    vi.mocked(PaymentsService.getMyFormResponses).mockResolvedValue({
+      fields: [{ id: "field-1" }],
+    } as never)
+    renderProducts([
+      shirt({
+        key: "lunch-1",
+        name: "Lunch Week 2",
+        checkInCode: null,
+        paymentId: "payment-1",
+      }),
+      shirt({
+        key: "lunch-2",
+        name: "Lunch Week 3",
+        checkInCode: null,
+        paymentId: "payment-2",
+      }),
+    ])
+    fireEvent.click(
+      await screen.findByRole("button", {
+        name: "View purchase details for Lunch Week 3",
+      }),
+    )
+    const dialog = screen.getByRole("dialog", { name: "Lunch Week 3" })
+    expect(within(dialog).getByTestId("response-payment").textContent).toBe(
+      "payment-2",
+    )
+    expect(screen.queryByTestId("qr-payload")).toBeNull()
+  })
+
+  it("keeps products with a payment but no form or QR non-interactive", async () => {
+    renderProducts([
+      shirt({
+        name: "Lunch without form",
+        checkInCode: null,
+        paymentId: "payment-empty",
+      }),
+    ])
+    await waitFor(() =>
+      expect(PaymentsService.getMyFormResponses).toHaveBeenCalledWith({
+        paymentId: "payment-empty",
+      }),
+    )
+    expect(screen.getByText("Lunch without form")).toBeTruthy()
+    expect(
+      screen.queryByRole("button", { name: /View purchase details/ }),
+    ).toBeNull()
+    expect(screen.queryByRole("dialog")).toBeNull()
+  })
+
+  it("does not offer empty details when form responses cannot be loaded", async () => {
+    vi.mocked(PaymentsService.getMyFormResponses).mockRejectedValue(
+      new Error("Unavailable"),
+    )
+    renderProducts([
+      shirt({ checkInCode: null, paymentId: "payment-unavailable" }),
+    ])
+    await waitFor(() =>
+      expect(PaymentsService.getMyFormResponses).toHaveBeenCalled(),
+    )
+    expect(
+      screen.queryByRole("button", { name: /View purchase details/ }),
+    ).toBeNull()
+  })
+
   it("gives each unit its own row and opens that unit's QR", () => {
     renderProducts(twoShirts)
 

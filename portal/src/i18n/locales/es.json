@@ -317,6 +317,18 @@
     "resend_code_countdown": "Reenviar código ({{countdown}}s)",
     "resend_code": "Reenviar código",
     "resend_hint": "¿No recibiste el código? Revisá tu carpeta de spam o hacé clic en \"Reenviar código\" después de que expire el temporizador.",
+    "verification": {
+      "incorrect": "Código incorrecto. Revisá el último email e intentá de nuevo.",
+      "expired": "Este código venció. Pedí un código nuevo.",
+      "no_active_code": "No hay un código activo. Pedí un código nuevo.",
+      "too_many_attempts": "Demasiados intentos. Pedí un código nuevo para continuar.",
+      "resent": "Enviamos un código nuevo. Los anteriores ya no funcionan. Usá el código del último email.",
+      "network_error": "No pudimos verificar tu código. Revisá tu conexión e intentá de nuevo.",
+      "server_error": "No pudimos verificar tu código en este momento. Intentá de nuevo en unos instantes.",
+      "send_error": "No pudimos enviar el código de verificación. Intentá de nuevo.",
+      "incomplete": "Ingresá el código completo de 6 dígitos.",
+      "request_new_code": "Pedir un código nuevo"
+    },
     "success_title": "¡Tickets comprados!",
     "success_description": "Gracias por tu compra. Tus tickets ya están listos para usar.",
     "steps": {
@@ -688,6 +700,10 @@
     "no_passes_yet_suffix": "para comprar",
     "check_in_code": "Código de check-in",
     "qr_already_scanned": "QR ya escaneado",
+    "purchase_details_label": "Ver detalles de la compra de {{product}}",
+    "purchase_details_close": "Cerrar",
+    "purchase_address": "Dirección",
+    "purchase_total_paid": "Total pagado",
     "latam_citizens": "Ciudadanos de Latam",
     "standard": "Estándar",
     "id_required": "Se requiere identificación en el check-in *",
@@ -1575,5 +1591,22 @@
     "badge_count_one": "{{count}} insignia",
     "badge_count_other": "{{count}} insignias",
     "no_badges": "Todavía no tiene insignias."
+  },
+  "form_responses": {
+    "view": "Ver respuestas",
+    "hide": "Ocultar respuestas",
+    "not_answered": "Sin responder",
+    "title": "Respuestas del formulario",
+    "edit": "Editar respuestas",
+    "edit_action": "Editar",
+    "deadline": "Podés editar tus respuestas hasta {{date}} ({{timezone}}).",
+    "expired": "El plazo de edición terminó.",
+    "unavailable": "La edición de respuestas ya no está disponible.",
+    "save": "Guardar cambios",
+    "saving": "Guardando…",
+    "cancel": "Cancelar",
+    "saved": "Respuestas actualizadas.",
+    "save_error": "No se pudieron guardar las respuestas. Intentá nuevamente.",
+    "history": "Historial de respuestas"
   }
 }

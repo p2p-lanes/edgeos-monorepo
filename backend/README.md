@@ -162,39 +162,6 @@ async def list_products(
 
 ## Database
 
-### Pending recipient identity
-
-A recipient's `human_id` identifies the ticket holder; `managed_by_human_id`
-and `application_id` retain the purchaser/application's management lineage.
-Email verification (new or existing account), an explicit email edit on an
-unlinked attendee, and payment fulfillment can resolve a pending identity.
-
-Resolution requires one normalized account per tenant/email and one eligible
-pending attendee per popup. A manager's email or an applicant's email on a
-companion is contact data, not proof of self identity. Manager-self rows are
-excluded; an applicant's own pending row must have a primary category from
-that application flow. Explicit checkout self snapshots remain authoritative.
-It never replaces an existing `human_id`, changes the
-manager, moves products, or merges/deletes attendees. An application-linked
-legacy main does not block a recipient, but an existing direct-sale row does
-because of `ux_attendees_human_popup_direct`. Ambiguous/conflicting records
-remain pending and runtime logs identify the affected human/popup or direct
-row for explicit reconciliation. Contact edits on linked rows are not transfers.
-
-Migration `e8a4f1c7d2b6` applies the same conservative rules to existing data.
-Preview its global scope with `scripts/preview_pending_recipient_identity.sql`
-in a read-only transaction. See the [hotfix release runbook](../docs/hotfix-ticket-recipient-identity.md)
-for release gates, post-deploy validation and rollback constraints.
-It briefly locks attendee writes (reads stay available) to prevent uniqueness
-races. Downgrade intentionally does not undo links: backfilled links cannot be
-distinguished safely from later legitimate ownership. Review unresolved rows
-separately; absence of an active ticket alone does not make a main deletable.
-
-RSVP policy and personal API response contracts are unchanged. Repaired ticket
-holders satisfy the existing linked-active-ticket check; accepted applications
-alone still do not authorize RSVP. Login repair failures roll back independently
-and do not invalidate successful authentication.
-
 ### Migrations
 
 ```bash

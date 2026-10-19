@@ -7,7 +7,7 @@ import { queryKeys } from "@/lib/query-keys"
 
 /**
  * Portal-listed application flows for a popup (sdd/sales-flows G0, task
- * 9.4). Backs the gathering overview and application route resolution.
+ * 9.4). Backs discovery on the gathering overview.
  * `direct_url_only` flows and non-application flows never appear
  * (backend-filtered).
  */

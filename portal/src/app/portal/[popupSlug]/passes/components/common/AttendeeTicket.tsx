@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query"
-import { ChevronRight, Pencil, QrCode, User } from "lucide-react"
+import { ChevronRight, User } from "lucide-react"
 import Image from "next/image"
 import React, { useMemo, useState } from "react"
 import { useTranslation } from "react-i18next"
@@ -24,13 +24,14 @@ import type { AttendeePassState, TicketEntry } from "@/types/Attendee"
 import type { ProductsPass } from "@/types/Products"
 import { badgeName } from "../../constants/multiuse"
 import useModal from "../../hooks/useModal"
-import { isAccommodationEntry } from "../../utils/accommodationBooking"
-import { compareByCategory, getCategoryIcon } from "../../utils/categoryDisplay"
+import { resolveOtherProductVisual } from "../../otherProductVisual"
+import { compareByCategory } from "../../utils/categoryDisplay"
 import { AttendeeModal } from "../AttendeeModal"
-import { AccommodationBookingRow } from "./AccommodationBookingRow"
 import OptionsMenu from "./Buttons/OptionsMenu"
 import { MealPlanEditModal } from "./MealPlanEditModal"
 import Product from "./Products/ProductTicket"
+import PurchasedProductSheet from "./PurchasedProductSheet"
+import PurchasedTicketRow from "./PurchasedTicketRow"
 import QRcode from "./QRcode"
 
 const getDurationPriority = (p: ProductsPass): number => {
@@ -136,6 +137,17 @@ const AttendeeTicket = ({
 
   const [editingEntryId, setEditingEntryId] = useState<string | null>(null)
 
+  // The purchase whose detail sheet is open. Rows stay closed in the list so
+  // a long description or a booked stay never stretches the ticket.
+  const [selectedEntryId, setSelectedEntryId] = useState<string | null>(null)
+
+  const ticketImageUrl = (entry: TicketEntry): string | null =>
+    resolveOtherProductVisual(
+      { id: entry.product_id, category: entry.product_category ?? "" },
+      ticketingStepsData?.results ?? [],
+      [{ id: entry.product_id, image_url: entry.product_image_url }],
+    ).imageUrl
+
   // Used by buy mode <Product> components to disable day/week tickets when a
   // monthly pass is selected/purchased (buy-mode logic is out of scope here).
   const hasMonthPurchased = attendee.products.some(
@@ -173,6 +185,9 @@ const AttendeeTicket = ({
   const mealPlanEntries = ticketEntries.filter((e) =>
     mealPlanIds.has(e.product_id),
   )
+
+  const selectedEntry =
+    ticketEntries.find((e) => e.id === selectedEntryId) ?? null
 
   // Inline QR modal state — drives the shared <QRcode> modal at bottom of file.
   // Tracks lastScanAt alongside the code so the modal can flag already-used QRs.
@@ -217,7 +232,7 @@ const AttendeeTicket = ({
   return (
     <div className="relative h-full w-full">
       <div className="w-full overflow-hidden">
-        <div className="w-full rounded-3xl border border-border h-full lg:grid lg:grid-cols-[1fr_2px_2fr] bg-card">
+        <div className="w-full rounded-3xl border border-border h-full lg:grid lg:grid-cols-[minmax(0,1fr)_2px_minmax(0,2fr)] bg-card">
           {/* Left panel - City & Attendee info */}
           <div className="relative flex flex-col p-6 overflow-hidden h-full min-h-[160px]">
             <div className="absolute inset-0 z-0 overflow-hidden rounded-t-3xl lg:rounded-l-3xl lg:rounded-tr-none">
@@ -324,77 +339,37 @@ const AttendeeTicket = ({
               /* View mode - with purchased passes - flat list by category + inline QR */
               <div className="w-full">
                 {ticketEntries.map((entry, idx) => {
-                  const CategoryIcon = getCategoryIcon(entry.product_category)
-                  const isScanned = entry.last_scan_at != null
-                  // A booked room is a stay, not a ticket: it needs its dates
-                  // and its guest list, and it has no gate to be scanned at.
-                  if (isAccommodationEntry(entry)) {
-                    return (
-                      <div
-                        key={entry.id}
-                        className={cn(
-                          idx !== ticketEntries.length - 1 &&
-                            "border-b border-dotted border-border",
-                        )}
-                      >
-                        <AccommodationBookingRow entry={entry} />
-                      </div>
-                    )
-                  }
+                  const canEditMealPlan =
+                    !readOnly &&
+                    mealPlanIds.has(entry.product_id) &&
+                    isMealPlanEntryEditable(entry)
                   return (
                     <div
                       key={entry.id}
                       className={cn(
-                        "flex items-center gap-2 py-3",
                         idx !== ticketEntries.length - 1 &&
                           "border-b border-dotted border-border",
                       )}
                     >
-                      <CategoryIcon className="w-4 h-4 lg:w-5 lg:h-5 text-pass-text flex-shrink-0" />
-                      <div className="flex items-baseline gap-1.5 flex-1 min-w-0">
-                        <span className="font-bold text-pass-title text-sm lg:text-base whitespace-nowrap">
-                          {entry.product_name}
-                        </span>
-                      </div>
-                      {!readOnly &&
-                        mealPlanIds.has(entry.product_id) &&
-                        isMealPlanEntryEditable(entry) && (
-                          <button
-                            type="button"
-                            onClick={() => setEditingEntryId(entry.id)}
-                            aria-label="Edit meal plan"
-                            className="flex items-center gap-1 text-xs font-medium text-pass-text hover:text-pass-title transition-colors cursor-pointer flex-shrink-0"
-                          >
-                            <Pencil className="w-4 h-4" />
-                            <span className="hidden sm:inline">
-                              Edit meal plan
-                            </span>
-                          </button>
-                        )}
-                      {entry.requires_check_in === true && (
-                        <button
-                          type="button"
-                          onClick={() =>
-                            setActiveTicket({
-                              code: entry.check_in_code,
-                              lastScanAt: entry.last_scan_at ?? null,
-                            })
-                          }
-                          aria-label={
-                            isScanned
-                              ? t("passes.qr_already_scanned")
-                              : t("passes.check_in_code")
-                          }
-                          className={cn(
-                            "transition-colors cursor-pointer flex-shrink-0",
-                            isScanned
-                              ? "text-yellow-500 hover:text-yellow-700"
-                              : "text-pass-text hover:text-pass-title",
-                          )}
-                        >
-                          <QrCode className="w-5 h-5" />
-                        </button>
-                      )}
+                      <PurchasedTicketRow
+                        entry={entry}
+                        imageUrl={ticketImageUrl(entry)}
+                        onOpen={() => setSelectedEntryId(entry.id)}
+                        onEditMealPlan={
+                          canEditMealPlan
+                            ? () => setEditingEntryId(entry.id)
+                            : undefined
+                        }
+                        onShowQr={
+                          entry.requires_check_in === true
+                            ? () =>
+                                setActiveTicket({
+                                  code: entry.check_in_code,
+                                  lastScanAt: entry.last_scan_at ?? null,
+                                })
+                            : undefined
+                        }
+                      />
                     </div>
                   )
                 })}
@@ -405,6 +380,14 @@ const AttendeeTicket = ({
                   onOpenChange={(open) => {
                     if (!open) setActiveTicket(null)
                   }}
+                />
+                <PurchasedProductSheet
+                  entry={selectedEntry}
+                  imageUrl={
+                    selectedEntry ? ticketImageUrl(selectedEntry) : null
+                  }
+                  attendeeName={attendee.name}
+                  onClose={() => setSelectedEntryId(null)}
                 />
               </div>
             ) : (

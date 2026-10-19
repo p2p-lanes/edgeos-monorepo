@@ -5,17 +5,19 @@ from fastapi import APIRouter, HTTPException, status
 from sqlalchemy.exc import IntegrityError
 from sqlmodel import Session, select
 
+from app.api.popup.models import Popups
 from app.api.popup_reviewer.crud import popup_reviewers_crud
 from app.api.sales_flow import crud
 from app.api.sales_flow.application_defaults import seed_application_defaults
 from app.api.sales_flow.crud import START_FRESH
 from app.api.sales_flow.models import SalesFlows
 from app.api.sales_flow.readiness import flow_readiness
-from app.api.sales_flow.resolver import build_checkout_config
+from app.api.sales_flow.resolver import build_checkout_config, resolve_flow
 from app.api.sales_flow.schemas import (
     EFFECTIVE_CONFIG_FIELDS,
     FlowSettingsByType,
     FlowStartPreview,
+    SalesFlowApplicationEntryPublic,
     SalesFlowCheckoutConfig,
     SalesFlowCreate,
     SalesFlowPortalPublic,
@@ -27,6 +29,7 @@ from app.api.sales_flow.schemas import (
     fields_for,
     parse_portal_theme_config,
 )
+from app.api.shared.enums import ApplicationLayout
 from app.api.shared.response import ListModel, PaginationLimit, PaginationSkip, Paging
 from app.api.ticketing_step.constants import seed_confirm_step_for_flow
 from app.core.dependencies.users import (
@@ -71,6 +74,45 @@ async def list_portal_sales_flows(
     return ListModel[SalesFlowPortalPublic](
         results=[_portal_flow_public(db, flow) for flow in flows],
         paging=Paging(offset=0, limit=len(flows), total=len(flows)),
+    )
+
+
+@router.get("/portal/application", response_model=SalesFlowApplicationEntryPublic)
+async def resolve_portal_application_flow(
+    db: HumanTenantSession,
+    _: CurrentHuman,
+    popup_id: uuid.UUID,
+    identifier: str,
+) -> SalesFlowApplicationEntryPublic:
+    """Resolve an application entry link by slug or ID, including unlisted flows.
+
+    Visibility controls discovery only. The popup, flow status and flow type
+    still gate entry, using the same rules as the checkout resolver.
+    """
+    flow = crud.sales_flows_crud.get_by_slug(db, popup_id, identifier)
+    if flow is None:
+        try:
+            flow_id = uuid.UUID(identifier)
+        except ValueError:
+            flow_id = None
+        if flow_id is not None:
+            flow = crud.sales_flows_crud.get(db, flow_id)
+    if flow is None or flow.popup_id != popup_id:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Sales flow not found for this popup",
+        )
+    resolved = resolve_flow(
+        db,
+        db.get(Popups, popup_id),
+        flow.slug,
+        require_types={SalesFlowType.application},
+    )
+    return SalesFlowApplicationEntryPublic(
+        **_portal_flow_public(db, resolved).model_dump(),
+        requires_application_fee=bool(resolved.requires_application_fee),
+        application_fee_amount=resolved.application_fee_amount,
+        application_layout=resolved.application_layout or ApplicationLayout.single_page,
     )
 
 

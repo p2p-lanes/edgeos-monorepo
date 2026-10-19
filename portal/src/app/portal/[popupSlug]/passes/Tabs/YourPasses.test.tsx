@@ -12,6 +12,12 @@ interface QueryConfiguration {
   queryKey: unknown[]
 }
 
+vi.mock("@/components/payments/PaymentFormResponses", () => ({
+  PaymentFormResponses: ({ paymentId }: { paymentId: string }) => (
+    <div data-testid="purchase-form-payment">{paymentId}</div>
+  ),
+}))
+
 const queryConfigurations = vi.hoisted(() => [] as QueryConfiguration[])
 const queryResult = vi.hoisted(() => ({ data: undefined as unknown }))
 const productsQueryResult = vi.hoisted(() => ({ data: [] as unknown[] }))
@@ -45,6 +51,10 @@ vi.mock("@/hooks/useAttendee", () => ({
     removeAttendee: vi.fn(),
   }),
 }))
+
+// The detail sheet picks bottom vs side by viewport; restoreAllMocks below
+// wipes the global matchMedia stub, so pin the desktop layout here.
+vi.mock("@/hooks/useIsMobile", () => ({ useIsMobile: () => false }))
 
 vi.mock("@/hooks/useAttendeeCategories", () => ({
   useAttendeeCategories: () => ({ categories: [] }),
@@ -328,5 +338,43 @@ describe("YourPasses selected projection", () => {
     expect(screen.getByText("$222")).toBeTruthy()
     expect(screen.queryByText("Attendee Suite")).toBeNull()
     expect(screen.queryByText("$111")).toBeNull()
+  })
+
+  it("opens the detail sheet of the purchase that was tapped", () => {
+    const base = attendee("unused", "unused")
+    const withDetails = {
+      ...base,
+      ticket_entries: [
+        {
+          ...base.ticket_entries![0],
+          id: "ticket-eclipse",
+          payment_id: "payment-eclipse",
+          product_id: "product-eclipse",
+          product_name: "The Luxor Eclipse Gathering",
+          product_description: "Three days on the West Bank.",
+        },
+        {
+          ...base.ticket_entries![0],
+          id: "ticket-felucca",
+          payment_id: "payment-felucca",
+          product_id: "product-felucca",
+          product_name: "Nile Sunset Felucca",
+          product_description: "Two hours sailing from the Corniche.",
+        },
+      ],
+    }
+
+    render(<YourPasses attendees={[withDetails]} salesFlowId={null} />)
+
+    expect(screen.queryByRole("dialog")).toBeNull()
+
+    fireEvent.click(screen.getByRole("button", { name: /Nile Sunset Felucca/ }))
+
+    expect(
+      screen.getByRole("dialog", { name: "Nile Sunset Felucca" }),
+    ).toBeTruthy()
+    expect(screen.getByTestId("purchase-form-payment").textContent).toBe(
+      "payment-felucca",
+    )
   })
 })

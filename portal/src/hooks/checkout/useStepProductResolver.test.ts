@@ -205,6 +205,77 @@ describe("useStepProductResolver", () => {
     expect(resolved![0].id).toBe("p1")
   })
 
+  it("resolves only product_ids assigned to configured sections", () => {
+    const step = makeStep({
+      id: "step-tickets",
+      step_type: "tickets",
+      product_category: "ticket",
+      template_config: {
+        sections: [{ key: "main", product_ids: ["assigned"] }],
+      },
+    })
+    const products = [
+      makeProduct({ id: "assigned", category: "ticket" }),
+      makeProduct({ id: "unassigned", category: "ticket" }),
+    ]
+
+    const { result } = renderHook(() =>
+      useStepProductResolver([step], products),
+    )
+
+    expect(result.current.getProductsForStep(step).map((p) => p.id)).toEqual([
+      "assigned",
+    ])
+  })
+
+  it("resolves meal-plan product references from section product metadata", () => {
+    const step = makeStep({
+      id: "step-meals",
+      step_type: "meals",
+      product_category: "meal_plan",
+      template: "meal-plan-select",
+      template_config: {
+        sections: [
+          {
+            key: "week-one",
+            products: [
+              { product_id: "week-one-product", coverage_start: "2026-10-12" },
+            ],
+          },
+        ],
+      },
+    })
+    const products = [
+      makeProduct({ id: "week-one-product", category: "meal_plan" }),
+      makeProduct({ id: "unassigned-week", category: "meal_plan" }),
+    ]
+
+    const { result } = renderHook(() =>
+      useStepProductResolver([step], products),
+    )
+
+    expect(result.current.getProductsForStep(step).map((p) => p.id)).toEqual([
+      "week-one-product",
+    ])
+  })
+
+  it("returns no products when configured sections have no assignments", () => {
+    const step = makeStep({
+      id: "step-empty",
+      step_type: "tickets",
+      product_category: "ticket",
+      template_config: { sections: [{ key: "empty", product_ids: [] }] },
+    })
+    const { result } = renderHook(() =>
+      useStepProductResolver(
+        [step],
+        [makeProduct({ id: "unassigned", category: "ticket" })],
+      ),
+    )
+
+    expect(result.current.getProductsForStep(step)).toEqual([])
+  })
+
   it("getProductsForStep returns [] for null/undefined step", () => {
     const { result } = renderHook(() => useStepProductResolver([], []))
     expect(result.current.getProductsForStep(null)).toEqual([])

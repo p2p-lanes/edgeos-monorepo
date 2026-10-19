@@ -17,6 +17,9 @@ vi.mock("@/client", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/client")>()
   return {
     ...actual,
+    EventSettingsService: {
+      getEventSettings: vi.fn().mockResolvedValue({ timezone: "Asia/Kolkata" }),
+    },
     TicketingStepsService: {
       getTicketingStep: vi.fn(),
       updateTicketingStep: vi.fn(),
@@ -115,6 +118,76 @@ describe("StepDetailPanel", () => {
       results: [],
       paging: { limit: 100, offset: 0, total: 0 },
     })
+  })
+
+  it("uses the popup time zone for the deadline without a separate zone setting", async () => {
+    const user = userEvent.setup()
+    vi.mocked(TicketingStepsService.getTicketingStep).mockResolvedValue({
+      ...baseStep,
+      allow_response_editing: true,
+      response_edit_deadline: "2026-10-23T06:30:00Z",
+    })
+    renderPanel()
+    expect(
+      await screen.findByText("Uses the gathering time zone: Asia/Kolkata."),
+    ).toBeInTheDocument()
+    expect(screen.queryByLabelText("Time zone (IANA)")).not.toBeInTheDocument()
+    expect(screen.getByLabelText("Deadline date")).toHaveValue("2026-10-23")
+    expect(screen.getByLabelText("Deadline time")).toHaveValue("12:00")
+    await user.clear(screen.getByLabelText("Deadline time"))
+    await user.type(screen.getByLabelText("Deadline time"), "13:00")
+    await user.click(screen.getByRole("button", { name: "Save" }))
+    const payload = vi.mocked(TicketingStepsService.updateTicketingStep).mock
+      .lastCall?.[0].requestBody
+    expect(payload?.response_edit_deadline).toBe("2026-10-23T07:30:00.000Z")
+    expect(payload).not.toHaveProperty("response_edit_timezone")
+  })
+
+  it("validates typed dates and retains the calendar option", async () => {
+    const user = userEvent.setup()
+    vi.mocked(TicketingStepsService.getTicketingStep).mockResolvedValue({
+      ...baseStep,
+      allow_response_editing: true,
+      response_edit_deadline: "2026-10-23T06:30:00Z",
+    })
+    renderPanel()
+    await user.clear(await screen.findByLabelText("Deadline date"))
+    await user.type(screen.getByLabelText("Deadline date"), "2026-02-30")
+    expect(screen.getByRole("button", { name: "Save" })).toBeDisabled()
+    await user.clear(screen.getByLabelText("Deadline date"))
+    await user.type(screen.getByLabelText("Deadline date"), "2026-10-24")
+    expect(screen.getByRole("button", { name: "Save" })).toBeEnabled()
+    await user.click(
+      screen.getByRole("button", { name: "Choose deadline date" }),
+    )
+    expect(await screen.findByRole("grid")).toBeInTheDocument()
+  })
+
+  it("requires both a date and a time before saving an enabled policy", async () => {
+    const user = userEvent.setup()
+    renderPanel()
+    await user.click(
+      await screen.findByRole("switch", {
+        name: "Allow editing after purchase",
+      }),
+    )
+    await user.type(screen.getByLabelText("Deadline time"), "13:00")
+    expect(screen.getByRole("alert")).toHaveTextContent(
+      "Choose a deadline date and time.",
+    )
+    expect(screen.getByRole("button", { name: "Save" })).toBeDisabled()
+    await user.click(
+      screen.getByRole("switch", { name: "Allow editing after purchase" }),
+    )
+    await user.click(screen.getByRole("button", { name: "Save" }))
+    expect(TicketingStepsService.updateTicketingStep).toHaveBeenCalledWith(
+      expect.objectContaining({
+        requestBody: expect.objectContaining({
+          allow_response_editing: false,
+          response_edit_deadline: null,
+        }),
+      }),
+    )
   })
 
   it("sends the icon picker's slug in the save payload", async () => {

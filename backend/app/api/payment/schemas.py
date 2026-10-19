@@ -238,7 +238,8 @@ class PaymentBase(SQLModel):
     # popup's default flow (sdd/sales-flows slice 4). Provenance only per
     # design D7 — read for background/reporting partitioning (e.g. the
     # reminder dispatcher), never for a request-path authorization, pricing,
-    # or eligibility rule.
+    # or eligibility rule. Post-purchase form edits use the original flow
+    # to resolve answer-edit settings and field membership.
     sales_flow_id: uuid.UUID | None = Field(
         default=None, foreign_key="sales_flows.id", nullable=True, index=True
     )
@@ -272,6 +273,7 @@ class PaymentBase(SQLModel):
     )
     source: str | None = Field(default=None, nullable=True)
     checkout_url: str | None = Field(default=None, nullable=True)
+    form_response_version: int = Field(default=0, nullable=False)
     buyer_snapshot: dict | None = Field(
         default=None,
         sa_column=Column(JSONB, nullable=True),

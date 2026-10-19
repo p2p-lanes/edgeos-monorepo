@@ -81,6 +81,8 @@ export const queryKeys = {
       ["attendee-categories", popupId, salesFlowId ?? null] as const,
   },
   salesFlows: {
+    applicationEntry: (popupId: string, identifier: string | null) =>
+      ["sales-flows", "application-entry", popupId, identifier] as const,
     portal: (popupId: string) => ["sales-flows", "portal", popupId] as const,
     portalDirect: (popupId: string) =>
       ["sales-flows", "portal", "direct", popupId] as const,

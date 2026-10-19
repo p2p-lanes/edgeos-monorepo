@@ -6,6 +6,7 @@ import { useCheckout } from "@/providers/checkoutProvider"
 export default function OpenCheckoutBuyerStep() {
   const {
     buyerFormSchema,
+    buyerFormDisplaySchema,
     buyerValues,
     buyerErrors,
     setBuyerField,
@@ -19,7 +20,7 @@ export default function OpenCheckoutBuyerStep() {
   return (
     <div className="space-y-4">
       <OpenTicketingBuyerForm
-        schema={buyerFormSchema}
+        schema={buyerFormDisplaySchema ?? buyerFormSchema}
         values={buyerValues}
         errors={buyerErrors}
         onChange={setBuyerField}

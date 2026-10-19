@@ -24,9 +24,36 @@ function resolveProductsForStep(
   // No category configured → empty list (silent skip per Decision #2 of proposal).
   if (!step.product_category) return []
   const target = step.product_category.toLowerCase()
-  return allProducts.filter(
+  const categoryProducts = allProducts.filter(
     (p) => p.is_active && p.category.toLowerCase() === target,
   )
+
+  const sections = (
+    step.template_config as
+      | {
+          sections?: {
+            product_ids?: string[]
+            products?: { product_id?: string }[]
+          }[]
+        }
+      | null
+      | undefined
+  )?.sections
+
+  // A configured section list is the step's assignment, not decoration.
+  // Support both the shared product_ids shape and templates (Meal Plan) that
+  // attach per-product metadata alongside product_id.
+  if (!sections?.length) return categoryProducts
+  const assignedIds = new Set(
+    sections.flatMap((section) => [
+      ...(section.product_ids ?? []),
+      ...(section.products ?? [])
+        .map((product) => product.product_id)
+        .filter((productId): productId is string => !!productId),
+    ]),
+  )
+
+  return categoryProducts.filter((product) => assignedIds.has(product.id))
 }
 
 export function useStepProductResolver(

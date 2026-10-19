@@ -22,6 +22,7 @@ from app.api.sales_flow.eligibility import (
     assert_upsale_eligible,
 )
 from app.api.sales_flow.schemas import SalesFlowType, SelectedSalesFlow
+from app.api.ticketing_step.models import TicketingSteps
 from app.core.config import settings
 from app.core.security import ALGORITHM
 from app.services.restrictions.context import build_context
@@ -189,10 +190,26 @@ def evaluate_gate_quote(
     form_data = buyer.form_data if buyer else {}
     if set(form_data) - allowed_fields:
         _unavailable()
-    complete = buyer is not None and all(
-        form_data.get(field.name) not in (None, "", [])
-        for field in fields
-        if field.required
+    # Required form answers can only gate a purchase when that flow actually
+    # renders its buyer step. Keep identity and unknown-field checks intact.
+    buyer_form_enabled = (
+        session.exec(
+            select(TicketingSteps.id).where(
+                TicketingSteps.sales_flow_id == flow.id,
+                TicketingSteps.popup_id == popup.id,
+                TicketingSteps.step_type == "buyer",
+                TicketingSteps.is_enabled == True,  # noqa: E712
+            )
+        ).first()
+        is not None
+    )
+    complete = buyer is not None and (
+        not buyer_form_enabled
+        or all(
+            form_data.get(field.name) not in (None, "", [])
+            for field in fields
+            if field.required
+        )
     )
     if require_complete and not complete:
         _unavailable()

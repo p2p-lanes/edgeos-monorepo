@@ -8,11 +8,11 @@ import { toast } from "sonner"
 import type { ApplicationPortalPublic } from "@/client"
 import { ApplicationUnavailable } from "@/components/Portal/ApplicationUnavailable"
 import { Loader } from "@/components/ui/Loader"
+import { useApplicationEntryFlow } from "@/hooks/useApplicationEntryFlow"
 import { useApplicationSchema } from "@/hooks/useApplicationSchema"
 import { useApplicationsQuery } from "@/hooks/useGetApplications"
 import { useHumanPopupAccess } from "@/hooks/useHumanPopupAccess"
 import { usePortalPrimarySalesFlow } from "@/hooks/usePortalPrimarySalesFlow"
-import { usePortalSalesFlows } from "@/hooks/usePortalSalesFlows"
 import { useInitialQueryResolution } from "@/lib/initial-query-resolution"
 import { useApplication } from "@/providers/applicationProvider"
 import { useCityProvider } from "@/providers/cityProvider"
@@ -21,7 +21,6 @@ import { DynamicApplicationForm } from "./components/dynamic-application-form"
 import { ExistingApplicationCard } from "./components/existing-application-card"
 import { FormHeader } from "./components/form-header"
 import { SectionSeparator } from "./components/section-separator"
-import { resolveApplicationFlowId } from "./lib/resolveApplicationFlowId"
 import { resolvedApplicationDestination } from "./lib/resolvedApplicationDestination"
 import { shouldRedirectToStatus } from "./lib/shouldRedirectToStatus"
 
@@ -93,30 +92,21 @@ export default function FormPage() {
   // readable flow slug; authenticated portal handoffs carry the internal id.
   // Both resolve to the id required by the application API.
   const flowIdentifier = searchParams.get("flow")
-  const flowsQuery = usePortalSalesFlows(city?.id)
-  const portalFlows = flowsQuery.data
+  const flowsQuery = useApplicationEntryFlow(city?.id, flowIdentifier)
+  const selectedFlow = flowsQuery.data
   const applicationsLoading = useInitialQueryResolution(
     "applications",
     applicationsQuery,
   )
   const flowsLoading = useInitialQueryResolution(
-    `application-flows:${city?.id ?? ""}`,
+    `application-flows:${city?.id ?? ""}:${flowIdentifier ?? ""}`,
     flowsQuery,
   )
   const initialFlowsReady = !flowsLoading
-  const selectedFlowId = useMemo(() => {
-    if (!initialFlowsReady || !portalFlows) return null
-    if (!flowIdentifier) {
-      return portalFlows.length === 1 ? portalFlows[0].id : null
-    }
-    return resolveApplicationFlowId(flowIdentifier, portalFlows)
-  }, [flowIdentifier, initialFlowsReady, portalFlows])
-  const primaryFlowId = portalFlows?.find(
-    (flow) => flow.slug === primaryFlowQuery.data?.flow_slug,
-  )?.id
+  const selectedFlowId = initialFlowsReady ? (selectedFlow?.id ?? null) : null
   const hasTicketForPrimaryFlow =
     selectedFlowId != null &&
-    selectedFlowId === primaryFlowId &&
+    selectedFlow?.slug === primaryFlowQuery.data?.flow_slug &&
     popupAccess.state === "allowed" &&
     (popupAccess.source === "attendee" || popupAccess.source === "payment")
   // Declared after the door, not before it: asking which application this
@@ -148,12 +138,12 @@ export default function FormPage() {
     if (
       !initialFlowsReady ||
       !city ||
-      portalFlows === undefined ||
+      selectedFlow === undefined ||
       selectedFlowId
     )
       return
     router.replace(`/portal/${city.slug}`)
-  }, [city, initialFlowsReady, portalFlows, router, selectedFlowId])
+  }, [city, initialFlowsReady, selectedFlow, router, selectedFlowId])
 
   // Resolved applications are no longer accessible from the form.
   // draft/pending_fee/in review stay editable so the applicant can still
@@ -220,7 +210,7 @@ export default function FormPage() {
     return <ApplicationUnavailable />
   }
 
-  if (!portalFlows || !selectedFlowId || schemaPending) return <Loader />
+  if (!selectedFlow || !selectedFlowId || schemaPending) return <Loader />
 
   if (city.takes_applications === false) {
     return <Loader />
@@ -267,7 +257,12 @@ export default function FormPage() {
           key={`${selectedFlowId}:${existingApp?.id ?? importedData?.id ?? "new"}`}
           schema={schema}
           existingApplication={prefillData}
-          popup={city}
+          popup={{
+            ...city,
+            requires_application_fee: selectedFlow.requires_application_fee,
+            application_fee_amount: selectedFlow.application_fee_amount,
+            application_layout: selectedFlow.application_layout,
+          }}
           referralId={referralId}
           salesFlowId={selectedFlowId}
         />

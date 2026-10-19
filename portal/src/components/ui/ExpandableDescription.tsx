@@ -18,6 +18,8 @@ interface ExpandableDescriptionProps {
   buttonClassName?: string
   moreLabel?: string
   lessLabel?: string
+  /** Called with the new state when the reader expands or collapses. */
+  onToggle?: (expanded: boolean) => void
 }
 
 const ExpandableDescription = ({
@@ -27,6 +29,7 @@ const ExpandableDescription = ({
   buttonClassName,
   moreLabel,
   lessLabel,
+  onToggle,
 }: ExpandableDescriptionProps) => {
   const { t } = useTranslation()
   const resolvedMoreLabel = moreLabel ?? t("common.see_more")
@@ -81,7 +84,9 @@ const ExpandableDescription = ({
   const handleToggle = (e: MouseEvent<HTMLButtonElement>) => {
     e.stopPropagation()
     e.preventDefault()
-    setIsExpanded((prev) => !prev)
+    const next = !isExpanded
+    setIsExpanded(next)
+    onToggle?.(next)
   }
 
   const collapsedStyle = !isExpanded

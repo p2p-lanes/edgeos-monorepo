@@ -1,9 +1,15 @@
 import uuid
-from datetime import date
+from datetime import date, datetime
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, field_validator, model_validator
-from sqlalchemy import Column
+from pydantic import (
+    AwareDatetime,
+    BaseModel,
+    ConfigDict,
+    field_validator,
+    model_validator,
+)
+from sqlalchemy import Column, DateTime
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlmodel import Field, SQLModel
 
@@ -269,6 +275,10 @@ class TicketingStepBase(SQLModel):
     description: str | None = Field(default=None, nullable=True)
     order: int = Field(default=0)
     is_enabled: bool = Field(default=True)
+    allow_response_editing: bool = Field(default=False)
+    response_edit_deadline: datetime | None = Field(
+        default=None, sa_column=Column(DateTime(timezone=True), nullable=True)
+    )
     protected: bool = Field(default=False)
     product_category: str | None = Field(default=None, nullable=True)
     template: str | None = Field(default=None, nullable=True)
@@ -292,6 +302,8 @@ class TicketingStepPublic(BaseModel):
     description: str | None = None
     order: int = 0
     is_enabled: bool = True
+    allow_response_editing: bool = False
+    response_edit_deadline: datetime | None = None
     protected: bool = False
     product_category: str | None = None
     template: str | None = None
@@ -305,7 +317,18 @@ class TicketingStepPublic(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
-class TicketingStepCreate(BaseModel):
+class ResponseEditingSettings(BaseModel):
+    allow_response_editing: bool = False
+    response_edit_deadline: AwareDatetime | None = None
+
+    @model_validator(mode="after")
+    def requires_deadline(self) -> "ResponseEditingSettings":
+        if self.allow_response_editing and self.response_edit_deadline is None:
+            raise ValueError("An editing deadline is required")
+        return self
+
+
+class TicketingStepCreate(ResponseEditingSettings):
     popup_id: uuid.UUID
     # Required: every step is created into a specific flow. The caller picks
     # the flow it is looking at; there is no shared tier to omit into.
@@ -333,6 +356,8 @@ class TicketingStepCreate(BaseModel):
 
 
 class TicketingStepUpdate(BaseModel):
+    allow_response_editing: bool | None = None
+    response_edit_deadline: AwareDatetime | None = None
     title: str | None = None
     description: str | None = None
     order: int | None = None

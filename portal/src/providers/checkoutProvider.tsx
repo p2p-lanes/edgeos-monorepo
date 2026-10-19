@@ -52,6 +52,7 @@ import { useStepProductResolver } from "@/hooks/checkout/useStepProductResolver"
 import useGetPassesData from "@/hooks/useGetPassesData"
 import { useIsAuthenticated } from "@/hooks/useIsAuthenticated"
 import { firstIncompleteStay } from "@/lib/accommodationForm"
+import { buyerFormValidationSchema } from "@/lib/buyerFormValidation"
 import { type BuyerIdentity, buildBuyerIdentity } from "@/lib/buyerIdentity"
 import { buildFormZodSchema } from "@/lib/form-schema-builder"
 import { trackGAAddToCart } from "@/lib/google-analytics"
@@ -237,6 +238,7 @@ interface CheckoutContextValue {
     qty: number,
   ) => void
   buyerFormSchema: ApplicationFormSchema | null
+  buyerFormDisplaySchema?: ApplicationFormSchema | null
   /** What the checkout already knows about the buyer, so the accommodation
    *  step neither asks for it nor gates on it. */
   buyerIdentity: BuyerIdentity
@@ -327,6 +329,7 @@ interface CheckoutProviderProps {
   submitPopupSlug?: string | null
   returnContext?: "direct" | "portal"
   buyerFormSchema?: ApplicationFormSchema | null
+  buyerFormDisplaySchema?: ApplicationFormSchema | null
   initialBuyerValues?: Record<string, unknown>
   cartPersistenceEnabled?: boolean
   cartUiEnabled?: boolean
@@ -363,6 +366,7 @@ export function CheckoutProvider({
   submitPopupSlug = null,
   returnContext = "direct",
   buyerFormSchema = null,
+  buyerFormDisplaySchema = buyerFormSchema,
   initialBuyerValues = {},
   cartPersistenceEnabled = true,
   cartUiEnabled = true,
@@ -415,6 +419,16 @@ export function CheckoutProvider({
   const pendingReleaseSettledRef = useRef(false)
   const [buyerValues, setBuyerValues] =
     useState<Record<string, unknown>>(initialBuyerValues)
+  // Session identity can arrive after the runtime; keep custom answers intact.
+  useEffect(() => {
+    const entries = Object.entries(initialBuyerValues)
+    if (!entries.length) return
+    setBuyerValues((current) => {
+      if (entries.every(([key, value]) => current[key] === value))
+        return current
+      return { ...current, ...initialBuyerValues }
+    })
+  }, [initialBuyerValues])
   const [buyerErrors, setBuyerErrors] = useState<Record<string, string>>({})
   const [buyerGeneralError, setBuyerGeneralError] = useState<string | null>(
     null,
@@ -477,6 +491,12 @@ export function CheckoutProvider({
   // config said. It is a real step now, added from the backoffice like any
   // other — a popup without one collects no buyer info.
   const configuredSteps = configuredStepsOverride ?? stepsData?.results ?? []
+  const buyerValidationSchema = buyerFormValidationSchema(
+    buyerFormSchema,
+    configuredSteps.some(
+      (step) => step.step_type === "buyer" && step.is_enabled,
+    ),
+  )
 
   // Whether the accommodation step collects a name per guest. Read here as
   // well as in the step itself because the pay-time gate has to apply the
@@ -489,8 +509,9 @@ export function CheckoutProvider({
     )?.require_guest_names !== false
 
   const isBuyerInfoComplete =
-    !buyerFormSchema ||
-    buildFormZodSchema(buyerFormSchema, false).safeParse(buyerValues).success
+    !buyerValidationSchema ||
+    buildFormZodSchema(buyerValidationSchema, false).safeParse(buyerValues)
+      .success
 
   /**
    * Who is buying, so nothing asks them for it twice.
@@ -515,8 +536,8 @@ export function CheckoutProvider({
   // Returns the names of buyer-form fields that fail the current schema.
   // Returns [] when complete or when no schema is configured.
   const getBuyerInvalidFields = useCallback((): string[] => {
-    if (!buyerFormSchema) return []
-    const result = buildFormZodSchema(buyerFormSchema, false).safeParse(
+    if (!buyerValidationSchema) return []
+    const result = buildFormZodSchema(buyerValidationSchema, false).safeParse(
       buyerValues,
     )
     if (result.success) return []
@@ -529,7 +550,7 @@ export function CheckoutProvider({
       if (fieldName) seen.add(fieldName)
     }
     return Array.from(seen)
-  }, [buyerFormSchema, buyerValues])
+  }, [buyerValidationSchema, buyerValues])
 
   // True while checkout settings, step configs or products are initially loading.
   // Why: when both queries are pending, availableSteps falls back to
@@ -1796,6 +1817,7 @@ export function CheckoutProvider({
     removeDynamicItem,
     updateDynamicQuantity,
     buyerFormSchema,
+    buyerFormDisplaySchema,
     buyerIdentity,
     buyerValues,
     buyerErrors,

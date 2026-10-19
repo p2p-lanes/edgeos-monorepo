@@ -1,15 +1,15 @@
 "use client"
 
-import { Download, FileText, Loader2, QrCode } from "lucide-react"
+import { Download, FileText, Loader2 } from "lucide-react"
 import { useState } from "react"
 import { useTranslation } from "react-i18next"
 import { toast } from "sonner"
 import { OpenAPI, type PaymentPortalPublic } from "@/client"
+import { PaymentFormResponses } from "@/components/payments/PaymentFormResponses"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { formatDate } from "@/helpers/dates"
 import { formatCurrency } from "@/types/checkout"
-import QRcode from "../passes/components/common/QRcode"
 import { type OrderStatus, projectOrders } from "./ordersProjection"
 
 const statusVariant: Record<
@@ -39,21 +39,6 @@ export function OrdersContent({
   const { t } = useTranslation()
   const [downloadingId, setDownloadingId] = useState<string | null>(null)
   const orders = projectOrders(payments, invoiceAvailable)
-  const [selectedUnit, setSelectedUnit] = useState<{
-    orderId: string
-    unitId: string
-  } | null>(null)
-  // Resolve the selection from current data, never a cached code: refreshing
-  // a cancelled payment or revoked unit must also close its QR.
-  const activeOrder = orders.find((order) => order.id === selectedUnit?.orderId)
-  const activeLine = activeOrder?.lines.find((line) =>
-    line.units.some((unit) => unit.id === selectedUnit?.unitId),
-  )
-  const activeUnitIndex =
-    activeLine?.units.findIndex((unit) => unit.id === selectedUnit?.unitId) ??
-    -1
-  const activeUnit = activeLine?.units[activeUnitIndex]
-
   const downloadInvoice = async (paymentId: string) => {
     setDownloadingId(paymentId)
     try {
@@ -118,7 +103,7 @@ export function OrdersContent({
       ) : (
         <div
           data-testid="orders-ledger"
-          className="divide-y divide-slate-200 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm"
+          className="divide-y divide-slate-200 overflow-hidden rounded-xl bg-white shadow-sm"
         >
           {orders.map((order) => (
             <article
@@ -143,10 +128,7 @@ export function OrdersContent({
                 )}
               </div>
 
-              <ul
-                className="divide-y divide-slate-100 border-y border-slate-100"
-                aria-label={t("orders.lines")}
-              >
+              <ul aria-label={t("orders.lines")}>
                 {order.isApplicationFee && (
                   <li className="flex items-center justify-between gap-4 py-3 text-sm first:pt-0 last:pb-0">
                     <div>
@@ -172,32 +154,7 @@ export function OrdersContent({
                         {line.category}
                       </p>
                     </div>
-                    <div className="flex shrink-0 flex-col items-end gap-2">
-                      <p>{formattedAmount(line.unitPrice, line.currency)}</p>
-                      {line.units.length > 0 && (
-                        <div className="flex flex-wrap justify-end gap-2">
-                          {line.units.map((unit, index) => (
-                            <button
-                              key={unit.id}
-                              type="button"
-                              aria-label={t("orders.show_unit_qr_label", {
-                                product: line.name,
-                                number: index + 1,
-                              })}
-                              onClick={() =>
-                                setSelectedUnit({
-                                  orderId: order.id,
-                                  unitId: unit.id,
-                                })
-                              }
-                              className="cursor-pointer text-muted-foreground transition-colors hover:text-foreground"
-                            >
-                              <QrCode className="size-5" />
-                            </button>
-                          ))}
-                        </div>
-                      )}
-                    </div>
+                    <p>{formattedAmount(line.unitPrice, line.currency)}</p>
                   </li>
                 ))}
               </ul>
@@ -225,23 +182,15 @@ export function OrdersContent({
                   </Button>
                 )}
               </div>
+              <PaymentFormResponses
+                collapsible
+                paymentId={order.id}
+                className="-mt-2 border-t-0 pt-0 sm:col-span-3"
+              />
             </article>
           ))}
         </div>
       )}
-
-      <QRcode
-        check_in_code={activeUnit?.checkInCode ?? ""}
-        isOpen={activeUnit != null}
-        onOpenChange={(open) => {
-          if (!open) setSelectedUnit(null)
-        }}
-        title={t("orders.unit_qr_title", {
-          product: activeLine?.name,
-          number: activeUnitIndex + 1,
-        })}
-        description={t("orders.unit_qr_description")}
-      />
     </section>
   )
 }

@@ -21,6 +21,7 @@ const mocks = vi.hoisted(() => ({
     | Array<{ id: string; slug: string; name: string }>
     | undefined,
   primaryFlowSlug: null as string | null,
+  unlistedFlow: null as { id: string; slug: string; name: string } | null,
   popupAccess: { state: "denied" } as
     | {
         state: "allowed"
@@ -69,6 +70,9 @@ vi.mock("@/providers/cityProvider", () => ({
       slug: "gathering",
       status: "active",
       takes_applications: true,
+      requires_application_fee: true,
+      application_fee_amount: "999",
+      application_layout: "multi_step",
     }),
     getPopups: () => [],
   }),
@@ -85,8 +89,32 @@ vi.mock("@/hooks/useGetApplications", () => ({
   useApplicationsQuery: () => mocks.applicationsQueryState,
 }))
 
-vi.mock("@/hooks/usePortalSalesFlows", () => ({
-  usePortalSalesFlows: () => ({ data: mocks.portalFlows, ...mocks.flowState }),
+vi.mock("@/hooks/useApplicationEntryFlow", () => ({
+  useApplicationEntryFlow: (_popupId: string, identifier: string | null) => {
+    const selected =
+      mocks.portalFlows === undefined
+        ? undefined
+        : identifier
+          ? (mocks.unlistedFlow ??
+            mocks.portalFlows.find(
+              (flow) => flow.id === identifier || flow.slug === identifier,
+            ) ??
+            null)
+          : mocks.portalFlows.length === 1
+            ? mocks.portalFlows[0]
+            : null
+    return {
+      data: selected
+        ? {
+            ...selected,
+            requires_application_fee: selected.slug === "attendee",
+            application_fee_amount: selected.slug === "attendee" ? "999" : null,
+            application_layout: "single_page",
+          }
+        : selected,
+      ...mocks.flowState,
+    }
+  },
 }))
 
 vi.mock("@/hooks/usePortalPrimarySalesFlow", () => ({
@@ -149,6 +177,7 @@ describe("application flow routing", () => {
     mocks.checkoutSuccess = false
     mocks.portalFlows = MULTI_FLOWS
     mocks.primaryFlowSlug = null
+    mocks.unlistedFlow = null
     mocks.popupAccess = { state: "denied" }
     mocks.applicationsQueryState = {
       isPending: false,
@@ -241,6 +270,35 @@ describe("application flow routing", () => {
     expect(mocks.dynamicForm).toHaveBeenCalledWith(
       expect.objectContaining({ salesFlowId: "flow-a" }),
     )
+  })
+
+  it.each([
+    "invited",
+    "unlisted-id",
+  ])("opens an unlisted application selected by %s without adding it to discovery", (identifier) => {
+    mocks.flowIdentifier = identifier
+    mocks.unlistedFlow = {
+      id: "unlisted-id",
+      slug: "invited",
+      name: "By personal invitation",
+    }
+    mocks.getRelevantApplication.mockReturnValue(null)
+
+    render(<FormPage />)
+
+    expect(screen.getByTestId("application-form")).toBeTruthy()
+    expect(mocks.schemaRequest).toHaveBeenCalledWith("unlisted-id")
+    expect(mocks.dynamicForm).toHaveBeenCalledWith(
+      expect.objectContaining({
+        salesFlowId: "unlisted-id",
+        popup: expect.objectContaining({
+          requires_application_fee: false,
+          application_fee_amount: null,
+          application_layout: "single_page",
+        }),
+      }),
+    )
+    expect(mocks.replace).not.toHaveBeenCalled()
   })
 
   it("returns a ticket holder without an application to passes instead of showing a new application form", async () => {

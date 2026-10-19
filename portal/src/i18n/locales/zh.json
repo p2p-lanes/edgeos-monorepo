@@ -301,6 +301,18 @@
     "resend_code_countdown": "重新发送验证码 ({{countdown}}秒)",
     "resend_code": "重新发送验证码",
     "resend_hint": "没有收到验证码？请检查垃圾邮件文件夹，或在计时器结束后点击\"重新发送验证码\"。",
+    "verification": {
+      "incorrect": "验证码不正确。请查看最新的邮件并重试。",
+      "expired": "此验证码已过期。请申请新的验证码。",
+      "no_active_code": "没有有效的验证码。请申请新的验证码。",
+      "too_many_attempts": "尝试次数过多。请申请新的验证码以继续。",
+      "resent": "新的验证码已发送。之前的验证码已失效。请使用最新邮件中的验证码。",
+      "network_error": "无法验证您的验证码。请检查网络连接后重试。",
+      "server_error": "暂时无法验证您的验证码。请稍后重试。",
+      "send_error": "验证码发送失败。请重试。",
+      "incomplete": "请输入完整的6位验证码。",
+      "request_new_code": "申请新的验证码"
+    },
     "success_title": "购票成功！",
     "success_description": "感谢您的购买。您的票已准备就绪。",
     "steps": {
@@ -569,6 +581,9 @@
     "no_passes_yet_suffix": "进行购买",
     "check_in_code": "签到码",
     "qr_already_scanned": "二维码已扫描",
+    "purchase_details_close": "关闭",
+    "purchase_address": "地址",
+    "purchase_total_paid": "已付总额",
     "latam_citizens": "拉美公民",
     "standard": "标准",
     "id_required": "签到时需要身份证明 *",

@@ -23,6 +23,8 @@ export default function CheckoutLoginGate() {
     verificationCode,
     setVerificationCode,
     verificationError,
+    requiresNewCode,
+    verificationNotice,
     countdown,
     isSendingCode,
     isVerifyingCode,
@@ -84,6 +86,8 @@ export default function CheckoutLoginGate() {
             verificationCode={verificationCode}
             setVerificationCode={setVerificationCode}
             verificationError={verificationError}
+            requiresNewCode={requiresNewCode}
+            verificationNotice={verificationNotice}
             countdown={countdown}
             handleEmailChange={handleEmailChange}
             handleSendCode={handleSendVerificationCode}

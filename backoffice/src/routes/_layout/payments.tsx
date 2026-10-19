@@ -37,6 +37,7 @@ import { QueryErrorBoundary } from "@/components/Common/QueryErrorBoundary"
 import { SavedViewsMenu } from "@/components/Common/SavedViewsMenu"
 import { StatusBadge } from "@/components/Common/StatusBadge"
 import { WorkspaceAlert } from "@/components/Common/WorkspaceAlert"
+import { PaymentFormResponses } from "@/components/payments/PaymentFormResponses"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
@@ -723,6 +724,10 @@ function PaymentSubRow({ row }: { row: Row<PaymentPublic> }) {
           ) : null}
         </tfoot>
       </table>
+      <PaymentFormResponses
+        paymentId={payment.id}
+        snapshot={payment.buyer_snapshot}
+      />
     </div>
   )
 }

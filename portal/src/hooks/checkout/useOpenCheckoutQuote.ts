@@ -72,14 +72,7 @@ export function useOpenCheckoutQuote({
 }) {
   const { cart, buyerValues, isBuyerInfoComplete } = useCheckout()
   const request = buildOpenCheckoutPreviewRequest(cart)
-  const buyer = isBuyerInfoComplete
-    ? {
-        email: String(buyerValues.email ?? ""),
-        first_name: String(buyerValues.first_name ?? ""),
-        last_name: String(buyerValues.last_name ?? ""),
-        form_data: buyerValues,
-      }
-    : null
+  const buyer = isBuyerInfoComplete ? buildOpenCheckoutBuyer(buyerValues) : null
 
   return useQuery({
     queryKey: ["checkout", "preview", popupSlug, flowSlug, request, buyer],
@@ -92,4 +85,20 @@ export function useOpenCheckoutQuote({
     enabled: request.products.length > 0,
     staleTime: 0,
   })
+}
+
+/** Match the purchase payload: identity is not a custom form answer. */
+export function buildOpenCheckoutBuyer(
+  values: Record<string, unknown>,
+): BuyerInfo {
+  return {
+    email: String(values.email ?? ""),
+    first_name: String(values.first_name ?? ""),
+    last_name: String(values.last_name ?? ""),
+    form_data: Object.fromEntries(
+      Object.entries(values).flatMap(([key, value]) =>
+        key.startsWith("custom_") ? [[key.slice("custom_".length), value]] : [],
+      ),
+    ),
+  }
 }

@@ -1,7 +1,7 @@
 """Tests for AttendeeProductPublic denormalization of product fields.
 
 T3.1 — Three scenarios:
-1. Active product → all 5 fields populated.
+1. Active product → all denormalized fields populated (incl. image and description).
 2. Deactivated product (is_active=False) → still populated (deactivation doesn't suppress denorm).
 3. Null product guard → fields are None, no AttributeError.
 
@@ -42,6 +42,8 @@ def _make_product(
     category: str = "ticket",
     requires_check_in: bool = True,
     duration_type: str | None = "week",
+    image_url: str | None = None,
+    description: str | None = None,
 ) -> Products:
     product = Products(
         id=uuid.uuid4(),
@@ -54,6 +56,8 @@ def _make_product(
         requires_check_in=requires_check_in,
         is_active=is_active,
         duration_type=duration_type,
+        image_url=image_url,
+        description=description,
     )
     db.add(product)
     db.commit()
@@ -131,6 +135,8 @@ def test_denorm_active_product_populates_all_fields(
         category="ticket",
         requires_check_in=True,
         duration_type="week",
+        image_url="https://cdn.example.com/eclipse.jpg",
+        description="Three days on the West Bank of Luxor.",
     )
     human = _make_human(db, tenant_a, suffix="active")
     attendee = _make_attendee(db, tenant_a, popup_tenant_a, human, suffix="active")
@@ -159,6 +165,8 @@ def test_denorm_active_product_populates_all_fields(
     assert ap.product_category == "ticket"
     assert ap.duration_type == "week"
     assert ap.requires_check_in is True
+    assert ap.product_image_url == "https://cdn.example.com/eclipse.jpg"
+    assert ap.product_description == "Three days on the West Bank of Luxor."
 
 
 # ---------------------------------------------------------------------------
@@ -268,6 +276,8 @@ def test_denorm_null_product_guard(
     assert ap.product_category is None
     assert ap.duration_type is None
     assert ap.requires_check_in is False
+    assert ap.product_image_url is None
+    assert ap.product_description is None
 
 
 # ---------------------------------------------------------------------------

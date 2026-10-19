@@ -84,6 +84,8 @@ const UserInfoForm = ({
     isSendingCode,
     isVerifyingCode,
     verificationError,
+    requiresNewCode,
+    verificationNotice,
     countdown,
     handleSendVerificationCode,
     handleVerifyCode,
@@ -215,6 +217,8 @@ const UserInfoForm = ({
               verificationCode={verificationCode}
               setVerificationCode={setVerificationCode}
               verificationError={verificationError}
+              requiresNewCode={requiresNewCode}
+              verificationNotice={verificationNotice}
               countdown={countdown}
               handleEmailChange={(value) => handleInputChange("email", value)}
               handleSendCode={handleSendVerificationCode}
@@ -246,7 +250,8 @@ const UserInfoForm = ({
                 verificationCode.length !== 6 &&
                 !emailVerified) ||
               isSendingCode ||
-              isVerifyingCode
+              isVerifyingCode ||
+              requiresNewCode
             }
           >
             {isSubmitting

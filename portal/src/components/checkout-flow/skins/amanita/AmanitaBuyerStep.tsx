@@ -330,6 +330,7 @@ export default function AmanitaBuyerStep({
     setBuyerField,
     forcedBuyerFieldsTouched,
     buyerFormSchema,
+    buyerFormDisplaySchema,
     getBuyerInvalidFields,
   } = useCheckout()
 
@@ -344,8 +345,9 @@ export default function AmanitaBuyerStep({
   const isTouched = (name: string) =>
     localTouched.has(name) || forcedBuyerFieldsTouched.has(name)
 
-  const sections = buyerFormSchema
-    ? getCheckoutSchemaSections(buyerFormSchema, { includeAllSections: true })
+  const displaySchema = buyerFormDisplaySchema ?? buyerFormSchema
+  const sections = displaySchema
+    ? getCheckoutSchemaSections(displaySchema, { includeAllSections: true })
     : []
   // Same Zod-derived set the funnel gates on, so what the step paints red and
   // what blocks Pay can never disagree.

@@ -82,8 +82,9 @@ def _build_attendee_with_origin(
     recategorizations after the purchase do not retroactively rewrite a buyer's
     pass. Falls back to live ap.product when the attendee has no payment_id
     (free / application grant) or no snapshot row exists (e.g., cancelled
-    payment whose snapshot rows were deleted). start_date, end_date, and
-    duration_type are not snapshotted and always read from the live product.
+    payment whose snapshot rows were deleted). duration_type, image_url and
+    description are not snapshotted and always read from the live product, so
+    an organizer fixing a photo or a description reaches existing buyers.
 
     last_scan_by_ticket is an optional {attendee_product_id: last_scan_at} map
     precomputed by the caller (typically via get_last_scan_by_tickets) so the
@@ -131,6 +132,8 @@ def _build_attendee_with_origin(
                 product_name=product_name,
                 product_category=product_category,
                 duration_type=(ap.product.duration_type if ap.product else None),
+                product_image_url=(ap.product.image_url if ap.product else None),
+                product_description=(ap.product.description if ap.product else None),
                 last_scan_at=(
                     last_scan_by_ticket.get(ap.id) if last_scan_by_ticket else None
                 ),

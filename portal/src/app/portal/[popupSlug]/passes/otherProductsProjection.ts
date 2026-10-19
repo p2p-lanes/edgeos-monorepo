@@ -4,6 +4,8 @@ import type { PaymentPortalPublic } from "@/client"
 export interface OtherPurchasedProduct {
   /** Stable row key: the unit id, or a synthetic one for legacy lines. */
   key: string
+  /** The specific purchase whose answers this unit belongs to. */
+  paymentId?: string
   /** Product id. */
   id: string
   name: string
@@ -75,6 +77,7 @@ export function projectOtherPurchasedProducts(
           const scannable = unit.requires_check_in && !!unit.check_in_code
           items.push({
             key: unit.id,
+            paymentId: payment.id,
             id: line.product_id,
             ...origin,
             checkInCode: scannable ? unit.check_in_code : null,
@@ -99,6 +102,7 @@ export function projectOtherPurchasedProducts(
       for (let index = 0; index < quantity; index++) {
         items.push({
           key: `${paymentProductKey}:${index}`,
+          paymentId: payment.id,
           id: line.product_id,
           ...origin,
           checkInCode: null,

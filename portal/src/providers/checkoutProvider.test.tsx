@@ -154,7 +154,7 @@ function makeStep(
     title: overrides.step_type,
     description: null,
     order: 0,
-    is_enabled: true,
+    is_enabled: overrides.is_enabled ?? true,
     protected: false,
     product_category: overrides.product_category ?? null,
     template: overrides.template ?? null,
@@ -200,6 +200,77 @@ function makeWrapper(
     ) as ReactNode
   }
 }
+
+describe("checkoutProvider session identity", () => {
+  it("ignores disabled form requirements and restores them when the step is enabled", () => {
+    const buyerStep = makeStep({
+      id: "buyer-form",
+      step_type: "buyer",
+      is_enabled: false,
+    })
+    const schema: ApplicationFormSchema = {
+      base_fields: { email: { type: "email", label: "Email", required: true } },
+      custom_fields: {
+        location: { type: "text", label: "Location", required: true },
+      },
+      sections: [],
+    }
+    const { result, rerender } = renderHook(() => useCheckout(), {
+      wrapper: makeWrapper([buyerStep], [], {
+        buyerFormSchema: schema,
+        initialBuyerValues: { email: "buyer@example.com" },
+      }),
+    })
+    expect(result.current.isBuyerInfoComplete).toBe(true)
+    expect(result.current.getBuyerInvalidFields()).toEqual([])
+    buyerStep.is_enabled = true
+    rerender()
+    expect(result.current.isBuyerInfoComplete).toBe(false)
+    expect(result.current.getBuyerInvalidFields()).toEqual(["custom_location"])
+    act(() => result.current.setBuyerField("custom_location", "Test location"))
+    expect(result.current.isBuyerInfoComplete).toBe(true)
+    expect(schema.custom_fields.location.required).toBe(true)
+  })
+
+  it("merges late session data without losing custom answers or payment identity", () => {
+    const props: Partial<ComponentProps<typeof CheckoutProvider>> = {
+      submitMode: "open-ticketing",
+      initialBuyerValues: {},
+      buyerFormDisplaySchema: {
+        base_fields: {},
+        custom_fields: {},
+        sections: [],
+      },
+    }
+    const { result, rerender } = renderHook(() => useCheckout(), {
+      wrapper: makeWrapper([], [], props),
+    })
+    act(() => result.current.setBuyerField("custom_location", "Test location"))
+    props.initialBuyerValues = {
+      email: "buyer@example.com",
+      first_name: "Test",
+      last_name: "Buyer",
+    }
+    rerender()
+    expect(result.current.buyerValues).toEqual({
+      ...props.initialBuyerValues,
+      custom_location: "Test location",
+    })
+    expect(result.current.buyerFormDisplaySchema?.base_fields).toEqual({})
+    expect(paymentSubmitSpy).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        buyerData: expect.objectContaining({
+          email: "buyer@example.com",
+          firstName: "Test",
+          lastName: "Buyer",
+          formData: expect.objectContaining({
+            custom_location: "Test location",
+          }),
+        }),
+      }),
+    )
+  })
+})
 
 describe("checkoutProvider override loading", () => {
   it.each([false, true])("uses supplied sources: nonempty=%s", (nonempty) => {

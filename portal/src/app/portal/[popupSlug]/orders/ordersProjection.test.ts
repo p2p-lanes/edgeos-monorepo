@@ -51,83 +51,10 @@ describe("projectOrders", () => {
             quantity: 2,
             unitPrice: "21.25",
             currency: "USD",
-            units: [],
           },
         ],
       },
     ])
-  })
-
-  it("projects buyer-owned ownerless parking units", () => {
-    const payments = [
-      {
-        id: "parking-payment",
-        status: "approved",
-        products_snapshot: [
-          {
-            units: [
-              {
-                id: "parking-unit",
-                check_in_code: "PARK1234",
-                active: true,
-                requires_check_in: true,
-              },
-              {
-                id: "revoked-parking-unit",
-                check_in_code: "REVOKED1",
-                active: false,
-                requires_check_in: true,
-              },
-              {
-                id: "not-scannable",
-                check_in_code: "NOTSCAN1",
-                active: true,
-                requires_check_in: false,
-              },
-              {
-                id: "missing-code",
-                check_in_code: "",
-                active: true,
-                requires_check_in: true,
-              },
-            ],
-          },
-        ],
-      },
-    ] as PaymentPortalPublic[]
-
-    expect(projectOrders(payments, false)[0]?.lines[0]?.units).toEqual([
-      { id: "parking-unit", checkInCode: "PARK1234" },
-    ])
-  })
-
-  it.each([
-    "pending",
-    "rejected",
-    "expired",
-    "cancelled",
-    "provider_delayed",
-  ])("does not expose unit codes for a %s payment", (status) => {
-    const payments = [
-      {
-        id: "shirt-payment",
-        status,
-        products_snapshot: [
-          {
-            units: [
-              {
-                id: "shirt-unit",
-                check_in_code: "SHIRT1",
-                active: true,
-                requires_check_in: true,
-              },
-            ],
-          },
-        ],
-      },
-    ] as PaymentPortalPublic[]
-
-    expect(projectOrders(payments, false)[0].lines[0].units).toEqual([])
   })
 
   it("preserves unknown status and missing flow provenance as visible legacy history", () => {

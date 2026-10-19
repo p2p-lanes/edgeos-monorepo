@@ -293,6 +293,18 @@
     "resend_code_countdown": "Senda kóða aftur ({{countdown}}s)",
     "resend_code": "Senda kóða aftur",
     "resend_hint": "Fékkstu ekki kóðann? Athugaðu ruslpóstinn þinn eða smelltu á \"Senda kóða aftur\" þegar tímamælirinn rennur út.",
+    "verification": {
+      "incorrect": "Rangur kóði. Athugaðu nýjasta tölvupóstinn og reyndu aftur.",
+      "expired": "Þessi kóði er útrunninn. Biddu um nýjan kóða.",
+      "no_active_code": "Enginn virkur kóði fannst. Biddu um nýjan kóða.",
+      "too_many_attempts": "Of margar tilraunir. Biddu um nýjan kóða til að halda áfram.",
+      "resent": "Nýr kóði hefur verið sendur. Fyrri kóðar virka ekki lengur. Notaðu kóðann úr nýjasta tölvupóstinum.",
+      "network_error": "Ekki tókst að staðfesta kóðann. Athugaðu nettenginguna og reyndu aftur.",
+      "server_error": "Ekki tókst að staðfesta kóðann núna. Reyndu aftur eftir smástund.",
+      "send_error": "Ekki tókst að senda staðfestingarkóða. Reyndu aftur.",
+      "incomplete": "Sláðu inn allan 6 stafa kóðann.",
+      "request_new_code": "Biðja um nýjan kóða"
+    },
     "success_title": "Miðar keyptir!",
     "success_description": "Takk fyrir kaupin. Miðarnir þínir eru tilbúnir til notkunar.",
     "steps": {
@@ -560,6 +572,9 @@
     "no_passes_yet_suffix": "til að kaupa",
     "check_in_code": "Innritunarkóði",
     "qr_already_scanned": "QR þegar skannaður",
+    "purchase_details_close": "Loka",
+    "purchase_address": "Heimilisfang",
+    "purchase_total_paid": "Greitt alls",
     "latam_citizens": "Latam ríkisborgarar",
     "standard": "Venjulegt",
     "id_required": "Skilríki krafist við innritun *",
