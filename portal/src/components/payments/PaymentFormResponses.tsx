@@ -2,13 +2,18 @@
 
 import { FileUploadProvider, SchemaField } from "@edgeos/shared-form-ui"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
-import { Pencil } from "lucide-react"
+import { ChevronDown, Pencil } from "lucide-react"
 import { useEffect, useState } from "react"
 import { useTranslation } from "react-i18next"
 import { toast } from "sonner"
 import { useFileUpload } from "@/app/portal/[popupSlug]/events/lib/useFileUpload"
 import { PaymentsService } from "@/client"
 import { Button } from "@/components/ui/button"
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible"
 import { buildFormZodSchema } from "@/lib/form-schema-builder"
 import { cn } from "@/lib/utils"
 import type { FormFieldSchema } from "@/types/form-schema"
@@ -40,9 +45,11 @@ function initialValue(value: unknown, schema: FormFieldSchema): unknown {
 export function PaymentFormResponses({
   paymentId,
   className,
+  collapsible = false,
 }: {
   paymentId: string
   className?: string
+  collapsible?: boolean
 }) {
   const { t, i18n } = useTranslation()
   const client = useQueryClient()
@@ -53,6 +60,7 @@ export function PaymentFormResponses({
     queryFn: () => PaymentsService.getMyFormResponses({ paymentId }),
     retry: false,
   })
+  const [expanded, setExpanded] = useState(false)
   const [open, setOpen] = useState(false)
   const [answers, setAnswers] = useState<Record<string, unknown>>({})
   const [errors, setErrors] = useState<Record<string, string>>({})
@@ -136,11 +144,8 @@ export function PaymentFormResponses({
       setSaving(false)
     }
   }
-  return (
-    <section
-      className={cn("space-y-3 border-t pt-4", className)}
-      aria-label={t("form_responses.title")}
-    >
+  const content = (
+    <div className="space-y-3">
       <div className="flex items-center justify-between gap-3">
         <h3 className="text-lg font-semibold">{data.title}</h3>
         {canEdit && !open && (
@@ -228,6 +233,32 @@ export function PaymentFormResponses({
             </div>
           </form>
         </FileUploadProvider>
+      )}
+    </div>
+  )
+  return (
+    <section
+      className={cn("border-t pt-4", className)}
+      aria-label={t("form_responses.title")}
+    >
+      {collapsible ? (
+        <Collapsible open={expanded} onOpenChange={setExpanded}>
+          <CollapsibleTrigger asChild>
+            <Button variant="ghost" size="sm" className="gap-2">
+              {t(expanded ? "form_responses.hide" : "form_responses.view")}
+              <ChevronDown
+                aria-hidden="true"
+                className={cn(
+                  "size-4 transition-transform",
+                  expanded && "rotate-180",
+                )}
+              />
+            </Button>
+          </CollapsibleTrigger>
+          <CollapsibleContent className="pt-3">{content}</CollapsibleContent>
+        </Collapsible>
+      ) : (
+        content
       )}
     </section>
   )
