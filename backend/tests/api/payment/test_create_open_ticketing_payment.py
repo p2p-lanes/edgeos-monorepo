@@ -264,6 +264,65 @@ def test_payment_provider_cancel_url_returns_to_flow(
     )
 
 
+@pytest.mark.parametrize("has_merch_section", [False, True])
+def test_merch_purchase_preserves_other_flow_sections(
+    db: Session, tenant_a: Tenants, has_merch_section: bool
+) -> None:
+    popup = _make_popup(db, tenant_a, slug_prefix="merch-sections")
+    product = _make_product(db, popup, name="Size M", price="30.00", category="merch")
+    offer_category(db, popup, "merch")
+    other_flow = SalesFlows(
+        tenant_id=tenant_a.id,
+        popup_id=popup.id,
+        name="Applications",
+        slug="applications",
+        type="application",
+        is_default=False,
+    )
+    db.add(other_flow)
+    db.flush()
+    other_section = _make_section(db, popup, label="Personal Information")
+    other_section.sales_flow_id = other_flow.id
+    other_section.protected = True
+    db.add(other_section)
+    other_field = _make_field(db, popup, other_section, name="bio", label="Bio")
+    other_field.sales_flow_id = other_flow.id
+    db.add(other_field)
+    merch_section = (
+        _make_section(db, popup, label="Merch Info") if has_merch_section else None
+    )
+    db.commit()
+    section_ids = {section.id for section in popup.form_sections}
+    other_field_id = other_field.id
+    obj = _purchase_create(
+        email=f"merch-{uuid.uuid4().hex[:8]}@test.com",
+        first_name="Merch",
+        last_name="Buyer",
+        form_data={},
+        products=[(product, 1)],
+    )
+    with patch("app.services.simplefi.get_simplefi_client") as mock_get_client:
+        mock_get_client.return_value.create_payment.return_value = SimpleNamespace(
+            id=f"sf_merch_{uuid.uuid4().hex}",
+            status="pending",
+            checkout_url="https://simplefi.test/checkout/merch",
+            is_installment_plan=False,
+        )
+        payment, checkout_url, _ = payments_crud.create_open_ticketing_payment(
+            db, obj=obj, popup=popup, tenant=tenant_a, flow_slug="checkout"
+        )
+
+    assert payment.status == "pending"
+    assert payment.amount == Decimal("30.00")
+    assert checkout_url == "https://simplefi.test/checkout/merch"
+    assert {s["section_id"] for s in payment.buyer_snapshot["sections"]} == (
+        {str(merch_section.id)} if merch_section else set()
+    )
+    db.expire_all()
+    assert {section.id for section in popup.form_sections} == section_ids
+    assert db.get(FormFields, other_field_id) is not None
+
+
 def test_create_open_ticketing_payment_one_attendee_n_tickets(
     db: Session,
     tenant_a: Tenants,

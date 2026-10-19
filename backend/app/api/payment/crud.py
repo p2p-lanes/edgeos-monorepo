@@ -35,7 +35,6 @@ from app.api.attendee.models import AttendeeProducts, Attendees
 from app.api.attendee.validation import validate_required_fields
 from app.api.attendee_category.models import AttendeeCategories
 from app.api.coupon.crud import coupons_crud
-from app.api.form_section.models import FormSections
 from app.api.human.crud import humans_crud
 from app.api.payment.models import PaymentProducts, PaymentRecipients, Payments
 from app.api.payment.schemas import (
@@ -1197,14 +1196,6 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
         if obj.quote_token:
             assert_quote_current(obj.quote_token, gate)
 
-        popup_statement = (
-            select(FormSections)
-            .where(FormSections.sales_flow_id == target_flow.id)
-            .options(selectinload(FormSections.form_fields))  # ty: ignore[invalid-argument-type]
-            .order_by(FormSections.order)  # type: ignore[arg-type]
-        )
-        popup.form_sections = list(session.exec(popup_statement).all())
-
         buyer = humans_crud.find_or_create(
             session,
             email=obj.buyer.email,
@@ -1262,6 +1253,8 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
         # hold on the lock or 409 from the sibling re-check.
         from app.core.config import settings as _settings
 
+        # Filter inside the snapshot builder: replacing popup.form_sections
+        # would cascade-delete sections belonging to other flows.
         buyer_snapshot = self._build_buyer_snapshot(
             popup,
             obj.buyer.form_data,
