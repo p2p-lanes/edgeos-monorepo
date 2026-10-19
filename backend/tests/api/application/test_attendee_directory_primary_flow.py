@@ -49,6 +49,7 @@ def primary_flow_world(db: Session, tenant_a: Tenants):
         key="main",
         label="Main",
         is_primary=True,
+        directory_eligible=True,
     )
     db.add(sibling_main)
     db.commit()

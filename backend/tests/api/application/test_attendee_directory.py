@@ -191,30 +191,37 @@ def _attendee(
         if app.human_id == human.id
         else set()
     )
-    db.add(
-        HumanDirectorySettings(
-            tenant_id=popup.tenant_id,
-            human_id=human.id,
-            popup_id=popup.id,
-            listed=True,
-            shared_fields=[
-                field
-                for field in (
-                    "first_name",
-                    "last_name",
-                    "email",
-                    "telegram",
-                    "role",
-                    "organization",
-                    "residence",
-                    "age",
-                    "gender",
-                )
-                if field not in hidden
-            ],
+    settings = db.exec(
+        select(HumanDirectorySettings).where(
+            HumanDirectorySettings.human_id == human.id,
+            HumanDirectorySettings.popup_id == popup.id,
         )
-    )
-    db.commit()
+    ).first()
+    if settings is None:
+        db.add(
+            HumanDirectorySettings(
+                tenant_id=popup.tenant_id,
+                human_id=human.id,
+                popup_id=popup.id,
+                listed=True,
+                shared_fields=[
+                    field
+                    for field in (
+                        "first_name",
+                        "last_name",
+                        "email",
+                        "telegram",
+                        "role",
+                        "organization",
+                        "residence",
+                        "age",
+                        "gender",
+                    )
+                    if field not in hidden
+                ],
+            )
+        )
+        db.commit()
     if tickets:
         prod = product or _product(db, popup)
         for _ in range(tickets):

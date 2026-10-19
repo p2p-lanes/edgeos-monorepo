@@ -235,19 +235,19 @@ def test_canonical_mask_marker_does_not_fall_back_to_visible_alias(
 
 
 @pytest.mark.parametrize(
-    "name,email,visible",
+    "name,email",
     (
-        ("Snapshot Name", None, True),
-        ("", "snapshot@example.com", True),
-        ("", None, False),
-        ("", "", False),
-        (" \t\n ", " \t\n ", False),
-        ("\u00a0 \u3000", "\u00a0 \u3000", False),
-        ("*", "*", False),
+        ("Snapshot Name", None),
+        ("", "snapshot@example.com"),
+        ("", None),
+        ("", ""),
+        (" \t\n ", " \t\n "),
+        ("\u00a0 \u3000", "\u00a0 \u3000"),
+        ("*", "*"),
     ),
 )
-def test_unlinked_companion_uses_own_snapshot_not_applicant_custom_fields(
-    db: Session, empty_row_world, name: str, email: str | None, visible: bool
+def test_unlinked_attendee_is_excluded_even_with_visible_snapshot(
+    db: Session, empty_row_world, name: str, email: str | None
 ) -> None:
     popup = empty_row_world["popup"]
     app = empty_row_world["private"].application
@@ -281,8 +281,8 @@ def test_unlinked_companion_uses_own_snapshot_not_applicant_custom_fields(
     results, total = applications_crud.find_directory(
         db, popup_id=popup.id, hide_empty_rows=True
     )
-    assert total == 2 + int(visible)
-    assert (attendee.id in {row.id for row in results}) is visible
+    assert total == 2
+    assert attendee.id not in {row.id for row in results}
 
 
 def test_fully_hidden_rows_are_excluded_even_when_all_nine_fields_are_masked(

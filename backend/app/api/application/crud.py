@@ -1031,7 +1031,7 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
 
         if hide_empty_rows:
             # This opt-in filter reflects the portal's columns, not all API fields.
-            # Retain unlinked attendees whose own name/email snapshot is visible.
+            # Directory entries still require a linked Human identity above.
             base_statement = base_statement.outerjoin(
                 Humans,
                 Attendees.human_id == Humans.id,  # type: ignore[arg-type]
