@@ -167,6 +167,9 @@ export function buildPaymentProducts({
     // Editing mode: send kept + new products
     for (const attendee of attendeePasses) {
       for (const product of attendee.products) {
+        // Only access passes are replaced by edit_passes. Other purchased
+        // holdings remain active and must not be reserved or charged again.
+        if (product.category !== "ticket") continue
         // Kept: purchased and NOT given up for credit
         if (product.purchased && !product.edit) {
           products.push({
@@ -203,6 +206,7 @@ export function buildPaymentProducts({
         )
 
         for (const product of attendee.products) {
+          if (product.category !== "ticket") continue
           if (!product.purchased) continue
           // Skip week/day if upgrading to full/month
           if (
@@ -211,9 +215,6 @@ export function buildPaymentProducts({
               product.duration_type === "day")
           )
             continue
-          // Skip patron if a new patron is selected
-          if (patron && product.category === "patreon") continue
-
           products.push({
             product_id: product.id,
             ...attendeeProductIdentity(attendee, product),
