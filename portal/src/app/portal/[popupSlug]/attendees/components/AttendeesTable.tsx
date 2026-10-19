@@ -11,6 +11,7 @@ import type { AttendeeDirectory } from "@/types/Attendee"
 import GiveableBadgesBanner from "./GiveableBadgesBanner"
 import PaginationControls from "./Pagination"
 import AttendeeCell from "./Table/Cells/AttendeeCell"
+import CellControl from "./Table/Cells/CellControl"
 import Header from "./Table/Header"
 import "./Table/Cells/styles.css"
 
@@ -98,9 +99,11 @@ const AttendeesTable = ({
                       key={field.id}
                       className="px-4 py-2 text-sm text-foreground border-b border-border"
                     >
-                      {value.length > maxLength
-                        ? `${value.slice(0, maxLength)}...`
-                        : value}
+                      <CellControl value={value}>
+                        {value.length > maxLength
+                          ? `${value.slice(0, maxLength)}...`
+                          : value}
+                      </CellControl>
                     </TableCell>
                   )
                 })}

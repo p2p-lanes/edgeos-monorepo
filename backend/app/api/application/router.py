@@ -1473,7 +1473,7 @@ def _build_directory_entry(attendee) -> AttendeesDirectoryEntry:
             "value": (
                 resolve_field(field)
                 if field["id"] in shared_fields and field["id"] not in legacy_hidden
-                else None
+                else "*"
             ),
         }
         for field in directory_fields

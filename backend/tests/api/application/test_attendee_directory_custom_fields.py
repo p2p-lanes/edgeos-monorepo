@@ -147,8 +147,12 @@ def test_directory_custom_aliases_api_and_csv_keep_canonical_keys_and_privacy(
     response = client.get(url, headers=headers)
     assert response.status_code == 200, response.text
     entries = {entry["id"]: entry for entry in response.json()["results"]}
+    dynamic_fields = {
+        field["id"]: field["value"] for field in entries[str(main.id)]["fields"]
+    }
     for field, alias in DIRECTORY_CUSTOM_KEYS:
         assert entries[str(main.id)][field] == expected[field]
+        assert dynamic_fields[field] == expected[field]
         assert alias not in entries[str(main.id)]
         assert entries[str(spouse.id)][field] is None
     assert entries[str(main.id)]["first_name"] == main.human.first_name
