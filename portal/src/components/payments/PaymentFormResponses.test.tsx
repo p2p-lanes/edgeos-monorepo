@@ -75,7 +75,7 @@ const original = {
   ],
   history: [],
 }
-function mount(inDialog = false) {
+function mount(inDialog = false, collapsible = false) {
   const client = new QueryClient({
     defaultOptions: { queries: { retry: false } },
   })
@@ -83,10 +83,13 @@ function mount(inDialog = false) {
     <QueryClientProvider client={client}>
       {inDialog ? (
         <div role="dialog" aria-label="Purchase details">
-          <PaymentFormResponses paymentId="payment-1" />
+          <PaymentFormResponses
+            paymentId="payment-1"
+            collapsible={collapsible}
+          />
         </div>
       ) : (
-        <PaymentFormResponses paymentId="payment-1" />
+        <PaymentFormResponses paymentId="payment-1" collapsible={collapsible} />
       )}
     </QueryClientProvider>,
   )
@@ -98,6 +101,34 @@ beforeEach(() => {
 })
 
 describe("post-purchase responses", () => {
+  it("collapses answers until requested and allows hiding them again", async () => {
+    mount(false, true)
+    const toggle = await screen.findByRole("button", {
+      name: "form_responses.view",
+    })
+    expect(toggle.getAttribute("aria-expanded")).toBe("false")
+    expect(screen.queryByText("Riva Resort")).toBeNull()
+    fireEvent.click(toggle)
+    expect(screen.getByText("Riva Resort")).toBeTruthy()
+    expect(
+      screen.getByRole("button", { name: "form_responses.edit" }),
+    ).toBeTruthy()
+    fireEvent.click(screen.getByRole("button", { name: "form_responses.hide" }))
+    expect(screen.queryByText("Riva Resort")).toBeNull()
+  })
+
+  it("does not offer expansion when there are no answers", async () => {
+    vi.mocked(PaymentsService.getMyFormResponses).mockResolvedValue({
+      ...original,
+      fields: [],
+    })
+    mount(false, true)
+    await waitFor(() =>
+      expect(PaymentsService.getMyFormResponses).toHaveBeenCalled(),
+    )
+    expect(screen.queryByRole("button")).toBeNull()
+  })
+
   it("loads saved answers, opens the editor and sends only values plus version", async () => {
     vi.mocked(PaymentsService.editMyFormResponses).mockResolvedValue({
       ...original,

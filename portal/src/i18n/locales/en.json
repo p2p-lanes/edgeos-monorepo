@@ -1608,6 +1608,8 @@
     "no_badges": "No badges yet."
   },
   "form_responses": {
+    "view": "View responses",
+    "hide": "Hide responses",
     "not_answered": "Not answered",
     "title": "Form responses",
     "edit": "Edit responses",

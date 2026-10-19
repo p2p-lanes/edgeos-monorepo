@@ -1584,6 +1584,8 @@
     "no_badges": "Todavía no tiene insignias."
   },
   "form_responses": {
+    "view": "Ver respuestas",
+    "hide": "Ocultar respuestas",
     "not_answered": "Sin responder",
     "title": "Respuestas del formulario",
     "edit": "Editar respuestas",
