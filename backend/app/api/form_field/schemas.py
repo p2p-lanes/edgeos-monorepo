@@ -3,8 +3,8 @@ from enum import Enum
 from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict
-from sqlalchemy import String
-from sqlalchemy.dialects.postgresql import ARRAY, JSONB
+from sqlalchemy import ForeignKey, String
+from sqlalchemy.dialects.postgresql import ARRAY, JSONB, UUID
 from sqlalchemy.ext.mutable import MutableDict
 from sqlmodel import Column, Field, SQLModel
 
@@ -47,12 +47,20 @@ class FormFieldBase(SQLModel):
     NULL falls back to the heuristic.
     """
 
-    tenant_id: uuid.UUID = Field(foreign_key="tenants.id", index=True)
-    popup_id: uuid.UUID = Field(foreign_key="popups.id", index=True)
+    tenant_id: uuid.UUID = Field(
+        sa_column=Column(
+            UUID(as_uuid=True), ForeignKey("tenants.id", ondelete="CASCADE"), index=True
+        )
+    )
+    popup_id: uuid.UUID = Field(
+        sa_column=Column(
+            UUID(as_uuid=True), ForeignKey("popups.id", ondelete="CASCADE"), index=True
+        )
+    )
     # sdd/sales-flows-rediseno slice 3: belongs to exactly one flow.
     # There is no popup-shared tier and nothing is inherited.
     sales_flow_id: uuid.UUID = Field(
-        foreign_key="sales_flows.id", nullable=False, index=True
+        sa_column=Column(UUID(as_uuid=True), nullable=False, index=True)
     )
     name: str = Field(index=True)
     label: str
@@ -61,7 +69,12 @@ class FormFieldBase(SQLModel):
     short_label: str | None = Field(default=None, nullable=True)
     field_type: str = Field(default=FormFieldType.TEXT.value)
     section_id: uuid.UUID | None = Field(
-        default=None, nullable=True, foreign_key="formsections.id"
+        default=None,
+        sa_column=Column(
+            UUID(as_uuid=True),
+            ForeignKey("formsections.id", ondelete="SET NULL"),
+            nullable=True,
+        ),
     )
     position: int = Field(default=0)
     required: bool = Field(default=False)

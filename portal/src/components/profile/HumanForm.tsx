@@ -10,16 +10,22 @@ import {
   X,
 } from "lucide-react"
 import Image from "next/image"
-import { useRef, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { useTranslation } from "react-i18next"
 import { RiTelegram2Line } from "react-icons/ri"
 import type { HumanSelfPublic } from "@/client"
+import SelectForm from "@/components/ui/Form/Select"
 import uploadFileToS3 from "@/helpers/upload"
+import { useApplicationSchema } from "@/hooks/useApplicationSchema"
 import { imageOptimization } from "@/lib/image-optimization"
+import { useCityProvider } from "@/providers/cityProvider"
 import { Button } from "../ui/button"
 import { Card } from "../ui/card"
 import { Input } from "../ui/input"
 import { Label } from "../ui/label"
+
+const DEFAULT_AGE_OPTIONS = ["18-24", "25-34", "35-44", "45-54", "55+"]
+const DEFAULT_GENDER_OPTIONS = ["Male", "Female", "Non-binary", "Specify"]
 
 const HumanForm = ({
   userData,
@@ -39,10 +45,46 @@ const HumanForm = ({
   setEditForm: (editForm: any) => void
 }) => {
   const { t } = useTranslation()
+  const popupId = useCityProvider().getCity()?.id
+  const { data: applicationSchema } = useApplicationSchema(popupId)
   const [isHovering, setIsHovering] = useState(false)
   const [isUploading, setIsUploading] = useState(false)
   const [showLinkedEmails, setShowLinkedEmails] = useState(false)
+  const [specifyingGender, setSpecifyingGender] = useState(false)
+  const ageOptions =
+    applicationSchema?.base_fields.age?.options ?? DEFAULT_AGE_OPTIONS
+  const genderOptions =
+    applicationSchema?.base_fields.gender?.options ?? DEFAULT_GENDER_OPTIONS
+  const currentAge = editForm.age ?? ""
+  const currentGender = editForm.gender ?? ""
+  const hasCustomGender =
+    Boolean(currentGender) && !genderOptions.includes(currentGender)
+  const canSpecifyGender = genderOptions.includes("Specify")
+  const showGenderSpecify =
+    canSpecifyGender && (specifyingGender || hasCustomGender)
+  const hasRequiredNames = Boolean(
+    editForm.first_name?.trim() && editForm.last_name?.trim(),
+  )
+  const canSave =
+    hasRequiredNames &&
+    (!showGenderSpecify ||
+      (Boolean(currentGender.trim()) && currentGender !== "Specify"))
   const fileInputRef = useRef<HTMLInputElement>(null)
+
+  useEffect(() => {
+    if (!isEditing) setSpecifyingGender(false)
+  }, [isEditing])
+
+  const genderLabel = (option: string) => {
+    const key: Record<string, string> = {
+      Male: "form.gender_male",
+      Female: "form.gender_female",
+      "Non-binary": "form.gender_non_binary",
+      Specify: "form.gender_specify_own",
+      "Prefer not to say": "form.gender_prefer_not",
+    }
+    return key[option] ? t(key[option]) : option
+  }
 
   const profileFieldLabel = (field: "gender" | "age" | "residence") =>
     field === "gender" ? t("form.gender") : t(`profile.${field}`)
@@ -173,6 +215,7 @@ const HumanForm = ({
             <Button
               size="sm"
               onClick={handleSave}
+              disabled={!canSave}
               className="bg-primary hover:bg-primary/90 text-primary-foreground"
             >
               <Save className="w-4 h-4 mr-2" />
@@ -260,78 +303,174 @@ const HumanForm = ({
             )}
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
-            <div className="space-y-4">
+          <div className="space-y-5">
+            <section className="space-y-4 rounded-lg border border-border bg-background p-4">
               <div>
-                <Label
-                  htmlFor="first_name"
-                  className="text-sm font-medium text-foreground"
-                >
-                  {t("form.first_name")}
-                </Label>
-                <Input
-                  id="first_name"
-                  value={editForm.first_name ?? ""}
-                  onChange={(e) =>
-                    setEditForm({ ...editForm, first_name: e.target.value })
-                  }
-                  className="mt-1"
-                />
+                <h3 className="text-sm font-semibold text-foreground">
+                  {t("profile.basic_information")}
+                </h3>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  {t("profile.basic_information_description")}
+                </p>
               </div>
-              <div>
-                <Label
-                  htmlFor="last_name"
-                  className="text-sm font-medium text-foreground"
-                >
-                  {t("form.last_name")}
-                </Label>
-                <Input
-                  id="last_name"
-                  value={editForm.last_name ?? ""}
-                  onChange={(e) =>
-                    setEditForm({ ...editForm, last_name: e.target.value })
-                  }
-                  className="mt-1"
-                />
-              </div>
-              {(["gender", "age", "residence"] as const).map((field) => (
-                <div key={field}>
-                  <Label
-                    htmlFor={field}
-                    className="text-sm font-medium text-foreground"
-                  >
-                    {profileFieldLabel(field)}
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                <div className="space-y-1.5">
+                  <Label htmlFor="first_name">
+                    {t("form.first_name")}
+                    <span className="ml-1 text-destructive" aria-hidden="true">
+                      *
+                    </span>
                   </Label>
                   <Input
-                    id={field}
-                    value={editForm[field] ?? ""}
-                    onChange={(e) =>
-                      setEditForm({ ...editForm, [field]: e.target.value })
+                    id="first_name"
+                    autoComplete="given-name"
+                    required
+                    aria-required="true"
+                    value={editForm.first_name ?? ""}
+                    onChange={(event) =>
+                      setEditForm({
+                        ...editForm,
+                        first_name: event.target.value,
+                      })
                     }
-                    className="mt-1"
                   />
                 </div>
-              ))}
-            </div>
-            <div className="space-y-4">
-              {/* LEGACY: x_user removed from API – review for deletion */}
-              <div>
-                <Label
-                  htmlFor="telegram"
-                  className="text-sm font-medium text-foreground"
-                >
-                  {t("form.telegram")}
-                </Label>
-                <Input
-                  id="telegram"
-                  value={editForm.telegram ?? ""}
-                  onChange={(e) =>
-                    setEditForm({ ...editForm, telegram: e.target.value })
-                  }
-                  className="mt-1"
-                />
+                <div className="space-y-1.5">
+                  <Label htmlFor="last_name">
+                    {t("form.last_name")}
+                    <span className="ml-1 text-destructive" aria-hidden="true">
+                      *
+                    </span>
+                  </Label>
+                  <Input
+                    id="last_name"
+                    autoComplete="family-name"
+                    required
+                    aria-required="true"
+                    value={editForm.last_name ?? ""}
+                    onChange={(event) =>
+                      setEditForm({
+                        ...editForm,
+                        last_name: event.target.value,
+                      })
+                    }
+                  />
+                </div>
               </div>
-            </div>
+              {!hasRequiredNames && (
+                <output className="text-xs text-muted-foreground">
+                  {t("profile.name_required_hint")}
+                </output>
+              )}
+            </section>
+
+            <section className="space-y-4 rounded-lg border border-border bg-background p-4">
+              <div>
+                <h3 className="text-sm font-semibold text-foreground">
+                  {t("profile.additional_details")}
+                </h3>
+              </div>
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                <div className="space-y-1.5">
+                  <Label htmlFor="telegram">{t("form.telegram")}</Label>
+                  <Input
+                    id="telegram"
+                    autoComplete="off"
+                    value={editForm.telegram ?? ""}
+                    onChange={(event) =>
+                      setEditForm({ ...editForm, telegram: event.target.value })
+                    }
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <SelectForm
+                    id="gender"
+                    label={profileFieldLabel("gender")}
+                    value={showGenderSpecify ? "Specify" : currentGender}
+                    placeholder={t("profile.select_option")}
+                    options={[
+                      { value: "__unset__", label: t("profile.not_specified") },
+                      ...genderOptions.map((option) => ({
+                        value: option,
+                        label: genderLabel(option),
+                      })),
+                      ...(!canSpecifyGender && hasCustomGender
+                        ? [{ value: currentGender, label: currentGender }]
+                        : []),
+                    ]}
+                    onChange={(value) => {
+                      if (value === "Specify") {
+                        setSpecifyingGender(true)
+                        setEditForm({
+                          ...editForm,
+                          gender: hasCustomGender ? currentGender : "",
+                        })
+                        return
+                      }
+                      setSpecifyingGender(false)
+                      setEditForm({
+                        ...editForm,
+                        gender: value === "__unset__" ? "" : value,
+                      })
+                    }}
+                  />
+                  {showGenderSpecify && (
+                    <div className="space-y-1.5">
+                      <Label htmlFor="gender_specify">
+                        {t("form.gender_specify")}
+                      </Label>
+                      <Input
+                        id="gender_specify"
+                        value={currentGender === "Specify" ? "" : currentGender}
+                        onChange={(event) =>
+                          setEditForm({
+                            ...editForm,
+                            gender: event.target.value,
+                          })
+                        }
+                      />
+                    </div>
+                  )}
+                </div>
+                <SelectForm
+                  id="age"
+                  label={profileFieldLabel("age")}
+                  value={currentAge}
+                  placeholder={t("profile.select_option")}
+                  options={[
+                    { value: "__unset__", label: t("profile.not_specified") },
+                    ...ageOptions.map((option) => ({
+                      value: option,
+                      label: option,
+                    })),
+                    ...(currentAge && !ageOptions.includes(currentAge)
+                      ? [{ value: currentAge, label: currentAge }]
+                      : []),
+                  ]}
+                  onChange={(value) =>
+                    setEditForm({
+                      ...editForm,
+                      age: value === "__unset__" ? "" : value,
+                    })
+                  }
+                />
+                <div className="space-y-1.5">
+                  <Label htmlFor="residence">
+                    {profileFieldLabel("residence")}
+                  </Label>
+                  <Input
+                    id="residence"
+                    value={editForm.residence ?? ""}
+                    onChange={(event) =>
+                      setEditForm({
+                        ...editForm,
+                        residence: event.target.value,
+                      })
+                    }
+                  />
+                </div>
+              </div>
+            </section>
           </div>
         )}
       </div>

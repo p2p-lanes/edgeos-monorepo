@@ -11,6 +11,7 @@ function buildTargetMap(
 ): Record<string, "human" | "application"> {
   const map: Record<string, "human" | "application"> = {}
   for (const [name, field] of Object.entries(schema.base_fields)) {
+    if (name === "info_not_shared") continue
     map[name] = field.target ?? "application"
   }
   return map
@@ -91,7 +92,6 @@ export function splitForCreate({
     age: (profile.age ?? values.age) as string | undefined,
     residence: (profile.residence ?? values.residence) as string | undefined,
     referral: application.referral as string | undefined,
-    info_not_shared: application.info_not_shared as string[] | undefined,
     custom_fields:
       Object.keys(customFields).length > 0 ? customFields : undefined,
     status,
@@ -168,7 +168,6 @@ export function splitForUpdate({
     age: (profile.age ?? values.age) as string | undefined,
     residence: (profile.residence ?? values.residence) as string | undefined,
     referral: application.referral as string | undefined,
-    info_not_shared: application.info_not_shared as string[] | undefined,
     custom_fields:
       Object.keys(customFields).length > 0 ? customFields : undefined,
     status,

@@ -23,7 +23,14 @@ def test_settings_follow_popup_deletion_and_fk_downgrade_preserves_rows():
                 text(
                     "ALTER TABLE popups "
                     "ADD COLUMN badges_enabled BOOLEAN NOT NULL DEFAULT false, "
-                    "ADD COLUMN sidebar_config JSONB"
+                    "ADD COLUMN sidebar_config JSONB, "
+                    "ADD COLUMN directory_fields JSONB NOT NULL DEFAULT '[]'"
+                )
+            )
+            connection.execute(
+                text(
+                    "ALTER TABLE attendee_categories "
+                    "ADD COLUMN directory_eligible BOOLEAN NOT NULL DEFAULT false"
                 )
             )
             with Session(connection) as session:

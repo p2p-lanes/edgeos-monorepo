@@ -5,7 +5,7 @@ import Image from "next/image"
 import { useMemo, useState } from "react"
 import { useTranslation } from "react-i18next"
 
-import type { EventVenuePublic } from "@/client"
+import type { EventVenuePublic, VenueBookingMode } from "@/client"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
@@ -38,7 +38,7 @@ interface VenueSectionProps {
    * Backend-resolved mode for the current [start, end] window. ``null``
    * until the debounced availability check resolves.
    */
-  effectiveBookingMode?: string | null
+  effectiveBookingMode?: VenueBookingMode | null
   /**
    * Keep the virtual-meeting option visible — only for events that are
    * already meetings (venue selection is mandatory for everything else).

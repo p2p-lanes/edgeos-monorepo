@@ -34,7 +34,7 @@ from app.api.event.models import Events
 from app.api.event.schemas import AttendanceMode, EventStatus, EventVisibility
 from app.api.event_participant.models import EventParticipants
 from app.api.event_participant.schemas import ParticipantRole, ParticipantStatus
-from app.api.human.models import Humans
+from app.api.human.models import HumanDirectorySettings, Humans
 from app.api.popup.models import Popups
 from app.api.product.models import Products
 from app.api.tenant.models import Tenants
@@ -215,7 +215,7 @@ class TestPortalAttendeeCount:
                     status=ParticipantStatus.REGISTERED,
                 )
             )
-        # The hider opted out of showing their name on their application.
+        # The hider shared only one name field in the popup directory settings.
         db.add(
             Applications(
                 sales_flow_id=application_flow_id(db, popup.id),
@@ -224,7 +224,15 @@ class TestPortalAttendeeCount:
                 popup_id=popup.id,
                 human_id=hider.id,
                 status=ApplicationStatus.ACCEPTED.value,
-                info_not_shared=["first_name"],
+            )
+        )
+        db.add(
+            HumanDirectorySettings(
+                tenant_id=tenant_a.id,
+                human_id=hider.id,
+                popup_id=popup.id,
+                listed=True,
+                shared_fields=["last_name"],
             )
         )
         db.commit()
@@ -343,8 +351,8 @@ class TestPortalAttendeeEmails:
                 ),
             ]
         )
-        # The hider opted out of showing their name; emails must still include
-        # them since this is the organiser reaching their own attendees.
+        # The hider shared only one name field; emails must still include them
+        # since this is the organiser reaching their own attendees.
         db.add(
             Applications(
                 sales_flow_id=application_flow_id(db, popup.id),
@@ -353,7 +361,15 @@ class TestPortalAttendeeEmails:
                 popup_id=popup.id,
                 human_id=hider.id,
                 status=ApplicationStatus.ACCEPTED.value,
-                info_not_shared=["first_name"],
+            )
+        )
+        db.add(
+            HumanDirectorySettings(
+                tenant_id=tenant.id,
+                human_id=hider.id,
+                popup_id=popup.id,
+                listed=True,
+                shared_fields=["last_name"],
             )
         )
         db.commit()

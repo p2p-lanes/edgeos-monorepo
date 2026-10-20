@@ -263,6 +263,7 @@ def _seed_attendee_categories(
     Returns {popup_key: {cat_key: category_id}}.
     """
     from app.api.attendee_category.models import AttendeeCategories
+    from app.api.attendee_category.schemas import default_directory_eligible
     from app.api.sales_flow.crud import sales_flows_crud
 
     REQUIRED_FIELDS_BY_KEY: dict[str, list[dict]] = {
@@ -317,6 +318,7 @@ def _seed_attendee_categories(
                 sales_flow_id=flow.id,
                 key=cat_key,
                 is_primary=(cat_key == "main"),
+                directory_eligible=default_directory_eligible(cat_key),
                 sort_order=SORT_ORDER_BY_KEY.get(cat_key, 99),
                 max_per_application=MAX_PER_APPLICATION_BY_KEY.get(cat_key),
                 required_fields=REQUIRED_FIELDS_BY_KEY.get(cat_key, []),

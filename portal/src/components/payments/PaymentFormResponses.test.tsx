@@ -75,13 +75,22 @@ const original = {
   ],
   history: [],
 }
-function mount() {
+function mount(inDialog = false, collapsible = false) {
   const client = new QueryClient({
     defaultOptions: { queries: { retry: false } },
   })
   return render(
     <QueryClientProvider client={client}>
-      <PaymentFormResponses paymentId="payment-1" />
+      {inDialog ? (
+        <div role="dialog" aria-label="Purchase details">
+          <PaymentFormResponses
+            paymentId="payment-1"
+            collapsible={collapsible}
+          />
+        </div>
+      ) : (
+        <PaymentFormResponses paymentId="payment-1" collapsible={collapsible} />
+      )}
     </QueryClientProvider>,
   )
 }
@@ -92,16 +101,46 @@ beforeEach(() => {
 })
 
 describe("post-purchase responses", () => {
+  it("collapses answers until requested and allows hiding them again", async () => {
+    mount(false, true)
+    const toggle = await screen.findByRole("button", {
+      name: "form_responses.view",
+    })
+    expect(toggle.getAttribute("aria-expanded")).toBe("false")
+    expect(screen.queryByText("Riva Resort")).toBeNull()
+    fireEvent.click(toggle)
+    expect(screen.getByText("Riva Resort")).toBeTruthy()
+    expect(
+      screen.getByRole("button", { name: "form_responses.edit" }),
+    ).toBeTruthy()
+    fireEvent.click(screen.getByRole("button", { name: "form_responses.hide" }))
+    expect(screen.queryByText("Riva Resort")).toBeNull()
+  })
+
+  it("does not offer expansion when there are no answers", async () => {
+    vi.mocked(PaymentsService.getMyFormResponses).mockResolvedValue({
+      ...original,
+      fields: [],
+    })
+    mount(false, true)
+    await waitFor(() =>
+      expect(PaymentsService.getMyFormResponses).toHaveBeenCalled(),
+    )
+    expect(screen.queryByRole("button")).toBeNull()
+  })
+
   it("loads saved answers, opens the editor and sends only values plus version", async () => {
     vi.mocked(PaymentsService.editMyFormResponses).mockResolvedValue({
       ...original,
       version: 1,
       fields: [{ ...original.fields[0], value: "Circle Coworking" }],
     })
-    mount()
+    mount(true)
     fireEvent.click(
       await screen.findByRole("button", { name: "form_responses.edit" }),
     )
+    await screen.findByRole("form", { name: "form_responses.edit" })
+    expect(screen.getAllByRole("dialog")).toHaveLength(1)
     fireEvent.change(await screen.findByRole("combobox"), {
       target: { value: "Circle Coworking" },
     })
@@ -112,9 +151,27 @@ describe("post-purchase responses", () => {
         requestBody: { version: 0, answers: { "field-1": "Circle Coworking" } },
       }),
     )
-    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull())
+    await waitFor(() => expect(screen.queryByRole("form")).toBeNull())
+    expect(screen.getAllByRole("dialog")).toHaveLength(1)
     expect(await screen.findByText("Circle Coworking")).toBeTruthy()
   })
+  it("cancels inline editing and returns to saved answers in the same popup", async () => {
+    mount(true)
+    fireEvent.click(
+      await screen.findByRole("button", { name: "form_responses.edit" }),
+    )
+    fireEvent.change(await screen.findByRole("combobox"), {
+      target: { value: "Circle Coworking" },
+    })
+    fireEvent.click(
+      screen.getByRole("button", { name: "form_responses.cancel" }),
+    )
+    expect(screen.queryByRole("form")).toBeNull()
+    expect(screen.getByText("Riva Resort")).toBeTruthy()
+    expect(screen.getAllByRole("dialog")).toHaveLength(1)
+    expect(PaymentsService.editMyFormResponses).not.toHaveBeenCalled()
+  })
+
   it("blocks empty required fields before calling the API", async () => {
     mount()
     fireEvent.click(
@@ -168,4 +225,30 @@ describe("post-purchase responses", () => {
         .hasAttribute("disabled"),
     ).toBe(true)
   })
+})
+
+it("shows an unanswered historical question and lets the buyer complete it", async () => {
+  vi.mocked(PaymentsService.getMyFormResponses).mockResolvedValue({
+    ...original,
+    fields: [{ ...original.fields[0], value: null }],
+  })
+  vi.mocked(PaymentsService.editMyFormResponses).mockResolvedValue({
+    ...original,
+    version: 1,
+    fields: [{ ...original.fields[0], value: "Circle Coworking" }],
+  })
+  mount()
+  expect(await screen.findByText("form_responses.not_answered")).toBeTruthy()
+  fireEvent.click(screen.getByRole("button", { name: "form_responses.edit" }))
+  const select = await screen.findByRole("combobox")
+  expect((select as HTMLSelectElement).value).toBe("")
+  fireEvent.change(select, { target: { value: "Circle Coworking" } })
+  fireEvent.click(screen.getByRole("button", { name: "form_responses.save" }))
+  await waitFor(() =>
+    expect(PaymentsService.editMyFormResponses).toHaveBeenCalledWith({
+      paymentId: "payment-1",
+      requestBody: { version: 0, answers: { "field-1": "Circle Coworking" } },
+    }),
+  )
+  expect(await screen.findByText("Circle Coworking")).toBeTruthy()
 })

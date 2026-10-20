@@ -50,6 +50,12 @@ vi.mock("@/types/checkout", () => ({
     `${currency} ${amount.toFixed(2)}`,
 }))
 
+vi.mock("@/components/payments/PaymentFormResponses", () => ({
+  PaymentFormResponses: ({ paymentId }: { paymentId: string }) => (
+    <div data-testid="payment-form-responses" data-payment-id={paymentId} />
+  ),
+}))
+
 vi.mock("sonner", () => ({
   toast: { error: mockToastError },
 }))
@@ -126,6 +132,12 @@ describe("OrdersContent", () => {
     )
 
     expect(screen.getByRole("heading", { name: "Payments" })).toBeTruthy()
+    // Historical payments without buyer_snapshot must still load form answers.
+    expect(
+      screen
+        .getByTestId("payment-form-responses")
+        .getAttribute("data-payment-id"),
+    ).toBe("payment-1")
     expect(screen.queryByText("Orders")).toBeNull()
     expect(screen.getByText("Event shirt")).toBeTruthy()
     expect(screen.queryByText("Application fee")).toBeNull()

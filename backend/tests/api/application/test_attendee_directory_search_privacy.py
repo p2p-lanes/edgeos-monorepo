@@ -17,12 +17,11 @@ from tests.api.application.test_attendee_directory import (
     _category,
     _human,
     _popup,
-    _privacy_option,
     _product,
+    _set_shared_fields,
 )
 
 SEARCH_FIELDS = ("first_name", "last_name", "email", "telegram")
-OPTION_STYLES = ("lowercase", "capitalized", "mixed_case", "whitespace")
 
 
 @pytest.fixture()
@@ -75,21 +74,22 @@ def search_world(db: Session, tenant_a: Tenants):
     }
 
 
-def _hide_fields(db: Session, attendee, fields: tuple[str, ...], style: str) -> None:
-    attendee.application.info_not_shared = [
-        _privacy_option(field, style) for field in fields
-    ]
-    db.add(attendee.application)
-    db.commit()
+def _hide_fields(db: Session, attendee, fields: tuple[str, ...]) -> None:
+    settings = attendee.human.directory_settings[0]
+    _set_shared_fields(
+        db,
+        attendee.human,
+        attendee.popup,
+        [field for field in settings.shared_fields if field not in fields],
+    )
 
 
-@pytest.mark.parametrize("style", OPTION_STYLES)
 @pytest.mark.parametrize("hidden_field", SEARCH_FIELDS)
 def test_directory_search_matches_only_shared_fields(
-    db: Session, search_world, hidden_field: str, style: str
+    db: Session, search_world, hidden_field: str
 ) -> None:
     private = search_world["private"]
-    _hide_fields(db, private, (hidden_field,), style)
+    _hide_fields(db, private, (hidden_field,))
 
     for field in SEARCH_FIELDS:
         results, total = applications_crud.find_directory(
@@ -117,13 +117,12 @@ def test_directory_search_matches_only_shared_fields(
             assert [attendee.id for attendee in results] == [private.id]
 
 
-@pytest.mark.parametrize("style", OPTION_STYLES)
 @pytest.mark.parametrize("hidden_field", SEARCH_FIELDS)
 def test_directory_search_api_and_csv_do_not_reveal_hidden_matches(
-    db: Session, client: TestClient, search_world, hidden_field: str, style: str
+    db: Session, client: TestClient, search_world, hidden_field: str
 ) -> None:
     private = search_world["private"]
-    _hide_fields(db, private, (hidden_field,), style)
+    _hide_fields(db, private, (hidden_field,))
     headers = {
         "Authorization": f"Bearer {create_access_token(subject=search_world['public'].human_id, token_type='human')}"
     }
@@ -158,14 +157,13 @@ def test_directory_search_api_and_csv_do_not_reveal_hidden_matches(
     assert rows[0][hidden_field.replace("_", " ").title()] == "*"
 
 
-@pytest.mark.parametrize("style", OPTION_STYLES)
 @pytest.mark.parametrize("hidden_field", ("email", "telegram"))
 def test_directory_search_filters_privacy_before_count_and_pagination(
-    db: Session, search_world, hidden_field: str, style: str
+    db: Session, search_world, hidden_field: str
 ) -> None:
     private = search_world["private"]
     public = search_world["public"]
-    _hide_fields(db, private, (hidden_field,), style)
+    _hide_fields(db, private, (hidden_field,))
     setattr(
         private.human,
         hidden_field,
@@ -193,11 +191,10 @@ def test_directory_search_filters_privacy_before_count_and_pagination(
     assert results == []
 
 
-@pytest.mark.parametrize("style", OPTION_STYLES)
 def test_directory_search_companions_do_not_inherit_applicant_privacy(
-    db: Session, search_world, style: str
+    db: Session, search_world
 ) -> None:
-    _hide_fields(db, search_world["private"], SEARCH_FIELDS, style)
+    _hide_fields(db, search_world["private"], SEARCH_FIELDS)
     companion = search_world["companion"]
     queries = [getattr(companion.human, field) for field in SEARCH_FIELDS]
     queries.append("CompanionGiven CompanionSurname")
@@ -213,7 +210,7 @@ def test_directory_search_companions_do_not_inherit_applicant_privacy(
 def test_directory_search_does_not_match_empty_hidden_full_name(
     db: Session, search_world, query: str
 ) -> None:
-    _hide_fields(db, search_world["private"], SEARCH_FIELDS, "capitalized")
+    _hide_fields(db, search_world["private"], SEARCH_FIELDS)
     results, total = applications_crud.find_directory(
         db, popup_id=search_world["popup"].id, q=query
     )
@@ -228,7 +225,7 @@ def test_directory_search_empty_preferences_keeps_fields_searchable(
     db: Session, search_world
 ) -> None:
     private = search_world["private"]
-    assert private.application.info_not_shared == []
+    assert set(private.human.directory_settings[0].shared_fields) >= set(SEARCH_FIELDS)
     for field in SEARCH_FIELDS:
         results, total = applications_crud.find_directory(
             db, popup_id=search_world["popup"].id, q=getattr(private.human, field)
@@ -241,7 +238,7 @@ def test_directory_search_can_match_value_shared_in_another_field(
     db: Session, search_world
 ) -> None:
     private = search_world["private"]
-    _hide_fields(db, private, ("email",), "capitalized")
+    _hide_fields(db, private, ("email",))
     private.human.telegram = private.human.email
     db.add(private.human)
     db.commit()

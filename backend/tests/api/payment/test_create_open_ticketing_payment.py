@@ -281,18 +281,32 @@ def test_merch_purchase_preserves_other_flow_sections(
     )
     db.add(other_flow)
     db.flush()
-    other_section = _make_section(db, popup, label="Personal Information")
-    other_section.sales_flow_id = other_flow.id
-    other_section.protected = True
+    other_section = FormSections(
+        tenant_id=tenant_a.id,
+        popup_id=popup.id,
+        sales_flow_id=other_flow.id,
+        label="Personal Information",
+        protected=True,
+    )
     db.add(other_section)
-    other_field = _make_field(db, popup, other_section, name="bio", label="Bio")
-    other_field.sales_flow_id = other_flow.id
+    db.flush()
+    other_field = FormFields(
+        tenant_id=tenant_a.id,
+        popup_id=popup.id,
+        sales_flow_id=other_flow.id,
+        section_id=other_section.id,
+        name=f"bio_{uuid.uuid4().hex[:6]}",
+        label="Bio",
+        field_type="text",
+    )
     db.add(other_field)
     merch_section = (
         _make_section(db, popup, label="Merch Info") if has_merch_section else None
     )
     db.commit()
-    section_ids = {section.id for section in popup.form_sections}
+    section_ids = set(
+        db.exec(select(FormSections.id).where(FormSections.popup_id == popup.id)).all()
+    )
     other_field_id = other_field.id
     obj = _purchase_create(
         email=f"merch-{uuid.uuid4().hex[:8]}@test.com",
@@ -319,7 +333,14 @@ def test_merch_purchase_preserves_other_flow_sections(
         {str(merch_section.id)} if merch_section else set()
     )
     db.expire_all()
-    assert {section.id for section in popup.form_sections} == section_ids
+    assert (
+        set(
+            db.exec(
+                select(FormSections.id).where(FormSections.popup_id == popup.id)
+            ).all()
+        )
+        == section_ids
+    )
     assert db.get(FormFields, other_field_id) is not None
 
 

@@ -11,8 +11,7 @@ from typing import Any
 # Keys are used as identifiers during creation; values define the section.
 DEFAULT_SECTIONS: dict[str, dict[str, Any]] = {
     "profile": {"label": "Personal Information", "order": 0, "kind": "standard"},
-    "info_not_shared": {"label": "Info not shared", "order": 1, "kind": "standard"},
-    "scholarship": {"label": "Scholarship", "order": 2, "kind": "scholarship"},
+    "scholarship": {"label": "Scholarship", "order": 1, "kind": "scholarship"},
 }
 
 # Each entry defines:
@@ -90,26 +89,6 @@ BASE_FIELD_DEFINITIONS: dict[str, dict[str, Any]] = {
         "default_section_key": "profile",
         "default_position": 6,
         "default_help_text": "List everyone who encouraged you to apply.",
-    },
-    "info_not_shared": {
-        "type": "multiselect",
-        "label": "Info I'm NOT willing to share with other attendees",
-        "required": False,
-        "target": "application",
-        "default_section_key": "info_not_shared",
-        "default_position": 0,
-        "default_help_text": (
-            "We will make a directory to make it easier for attendees to coordinate"
-        ),
-        "default_options": [
-            "Email",
-            "Telegram",
-            "Organization",
-            "Role",
-            "Gender",
-            "Age",
-            "Residence",
-        ],
     },
     "scholarship_request": {
         "type": "boolean",
