@@ -101,13 +101,6 @@ def upgrade() -> None:
         """
     )
 
-    # The popup-scoped settings are now authoritative. Keep the legacy column
-    # empty for compatibility; historical snapshots retain their own values.
-    op.execute(
-        "UPDATE applications SET info_not_shared = '{}' "
-        "WHERE cardinality(info_not_shared) > 0"
-    )
-
     # Remove the retired field from existing application forms. The migration
     # above has already transferred its answers to popup-scoped settings.
     op.execute("DELETE FROM basefieldconfigs WHERE field_name = 'info_not_shared'")
@@ -128,50 +121,9 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    # Reconstruct the legacy application answers from the durable directory
-    # settings before restoring the old form control.
-    op.execute(
-        f"""
-        UPDATE applications AS application
-        SET info_not_shared = COALESCE((
-            SELECT array_agg(
-                CASE regexp_replace(
-                    lower(COALESCE(configured_field.field->>'key', '')),
-                    '[^a-z0-9]+', '', 'g'
-                )
-                    WHEN 'telegram' THEN 'Telegram'
-                    WHEN 'role' THEN 'Role'
-                    WHEN 'roleintheorganization' THEN 'Role'
-                    WHEN 'organization' THEN 'Organization'
-                    WHEN 'organizationyourepresent' THEN 'Organization'
-                    WHEN 'gender' THEN 'Gender'
-                    WHEN 'age' THEN 'Age'
-                    WHEN 'residence' THEN 'Residence'
-                    ELSE configured_field.field->>'label'
-                END
-                ORDER BY configured_field.field_position
-            )
-            FROM popups AS popup
-            CROSS JOIN LATERAL jsonb_array_elements(
-                CASE
-                    WHEN jsonb_typeof(popup.directory_fields) = 'array'
-                         AND jsonb_array_length(popup.directory_fields) > 0
-                    THEN popup.directory_fields
-                    ELSE '{_DEFAULT_DIRECTORY_FIELDS}'::jsonb
-                END
-            ) WITH ORDINALITY AS configured_field(field, field_position)
-            WHERE popup.id = application.popup_id
-              AND configured_field.field->>'id' IS NOT NULL
-              AND NOT EXISTS (
-                  SELECT 1
-                  FROM human_directory_settings AS settings
-                  WHERE settings.human_id = application.human_id
-                    AND settings.popup_id = application.popup_id
-                    AND configured_field.field->>'id' = ANY(settings.shared_fields)
-              )
-        ), ARRAY[]::text[])
-        """
-    )
+    # Legacy answers stay on the application throughout the upgrade. No
+    # reconstruction is necessary, and current directory choices must not
+    # overwrite the original answers when downgrading.
     op.execute(
         """
         WITH legacy_sections AS (
