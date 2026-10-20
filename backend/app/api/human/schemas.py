@@ -202,6 +202,20 @@ class HumanProfileUpdate(BaseModel):
         return v
 
 
+class HumanDirectorySettingsPublic(BaseModel):
+    popup_id: uuid.UUID
+    listed: bool
+    shared_fields: list[str]
+    available_fields: list[dict]
+
+
+class HumanDirectorySettingsUpdate(BaseModel):
+    listed: bool
+    shared_fields: list[str]
+
+    model_config = ConfigDict(extra="forbid")
+
+
 class HumanUpdate(BaseModel):
     """Human schema for profile updates."""
 

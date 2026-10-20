@@ -3,7 +3,7 @@ from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
 from sqlalchemy import Boolean, DateTime, Numeric, String, Text, UniqueConstraint, func
-from sqlalchemy.dialects.postgresql import JSONB, UUID
+from sqlalchemy.dialects.postgresql import ARRAY, JSONB, UUID
 from sqlmodel import Column, Field, Relationship, SQLModel
 
 from app.api.group.models import GroupLeaders, GroupMembers
@@ -53,6 +53,9 @@ class Humans(HumanBase, table=True):
         back_populates="human",
         sa_relationship_kwargs={"foreign_keys": "Attendees.human_id"},
     )
+    directory_settings: list["HumanDirectorySettings"] = Relationship(
+        sa_relationship_kwargs={"cascade": "all, delete-orphan"}
+    )
 
     # Groups where this human is a leader
     led_groups: list["Groups"] = Relationship(
@@ -93,6 +96,30 @@ class Humans(HumanBase, table=True):
         if self.first_name or self.last_name:
             return f"{self.first_name or ''} {self.last_name or ''}".strip()
         return None
+
+
+class HumanDirectorySettings(SQLModel, table=True):
+    """A human's popup-scoped directory participation and shared fields."""
+
+    __tablename__ = "human_directory_settings"
+    __table_args__ = (
+        UniqueConstraint(
+            "human_id", "popup_id", name="uq_human_directory_settings_human_popup"
+        ),
+    )
+
+    id: uuid.UUID = Field(
+        default_factory=uuid.uuid4,
+        sa_column=Column(UUID(as_uuid=True), primary_key=True),
+    )
+    tenant_id: uuid.UUID = Field(foreign_key="tenants.id", index=True)
+    human_id: uuid.UUID = Field(foreign_key="humans.id", index=True)
+    popup_id: uuid.UUID = Field(foreign_key="popups.id", index=True)
+    listed: bool = Field(default=False, sa_column=Column(Boolean, nullable=False))
+    shared_fields: list[str] = Field(
+        default_factory=list,
+        sa_column=Column(ARRAY(String), nullable=False, server_default="{}"),
+    )
 
 
 class HumanComment(CommentMixin, table=True):

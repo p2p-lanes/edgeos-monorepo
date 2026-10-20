@@ -343,9 +343,9 @@ async def list_portal_participants(
         exclude_profile_id=event.host_id,
     )
 
-    # Privacy: drop participants who hid their name (info_not_shared) on their
-    # application for this event's popup. Excluding (not masking) keeps the RSVP
-    # list from leaking a name the attendee chose to hide.
+    # Privacy: drop participants who did not share their name in popup-scoped
+    # directory settings. Excluding (not masking) keeps the RSVP list from
+    # leaking a name the attendee chose to hide.
     if event is not None and participants:
         hidden = applications_crud.human_ids_hiding_name(
             db,

@@ -666,7 +666,6 @@ export type ApplicationAdminCreate = {
     age?: (string | null);
     residence?: (string | null);
     referral?: (string | null);
-    info_not_shared?: (Array<(string)> | null);
     custom_fields?: ({
     [key: string]: unknown;
 } | null);
@@ -710,7 +709,6 @@ export type ApplicationCreate = {
     age?: (string | null);
     residence?: (string | null);
     referral?: (string | null);
-    info_not_shared?: (Array<(string)> | null);
     custom_fields?: ({
     [key: string]: unknown;
 } | null);
@@ -777,7 +775,6 @@ export type ApplicationPortalPublic = {
     referral_id?: (string | null);
     referred_by_name?: (string | null);
     access_sources?: Array<ApplicationAccessSource>;
-    info_not_shared?: Array<(string)>;
     status: string;
     custom_fields?: {
         [key: string]: unknown;
@@ -817,7 +814,6 @@ export type ApplicationPublic = {
     referral_id?: (string | null);
     referred_by_name?: (string | null);
     access_sources?: Array<ApplicationAccessSource>;
-    info_not_shared?: Array<(string)>;
     status: string;
     custom_fields?: {
         [key: string]: unknown;
@@ -942,7 +938,6 @@ export type ApplicationUpdate = {
     age?: (string | null);
     residence?: (string | null);
     referral?: (string | null);
-    info_not_shared?: (Array<(string)> | null);
     custom_fields?: ({
     [key: string]: unknown;
 } | null);
@@ -1124,6 +1119,7 @@ export type AttendeeCategoryCreate = {
     popup_id: string;
     key: string;
     sort_order?: number;
+    directory_eligible?: (boolean | null);
     max_per_application?: (number | null);
     required_fields?: Array<{
         [key: string]: unknown;
@@ -1143,6 +1139,7 @@ export type AttendeeCategoryPublic = {
     sales_flow_id: string;
     key: string;
     is_primary?: boolean;
+    directory_eligible?: boolean;
     sort_order?: number;
     max_per_application?: (number | null);
     required_fields?: Array<{
@@ -1164,6 +1161,7 @@ export type AttendeeCategoryPublic = {
  */
 export type AttendeeCategoryUpdate = {
     sort_order?: (number | null);
+    directory_eligible?: (boolean | null);
     max_per_application?: (number | null);
     required_fields?: (Array<{
     [key: string]: unknown;
@@ -1365,6 +1363,9 @@ export type AttendeesDirectoryEntry = {
     gender?: (string | null);
     picture_url?: (string | null);
     category?: (string | null);
+    fields?: Array<{
+        [key: string]: (string | null);
+    }>;
     participation?: Array<DirectoryProduct>;
     associated_attendees?: Array<AssociatedAttendee>;
 };
@@ -2735,6 +2736,12 @@ export type DirectoryProduct = {
     duration_type?: (string | null);
 };
 
+export type DirectoryValuesUpdate = {
+    values: {
+        [key: string]: (string);
+    };
+};
+
 /**
  * Ticket and accommodation distribution.
  */
@@ -4059,6 +4066,20 @@ export type HumanCreate = {
     picture_url?: (string | null);
 };
 
+export type HumanDirectorySettingsPublic = {
+    popup_id: string;
+    listed: boolean;
+    shared_fields: Array<(string)>;
+    available_fields: Array<{
+        [key: string]: unknown;
+    }>;
+};
+
+export type HumanDirectorySettingsUpdate = {
+    listed: boolean;
+    shared_fields: Array<(string)>;
+};
+
 /**
  * One atomic fact the enrichment agent extracted from a source.
  */
@@ -5272,6 +5293,9 @@ export type PopupAdmin = {
     checkin_pass_lead_days?: (number | null);
     accommodation_min_stay?: number;
     show_attendee_directory?: boolean;
+    directory_fields?: Array<{
+        [key: string]: unknown;
+    }>;
     badges_enabled?: boolean;
     edit_passes_enabled?: boolean;
     invites_enabled?: boolean;
@@ -5467,6 +5491,9 @@ export type PopupPublic = {
     events_enabled?: boolean;
     accommodation_min_stay?: number;
     show_attendee_directory?: boolean;
+    directory_fields?: Array<{
+        [key: string]: unknown;
+    }>;
     badges_enabled?: boolean;
     edit_passes_enabled?: boolean;
     invites_enabled?: boolean;
@@ -5571,6 +5598,9 @@ export type PopupUpdate = {
     events_enabled?: (boolean | null);
     self_check_in_enabled?: (boolean | null);
     show_attendee_directory?: (boolean | null);
+    directory_fields?: (Array<{
+    [key: string]: unknown;
+}> | null);
     badges_enabled?: (boolean | null);
     edit_passes_enabled?: (boolean | null);
     installments_enabled?: (boolean | null);
@@ -8041,6 +8071,23 @@ export type ApplicationsListAttendeesDirectoryData = {
 
 export type ApplicationsListAttendeesDirectoryResponse = (ListModel_AttendeesDirectoryEntry_);
 
+export type ApplicationsUpdateMyDirectoryValuesData = {
+    popupId: string;
+    requestBody: DirectoryValuesUpdate;
+};
+
+export type ApplicationsUpdateMyDirectoryValuesResponse = ({
+    [key: string]: (string);
+});
+
+export type ApplicationsGetMyDirectoryValuesData = {
+    popupId: string;
+};
+
+export type ApplicationsGetMyDirectoryValuesResponse = ({
+    [key: string]: (string);
+});
+
 export type ApplicationsExportAttendeesDirectoryCsvData = {
     popupId: string;
     q?: (string | null);
@@ -10130,7 +10177,26 @@ export type HumansUpdateCurrentHumanData = {
 
 export type HumansUpdateCurrentHumanResponse = (HumanSelfPublic);
 
+export type HumansHasCurrentHumanActiveTicketData = {
+    popupId: string;
+};
+
+export type HumansHasCurrentHumanActiveTicketResponse = (boolean);
+
 export type HumansGetCurrentHumanProfileStatsResponse = (HumanProfileStats);
+
+export type HumansGetMyDirectorySettingsData = {
+    popupId: string;
+};
+
+export type HumansGetMyDirectorySettingsResponse = (HumanDirectorySettingsPublic);
+
+export type HumansUpdateMyDirectorySettingsData = {
+    popupId: string;
+    requestBody: HumanDirectorySettingsUpdate;
+};
+
+export type HumansUpdateMyDirectorySettingsResponse = (HumanDirectorySettingsPublic);
 
 export type HumansGetMyPublicProfileResponse = (PublicProfileSettings);
 

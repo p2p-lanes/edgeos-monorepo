@@ -22,6 +22,7 @@ from tests.api.application.test_attendee_directory import (
     _category,
     _human,
     _popup,
+    _set_shared_fields,
 )
 
 
@@ -49,6 +50,7 @@ def primary_flow_world(db: Session, tenant_a: Tenants):
         key="main",
         label="Main",
         is_primary=True,
+        directory_eligible=True,
     )
     db.add(sibling_main)
     db.commit()
@@ -146,9 +148,12 @@ def test_directory_human_picker_cannot_use_a_sibling_to_bypass_primary_privacy(
     world = primary_flow_world
     rows, total = applications_crud.find_directory_humans(db, world["popup"].id)
     assert total == 1 and [row.id for row in rows] == [world["person"].id]
-    world["primary_app"].info_not_shared = ["first_name"]
-    db.add(world["primary_app"])
-    db.commit()
+    _set_shared_fields(
+        db,
+        world["person"],
+        world["popup"],
+        ["last_name", "email", "telegram"],
+    )
     rows, total = applications_crud.find_directory_humans(db, world["popup"].id)
     assert rows == [] and total == 0
 
@@ -297,25 +302,22 @@ def test_primary_flow_lookup_keeps_assessments_private(
         assert attendee.additional_data["dietary_notes"] == "vegetarian"
 
 
-def test_sharing_settings_update_only_the_primary_application(
+def test_sharing_settings_are_popup_scoped_not_application_scoped(
     client: TestClient, db: Session, primary_flow_world
 ) -> None:
     world = primary_flow_world
-    url = f"/api/v1/applications/my/{world['popup'].id}"
-    response = client.get(
-        url, params={"primary_flow_only": True}, headers=world["headers"]
-    )
-    assert response.status_code == 200, response.text
-    response = client.patch(
-        url,
-        params={"sales_flow_id": response.json()["sales_flow_id"]},
-        json={"info_not_shared": ["Email", "Telegram"]},
+    response = client.put(
+        f"/api/v1/humans/me/directory/{world['popup'].id}",
+        json={"listed": True, "shared_fields": ["first_name", "last_name"]},
         headers=world["headers"],
     )
     assert response.status_code == 200, response.text
+    assert response.json()["shared_fields"] == ["first_name", "last_name"]
     db.refresh(world["primary_app"])
     db.refresh(world["sibling_app"])
-    assert world["primary_app"].info_not_shared == ["Email", "Telegram"]
+    # The obsolete per-application choices are no longer modified by directory
+    # settings; both application flows now use the Human+popup setting above.
+    assert world["primary_app"].info_not_shared == ["Email"]
     assert world["sibling_app"].info_not_shared == []
 
 

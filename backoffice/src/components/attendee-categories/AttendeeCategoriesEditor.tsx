@@ -37,6 +37,7 @@ interface DialogState {
   sortOrder: string
   /** Empty string = unlimited (null on the server). */
   maxPerApplication: string
+  directoryEligible: boolean | null
   // High-level form fields the admin toggles. We serialize/deserialize these
   // to/from the underlying `required_fields` JSONB so the dialog stays simple
   // for the cases we actually have: spouse (email+gender), kid (age group).
@@ -52,6 +53,7 @@ const EMPTY_DIALOG: DialogState = {
   label: "",
   sortOrder: "",
   maxPerApplication: "",
+  directoryEligible: null,
   requireEmail: true,
   requireGender: false,
   askAgeGroup: false,
@@ -191,6 +193,7 @@ export function AttendeeCategoriesEditor({
             state.maxPerApplication !== ""
               ? Number(state.maxPerApplication)
               : undefined,
+          directory_eligible: state.directoryEligible ?? undefined,
           required_fields: fields as unknown as Array<{
             [key: string]: unknown
           }>,
@@ -220,6 +223,7 @@ export function AttendeeCategoriesEditor({
             state.maxPerApplication !== ""
               ? Number(state.maxPerApplication)
               : null,
+          directory_eligible: state.directoryEligible,
           required_fields: fields as unknown as Array<{
             [key: string]: unknown
           }>,
@@ -258,6 +262,7 @@ export function AttendeeCategoriesEditor({
       sortOrder: cat.sort_order != null ? String(cat.sort_order) : "",
       maxPerApplication:
         cat.max_per_application != null ? String(cat.max_per_application) : "",
+      directoryEligible: cat.directory_eligible ?? false,
       ...fieldsState,
     })
   }
@@ -436,6 +441,28 @@ export function AttendeeCategoriesEditor({
                 How many attendees of this type a single applicant can add.
                 Leave empty for unlimited.
               </p>
+            </div>
+
+            <div className="flex items-center justify-between rounded-md border p-3">
+              <div className="space-y-1">
+                <Label htmlFor="cat-directory-eligible">
+                  Include individual attendees in directory
+                </Label>
+                <p className="text-xs text-muted-foreground">
+                  Only applies when an attendee has their own human profile.
+                  They still control whether they appear and what they share.
+                </p>
+              </div>
+              <Switch
+                id="cat-directory-eligible"
+                checked={
+                  state.directoryEligible ??
+                  state.key.trim().toLowerCase() === "spouse"
+                }
+                onCheckedChange={(checked) =>
+                  setState((prev) => ({ ...prev, directoryEligible: checked }))
+                }
+              />
             </div>
 
             <div className="space-y-2 rounded-md border p-3">

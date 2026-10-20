@@ -164,6 +164,34 @@ describe("AttendeeCategoriesEditor", () => {
     })
   })
 
+  it("defaults spouse to eligible and allows explicitly excluding it", async () => {
+    const user = userEvent.setup()
+    render(<AttendeeCategoriesEditor popupId="popup-1" flowId="flow-1" />, {
+      wrapper: wrapper(),
+    })
+
+    await user.click(screen.getByRole("button", { name: /add category/i }))
+    await user.type(screen.getByPlaceholderText(/e\.g\. spouse/i), "spouse")
+    const eligibility = screen.getByRole("switch", {
+      name: "Include individual attendees in directory",
+    })
+    expect(eligibility).toBeChecked()
+
+    await user.click(eligibility)
+    expect(eligibility).not.toBeChecked()
+    await user.click(screen.getByRole("button", { name: /create/i }))
+    await waitFor(() =>
+      expect(mockCreate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          requestBody: expect.objectContaining({
+            key: "spouse",
+            directory_eligible: false,
+          }),
+        }),
+      ),
+    )
+  })
+
   it("keeps the main category delete disabled", async () => {
     const primary = makeCategory({
       id: "cat-main",

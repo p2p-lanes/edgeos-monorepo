@@ -10,6 +10,7 @@ from app.api.attendee_category.models import AttendeeCategories
 from app.api.attendee_category.schemas import (
     AttendeeCategoryCreate,
     AttendeeCategoryUpdate,
+    default_directory_eligible,
 )
 from app.api.shared.crud import BaseCRUD
 
@@ -67,6 +68,12 @@ class AttendeeCategoriesCRUD(
                 detail="The 'main' category is managed automatically and cannot be created manually",
             )
 
+        directory_eligible = (
+            data.directory_eligible
+            if data.directory_eligible is not None
+            else default_directory_eligible(data.key)
+        )
+
         category = session.exec(
             select(AttendeeCategories).where(
                 AttendeeCategories.sales_flow_id == flow.id,
@@ -84,6 +91,7 @@ class AttendeeCategoriesCRUD(
             category.max_per_application = data.max_per_application
             category.required_fields = data.required_fields
             category.display_meta = data.display_meta
+            category.directory_eligible = directory_eligible
         else:
             category = AttendeeCategories(
                 tenant_id=flow.tenant_id,
@@ -91,6 +99,7 @@ class AttendeeCategoriesCRUD(
                 sales_flow_id=flow.id,
                 key=data.key,
                 is_primary=False,
+                directory_eligible=directory_eligible,
                 sort_order=data.sort_order,
                 max_per_application=data.max_per_application,
                 required_fields=data.required_fields,
@@ -185,6 +194,7 @@ class AttendeeCategoriesCRUD(
             sales_flow_id=flow.id,
             key="main",
             is_primary=True,
+            directory_eligible=True,
             sort_order=0,
             max_per_application=None,
             required_fields=[],
@@ -265,6 +275,7 @@ class AttendeeCategoriesCRUD(
                 sales_flow_id=flow.id,
                 key=category.key,
                 is_primary=category.is_primary,
+                directory_eligible=category.directory_eligible,
                 sort_order=category.sort_order,
                 max_per_application=category.max_per_application,
                 required_fields=copy.deepcopy(category.required_fields),

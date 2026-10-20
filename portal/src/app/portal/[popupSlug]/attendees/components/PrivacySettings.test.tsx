@@ -10,12 +10,21 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import { queryKeys } from "@/lib/query-keys"
 import PrivacySettings from "./PrivacySettings"
 
-const mocks = vi.hoisted(() => ({ get: vi.fn(), update: vi.fn() }))
+const mocks = vi.hoisted(() => ({
+  get: vi.fn(),
+  update: vi.fn(),
+  getValues: vi.fn(),
+  updateValues: vi.fn(),
+}))
 
 vi.mock("@/client", () => ({
+  HumansService: {
+    getMyDirectorySettings: mocks.get,
+    updateMyDirectorySettings: mocks.update,
+  },
   ApplicationsService: {
-    getMyApplication: mocks.get,
-    updateMyApplication: mocks.update,
+    getMyDirectoryValues: mocks.getValues,
+    updateMyDirectoryValues: mocks.updateValues,
   },
 }))
 vi.mock("@/providers/cityProvider", () => ({
@@ -24,49 +33,31 @@ vi.mock("@/providers/cityProvider", () => ({
 vi.mock("react-i18next", () => ({
   useTranslation: () => ({ t: (key: string) => key }),
 }))
-vi.mock("sonner", () => ({
-  toast: { success: vi.fn(), error: vi.fn() },
-}))
+vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }))
 
-const siblingApplication = {
-  id: "sibling-app",
+const initialSettings = {
   popup_id: "popup-1",
-  sales_flow_id: "sibling-flow",
-  info_not_shared: [],
+  listed: false,
+  shared_fields: [],
+  available_fields: [
+    { id: "first_name", label: "Given name" },
+    { id: "last_name", label: "Family name" },
+    { id: "role_custom", label: "Position" },
+  ],
 }
 
-function setup(hiddenFields: string[] = [], noApplication = false) {
-  let serverApplication = {
-    id: "primary-app",
-    popup_id: "popup-1",
-    sales_flow_id: "primary-flow",
-    info_not_shared: hiddenFields,
-  }
-  mocks.get.mockImplementation(() =>
-    noApplication
-      ? Promise.reject(new Error("Application not found"))
-      : Promise.resolve(structuredClone(serverApplication)),
-  )
-  mocks.update.mockImplementation(async ({ requestBody }) => {
-    serverApplication = {
-      ...serverApplication,
-      info_not_shared: [...requestBody.info_not_shared],
-    }
-    return structuredClone(serverApplication)
-  })
+function setup() {
+  mocks.get.mockResolvedValue(structuredClone(initialSettings))
+  mocks.getValues.mockResolvedValue({})
+  mocks.updateValues.mockResolvedValue({})
+  mocks.update.mockImplementation(async ({ requestBody }) => ({
+    ...structuredClone(initialSettings),
+    ...requestBody,
+  }))
   const client = new QueryClient({
     defaultOptions: { queries: { retry: false, staleTime: 30_000 } },
   })
-  client.setQueryData(queryKeys.applications.mine(), [
-    siblingApplication,
-    structuredClone(serverApplication),
-  ])
-  // A legacy popup-scoped lookup can select a different application. It must
-  // not be reused by the primary-only settings query.
-  client.setQueryData(
-    [...queryKeys.applications.mine(), "popup", "popup-1"],
-    siblingApplication,
-  )
+  client.setQueryData(queryKeys.attendees.directory("popup-1"), [])
   render(
     <QueryClientProvider client={client}>
       <PrivacySettings />
@@ -75,106 +66,50 @@ function setup(hiddenFields: string[] = [], noApplication = false) {
   return client
 }
 
-async function open() {
-  fireEvent.click(
-    screen.getByRole("button", { name: "attendees.privacy_button" }),
-  )
-  await screen.findByRole("checkbox", { name: "attendees.fields.email" })
-}
-
-async function save() {
-  fireEvent.click(
-    screen.getByRole("button", { name: "attendees.privacy_save" }),
-  )
-  await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull())
-}
-
-const checkbox = (field: string) =>
-  screen.getByRole("checkbox", { name: `attendees.fields.${field}` })
-
 afterEach(cleanup)
 beforeEach(() => vi.clearAllMocks())
 
-describe("primary-flow directory sharing settings", () => {
-  it("loads only the primary application and updates its explicit flow", async () => {
-    setup(["email", "Residence"])
-    await open()
-    expect(mocks.get).toHaveBeenCalledWith({
-      popupId: "popup-1",
-      primaryFlowOnly: true,
-    })
-    expect(checkbox("email").getAttribute("aria-checked")).toBe("false")
-    fireEvent.click(checkbox("telegram"))
-    await save()
-    expect(mocks.update).toHaveBeenCalledWith({
-      popupId: "popup-1",
-      salesFlowId: "primary-flow",
-      requestBody: { info_not_shared: ["email", "Residence", "telegram"] },
-    })
-  })
-
-  it("hides sharing settings when no primary application exists", async () => {
-    setup([], true)
-    await waitFor(() =>
-      expect(
-        screen.queryByRole("button", { name: "attendees.privacy_button" }),
-      ).toBeNull(),
-    )
-    expect(screen.queryByRole("checkbox")).toBeNull()
-    expect(mocks.update).not.toHaveBeenCalled()
-  })
-
-  it("updates both primary caches without modifying the sibling application", async () => {
+describe("popup-scoped directory privacy settings", () => {
+  it("lets a human opt into the directory and share configured fields", async () => {
     const client = setup()
-    client.setQueryData(queryKeys.attendees.directory("popup-1"), [])
-    await open()
-    fireEvent.click(checkbox("email"))
-    await save()
-    expect(
-      client.getQueryData([
-        ...queryKeys.applications.mine(),
-        "popup",
-        "popup-1",
-        "primary",
-      ]),
-    ).toMatchObject({ id: "primary-app", info_not_shared: ["email"] })
-    expect(client.getQueryData(queryKeys.applications.mine())).toEqual([
-      siblingApplication,
-      expect.objectContaining({
-        id: "primary-app",
-        info_not_shared: ["email"],
+    fireEvent.click(
+      await screen.findByRole("button", { name: "attendees.privacy_button" }),
+    )
+    const listed = await screen.findByRole("checkbox", {
+      name: "attendees.directory_listed",
+    })
+    expect(listed.getAttribute("aria-checked")).toBe("false")
+
+    fireEvent.click(listed)
+    fireEvent.click(document.getElementById("share-first_name")!)
+    fireEvent.click(
+      screen.getByRole("button", { name: "attendees.privacy_save" }),
+    )
+
+    await waitFor(() =>
+      expect(mocks.update).toHaveBeenCalledWith({
+        popupId: "popup-1",
+        requestBody: { listed: true, shared_fields: ["first_name"] },
       }),
-    ])
+    )
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull())
     expect(
       client.getQueryState(queryKeys.attendees.directory("popup-1"))
         ?.isInvalidated,
     ).toBe(true)
   })
 
-  it("keeps saved primary preferences when reopening within staleTime", async () => {
+  it("uses the popup's configured fields and starts them unshared", async () => {
     setup()
-    await open()
-    fireEvent.click(checkbox("email"))
-    await save()
-    await open()
-    expect(checkbox("email").getAttribute("aria-checked")).toBe("false")
-    fireEvent.click(checkbox("telegram"))
-    await save()
-    expect(mocks.update.mock.calls[1][0]).toMatchObject({
-      salesFlowId: "primary-flow",
-      requestBody: { info_not_shared: ["email", "telegram"] },
-    })
-    expect(mocks.get).toHaveBeenCalledTimes(1)
-  })
-
-  it("recognizes and removes all case/whitespace variants from form selections", async () => {
-    setup(["Email", " eMaIl ", "Residence"])
-    await open()
-    expect(checkbox("email").getAttribute("aria-checked")).toBe("false")
-    fireEvent.click(checkbox("email"))
-    await save()
-    expect(mocks.update.mock.calls[0][0].requestBody.info_not_shared).toEqual([
-      "Residence",
-    ])
+    fireEvent.click(
+      await screen.findByRole("button", { name: "attendees.privacy_button" }),
+    )
+    await screen.findByRole("dialog")
+    expect(
+      document
+        .getElementById("share-role_custom")
+        ?.getAttribute("aria-checked"),
+    ).toBe("false")
+    expect(mocks.get).toHaveBeenCalledWith({ popupId: "popup-1" })
   })
 })

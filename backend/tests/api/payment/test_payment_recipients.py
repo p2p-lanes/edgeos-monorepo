@@ -14,7 +14,7 @@ from app.api.attendee.models import Attendees
 from app.api.attendee_category.crud import attendee_categories_crud
 from app.api.attendee_category.models import AttendeeCategories
 from app.api.checkout.schemas import BuyerInfo, OpenTicketingPurchaseCreate, ProductLine
-from app.api.human.models import Humans
+from app.api.human.models import HumanDirectorySettings, Humans
 from app.api.payment.crud import payments_crud
 from app.api.payment.models import PaymentProducts, PaymentRecipients, Payments
 from app.api.payment.schemas import (
@@ -1274,6 +1274,16 @@ def test_purchase_preserves_companion_category_and_buyer_main(
     headers = {
         "Authorization": f"Bearer {create_access_token(subject=buyer.id, token_type='human')}"
     }
+    db.add(
+        HumanDirectorySettings(
+            tenant_id=tenant_a.id,
+            human_id=buyer.id,
+            popup_id=popup.id,
+            listed=True,
+            shared_fields=["first_name", "last_name"],
+        )
+    )
+    db.commit()
     directory = client.get(
         f"/api/v1/applications/my/directory/{popup.id}", headers=headers
     )

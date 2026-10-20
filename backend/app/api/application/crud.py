@@ -4,8 +4,7 @@ from decimal import Decimal
 from typing import TYPE_CHECKING, Any
 
 from fastapi import HTTPException, status
-from sqlalchemy import and_, case, desc, exists, nullslast, or_
-from sqlalchemy.dialects import postgresql
+from sqlalchemy import and_, case, desc, exists, false, nullslast, or_
 from sqlalchemy.orm import selectinload
 from sqlalchemy.sql.elements import ColumnElement
 from sqlmodel import Session, col, func, select
@@ -38,7 +37,7 @@ from app.api.application_review.models import (
 from app.api.attendee.crud import attendees_crud
 from app.api.attendee.models import AttendeeProducts, Attendees
 from app.api.attendee_category.models import AttendeeCategories
-from app.api.human.models import Humans
+from app.api.human.models import HumanDirectorySettings, Humans
 from app.api.human.schemas import HumanCreate, HumanUpdate
 from app.api.shared.crud import BaseCRUD
 from app.core.filters import build_filter_expression, text_condition_expression
@@ -51,7 +50,6 @@ if TYPE_CHECKING:
 # Attendee categories shown in the Portal attendee directory. Kids (and any
 # other non-adult categories) are intentionally excluded — only the main
 # applicant and their spouse appear.
-DIRECTORY_VISIBLE_CATEGORY_KEYS = ("main", "spouse")
 
 
 # PostgreSQL's locale-dependent [:space:] is not identical to Python str.strip().
@@ -84,26 +82,21 @@ def _application_is_in_primary_flow(popup_id: uuid.UUID) -> ColumnElement[bool]:
     )
 
 
-def _directory_field_is_shared(field: str) -> ColumnElement[bool]:
-    """SQL visibility predicate matching main-applicant directory masking."""
-    hidden_options = (
-        func.unnest(col(Applications.info_not_shared))
-        .table_valued("value")
-        .render_derived(name="directory_hidden_options")
+def _directory_field_is_shared(
+    field: str, enabled_fields: set[str] | None = None
+) -> ColumnElement[bool]:
+    """Only expose a field when the attendee's own Human shared it."""
+    if enabled_fields is not None and field not in enabled_fields:
+        return false()
+    preference_shares = exists(
+        select(1).where(
+            HumanDirectorySettings.human_id == Attendees.human_id,
+            HumanDirectorySettings.popup_id == Attendees.popup_id,
+            HumanDirectorySettings.listed.is_(True),
+            col(HumanDirectorySettings.shared_fields).any(field),
+        )
     )
-    # Form options are ASCII field labels; normalize case and surrounding
-    # whitespace, including tabs/newlines, just as the serializer does.
-    normalized_option = func.lower(
-        func.btrim(hidden_options.c.value, _DIRECTORY_WHITESPACE)
-    )
-    hides_field = exists(
-        select(1)
-        .select_from(hidden_options)
-        .where(normalized_option == field)
-        .correlate(Applications)
-    )
-    # Companions share their own profile, not the applicant's preferences.
-    return or_(_directory_category_key() != "main", ~hides_field)
+    return preference_shares
 
 
 def _directory_has_text(value: ColumnElement[str]) -> ColumnElement[bool]:
@@ -130,7 +123,9 @@ def _directory_custom_text(*keys: str) -> ColumnElement[str]:
     )
 
 
-def _directory_has_visible_portal_fields() -> ColumnElement[bool]:
+def _directory_has_visible_portal_fields(
+    enabled_fields: set[str],
+) -> ColumnElement[bool]:
     """At least one of the six values rendered in the portal table is visible."""
     is_main = _directory_category_key() == "main"
     values = {
@@ -159,7 +154,7 @@ def _directory_has_visible_portal_fields() -> ColumnElement[bool]:
     return or_(
         *(
             and_(
-                _directory_field_is_shared(field),
+                _directory_field_is_shared(field, enabled_fields),
                 _directory_has_text(value),
                 value != "*",  # The UI renders this reserved value as an EyeOff icon.
             )
@@ -364,6 +359,82 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
 
     def __init__(self) -> None:
         super().__init__(Applications)
+
+    def update_directory_values(
+        self,
+        session: Session,
+        popup_id: uuid.UUID,
+        human_id: uuid.UUID,
+        values: dict[str, str],
+    ) -> dict[str, str]:
+        from app.api.application.directory import directory_fields_for_popup
+        from app.api.attendee_category.models import AttendeeCategories
+        from app.api.popup.models import Popups
+
+        popup = session.get(Popups, popup_id)
+        if popup is None:
+            raise ValueError("Popup not found")
+        attendee = session.exec(
+            select(Attendees)
+            .join(AttendeeCategories, Attendees.category_id == AttendeeCategories.id)
+            .where(
+                Attendees.popup_id == popup_id,
+                Attendees.human_id == human_id,
+                AttendeeCategories.directory_eligible.is_(True),
+            )
+            .limit(1)
+        ).first()
+        if attendee is None:
+            raise ValueError("Human is not eligible for this popup directory")
+
+        configured = {
+            field["id"]: field["key"]
+            for field in directory_fields_for_popup(popup)
+            if isinstance(field, dict)
+            and field.get("source") == "attendee"
+            and isinstance(field.get("id"), str)
+            and isinstance(field.get("key"), str)
+        }
+        if set(values) - set(configured):
+            raise ValueError("Only popup-configured attendee fields can be updated")
+        additional_data = dict(attendee.additional_data or {})
+        for field_id, value in values.items():
+            additional_data[configured[field_id]] = value.strip()
+        attendee.additional_data = additional_data
+        session.add(attendee)
+        session.commit()
+        return values
+
+    def get_directory_values(
+        self, session: Session, popup_id: uuid.UUID, human_id: uuid.UUID
+    ) -> dict[str, str]:
+        from app.api.application.directory import directory_fields_for_popup
+        from app.api.attendee_category.models import AttendeeCategories
+        from app.api.popup.models import Popups
+
+        popup = session.get(Popups, popup_id)
+        attendee = session.exec(
+            select(Attendees)
+            .join(AttendeeCategories, Attendees.category_id == AttendeeCategories.id)
+            .where(
+                Attendees.popup_id == popup_id,
+                Attendees.human_id == human_id,
+                AttendeeCategories.directory_eligible.is_(True),
+            )
+            .limit(1)
+        ).first()
+        if popup is None or attendee is None:
+            raise ValueError("Human is not eligible for this popup directory")
+        stored = attendee.additional_data or {}
+        return {
+            field["id"]: stored[field["key"]]
+            for field in directory_fields_for_popup(popup)
+            if isinstance(field, dict)
+            and field.get("source") == "attendee"
+            and isinstance(field.get("id"), str)
+            and isinstance(field.get("key"), str)
+            and isinstance(stored.get(field["key"]), str)
+        }
 
     def get_by_human_popup(
         self, session: Session, human_id: uuid.UUID, popup_id: uuid.UUID
@@ -883,6 +954,18 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
         attendee's own human fields.
         """
 
+        from app.api.application.directory import directory_fields_for_popup
+        from app.api.popup.models import Popups
+
+        popup = session.get(Popups, popup_id)
+        enabled_fields = {
+            field["id"]
+            for field in directory_fields_for_popup(popup)
+            if isinstance(field, dict)
+            and isinstance(field.get("id"), str)
+            and field.get("shareable", True)
+        }
+
         # Root on attendees so the spouse appears as their own row, not just
         # nested under the main applicant. A product grant can create an
         # attendee without creating an application, so application status
@@ -901,6 +984,16 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
                 Attendees.category_id == AttendeeCategories.id,  # type: ignore[arg-type]
             )
             .where(Attendees.popup_id == popup_id)
+            .where(Attendees.human_id.is_not(None))
+            .where(
+                exists(
+                    select(1).where(
+                        HumanDirectorySettings.human_id == Attendees.human_id,
+                        HumanDirectorySettings.popup_id == popup_id,
+                        HumanDirectorySettings.listed.is_(True),
+                    )
+                )
+            )
             .where(
                 or_(
                     Applications.id.is_(None),
@@ -908,16 +1001,16 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
                 )
             )
             .where(has_products)
-            .where(_directory_category_key().in_(DIRECTORY_VISIBLE_CATEGORY_KEYS))
+            .where(AttendeeCategories.directory_eligible.is_(True))
         )
 
         if hide_empty_rows:
             # This opt-in filter reflects the portal's columns, not all API fields.
-            # Retain unlinked attendees whose own name/email snapshot is visible.
+            # Directory entries still require a linked Human identity above.
             base_statement = base_statement.outerjoin(
                 Humans,
                 Attendees.human_id == Humans.id,  # type: ignore[arg-type]
-            ).where(_directory_has_visible_portal_fields())
+            ).where(_directory_has_visible_portal_fields(enabled_fields))
 
         # Search only shared fields from the attendee's OWN human record.
         # Apply privacy in SQL before counting/paginating, not to fetched rows.
@@ -925,7 +1018,10 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
             search_term = f"%{q}%"
             visible_fields = {
                 field: case(
-                    (_directory_field_is_shared(field), col(getattr(Humans, field))),
+                    (
+                        _directory_field_is_shared(field, enabled_fields),
+                        col(getattr(Humans, field)),
+                    ),
                     else_=None,
                 )
                 for field in ("first_name", "last_name", "email", "telegram")
@@ -964,7 +1060,10 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
                 ),
                 selectinload(Attendees.category_ref),  # type: ignore[arg-type]
                 selectinload(Attendees.application),  # type: ignore[arg-type]
-                selectinload(Attendees.human),  # type: ignore[arg-type]
+                selectinload(Attendees.popup),  # type: ignore[arg-type]
+                selectinload(Attendees.human).selectinload(  # type: ignore[arg-type]
+                    Humans.directory_settings  # type: ignore[arg-type]
+                ),
             )
             .order_by(desc(Attendees.created_at))  # type: ignore[arg-type]
             .offset(skip)
@@ -990,13 +1089,24 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
         the event host picker: a creator may only pick a host who actually
         attends this popup AND has not hidden their name for it.
 
-        Main applicants that listed "first_name" or "last_name" in
-        ``info_not_shared`` are excluded — picking them would surface a name the
-        attendee chose to hide. Companions share their own names independently
-        of the applicant's preferences. Humans with no usable name are excluded so
-        the picker never renders a blank entry. Optional ``q`` does an ilike
-        match on the human's first/last name.
+        Humans who have not shared both name fields for this popup are excluded.
+        Companions share their own names independently of the applicant's settings.
+        Humans with no usable name are excluded so the picker never renders a
+        blank entry. Optional ``q`` does an ilike match on the human's first/last
+        name.
         """
+
+        from app.api.application.directory import directory_fields_for_popup
+        from app.api.popup.models import Popups
+
+        popup = session.get(Popups, popup_id)
+        enabled_fields = {
+            field["id"]
+            for field in directory_fields_for_popup(popup)
+            if isinstance(field, dict)
+            and isinstance(field.get("id"), str)
+            and field.get("shareable", True)
+        }
 
         has_products = exists().where(
             AttendeeProducts.attendee_id == Attendees.id,
@@ -1017,6 +1127,16 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
                 Attendees.category_id == AttendeeCategories.id,  # type: ignore[arg-type]
             )
             .where(Attendees.popup_id == popup_id)
+            .where(Attendees.human_id.is_not(None))
+            .where(
+                exists(
+                    select(1).where(
+                        HumanDirectorySettings.human_id == Attendees.human_id,
+                        HumanDirectorySettings.popup_id == popup_id,
+                        HumanDirectorySettings.listed.is_(True),
+                    )
+                )
+            )
             .where(
                 or_(
                     Applications.id.is_(None),
@@ -1024,9 +1144,9 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
                 )
             )
             .where(has_products)
-            .where(_directory_category_key().in_(DIRECTORY_VISIBLE_CATEGORY_KEYS))
-            .where(_directory_field_is_shared("first_name"))
-            .where(_directory_field_is_shared("last_name"))
+            .where(AttendeeCategories.directory_eligible.is_(True))
+            .where(_directory_field_is_shared("first_name", enabled_fields))
+            .where(_directory_field_is_shared("last_name", enabled_fields))
             .where(has_name)
         )
 
@@ -1060,22 +1180,24 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
     ) -> set[uuid.UUID]:
         """Return the subset of ``human_ids`` who hid their name for ``popup_id``.
 
-        A human hides their name when their Application for the popup lists
-        "first_name" or "last_name" in ``info_not_shared``. Used to drop those
-        people from portal-facing participant/RSVP lists.
+        A human hides their name when their popup-scoped sharing settings omit
+        either name field. Used to drop those people from portal-facing
+        participant/RSVP lists.
         """
 
         if not human_ids:
             return set()
 
-        hides_name = col(Applications.info_not_shared).op("&&")(
-            postgresql.array(("first_name", "last_name"))
-        )
         statement = (
-            select(Applications.human_id)
-            .where(Applications.popup_id == popup_id)
-            .where(col(Applications.human_id).in_(human_ids))
-            .where(hides_name)
+            select(HumanDirectorySettings.human_id)
+            .where(HumanDirectorySettings.popup_id == popup_id)
+            .where(col(HumanDirectorySettings.human_id).in_(human_ids))
+            .where(
+                or_(
+                    ~col(HumanDirectorySettings.shared_fields).any("first_name"),
+                    ~col(HumanDirectorySettings.shared_fields).any("last_name"),
+                )
+            )
         )
         return set(session.exec(statement).all())
 
@@ -1315,7 +1437,6 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
         app_fields = [
             "popup_id",
             "referral",
-            "info_not_shared",
             "custom_fields",
             "status",
             "group_id",
@@ -1675,7 +1796,6 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
         app_fields = [
             "popup_id",
             "referral",
-            "info_not_shared",
             "custom_fields",
             "status",
             "group_id",
@@ -1869,7 +1989,6 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
         # validate_base_fields.
         base_data: dict[str, Any] = {
             "referral": application.referral,
-            "info_not_shared": application.info_not_shared,
             "scholarship_request": application.scholarship_request,
             "scholarship_details": application.scholarship_details,
             "scholarship_video_url": application.scholarship_video_url,
@@ -1931,7 +2050,6 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
         ]
         app_fields = [
             "referral",
-            "info_not_shared",
             "custom_fields",
             "status",
             "scholarship_request",

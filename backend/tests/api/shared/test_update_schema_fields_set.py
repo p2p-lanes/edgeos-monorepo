@@ -59,6 +59,7 @@ NO_SAMPLEABLE_FIELDS = {
     "app.api.cart.schemas.CartUpdate",  # items: CartState
     "app.api.event.schemas.RecurrenceUpdate",  # recurrence: RecurrenceRule | None
     "app.api.popup.schemas.PopupHomeUpdate",  # enabled + html + version atomically
+    "app.api.human.schemas.HumanDirectorySettingsUpdate",  # listed + shared_fields atomically
 }
 
 

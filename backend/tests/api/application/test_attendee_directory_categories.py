@@ -19,6 +19,7 @@ from tests.api.application.test_attendee_directory import (
     _human,
     _popup,
     _product,
+    _set_shared_fields,
 )
 
 PORTAL_FIELDS = ("first_name", "last_name", "email", "telegram", "role", "organization")
@@ -91,10 +92,8 @@ def test_categories_are_normalized_for_selection_and_main_masking(
 ) -> None:
     world = category_world
     rows, total = applications_crud.find_directory(db, popup_id=world["popup"].id)
-    assert total == 3
-    assert {row.id for row in rows} == {
-        world[key].id for key in ("main", "linked", "snapshot")
-    }
+    assert total == 2
+    assert {row.id for row in rows} == {world["main"].id, world["linked"].id}
     primary = _build_directory_entry(world["main"])
     assert primary.category == world["keys"][0]
     assert all(getattr(primary, field) == "*" for field in ALL_FIELDS)
@@ -104,20 +103,15 @@ def test_categories_are_normalized_for_selection_and_main_masking(
         world["linked"].human.email,
     )
     assert linked.role is None and linked.organization is None
-    snapshot = _build_directory_entry(world["snapshot"])
-    assert (snapshot.first_name, snapshot.email) == (
-        "Snapshot Companion",
-        "snapshot@example.test",
-    )
-    assert snapshot.role is None and snapshot.organization is None
+    assert world["snapshot"].id not in {row.id for row in rows}
     for category, original in zip(world["categories"], world["keys"], strict=True):
         db.refresh(category)
         assert category.key == original
     rows, total = applications_crud.find_directory(
         db, popup_id=world["popup"].id, hide_empty_rows=True
     )
-    assert total == 2
-    assert {row.id for row in rows} == {world["linked"].id, world["snapshot"].id}
+    assert total == 1
+    assert {row.id for row in rows} == {world["linked"].id}
 
 
 @pytest.mark.parametrize("field", ("role", "organization"))
@@ -125,13 +119,11 @@ def test_normalized_main_with_only_shared_alias_stays_visible(
     db: Session, category_world, field: str
 ) -> None:
     world = category_world
-    world["app"].info_not_shared = [key for key in ALL_FIELDS if key != field]
-    db.add(world["app"])
-    db.commit()
+    _set_shared_fields(db, world["main"].human, world["popup"], [field])
     rows, total = applications_crud.find_directory(
         db, popup_id=world["popup"].id, hide_empty_rows=True
     )
-    assert total == 3 and world["main"].id in {row.id for row in rows}
+    assert total == 2 and world["main"].id in {row.id for row in rows}
     entry = _build_directory_entry(world["main"])
     assert getattr(entry, field) == (
         "Applicant Role" if field == "role" else "Applicant Org"
@@ -181,7 +173,7 @@ def test_normalized_category_filter_precedes_count_and_pagination(
     db: Session, category_world
 ) -> None:
     world = category_world
-    for hide_empty, count in ((False, 3), (True, 2)):
+    for hide_empty, count in ((False, 2), (True, 1)):
         baseline, total = applications_crud.find_directory(
             db, popup_id=world["popup"].id, hide_empty_rows=hide_empty
         )
@@ -200,14 +192,14 @@ def test_normalized_category_filter_precedes_count_and_pagination(
             ]
 
 
-def test_api_and_csv_preserve_original_category_values_and_companion_snapshots(
+def test_api_and_csv_preserve_original_category_values_and_linked_companions(
     client: TestClient, category_world
 ) -> None:
     world = category_world
     url = f"/api/v1/applications/my/directory/{world['popup'].id}"
     token = create_access_token(subject=world["main"].human_id, token_type="human")
     headers = {"Authorization": f"Bearer {token}"}
-    for params, count in (({}, 3), ({"hide_empty_rows": "true"}, 2)):
+    for params, count in (({}, 2), ({"hide_empty_rows": "true"}, 1)):
         response = client.get(url, params=params, headers=headers)
         assert response.status_code == 200, response.text
         data = response.json()
@@ -226,22 +218,12 @@ def test_api_and_csv_preserve_original_category_values_and_companion_snapshots(
             and companion["first_name"] == "Companion"
         )
         assert companion["role"] is None and companion["organization"] is None
-        snapshot = next(
-            row for row in data["results"] if row["id"] == str(world["snapshot"].id)
-        )
-        assert (snapshot["first_name"], snapshot["email"]) == (
-            "Snapshot Companion",
-            "snapshot@example.test",
-        )
+        assert all(row["id"] != str(world["snapshot"].id) for row in data["results"])
     response = client.get(f"{url}/csv", headers=headers)
     assert response.status_code == 200, response.text
     rows = list(csv.reader(io.StringIO(response.text)))
-    assert len(rows) == 4 and len(rows[0]) == 9
+    assert len(rows) == 3 and len(rows[0]) == 9
     assert ["*"] * 9 in rows[1:]
-    assert any(
-        row[0] == "Snapshot Companion" and row[2] == "snapshot@example.test"
-        for row in rows[1:]
-    )
 
 
 @pytest.mark.parametrize("key", ("Kid", "Nanny/Caretaker"))
@@ -253,7 +235,7 @@ def test_other_categories_remain_excluded(
     person = _human(db, tenant_a, "Excluded", "Person")
     excluded = _attendee(db, world["popup"], world["app"], person, category, tickets=1)
     rows, total = applications_crud.find_directory(db, popup_id=world["popup"].id)
-    assert total == 3 and excluded.id not in {row.id for row in rows}
+    assert total == 2 and excluded.id not in {row.id for row in rows}
     humans, total = applications_crud.find_directory_humans(
         db, popup_id=world["popup"].id
     )
@@ -269,7 +251,7 @@ def test_revoked_spouse_tickets_are_still_excluded(db: Session, category_world) 
     rows, total = applications_crud.find_directory(
         db, popup_id=world["popup"].id, hide_empty_rows=True
     )
-    assert total == 1 and [row.id for row in rows] == [world["snapshot"].id]
+    assert total == 0 and rows == []
     humans, total = applications_crud.find_directory_humans(
         db, popup_id=world["popup"].id
     )
