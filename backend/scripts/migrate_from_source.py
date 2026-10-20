@@ -142,10 +142,42 @@ def parse_decimal(val) -> Decimal | None:
 def parse_info_not_shared(val) -> list[str]:
     if not val:
         return []
+    if isinstance(val, (list, tuple, set)):
+        return [str(item).strip() for item in val if str(item).strip()]
     s = str(val).strip()
     if not s:
         return []
     return [item.strip() for item in s.split(",") if item.strip()]
+
+
+def directory_shared_fields(
+    directory_fields: list[dict], legacy_hidden: set[str]
+) -> list[str]:
+    """Convert legacy form labels to the current directory field identities."""
+
+    def normalize(value: str) -> str:
+        return re.sub(r"[^a-z0-9]+", "", value.casefold())
+
+    hidden = {normalize(value) for value in legacy_hidden}
+    shared: list[str] = []
+    for field in directory_fields:
+        field_id = field.get("id")
+        if not isinstance(field_id, str) or field.get("shareable", True) is False:
+            continue
+        key = field.get("key")
+        label = field.get("label")
+        identities = {field_id}
+        if isinstance(key, str):
+            identities.add(key)
+            if key == "role_in_the_organization":
+                identities.add("role")
+            elif key == "organization_you_represent":
+                identities.add("organization")
+        if isinstance(label, str):
+            identities.add(label)
+        if not hidden.intersection(normalize(identity) for identity in identities):
+            shared.append(field_id)
+    return shared
 
 
 def build_custom_fields(row: dict, custom_field_defs: list[dict]) -> dict:
@@ -436,6 +468,7 @@ def run_import(
     from sqlalchemy import delete
     from sqlmodel import Session, select
 
+    from app.api.application.directory import directory_fields_for_popup
     from app.api.approval_strategy.schemas import ApprovalStrategyType
     from app.api.attendee.crud import generate_check_in_code
     from app.api.product.schemas import (
@@ -458,6 +491,7 @@ def run_import(
         GroupLeaders,
         GroupMembers,
         Groups,
+        HumanDirectorySettings,
         Humans,
         PaymentProducts,
         Payments,
@@ -495,6 +529,7 @@ def run_import(
     human_map: dict[int, uuid_mod.UUID] = {}  # source citizen_id → target human.id
     group_map: dict[int, uuid_mod.UUID] = {}  # source group_id → target group.id
     app_map: dict[int, uuid_mod.UUID] = {}  # source application_id → target app.id
+    legacy_privacy_by_human: dict[uuid_mod.UUID, set[str]] = {}
     attendee_map: dict[
         int, uuid_mod.UUID
     ] = {}  # source attendee_id → target attendee.id
@@ -989,6 +1024,9 @@ def run_import(
                 referral = referral[:255]
 
             info_not_shared = parse_info_not_shared(row.get("info_not_shared"))
+            legacy_privacy_by_human.setdefault(human_uuid, set()).update(
+                info_not_shared
+            )
             custom_fields = build_custom_fields(row, custom_field_defs)
 
             # Preserve AI review text as a custom field
@@ -1008,7 +1046,6 @@ def run_import(
                 group_id=group_uuid,
                 status=status,
                 referral=referral,
-                info_not_shared=info_not_shared,
                 custom_fields=custom_fields,
                 submitted_at=submitted_at,
                 accepted_at=accepted_at,
@@ -1083,6 +1120,7 @@ def run_import(
                     popup_id=popup_id,
                     key=key,
                     sort_order=next_sort,
+                    directory_eligible=key in {"main", "spouse"},
                 )
                 created_cats.append(cat)
                 next_sort += 1
@@ -1619,6 +1657,29 @@ def run_import(
 
         session.add_all(new_payment_products)
         session.add_all(new_attendee_products)
+
+        # Legacy applications stored privacy choices as form answers. Move
+        # those choices to the popup-scoped Human settings during import so
+        # imported people use the same privacy source as native signups.
+        fields = directory_fields_for_popup(popup)
+        for human_id, legacy_hidden in legacy_privacy_by_human.items():
+            settings = session.exec(
+                select(HumanDirectorySettings).where(
+                    HumanDirectorySettings.human_id == human_id,
+                    HumanDirectorySettings.popup_id == popup_id,
+                )
+            ).first()
+            if settings is None:
+                settings = HumanDirectorySettings(
+                    tenant_id=tenant_id,
+                    human_id=human_id,
+                    popup_id=popup_id,
+                    listed=True,
+                    shared_fields=directory_shared_fields(fields, legacy_hidden),
+                )
+            else:
+                settings.shared_fields = directory_shared_fields(fields, legacy_hidden)
+            session.add(settings)
 
         logger.info(
             f"  PaymentProducts: {stats.data['PaymentProducts']['imported']} imported, "

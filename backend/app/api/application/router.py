@@ -177,7 +177,6 @@ def _build_application_public(
         referral_id=application.referral_id,
         referred_by_name=referred_by_name,
         access_sources=access_sources or [],
-        info_not_shared=application.info_not_shared or [],
         status=application.status,
         custom_fields=application.custom_fields or {},
         custom_fields_schema=application.custom_fields_schema,
@@ -1390,9 +1389,6 @@ def _build_directory_entry(attendee) -> AttendeesDirectoryEntry:
     # Match SQL category normalization while preserving the response's raw key.
     is_main = (attendee.category or "").strip().lower() == "main"
 
-    # info_not_shared masking belongs to the main applicant's own application.
-    # Forms store labels like "Email", while directory keys are lowercase.
-    # Normalize on read without changing the stored form selections.
     directory_settings = next(
         (
             setting
@@ -1414,17 +1410,6 @@ def _build_directory_entry(attendee) -> AttendeesDirectoryEntry:
         and isinstance(field.get("id"), str)
         and field.get("shareable", True)
     }
-    legacy_hidden = (
-        {
-            {
-                "role_in_the_organization": "role",
-                "organization_you_represent": "organization",
-            }.get(item.strip().casefold(), item.strip().casefold())
-            for item in (application.info_not_shared or [])
-        }
-        if is_main and application
-        else set()
-    )
 
     def resolve_field(field: dict) -> str | None:
         source = field.get("source")
@@ -1470,11 +1455,7 @@ def _build_directory_entry(attendee) -> AttendeesDirectoryEntry:
         {
             "id": field["id"],
             "label": field.get("label", field["id"]),
-            "value": (
-                resolve_field(field)
-                if field["id"] in shared_fields and field["id"] not in legacy_hidden
-                else "*"
-            ),
+            "value": (resolve_field(field) if field["id"] in shared_fields else "*"),
         }
         for field in directory_fields
         if isinstance(field, dict)
@@ -1524,7 +1505,7 @@ def _build_directory_entry(attendee) -> AttendeesDirectoryEntry:
     def mask(field: str, value: str | None) -> str | None:
         if not is_enabled(field):
             return None
-        return value if is_shared(field) and field not in legacy_hidden else "*"
+        return value if is_shared(field) else "*"
 
     # Each AttendeeProducts row is one ticket — dedupe by product_id so the
     # directory shows each product once even if the attendee holds several
@@ -1634,7 +1615,7 @@ async def list_attendees_directory(
 
     Returns ticket-holding attendees in the popup's primary sales flow (or
     without an application). A ticket grants directory eligibility regardless
-    of application status. Respects application info_not_shared masking.
+    of application status. Respects each human's popup-scoped sharing settings.
     When hide_empty_rows is true, excludes entries without shared, nonblank
     name, email, Telegram, role or organization. Residence, age and gender remain
     in the response but do not determine portal row visibility. The default

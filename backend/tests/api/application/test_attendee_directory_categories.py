@@ -6,11 +6,10 @@ from datetime import UTC, datetime
 
 import pytest
 from fastapi.testclient import TestClient
-from sqlmodel import Session, select
+from sqlmodel import Session
 
 from app.api.application.crud import applications_crud
 from app.api.application.router import _build_directory_entry
-from app.api.human.models import HumanDirectorySettings
 from app.api.tenant.models import Tenants
 from app.core.security import create_access_token
 from tests.api.application.test_attendee_directory import (
@@ -20,6 +19,7 @@ from tests.api.application.test_attendee_directory import (
     _human,
     _popup,
     _product,
+    _set_shared_fields,
 )
 
 PORTAL_FIELDS = ("first_name", "last_name", "email", "telegram", "role", "organization")
@@ -119,17 +119,7 @@ def test_normalized_main_with_only_shared_alias_stays_visible(
     db: Session, category_world, field: str
 ) -> None:
     world = category_world
-    world["app"].info_not_shared = [key for key in ALL_FIELDS if key != field]
-    db.add(world["app"])
-    settings = db.exec(
-        select(HumanDirectorySettings).where(
-            HumanDirectorySettings.human_id == world["main"].human_id,
-            HumanDirectorySettings.popup_id == world["popup"].id,
-        )
-    ).one()
-    settings.shared_fields = [field]
-    db.add(settings)
-    db.commit()
+    _set_shared_fields(db, world["main"].human, world["popup"], [field])
     rows, total = applications_crud.find_directory(
         db, popup_id=world["popup"].id, hide_empty_rows=True
     )

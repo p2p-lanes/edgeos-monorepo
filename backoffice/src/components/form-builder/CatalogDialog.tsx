@@ -16,7 +16,6 @@ import { createErrorHandler } from "@/utils"
 
 const SECTION_LABELS: Record<string, string> = {
   profile: "Personal Information",
-  info_not_shared: "Info not shared",
   companions: "Children and +1s",
   scholarship: "Scholarship",
 }
@@ -61,7 +60,7 @@ export function CatalogDialog({
       if (!bySection[key]) bySection[key] = []
       bySection[key].push(field)
     }
-    const order = ["profile", "info_not_shared", "companions", "scholarship"]
+    const order = ["profile", "companions", "scholarship"]
     const sortedKeys = Object.keys(bySection).sort((a, b) => {
       const ai = order.indexOf(a)
       const bi = order.indexOf(b)

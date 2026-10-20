@@ -5,7 +5,6 @@ from typing import TYPE_CHECKING, Any
 
 from fastapi import HTTPException, status
 from sqlalchemy import and_, case, desc, exists, false, nullslast, or_
-from sqlalchemy.dialects import postgresql
 from sqlalchemy.orm import selectinload
 from sqlalchemy.sql.elements import ColumnElement
 from sqlmodel import Session, col, func, select
@@ -97,31 +96,7 @@ def _directory_field_is_shared(
             col(HumanDirectorySettings.shared_fields).any(field),
         )
     )
-    hidden_options = (
-        func.unnest(col(Applications.info_not_shared))
-        .table_valued("value")
-        .render_derived(name="directory_legacy_hidden_options")
-    )
-    legacy_hides = exists(
-        select(1)
-        .select_from(hidden_options)
-        .where(
-            func.lower(func.btrim(hidden_options.c.value, _DIRECTORY_WHITESPACE)).in_(
-                {
-                    field,
-                    {
-                        "role": "role_in_the_organization",
-                        "organization": "organization_you_represent",
-                    }.get(field, field),
-                }
-            )
-        )
-        .correlate(Applications)
-    )
-    return and_(
-        preference_shares,
-        or_(_directory_category_key() != "main", ~legacy_hides),
-    )
+    return preference_shares
 
 
 def _directory_has_text(value: ColumnElement[str]) -> ColumnElement[bool]:
@@ -1114,12 +1089,11 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
         the event host picker: a creator may only pick a host who actually
         attends this popup AND has not hidden their name for it.
 
-        Main applicants that listed "first_name" or "last_name" in
-        ``info_not_shared`` are excluded — picking them would surface a name the
-        attendee chose to hide. Companions share their own names independently
-        of the applicant's preferences. Humans with no usable name are excluded so
-        the picker never renders a blank entry. Optional ``q`` does an ilike
-        match on the human's first/last name.
+        Humans who have not shared both name fields for this popup are excluded.
+        Companions share their own names independently of the applicant's settings.
+        Humans with no usable name are excluded so the picker never renders a
+        blank entry. Optional ``q`` does an ilike match on the human's first/last
+        name.
         """
 
         from app.api.application.directory import directory_fields_for_popup
@@ -1206,22 +1180,24 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
     ) -> set[uuid.UUID]:
         """Return the subset of ``human_ids`` who hid their name for ``popup_id``.
 
-        A human hides their name when their Application for the popup lists
-        "first_name" or "last_name" in ``info_not_shared``. Used to drop those
-        people from portal-facing participant/RSVP lists.
+        A human hides their name when their popup-scoped sharing settings omit
+        either name field. Used to drop those people from portal-facing
+        participant/RSVP lists.
         """
 
         if not human_ids:
             return set()
 
-        hides_name = col(Applications.info_not_shared).op("&&")(
-            postgresql.array(("first_name", "last_name"))
-        )
         statement = (
-            select(Applications.human_id)
-            .where(Applications.popup_id == popup_id)
-            .where(col(Applications.human_id).in_(human_ids))
-            .where(hides_name)
+            select(HumanDirectorySettings.human_id)
+            .where(HumanDirectorySettings.popup_id == popup_id)
+            .where(col(HumanDirectorySettings.human_id).in_(human_ids))
+            .where(
+                or_(
+                    ~col(HumanDirectorySettings.shared_fields).any("first_name"),
+                    ~col(HumanDirectorySettings.shared_fields).any("last_name"),
+                )
+            )
         )
         return set(session.exec(statement).all())
 
@@ -1461,7 +1437,6 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
         app_fields = [
             "popup_id",
             "referral",
-            "info_not_shared",
             "custom_fields",
             "status",
             "group_id",
@@ -1821,7 +1796,6 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
         app_fields = [
             "popup_id",
             "referral",
-            "info_not_shared",
             "custom_fields",
             "status",
             "group_id",
@@ -2015,7 +1989,6 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
         # validate_base_fields.
         base_data: dict[str, Any] = {
             "referral": application.referral,
-            "info_not_shared": application.info_not_shared,
             "scholarship_request": application.scholarship_request,
             "scholarship_details": application.scholarship_details,
             "scholarship_video_url": application.scholarship_video_url,
@@ -2077,7 +2050,6 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
         ]
         app_fields = [
             "referral",
-            "info_not_shared",
             "custom_fields",
             "status",
             "scholarship_request",

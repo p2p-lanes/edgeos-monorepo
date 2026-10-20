@@ -66,21 +66,20 @@ describe("DynamicApplicationForm", () => {
     "full",
     "half",
     "half_row",
-  ] as const)("shows the privacy field label and help text at %s width", (width) => {
+  ] as const)("shows a multiselect label and help text at %s width", (width) => {
     const field: FormFieldSchema = {
       type: "multiselect",
-      label: "Info I'm NOT willing to share with other attendees",
-      help_text:
-        "We will make a directory to make it easier for attendees to coordinate",
+      label: "Food preferences",
+      help_text: "Select the options that apply to you.",
       required: false,
-      options: ["Email", "Telegram"],
+      options: ["Vegetarian", "Vegan"],
       section_id: "profile",
       width,
     }
     const { getByText, getByRole } = render(
       <DynamicApplicationForm
         schema={{
-          base_fields: { info_not_shared: field },
+          base_fields: { food_preferences: field },
           custom_fields: {},
           sections: [
             {
@@ -99,8 +98,10 @@ describe("DynamicApplicationForm", () => {
 
     expect(getByText(field.label)).toBeTruthy()
     expect(getByText(field.help_text!)).toBeTruthy()
-    expect(getByRole("button", { name: "Email, not selected" })).toBeTruthy()
-    expect(getByRole("button", { name: "Telegram, not selected" })).toBeTruthy()
+    expect(
+      getByRole("button", { name: "Vegetarian, not selected" }),
+    ).toBeTruthy()
+    expect(getByRole("button", { name: "Vegan, not selected" })).toBeTruthy()
   })
 
   it("pairs its card background with the semantic card foreground", () => {

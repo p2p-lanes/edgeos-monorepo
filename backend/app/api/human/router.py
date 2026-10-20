@@ -429,9 +429,9 @@ async def search_humans_portal(
 
     Used by the event-creation Displayed-host field to let a creator pick a
     host. Scoped to humans who actually attend ``popup_id`` (accepted
-    application with a ticket-holding main/spouse attendee) AND who have not
-    hidden their name via ``info_not_shared`` for that popup. RLS scopes to the
-    caller's tenant; the slim response schema omits email.
+    application with a ticket-holding main/spouse attendee) AND who share both
+    name fields in their popup directory settings. RLS scopes to the caller's
+    tenant; the slim response schema omits email.
     """
     from app.api.application.crud import applications_crud
 

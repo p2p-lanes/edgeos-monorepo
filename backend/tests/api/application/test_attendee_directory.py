@@ -10,7 +10,7 @@ ticket-holding attendee, sourced from that attendee's own human):
   appears, the 0-ticket main does not.
 - Only main + spouse are listed; kids (and any other categories) are excluded.
 - Unlinked ticket holders retain the attendee name/email snapshot in their row.
-- info_not_shared masking + role/organization apply ONLY to the main applicant;
+- popup-scoped sharing + role/organization apply ONLY to the main applicant;
   companions show their own profile with blank role/org and no masking.
 """
 
@@ -96,6 +96,30 @@ def _human(db: Session, tenant: Tenants, first: str, last: str, **extra) -> Huma
     db.commit()
     db.refresh(human)
     return human
+
+
+def _set_shared_fields(
+    db: Session, human: Humans, popup: Popups, shared_fields: list[str]
+) -> HumanDirectorySettings:
+    settings = db.exec(
+        select(HumanDirectorySettings).where(
+            HumanDirectorySettings.human_id == human.id,
+            HumanDirectorySettings.popup_id == popup.id,
+        )
+    ).first()
+    if settings is None:
+        settings = HumanDirectorySettings(
+            tenant_id=popup.tenant_id,
+            human_id=human.id,
+            popup_id=popup.id,
+            listed=True,
+            shared_fields=shared_fields,
+        )
+    else:
+        settings.shared_fields = shared_fields
+    db.add(settings)
+    db.commit()
+    return settings
 
 
 def _product(db: Session, popup: Popups, name: str = "Ticket") -> Products:
@@ -445,7 +469,7 @@ def test_companion_entry_uses_own_profile_no_masking(
 
 
 def test_main_entry_keeps_role_org_and_masking(db: Session, directory_world) -> None:
-    """Main applicant row: role/org from custom_fields, info_not_shared masking."""
+    """Main applicant row: role/org and privacy from its own application."""
     andrea = next(
         a
         for a in applications_crud.find_directory(
@@ -457,7 +481,7 @@ def test_main_entry_keeps_role_org_and_masking(db: Session, directory_world) -> 
     assert entry.category == "main"
     assert entry.role == "Founder"
     assert entry.organization == "Staple & Spindle"
-    assert entry.email == "*"  # masked via info_not_shared=["email"]
+    assert entry.email == "*"  # masked by the Human's popup sharing settings
 
 
 DIRECTORY_FIELD_VALUES = {

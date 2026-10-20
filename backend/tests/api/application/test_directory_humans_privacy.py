@@ -4,8 +4,8 @@ Covers the privacy fix that:
 
 - Scopes the portal host picker (``find_directory_humans``) to a popup's
   accepted attendees who share their name, EXCLUDING anyone who put
-  "first_name"/"last_name" in ``info_not_shared`` and anyone who is not an
-  accepted ticket-holding attendee of that popup.
+  either name field outside ``HumanDirectorySettings.shared_fields`` and anyone
+  who is not an accepted ticket-holding attendee of that popup.
 - Excludes (does not mask) RSVP participants who hid their name for the event's
   popup, via ``human_ids_hiding_name``.
 """
@@ -156,7 +156,13 @@ def _attendee(
     db.commit()
     db.refresh(attendee)
     hidden_fields = (
-        {item.strip().casefold() for item in app.info_not_shared or []}
+        {
+            {
+                "role_in_the_organization": "role",
+                "organization_you_represent": "organization",
+            }.get(item.strip().casefold(), item.strip().casefold())
+            for item in (app.info_not_shared or [])
+        }
         if app.human_id == human.id
         else set()
     )
@@ -281,7 +287,26 @@ def test_human_ids_hiding_name_returns_only_hiders(
     sharer = _human(db, tenant_a, "Sam", "Shares")
     hider = _human(db, tenant_a, "Hank", "Hides")
     _application(db, popup, sharer)
-    _application(db, popup, hider, info_not_shared=["last_name", "telegram"])
+    _application(db, popup, hider)
+    db.add_all(
+        [
+            HumanDirectorySettings(
+                tenant_id=tenant_a.id,
+                human_id=sharer.id,
+                popup_id=popup.id,
+                listed=True,
+                shared_fields=["first_name", "last_name"],
+            ),
+            HumanDirectorySettings(
+                tenant_id=tenant_a.id,
+                human_id=hider.id,
+                popup_id=popup.id,
+                listed=True,
+                shared_fields=["first_name"],
+            ),
+        ]
+    )
+    db.commit()
 
     result = applications_crud.human_ids_hiding_name(
         db, popup.id, [sharer.id, hider.id]
@@ -347,7 +372,26 @@ def test_portal_participants_excludes_name_hiders(
     owner = _human(db, tenant_a, "Olga", "Owner")
 
     _application(db, popup, sharer)
-    _application(db, popup, hider, info_not_shared=["first_name"])
+    _application(db, popup, hider)
+    db.add_all(
+        [
+            HumanDirectorySettings(
+                tenant_id=tenant_a.id,
+                human_id=sharer.id,
+                popup_id=popup.id,
+                listed=True,
+                shared_fields=["first_name", "last_name"],
+            ),
+            HumanDirectorySettings(
+                tenant_id=tenant_a.id,
+                human_id=hider.id,
+                popup_id=popup.id,
+                listed=True,
+                shared_fields=["last_name"],
+            ),
+        ]
+    )
+    db.commit()
 
     event = _event(db, popup, owner)
     _participant(db, event, sharer)

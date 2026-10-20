@@ -16,8 +16,8 @@ from tests.api.application.test_attendee_directory import (
     _category,
     _human,
     _popup,
-    _privacy_option,
     _product,
+    _set_shared_fields,
 )
 
 DIRECTORY_CUSTOM_KEYS = (
@@ -109,9 +109,6 @@ def test_directory_custom_field_prefers_nonempty_canonical_then_alias(
 
 
 @pytest.mark.parametrize(
-    "style", ("lowercase", "capitalized", "mixed_case", "whitespace")
-)
-@pytest.mark.parametrize(
     "hidden_fields", ((), ("role",), ("organization",), ("role", "organization"))
 )
 def test_directory_custom_aliases_api_and_csv_keep_canonical_keys_and_privacy(
@@ -119,20 +116,37 @@ def test_directory_custom_aliases_api_and_csv_keep_canonical_keys_and_privacy(
     client: TestClient,
     custom_field_world,
     hidden_fields: tuple[str, ...],
-    style: str,
 ) -> None:
     app = custom_field_world["app"]
     custom = {
         "role_in_the_organization": "Founder",
         "organization_you_represent": "India Organization",
     }
-    options = [_privacy_option(field, style) for field in hidden_fields]
     app.custom_fields = custom
-    app.info_not_shared = options
     db.add(app)
     db.commit()
     main = custom_field_world["main"]
     spouse = custom_field_world["spouse"]
+    _set_shared_fields(
+        db,
+        main.human,
+        custom_field_world["popup"],
+        [
+            field
+            for field in (
+                "first_name",
+                "last_name",
+                "email",
+                "telegram",
+                "residence",
+                "age",
+                "gender",
+                "role",
+                "organization",
+            )
+            if field not in hidden_fields
+        ],
+    )
     headers = {
         "Authorization": f"Bearer {create_access_token(subject=main.human_id, token_type='human')}"
     }
@@ -177,4 +191,3 @@ def test_directory_custom_aliases_api_and_csv_keep_canonical_keys_and_privacy(
         assert rows[spouse.human.first_name][field.capitalize()] == ""
     db.refresh(app)
     assert app.custom_fields == custom
-    assert app.info_not_shared == options

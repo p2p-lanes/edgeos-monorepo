@@ -3319,20 +3319,6 @@ export const ApplicationAdminCreateSchema = {
             ],
             title: 'Referral'
         },
-        info_not_shared: {
-            anyOf: [
-                {
-                    items: {
-                        type: 'string'
-                    },
-                    type: 'array'
-                },
-                {
-                    type: 'null'
-                }
-            ],
-            title: 'Info Not Shared'
-        },
         custom_fields: {
             anyOf: [
                 {
@@ -3563,20 +3549,6 @@ export const ApplicationCreateSchema = {
                 }
             ],
             title: 'Referral'
-        },
-        info_not_shared: {
-            anyOf: [
-                {
-                    items: {
-                        type: 'string'
-                    },
-                    type: 'array'
-                },
-                {
-                    type: 'null'
-                }
-            ],
-            title: 'Info Not Shared'
         },
         custom_fields: {
             anyOf: [
@@ -3878,14 +3850,6 @@ export const ApplicationPortalPublicSchema = {
             type: 'array',
             title: 'Access Sources'
         },
-        info_not_shared: {
-            items: {
-                type: 'string'
-            },
-            type: 'array',
-            title: 'Info Not Shared',
-            default: []
-        },
         status: {
             type: 'string',
             title: 'Status'
@@ -4156,14 +4120,6 @@ export const ApplicationPublicSchema = {
             },
             type: 'array',
             title: 'Access Sources'
-        },
-        info_not_shared: {
-            items: {
-                type: 'string'
-            },
-            type: 'array',
-            title: 'Info Not Shared',
-            default: []
         },
         status: {
             type: 'string',
@@ -4779,20 +4735,6 @@ export const ApplicationUpdateSchema = {
                 }
             ],
             title: 'Referral'
-        },
-        info_not_shared: {
-            anyOf: [
-                {
-                    items: {
-                        type: 'string'
-                    },
-                    type: 'array'
-                },
-                {
-                    type: 'null'
-                }
-            ],
-            title: 'Info Not Shared'
         },
         custom_fields: {
             anyOf: [

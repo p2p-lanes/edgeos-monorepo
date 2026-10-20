@@ -1973,7 +1973,7 @@ export class ApplicationsService {
      *
      * Returns ticket-holding attendees in the popup's primary sales flow (or
      * without an application). A ticket grants directory eligibility regardless
-     * of application status. Respects application info_not_shared masking.
+     * of application status. Respects each human's popup-scoped sharing settings.
      * When hide_empty_rows is true, excludes entries without shared, nonblank
      * name, email, Telegram, role or organization. Residence, age and gender remain
      * in the response but do not determine portal row visibility. The default
@@ -9120,9 +9120,9 @@ export class HumansService {
      *
      * Used by the event-creation Displayed-host field to let a creator pick a
      * host. Scoped to humans who actually attend ``popup_id`` (accepted
-     * application with a ticket-holding main/spouse attendee) AND who have not
-     * hidden their name via ``info_not_shared`` for that popup. RLS scopes to the
-     * caller's tenant; the slim response schema omits email.
+     * application with a ticket-holding main/spouse attendee) AND who share both
+     * name fields in their popup directory settings. RLS scopes to the caller's
+     * tenant; the slim response schema omits email.
      * @param data The data for the request.
      * @param data.popupId
      * @param data.search

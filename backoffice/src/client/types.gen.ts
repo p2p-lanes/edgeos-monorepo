@@ -666,7 +666,6 @@ export type ApplicationAdminCreate = {
     age?: (string | null);
     residence?: (string | null);
     referral?: (string | null);
-    info_not_shared?: (Array<(string)> | null);
     custom_fields?: ({
     [key: string]: unknown;
 } | null);
@@ -710,7 +709,6 @@ export type ApplicationCreate = {
     age?: (string | null);
     residence?: (string | null);
     referral?: (string | null);
-    info_not_shared?: (Array<(string)> | null);
     custom_fields?: ({
     [key: string]: unknown;
 } | null);
@@ -777,7 +775,6 @@ export type ApplicationPortalPublic = {
     referral_id?: (string | null);
     referred_by_name?: (string | null);
     access_sources?: Array<ApplicationAccessSource>;
-    info_not_shared?: Array<(string)>;
     status: string;
     custom_fields?: {
         [key: string]: unknown;
@@ -817,7 +814,6 @@ export type ApplicationPublic = {
     referral_id?: (string | null);
     referred_by_name?: (string | null);
     access_sources?: Array<ApplicationAccessSource>;
-    info_not_shared?: Array<(string)>;
     status: string;
     custom_fields?: {
         [key: string]: unknown;
@@ -942,7 +938,6 @@ export type ApplicationUpdate = {
     age?: (string | null);
     residence?: (string | null);
     referral?: (string | null);
-    info_not_shared?: (Array<(string)> | null);
     custom_fields?: ({
     [key: string]: unknown;
 } | null);
