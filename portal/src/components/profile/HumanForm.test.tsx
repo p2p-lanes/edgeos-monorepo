@@ -69,7 +69,7 @@ describe("HumanForm", () => {
         custom_fields: {},
         sections: [],
       },
-    } as ReturnType<typeof useApplicationSchema>)
+    } as unknown as ReturnType<typeof useApplicationSchema>)
     const saved = renderForm({ age: "30", gender: "Female" })
 
     expect(useApplicationSchema).toHaveBeenCalledWith("popup-1")
@@ -100,7 +100,7 @@ describe("HumanForm", () => {
         custom_fields: {},
         sections: [],
       },
-    } as ReturnType<typeof useApplicationSchema>)
+    } as unknown as ReturnType<typeof useApplicationSchema>)
     const saved = renderForm({ age: "30", gender: "Female" })
 
     fireEvent.click(screen.getByRole("button", { name: "common.save" }))
@@ -121,7 +121,7 @@ describe("HumanForm", () => {
         custom_fields: {},
         sections: [],
       },
-    } as ReturnType<typeof useApplicationSchema>)
+    } as unknown as ReturnType<typeof useApplicationSchema>)
     const saved = renderForm({ age: "25-34", gender: "Fluid" })
 
     expect(
@@ -156,7 +156,7 @@ describe("HumanForm", () => {
         custom_fields: {},
         sections: [],
       },
-    } as ReturnType<typeof useApplicationSchema>)
+    } as unknown as ReturnType<typeof useApplicationSchema>)
     const saved = renderForm({ age: "25-34", gender: "Female" })
 
     fireEvent.click(screen.getByRole("combobox", { name: "form.gender" }))
