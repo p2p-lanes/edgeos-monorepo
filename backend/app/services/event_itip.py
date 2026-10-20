@@ -296,17 +296,34 @@ async def send_event_itip(
             when = format_event_when_range(
                 event.start_time, event.end_time, event.timezone
             )
+        # A recipient who isn't bound to an occurrence of a recurring event
+        # (invitee or group member who hasn't RSVPd yet) gets the email but
+        # no calendar entry. The only entry we could send is the RRULE
+        # master, and Proton refuses to let an invitee delete a single
+        # occurrence of a series invite (only "all events"). Calendar entries
+        # for recurring events come from per-occurrence RSVPs instead, which
+        # every client can remove one at a time. CANCEL still goes out so a
+        # series cancellation clears entries delivered before this change.
+        skip_ics = (
+            method != "CANCEL"
+            and bool(getattr(event, "rrule", None))
+            and recipient_occurrence is None
+        )
         try:
-            ics_body = build_event_ics(
-                event,
-                recipient_email=r["email"],
-                recipient_name=r["first_name"] or None,
-                organizer_email=organizer_email,
-                organizer_name=organizer_name,
-                event_url=event_url or None,
-                method=method,
-                sequence=int(getattr(event, "ical_sequence", 0)),
-                occurrence_start=recipient_occurrence,
+            ics_body = (
+                None
+                if skip_ics
+                else build_event_ics(
+                    event,
+                    recipient_email=r["email"],
+                    recipient_name=r["first_name"] or None,
+                    organizer_email=organizer_email,
+                    organizer_name=organizer_name,
+                    event_url=event_url or None,
+                    method=method,
+                    sequence=int(getattr(event, "ical_sequence", 0)),
+                    occurrence_start=recipient_occurrence,
+                )
             )
         except Exception as exc:  # pragma: no cover - defensive
             logger.warning(

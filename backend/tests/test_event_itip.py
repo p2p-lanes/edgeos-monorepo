@@ -17,6 +17,7 @@ bump-and-dispatch logic still runs against the real DB.
 
 from __future__ import annotations
 
+import asyncio
 import uuid
 from datetime import UTC, datetime, timedelta
 from unittest.mock import AsyncMock, MagicMock, PropertyMock, patch
@@ -37,6 +38,7 @@ from app.api.tenant.models import Tenants
 from app.services.event_itip import (
     calendar_fields_changed,
     gather_event_recipients,
+    send_event_itip,
 )
 from app.services.ical import build_event_ics
 
@@ -437,6 +439,105 @@ class TestBuildEventIcs:
         assert f"RECURRENCE-ID:{occurrence.strftime('%Y%m%dT%H%M%SZ')}" in update
         assert "SEQUENCE:0" in invite
         assert "SEQUENCE:1" in update
+
+
+# ---------------------------------------------------------------------------
+# Unit: send_event_itip calendar attachment for recurring series
+# ---------------------------------------------------------------------------
+
+
+class TestRecurringSeriesInviteAttachment:
+    """Recurring events reach calendars only per occurrence.
+
+    Proton only lets an invitee delete "all events" of a series invite, so a
+    recipient with no occurrence (invitee / group member who hasn't RSVPd)
+    gets the email without the RRULE master attached.
+    """
+
+    def _series(self) -> Events:
+        start = datetime(2026, 5, 5, 14, 0, tzinfo=UTC)
+        return Events(
+            id=uuid.uuid4(),
+            tenant_id=uuid.uuid4(),
+            popup_id=uuid.uuid4(),
+            owner_id=uuid.uuid4(),
+            title="Weekly sync",
+            start_time=start,
+            end_time=start + timedelta(hours=1),
+            timezone="UTC",
+            rrule="FREQ=WEEKLY;INTERVAL=1;COUNT=4",
+            visibility=EventVisibility.PRIVATE,
+            status=EventStatus.PUBLISHED,
+            ical_sequence=0,
+        )
+
+    def _recipient(self, occurrence_start: datetime | None = None) -> dict:
+        return {
+            "human_id": uuid.uuid4(),
+            "email": "alice@example.com",
+            "first_name": "Alice",
+            "occurrence_start": occurrence_start,
+        }
+
+    def test_series_invite_has_no_calendar_part(self) -> None:
+        event = self._series()
+        stack, service = _patch_email_service()
+        with stack:
+            asyncio.run(
+                send_event_itip(None, event, [self._recipient()], method="REQUEST")
+            )
+        service.send_event_invitation.assert_awaited_once()
+        assert service.send_event_invitation.await_args.kwargs["ical_body"] is None
+
+    def test_series_update_has_no_calendar_part(self) -> None:
+        event = self._series()
+        stack, service = _patch_email_service()
+        with stack:
+            asyncio.run(
+                send_event_itip(
+                    None, event, [self._recipient()], method="REQUEST", is_update=True
+                )
+            )
+        service.send_event_updated.assert_awaited_once()
+        assert service.send_event_updated.await_args.kwargs["ical_body"] is None
+
+    def test_occurrence_rsvper_still_gets_recurrence_id(self) -> None:
+        event = self._series()
+        occurrence = event.start_time + timedelta(weeks=1)
+        stack, service = _patch_email_service()
+        with stack:
+            asyncio.run(
+                send_event_itip(
+                    None, event, [self._recipient(occurrence)], method="REQUEST"
+                )
+            )
+        body = service.send_event_invitation.await_args.kwargs["ical_body"]
+        assert "RECURRENCE-ID:20260512T140000Z" in body
+        assert "RRULE:" not in body
+
+    def test_series_cancel_still_clears_the_calendar(self) -> None:
+        # Invitees from before this change hold the series entry; the
+        # whole-series CANCEL must still reach them to remove it.
+        event = self._series()
+        stack, service = _patch_email_service()
+        with stack:
+            asyncio.run(
+                send_event_itip(None, event, [self._recipient()], method="CANCEL")
+            )
+        body = service.send_event_cancelled.await_args.kwargs["ical_body"]
+        assert "METHOD:CANCEL" in body
+        assert "RECURRENCE-ID" not in body
+
+    def test_one_off_invite_keeps_calendar_part(self) -> None:
+        event = self._series()
+        event.rrule = None
+        stack, service = _patch_email_service()
+        with stack:
+            asyncio.run(
+                send_event_itip(None, event, [self._recipient()], method="REQUEST")
+            )
+        body = service.send_event_invitation.await_args.kwargs["ical_body"]
+        assert "METHOD:REQUEST" in body
 
 
 # ---------------------------------------------------------------------------
