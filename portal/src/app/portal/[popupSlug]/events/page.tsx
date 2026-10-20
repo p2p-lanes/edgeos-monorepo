@@ -606,7 +606,10 @@ export default function EventsPage() {
     // outer restore entirely to avoid a double-scroll/fight.
     if (focusEventRef.current?.id) return
     if (!restoredScroll || restoredScroll.outer == null) return
-    if (view === "list" && (isLoading || events.length === 0)) return
+    // tzLoading too: ListBody shows a spinner until the timezone resolves,
+    // so the page is too short to hold the restored scrollTop before then.
+    if (view === "list" && (isLoading || tzLoading || events.length === 0))
+      return
     didRestoreOuterScrollRef.current = true
     const main =
       typeof document !== "undefined"
@@ -632,7 +635,7 @@ export default function EventsPage() {
     return () => {
       cancelled = true
     }
-  }, [view, restoredScroll, isLoading, events.length])
+  }, [view, restoredScroll, isLoading, tzLoading, events.length])
 
   // Scroll the focused event-card into view after returning from the
   // detail page. The detail's back link stamps `?focus=<eventId>` (and
@@ -654,7 +657,8 @@ export default function EventsPage() {
     if (!focusId) return
     // For list view, the query must finish first; otherwise the card
     // is guaranteed not to be in the DOM yet.
-    if (view === "list" && (isLoading || events.length === 0)) return
+    if (view === "list" && (isLoading || tzLoading || events.length === 0))
+      return
 
     const cleanFocusParam = () => {
       if (typeof window === "undefined") return
@@ -695,7 +699,7 @@ export default function EventsPage() {
     return () => {
       cancelled = true
     }
-  }, [view, isLoading, events.length, router, pathname])
+  }, [view, isLoading, tzLoading, events.length, router, pathname])
 
   if (!moduleEnabled) {
     return (
@@ -863,7 +867,7 @@ export default function EventsPage() {
             onUnhide={(id) => unhideMutation.mutate(id)}
             placeholderUrl={eventSettings?.placeholder_url}
             autoScrollToUpcoming={
-              !restoredScroll?.outer && !focusEventRef.current?.id
+              restoredScroll?.outer == null && !focusEventRef.current?.id
             }
             stickyTop={toolbarHeight}
           />

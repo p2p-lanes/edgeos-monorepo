@@ -450,9 +450,12 @@ export function ListBody({
                       }
                     }
                     if (onEventLinkClick) {
+                      // The scrolling element is #portal-scroll, not the
+                      // first <main> (SidebarInset's, which never scrolls
+                      // and always reads 0, so every return landed at top).
                       const main =
                         typeof document !== "undefined"
-                          ? document.querySelector("main")
+                          ? document.getElementById("portal-scroll")
                           : null
                       onEventLinkClick("list", null, {
                         outer: main?.scrollTop ?? 0,
