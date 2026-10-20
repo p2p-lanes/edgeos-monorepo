@@ -1,14 +1,14 @@
 """Add per-flow SimpleFI pricing overrides.
 
 Revision ID: b73c9e20a451
-Revises: fe720154706f
+Revises: 6f702315ea94
 """
 
 import sqlalchemy as sa
 from alembic import op
 
 revision = "b73c9e20a451"
-down_revision = "fe720154706f"
+down_revision = "6f702315ea94"
 branch_labels = None
 depends_on = None
 
