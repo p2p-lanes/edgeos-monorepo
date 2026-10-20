@@ -144,7 +144,7 @@ from app.api.group.models import (
 from app.api.group.schemas import GroupCreate, GroupPublic, GroupUpdate
 
 # Core models
-from app.api.human.models import Humans
+from app.api.human.models import HumanDirectorySettings, Humans
 from app.api.human.schemas import HumanCreate, HumanPublic, HumanUpdate
 
 # Invite and Referral models (groups-rework)
@@ -260,6 +260,7 @@ __all__ = [
     "PendingTrials",
     # Core models
     "Humans",
+    "HumanDirectorySettings",
     "HumanCreate",
     "HumanPublic",
     "HumanUpdate",

@@ -4,7 +4,9 @@ import uuid
 from unittest.mock import patch
 
 import pytest
+from sqlmodel import select
 
+from app.api.api_key.models import ApiKeys
 from app.api.human.models import Humans
 from app.api.popup.models import PopupHomePages, Popups
 from app.api.popup.schemas import PopupStatus
@@ -47,6 +49,8 @@ def setup_sso(db, tenant_a):
     with patch("app.core.rate_limit.get_redis", return_value=None):
         yield human, popup, app, key, token
     db.rollback()
+    for api_key in db.exec(select(ApiKeys).where(ApiKeys.popup_id == popup.id)).all():
+        db.delete(api_key)
     db.delete(popup)
     db.delete(app)
     db.delete(human)

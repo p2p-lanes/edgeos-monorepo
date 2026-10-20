@@ -10,7 +10,7 @@ ticket-holding attendee, sourced from that attendee's own human):
   appears, the 0-ticket main does not.
 - Only main + spouse are listed; kids (and any other categories) are excluded.
 - Unlinked ticket holders retain the attendee name/email snapshot in their row.
-- info_not_shared masking + role/organization apply ONLY to the main applicant;
+- popup-scoped sharing + role/organization apply ONLY to the main applicant;
   companions show their own profile with blank role/org and no masking.
 """
 
@@ -21,7 +21,7 @@ from decimal import Decimal
 
 import pytest
 from fastapi.testclient import TestClient
-from sqlmodel import Session
+from sqlmodel import Session, select
 
 from app.api.application.crud import applications_crud
 from app.api.application.models import Applications
@@ -29,7 +29,7 @@ from app.api.application.router import _build_directory_entry
 from app.api.application.schemas import ApplicationStatus
 from app.api.attendee.models import AttendeeProducts, Attendees
 from app.api.attendee_category.models import AttendeeCategories
-from app.api.human.models import Humans
+from app.api.human.models import HumanDirectorySettings, Humans
 from app.api.popup.models import Popups
 from app.api.product.models import Products
 from app.api.tenant.models import Tenants
@@ -64,6 +64,9 @@ def _category(
     if is_primary:
         existing = attendee_categories_crud.get_primary_for_flow(db, flow_id)
         if existing is not None:
+            existing.directory_eligible = True
+            db.add(existing)
+            db.commit()
             return existing
     cat = AttendeeCategories(
         tenant_id=popup.tenant_id,
@@ -72,6 +75,7 @@ def _category(
         key=key,
         label=key.capitalize(),
         is_primary=is_primary,
+        directory_eligible=is_primary or key == "spouse",
     )
     db.add(cat)
     db.commit()
@@ -92,6 +96,30 @@ def _human(db: Session, tenant: Tenants, first: str, last: str, **extra) -> Huma
     db.commit()
     db.refresh(human)
     return human
+
+
+def _set_shared_fields(
+    db: Session, human: Humans, popup: Popups, shared_fields: list[str]
+) -> HumanDirectorySettings:
+    settings = db.exec(
+        select(HumanDirectorySettings).where(
+            HumanDirectorySettings.human_id == human.id,
+            HumanDirectorySettings.popup_id == popup.id,
+        )
+    ).first()
+    if settings is None:
+        settings = HumanDirectorySettings(
+            tenant_id=popup.tenant_id,
+            human_id=human.id,
+            popup_id=popup.id,
+            listed=True,
+            shared_fields=shared_fields,
+        )
+    else:
+        settings.shared_fields = shared_fields
+    db.add(settings)
+    db.commit()
+    return settings
 
 
 def _product(db: Session, popup: Popups, name: str = "Ticket") -> Products:
@@ -146,6 +174,29 @@ def _attendee(
     tickets: int = 0,
     product: Products | None = None,
 ) -> Attendees:
+    if not popup.directory_fields:
+        popup.directory_fields = [
+            {
+                "id": field,
+                "label": field.replace("_", " ").title(),
+                "source": "human",
+                "key": field,
+            }
+            for field in (
+                "first_name",
+                "last_name",
+                "email",
+                "telegram",
+                "residence",
+                "age",
+                "gender",
+            )
+        ] + [
+            {"id": field, "label": field.title(), "source": "application", "key": field}
+            for field in ("role", "organization")
+        ]
+        db.add(popup)
+        db.commit()
     attendee = Attendees(
         id=uuid.uuid4(),
         tenant_id=popup.tenant_id,
@@ -159,6 +210,42 @@ def _attendee(
     db.add(attendee)
     db.commit()
     db.refresh(attendee)
+    hidden = (
+        {item.strip().casefold() for item in (app.info_not_shared or [])}
+        if app.human_id == human.id
+        else set()
+    )
+    settings = db.exec(
+        select(HumanDirectorySettings).where(
+            HumanDirectorySettings.human_id == human.id,
+            HumanDirectorySettings.popup_id == popup.id,
+        )
+    ).first()
+    if settings is None:
+        db.add(
+            HumanDirectorySettings(
+                tenant_id=popup.tenant_id,
+                human_id=human.id,
+                popup_id=popup.id,
+                listed=True,
+                shared_fields=[
+                    field
+                    for field in (
+                        "first_name",
+                        "last_name",
+                        "email",
+                        "telegram",
+                        "role",
+                        "organization",
+                        "residence",
+                        "age",
+                        "gender",
+                    )
+                    if field not in hidden
+                ],
+            )
+        )
+        db.commit()
     if tickets:
         prod = product or _product(db, popup)
         for _ in range(tickets):
@@ -245,6 +332,75 @@ def test_directory_lists_main_and_spouse_excludes_kids_and_zero_ticket_main(
     assert directory_world["bob"].id not in got  # main, 0 tickets
 
 
+def test_human_can_opt_into_directory_and_edit_popup_scoped_field(
+    db: Session, client: TestClient, directory_world
+) -> None:
+    popup = directory_world["popup"]
+    popup.show_attendee_directory = True
+    attendee = directory_world["andrea"]
+    human = attendee.human
+    popup.directory_fields = [
+        {
+            "id": "first_name",
+            "label": "First name",
+            "source": "human",
+            "key": "first_name",
+        },
+        {
+            "id": "community_role",
+            "label": "Community role",
+            "source": "attendee",
+            "key": "community_role",
+            "shareable": True,
+        },
+    ]
+    db.add(popup)
+    settings = db.exec(
+        select(HumanDirectorySettings).where(
+            HumanDirectorySettings.human_id == human.id,
+            HumanDirectorySettings.popup_id == popup.id,
+        )
+    ).one()
+    db.delete(settings)
+    db.commit()
+    headers = {
+        "Authorization": f"Bearer {create_access_token(subject=human.id, token_type='human')}"
+    }
+    settings_url = f"/api/v1/humans/me/directory/{popup.id}"
+    response = client.get(settings_url, headers=headers)
+    assert response.status_code == 200, response.text
+    assert response.json()["listed"] is False
+    assert response.json()["available_fields"] == popup.directory_fields
+
+    profile_url = f"/api/v1/applications/my/directory/{popup.id}/profile-data"
+    response = client.put(
+        profile_url,
+        json={"values": {"community_role": "Volunteer"}},
+        headers=headers,
+    )
+    assert response.status_code == 200, response.text
+
+    response = client.put(
+        settings_url,
+        json={"listed": True, "shared_fields": ["first_name", "community_role"]},
+        headers=headers,
+    )
+    assert response.status_code == 200, response.text
+    directory = client.get(
+        f"/api/v1/applications/my/directory/{popup.id}", headers=headers
+    )
+    assert directory.status_code == 200, directory.text
+    entry = next(
+        row for row in directory.json()["results"] if row["id"] == str(attendee.id)
+    )
+    assert entry["first_name"] == human.first_name
+    assert entry["fields"][-1] == {
+        "id": "community_role",
+        "label": "Community role",
+        "value": "Volunteer",
+    }
+
+
 def test_companion_searchable_by_own_name(db: Session, directory_world) -> None:
     """Searching the spouse's own surname returns the spouse, not the applicant."""
     results, total = applications_crud.find_directory(
@@ -252,6 +408,32 @@ def test_companion_searchable_by_own_name(db: Session, directory_world) -> None:
     )
     assert total == 1
     assert results[0].id == directory_world["scott"].id
+
+
+def test_popup_field_configuration_limits_directory_and_search_data(
+    db: Session, directory_world
+) -> None:
+    popup = directory_world["popup"]
+    popup.directory_fields = [
+        {
+            "id": "first_name",
+            "label": "First name",
+            "source": "human",
+            "key": "first_name",
+        }
+    ]
+    db.add(popup)
+    db.commit()
+
+    results, total = applications_crud.find_directory(
+        db, popup_id=popup.id, q=directory_world["andrea"].human.email
+    )
+    assert total == 0
+    assert results == []
+
+    results, _ = applications_crud.find_directory(db, popup_id=popup.id)
+    andrea = next(item for item in results if item.id == directory_world["andrea"].id)
+    assert _build_directory_entry(andrea).email is None
 
 
 def test_directory_searchable_by_full_name(db: Session, directory_world) -> None:
@@ -287,7 +469,7 @@ def test_companion_entry_uses_own_profile_no_masking(
 
 
 def test_main_entry_keeps_role_org_and_masking(db: Session, directory_world) -> None:
-    """Main applicant row: role/org from custom_fields, info_not_shared masking."""
+    """Main applicant row: role/org and privacy from its own application."""
     andrea = next(
         a
         for a in applications_crud.find_directory(
@@ -299,7 +481,7 @@ def test_main_entry_keeps_role_org_and_masking(db: Session, directory_world) -> 
     assert entry.category == "main"
     assert entry.role == "Founder"
     assert entry.organization == "Staple & Spindle"
-    assert entry.email == "*"  # masked via info_not_shared=["email"]
+    assert entry.email == "*"  # masked by the Human's popup sharing settings
 
 
 DIRECTORY_FIELD_VALUES = {
@@ -444,7 +626,7 @@ def test_directory_api_and_csv_mask_fields_without_masking_companions(
     assert app.info_not_shared == options
 
 
-def test_unlinked_attendee_entry_uses_identity_snapshot(
+def test_unlinked_attendee_is_not_listed_without_own_human_identity(
     db: Session, tenant_a: Tenants
 ) -> None:
     popup = _popup(db, tenant_a)
@@ -477,12 +659,8 @@ def test_unlinked_attendee_entry_uses_identity_snapshot(
     db.commit()
 
     results, total = applications_crud.find_directory(db, popup_id=popup.id)
-    assert total == 1
-
-    entry = _build_directory_entry(results[0])
-    assert entry.first_name == "Taylor Companion"
-    assert entry.last_name is None
-    assert entry.email == "taylor@example.com"
+    assert total == 0
+    assert results == []
 
 
 def test_directory_excludes_pending_application_without_ticket(

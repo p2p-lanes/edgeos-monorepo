@@ -46,7 +46,14 @@ def test_backfill_preserves_buyers_existing_categories_and_ambiguous_history(
             text(
                 "ALTER TABLE popups "
                 "ADD COLUMN badges_enabled BOOLEAN NOT NULL DEFAULT false, "
-                "ADD COLUMN sidebar_config JSONB"
+                "ADD COLUMN sidebar_config JSONB, "
+                "ADD COLUMN directory_fields JSONB NOT NULL DEFAULT '[]'"
+            )
+        )
+        connection.execute(
+            text(
+                "ALTER TABLE attendee_categories "
+                "ADD COLUMN directory_eligible BOOLEAN NOT NULL DEFAULT false"
             )
         )
         # Insert payments against the historical schema, without newer ORM
