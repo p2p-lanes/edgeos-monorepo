@@ -230,3 +230,16 @@ describe("a secret the form never loads", () => {
     ).toBe("Back to sponsors.example.com, signed")
   })
 })
+
+it("treats blank payment pricing as zero", () => {
+  expect(say("Payment Pricing", { simplefi_card_adjustment_pct: "" })).toBe(
+    "No payment adjustments (0%)",
+  )
+  expect(
+    say("Payment Pricing", {
+      simplefi_card_adjustment_pct: "0",
+      simplefi_crypto_adjustment_pct: "-2.5",
+      simplefi_installments_adjustment_pct: "5",
+    }),
+  ).toBe("Crypto -2.5% · Installments +5%")
+})

@@ -19,7 +19,13 @@ export interface ConfigFieldConfig {
   options?: { value: string; label: string }[]
 }
 
-type FlowOnlyConfigKey = "cross_popup_referrals_enabled" | "simplefi_api_key"
+type FlowOnlyConfigKey =
+  | "cross_popup_referrals_enabled"
+  | "simplefi_api_key"
+  | "simplefi_card_adjustment_pct"
+  | "simplefi_crypto_adjustment_pct"
+  | "simplefi_pay_in_full_adjustment_pct"
+  | "simplefi_installments_adjustment_pct"
 
 export const CONFIG_SECTIONS: {
   title: string
@@ -37,6 +43,39 @@ export const CONFIG_SECTIONS: {
         description:
           "Overrides the popup's SimpleFi account for purchases and payment operations through this flow.",
         kind: "secret",
+      },
+    ],
+  },
+  {
+    title: "Payment Pricing",
+    description:
+      "Percentages from -99 to 100. Positive adds a surcharge; negative gives a discount. Blank or 0 means no adjustment. Payment timing applies before card or crypto pricing.",
+    fields: [
+      {
+        key: "simplefi_card_adjustment_pct",
+        label: "Card adjustment (%)",
+        kind: "percentage",
+        description: "Applies to card payments.",
+      },
+      {
+        key: "simplefi_crypto_adjustment_pct",
+        label: "Crypto adjustment (%)",
+        kind: "percentage",
+        description: "Applies to crypto payments.",
+      },
+      {
+        key: "simplefi_pay_in_full_adjustment_pct",
+        label: "Pay in full adjustment (%)",
+        kind: "percentage",
+        description:
+          "Applies when a buyer selects one payment within a plan; not to standalone payments.",
+      },
+      {
+        key: "simplefi_installments_adjustment_pct",
+        label: "Installments adjustment (%)",
+        kind: "percentage",
+        description:
+          "Applies when a buyer selects multiple payments within a plan.",
       },
     ],
   },
