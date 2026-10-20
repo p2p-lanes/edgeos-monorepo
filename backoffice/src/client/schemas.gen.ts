@@ -30313,6 +30313,74 @@ export const SalesFlowCreateSchema = {
             ],
             title: 'Simplefi Api Key'
         },
+        simplefi_card_adjustment_pct: {
+            anyOf: [
+                {
+                    type: 'number',
+                    maximum: 100,
+                    minimum: -99
+                },
+                {
+                    type: 'string',
+                    pattern: '^(?!^[-+.]*$)[+-]?0*(?:\\d{0,3}|(?=[\\d.]{1,6}0*$)\\d{0,3}\\.\\d{0,2}0*$)'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Simplefi Card Adjustment Pct'
+        },
+        simplefi_crypto_adjustment_pct: {
+            anyOf: [
+                {
+                    type: 'number',
+                    maximum: 100,
+                    minimum: -99
+                },
+                {
+                    type: 'string',
+                    pattern: '^(?!^[-+.]*$)[+-]?0*(?:\\d{0,3}|(?=[\\d.]{1,6}0*$)\\d{0,3}\\.\\d{0,2}0*$)'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Simplefi Crypto Adjustment Pct'
+        },
+        simplefi_pay_in_full_adjustment_pct: {
+            anyOf: [
+                {
+                    type: 'number',
+                    maximum: 100,
+                    minimum: -99
+                },
+                {
+                    type: 'string',
+                    pattern: '^(?!^[-+.]*$)[+-]?0*(?:\\d{0,3}|(?=[\\d.]{1,6}0*$)\\d{0,3}\\.\\d{0,2}0*$)'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Simplefi Pay In Full Adjustment Pct'
+        },
+        simplefi_installments_adjustment_pct: {
+            anyOf: [
+                {
+                    type: 'number',
+                    maximum: 100,
+                    minimum: -99
+                },
+                {
+                    type: 'string',
+                    pattern: '^(?!^[-+.]*$)[+-]?0*(?:\\d{0,3}|(?=[\\d.]{1,6}0*$)\\d{0,3}\\.\\d{0,2}0*$)'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Simplefi Installments Adjustment Pct'
+        },
         abandoned_cart_delay_days: {
             anyOf: [
                 {
@@ -31033,6 +31101,54 @@ export const SalesFlowPublicSchema = {
             ],
             title: 'Simplefi Api Key'
         },
+        simplefi_card_adjustment_pct: {
+            anyOf: [
+                {
+                    type: 'string',
+                    pattern: '^(?!^[-+.]*$)[+-]?0*(?:\\d{0,3}|(?=[\\d.]{1,6}0*$)\\d{0,3}\\.\\d{0,2}0*$)'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Simplefi Card Adjustment Pct'
+        },
+        simplefi_crypto_adjustment_pct: {
+            anyOf: [
+                {
+                    type: 'string',
+                    pattern: '^(?!^[-+.]*$)[+-]?0*(?:\\d{0,3}|(?=[\\d.]{1,6}0*$)\\d{0,3}\\.\\d{0,2}0*$)'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Simplefi Crypto Adjustment Pct'
+        },
+        simplefi_pay_in_full_adjustment_pct: {
+            anyOf: [
+                {
+                    type: 'string',
+                    pattern: '^(?!^[-+.]*$)[+-]?0*(?:\\d{0,3}|(?=[\\d.]{1,6}0*$)\\d{0,3}\\.\\d{0,2}0*$)'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Simplefi Pay In Full Adjustment Pct'
+        },
+        simplefi_installments_adjustment_pct: {
+            anyOf: [
+                {
+                    type: 'string',
+                    pattern: '^(?!^[-+.]*$)[+-]?0*(?:\\d{0,3}|(?=[\\d.]{1,6}0*$)\\d{0,3}\\.\\d{0,2}0*$)'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Simplefi Installments Adjustment Pct'
+        },
         abandoned_cart_delay_days: {
             anyOf: [
                 {
@@ -31638,6 +31754,74 @@ export const SalesFlowUpdateSchema = {
                 }
             ],
             title: 'Simplefi Api Key'
+        },
+        simplefi_card_adjustment_pct: {
+            anyOf: [
+                {
+                    type: 'number',
+                    maximum: 100,
+                    minimum: -99
+                },
+                {
+                    type: 'string',
+                    pattern: '^(?!^[-+.]*$)[+-]?0*(?:\\d{0,3}|(?=[\\d.]{1,6}0*$)\\d{0,3}\\.\\d{0,2}0*$)'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Simplefi Card Adjustment Pct'
+        },
+        simplefi_crypto_adjustment_pct: {
+            anyOf: [
+                {
+                    type: 'number',
+                    maximum: 100,
+                    minimum: -99
+                },
+                {
+                    type: 'string',
+                    pattern: '^(?!^[-+.]*$)[+-]?0*(?:\\d{0,3}|(?=[\\d.]{1,6}0*$)\\d{0,3}\\.\\d{0,2}0*$)'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Simplefi Crypto Adjustment Pct'
+        },
+        simplefi_pay_in_full_adjustment_pct: {
+            anyOf: [
+                {
+                    type: 'number',
+                    maximum: 100,
+                    minimum: -99
+                },
+                {
+                    type: 'string',
+                    pattern: '^(?!^[-+.]*$)[+-]?0*(?:\\d{0,3}|(?=[\\d.]{1,6}0*$)\\d{0,3}\\.\\d{0,2}0*$)'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Simplefi Pay In Full Adjustment Pct'
+        },
+        simplefi_installments_adjustment_pct: {
+            anyOf: [
+                {
+                    type: 'number',
+                    maximum: 100,
+                    minimum: -99
+                },
+                {
+                    type: 'string',
+                    pattern: '^(?!^[-+.]*$)[+-]?0*(?:\\d{0,3}|(?=[\\d.]{1,6}0*$)\\d{0,3}\\.\\d{0,2}0*$)'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Simplefi Installments Adjustment Pct'
         },
         abandoned_cart_delay_days: {
             anyOf: [

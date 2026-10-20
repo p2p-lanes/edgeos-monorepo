@@ -1,5 +1,6 @@
 from alembic import command
 from alembic.config import Config
+from sqlalchemy import MetaData, Table
 from sqlmodel import Session, create_engine, select
 from testcontainers.postgres import PostgresContainer
 
@@ -16,7 +17,7 @@ from app.api.base_field_config.models import BaseFieldConfigs
 from app.api.form_section.models import FormSections
 from app.api.human.models import HumanDirectorySettings, Humans
 from app.api.popup.models import Popups
-from app.api.sales_flow.crud import sales_flows_crud
+from app.api.sales_flow.models import SalesFlows
 from app.api.tenant.models import Tenants
 
 PREVIOUS_REVISION = "dcb07d3de9ee"
@@ -88,11 +89,26 @@ def test_legacy_privacy_choices_move_to_popup_directory_settings():
                 )
                 session.add(popup)
                 session.flush()
-                flow = sales_flows_crud.provision_default_flow(
-                    session,
+                # Seed the historical schema without querying newer ORM columns.
+                flow = SalesFlows(
                     popup_id=popup.id,
                     tenant_id=tenant.id,
-                    sale_type="application",
+                    type="application",
+                    slug="default",
+                    name="Default",
+                    is_default=True,
+                )
+                flows_table = Table(
+                    "sales_flows", MetaData(), autoload_with=connection
+                )
+                session.execute(
+                    flows_table.insert().values(
+                        **{
+                            key: value
+                            for key, value in flow.model_dump().items()
+                            if key in flows_table.c
+                        }
+                    )
                 )
                 human = Humans(
                     tenant_id=tenant.id,

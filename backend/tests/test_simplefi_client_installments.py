@@ -259,3 +259,86 @@ def test_create_payment_installment_branch_passes_success_behavior(
     )
 
     assert captured["body"]["redirect_urls"]["success_behavior"] == "automatic"
+
+
+@pytest.mark.parametrize("max_installments", [None, 1, 4])
+def test_pricing_overrides_follow_the_payment_endpoint(monkeypatch, max_installments):
+    captured = _install_capture(
+        monkeypatch,
+        {
+            "id": "payment",
+            "status": "pending",
+            "checkout_url": "https://pay/plan",
+            "checkout_v2_url": "https://pay/pr",
+        },
+    )
+    from app.api.payment.crud import _simplefi_pricing_overrides
+    from app.api.sales_flow.schemas import EffectiveFlowConfig
+
+    config = EffectiveFlowConfig(
+        simplefi_card_adjustment_pct=0,
+        simplefi_crypto_adjustment_pct=-2.5,
+        simplefi_pay_in_full_adjustment_pct=-10,
+        simplefi_installments_adjustment_pct=5,
+    )
+    SimpleFIClient("fake-key").create_payment(
+        amount=Decimal("100"),
+        popup_slug="popup",
+        tenant_slug="tenant",
+        max_installments=max_installments,
+        user_email="buyer@example.com",
+        **_simplefi_pricing_overrides(config),
+    )
+    assert captured["body"]["pricing"] == {"card": 0, "crypto": -2.5}
+    if max_installments == 4:
+        assert captured["body"]["payment_mode_pricing"] == {
+            "pay_in_full": -10,
+            "installments": 5,
+        }
+    else:
+        assert "payment_mode_pricing" not in captured["body"]
+    assert captured["body"].get("amount", captured["body"].get("total_amount")) == 100
+
+
+@pytest.mark.parametrize("max_installments", [None, 3])
+def test_unset_flow_pricing_sends_explicit_zeros(monkeypatch, max_installments):
+    from app.api.payment.crud import _simplefi_pricing_overrides
+    from app.api.sales_flow.schemas import EffectiveFlowConfig
+
+    captured = _install_capture(
+        monkeypatch,
+        {
+            "id": "payment",
+            "status": "pending",
+            "checkout_url": "https://pay/plan",
+            "checkout_v2_url": "https://pay/pr",
+        },
+    )
+    SimpleFIClient("fake-key").create_payment(
+        amount=Decimal("100"),
+        popup_slug="popup",
+        tenant_slug="tenant",
+        max_installments=max_installments,
+        user_email="buyer@example.com",
+        **_simplefi_pricing_overrides(EffectiveFlowConfig()),
+    )
+    assert captured["body"]["pricing"] == {"card": 0, "crypto": 0}
+    if max_installments:
+        assert captured["body"]["payment_mode_pricing"] == {
+            "pay_in_full": 0,
+            "installments": 0,
+        }
+    else:
+        assert "payment_mode_pricing" not in captured["body"]
+
+
+def test_partial_flow_pricing_fills_missing_adjustments_with_zero():
+    from app.api.payment.crud import _simplefi_pricing_overrides
+    from app.api.sales_flow.schemas import EffectiveFlowConfig
+
+    assert _simplefi_pricing_overrides(
+        EffectiveFlowConfig(simplefi_card_adjustment_pct=5)
+    ) == {
+        "pricing": {"card": 5, "crypto": 0},
+        "payment_mode_pricing": {"pay_in_full": 0, "installments": 0},
+    }

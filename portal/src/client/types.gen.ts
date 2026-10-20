@@ -6216,6 +6216,10 @@ export type SalesFlowCreate = {
     open_checkout_cancel_url?: (string | null);
     open_checkout_signing_secret?: (string | null);
     simplefi_api_key?: (string | null);
+    simplefi_card_adjustment_pct?: (number | string | null);
+    simplefi_crypto_adjustment_pct?: (number | string | null);
+    simplefi_pay_in_full_adjustment_pct?: (number | string | null);
+    simplefi_installments_adjustment_pct?: (number | string | null);
     abandoned_cart_delay_days?: (number | null);
     abandoned_cart_repeat_days?: (number | null);
     abandoned_cart_max_count?: (number | null);
@@ -6365,6 +6369,10 @@ export type SalesFlowPublic = {
     open_checkout_cancel_url?: (string | null);
     open_checkout_signing_secret?: (string | null);
     simplefi_api_key?: (string | null);
+    simplefi_card_adjustment_pct?: (string | null);
+    simplefi_crypto_adjustment_pct?: (string | null);
+    simplefi_pay_in_full_adjustment_pct?: (string | null);
+    simplefi_installments_adjustment_pct?: (string | null);
     abandoned_cart_delay_days?: (number | null);
     abandoned_cart_repeat_days?: (number | null);
     abandoned_cart_max_count?: (number | null);
@@ -6459,6 +6467,10 @@ export type SalesFlowUpdate = {
     open_checkout_cancel_url?: (string | null);
     open_checkout_signing_secret?: (string | null);
     simplefi_api_key?: (string | null);
+    simplefi_card_adjustment_pct?: (number | string | null);
+    simplefi_crypto_adjustment_pct?: (number | string | null);
+    simplefi_pay_in_full_adjustment_pct?: (number | string | null);
+    simplefi_installments_adjustment_pct?: (number | string | null);
     abandoned_cart_delay_days?: (number | null);
     abandoned_cart_repeat_days?: (number | null);
     abandoned_cart_max_count?: (number | null);

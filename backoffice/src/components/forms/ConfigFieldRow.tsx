@@ -13,6 +13,7 @@ export type ConfigFieldKind =
   | "boolean"
   | "number"
   | "currency"
+  | "percentage"
   | "text"
   | "secret"
   | "select"
@@ -71,11 +72,16 @@ export function ConfigFieldRow({
             disabled={readOnly}
           />
         )}
-        {(kind === "number" || kind === "currency") && (
+        {(kind === "number" ||
+          kind === "currency" ||
+          kind === "percentage") && (
           <Input
             id={controlId}
             type="number"
-            step={kind === "currency" ? "0.01" : "1"}
+            step={kind === "number" ? "1" : "0.01"}
+            min={kind === "percentage" ? -99 : undefined}
+            max={kind === "percentage" ? 100 : undefined}
+            placeholder={kind === "percentage" ? "0" : undefined}
             value={value}
             onChange={(e) => onValueChange(e.target.value)}
             disabled={readOnly}
