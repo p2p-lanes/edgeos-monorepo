@@ -7,6 +7,11 @@ from sqlalchemy.dialects.postgresql import JSONB
 from sqlmodel import Field, SQLModel
 
 
+def default_directory_eligible(key: str) -> bool:
+    """Initial directory eligibility for conventional attendee categories."""
+    return key.strip().casefold() in {"main", "spouse"}
+
+
 class AttendeeCategoryBase(SQLModel):
     """Base schema for sales-flow-owned attendee categories."""
 
@@ -58,7 +63,7 @@ class AttendeeCategoryCreate(SQLModel):
     popup_id: uuid.UUID
     key: str = Field(max_length=64)
     sort_order: int = 0
-    directory_eligible: bool = False
+    directory_eligible: bool | None = None
     max_per_application: int | None = None
     required_fields: list[dict] = []
     display_meta: dict = {}

@@ -5469,9 +5469,15 @@ export const AttendeeCategoryCreateSchema = {
             default: 0
         },
         directory_eligible: {
-            type: 'boolean',
-            title: 'Directory Eligible',
-            default: false
+            anyOf: [
+                {
+                    type: 'boolean'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Directory Eligible'
         },
         max_per_application: {
             anyOf: [

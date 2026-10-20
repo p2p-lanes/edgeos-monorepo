@@ -1119,7 +1119,7 @@ export type AttendeeCategoryCreate = {
     popup_id: string;
     key: string;
     sort_order?: number;
-    directory_eligible?: boolean;
+    directory_eligible?: (boolean | null);
     max_per_application?: (number | null);
     required_fields?: Array<{
         [key: string]: unknown;

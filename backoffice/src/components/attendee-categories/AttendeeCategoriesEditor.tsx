@@ -37,7 +37,7 @@ interface DialogState {
   sortOrder: string
   /** Empty string = unlimited (null on the server). */
   maxPerApplication: string
-  directoryEligible: boolean
+  directoryEligible: boolean | null
   // High-level form fields the admin toggles. We serialize/deserialize these
   // to/from the underlying `required_fields` JSONB so the dialog stays simple
   // for the cases we actually have: spouse (email+gender), kid (age group).
@@ -53,7 +53,7 @@ const EMPTY_DIALOG: DialogState = {
   label: "",
   sortOrder: "",
   maxPerApplication: "",
-  directoryEligible: false,
+  directoryEligible: null,
   requireEmail: true,
   requireGender: false,
   askAgeGroup: false,
@@ -193,7 +193,7 @@ export function AttendeeCategoriesEditor({
             state.maxPerApplication !== ""
               ? Number(state.maxPerApplication)
               : undefined,
-          directory_eligible: state.directoryEligible,
+          directory_eligible: state.directoryEligible ?? undefined,
           required_fields: fields as unknown as Array<{
             [key: string]: unknown
           }>,
@@ -455,7 +455,10 @@ export function AttendeeCategoriesEditor({
               </div>
               <Switch
                 id="cat-directory-eligible"
-                checked={state.directoryEligible}
+                checked={
+                  state.directoryEligible ??
+                  state.key.trim().toLowerCase() === "spouse"
+                }
                 onCheckedChange={(checked) =>
                   setState((prev) => ({ ...prev, directoryEligible: checked }))
                 }

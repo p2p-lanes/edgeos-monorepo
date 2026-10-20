@@ -16,6 +16,7 @@ Spec scenarios covered:
 import uuid
 from decimal import Decimal
 
+import pytest
 from fastapi.testclient import TestClient
 from sqlmodel import Session
 
@@ -83,6 +84,46 @@ def _create_category(
     )
     assert response.status_code == 201, response.text
     return response.json()
+
+
+@pytest.mark.parametrize(
+    ("key", "override", "expected"),
+    [
+        ("spouse", None, True),
+        ("kid", None, False),
+        ("other", None, False),
+        ("spouse", False, False),
+        ("other", True, True),
+    ],
+)
+def test_category_directory_eligibility_defaults_and_explicit_override(
+    client: TestClient,
+    db: Session,
+    admin_token_tenant_a: str,
+    popup_tenant_a: Popups,
+    key: str,
+    override: bool | None,
+    expected: bool,
+) -> None:
+    flow = SalesFlows(
+        tenant_id=popup_tenant_a.tenant_id,
+        popup_id=popup_tenant_a.id,
+        slug=f"eligibility-{uuid.uuid4().hex[:8]}",
+        name="Eligibility defaults",
+        type="application",
+    )
+    db.add(flow)
+    db.commit()
+    values = {} if override is None else {"directory_eligible": override}
+    category = _create_category(
+        client,
+        admin_token_tenant_a,
+        popup_tenant_a.id,
+        flow.id,
+        key,
+        **values,
+    )
+    assert category["directory_eligible"] is expected
 
 
 def test_copy_to_flow_preserves_directory_eligibility(

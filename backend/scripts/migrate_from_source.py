@@ -471,6 +471,7 @@ def run_import(
     from app.api.application.directory import directory_fields_for_popup
     from app.api.approval_strategy.schemas import ApprovalStrategyType
     from app.api.attendee.crud import generate_check_in_code
+    from app.api.attendee_category.schemas import default_directory_eligible
     from app.api.product.schemas import (
         CATEGORY_PATREON,
         CATEGORY_TICKET,
@@ -1120,7 +1121,7 @@ def run_import(
                     popup_id=popup_id,
                     key=key,
                     sort_order=next_sort,
-                    directory_eligible=key in {"main", "spouse"},
+                    directory_eligible=default_directory_eligible(key),
                 )
                 created_cats.append(cat)
                 next_sort += 1
