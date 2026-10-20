@@ -5,6 +5,7 @@ import { createElement } from "react"
 import { describe, expect, it, vi } from "vitest"
 import type { ApplicationPortalPublic, PopupPublic } from "@/client"
 import { ApplicationsService } from "@/client"
+import { trackGAApplicationEvent } from "@/lib/google-analytics"
 import type { ApplicationFormSchema } from "@/types/form-schema"
 import { useSubmitApplication } from "./use-submit-application"
 
@@ -28,6 +29,9 @@ vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: vi.fn(), replace: vi.fn() }),
 }))
 vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }))
+vi.mock("@/lib/google-analytics", () => ({
+  trackGAApplicationEvent: vi.fn(),
+}))
 vi.mock("@/hooks/useApplicationFee", () => ({
   useApplicationFee: () => ({ createOrResume: vi.fn(), isPending: false }),
 }))
@@ -75,6 +79,7 @@ describe("useSubmitApplication create-vs-update (rel-001 correction)", () => {
       expect.objectContaining({ salesFlowId: "flow-a" }),
     )
     expect(ApplicationsService.createMyApplication).not.toHaveBeenCalled()
+    expect(trackGAApplicationEvent).not.toHaveBeenCalled()
   })
 
   it("creates when this door has no application yet", async () => {
@@ -104,6 +109,12 @@ describe("useSubmitApplication create-vs-update (rel-001 correction)", () => {
 
     expect(ApplicationsService.createMyApplication).toHaveBeenCalled()
     expect(ApplicationsService.updateMyApplication).not.toHaveBeenCalled()
+    expect(trackGAApplicationEvent).toHaveBeenCalledWith({
+      eventName: "application_draft_saved",
+      popup,
+      applicationId: "app-2",
+      salesFlowId: "flow-b",
+    })
   })
 
   it("edits this door's own draft instead of opening a second one", async () => {
@@ -131,5 +142,114 @@ describe("useSubmitApplication create-vs-update (rel-001 correction)", () => {
       expect.objectContaining({ salesFlowId: "flow-b" }),
     )
     expect(ApplicationsService.createMyApplication).not.toHaveBeenCalled()
+    expect(trackGAApplicationEvent).not.toHaveBeenCalled()
+  })
+
+  it("tracks a successful submission, including one awaiting its fee", async () => {
+    vi.mocked(ApplicationsService.createMyApplication).mockResolvedValueOnce({
+      id: "app-2",
+      status: "pending_fee",
+      sales_flow_id: "flow-b",
+    } as ApplicationPortalPublic)
+    const { result } = renderHook(
+      () =>
+        useSubmitApplication({
+          popup,
+          schema,
+          values: {},
+          application: null,
+          validate: () => ({ isValid: true, errors: {} }),
+          salesFlowId: "flow-b",
+        }),
+      { wrapper },
+    )
+
+    await act(async () =>
+      result.current.handleSubmit({ preventDefault: vi.fn() } as never),
+    )
+
+    expect(trackGAApplicationEvent).toHaveBeenCalledWith({
+      eventName: "application_submitted",
+      popup,
+      applicationId: "app-2",
+      salesFlowId: "flow-b",
+    })
+  })
+
+  it("tracks submission of an existing draft", async () => {
+    const { result } = renderHook(
+      () =>
+        useSubmitApplication({
+          popup,
+          schema,
+          values: {},
+          application: {
+            id: "app-1",
+            status: "draft",
+            sales_flow_id: "flow-a",
+          } as ApplicationPortalPublic,
+          validate: () => ({ isValid: true, errors: {} }),
+        }),
+      { wrapper },
+    )
+
+    await act(async () =>
+      result.current.handleSubmit({ preventDefault: vi.fn() } as never),
+    )
+
+    expect(trackGAApplicationEvent).toHaveBeenCalledWith({
+      eventName: "application_submitted",
+      popup,
+      applicationId: "app-1",
+      salesFlowId: "flow-a",
+    })
+  })
+
+  it("does not track failed saves or invalid submissions", async () => {
+    vi.mocked(ApplicationsService.createMyApplication).mockRejectedValueOnce(
+      new Error("save failed"),
+    )
+    const { result } = renderHook(
+      () =>
+        useSubmitApplication({
+          popup,
+          schema,
+          values: {},
+          application: null,
+          validate: () => ({ isValid: false, errors: { email: "required" } }),
+        }),
+      { wrapper },
+    )
+
+    await act(async () => result.current.handleDraft())
+    await act(async () =>
+      result.current.handleSubmit({ preventDefault: vi.fn() } as never),
+    )
+
+    expect(trackGAApplicationEvent).not.toHaveBeenCalled()
+  })
+
+  it("does not count edits to an already submitted application as new submissions", async () => {
+    const { result } = renderHook(
+      () =>
+        useSubmitApplication({
+          popup,
+          schema,
+          values: {},
+          application: {
+            id: "app-1",
+            status: "in review",
+            sales_flow_id: "flow-a",
+          } as ApplicationPortalPublic,
+          validate: () => ({ isValid: true, errors: {} }),
+        }),
+      { wrapper },
+    )
+
+    await act(async () =>
+      result.current.handleSubmit({ preventDefault: vi.fn() } as never),
+    )
+
+    expect(trackGAApplicationEvent).not.toHaveBeenCalled()
   })
 })
