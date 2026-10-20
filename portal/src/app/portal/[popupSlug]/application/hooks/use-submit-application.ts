@@ -10,6 +10,7 @@ import { ApplicationsService } from "@/client"
 import { withCheckoutLocale } from "@/helpers/checkout"
 import { useApplicationFee } from "@/hooks/useApplicationFee"
 import { splitForCreate, splitForUpdate } from "@/lib/form-data-splitter"
+import { trackGAApplicationEvent } from "@/lib/google-analytics"
 import { queryKeys } from "@/lib/query-keys"
 import { useApplication } from "@/providers/applicationProvider"
 import type { ApplicationFormSchema } from "@/types/form-schema"
@@ -176,6 +177,19 @@ export function useSubmitApplication({
     try {
       const result = await submitMutation.mutateAsync("in review")
 
+      if (!application || application.status === "draft") {
+        trackGAApplicationEvent({
+          eventName: "application_submitted",
+          popup,
+          applicationId: result.id,
+          salesFlowId:
+            result.sales_flow_id ??
+            application?.sales_flow_id ??
+            salesFlowId ??
+            null,
+        })
+      }
+
       if (result.status === "pending_fee") {
         const feePayment = await createOrResume(result.id)
 
@@ -205,7 +219,15 @@ export function useSubmitApplication({
   const handleDraft = async () => {
     setStatusBtn({ loadingDraft: true, loadingSubmit: false })
     try {
-      await submitMutation.mutateAsync("draft")
+      const result = await submitMutation.mutateAsync("draft")
+      if (!application?.id) {
+        trackGAApplicationEvent({
+          eventName: "application_draft_saved",
+          popup,
+          applicationId: result.id,
+          salesFlowId: result.sales_flow_id ?? salesFlowId ?? null,
+        })
+      }
       toast.success(t("application.draft_saved_title"), {
         description: t("application.draft_saved_description"),
       })
