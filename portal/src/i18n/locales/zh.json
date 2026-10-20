@@ -204,6 +204,7 @@
     "save_draft": "保存草稿",
     "gender_male": "男",
     "gender_female": "女",
+    "gender_non_binary": "非二元性别",
     "gender_specify_own": "自行填写性别",
     "gender_prefer_not": "不愿透露"
   },
@@ -702,6 +703,8 @@
     "basic_information_description": "完善个人资料需要填写名字和姓氏。",
     "name_required_hint": "请填写名字和姓氏后保存个人资料。",
     "additional_details": "补充信息",
+    "select_option": "请选择",
+    "not_specified": "未填写",
     "age": "年龄",
     "residence": "居住地",
     "hide_linked_emails": "隐藏关联邮箱",

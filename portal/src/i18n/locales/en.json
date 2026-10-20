@@ -220,6 +220,7 @@
     "save_draft": "Save as draft",
     "gender_male": "Male",
     "gender_female": "Female",
+    "gender_non_binary": "Non-binary",
     "gender_specify_own": "Specify own gender",
     "gender_prefer_not": "Prefer not to say"
   },
@@ -824,6 +825,8 @@
     "basic_information_description": "Your first and last name are required to complete your profile.",
     "name_required_hint": "Enter both names to save your profile.",
     "additional_details": "Additional details",
+    "select_option": "Select an option",
+    "not_specified": "Not specified",
     "age": "Age",
     "residence": "Residence",
     "hide_linked_emails": "Hide linked emails",

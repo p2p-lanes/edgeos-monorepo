@@ -205,6 +205,7 @@
     "save_draft": "Vista sem drög",
     "gender_male": "Karl",
     "gender_female": "Kona",
+    "gender_non_binary": "Kynsegin",
     "gender_specify_own": "Tilgreina eigið kyn",
     "gender_prefer_not": "Vil ekki segja"
   },
@@ -694,6 +695,8 @@
     "basic_information_description": "Fornafn og eftirnafn eru nauðsynleg til að ljúka prófílnum.",
     "name_required_hint": "Skráðu bæði nöfnin til að vista prófílinn.",
     "additional_details": "Viðbótarupplýsingar",
+    "select_option": "Veldu valkost",
+    "not_specified": "Ekki tilgreint",
     "age": "Aldur",
     "residence": "Búseta",
     "hide_linked_emails": "Fela tengd netföng",
