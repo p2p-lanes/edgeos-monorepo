@@ -268,6 +268,7 @@ class AttendeeCategoriesCRUD(
                 sales_flow_id=flow.id,
                 key=category.key,
                 is_primary=category.is_primary,
+                directory_eligible=category.directory_eligible,
                 sort_order=category.sort_order,
                 max_per_application=category.max_per_application,
                 required_fields=copy.deepcopy(category.required_fields),
