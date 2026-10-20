@@ -190,7 +190,9 @@ def test_legacy_privacy_choices_move_to_popup_directory_settings():
                     "application_role",
                 ]
                 session.refresh(application)
-                assert application.info_not_shared == []
+                assert application.info_not_shared == ["Email", "Role"]
+                session.refresh(no_attendee_application)
+                assert no_attendee_application.info_not_shared == ["Telegram"]
                 assert (
                     session.exec(
                         select(BaseFieldConfigs).where(
