@@ -1,4 +1,5 @@
 import type { PaymentPublic } from "@/client"
+import { PaymentFormResponseHistory } from "./PaymentFormResponseHistory"
 
 function record(value: unknown): Record<string, unknown> | null {
   return value !== null && typeof value === "object" && !Array.isArray(value)
@@ -22,7 +23,7 @@ function formatAnswer(value: unknown): string {
   return String(value)
 }
 
-/** Read only the form snapshot; current form edits must not rewrite history. */
+/** Labels come from purchase time; only audited buyer edits can change values. */
 export function paymentFormSections(snapshot: unknown) {
   const sections = record(snapshot)?.sections
   if (!Array.isArray(sections)) return []
@@ -55,7 +56,9 @@ export function paymentFormSections(snapshot: unknown) {
 
 export function PaymentFormResponses({
   snapshot,
+  paymentId,
 }: {
+  paymentId?: string
   snapshot: PaymentPublic["buyer_snapshot"]
 }) {
   const sections = paymentFormSections(snapshot)
@@ -63,7 +66,10 @@ export function PaymentFormResponses({
 
   return (
     <section aria-label="Form responses" className="mt-4 border-t pt-4">
-      <h3 className="text-lg font-semibold tracking-tight">Form responses</h3>
+      <div className="flex items-center justify-between gap-3">
+        <h3 className="text-lg font-semibold tracking-tight">Form responses</h3>
+        {paymentId && <PaymentFormResponseHistory paymentId={paymentId} />}
+      </div>
       <div className="mt-4 space-y-4">
         {sections.map((section, sectionIndex) => (
           <section key={`${section.label}-${sectionIndex}`}>

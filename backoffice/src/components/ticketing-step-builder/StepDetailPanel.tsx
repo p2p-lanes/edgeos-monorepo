@@ -9,12 +9,14 @@ import { Suspense, useEffect, useMemo, useRef, useState } from "react"
 
 import {
   type ApiError,
+  EventSettingsService,
   PopupsService,
   ProductsService,
   type TicketingStepPublic,
   TicketingStepsService,
 } from "@/client"
 import { QueryErrorBoundary } from "@/components/Common/QueryErrorBoundary"
+import { ResponseEditDeadline } from "@/components/ticketing-step-builder/ResponseEditDeadline"
 import { CollapsibleSection } from "@/components/ticketing-step-builder/step-detail/CollapsibleSection"
 import { ConfirmStepFields } from "@/components/ticketing-step-builder/step-detail/ConfirmStepFields"
 import { StepContentSection } from "@/components/ticketing-step-builder/step-detail/StepContentSection"
@@ -28,15 +30,18 @@ import {
 } from "@/components/ticketing-step-builder/template-configs/FaqItemsEditor"
 import { TranslationManager } from "@/components/translations/TranslationManager"
 import { Button } from "@/components/ui/button"
+import { Label } from "@/components/ui/label"
 import { LoadingButton } from "@/components/ui/loading-button"
 import { Separator } from "@/components/ui/separator"
 import { Skeleton } from "@/components/ui/skeleton"
+import { Switch } from "@/components/ui/switch"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import useCustomToast from "@/hooks/useCustomToast"
 import {
   UnsavedChangesDialog,
   useDirtyBlocker,
 } from "@/hooks/useUnsavedChanges"
+import { deadlineInZone, deadlineToUtc } from "@/lib/responseEditDeadline"
 import { cn } from "@/lib/utils"
 import { createErrorHandler } from "@/utils"
 
@@ -94,9 +99,23 @@ function StepDetailContent({
   const queryClient = useQueryClient()
   const { showSuccessToast, showErrorToast } = useCustomToast()
   const { data: step } = useSuspenseQuery(getStepQueryOptions(stepId))
+  const { data: popupSettings } = useSuspenseQuery({
+    queryKey: ["event-settings", step.popup_id],
+    queryFn: () =>
+      EventSettingsService.getEventSettings({ popupId: step.popup_id }),
+  })
+  const responseEditTimezone = popupSettings.timezone || "UTC"
   const isSubmittingRef = useRef(false)
 
   // Form state
+  const [allowResponseEditing, setAllowResponseEditing] = useState(
+    step.allow_response_editing ?? false,
+  )
+  const [responseEditDeadline, setResponseEditDeadline] = useState(
+    step.response_edit_deadline
+      ? deadlineInZone(step.response_edit_deadline, responseEditTimezone)
+      : "",
+  )
   const [title, setTitle] = useState(step.title)
   const [description, setDescription] = useState(step.description ?? "")
   const [watermark, setWatermark] = useState(step.watermark ?? "")
@@ -115,7 +134,31 @@ function StepDetailContent({
   const [showInNavbar, setShowInNavbar] = useState(step.show_in_navbar ?? true)
   const [emoji, setEmoji] = useState(step.emoji ?? "")
 
+  const editingSettingsError = useMemo(() => {
+    if (!allowResponseEditing) return null
+    if (
+      !responseEditDeadline.split("T")[0] ||
+      !responseEditDeadline.split("T")[1]
+    )
+      return "Choose a deadline date and time."
+    try {
+      deadlineToUtc(responseEditDeadline, responseEditTimezone)
+      return null
+    } catch (error) {
+      return error instanceof RangeError
+        ? "Check the gathering time zone in its settings."
+        : error instanceof Error
+          ? error.message
+          : "Choose a valid deadline and time zone."
+    }
+  }, [allowResponseEditing, responseEditDeadline, responseEditTimezone])
+
   const isDirty =
+    allowResponseEditing !== (step.allow_response_editing ?? false) ||
+    responseEditDeadline !==
+      (step.response_edit_deadline
+        ? deadlineInZone(step.response_edit_deadline, responseEditTimezone)
+        : "") ||
     title !== step.title ||
     description !== (step.description ?? "") ||
     watermark !== (step.watermark ?? "") ||
@@ -135,6 +178,12 @@ function StepDetailContent({
 
   // Sync on step change
   useEffect(() => {
+    setAllowResponseEditing(step.allow_response_editing ?? false)
+    setResponseEditDeadline(
+      step.response_edit_deadline
+        ? deadlineInZone(step.response_edit_deadline, responseEditTimezone)
+        : "",
+    )
     setTitle(step.title)
     setDescription(step.description ?? "")
     setWatermark(step.watermark ?? "")
@@ -146,6 +195,9 @@ function StepDetailContent({
     setShowInNavbar(step.show_in_navbar ?? true)
     setEmoji(step.emoji ?? "")
   }, [
+    step.allow_response_editing,
+    step.response_edit_deadline,
+    responseEditTimezone,
     step.title,
     step.description,
     step.watermark,
@@ -187,9 +239,23 @@ function StepDetailContent({
   // Save mutation
   const updateMutation = useMutation({
     mutationFn: async () => {
+      let deadline: string | null = null
+      if (step.step_type === "buyer" && responseEditDeadline) {
+        try {
+          deadline = deadlineToUtc(responseEditDeadline, responseEditTimezone)
+        } catch (error) {
+          if (allowResponseEditing) throw error
+        }
+      }
       await TicketingStepsService.updateTicketingStep({
         stepId: step.id,
         requestBody: {
+          ...(step.step_type === "buyer"
+            ? {
+                allow_response_editing: allowResponseEditing,
+                response_edit_deadline: deadline,
+              }
+            : {}),
           title,
           description: description || null,
           watermark: watermark || null,
@@ -340,6 +406,44 @@ function StepDetailContent({
             />
           )}
 
+          {step.step_type === "buyer" && (
+            <section
+              className="space-y-4 rounded-lg border p-4"
+              aria-label="Post-purchase response editing"
+            >
+              <div className="flex items-center justify-between gap-4">
+                <Label htmlFor="allow-response-editing">
+                  Allow editing after purchase
+                </Label>
+                <Switch
+                  id="allow-response-editing"
+                  checked={allowResponseEditing}
+                  onCheckedChange={setAllowResponseEditing}
+                />
+              </div>
+              <p className="text-sm text-muted-foreground">
+                Buyers can change their form answers from My purchases until the
+                deadline. Every change is recorded.
+              </p>
+              {allowResponseEditing && (
+                <div className="space-y-2">
+                  <ResponseEditDeadline
+                    value={responseEditDeadline}
+                    onChange={setResponseEditDeadline}
+                  />
+                  <p className="text-sm text-muted-foreground">
+                    Uses the gathering time zone: {responseEditTimezone}.
+                  </p>
+                </div>
+              )}
+              {editingSettingsError && (
+                <p role="alert" className="text-sm text-destructive">
+                  {editingSettingsError}
+                </p>
+              )}
+            </section>
+          )}
+
           {/* Display & advanced */}
           <StepDisplaySettings
             stepType={step.step_type}
@@ -404,6 +508,7 @@ function StepDetailContent({
             </Button>
             <LoadingButton
               loading={updateMutation.isPending}
+              disabled={step.step_type === "buyer" && !!editingSettingsError}
               onClick={() => updateMutation.mutate()}
             >
               Save

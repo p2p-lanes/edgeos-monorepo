@@ -4,6 +4,7 @@ import { type ReactNode, useEffect, useState } from "react"
 import { useTranslation } from "react-i18next"
 import QRCodeReact from "react-qr-code"
 import { Drawer as DrawerPrimitive } from "vaul"
+import { PaymentFormResponses } from "@/components/payments/PaymentFormResponses"
 import ExpandableDescription from "@/components/ui/ExpandableDescription"
 import { useIsMobile } from "@/hooks/useIsMobile"
 import { imageOptimization } from "@/lib/image-optimization"
@@ -201,6 +202,10 @@ const SheetBody = ({
         {entry.requires_check_in === true && <CheckInCode entry={entry} />}
 
         {booking && <StayDetails booking={booking} />}
+
+        {entry.payment_id && (
+          <PaymentFormResponses paymentId={entry.payment_id} />
+        )}
 
         {description && fullHeight && (
           <p className="whitespace-pre-line break-words text-[15px] leading-relaxed text-pass-text">

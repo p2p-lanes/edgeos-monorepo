@@ -13,6 +13,13 @@ from app.api.attendee.models import AttendeeProducts
 from app.api.audit_log.actor import actor_from_human
 from app.api.check_in.crud import get_last_scan_by_tickets
 from app.api.payment.crud import payments_crud
+from app.api.payment.form_responses import (
+    FormResponseEdit,
+    PaymentFormResponsesPublic,
+    edit_responses,
+    owned_payment,
+    read_responses,
+)
 from app.api.payment.models import Payments
 from app.api.payment.schemas import (
     ApplicationFeeCreate,
@@ -68,6 +75,49 @@ if TYPE_CHECKING:
     from app.api.popup.models import Popups
 
 router = APIRouter(prefix="/payments", tags=["payments"])
+
+
+@router.get(
+    "/my/{payment_id}/form-responses",
+    response_model=PaymentFormResponsesPublic,
+    dependencies=[needs("portal:payments:read")],
+)
+async def get_my_form_responses(
+    payment_id: uuid.UUID, db: HumanTenantSession, current_human: CurrentHuman
+) -> PaymentFormResponsesPublic:
+    return read_responses(
+        db, owned_payment(db, payment_id, current_human.tenant_id, current_human.id)
+    )
+
+
+@router.patch(
+    "/my/{payment_id}/form-responses",
+    response_model=PaymentFormResponsesPublic,
+    dependencies=[needs("portal:payments:write")],
+)
+async def edit_my_form_responses(
+    payment_id: uuid.UUID,
+    payload: FormResponseEdit,
+    db: HumanTenantSession,
+    current_human: CurrentHuman,
+) -> PaymentFormResponsesPublic:
+    payment = owned_payment(
+        db, payment_id, current_human.tenant_id, current_human.id, lock=True
+    )
+    return edit_responses(db, payment, current_human.id, payload)
+
+
+@router.get("/{payment_id}/form-responses", response_model=PaymentFormResponsesPublic)
+async def get_payment_form_responses(
+    payment_id: uuid.UUID,
+    db: AdminOrApiKeySession_PaymentsRead,
+    _: AdminOrApiKey_PaymentsRead,
+) -> PaymentFormResponsesPublic:
+    payment = payments_crud.get(db, payment_id)
+    if payment is None:
+        raise HTTPException(404, "Payment not found")
+    return read_responses(db, payment)
+
 
 _META_BROWSER_ID_PATTERN = re.compile(r"^fb\.1\.\d{10,13}\.[A-Za-z0-9._-]{1,256}$")
 _MAX_USER_AGENT_LENGTH = 512

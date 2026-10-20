@@ -703,6 +703,7 @@
     "no_passes_yet_suffix": "para comprar",
     "check_in_code": "Código de check-in",
     "qr_already_scanned": "QR ya escaneado",
+    "purchase_details_label": "Ver detalles de la compra de {{product}}",
     "purchase_details_close": "Cerrar",
     "purchase_address": "Dirección",
     "purchase_total_paid": "Total pagado",
@@ -1606,5 +1607,22 @@
     "badge_count_one": "{{count}} insignia",
     "badge_count_other": "{{count}} insignias",
     "no_badges": "Todavía no tiene insignias."
+  },
+  "form_responses": {
+    "view": "Ver respuestas",
+    "hide": "Ocultar respuestas",
+    "not_answered": "Sin responder",
+    "title": "Respuestas del formulario",
+    "edit": "Editar respuestas",
+    "edit_action": "Editar",
+    "deadline": "Podés editar tus respuestas hasta {{date}} ({{timezone}}).",
+    "expired": "El plazo de edición terminó.",
+    "unavailable": "La edición de respuestas ya no está disponible.",
+    "save": "Guardar cambios",
+    "saving": "Guardando…",
+    "cancel": "Cancelar",
+    "saved": "Respuestas actualizadas.",
+    "save_error": "No se pudieron guardar las respuestas. Intentá nuevamente.",
+    "history": "Historial de respuestas"
   }
 }

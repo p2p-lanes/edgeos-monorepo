@@ -151,7 +151,12 @@ from app.api.human.schemas import HumanCreate, HumanPublic, HumanUpdate
 from app.api.invite.models import Invites
 
 # Payment models
-from app.api.payment.models import PaymentProducts, PaymentRecipients, Payments
+from app.api.payment.models import (
+    PaymentFormResponseChanges,
+    PaymentProducts,
+    PaymentRecipients,
+    Payments,
+)
 from app.api.payment.schemas import PaymentCreate, PaymentPublic, PaymentUpdate
 from app.api.popup.models import PopupHomePages, Popups
 from app.api.popup.schemas import (
@@ -351,6 +356,7 @@ __all__ = [
     "PaymentRecipients",
     "PaymentCreate",
     "PaymentPublic",
+    "PaymentFormResponseChanges",
     "PaymentUpdate",
     # Approval system
     "ApprovalStrategies",

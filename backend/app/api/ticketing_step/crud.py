@@ -172,6 +172,8 @@ class TicketingStepsCRUD(
                     description=step.description,
                     order=step.order,
                     is_enabled=step.is_enabled,
+                    allow_response_editing=step.allow_response_editing,
+                    response_edit_deadline=step.response_edit_deadline,
                     protected=step.protected,
                     product_category=step.product_category,
                     template=step.template,

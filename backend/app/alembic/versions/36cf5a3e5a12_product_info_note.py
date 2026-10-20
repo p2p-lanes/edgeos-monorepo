@@ -1,7 +1,7 @@
 """Add an optional info note to products.
 
 Revision ID: 36cf5a3e5a12
-Revises: e8a4f1c7d2b6
+Revises: fe720154706f
 
 Short admin-written context the checkout reveals behind an info icon next to
 the product name ("A passport will be requested for this product"). NULL
@@ -14,7 +14,7 @@ import sqlalchemy as sa
 from alembic import op
 
 revision: str = "36cf5a3e5a12"
-down_revision: str | None = "e8a4f1c7d2b6"
+down_revision: str | None = "fe720154706f"
 branch_labels: Sequence[str] | None = None
 depends_on: Sequence[str] | None = None
 

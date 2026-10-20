@@ -44,6 +44,7 @@ const product = (productId: string, units?: Unit[]) => ({
 })
 
 const shirtRow = {
+  paymentId: "payment-1",
   id: "shirt",
   name: "Event shirt",
   category: "merch",

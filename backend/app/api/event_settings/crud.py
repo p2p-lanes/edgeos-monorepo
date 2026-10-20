@@ -1,4 +1,5 @@
 import uuid
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from sqlmodel import Session, select
 
@@ -29,6 +30,17 @@ class EventSettingsCRUD(
     ) -> EventSettings | None:
         statement = select(EventSettings).where(EventSettings.popup_id == popup_id)
         return session.exec(statement).first()
+
+    def get_popup_timezone(self, session: Session, popup_id: uuid.UUID) -> str:
+        """Return the popup's configured time zone, with UTC as fallback."""
+        settings = self.get_by_popup_id(session, popup_id)
+        if settings and settings.timezone:
+            try:
+                ZoneInfo(settings.timezone)
+                return settings.timezone
+            except (ZoneInfoNotFoundError, ValueError):
+                pass
+        return "UTC"
 
 
 event_settings_crud = EventSettingsCRUD()

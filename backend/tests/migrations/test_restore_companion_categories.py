@@ -5,7 +5,7 @@ from datetime import UTC, datetime
 
 from alembic import command
 from alembic.config import Config
-from sqlalchemy import text
+from sqlalchemy import MetaData, Table, text
 from sqlmodel import Session
 
 from app.alembic.versions import d6f2b8a94c31_restore_companion_categories as migration
@@ -54,6 +54,9 @@ def test_backfill_preserves_buyers_existing_categories_and_ambiguous_history(
                 "ADD COLUMN sidebar_config JSONB"
             )
         )
+        # Insert payments against the historical schema, without newer ORM
+        # columns such as form_response_version that this revision never had.
+        payments_table = Table("payments", MetaData(), autoload_with=connection)
         with Session(bind=connection, join_transaction_mode="create_savepoint") as db:
             tenant = Tenants(name="Repair test", slug=f"repair-{uuid.uuid4()}")
             db.add(tenant)
@@ -146,8 +149,15 @@ def test_backfill_preserves_buyers_existing_categories_and_ambiguous_history(
                     buyer_human_id=buyer.id,
                     status=status,
                 )
-                db.add(payment)
-                db.flush()
+                db.execute(
+                    payments_table.insert().values(
+                        **{
+                            key: value
+                            for key, value in payment.model_dump().items()
+                            if key in payments_table.c
+                        }
+                    )
+                )
                 db.add(
                     PaymentRecipients(
                         tenant_id=tenant.id,

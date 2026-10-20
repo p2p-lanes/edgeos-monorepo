@@ -278,6 +278,11 @@ def delete_flow_and_its_configuration(session: Session, flow: SalesFlows) -> Non
     from sqlmodel import delete as sql_delete  # noqa: PLC0415
 
     for module, name in BELONGINGS:
+        if name == "FormSections":
+            # Let the sales_flow_id FK cascade delete sections. This keeps the
+            # protected-section trigger able to distinguish direct deletes
+            # from a flow's own configuration cleanup.
+            continue
         model = _model(module, name)
         session.exec(sql_delete(model).where(model.sales_flow_id == flow.id))
     session.delete(flow)

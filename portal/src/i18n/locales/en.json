@@ -703,6 +703,7 @@
     "no_passes_yet_suffix": "to purchase",
     "check_in_code": "Check-in code",
     "qr_already_scanned": "QR already scanned",
+    "purchase_details_label": "View purchase details for {{product}}",
     "purchase_details_close": "Close",
     "purchase_address": "Address",
     "purchase_total_paid": "Total paid",
@@ -1630,5 +1631,22 @@
     "badge_count_one": "{{count}} badge",
     "badge_count_other": "{{count}} badges",
     "no_badges": "No badges yet."
+  },
+  "form_responses": {
+    "view": "View responses",
+    "hide": "Hide responses",
+    "not_answered": "Not answered",
+    "title": "Form responses",
+    "edit": "Edit responses",
+    "edit_action": "Edit",
+    "deadline": "You can edit your responses until {{date}} ({{timezone}}).",
+    "expired": "The editing deadline has passed.",
+    "unavailable": "Response editing is no longer available.",
+    "save": "Save changes",
+    "saving": "Saving…",
+    "cancel": "Cancel",
+    "saved": "Responses updated.",
+    "save_error": "Could not save your responses. Please try again.",
+    "history": "Response history"
   }
 }

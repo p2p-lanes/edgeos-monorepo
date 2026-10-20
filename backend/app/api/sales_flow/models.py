@@ -1,11 +1,17 @@
 import uuid
 from datetime import UTC, datetime
+from typing import TYPE_CHECKING
 
 from sqlalchemy import CheckConstraint, Index, UniqueConstraint, text
 from sqlalchemy.dialects.postgresql import UUID
-from sqlmodel import Column, DateTime, Field, func
+from sqlmodel import Column, DateTime, Field, Relationship, func
 
 from app.api.sales_flow.schemas import SalesFlowBase
+
+if TYPE_CHECKING:
+    from app.api.base_field_config.models import BaseFieldConfigs
+    from app.api.form_field.models import FormFields
+    from app.api.form_section.models import FormSections
 
 
 class SalesFlows(SalesFlowBase, table=True):
@@ -21,6 +27,9 @@ class SalesFlows(SalesFlowBase, table=True):
     __tablename__ = "sales_flows"
     __table_args__ = (
         UniqueConstraint("popup_id", "slug", name="uq_sales_flows_popup_slug"),
+        UniqueConstraint(
+            "id", "popup_id", "tenant_id", name="uq_sales_flows_id_popup_tenant"
+        ),
         CheckConstraint(
             "type IN ('application', 'direct', 'upsale')",
             name="ck_sales_flows_type",
@@ -66,4 +75,22 @@ class SalesFlows(SalesFlowBase, table=True):
             onupdate=func.now(),
             nullable=False,
         ),
+    )
+
+    form_sections: list["FormSections"] = Relationship(
+        back_populates="sales_flow",
+        sa_relationship_kwargs={
+            "foreign_keys": "FormSections.sales_flow_id",
+            "passive_deletes": "all",
+        },
+    )
+    form_fields: list["FormFields"] = Relationship(
+        back_populates="sales_flow",
+        cascade_delete=True,
+        sa_relationship_kwargs={"foreign_keys": "FormFields.sales_flow_id"},
+    )
+    base_field_configs: list["BaseFieldConfigs"] = Relationship(
+        back_populates="sales_flow",
+        cascade_delete=True,
+        sa_relationship_kwargs={"foreign_keys": "BaseFieldConfigs.sales_flow_id"},
     )

@@ -724,7 +724,10 @@ function PaymentSubRow({ row }: { row: Row<PaymentPublic> }) {
           ) : null}
         </tfoot>
       </table>
-      <PaymentFormResponses snapshot={payment.buyer_snapshot} />
+      <PaymentFormResponses
+        paymentId={payment.id}
+        snapshot={payment.buyer_snapshot}
+      />
     </div>
   )
 }

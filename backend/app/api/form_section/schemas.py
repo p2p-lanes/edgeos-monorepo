@@ -2,7 +2,9 @@ import uuid
 from enum import Enum
 
 from pydantic import BaseModel, ConfigDict
-from sqlmodel import Field, SQLModel
+from sqlalchemy import ForeignKey
+from sqlalchemy.dialects.postgresql import UUID
+from sqlmodel import Column, Field, SQLModel
 
 
 class FormSectionKind(str, Enum):
@@ -11,12 +13,20 @@ class FormSectionKind(str, Enum):
 
 
 class FormSectionBase(SQLModel):
-    tenant_id: uuid.UUID = Field(foreign_key="tenants.id", index=True)
-    popup_id: uuid.UUID = Field(foreign_key="popups.id", index=True)
+    tenant_id: uuid.UUID = Field(
+        sa_column=Column(
+            UUID(as_uuid=True), ForeignKey("tenants.id", ondelete="CASCADE"), index=True
+        )
+    )
+    popup_id: uuid.UUID = Field(
+        sa_column=Column(
+            UUID(as_uuid=True), ForeignKey("popups.id", ondelete="CASCADE"), index=True
+        )
+    )
     # sdd/sales-flows-rediseno slice 3: belongs to exactly one flow.
     # There is no popup-shared tier and nothing is inherited.
     sales_flow_id: uuid.UUID = Field(
-        foreign_key="sales_flows.id", nullable=False, index=True
+        sa_column=Column(UUID(as_uuid=True), nullable=False, index=True)
     )
     label: str
     description: str | None = Field(default=None, nullable=True)

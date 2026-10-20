@@ -30,6 +30,7 @@ HumanScope = Literal[
     "portal:applications:write",
     "portal:attendees:write",
     "portal:payments:read",
+    "portal:payments:write",
     "portal:directory:read",
     "portal:api_keys:manage",
     "portal:badges:write",

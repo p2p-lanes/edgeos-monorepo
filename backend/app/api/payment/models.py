@@ -13,7 +13,7 @@ from sqlalchemy import (
     UniqueConstraint,
     text,
 )
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlmodel import Column, DateTime, Field, Relationship, SQLModel, func
 
 from app.api.payment.schemas import (
@@ -273,3 +273,22 @@ class PaymentInstallments(SQLModel, table=True):
 
     # Relationships
     payment: "Payments" = Relationship(back_populates="installments")
+
+
+class PaymentFormResponseChanges(SQLModel, table=True):
+    """Append-only audit of answer values; labels and payment identity stay untouched."""
+
+    __tablename__ = "payment_form_response_changes"
+    id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
+    tenant_id: uuid.UUID = Field(foreign_key="tenants.id", index=True)
+    payment_id: uuid.UUID = Field(foreign_key="payments.id", index=True)
+    field_id: uuid.UUID
+    field_label: str
+    old_value: object = Field(sa_column=Column(JSONB, nullable=True))
+    new_value: object = Field(sa_column=Column(JSONB, nullable=True))
+    changed_by_human_id: uuid.UUID = Field(foreign_key="humans.id")
+    changed_at: datetime = Field(
+        default_factory=lambda: datetime.now(UTC),
+        sa_column=Column(DateTime(timezone=True), nullable=False),
+    )
+    version: int

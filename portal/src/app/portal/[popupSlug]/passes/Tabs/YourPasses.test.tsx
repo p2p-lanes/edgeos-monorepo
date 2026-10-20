@@ -12,6 +12,12 @@ interface QueryConfiguration {
   queryKey: unknown[]
 }
 
+vi.mock("@/components/payments/PaymentFormResponses", () => ({
+  PaymentFormResponses: ({ paymentId }: { paymentId: string }) => (
+    <div data-testid="purchase-form-payment">{paymentId}</div>
+  ),
+}))
+
 const queryConfigurations = vi.hoisted(() => [] as QueryConfiguration[])
 const queryResult = vi.hoisted(() => ({ data: undefined as unknown }))
 const productsQueryResult = vi.hoisted(() => ({ data: [] as unknown[] }))
@@ -342,6 +348,7 @@ describe("YourPasses selected projection", () => {
         {
           ...base.ticket_entries![0],
           id: "ticket-eclipse",
+          payment_id: "payment-eclipse",
           product_id: "product-eclipse",
           product_name: "The Luxor Eclipse Gathering",
           product_description: "Three days on the West Bank.",
@@ -349,6 +356,7 @@ describe("YourPasses selected projection", () => {
         {
           ...base.ticket_entries![0],
           id: "ticket-felucca",
+          payment_id: "payment-felucca",
           product_id: "product-felucca",
           product_name: "Nile Sunset Felucca",
           product_description: "Two hours sailing from the Corniche.",
@@ -365,5 +373,8 @@ describe("YourPasses selected projection", () => {
     expect(
       screen.getByRole("dialog", { name: "Nile Sunset Felucca" }),
     ).toBeTruthy()
+    expect(screen.getByTestId("purchase-form-payment").textContent).toBe(
+      "payment-felucca",
+    )
   })
 })
