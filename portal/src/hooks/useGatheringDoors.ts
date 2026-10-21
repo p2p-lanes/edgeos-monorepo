@@ -26,7 +26,7 @@ export interface GatheringDoor {
   slug: string
   /** Absent when the person has not applied through this door yet. */
   application: ApplicationPortalPublic | null
-  status: "none" | "draft" | "in review" | "accepted" | "rejected"
+  status: "none" | "draft" | "in review" | "accepted" | "rejected" | "withdrawn"
 }
 
 function statusOf(
@@ -38,7 +38,8 @@ function statusOf(
     raw === "draft" ||
     raw === "in review" ||
     raw === "accepted" ||
-    raw === "rejected"
+    raw === "rejected" ||
+    raw === "withdrawn"
   ) {
     return raw
   }

@@ -15,6 +15,7 @@ describe("shouldRedirectToStatus", () => {
   it("redirects on a resolved application", () => {
     expect(shouldRedirectToStatus("accepted")).toBe(true)
     expect(shouldRedirectToStatus("rejected")).toBe(true)
+    expect(shouldRedirectToStatus("withdrawn")).toBe(true)
   })
 
   it("keeps the form open while the application can still be finished", () => {

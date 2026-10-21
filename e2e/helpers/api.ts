@@ -93,7 +93,12 @@ export async function loginAsHuman(
 // ---------------------------------------------------------------------------
 
 export type Tenant = { id: string; slug: string; name: string }
-export type Popup = { id: string; slug: string; name: string; tenant_id: string }
+export type Popup = {
+  id: string
+  slug: string
+  name: string
+  tenant_id: string
+}
 export type Human = { id: string; email: string; tenant_id: string }
 export type EdgeEvent = {
   id: string
@@ -139,10 +144,9 @@ export async function getActivePopup(
   tenant: Tenant,
 ): Promise<Popup> {
   type PopupWithStatus = Popup & { status: string }
-  const list = await request<{ results: PopupWithStatus[] }>(
-    "/api/v1/popups",
-    { headers: tenantHeader(superToken, tenant.id) },
-  )
+  const list = await request<{ results: PopupWithStatus[] }>("/api/v1/popups", {
+    headers: tenantHeader(superToken, tenant.id),
+  })
   const active = list.results.find((p) => p.status === "active")
   if (!active) {
     throw new Error(
@@ -198,4 +202,55 @@ export async function createPublishedEvent(
       status: "published",
     },
   })
+}
+
+/** Isolated future gathering and application for withdrawn-state regressions. */
+export async function createWithdrawnApplicationFixture(superToken: string) {
+  const tenant = await getDemoTenant(superToken)
+  const headers = tenantHeader(superToken, tenant.id)
+  const nonce = crypto.randomUUID().slice(0, 8)
+  const start = new Date()
+  start.setUTCFullYear(start.getUTCFullYear() + 1)
+  const end = new Date(start)
+  end.setUTCDate(end.getUTCDate() + 7)
+  const popup = await request<Popup>("/api/v1/popups", {
+    method: "POST",
+    headers,
+    body: {
+      name: `Withdrawn E2E ${nonce}`,
+      slug: `withdrawn-e2e-${nonce}`,
+      status: "active",
+      start_date: start.toISOString(),
+      end_date: end.toISOString(),
+      visible_in_portal: true,
+    },
+  })
+  const profile = {
+    popup_id: popup.id,
+    last_name: "E2E",
+    telegram: "@withdrawn_e2e",
+    residence: "Buenos Aires",
+    gender: "male",
+    age: "35-44",
+  }
+  const email = `withdrawn-${nonce}@example.com`
+  const application = await request<{ id: string; sales_flow_id: string }>(
+    "/api/v1/applications",
+    {
+      method: "POST",
+      headers,
+      body: { ...profile, email, first_name: "Withdrawn", status: "withdrawn" },
+    },
+  )
+  await request("/api/v1/applications", {
+    method: "POST",
+    headers,
+    body: {
+      ...profile,
+      email: `accepted-${nonce}@example.com`,
+      first_name: "Accepted",
+      status: "accepted",
+    },
+  })
+  return { tenant, popup, application, email }
 }

@@ -217,4 +217,23 @@ describe("useGatheringDoors", () => {
     expect(result.current.isLoading).toBe(false)
     expect(result.current.doors).toHaveLength(1)
   })
+  it("preserves withdrawn for listed and unlisted application flows", () => {
+    mocks.flows = [
+      { id: "flow-listed", slug: "attendee", name: "Attendee", order: 0 },
+    ] as SalesFlowPortalPublic[]
+    mocks.popupApplications = ["flow-listed", "flow-unlisted"].map(
+      (id) =>
+        ({
+          id: `application-${id}`,
+          popup_id: "popup-1",
+          sales_flow_id: id,
+          status: "withdrawn",
+        }) as ApplicationPortalPublic,
+    )
+    const { result } = renderHook(() => useGatheringDoors("popup-1"))
+    expect(result.current.doors.map(({ status }) => status)).toEqual([
+      "withdrawn",
+      "withdrawn",
+    ])
+  })
 })

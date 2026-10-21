@@ -18,7 +18,7 @@ const CTA_KEYS: Record<EventStatus, string> = {
   "in review": "cta.in_review",
   accepted: "cta.accepted",
   rejected: "",
-  withdrawn: "cta.withdrawn",
+  withdrawn: "",
 }
 
 interface EventCardContext {

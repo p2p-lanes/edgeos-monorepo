@@ -1,4 +1,4 @@
-const TERMINAL_STATUSES = new Set(["accepted", "rejected"])
+const TERMINAL_STATUSES = new Set(["accepted", "rejected", "withdrawn"])
 
 /**
  * Whether the form should hand back to the status page.

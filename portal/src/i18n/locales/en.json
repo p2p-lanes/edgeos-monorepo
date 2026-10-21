@@ -82,6 +82,7 @@
     "direct_sales_description": "Choose an available option for this event.",
     "door_generic": "Your application",
     "door_status": {
+      "withdrawn": "Withdrawn",
       "accepted": "Accepted",
       "in_review": "In review",
       "draft": "Draft",

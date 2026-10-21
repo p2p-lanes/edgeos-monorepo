@@ -1,7 +1,11 @@
 import { Calendar, Clock, MapPin } from "lucide-react"
 import Image from "next/image"
 import { useTranslation } from "react-i18next"
-import type { HumanProfileStatsPopup, PopupPublic } from "@/client"
+import type {
+  ApplicationStatus,
+  HumanProfileStatsPopup,
+  PopupPublic,
+} from "@/client"
 import { imageOptimization } from "@/lib/image-optimization"
 import { cn } from "@/lib/utils"
 import { useApplication } from "@/providers/applicationProvider"
@@ -44,8 +48,6 @@ function PopupThumb({
     </div>
   )
 }
-
-type ApplicationStatus = "draft" | "in review" | "accepted" | "rejected"
 
 interface PopupWithApplicationStatus {
   popup_name: string
@@ -106,6 +108,11 @@ const PopupsHistory = ({ popups }: { popups: HumanProfileStatsPopup[] }) => {
         return {
           label: t("status.application_submitted"),
           className: "bg-primary/20 text-blue-800",
+        }
+      case "withdrawn":
+        return {
+          label: t("status.withdrawn"),
+          className: "bg-muted text-muted-foreground",
         }
       case "draft":
         return {
@@ -178,11 +185,12 @@ const PopupsHistory = ({ popups }: { popups: HumanProfileStatsPopup[] }) => {
 
       <div className="py-2">
         <div className="space-y-6">
-          {popups.length === 0 && (
-            <div className="text-center text-muted-foreground p-4">
-              {t("profile.no_events")}
-            </div>
-          )}
+          {popups.length === 0 &&
+            upcomingPopupsFromApplications.length === 0 && (
+              <div className="text-center text-muted-foreground p-4">
+                {t("profile.no_events")}
+              </div>
+            )}
           <div className="flex items-center gap-2 mb-4">
             <Calendar className="w-6 h-6 text-foreground" />
             <h4 className="text-md font-semibold text-foreground">

@@ -31,14 +31,12 @@ import {
   useRef,
   useState,
 } from "react"
-
 import {
   type ApiError,
   type ApplicationPublic,
   type ApplicationReviewerOption,
   type ApplicationReviewerVote,
   ApplicationReviewsService,
-  type ApplicationStatus,
   ApplicationsService,
   ApprovalStrategiesService,
   FormFieldsService,
@@ -59,6 +57,7 @@ import {
   type ApplicationsView,
   ApplicationsViewSwitcher,
 } from "@/components/applications/ApplicationsViewSwitcher"
+import { APPLICATION_STATUS_OPTIONS } from "@/components/applications/application-status"
 import {
   availableFixedGroupByOptions,
   FIXED_GROUP_BY_OPTIONS,
@@ -229,17 +228,6 @@ function buildCustomFieldColumns(
       } satisfies ColumnDef<ApplicationPublic>
     })
 }
-
-const APPLICATION_STATUS_OPTIONS: {
-  value: ApplicationStatus
-  label: string
-}[] = [
-  { value: "draft", label: "Draft" },
-  { value: "pending_fee", label: "Pending Fee" },
-  { value: "in review", label: "In Review" },
-  { value: "accepted", label: "Accepted" },
-  { value: "rejected", label: "Rejected" },
-]
 
 // Field types whose answers come from a closed option list. All of them
 // store the selected option string(s), so filters can match exact values.
