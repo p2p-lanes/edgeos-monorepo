@@ -68,6 +68,7 @@
     "direct_sales_description": "Veldu einn af tiltækum möguleikum fyrir þennan viðburð.",
     "door_generic": "Umsóknin þín",
     "door_status": {
+      "withdrawn": "Afturkölluð",
       "accepted": "Samþykkt",
       "in_review": "Í yfirferð",
       "draft": "Drög",

@@ -18,6 +18,7 @@ const STATUS_TONE: Record<GatheringDoor["status"], string> = {
   "in review": "bg-amber-500/10 text-amber-600 dark:text-amber-400",
   draft: "bg-muted text-muted-foreground",
   rejected: "bg-destructive/10 text-destructive",
+  withdrawn: "bg-muted text-muted-foreground",
   none: "bg-muted text-muted-foreground",
 }
 
@@ -84,8 +85,8 @@ export function GatheringDoorCard({
           door and none at the other (sdd/sales-flows-rediseno). */}
 
       {/* A door that is not accepted yet still needs a way in, and a
-          rejected one deliberately offers none. */}
-      {door.status !== "rejected" && (
+          rejected or withdrawn one deliberately offers none. */}
+      {door.status !== "rejected" && door.status !== "withdrawn" && (
         <Button
           onClick={onClick}
           variant={isAccepted ? "default" : "outline"}
