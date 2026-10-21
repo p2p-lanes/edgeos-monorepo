@@ -14,7 +14,10 @@ from app.api.application.router import _build_directory_entry
 from app.api.attendee.models import AttendeeProducts, Attendees
 from app.core.security import create_access_token
 from tests.api.application import test_attendee_directory_search_privacy as search_tests
-from tests.api.application.test_attendee_directory import _privacy_option, _product
+from tests.api.application.test_attendee_directory import (
+    _product,
+    _set_shared_fields,
+)
 
 search_world = search_tests.search_world
 
@@ -24,7 +27,6 @@ PORTAL_FIELDS = ("first_name", "last_name", "email", "telegram", "role", "organi
 @pytest.fixture()
 def empty_row_world(db: Session, search_world):
     hidden = search_world["private"]
-    hidden.application.info_not_shared = list(PORTAL_FIELDS)
     # These are shared API/CSV fields, but are not columns in the portal table.
     hidden.human.residence = "India"
     hidden.human.age = "30"
@@ -35,25 +37,15 @@ def empty_row_world(db: Session, search_world):
     db.add(hidden.human)
     db.add(hidden)
     db.commit()
+    _set_shared_fields(db, hidden.human, hidden.popup, ["residence", "age", "gender"])
     return search_world
 
 
-@pytest.mark.parametrize(
-    "style",
-    ("lowercase", "capitalized", "mixed_case", "whitespace", "unicode_whitespace"),
-)
 def test_directory_api_empty_row_filter_is_opt_in_and_csv_is_unchanged(
-    db: Session, client: TestClient, empty_row_world, style: str
+    db: Session, client: TestClient, empty_row_world
 ) -> None:
     hidden = empty_row_world["private"]
-    hidden.application.info_not_shared = [
-        f"\u00a0{field.upper()}\u3000"
-        if style == "unicode_whitespace"
-        else _privacy_option(field, style)
-        for field in PORTAL_FIELDS
-    ]
-    db.add(hidden.application)
-    db.commit()
+    _set_shared_fields(db, hidden.human, hidden.popup, ["residence", "age", "gender"])
     headers = {
         "Authorization": f"Bearer {create_access_token(subject=empty_row_world['public'].human_id, token_type='human')}"
     }
@@ -125,13 +117,14 @@ def test_one_shared_portal_field_is_enough_to_keep_a_row(
     db: Session, empty_row_world, field: str
 ) -> None:
     hidden = empty_row_world["private"]
-    hidden.application.info_not_shared = [key for key in PORTAL_FIELDS if key != field]
     hidden.application.custom_fields = {
         "role_in_the_organization": "Alias Role",
         "organization_you_represent": "Alias Organization",
     }
     db.add(hidden.application)
     db.commit()
+    shared = ["residence", "age", "gender", field]
+    _set_shared_fields(db, hidden.human, hidden.popup, shared)
     results, total = applications_crud.find_directory(
         db, popup_id=empty_row_world["popup"].id, hide_empty_rows=True
     )
@@ -148,7 +141,6 @@ def test_blank_or_mask_marker_is_not_visible_content(
     db: Session, empty_row_world, field: str, value: str | None
 ) -> None:
     hidden = empty_row_world["private"]
-    hidden.application.info_not_shared = [key for key in PORTAL_FIELDS if key != field]
     if field in ("role", "organization"):
         hidden.application.custom_fields = {field: value}
     else:
@@ -156,6 +148,7 @@ def test_blank_or_mask_marker_is_not_visible_content(
         db.add(hidden.human)
     db.add(hidden.application)
     db.commit()
+    _set_shared_fields(db, hidden.human, hidden.popup, [field])
     # The attendee snapshot still has a name, but must not replace a linked
     # human's blank profile value when the serializer doesn't do so.
     results, total = applications_crud.find_directory(
@@ -178,10 +171,10 @@ def test_custom_alias_filter_matches_nonblank_text_resolution(
     db: Session, empty_row_world, field: str, alias: str, canonical
 ) -> None:
     hidden = empty_row_world["private"]
-    hidden.application.info_not_shared = [key for key in PORTAL_FIELDS if key != field]
     hidden.application.custom_fields = {field: canonical, alias: "Visible Alias"}
     db.add(hidden.application)
     db.commit()
+    _set_shared_fields(db, hidden.human, hidden.popup, [field])
     results, total = applications_crud.find_directory(
         db, popup_id=empty_row_world["popup"].id, hide_empty_rows=True
     )
@@ -201,10 +194,10 @@ def test_non_text_custom_values_cannot_make_a_row_visible(
     db: Session, empty_row_world, field: str, alias: str, non_text
 ) -> None:
     hidden = empty_row_world["private"]
-    hidden.application.info_not_shared = [key for key in PORTAL_FIELDS if key != field]
     hidden.application.custom_fields = {field: non_text, alias: non_text}
     db.add(hidden.application)
     db.commit()
+    _set_shared_fields(db, hidden.human, hidden.popup, [field])
     assert getattr(_build_directory_entry(hidden), field) is None
     results, total = applications_crud.find_directory(
         db, popup_id=empty_row_world["popup"].id, hide_empty_rows=True
@@ -223,10 +216,10 @@ def test_canonical_mask_marker_does_not_fall_back_to_visible_alias(
     db: Session, empty_row_world, field: str, alias: str
 ) -> None:
     hidden = empty_row_world["private"]
-    hidden.application.info_not_shared = [key for key in PORTAL_FIELDS if key != field]
     hidden.application.custom_fields = {field: "*", alias: "Must Not Be Used"}
     db.add(hidden.application)
     db.commit()
+    _set_shared_fields(db, hidden.human, hidden.popup, [field])
     assert getattr(_build_directory_entry(hidden), field) == "*"
     results, total = applications_crud.find_directory(
         db, popup_id=empty_row_world["popup"].id, hide_empty_rows=True
@@ -235,19 +228,19 @@ def test_canonical_mask_marker_does_not_fall_back_to_visible_alias(
 
 
 @pytest.mark.parametrize(
-    "name,email,visible",
+    "name,email",
     (
-        ("Snapshot Name", None, True),
-        ("", "snapshot@example.com", True),
-        ("", None, False),
-        ("", "", False),
-        (" \t\n ", " \t\n ", False),
-        ("\u00a0 \u3000", "\u00a0 \u3000", False),
-        ("*", "*", False),
+        ("Snapshot Name", None),
+        ("", "snapshot@example.com"),
+        ("", None),
+        ("", ""),
+        (" \t\n ", " \t\n "),
+        ("\u00a0 \u3000", "\u00a0 \u3000"),
+        ("*", "*"),
     ),
 )
-def test_unlinked_companion_uses_own_snapshot_not_applicant_custom_fields(
-    db: Session, empty_row_world, name: str, email: str | None, visible: bool
+def test_unlinked_attendee_is_excluded_even_with_visible_snapshot(
+    db: Session, empty_row_world, name: str, email: str | None
 ) -> None:
     popup = empty_row_world["popup"]
     app = empty_row_world["private"].application
@@ -281,17 +274,15 @@ def test_unlinked_companion_uses_own_snapshot_not_applicant_custom_fields(
     results, total = applications_crud.find_directory(
         db, popup_id=popup.id, hide_empty_rows=True
     )
-    assert total == 2 + int(visible)
-    assert (attendee.id in {row.id for row in results}) is visible
+    assert total == 2
+    assert attendee.id not in {row.id for row in results}
 
 
 def test_fully_hidden_rows_are_excluded_even_when_all_nine_fields_are_masked(
     db: Session, empty_row_world
 ) -> None:
     hidden = empty_row_world["private"]
-    hidden.application.info_not_shared = [*PORTAL_FIELDS, "Residence", "Age", "Gender"]
-    db.add(hidden.application)
-    db.commit()
+    _set_shared_fields(db, hidden.human, hidden.popup, [])
     results, total = applications_crud.find_directory(
         db, popup_id=empty_row_world["popup"].id, hide_empty_rows=True
     )
@@ -302,14 +293,13 @@ def test_directory_returns_zero_total_when_all_portal_rows_are_empty(
     db: Session, empty_row_world
 ) -> None:
     public = empty_row_world["public"]
-    public.application.info_not_shared = list(PORTAL_FIELDS)
     companion = empty_row_world["companion"]
     companion.human = None
     companion.name = ""
     companion.email = None
-    db.add(public.application)
     db.add(companion)
     db.commit()
+    _set_shared_fields(db, public.human, public.popup, ["residence", "age", "gender"])
     results, total = applications_crud.find_directory(
         db, popup_id=empty_row_world["popup"].id, hide_empty_rows=True
     )

@@ -10,6 +10,7 @@ from sqlmodel import Session, func, select
 
 from app.api.application.models import Applications
 from app.api.attendee.models import AttendeeProducts
+from app.api.attendee_category.models import AttendeeCategories
 from app.api.payment.models import PaymentProducts, Payments
 from app.api.popup.models import Popups
 from app.api.product.models import Products
@@ -47,6 +48,12 @@ def test_seeded_popups_each_get_exactly_one_default_flow(db: Session) -> None:
             assert exc.status_code != 500, (
                 f"resolve_flow 500'd for seeded popup {popup.slug!r}: {exc.detail}"
             )
+
+        categories = db.exec(
+            select(AttendeeCategories).where(AttendeeCategories.popup_id == popup.id)
+        ).all()
+        for category in categories:
+            assert category.directory_eligible is (category.key in {"main", "spouse"})
 
     products = db.exec(select(Products).where(Products.tenant_id == tenant.id)).all()
     snapshots = db.exec(

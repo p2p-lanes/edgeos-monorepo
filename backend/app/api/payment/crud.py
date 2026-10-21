@@ -791,6 +791,21 @@ def _calculate_price(
     return discounted_standard + non_discountable_amount, credit_applied
 
 
+def _simplefi_pricing_overrides(config) -> dict[str, dict[str, float]]:
+    """EdgeOS owns pricing: send zero for unset fields, never merchant defaults."""
+    result = {}
+    for group, names in (
+        ("pricing", ("card", "crypto")),
+        ("payment_mode_pricing", ("pay_in_full", "installments")),
+    ):
+        values = {}
+        for name in names:
+            value = getattr(config, f"simplefi_{name}_adjustment_pct", None)
+            values[name] = float(value) if value is not None else 0.0
+        result[group] = values
+    return result
+
+
 def _installment_interval(config: "Any | None") -> str:
     """The billing cadence a flow bills its installments on.
 
@@ -1490,7 +1505,7 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
                 payment.insurance_amount = amounts.insurance_amount
                 payment.amount += amounts.insurance_amount
 
-            flow_fees = build_effective_config(target_flow) if target_flow else None
+            flow_fees = build_effective_config(target_flow, popup)
             if (
                 flow_fees
                 and flow_fees.contribution_enabled
@@ -1633,6 +1648,7 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
             # any subsequent lock holder is guaranteed to find the committed row
             # in the sibling re-check.  No explicit unlock is needed.
             simplefi_response = simplefi_client.create_payment(
+                **_simplefi_pricing_overrides(flow_fees),
                 amount=payment.amount,
                 popup_slug=popup.slug,
                 tenant_slug=tenant.slug,
@@ -2003,6 +2019,7 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
                 cancel_path,
             )
             simplefi_response = simplefi_client.create_payment(
+                **_simplefi_pricing_overrides(fee_config),
                 amount=fee_amount,
                 popup_slug=popup.slug,
                 tenant_slug=popup.tenant.slug,
@@ -3968,6 +3985,7 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
                 max_installments,
             )
             simplefi_response = simplefi_client.create_payment(
+                **_simplefi_pricing_overrides(terms),
                 amount=preview.amount,
                 popup_slug=application.popup.slug,
                 tenant_slug=application.popup.tenant.slug,

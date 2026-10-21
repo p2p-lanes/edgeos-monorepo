@@ -16,11 +16,14 @@ Spec scenarios covered:
 import uuid
 from decimal import Decimal
 
+import pytest
 from fastapi.testclient import TestClient
 from sqlmodel import Session
 
 from app.api.attendee.models import Attendees
+from app.api.attendee_category.crud import attendee_categories_crud
 from app.api.attendee_category.models import AttendeeCategories
+from app.api.attendee_category.schemas import AttendeeCategoryCreate
 from app.api.payment.models import PaymentRecipients, Payments
 from app.api.popup.models import Popups
 from app.api.product.models import Products
@@ -81,6 +84,99 @@ def _create_category(
     )
     assert response.status_code == 201, response.text
     return response.json()
+
+
+@pytest.mark.parametrize(
+    ("key", "override", "expected"),
+    [
+        ("spouse", None, True),
+        ("kid", None, False),
+        ("other", None, False),
+        ("spouse", False, False),
+        ("other", True, True),
+    ],
+)
+def test_category_directory_eligibility_defaults_and_explicit_override(
+    client: TestClient,
+    db: Session,
+    admin_token_tenant_a: str,
+    popup_tenant_a: Popups,
+    key: str,
+    override: bool | None,
+    expected: bool,
+) -> None:
+    flow = SalesFlows(
+        tenant_id=popup_tenant_a.tenant_id,
+        popup_id=popup_tenant_a.id,
+        slug=f"eligibility-{uuid.uuid4().hex[:8]}",
+        name="Eligibility defaults",
+        type="application",
+    )
+    db.add(flow)
+    db.commit()
+    values = {} if override is None else {"directory_eligible": override}
+    category = _create_category(
+        client,
+        admin_token_tenant_a,
+        popup_tenant_a.id,
+        flow.id,
+        key,
+        **values,
+    )
+    assert category["directory_eligible"] is expected
+
+
+def test_copy_to_flow_preserves_directory_eligibility(
+    db: Session, popup_tenant_a: Popups
+) -> None:
+    source = SalesFlows(
+        tenant_id=popup_tenant_a.tenant_id,
+        popup_id=popup_tenant_a.id,
+        slug=f"source-categories-{uuid.uuid4().hex[:8]}",
+        name="Source categories",
+        type="application",
+    )
+    db.add(source)
+    db.flush()
+    attendee_categories_crud.seed_main_for_flow(db, source)
+    db.flush()
+    spouse = attendee_categories_crud.create_for_flow(
+        db,
+        AttendeeCategoryCreate(
+            popup_id=popup_tenant_a.id,
+            key="spouse",
+            directory_eligible=True,
+        ),
+        source,
+    )
+    excluded = attendee_categories_crud.create_for_flow(
+        db,
+        AttendeeCategoryCreate(
+            popup_id=popup_tenant_a.id,
+            key="child",
+            directory_eligible=False,
+        ),
+        source,
+    )
+    target = SalesFlows(
+        tenant_id=popup_tenant_a.tenant_id,
+        popup_id=popup_tenant_a.id,
+        slug=f"copy-categories-{uuid.uuid4().hex[:8]}",
+        name="Copied categories",
+        type="application",
+    )
+    db.add(target)
+    db.flush()
+
+    attendee_categories_crud.seed_for_flow(db, target, source_flow_id=source.id)
+    db.flush()
+
+    categories = {
+        category.key: category
+        for category in attendee_categories_crud.list_by_flow(db, target.id)
+    }
+    assert categories["spouse"].directory_eligible == spouse.directory_eligible
+    assert categories["child"].directory_eligible == excluded.directory_eligible
 
 
 # ---------------------------------------------------------------------------

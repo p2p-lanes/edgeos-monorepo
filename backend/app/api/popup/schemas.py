@@ -1,3 +1,4 @@
+import re
 import uuid
 from datetime import datetime
 from decimal import Decimal
@@ -53,6 +54,46 @@ def validate_popup_contribution_config(enabled: bool, pct: "Decimal | None") -> 
         raise ValueError(
             "contribution_percentage must be <= 100 (it represents a percentage)"
         )
+
+
+def _validate_directory_fields(value: list[dict] | None) -> list[dict] | None:
+    if value is None:
+        return None
+    seen: set[str] = set()
+    human_keys = {
+        "first_name",
+        "last_name",
+        "email",
+        "telegram",
+        "residence",
+        "age",
+        "gender",
+    }
+    for field in value:
+        if not isinstance(field, dict):
+            raise ValueError("Each directory field must be an object")
+        field_id = field.get("id")
+        label = field.get("label")
+        source = field.get("source")
+        key = field.get("key")
+        if not isinstance(field_id, str) or not re.fullmatch(
+            r"[a-z][a-z0-9_]{0,63}", field_id
+        ):
+            raise ValueError("Directory field ids must be lowercase identifiers")
+        if field_id in seen:
+            raise ValueError("Directory field ids must be unique")
+        seen.add(field_id)
+        if not isinstance(label, str) or not label.strip():
+            raise ValueError("Directory field labels are required")
+        if source not in {"human", "application", "attendee"}:
+            raise ValueError("Unsupported directory field source")
+        if not isinstance(key, str) or not key.strip():
+            raise ValueError("Directory field source keys are required")
+        if source == "human" and key not in human_keys:
+            raise ValueError("Unsupported Human directory field")
+        if "shareable" in field and not isinstance(field["shareable"], bool):
+            raise ValueError("Directory field shareable must be boolean")
+    return value
 
 
 def validate_popup_installments_config(
@@ -243,6 +284,38 @@ class PopupBase(SQLModel):
     blog_url: str | None = None
     twitter_url: str | None = None
     simplefi_api_key: str | None = None
+    simplefi_card_adjustment_pct: Decimal | None = Field(
+        default=None,
+        ge=-99,
+        le=100,
+        max_digits=5,
+        decimal_places=2,
+        sa_column=Column(Numeric(5, 2), nullable=True),
+    )
+    simplefi_crypto_adjustment_pct: Decimal | None = Field(
+        default=None,
+        ge=-99,
+        le=100,
+        max_digits=5,
+        decimal_places=2,
+        sa_column=Column(Numeric(5, 2), nullable=True),
+    )
+    simplefi_pay_in_full_adjustment_pct: Decimal | None = Field(
+        default=None,
+        ge=-99,
+        le=100,
+        max_digits=5,
+        decimal_places=2,
+        sa_column=Column(Numeric(5, 2), nullable=True),
+    )
+    simplefi_installments_adjustment_pct: Decimal | None = Field(
+        default=None,
+        ge=-99,
+        le=100,
+        max_digits=5,
+        decimal_places=2,
+        sa_column=Column(Numeric(5, 2), nullable=True),
+    )
     # Forwarded to SimpleFi as redirect_urls.success_behavior on every payment
     # created for this popup. Manual (SimpleFi's default) keeps the buyer on
     # SimpleFi's checkout until they click through to the success URL.
@@ -340,6 +413,16 @@ class PopupBase(SQLModel):
         default=False,
         sa_column=Column(Boolean, nullable=False, server_default="false"),
     )
+    directory_fields: list[dict] = Field(
+        default_factory=list,
+        sa_column=Column(JSONB, nullable=False, server_default="[]"),
+    )
+
+    @field_validator("directory_fields")
+    @classmethod
+    def validate_directory_fields_config(cls, value: list[dict]) -> list[dict]:
+        return _validate_directory_fields(value) or []
+
     # Badges in this popup: peer giving in the directory, check-ins counting
     # toward badge rules, policies and admin awards tied to it, and the badge
     # section of the portal profile while this popup is the one open.
@@ -427,6 +510,18 @@ class PopupCreate(SQLModel):
     blog_url: str | None = None
     twitter_url: str | None = None
     simplefi_api_key: str | None = None
+    simplefi_card_adjustment_pct: Decimal | None = Field(
+        default=None, ge=-99, le=100, max_digits=5, decimal_places=2
+    )
+    simplefi_crypto_adjustment_pct: Decimal | None = Field(
+        default=None, ge=-99, le=100, max_digits=5, decimal_places=2
+    )
+    simplefi_pay_in_full_adjustment_pct: Decimal | None = Field(
+        default=None, ge=-99, le=100, max_digits=5, decimal_places=2
+    )
+    simplefi_installments_adjustment_pct: Decimal | None = Field(
+        default=None, ge=-99, le=100, max_digits=5, decimal_places=2
+    )
     simplefi_success_behavior: SimpleFiSuccessBehavior = SimpleFiSuccessBehavior.manual
     terms_and_conditions_url: str | None = None
     open_checkout_success_url: str | None = None
@@ -557,6 +652,18 @@ class PopupUpdate(SQLModel):
     blog_url: str | None = None
     twitter_url: str | None = None
     simplefi_api_key: str | None = None
+    simplefi_card_adjustment_pct: Decimal | None = Field(
+        default=None, ge=-99, le=100, max_digits=5, decimal_places=2
+    )
+    simplefi_crypto_adjustment_pct: Decimal | None = Field(
+        default=None, ge=-99, le=100, max_digits=5, decimal_places=2
+    )
+    simplefi_pay_in_full_adjustment_pct: Decimal | None = Field(
+        default=None, ge=-99, le=100, max_digits=5, decimal_places=2
+    )
+    simplefi_installments_adjustment_pct: Decimal | None = Field(
+        default=None, ge=-99, le=100, max_digits=5, decimal_places=2
+    )
     simplefi_success_behavior: SimpleFiSuccessBehavior | None = None
     terms_and_conditions_url: str | None = None
     open_checkout_success_url: str | None = None
@@ -583,6 +690,15 @@ class PopupUpdate(SQLModel):
     events_enabled: bool | None = None
     self_check_in_enabled: bool | None = None
     show_attendee_directory: bool | None = None
+    directory_fields: list[dict] | None = None
+
+    @field_validator("directory_fields")
+    @classmethod
+    def validate_directory_fields_update(
+        cls, value: list[dict] | None
+    ) -> list[dict] | None:
+        return _validate_directory_fields(value)
+
     badges_enabled: bool | None = None
     edit_passes_enabled: bool | None = None
     installments_enabled: bool | None = None
@@ -747,6 +863,7 @@ class PopupPublic(SQLModel):
     events_enabled: bool = True
     accommodation_min_stay: int = 1
     show_attendee_directory: bool = False
+    directory_fields: list[dict] = []
     badges_enabled: bool = False
     edit_passes_enabled: bool = False
     # groups-rework feature flags (portal needs these to gate nav/UI)

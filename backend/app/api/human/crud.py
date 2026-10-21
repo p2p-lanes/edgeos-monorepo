@@ -8,9 +8,15 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import selectinload
 from sqlmodel import Session, col, func, select
 
-from app.api.human.models import HumanComment, HumanEnrichmentFact, Humans
+from app.api.human.models import (
+    HumanComment,
+    HumanDirectorySettings,
+    HumanEnrichmentFact,
+    Humans,
+)
 from app.api.human.schemas import (
     HumanCreate,
+    HumanDirectorySettingsUpdate,
     HumanEnrichmentFactCreate,
     HumanFilterCondition,
     HumanFilters,
@@ -77,6 +83,97 @@ class HardDeleteSummary(TypedDict):
 class HumansCRUD(BaseCRUD[Humans, HumanCreate, HumanUpdate]):
     def __init__(self) -> None:
         super().__init__(Humans)
+
+    def has_active_ticket(
+        self, session: Session, human_id: uuid.UUID, popup_id: uuid.UUID
+    ) -> bool:
+        from app.api.attendee.models import AttendeeProducts, Attendees
+
+        return (
+            session.exec(
+                select(AttendeeProducts.id)
+                .join(Attendees, Attendees.id == AttendeeProducts.attendee_id)
+                .where(
+                    Attendees.human_id == human_id,
+                    Attendees.popup_id == popup_id,
+                    AttendeeProducts.attendee_id.is_not(None),
+                    AttendeeProducts.product_category_snapshot == CATEGORY_TICKET,
+                    AttendeeProducts.revoked_at.is_(None),
+                )
+                .limit(1)
+            ).first()
+            is not None
+        )
+
+    def get_directory_settings(
+        self, session: Session, human: Humans, popup_id: uuid.UUID
+    ) -> HumanDirectorySettings:
+        from app.api.attendee.models import Attendees
+        from app.api.attendee_category.models import AttendeeCategories
+
+        attendee = session.exec(
+            select(Attendees.id)
+            .join(AttendeeCategories, Attendees.category_id == AttendeeCategories.id)
+            .where(
+                Attendees.popup_id == popup_id,
+                Attendees.human_id == human.id,
+                AttendeeCategories.directory_eligible.is_(True),
+            )
+            .limit(1)
+        ).first()
+        if attendee is None:
+            raise ValueError("Human is not eligible for this popup directory")
+
+        settings = session.exec(
+            select(HumanDirectorySettings).where(
+                HumanDirectorySettings.human_id == human.id,
+                HumanDirectorySettings.popup_id == popup_id,
+            )
+        ).first()
+        if settings is not None:
+            return settings
+
+        from app.api.popup.models import Popups
+
+        popup = session.get(Popups, popup_id)
+        if popup is None or popup.tenant_id != human.tenant_id:
+            raise ValueError("Popup not found")
+        return HumanDirectorySettings(
+            tenant_id=human.tenant_id,
+            human_id=human.id,
+            popup_id=popup_id,
+            listed=False,
+            shared_fields=[],
+        )
+
+    def update_directory_settings(
+        self,
+        session: Session,
+        human: Humans,
+        popup_id: uuid.UUID,
+        data: HumanDirectorySettingsUpdate,
+    ) -> HumanDirectorySettings:
+        settings = self.get_directory_settings(session, human, popup_id)
+        from app.api.application.directory import directory_fields_for_popup
+        from app.api.popup.models import Popups
+
+        popup = session.get(Popups, popup_id)
+        available = {
+            field.get("id")
+            for field in directory_fields_for_popup(popup)
+            if isinstance(field, dict)
+            and field.get("id")
+            and field.get("shareable", True)
+        }
+        invalid = set(data.shared_fields) - available
+        if invalid:
+            raise ValueError("Shared fields must be enabled for the popup directory")
+        settings.listed = data.listed
+        settings.shared_fields = sorted(set(data.shared_fields))
+        session.add(settings)
+        session.commit()
+        session.refresh(settings)
+        return settings
 
     def find_or_create(
         self,

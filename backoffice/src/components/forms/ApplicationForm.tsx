@@ -72,7 +72,7 @@ const HUMAN_FIELD_KEYS = new Set([
 ])
 
 /** Fields on the Application model that map to named API fields */
-const APPLICATION_FIELD_KEYS = new Set(["referral", "info_not_shared"])
+const APPLICATION_FIELD_KEYS = new Set(["referral"])
 
 export function ApplicationForm({ onSuccess }: ApplicationFormProps) {
   const navigate = useNavigate()

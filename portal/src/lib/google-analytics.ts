@@ -1,6 +1,10 @@
 "use client"
 
-import type { CheckoutRuntimeProduct, PopupPublic } from "@/client"
+import type {
+  CheckoutRuntimeProduct,
+  PaymentPortalPublic,
+  PopupPublic,
+} from "@/client"
 
 type GtagWindow = Window & { gtag?: (...args: unknown[]) => void }
 
@@ -88,6 +92,19 @@ export function trackGACheckoutStep(params: {
   })
 }
 
+export function trackGAApplicationEvent(params: {
+  eventName: "application_draft_saved" | "application_submitted"
+  popup: GAPopup
+  applicationId: string
+  salesFlowId: string | null
+}) {
+  trackGAEvent(params.eventName, {
+    ...getPopupParams(params.popup),
+    application_id: params.applicationId,
+    ...(params.salesFlowId && { sales_flow_id: params.salesFlowId }),
+  })
+}
+
 export function trackGAAddToCart(params: {
   popup: GAPopup
   product: GAProduct
@@ -133,4 +150,53 @@ export function trackGAPurchase(params: {
     value: Number(params.amount),
     items,
   })
+}
+
+/** A fee is a separate transaction from any subsequent booking purchase. */
+export function trackGAApplicationFeePurchase(params: {
+  payment: PaymentPortalPublic
+  popupName?: string | null
+}) {
+  const { payment } = params
+  const amount = Number(payment.amount_charged ?? payment.amount)
+  if (
+    payment.payment_type !== "application_fee" ||
+    payment.status !== "approved" ||
+    !Number.isFinite(amount) ||
+    amount <= 0 ||
+    typeof window === "undefined" ||
+    typeof (window as GtagWindow).gtag !== "function"
+  ) {
+    return
+  }
+
+  const storageKey = `edgeos_ga4_fee_purchase_${payment.id}`
+  try {
+    if (window.localStorage.getItem(storageKey)) return
+  } catch {
+    // Storage may be unavailable; GA4 still deduplicates by transaction_id.
+  }
+
+  trackGAEvent("purchase", {
+    popup_id: payment.popup_id,
+    ...(params.popupName && { popup_name: params.popupName }),
+    application_id: payment.application_id,
+    transaction_id: payment.id,
+    currency: payment.currency ?? "USD",
+    value: amount,
+    items: [
+      {
+        item_id: "application_fee",
+        item_name: params.popupName ?? "Application fee",
+        quantity: 1,
+        price: amount,
+      },
+    ],
+  })
+
+  try {
+    window.localStorage.setItem(storageKey, "1")
+  } catch {
+    // Event was already sent; storage is only an extra deduplication guard.
+  }
 }

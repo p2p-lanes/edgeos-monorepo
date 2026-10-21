@@ -12,6 +12,10 @@ vi.mock("@/components/Authentication", () => ({
   default: ({ children }: { children: React.ReactNode }) => <>{children}</>,
 }))
 
+vi.mock("@/components/profile/ProfileCompletionReminder", () => ({
+  default: () => <div data-testid="profile-completion-reminder" />,
+}))
+
 vi.mock("@/components/Providers", () => ({
   default: ({ children }: { children: React.ReactNode }) => <>{children}</>,
 }))
@@ -123,6 +127,9 @@ describe("PortalShell", () => {
     )
 
     expect(document.querySelector("header")).toBeNull()
+    expect(
+      document.querySelector("[data-testid='profile-completion-reminder']"),
+    ).toBeNull()
     expectPortalBoundary(getByTestId)
   })
 

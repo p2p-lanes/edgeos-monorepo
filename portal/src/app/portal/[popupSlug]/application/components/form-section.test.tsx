@@ -13,20 +13,19 @@ describe("FormSection", () => {
     "full",
     "half",
     "half_row",
-  ] as const)("shows the privacy field label and help text at %s width", (width) => {
+  ] as const)("shows a multiselect label and help text at %s width", (width) => {
     const field: FormFieldSchema = {
       type: "multiselect",
-      label: "Info I'm NOT willing to share with other attendees",
-      help_text:
-        "We will make a directory to make it easier for attendees to coordinate",
+      label: "Food preferences",
+      help_text: "Select the options that apply to you.",
       required: false,
-      options: ["Email", "Telegram"],
+      options: ["Vegetarian", "Vegan"],
       width,
     }
     const { getByText, getByRole } = render(
       <FormSection
         title="Personal Information"
-        fields={[["info_not_shared", field]]}
+        fields={[["food_preferences", field]]}
         values={{}}
         errors={{}}
         onChange={vi.fn()}
@@ -35,7 +34,9 @@ describe("FormSection", () => {
 
     expect(getByText(field.label)).toBeTruthy()
     expect(getByText(field.help_text!)).toBeTruthy()
-    expect(getByRole("button", { name: "Email, not selected" })).toBeTruthy()
-    expect(getByRole("button", { name: "Telegram, not selected" })).toBeTruthy()
+    expect(
+      getByRole("button", { name: "Vegetarian, not selected" }),
+    ).toBeTruthy()
+    expect(getByRole("button", { name: "Vegan, not selected" })).toBeTruthy()
   })
 })

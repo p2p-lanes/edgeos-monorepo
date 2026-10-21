@@ -7,6 +7,11 @@ from sqlalchemy.dialects.postgresql import JSONB
 from sqlmodel import Field, SQLModel
 
 
+def default_directory_eligible(key: str) -> bool:
+    """Initial directory eligibility for conventional attendee categories."""
+    return key.strip().casefold() in {"main", "spouse"}
+
+
 class AttendeeCategoryBase(SQLModel):
     """Base schema for sales-flow-owned attendee categories."""
 
@@ -15,6 +20,10 @@ class AttendeeCategoryBase(SQLModel):
     sales_flow_id: uuid.UUID = Field(foreign_key="sales_flows.id", ondelete="CASCADE")
     key: str = Field(max_length=64)
     is_primary: bool = Field(default=False)
+    directory_eligible: bool = Field(
+        default=False,
+        description="Whether attendees in this category may appear as individual directory entries.",
+    )
     sort_order: int = Field(default=0)
     max_per_application: int | None = Field(default=None, nullable=True)
     required_fields: list[dict] = Field(
@@ -36,6 +45,7 @@ class AttendeeCategoryPublic(SQLModel):
     sales_flow_id: uuid.UUID
     key: str
     is_primary: bool = False
+    directory_eligible: bool = False
     sort_order: int = 0
     max_per_application: int | None = None
     required_fields: list[dict] = []
@@ -53,6 +63,7 @@ class AttendeeCategoryCreate(SQLModel):
     popup_id: uuid.UUID
     key: str = Field(max_length=64)
     sort_order: int = 0
+    directory_eligible: bool | None = None
     max_per_application: int | None = None
     required_fields: list[dict] = []
     display_meta: dict = {}
@@ -68,6 +79,7 @@ class AttendeeCategoryUpdate(SQLModel):
     model_config = ConfigDict(extra="forbid")
 
     sort_order: int | None = None
+    directory_eligible: bool | None = None
     max_per_application: int | None = None
     required_fields: list[dict] | None = None
     display_meta: dict | None = None

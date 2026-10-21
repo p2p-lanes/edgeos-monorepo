@@ -43,8 +43,13 @@ import { DangerZone } from "@/components/Common/DangerZone"
 import { FieldError } from "@/components/Common/FieldError"
 import { FormErrorSummary } from "@/components/Common/FormErrorSummary"
 import { ApprovalStrategyForm } from "@/components/forms/ApprovalStrategyForm"
+import {
+  type DirectoryFieldConfig,
+  DirectoryFieldsEditor,
+} from "@/components/forms/DirectoryFieldsEditor"
 import { PopupHomeEditor } from "@/components/forms/PopupHomeEditor"
 import {
+  DEFAULT_POPUP_SIDEBAR_CONFIG,
   type PopupSidebarConfig,
   PopupSidebarEditor,
 } from "@/components/forms/PopupSidebarEditor"
@@ -294,6 +299,23 @@ export function PopupForm({
       twitter_url: defaultValues?.twitter_url ?? "",
       terms_and_conditions_url: defaultValues?.terms_and_conditions_url ?? "",
       simplefi_api_key: defaultValues?.simplefi_api_key ?? "",
+      simplefi_card_adjustment_pct:
+        defaultValues?.simplefi_card_adjustment_pct == null
+          ? ""
+          : String(defaultValues.simplefi_card_adjustment_pct),
+      simplefi_crypto_adjustment_pct:
+        defaultValues?.simplefi_crypto_adjustment_pct == null
+          ? ""
+          : String(defaultValues.simplefi_crypto_adjustment_pct),
+      simplefi_pay_in_full_adjustment_pct:
+        defaultValues?.simplefi_pay_in_full_adjustment_pct == null
+          ? ""
+          : String(defaultValues.simplefi_pay_in_full_adjustment_pct),
+      simplefi_installments_adjustment_pct:
+        defaultValues?.simplefi_installments_adjustment_pct == null
+          ? ""
+          : String(defaultValues.simplefi_installments_adjustment_pct),
+
       simplefi_success_behavior: (defaultValues?.simplefi_success_behavior ??
         "manual") as SimpleFiSuccessBehavior,
       invoice_company_name: defaultValues?.invoice_company_name ?? "",
@@ -307,6 +329,8 @@ export function PopupForm({
       edit_passes_enabled: defaultValues?.edit_passes_enabled ?? false,
       self_check_in_enabled: defaultValues?.self_check_in_enabled ?? false,
       show_attendee_directory: defaultValues?.show_attendee_directory ?? false,
+      directory_fields: (defaultValues?.directory_fields ??
+        []) as DirectoryFieldConfig[],
       badges_enabled: defaultValues?.badges_enabled ?? false,
       group_private_events_enabled:
         defaultValues?.group_private_events_enabled ?? false,
@@ -346,6 +370,23 @@ export function PopupForm({
         twitter_url: value.twitter_url || null,
         terms_and_conditions_url: value.terms_and_conditions_url || null,
         simplefi_api_key: value.simplefi_api_key || null,
+        simplefi_card_adjustment_pct:
+          value.simplefi_card_adjustment_pct === ""
+            ? null
+            : Number(value.simplefi_card_adjustment_pct),
+        simplefi_crypto_adjustment_pct:
+          value.simplefi_crypto_adjustment_pct === ""
+            ? null
+            : Number(value.simplefi_crypto_adjustment_pct),
+        simplefi_pay_in_full_adjustment_pct:
+          value.simplefi_pay_in_full_adjustment_pct === ""
+            ? null
+            : Number(value.simplefi_pay_in_full_adjustment_pct),
+        simplefi_installments_adjustment_pct:
+          value.simplefi_installments_adjustment_pct === ""
+            ? null
+            : Number(value.simplefi_installments_adjustment_pct),
+
         simplefi_success_behavior: value.simplefi_success_behavior,
         invoice_company_name: value.invoice_company_name || null,
         invoice_company_address: value.invoice_company_address || null,
@@ -363,18 +404,23 @@ export function PopupForm({
         show_attendee_directory:
           (isEdit ? takesApplications : value.sale_type === "application") &&
           value.show_attendee_directory,
+        directory_fields: value.directory_fields,
         group_private_events_enabled: value.group_private_events_enabled,
-        ...(isEdit && canCustomizeSidebar
+        ...(canCustomizeSidebar
           ? {
-              sidebar_config: sidebarConfig
-                ? {
-                    sections: sidebarConfig.sections.filter(
-                      (section) =>
-                        section.kind !== "external" ||
-                        (section.links?.length ?? 0) > 0,
-                    ),
-                  }
-                : null,
+              sidebar_config: isEdit
+                ? sidebarConfig
+                  ? {
+                      ...sidebarConfig,
+                      layout: sidebarConfig.layout.filter(
+                        (block) =>
+                          block.type !== "section" ||
+                          block.items.length > 0 ||
+                          block.links.length > 0,
+                      ),
+                    }
+                  : null
+                : (sidebarConfig ?? DEFAULT_POPUP_SIDEBAR_CONFIG),
             }
           : {}),
       }
@@ -844,6 +890,92 @@ export function PopupForm({
 
             <Separator />
 
+            <InlineSection title="Payment Pricing">
+              <p className="text-sm text-muted-foreground">
+                Default adjustments for this popup. Blank or 0 means no
+                adjustment. Sales flows can override each value. Percentages
+                from -99 to 100; positive adds a surcharge and negative gives a
+                discount.
+              </p>
+              <form.Field name="simplefi_card_adjustment_pct">
+                {(field) => (
+                  <InlineRow label="Card adjustment (%)">
+                    <Input
+                      id="popup-config-simplefi_card_adjustment_pct"
+                      aria-label="Card adjustment (%)"
+                      type="number"
+                      min={-99}
+                      max={100}
+                      step="0.01"
+                      placeholder="0"
+                      value={field.state.value}
+                      onChange={(e) => field.handleChange(e.target.value)}
+                      disabled={readOnly}
+                      className="w-28"
+                    />
+                  </InlineRow>
+                )}
+              </form.Field>
+              <form.Field name="simplefi_crypto_adjustment_pct">
+                {(field) => (
+                  <InlineRow label="Crypto adjustment (%)">
+                    <Input
+                      id="popup-config-simplefi_crypto_adjustment_pct"
+                      aria-label="Crypto adjustment (%)"
+                      type="number"
+                      min={-99}
+                      max={100}
+                      step="0.01"
+                      placeholder="0"
+                      value={field.state.value}
+                      onChange={(e) => field.handleChange(e.target.value)}
+                      disabled={readOnly}
+                      className="w-28"
+                    />
+                  </InlineRow>
+                )}
+              </form.Field>
+              <form.Field name="simplefi_pay_in_full_adjustment_pct">
+                {(field) => (
+                  <InlineRow label="Pay in full adjustment (%)">
+                    <Input
+                      id="popup-config-simplefi_pay_in_full_adjustment_pct"
+                      aria-label="Pay in full adjustment (%)"
+                      type="number"
+                      min={-99}
+                      max={100}
+                      step="0.01"
+                      placeholder="0"
+                      value={field.state.value}
+                      onChange={(e) => field.handleChange(e.target.value)}
+                      disabled={readOnly}
+                      className="w-28"
+                    />
+                  </InlineRow>
+                )}
+              </form.Field>
+              <form.Field name="simplefi_installments_adjustment_pct">
+                {(field) => (
+                  <InlineRow label="Installments adjustment (%)">
+                    <Input
+                      id="popup-config-simplefi_installments_adjustment_pct"
+                      aria-label="Installments adjustment (%)"
+                      type="number"
+                      min={-99}
+                      max={100}
+                      step="0.01"
+                      placeholder="0"
+                      value={field.state.value}
+                      onChange={(e) => field.handleChange(e.target.value)}
+                      disabled={readOnly}
+                      className="w-28"
+                    />
+                  </InlineRow>
+                )}
+              </form.Field>
+            </InlineSection>
+            <Separator />
+
             {/* Integrations */}
             <InlineSection title="Integrations">
               <form.Field name="simplefi_api_key">
@@ -1034,6 +1166,16 @@ export function PopupForm({
                               disabled={readOnly}
                             />
                           </InlineRow>
+                        )}
+                      </form.Field>
+                      <form.Field name="directory_fields">
+                        {(field) => (
+                          <DirectoryFieldsEditor
+                            popupId={defaultValues?.id}
+                            fields={field.state.value}
+                            onChange={field.handleChange}
+                            disabled={readOnly}
+                          />
                         )}
                       </form.Field>
                     </InlineSection>

@@ -6,6 +6,8 @@ import { useRef, useState } from "react"
 
 import {
   type ApiError,
+  type PopupAdmin,
+  PopupsService,
   type SalesFlowCreate,
   type SalesFlowPublic,
   SalesFlowsService,
@@ -70,7 +72,8 @@ function parseDraftValue(
 ): string | number | boolean | null {
   if (kind === "boolean") return draft === "true"
   if (draft === "") return null
-  if (kind === "number" || kind === "currency") return Number(draft)
+  if (kind === "number" || kind === "currency" || kind === "percentage")
+    return Number(draft)
   return draft
 }
 
@@ -79,9 +82,8 @@ function recommendedVisibilityForType(type: SalesFlowCreate["type"]) {
 }
 
 /**
- * The flow's own values. There is no inherited value to fall back to since
- * sdd/sales-flows-rediseno slice 7 — creating a flow copies the popup's
- * configuration into it, so what the form shows is what the flow stores.
+ * The flow's stored values. Blank pricing fields inherit live popup defaults;
+ * other settings are owned by the flow.
  *
  * A secret starts empty no matter what is stored. Loading it would put the
  * value in the DOM for anyone who opens the page or its devtools, and an
@@ -135,6 +137,10 @@ export function SalesFlowForm({
 }: SalesFlowFormProps) {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
+  const { data: popup } = useQuery({
+    queryKey: ["popups", popupId, "pricing"],
+    queryFn: () => PopupsService.getPopup({ popupId }),
+  })
   const { showSuccessToast, showErrorToast } = useCustomToast()
   const { isOperatorOrAbove } = useAuth()
   const isEdit = !!defaultValues
@@ -578,6 +584,15 @@ export function SalesFlowForm({
                             fieldKey={fieldConfig.key}
                             label={fieldConfig.label}
                             description={fieldConfig.description}
+                            inheritedValue={
+                              fieldConfig.kind === "percentage"
+                                ? String(
+                                    popup?.[
+                                      fieldConfig.key as keyof PopupAdmin
+                                    ] ?? 0,
+                                  )
+                                : undefined
+                            }
                             kind={fieldConfig.kind}
                             options={fieldConfig.options}
                             value={field.state.value as unknown as string}

@@ -55,16 +55,39 @@ const resources = [
     path: "/portal/summit/attendees",
     group: "community" as const,
   },
+  {
+    name: "Events",
+    status: "active" as const,
+    path: "/portal/summit/events",
+    group: "community" as const,
+    children: [
+      {
+        name: "Tracks",
+        status: "active" as const,
+        path: "/portal/summit/events/tracks",
+      },
+      {
+        name: "Venues",
+        status: "active" as const,
+        path: "/portal/summit/events/venues",
+      },
+    ],
+  },
 ]
 
 let includeCheckoutResources = true
 let configuredSidebar: {
-  sections?: {
-    id: string
-    kind: "commerce" | "checkouts" | "community" | "external"
-    title?: string
-    links?: { id: string; label: string; url: string }[]
-  }[]
+  layout?: (
+    | {
+        id: string
+        type: "section"
+        title: string
+        items: string[]
+        links?: { id: string; label: string; url: string }[]
+      }
+    | { id: string; type: "item"; resource: string }
+  )[]
+  hidden_items?: string[]
 } | null = null
 
 const navigation = vi.hoisted(() => ({
@@ -150,7 +173,9 @@ vi.mock("./StatusResource/ResourceMenuItem", () => ({
   ),
 }))
 
-vi.mock("../ui/separator", () => ({ Separator: () => null }))
+vi.mock("../ui/separator", () => ({
+  Separator: () => <hr data-testid="nav-separator" />,
+}))
 
 vi.mock("../ui/tooltip", () => ({
   TooltipProvider: ({ children }: { children: React.ReactNode }) => (
@@ -267,19 +292,26 @@ describe("ResourcesMenu", () => {
 
   it("reorders existing sections and renders an external-link section", () => {
     configuredSidebar = {
-      sections: [
+      layout: [
         {
-          id: "checkouts",
-          kind: "checkouts",
+          id: "commerce-options",
+          type: "section",
+          title: "Commerce options",
+          items: ["checkouts"],
+          links: [],
         },
         {
-          id: "commerce",
-          kind: "commerce",
+          id: "general-details",
+          type: "section",
+          title: "Gathering details",
+          items: ["home", "application", "passes", "orders"],
+          links: [],
         },
         {
           id: "external",
-          kind: "external",
+          type: "section",
           title: "Venue links",
+          items: [],
           links: [
             {
               id: "external",
@@ -288,6 +320,13 @@ describe("ResourcesMenu", () => {
             },
           ],
         },
+        {
+          id: "community",
+          type: "section",
+          title: "Community",
+          items: ["directory", "events", "referrals", "groups"],
+          links: [],
+        },
       ],
     }
 
@@ -295,8 +334,13 @@ describe("ResourcesMenu", () => {
 
     expect(
       screen.getAllByRole("heading").map((heading) => heading.textContent),
-    ).toEqual(["Commerce", "General", "Venue links", "Community"])
-    const section = screen.getByRole("region", { name: "General" })
+    ).toEqual([
+      "Commerce options",
+      "Gathering details",
+      "Venue links",
+      "Community",
+    ])
+    const section = screen.getByRole("region", { name: "Gathering details" })
     expect(
       within(section)
         .getAllByRole("link")
@@ -307,6 +351,57 @@ describe("ResourcesMenu", () => {
         .getByRole("link", { name: "Venue website" })
         .getAttribute("target"),
     ).toBe("_blank")
+    const navigation = screen.getByRole("navigation", {
+      name: "Portal navigation",
+    })
+    expect(navigation.lastElementChild?.getAttribute("data-testid")).toBe(
+      "nav-separator",
+    )
+  })
+
+  it("places Home outside sections and hides selected community options", () => {
+    configuredSidebar = {
+      layout: [
+        { id: "standalone-home", type: "item", resource: "home" },
+        {
+          id: "community",
+          type: "section",
+          title: "Community",
+          items: ["directory", "events", "referrals", "groups"],
+          links: [],
+        },
+        {
+          id: "commerce",
+          type: "section",
+          title: "Commerce",
+          items: ["checkouts"],
+          links: [],
+        },
+        {
+          id: "general",
+          type: "section",
+          title: "General",
+          items: ["application", "passes", "orders"],
+          links: [],
+        },
+      ],
+      hidden_items: ["tracks"],
+    }
+
+    render(<ResourcesMenu />)
+
+    const links = screen.getAllByRole("link")
+    expect(links[0].textContent).toBe("Home")
+    expect(screen.queryByRole("link", { name: "Tracks" })).toBeNull()
+    expect(
+      screen.getAllByRole("heading").map((heading) => heading.textContent),
+    ).toEqual(["Community", "Commerce", "General"])
+    expect(
+      screen
+        .getByRole("link", { name: "Home" })
+        .closest("section")
+        ?.getAttribute("aria-labelledby"),
+    ).toBeNull()
   })
 
   it("closes the mobile sheet and navigates when an item is clicked", () => {

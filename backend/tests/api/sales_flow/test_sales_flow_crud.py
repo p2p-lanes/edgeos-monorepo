@@ -446,3 +446,66 @@ class TestSalesFlowReviewersModeGuard:
             headers={"Authorization": f"Bearer {admin_token_tenant_a}"},
         )
         assert response.status_code == 204, response.text
+
+
+def test_pricing_overrides_round_trip_copy_and_clear(
+    client, admin_token_tenant_a, popup_tenant_a
+):
+    headers = {"Authorization": f"Bearer {admin_token_tenant_a}"}
+    values = {
+        "simplefi_card_adjustment_pct": "0",
+        "simplefi_crypto_adjustment_pct": "-2.50",
+        "simplefi_pay_in_full_adjustment_pct": "-10",
+        "simplefi_installments_adjustment_pct": "5",
+    }
+    response = client.post(
+        "/api/v1/sales-flows",
+        headers=headers,
+        json=_create_payload(popup_tenant_a.id, **values),
+    )
+    assert response.status_code == 201, response.text
+    flow = response.json()
+    from decimal import Decimal
+
+    for key, value in values.items():
+        assert Decimal(str(flow[key])) == Decimal(value)
+    copied = client.post(
+        "/api/v1/sales-flows",
+        headers=headers,
+        json=_create_payload(popup_tenant_a.id, start_from=flow["id"]),
+    )
+    assert copied.status_code == 201, copied.text
+    for key in values:
+        assert copied.json()[key] == flow[key]
+    cleared = client.patch(
+        f"/api/v1/sales-flows/{flow['id']}",
+        headers=headers,
+        json={"simplefi_card_adjustment_pct": None},
+    )
+    assert cleared.status_code == 200, cleared.text
+    assert cleared.json()["simplefi_card_adjustment_pct"] is None
+    assert (
+        cleared.json()["simplefi_crypto_adjustment_pct"]
+        == flow["simplefi_crypto_adjustment_pct"]
+    )
+
+
+@pytest.mark.parametrize(
+    "key",
+    [
+        "simplefi_card_adjustment_pct",
+        "simplefi_crypto_adjustment_pct",
+        "simplefi_pay_in_full_adjustment_pct",
+        "simplefi_installments_adjustment_pct",
+    ],
+)
+@pytest.mark.parametrize("value", [-100, 101, "NaN", "0.001"])
+def test_pricing_rejects_invalid_percentages(key, value):
+    from pydantic import ValidationError
+
+    from app.api.sales_flow.schemas import SalesFlowCreate, SalesFlowUpdate
+
+    with pytest.raises(ValidationError):
+        SalesFlowCreate(**_create_payload(uuid.uuid4(), **{key: value}))
+    with pytest.raises(ValidationError):
+        SalesFlowUpdate(**{key: value})

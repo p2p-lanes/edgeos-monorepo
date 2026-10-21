@@ -2,7 +2,7 @@ import uuid
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Optional
 
-from sqlalchemy import Index, UniqueConstraint, text
+from sqlalchemy import ARRAY, Index, String, UniqueConstraint, text
 from sqlalchemy.dialects.postgresql import UUID
 from sqlmodel import Column, DateTime, Field, Relationship, func
 
@@ -77,6 +77,14 @@ class Applications(ApplicationBase, table=True):
             "custom_fields",
             postgresql_using="gin",
         ),
+    )
+
+    # Retained only as the source for the one-time migration to
+    # HumanDirectorySettings. It is intentionally absent from API schemas and
+    # no longer drives directory visibility.
+    info_not_shared: list[str] = Field(
+        default_factory=list,
+        sa_column=Column(ARRAY(String), nullable=False, server_default="{}"),
     )
 
     id: uuid.UUID = Field(

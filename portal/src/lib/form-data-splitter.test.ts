@@ -29,4 +29,30 @@ describe("splitForCreate", () => {
     })
     expect(result.sales_flow_id).toBe("flow-vip")
   })
+
+  it("does not submit the retired application privacy field", () => {
+    const result = splitForCreate({
+      values: {
+        first_name: "Pat",
+        last_name: "Doe",
+        info_not_shared: ["Email"],
+      },
+      popupId: "popup-1",
+      status: "draft",
+      schema: {
+        ...emptySchema,
+        base_fields: {
+          info_not_shared: {
+            type: "multiselect",
+            label: "Info not shared",
+            required: false,
+            target: "application",
+            options: ["Email"],
+          },
+        },
+      },
+    })
+
+    expect(result).not.toHaveProperty("info_not_shared")
+  })
 })
