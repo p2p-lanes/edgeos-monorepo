@@ -1047,6 +1047,9 @@ def run_import(
                 group_id=group_uuid,
                 status=status,
                 referral=referral,
+                # Historical source answers remain on imported applications;
+                # the directory reads the separate Human settings below.
+                info_not_shared=info_not_shared,
                 custom_fields=custom_fields,
                 submitted_at=submitted_at,
                 accepted_at=accepted_at,

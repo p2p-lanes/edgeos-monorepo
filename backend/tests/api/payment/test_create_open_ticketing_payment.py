@@ -224,6 +224,8 @@ def test_payment_provider_cancel_url_returns_to_flow(
     flow = db.get(SalesFlows, default_flow_id(db, popup.id))
     assert flow is not None
     flow.slug = flow_slug
+    flow.simplefi_card_adjustment_pct = Decimal("3.25")
+    flow.simplefi_crypto_adjustment_pct = Decimal("0")
     flow.open_checkout_cancel_url = custom_cancel
     db.add(flow)
     db.commit()
@@ -258,6 +260,10 @@ def test_payment_provider_cancel_url_returns_to_flow(
             db, obj=obj, popup=popup, tenant=tenant, flow_slug=flow_slug
         )
 
+    assert mock_client.create_payment.call_args.kwargs["pricing"] == {
+        "card": 3.25,
+        "crypto": 0,
+    }
     assert mock_client.create_payment.call_args.kwargs["cancel_path"] == (
         custom_cancel
         or f"https://tickets.example.com/checkout/{popup.slug}/{flow_slug}?cancelled=1&lang=es"

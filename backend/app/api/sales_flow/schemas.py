@@ -216,6 +216,38 @@ class SalesFlowBase(SQLModel):
     # NULL inherits the popup's SimpleFi account; a value routes this flow's
     # new payments and payment operations through its own account.
     simplefi_api_key: str | None = Field(default=None, nullable=True)
+    simplefi_card_adjustment_pct: Decimal | None = Field(
+        default=None,
+        ge=-99,
+        le=100,
+        max_digits=5,
+        decimal_places=2,
+        sa_column=Column(Numeric(5, 2), nullable=True),
+    )
+    simplefi_crypto_adjustment_pct: Decimal | None = Field(
+        default=None,
+        ge=-99,
+        le=100,
+        max_digits=5,
+        decimal_places=2,
+        sa_column=Column(Numeric(5, 2), nullable=True),
+    )
+    simplefi_pay_in_full_adjustment_pct: Decimal | None = Field(
+        default=None,
+        ge=-99,
+        le=100,
+        max_digits=5,
+        decimal_places=2,
+        sa_column=Column(Numeric(5, 2), nullable=True),
+    )
+    simplefi_installments_adjustment_pct: Decimal | None = Field(
+        default=None,
+        ge=-99,
+        le=100,
+        max_digits=5,
+        decimal_places=2,
+        sa_column=Column(Numeric(5, 2), nullable=True),
+    )
     abandoned_cart_delay_days: int | None = Field(default=None, nullable=True)
     abandoned_cart_repeat_days: int | None = Field(default=None, nullable=True)
     abandoned_cart_max_count: int | None = Field(default=None, nullable=True)
@@ -269,6 +301,18 @@ class SalesFlowCreate(BaseModel):
     open_checkout_cancel_url: str | None = None
     open_checkout_signing_secret: str | None = None
     simplefi_api_key: str | None = None
+    simplefi_card_adjustment_pct: Decimal | None = Field(
+        default=None, ge=-99, le=100, max_digits=5, decimal_places=2
+    )
+    simplefi_crypto_adjustment_pct: Decimal | None = Field(
+        default=None, ge=-99, le=100, max_digits=5, decimal_places=2
+    )
+    simplefi_pay_in_full_adjustment_pct: Decimal | None = Field(
+        default=None, ge=-99, le=100, max_digits=5, decimal_places=2
+    )
+    simplefi_installments_adjustment_pct: Decimal | None = Field(
+        default=None, ge=-99, le=100, max_digits=5, decimal_places=2
+    )
     abandoned_cart_delay_days: int | None = None
     abandoned_cart_repeat_days: int | None = None
     abandoned_cart_max_count: int | None = None
@@ -351,6 +395,18 @@ class SalesFlowUpdate(BaseModel):
     open_checkout_cancel_url: str | None = None
     open_checkout_signing_secret: str | None = None
     simplefi_api_key: str | None = None
+    simplefi_card_adjustment_pct: Decimal | None = Field(
+        default=None, ge=-99, le=100, max_digits=5, decimal_places=2
+    )
+    simplefi_crypto_adjustment_pct: Decimal | None = Field(
+        default=None, ge=-99, le=100, max_digits=5, decimal_places=2
+    )
+    simplefi_pay_in_full_adjustment_pct: Decimal | None = Field(
+        default=None, ge=-99, le=100, max_digits=5, decimal_places=2
+    )
+    simplefi_installments_adjustment_pct: Decimal | None = Field(
+        default=None, ge=-99, le=100, max_digits=5, decimal_places=2
+    )
     abandoned_cart_delay_days: int | None = None
     abandoned_cart_repeat_days: int | None = None
     abandoned_cart_max_count: int | None = None
@@ -536,11 +592,14 @@ class SalesFlowReadiness(BaseModel):
     warnings: list[str]
 
 
-# Class B (inheritable override) column names — must exactly match both
-# SalesFlowBase and PopupBase field names (same names by construction, see
-# design D1/D2). Single source of truth for `build_effective_config`
-# (sales_flow/resolver.py) and its NULL-matrix unit tests.
+# Flow-owned configuration, shared by copying, the settings editor and
+# build_effective_config. Some fields originated on popups; SimpleFI pricing
+# exists only on flows and null means a zero adjustment.
 EFFECTIVE_CONFIG_FIELDS: tuple[str, ...] = (
+    "simplefi_card_adjustment_pct",
+    "simplefi_crypto_adjustment_pct",
+    "simplefi_pay_in_full_adjustment_pct",
+    "simplefi_installments_adjustment_pct",
     "application_layout",
     "requires_application_fee",
     "application_fee_amount",
@@ -686,6 +745,18 @@ class EffectiveFlowConfig(BaseModel):
     this slice is actually chartered to deliver.
     """
 
+    simplefi_card_adjustment_pct: Decimal | None = Field(
+        default=None, ge=-99, le=100, max_digits=5, decimal_places=2
+    )
+    simplefi_crypto_adjustment_pct: Decimal | None = Field(
+        default=None, ge=-99, le=100, max_digits=5, decimal_places=2
+    )
+    simplefi_pay_in_full_adjustment_pct: Decimal | None = Field(
+        default=None, ge=-99, le=100, max_digits=5, decimal_places=2
+    )
+    simplefi_installments_adjustment_pct: Decimal | None = Field(
+        default=None, ge=-99, le=100, max_digits=5, decimal_places=2
+    )
     application_layout: ApplicationLayout | None = None
     requires_application_fee: bool | None = None
     application_fee_amount: Decimal | None = None

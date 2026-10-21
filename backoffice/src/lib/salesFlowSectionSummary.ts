@@ -56,6 +56,27 @@ function cadence(
 }
 
 const SUMMARIES: Record<string, (v: ConfigValues) => SectionSummary> = {
+  "Payment Provider": (v) => ({
+    answer: v.simplefi_api_key
+      ? "Uses this flow's SimpleFI account"
+      : "Uses the popup's SimpleFI account",
+    active: Boolean(v.simplefi_api_key),
+  }),
+  "Payment Pricing": (v) => {
+    const parts = [
+      ["card", "Card"],
+      ["crypto", "Crypto"],
+      ["pay_in_full", "Pay in full"],
+      ["installments", "Installments"],
+    ].flatMap(([key, label]) => {
+      const value = num(v[`simplefi_${key}_adjustment_pct`]) ?? 0
+      return value === 0 ? [] : [`${label} ${value > 0 ? "+" : ""}${value}%`]
+    })
+    return {
+      answer: parts.length ? parts.join(" · ") : "No payment adjustments (0%)",
+      active: parts.length > 0,
+    }
+  },
   "Application Settings": (v) => {
     const bits: string[] = []
     if (on(v.requires_application_fee)) {

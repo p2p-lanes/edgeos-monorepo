@@ -70,7 +70,8 @@ function parseDraftValue(
 ): string | number | boolean | null {
   if (kind === "boolean") return draft === "true"
   if (draft === "") return null
-  if (kind === "number" || kind === "currency") return Number(draft)
+  if (kind === "number" || kind === "currency" || kind === "percentage")
+    return Number(draft)
   return draft
 }
 
