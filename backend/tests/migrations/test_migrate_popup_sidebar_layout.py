@@ -7,7 +7,7 @@ from alembic.config import Config
 from sqlalchemy import text
 
 REVISION = "c1d7a4e9b2f6"
-PREVIOUS_REVISION = "6f702315ea94"
+PREVIOUS_REVISION = "b73c9e20a451"
 
 
 def test_reordered_sections_and_menu_options_survive_layout_migration(
