@@ -68,6 +68,7 @@
     "direct_sales_description": "请选择适用于此活动的选项。",
     "door_generic": "你的申请",
     "door_status": {
+      "withdrawn": "已撤回",
       "accepted": "已接受",
       "in_review": "审核中",
       "draft": "草稿",

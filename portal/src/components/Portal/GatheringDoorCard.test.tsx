@@ -55,4 +55,15 @@ describe("GatheringDoorCard", () => {
       "/portal/gathering/application?flow=flow-attendee",
     )
   })
+  it("shows a withdrawn application without an apply or resume action", () => {
+    render(
+      <GatheringDoorCard
+        door={{ ...door, status: "withdrawn" }}
+        popupSlug="gathering"
+        showName
+      />,
+    )
+    expect(screen.getByText("portal.door_status.withdrawn")).toBeTruthy()
+    expect(screen.queryByRole("button")).toBeNull()
+  })
 })

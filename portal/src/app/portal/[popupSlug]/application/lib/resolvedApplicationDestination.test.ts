@@ -31,4 +31,12 @@ describe("resolvedApplicationDestination", () => {
       }),
     ).toBe("/portal/tech-summit-2025")
   })
+  it("returns a withdrawal to the gathering home, never the purchase flow", () => {
+    expect(
+      resolvedApplicationDestination("gathering", {
+        status: "withdrawn",
+        sales_flow_id: "flow-1",
+      }),
+    ).toBe("/portal/gathering")
+  })
 })

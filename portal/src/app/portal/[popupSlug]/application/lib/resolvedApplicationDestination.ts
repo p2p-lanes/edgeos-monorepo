@@ -1,12 +1,12 @@
 /**
  * Where the form hands someone whose application is already resolved.
  *
- * Both terminal statuses used to land on the gathering home. For an
+ * Resolved applications used to land on the gathering home. For an
  * acceptance that made the person answer "which way in?" a second time,
  * having just arrived from the very door card that asked it — and the home
  * is a chooser, not an answer.
  *
- * An acceptance goes to that door's passes. A rejection has no passes to
+ * An acceptance goes to that door's passes. A rejection or withdrawal has no passes to
  * show, so it keeps the home, where the door card says what happened. An
  * accepted application with no flow on it predates the re-key and has no
  * door to name, so it keeps the home too.
