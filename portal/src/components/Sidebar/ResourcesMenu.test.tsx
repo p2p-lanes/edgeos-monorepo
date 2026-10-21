@@ -1,4 +1,4 @@
-import { render, screen, within } from "@testing-library/react"
+import { act, fireEvent, render, screen, within } from "@testing-library/react"
 import { useEffect } from "react"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 
@@ -55,21 +55,54 @@ const resources = [
     path: "/portal/summit/attendees",
     group: "community" as const,
   },
+  {
+    name: "Events",
+    status: "active" as const,
+    path: "/portal/summit/events",
+    group: "community" as const,
+    children: [
+      {
+        name: "Tracks",
+        status: "active" as const,
+        path: "/portal/summit/events/tracks",
+      },
+      {
+        name: "Venues",
+        status: "active" as const,
+        path: "/portal/summit/events/venues",
+      },
+    ],
+  },
 ]
 
 let includeCheckoutResources = true
 let configuredSidebar: {
-  sections?: {
-    id: string
-    kind: "commerce" | "checkouts" | "community" | "external"
-    title?: string
-    links?: { id: string; label: string; url: string }[]
-  }[]
+  layout?: (
+    | {
+        id: string
+        type: "section"
+        title: string
+        items: string[]
+        links?: { id: string; label: string; url: string }[]
+      }
+    | { id: string; type: "item"; resource: string }
+  )[]
+  hidden_items?: string[]
 } | null = null
 
+const navigation = vi.hoisted(() => ({
+  pathname: "/portal/summit/shop/attendee",
+  push: vi.fn(),
+  setOpenMobile: vi.fn(),
+}))
+
 vi.mock("next/navigation", () => ({
-  usePathname: () => "/portal/summit/shop/attendee",
-  useRouter: () => ({ push: vi.fn() }),
+  usePathname: () => navigation.pathname,
+  useRouter: () => ({ push: navigation.push }),
+}))
+
+vi.mock("@/lib/portal-telemetry", () => ({
+  trackPortalTelemetry: vi.fn(),
 }))
 
 vi.mock("react-i18next", () => ({
@@ -121,17 +154,28 @@ vi.mock("./StatusResource/ResourceMenuItem", () => ({
   default: ({
     resource,
     isActive,
+    onNavigate,
   }: {
     resource: { name: string; path: string }
     isActive: boolean
+    onNavigate: (path: string) => void
   }) => (
-    <a aria-current={isActive ? "page" : undefined} href={resource.path}>
+    <a
+      aria-current={isActive ? "page" : undefined}
+      href={resource.path}
+      onClick={(event) => {
+        event.preventDefault()
+        onNavigate(resource.path)
+      }}
+    >
       {resource.name}
     </a>
   ),
 }))
 
-vi.mock("../ui/separator", () => ({ Separator: () => null }))
+vi.mock("../ui/separator", () => ({
+  Separator: () => <hr data-testid="nav-separator" />,
+}))
 
 vi.mock("../ui/tooltip", () => ({
   TooltipProvider: ({ children }: { children: React.ReactNode }) => (
@@ -169,6 +213,7 @@ vi.mock("./SidebarComponents", () => ({
   SidebarMenuSub: ({ children }: { children: React.ReactNode }) => (
     <div>{children}</div>
   ),
+  useSidebar: () => ({ setOpenMobile: navigation.setOpenMobile }),
 }))
 
 import ResourcesMenu from "./ResourcesMenu"
@@ -177,6 +222,9 @@ describe("ResourcesMenu", () => {
   beforeEach(() => {
     includeCheckoutResources = true
     configuredSidebar = null
+    navigation.pathname = "/portal/summit/shop/attendee"
+    navigation.push.mockClear()
+    navigation.setOpenMobile.mockClear()
   })
 
   it("renders General, Commerce, and Community in order", () => {
@@ -244,19 +292,26 @@ describe("ResourcesMenu", () => {
 
   it("reorders existing sections and renders an external-link section", () => {
     configuredSidebar = {
-      sections: [
+      layout: [
         {
-          id: "checkouts",
-          kind: "checkouts",
+          id: "commerce-options",
+          type: "section",
+          title: "Commerce options",
+          items: ["checkouts"],
+          links: [],
         },
         {
-          id: "commerce",
-          kind: "commerce",
+          id: "general-details",
+          type: "section",
+          title: "Gathering details",
+          items: ["home", "application", "passes", "orders"],
+          links: [],
         },
         {
           id: "external",
-          kind: "external",
+          type: "section",
           title: "Venue links",
+          items: [],
           links: [
             {
               id: "external",
@@ -265,6 +320,13 @@ describe("ResourcesMenu", () => {
             },
           ],
         },
+        {
+          id: "community",
+          type: "section",
+          title: "Community",
+          items: ["directory", "events", "referrals", "groups"],
+          links: [],
+        },
       ],
     }
 
@@ -272,8 +334,13 @@ describe("ResourcesMenu", () => {
 
     expect(
       screen.getAllByRole("heading").map((heading) => heading.textContent),
-    ).toEqual(["Commerce", "General", "Venue links", "Community"])
-    const section = screen.getByRole("region", { name: "General" })
+    ).toEqual([
+      "Commerce options",
+      "Gathering details",
+      "Venue links",
+      "Community",
+    ])
+    const section = screen.getByRole("region", { name: "Gathering details" })
     expect(
       within(section)
         .getAllByRole("link")
@@ -284,6 +351,112 @@ describe("ResourcesMenu", () => {
         .getByRole("link", { name: "Venue website" })
         .getAttribute("target"),
     ).toBe("_blank")
+    const navigation = screen.getByRole("navigation", {
+      name: "Portal navigation",
+    })
+    expect(navigation.lastElementChild?.getAttribute("data-testid")).toBe(
+      "nav-separator",
+    )
+  })
+
+  it("places Home outside sections and hides selected community options", () => {
+    configuredSidebar = {
+      layout: [
+        { id: "standalone-home", type: "item", resource: "home" },
+        {
+          id: "community",
+          type: "section",
+          title: "Community",
+          items: ["directory", "events", "referrals", "groups"],
+          links: [],
+        },
+        {
+          id: "commerce",
+          type: "section",
+          title: "Commerce",
+          items: ["checkouts"],
+          links: [],
+        },
+        {
+          id: "general",
+          type: "section",
+          title: "General",
+          items: ["application", "passes", "orders"],
+          links: [],
+        },
+      ],
+      hidden_items: ["tracks"],
+    }
+
+    render(<ResourcesMenu />)
+
+    const links = screen.getAllByRole("link")
+    expect(links[0].textContent).toBe("Home")
+    expect(screen.queryByRole("link", { name: "Tracks" })).toBeNull()
+    expect(
+      screen.getAllByRole("heading").map((heading) => heading.textContent),
+    ).toEqual(["Community", "Commerce", "General"])
+    expect(
+      screen
+        .getByRole("link", { name: "Home" })
+        .closest("section")
+        ?.getAttribute("aria-labelledby"),
+    ).toBeNull()
+  })
+
+  it("closes the mobile sheet and navigates when an item is clicked", () => {
+    render(<ResourcesMenu />)
+
+    fireEvent.click(screen.getByRole("link", { name: "Passes" }))
+
+    expect(navigation.setOpenMobile).toHaveBeenCalledWith(false)
+    expect(navigation.push).toHaveBeenCalledWith("/portal/summit/passes")
+  })
+
+  it("closes the mobile sheet without navigating when the current page is clicked", () => {
+    render(<ResourcesMenu />)
+
+    fireEvent.click(screen.getByRole("link", { name: "Attendee" }))
+
+    expect(navigation.setOpenMobile).toHaveBeenCalledWith(false)
+    expect(navigation.push).not.toHaveBeenCalled()
+  })
+
+  it("closes the mobile sheet when the route changes from outside the sidebar", () => {
+    isMobile = true
+    const { Sidebar, SidebarProvider, useSidebar } = SidebarComponents
+
+    const OpenMobileSidebar = () => {
+      const { setOpenMobile } = useSidebar()
+
+      useEffect(() => {
+        setOpenMobile(true)
+      }, [setOpenMobile])
+
+      return (
+        <Sidebar>
+          <span>Portal content</span>
+        </Sidebar>
+      )
+    }
+
+    const { rerender } = render(
+      <SidebarProvider>
+        <OpenMobileSidebar />
+      </SidebarProvider>,
+    )
+    expect(screen.getByRole("dialog")).toBeTruthy()
+
+    navigation.pathname = "/portal/summit/passes"
+    act(() => {
+      rerender(
+        <SidebarProvider>
+          <OpenMobileSidebar />
+        </SidebarProvider>,
+      )
+    })
+
+    expect(screen.queryByRole("dialog")).toBeNull()
   })
 
   it("uses the localized name for the mobile navigation sheet", () => {

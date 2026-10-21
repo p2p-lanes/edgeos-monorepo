@@ -25,8 +25,10 @@ from app.api.sales_flow.crud import sales_flows_crud
 from app.api.sales_flow.models import SalesFlows
 from app.api.sales_flow.schemas import (
     EFFECTIVE_CONFIG_FIELDS,
+    SIMPLEFI_PRICING_FIELDS,
     EffectiveFlowConfig,
     SalesFlowCheckoutConfig,
+    SalesFlowTicketSalesStatus,
     SalesFlowType,
 )
 from app.api.shared.enums import SaleType
@@ -149,25 +151,21 @@ def resolve_active_direct_flow(
 
 
 def build_effective_config(
-    flow: SalesFlows,
-    popup: Popups | None = None,  # noqa: ARG001 — kept so existing call sites still work
+    flow: SalesFlows | None,
+    popup: Popups | None = None,
 ) -> EffectiveFlowConfig:
-    """The flow's channel configuration.
+    """Resolve pricing as flow -> popup -> zero; other settings remain flow-owned.
 
-    A flow owns these columns since sdd/sales-flows-rediseno slice 7: they
-    are seeded from the popup when the flow is created and never read
-    through to it afterwards, so editing one flow cannot change another.
-
-    `popup` is accepted and ignored, so the call sites that still pass it
-    keep working; it goes away with the popup columns themselves.
-
-    Pure function — no I/O, no session. `flow` may be a transient
-    (unpersisted) object, which is what keeps this table-driven unit
-    testable without a database.
+    Explicit zero is an override. This function performs no database access;
+    payment callers must supply the owning popup for pricing inheritance.
     """
-    return EffectiveFlowConfig(
-        **{name: getattr(flow, name) for name in EFFECTIVE_CONFIG_FIELDS}
-    )
+    values = {name: getattr(flow, name, None) for name in EFFECTIVE_CONFIG_FIELDS}
+    for name in SIMPLEFI_PRICING_FIELDS:
+        if values[name] is None:
+            values[name] = getattr(popup, name, None)
+        if values[name] is None:
+            values[name] = 0
+    return EffectiveFlowConfig(**values)
 
 
 def config_for(
@@ -188,15 +186,14 @@ def config_for(
     the popup's own copies of these columns, which are on their way out and
     which nothing else reads anymore.
 
-    A popup with no default flow returns an all-null config rather than
-    raising, so a read never takes down a request.
+    Pricing inherits from the popup when the flow value is null, then defaults
+    to zero. With no default flow, other configuration remains null.
     """
     flow = session.get(SalesFlows, sales_flow_id) if sales_flow_id is not None else None
     if flow is None:
         flow = sales_flows_crud.get_default_flow(session, popup_id)
-    if flow is None:
-        return EffectiveFlowConfig(**dict.fromkeys(EFFECTIVE_CONFIG_FIELDS))
-    return build_effective_config(flow)
+    popup = session.get(Popups, popup_id)
+    return build_effective_config(flow, popup)
 
 
 def build_checkout_config(flow: SalesFlows) -> SalesFlowCheckoutConfig:
@@ -215,4 +212,22 @@ def build_checkout_config(flow: SalesFlows) -> SalesFlowCheckoutConfig:
         contribution_percentage=config.contribution_percentage,
         contribution_label=config.contribution_label,
         contribution_description=config.contribution_description,
+        ticket_sales_status=flow.ticket_sales_status,
+        coming_soon_title=flow.coming_soon_title,
+        coming_soon_message=flow.coming_soon_message,
     )
+
+
+def assert_ticket_sales_open(flow: SalesFlows) -> None:
+    """Refuse a purchase through a flow whose sales are not open yet.
+
+    The portal shows the coming-soon message instead of a checkout, but a
+    hidden button is not a closed door: every purchase and quote path calls
+    this, so a kept link or a scripted request cannot buy early either.
+    Applications are untouched; only buying waits.
+    """
+    if flow.ticket_sales_status != SalesFlowTicketSalesStatus.open:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Ticket sales are not open yet",
+        )

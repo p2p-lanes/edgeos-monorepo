@@ -42,6 +42,10 @@ class SalesFlows(SalesFlowBase, table=True):
             "reviewers_mode IN ('inherit', 'override')",
             name="ck_sales_flows_reviewers_mode",
         ),
+        CheckConstraint(
+            "ticket_sales_status IN ('open', 'coming_soon')",
+            name="ck_sales_flows_ticket_sales_status",
+        ),
         Index(
             "uq_sales_flows_default_per_popup",
             "popup_id",

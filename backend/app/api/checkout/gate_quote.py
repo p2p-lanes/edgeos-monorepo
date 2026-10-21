@@ -21,6 +21,7 @@ from app.api.sales_flow.eligibility import (
     assert_application_flow_eligible,
     assert_upsale_eligible,
 )
+from app.api.sales_flow.resolver import assert_ticket_sales_open
 from app.api.sales_flow.schemas import SalesFlowType, SelectedSalesFlow
 from app.api.ticketing_step.models import TicketingSteps
 from app.core.config import settings
@@ -142,6 +143,7 @@ def evaluate_gate_quote(
     require_complete: bool = False,
 ) -> GateQuote:
     """Evaluate every mutable checkout rule once and produce one quote."""
+    assert_ticket_sales_open(flow)
     assert_upsale_eligible(session, flow, popup.id, popup.tenant_id, current_human)
     assert_application_flow_eligible(session, flow, popup.tenant_id, current_human)
     context = build_context(

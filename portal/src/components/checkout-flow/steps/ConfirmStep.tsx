@@ -252,6 +252,10 @@ export default function ConfirmStep() {
                           </span>
                         )}
                       </div>
+                      {/* Full price on purpose: these lines sum to the
+                          Subtotal below, which the discount row reduces.
+                          The cart drawer has no such ladder, so it shows
+                          discounted prices instead. */}
                       <span className="font-medium text-foreground">
                         {formatCurrency(pass.originalPrice ?? pass.price)}
                       </span>

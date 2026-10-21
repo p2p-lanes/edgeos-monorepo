@@ -118,8 +118,8 @@ describe("useEventScheduling", () => {
     expect(result.current.startIso).toBe("2026-06-04T20:00:00.000Z")
     expect(result.current.endIso).toBe("2026-06-04T21:00:00.000Z")
     expect(result.current.durationMinutes).toBe(60)
-    expect(result.current.durationUnit).toBe("hours")
-    expect(result.current.durationValue).toBe(1)
+    expect(result.current.durationDraft).toEqual({ hours: "1", minutes: "0" })
+    expect(result.current.durationError).toBeNull()
   })
 
   it("setTimeStr updates startIso through the popup tz", () => {
@@ -134,7 +134,7 @@ describe("useEventScheduling", () => {
     expect(result.current.startIso).toBe("2026-06-04T20:00:00.000Z")
   })
 
-  it("endIso = startIso + durationMinutes (durationUnit=hours)", () => {
+  it("endIso = startIso + durationMinutes", () => {
     const { result } = renderHook(() =>
       useEventScheduling({
         displayTz: "America/Los_Angeles",
@@ -149,25 +149,59 @@ describe("useEventScheduling", () => {
     expect(result.current.durationMinutes).toBe(180)
   })
 
-  it("switching to minutes preserves the same derived duration", () => {
+  it("seeds a multi-day duration as hours and minutes", () => {
+    const { result } = renderHook(() =>
+      useEventScheduling({
+        displayTz: "UTC",
+        initialDateStr: "2026-06-04",
+        initialTimeStr: "13:00",
+        initialDurationMinutes: 26 * 60 + 30,
+      }),
+    )
+    expect(result.current.durationDraft).toEqual({ hours: "26", minutes: "30" })
+    expect(result.current.endIso).toBe("2026-06-05T15:30:00.000Z")
+  })
+
+  it("decimal hours keep their fraction", () => {
     const { result } = renderHook(() =>
       useEventScheduling({
         displayTz: "America/Los_Angeles",
         initialDateStr: "2026-06-04",
         initialTimeStr: "13:00",
-        initialDurationMinutes: 60,
       }),
     )
-    // Start in hours (value=1).
-    expect(result.current.durationUnit).toBe("hours")
-    expect(result.current.durationMinutes).toBe(60)
+    act(() => result.current.setDurationDraft({ hours: "1.5", minutes: "" }))
+    expect(result.current.durationMinutes).toBe(90)
+    expect(result.current.endIso).toBe("2026-06-04T21:30:00.000Z")
+  })
 
-    // Caller updates value+unit together (form does the conversion).
-    act(() => {
-      result.current.setDurationUnit("minutes")
-      result.current.setDurationValue(60)
-    })
-    expect(result.current.durationMinutes).toBe(60)
-    expect(result.current.endIso).toBe("2026-06-04T21:00:00.000Z")
+  it("an invalid duration clears endIso instead of becoming 1 minute", () => {
+    const { result } = renderHook(() =>
+      useEventScheduling({
+        displayTz: "America/Los_Angeles",
+        initialDateStr: "2026-06-04",
+        initialTimeStr: "13:00",
+      }),
+    )
+    act(() => result.current.setDurationDraft({ hours: "0", minutes: "0" }))
+    expect(result.current.durationMinutes).toBeNull()
+    expect(result.current.durationError).toBe("not_positive")
+    expect(result.current.endIso).toBe("")
+
+    act(() => result.current.setDurationDraft({ hours: "", minutes: "" }))
+    expect(result.current.durationError).toBe("required")
+  })
+
+  it("an empty stored range seeds an error rather than a default", () => {
+    const { result } = renderHook(() =>
+      useEventScheduling({
+        displayTz: "UTC",
+        initialDateStr: "2026-06-04",
+        initialTimeStr: "13:00",
+        initialDurationMinutes: 0,
+      }),
+    )
+    expect(result.current.durationError).toBe("not_positive")
+    expect(result.current.endIso).toBe("")
   })
 })

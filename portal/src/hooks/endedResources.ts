@@ -1,7 +1,6 @@
 import {
   CalendarDays,
   FileText,
-  Layers,
   Link2,
   MapPin,
   ReceiptText,
@@ -77,12 +76,6 @@ export function buildEndedResources({
       path: `/portal/${city?.slug}/events`,
       group: "community",
       children: [
-        {
-          name: t("sidebar.tracks", { defaultValue: "Tracks" }),
-          icon: Layers,
-          status: eventsStatus,
-          path: `/portal/${city?.slug}/events/tracks`,
-        },
         {
           name: t("sidebar.venues"),
           icon: MapPin,

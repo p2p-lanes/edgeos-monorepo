@@ -77,6 +77,7 @@ class CheckoutRuntimeProduct(BaseModel):
     name: str
     slug: str
     description: str | None = None
+    info_note: str | None = None
     price: Decimal
     compare_price: Decimal | None = None
     image_url: str | None = None

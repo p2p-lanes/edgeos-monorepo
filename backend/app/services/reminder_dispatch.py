@@ -52,7 +52,7 @@ from app.api.popup.models import Popups
 from app.api.product.models import Products
 from app.api.sales_flow.models import SalesFlows
 from app.api.sales_flow.resolver import build_effective_config
-from app.api.sales_flow.schemas import EffectiveFlowConfig
+from app.api.sales_flow.schemas import EffectiveFlowConfig, SalesFlowTicketSalesStatus
 from app.services.email.service import get_email_service
 from app.services.email.templates import (
     AbandonedApplicationContext,
@@ -480,9 +480,16 @@ async def _run_dispatch(db: Session, now: datetime) -> dict:
         summary["flows"] += 1
         seen_popups.add(popup.id)
         effective = build_effective_config(flow, popup)
+        # Nobody can buy through a flow whose sales are not open yet, so
+        # nudging people to finish a purchase there would only send them to
+        # the coming-soon screen. Application reminders still go out.
+        sales_open = flow.ticket_sales_status == SalesFlowTicketSalesStatus.open
         try:
-            await _dispatch_abandoned_cart(db, flow, popup, effective, now, summary)
-            await _dispatch_purchase_reminder(db, flow, popup, effective, now, summary)
+            if sales_open:
+                await _dispatch_abandoned_cart(db, flow, popup, effective, now, summary)
+                await _dispatch_purchase_reminder(
+                    db, flow, popup, effective, now, summary
+                )
             await _dispatch_abandoned_application(
                 db, flow, popup, effective, now, summary
             )

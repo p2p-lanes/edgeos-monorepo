@@ -75,8 +75,8 @@ describe("OrdersContent", () => {
 
     expect(screen.getByText("Conference T-Shirt")).toBeTruthy()
     expect(screen.getByText(/Quantity: 2/)).toBeTruthy()
-    expect(screen.getByText("$35")).toBeTruthy()
-    expect(screen.getByText("$70")).toBeTruthy()
+    expect(screen.getByText("$35.00")).toBeTruthy()
+    expect(screen.getByText("$70.00")).toBeTruthy()
     expect(screen.queryByRole("button")).toBeNull()
     expect(screen.queryByRole("dialog")).toBeNull()
     expect(screen.queryByText("SHIRT1")).toBeNull()

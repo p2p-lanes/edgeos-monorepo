@@ -2,7 +2,6 @@ import {
   CalendarDays,
   FileText,
   House,
-  Layers,
   Link2,
   MapPin,
   ReceiptText,
@@ -212,12 +211,6 @@ const useResources = () => {
               group: "community" as const,
               children: [
                 {
-                  name: t("sidebar.tracks", { defaultValue: "Tracks" }),
-                  icon: Layers,
-                  status: "active" as const,
-                  path: `/portal/${city.slug}/events/tracks`,
-                },
-                {
                   name: t("sidebar.venues"),
                   icon: MapPin,
                   status: "active" as const,
@@ -280,12 +273,6 @@ const useResources = () => {
         path: `/portal/${city?.slug}/events${flowQuery}`,
         group: "community",
         children: [
-          {
-            name: t("sidebar.tracks", { defaultValue: "Tracks" }),
-            icon: Layers,
-            status: companionEventsVisible ? "active" : "hidden",
-            path: `/portal/${city?.slug}/events/tracks${flowQuery}`,
-          },
           {
             name: t("sidebar.venues"),
             icon: MapPin,
@@ -353,12 +340,6 @@ const useResources = () => {
       path: `/portal/${city?.slug}/events${flowQuery}`,
       group: "community",
       children: [
-        {
-          name: t("sidebar.tracks", { defaultValue: "Tracks" }),
-          icon: Layers,
-          status: hasPopupAccess && eventsEnabled ? "active" : "hidden",
-          path: `/portal/${city?.slug}/events/tracks${flowQuery}`,
-        },
         {
           name: t("sidebar.venues"),
           icon: MapPin,

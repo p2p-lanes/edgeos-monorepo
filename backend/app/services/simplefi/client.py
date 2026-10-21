@@ -151,6 +151,8 @@ class SimpleFIClient:
         user_email: str | None = None,
         plan_name: str | None = None,
         success_behavior: str = "manual",
+        pricing: dict[str, float] | None = None,
+        payment_mode_pricing: dict[str, float] | None = None,
     ) -> SimpleFIPaymentResponse:
         """
         Create a payment request OR an installment plan in SimpleFI.
@@ -161,6 +163,9 @@ class SimpleFIClient:
         created in ``pending`` status and the buyer picks the actual number
         of installments on SimpleFi's checkout UI; activation fires our
         ``installment_plan_activated`` webhook.
+
+        Unset pricing keys inherit SimpleFI merchant defaults. Rail pricing
+        applies to either endpoint; payment_mode_pricing is sent only to plans.
 
         Both modes return a uniform ``SimpleFIPaymentResponse`` — ``id`` is
         either a payment_request_id (one-shot) or an installment_plan_id
@@ -219,6 +224,8 @@ class SimpleFIClient:
                     "user_email is required when creating an installment plan"
                 )
             return self._create_installment_plan(
+                pricing=pricing,
+                payment_mode_pricing=payment_mode_pricing,
                 amount=amount,
                 currency=currency,
                 max_installments=max_installments,
@@ -241,6 +248,9 @@ class SimpleFIClient:
             "notification_url": notification_url,
             "redirect_urls": redirect_urls,
         }
+
+        if pricing:
+            body["pricing"] = pricing
 
         logger.info(
             "SimpleFI create payment request: amount={} currency={} popup_slug={} tenant_slug={} memo={} reference_keys={} success_url={} cancel_url={}",
@@ -284,6 +294,8 @@ class SimpleFIClient:
         redirect_urls: dict[str, str],
         popup_slug: str,
         tenant_slug: str,
+        pricing: dict[str, float] | None = None,
+        payment_mode_pricing: dict[str, float] | None = None,
     ) -> SimpleFIPaymentResponse:
         """POST to /installment_plans with the buyer-pickable ceiling.
 
@@ -303,6 +315,10 @@ class SimpleFIClient:
             "notification_url": notification_url,
             "redirect_urls": redirect_urls,
         }
+        if pricing:
+            body["pricing"] = pricing
+        if payment_mode_pricing:
+            body["payment_mode_pricing"] = payment_mode_pricing
         if plan_name:
             body["name"] = plan_name
 

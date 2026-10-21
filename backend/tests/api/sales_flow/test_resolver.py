@@ -363,3 +363,99 @@ class TestBuildEffectiveConfig:
         config = resolver.build_effective_config(flow, popup)
 
         assert config.abandoned_cart_max_count == 0
+
+
+@pytest.mark.parametrize(
+    "field",
+    [
+        "simplefi_card_adjustment_pct",
+        "simplefi_crypto_adjustment_pct",
+        "simplefi_pay_in_full_adjustment_pct",
+        "simplefi_installments_adjustment_pct",
+    ],
+)
+@pytest.mark.parametrize(
+    "popup_value,flow_value,expected",
+    [
+        (None, None, 0),
+        (3, None, 3),
+        (-5, None, -5),
+        (3, 0, 0),
+        (3, -2, -2),
+        (None, 4, 4),
+    ],
+)
+def test_pricing_inheritance_per_field(field, popup_value, flow_value, expected):
+    popup = Popups(
+        tenant_id=uuid.uuid4(), name="Pricing", slug="pricing", **{field: popup_value}
+    )
+    flow = SalesFlows(
+        tenant_id=popup.tenant_id,
+        popup_id=popup.id,
+        slug="sale",
+        name="Sale",
+        **{field: flow_value},
+    )
+    assert getattr(resolver.build_effective_config(flow, popup), field) == expected
+
+
+def test_pricing_mixes_inherited_and_overridden_fields():
+    popup = Popups(
+        tenant_id=uuid.uuid4(),
+        name="Pricing",
+        slug="pricing",
+        simplefi_card_adjustment_pct=3,
+        simplefi_crypto_adjustment_pct=-2,
+        simplefi_pay_in_full_adjustment_pct=-5,
+        simplefi_installments_adjustment_pct=8,
+    )
+    flow = SalesFlows(
+        tenant_id=popup.tenant_id,
+        popup_id=popup.id,
+        slug="sale",
+        name="Sale",
+        simplefi_crypto_adjustment_pct=0,
+        simplefi_pay_in_full_adjustment_pct=-10,
+    )
+    config = resolver.build_effective_config(flow, popup)
+    assert (
+        config.simplefi_card_adjustment_pct,
+        config.simplefi_crypto_adjustment_pct,
+        config.simplefi_pay_in_full_adjustment_pct,
+        config.simplefi_installments_adjustment_pct,
+    ) == (3, 0, -10, 8)
+    popup.simplefi_card_adjustment_pct = 7
+    assert (
+        resolver.build_effective_config(flow, popup).simplefi_card_adjustment_pct == 7
+    )
+    flow.simplefi_crypto_adjustment_pct = None
+    assert (
+        resolver.build_effective_config(flow, popup).simplefi_crypto_adjustment_pct
+        == -2
+    )
+
+
+def test_pricing_config_for_loads_popup_and_new_flows_inherit(db, tenant_a):
+    from app.api.sales_flow.crud import _attrs
+
+    popup = _make_popup(db, tenant_a)
+    popup.simplefi_card_adjustment_pct = 3
+    db.add(popup)
+    flow = _make_flow(db, popup, slug="pricing", is_default=True)
+    db.flush()
+    assert _attrs(popup)["simplefi_card_adjustment_pct"] is None
+    assert (
+        resolver.config_for(
+            db, sales_flow_id=flow.id, popup_id=popup.id
+        ).simplefi_card_adjustment_pct
+        == 3
+    )
+    flow.simplefi_card_adjustment_pct = 0
+    db.add(flow)
+    db.flush()
+    assert (
+        resolver.config_for(
+            db, sales_flow_id=flow.id, popup_id=popup.id
+        ).simplefi_card_adjustment_pct
+        == 0
+    )

@@ -90,6 +90,10 @@
     "estimated_total": "Áætluð heildarupphæð",
     "definitive_total": "Heildarupphæð"
   },
+  "ticketSales": {
+    "coming_soon_title": "Miðar væntanlegir",
+    "coming_soon_description": "Miðasala á þennan viðburð er ekki hafin enn. Kíktu aftur fljótlega."
+  },
   "orders": {
     "show_unit_qr_label": "Sjá QR-kóða fyrir {{product}}, einingu {{number}}",
     "unit_qr_title": "{{product}} · QR {{number}}",
@@ -275,6 +279,7 @@
     "sold_out": "Uppselt",
     "sale_upcoming": "Væntanlegt",
     "sale_ended": "Lokið",
+    "product_info_note_label": "Nánari upplýsingar um {{name}}",
     "loading_info": "Hleður upplýsingum þínum",
     "processing": "Vinn úr skráningu þinni",
     "processing_subtitle": "Þetta gæti tekið nokkur augnablik",
@@ -350,7 +355,8 @@
       "confirm_edit": "Staðfesta breytingu",
       "pay_and_confirm_edit": "Greiða og staðfesta breytingu",
       "continue_to": "Halda áfram á {{step}}",
-      "review": "Yfirfara"
+      "review": "Yfirfara",
+      "select_ticket": "Veldu miða til að halda áfram"
     },
     "step_short": {
       "passes": "Passar",
@@ -858,15 +864,25 @@
     "invite_email_help": "If they already have an account they'll be added right away. If not, they'll join automatically when they sign up.",
     "first_name": "First name",
     "last_name": "Last name",
-    "email": "Email",
+    "email": "Netfang",
     "telegram": "Telegram",
-    "gender": "Gender",
+    "gender": "Kyn",
     "select_gender": "Select gender",
     "cancel": "Cancel",
     "update_member": "Update member",
     "send_invitation": "Send invitation",
     "updating": "Updating...",
-    "sending": "Sending..."
+    "sending": "Sending...",
+    "organization": "Stofnun",
+    "role": "Hlutverk",
+    "pass_holder": "Passahafi",
+    "edit": "Breyta",
+    "remove": "Fjarlægja",
+    "remove_member": "Fjarlægja meðlim",
+    "member_has_active_ticket": "Þessi meðlimur er nú þegar með virkan miða.",
+    "toggle_member_details": "Sýna eða fela upplýsingar um {{name}}",
+    "expand": "Stækka",
+    "collapse": "Fella saman"
   },
   "referrals": {
     "title": "Referrals",
@@ -1214,6 +1230,15 @@
       "duration_label": "Lengd",
       "minutes": "Mínútur",
       "hours": "Klukkustundir",
+      "duration_presets_label": "Algengar lengdir",
+      "duration_preset_minutes": "{{minutes}} mín.",
+      "duration_preset_hours": "{{hours}} klst.",
+      "duration_preset_hours_minutes": "{{hours}} klst. {{minutes}} mín.",
+      "duration_ends_at": "Lýkur kl. {{time}}",
+      "duration_ends_at_on_date": "Lýkur {{date}} kl. {{time}}",
+      "duration_error_required": "Sláðu inn lengd.",
+      "duration_error_invalid": "Sláðu inn gilda lengd í klukkustundum og mínútum.",
+      "duration_error_not_positive": "Lengd verður að vera meiri en 0.",
       "no_venue_open_hours": "Staðurinn hefur enga opnunartíma á þessum degi (athugaðu vikulega tíma eða undantekningar).",
       "start_time_outside_venue_hours": "Upphafstími fellur utan opnunartíma staðarins.",
       "start_time_conflict": "Það er þegar viðburður á þessum tíma.",

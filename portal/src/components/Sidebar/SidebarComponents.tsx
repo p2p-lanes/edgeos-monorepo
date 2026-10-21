@@ -3,6 +3,7 @@
 import { Slot } from "@radix-ui/react-slot"
 import { cva, type VariantProps } from "class-variance-authority"
 import { PanelLeft } from "lucide-react"
+import { usePathname } from "next/navigation"
 import * as React from "react"
 import { useTranslation } from "react-i18next"
 import { Button } from "@/components/ui/button"
@@ -178,6 +179,17 @@ const Sidebar = React.forwardRef<
   ) => {
     const { isMobile, state, openMobile, setOpenMobile } = useSidebar()
     const { t } = useTranslation()
+    const pathname = usePathname()
+    const lastPathname = React.useRef(pathname)
+
+    // Sidebar items close the mobile sheet themselves when clicked; this
+    // catches every other route change (browser back/forward, a plain link)
+    // so the sheet never stays open over the new page.
+    React.useEffect(() => {
+      if (lastPathname.current === pathname) return
+      lastPathname.current = pathname
+      setOpenMobile(false)
+    }, [pathname, setOpenMobile])
 
     if (collapsible === "none") {
       return (

@@ -193,6 +193,9 @@ class TestPortalUpsaleListing:
                     "kind": "fixed",
                 },
                 "theme_config": None,
+                "ticket_sales_status": "open",
+                "coming_soon_title": None,
+                "coming_soon_message": None,
             }
         ]
 

@@ -128,13 +128,12 @@ export function EditEventForm({
         ? (occurrenceStart ?? event.start_time)
         : event.start_time,
     )
+    // Occurrences share the master's duration. Not clamped: a stored range
+    // that is empty or reversed surfaces as a duration error to fix, rather
+    // than silently becoming a 1-minute event.
     const masterDuration =
       new Date(event.end_time).getTime() - new Date(event.start_time).getTime()
-    const endDate = new Date(startDate.getTime() + masterDuration)
-    const minutes = Math.max(
-      1,
-      Math.round((endDate.getTime() - startDate.getTime()) / 60_000),
-    )
+    const minutes = Math.round(masterDuration / 60_000)
     return {
       initialDateStr: formatDateKeyInTz(startDate, eventTz),
       initialTimeStr: formatHhmmInTz(startDate, eventTz),
@@ -154,10 +153,8 @@ export function EditEventForm({
     setDateStr,
     timeStr,
     setTimeStr,
-    durationValue,
-    setDurationValue,
-    durationUnit,
-    setDurationUnit,
+    durationDraft,
+    setDurationDraft,
     startIso,
     endIso,
     durationMinutes,
@@ -324,12 +321,10 @@ export function EditEventForm({
           popupWindowLabel={popupWindowLabel}
           timeStr={timeStr}
           onTimeChange={setTimeStr}
-          durationValue={durationValue}
-          durationUnit={durationUnit}
-          onDurationChange={(next) => {
-            setDurationValue(next.value)
-            setDurationUnit(next.unit)
-          }}
+          durationDraft={durationDraft}
+          onDurationChange={setDurationDraft}
+          startIso={startIso}
+          timeZone={displayTz}
           venueId={realVenueId}
           withinOpenHours={withinOpenHours}
           availability={availability}

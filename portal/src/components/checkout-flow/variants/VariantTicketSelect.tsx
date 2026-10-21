@@ -3,6 +3,7 @@
 import { Check, ChevronDown, Ticket } from "lucide-react"
 import { useEffect, useLayoutEffect, useRef, useState } from "react"
 import { useTranslation } from "react-i18next"
+import { ProductInfoNote } from "@/components/checkout-flow/shared/ProductInfoNote"
 import {
   TicketRecipientControls,
   useTicketRecipientContext,
@@ -623,6 +624,11 @@ function PassRow({
             <span className="font-medium text-foreground break-words">
               {product.name}
             </span>
+            <ProductInfoNote
+              note={product.info_note}
+              productName={product.name}
+              className="mt-0.5"
+            />
             <SaleStateBadge state={saleState} />
           </div>
           {product.description && (
@@ -805,6 +811,11 @@ function DayPassRow({
             <span className="font-medium text-foreground break-words">
               {product.name}
             </span>
+            <ProductInfoNote
+              note={product.info_note}
+              productName={product.name}
+              className="mt-0.5"
+            />
             <SaleStateBadge state={saleState} />
           </div>
           <p className="text-sm text-muted-foreground">per day</p>
@@ -997,6 +1008,11 @@ function CompactAttendeeCard({
                   >
                     {p.name}
                   </span>
+                  <ProductInfoNote
+                    note={p.info_note}
+                    productName={p.name}
+                    className="size-4"
+                  />
                   <SaleStateBadge state={pillSaleState} />
                   <span
                     className={cn(
@@ -1054,6 +1070,11 @@ function CompactAttendeeCard({
                 {isSelected && <Check className="w-3 h-3" />}
                 {p.purchased && !isEditing && <Ticket className="w-3 h-3" />}
                 <span>{p.name}</span>
+                <ProductInfoNote
+                  note={p.info_note}
+                  productName={p.name}
+                  className="size-4 text-current"
+                />
                 <SaleStateBadge state={pillSaleState} />
                 <span
                   className={cn(
@@ -1114,6 +1135,10 @@ function OpenCheckoutRow({
             <h3 className="font-medium text-foreground text-sm">
               {product.name}
             </h3>
+            <ProductInfoNote
+              note={product.info_note}
+              productName={product.name}
+            />
           </div>
           {product.description && (
             <ExpandableDescription

@@ -791,6 +791,21 @@ def _calculate_price(
     return discounted_standard + non_discountable_amount, credit_applied
 
 
+def _simplefi_pricing_overrides(config) -> dict[str, dict[str, float]]:
+    """EdgeOS owns pricing: send zero for unset fields, never merchant defaults."""
+    result = {}
+    for group, names in (
+        ("pricing", ("card", "crypto")),
+        ("payment_mode_pricing", ("pay_in_full", "installments")),
+    ):
+        values = {}
+        for name in names:
+            value = getattr(config, f"simplefi_{name}_adjustment_pct", None)
+            values[name] = float(value) if value is not None else 0.0
+        result[group] = values
+    return result
+
+
 def _installment_interval(config: "Any | None") -> str:
     """The billing cadence a flow bills its installments on.
 
@@ -1490,7 +1505,7 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
                 payment.insurance_amount = amounts.insurance_amount
                 payment.amount += amounts.insurance_amount
 
-            flow_fees = build_effective_config(target_flow) if target_flow else None
+            flow_fees = build_effective_config(target_flow, popup)
             if (
                 flow_fees
                 and flow_fees.contribution_enabled
@@ -1633,6 +1648,7 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
             # any subsequent lock holder is guaranteed to find the committed row
             # in the sibling re-check.  No explicit unlock is needed.
             simplefi_response = simplefi_client.create_payment(
+                **_simplefi_pricing_overrides(flow_fees),
                 amount=payment.amount,
                 popup_slug=popup.slug,
                 tenant_slug=tenant.slug,
@@ -2003,6 +2019,7 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
                 cancel_path,
             )
             simplefi_response = simplefi_client.create_payment(
+                **_simplefi_pricing_overrides(fee_config),
                 amount=fee_amount,
                 popup_slug=popup.slug,
                 tenant_slug=popup.tenant.slug,
@@ -2201,6 +2218,28 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Application must be accepted before purchasing products",
             )
+
+    def _validate_ticket_sales_open(
+        self, session: Session, application: Applications
+    ) -> None:
+        """An accepted applicant still waits while the flow's sales are not open.
+
+        Runs on preview and on create (create previews first), so neither a
+        quote nor a purchase gets through before the organiser opens sales.
+        """
+        from app.api.sales_flow.crud import sales_flows_crud  # noqa: PLC0415
+        from app.api.sales_flow.models import SalesFlows  # noqa: PLC0415
+        from app.api.sales_flow.resolver import (  # noqa: PLC0415
+            assert_ticket_sales_open,
+        )
+
+        flow = (
+            session.get(SalesFlows, application.sales_flow_id)
+            if application.sales_flow_id is not None
+            else sales_flows_crud.get_default_flow(session, application.popup_id)
+        )
+        if flow is not None:
+            assert_ticket_sales_open(flow)
 
     def _validate_products(
         self,
@@ -3191,6 +3230,7 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
             )
 
         self._validate_application(application)
+        self._validate_ticket_sales_open(session, application)
         valid_products = self._validate_products(session, obj.products, application)
         self._validate_attendees(session, obj.products, application)
         self._validate_recipient_requests(
@@ -3945,6 +3985,7 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
                 max_installments,
             )
             simplefi_response = simplefi_client.create_payment(
+                **_simplefi_pricing_overrides(terms),
                 amount=preview.amount,
                 popup_slug=application.popup.slug,
                 tenant_slug=application.popup.tenant.slug,

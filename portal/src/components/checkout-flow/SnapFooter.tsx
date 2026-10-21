@@ -94,6 +94,8 @@ function StripeFooter({
           >
             {isSubmitting ? (
               <Loader2 className="w-4 h-4 animate-spin" />
+            ) : cart.passes.length === 0 ? (
+              t("checkout.actions.select_ticket")
             ) : summary.grandTotal === 0 ? (
               "Claim"
             ) : (

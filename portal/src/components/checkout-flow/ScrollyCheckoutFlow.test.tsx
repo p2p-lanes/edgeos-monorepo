@@ -7,6 +7,11 @@ const mockReadAndClearPendingPaymentRedirectState = vi.fn()
 const mockRouterReplace = vi.fn()
 const retryFlowConfig = vi.fn()
 let flowConfigError: string | null = null
+let flowConfig: {
+  ticket_sales_status?: "open" | "coming_soon"
+  coming_soon_title?: string | null
+  coming_soon_message?: string | null
+} | null = null
 let isInitialLoading = false
 
 vi.mock("next/navigation", () => ({
@@ -25,6 +30,7 @@ vi.mock("@/providers/checkoutProvider", () => ({
     availableSteps: ["passes"],
     submitPayment: vi.fn().mockResolvedValue({ success: true }),
     stepConfigs: [],
+    flowConfig,
     flowConfigError,
     retryFlowConfig,
     isInitialLoading,
@@ -86,6 +92,7 @@ describe("ScrollyCheckoutFlow", () => {
     mockRouterReplace.mockReset()
     retryFlowConfig.mockReset()
     flowConfigError = null
+    flowConfig = null
     isInitialLoading = false
     mockUseSearchParams.mockReturnValue({ get: () => null })
   })
@@ -106,6 +113,20 @@ describe("ScrollyCheckoutFlow", () => {
       screen.getByRole("button", { name: "checkout.config_retry" }),
     )
     expect(retryFlowConfig).toHaveBeenCalledOnce()
+  })
+
+  it("shows the coming-soon copy instead of the checkout while sales are held", () => {
+    flowConfig = {
+      ticket_sales_status: "coming_soon",
+      coming_soon_title: null,
+      coming_soon_message: "Hang tight.",
+    }
+    render(<ScrollyCheckoutFlow />)
+    expect(
+      screen.getByRole("heading", { name: "ticketSales.coming_soon_title" }),
+    ).toBeTruthy()
+    expect(screen.getByText("Hang tight.")).toBeTruthy()
+    expect(screen.queryByText("footer")).toBeNull()
   })
 
   it("redirects to /passes when returning from SimpleFI", async () => {

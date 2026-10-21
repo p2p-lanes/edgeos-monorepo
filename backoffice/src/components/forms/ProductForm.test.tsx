@@ -173,6 +173,49 @@ describe("ProductForm — ticket-as-first-class-entity (Phase 8.2)", () => {
     )
   })
 
+  it("creates a product with an info note", async () => {
+    const user = userEvent.setup()
+    render(<ProductForm onSuccess={vi.fn()} />, { wrapper: makeWrapper() })
+    await user.type(
+      await screen.findByPlaceholderText(/product name/i),
+      "Passport pass",
+    )
+    await user.type(screen.getByPlaceholderText("100.00"), "50")
+    await user.type(
+      screen.getByLabelText(/info note/i),
+      "A passport will be requested.",
+    )
+
+    await user.click(screen.getByRole("button", { name: /create product/i }))
+
+    await waitFor(() => expect(mockCreateProduct).toHaveBeenCalledOnce())
+    expect(mockCreateProduct.mock.calls[0]?.[0].requestBody).toMatchObject({
+      info_note: "A passport will be requested.",
+    })
+  })
+
+  it("clears an emptied info note with null on edit", async () => {
+    const user = userEvent.setup()
+    render(
+      <ProductForm
+        defaultValues={{ ...editProduct()!, info_note: "Old note" }}
+        onSuccess={vi.fn()}
+      />,
+      { wrapper: makeWrapper() },
+    )
+    const note = await screen.findByLabelText(/info note/i)
+    expect(note).toHaveValue("Old note")
+    expect(note).toHaveAttribute("maxLength", "500")
+
+    await user.clear(note)
+    await user.click(screen.getByRole("button", { name: /save changes/i }))
+
+    await waitFor(() => expect(mockUpdateProduct).toHaveBeenCalledOnce())
+    expect(mockUpdateProduct.mock.calls[0]?.[0].requestBody).toMatchObject({
+      info_note: null,
+    })
+  })
+
   it("does not submit a product with an empty category", async () => {
     const user = userEvent.setup()
     render(

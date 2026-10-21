@@ -31,11 +31,8 @@ def test_backfill_preserves_buyers_existing_categories_and_ambiguous_history(
         command.upgrade(config, migration.revision)
         command.downgrade(config, migration.down_revision)
         # This test intentionally runs at the migration's parent revision,
-        # while the ORM model reflects later SimpleFi-key, profile, badge, and
+        # while the ORM model reflects later profile, badge, and
         # sidebar configuration fields.
-        connection.execute(
-            text("ALTER TABLE sales_flows ADD COLUMN simplefi_api_key VARCHAR")
-        )
         connection.execute(
             text(
                 "ALTER TABLE humans ADD COLUMN public_profile_token VARCHAR(64), "
@@ -45,6 +42,10 @@ def test_backfill_preserves_buyers_existing_categories_and_ambiguous_history(
         connection.execute(
             text(
                 "ALTER TABLE popups "
+                "ADD COLUMN simplefi_card_adjustment_pct NUMERIC(5,2), "
+                "ADD COLUMN simplefi_crypto_adjustment_pct NUMERIC(5,2), "
+                "ADD COLUMN simplefi_pay_in_full_adjustment_pct NUMERIC(5,2), "
+                "ADD COLUMN simplefi_installments_adjustment_pct NUMERIC(5,2), "
                 "ADD COLUMN badges_enabled BOOLEAN NOT NULL DEFAULT false, "
                 "ADD COLUMN sidebar_config JSONB, "
                 "ADD COLUMN directory_fields JSONB NOT NULL DEFAULT '[]'"
@@ -56,9 +57,10 @@ def test_backfill_preserves_buyers_existing_categories_and_ambiguous_history(
                 "ADD COLUMN directory_eligible BOOLEAN NOT NULL DEFAULT false"
             )
         )
-        # Insert payments against the historical schema, without newer ORM
-        # columns such as form_response_version that this revision never had.
+        # Insert payments and flows against the historical schema, without newer
+        # ORM columns such as form_response_version or SimpleFI pricing.
         payments_table = Table("payments", MetaData(), autoload_with=connection)
+        flows_table = Table("sales_flows", MetaData(), autoload_with=connection)
         with Session(bind=connection, join_transaction_mode="create_savepoint") as db:
             tenant = Tenants(name="Repair test", slug=f"repair-{uuid.uuid4()}")
             db.add(tenant)
@@ -88,7 +90,21 @@ def test_backfill_preserves_buyers_existing_categories_and_ambiguous_history(
             other_buyer = Humans(
                 tenant_id=tenant.id, email=f"other-{uuid.uuid4()}@example.com"
             )
-            db.add_all([flow, other_flow, buyer, other_buyer])
+
+            def insert_flow(flow):
+                db.execute(
+                    flows_table.insert().values(
+                        **{
+                            key: value
+                            for key, value in flow.model_dump().items()
+                            if key in flows_table.c
+                        }
+                    )
+                )
+
+            insert_flow(flow)
+            insert_flow(other_flow)
+            db.add_all([buyer, other_buyer])
             db.flush()
             legacy_application = Applications(
                 tenant_id=tenant.id,
@@ -129,7 +145,7 @@ def test_backfill_preserves_buyers_existing_categories_and_ambiguous_history(
                 slug="foreign",
                 type="direct",
             )
-            db.add(foreign_flow)
+            insert_flow(foreign_flow)
             db.flush()
             roles["foreign_category"] = AttendeeCategories(
                 tenant_id=other_tenant.id,

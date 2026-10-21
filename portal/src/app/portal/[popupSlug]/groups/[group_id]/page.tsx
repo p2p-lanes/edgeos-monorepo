@@ -89,7 +89,7 @@ const GroupPage = () => {
           <MembersList
             members={currentMembers}
             onMemberUpdated={refetch}
-            isLeader={group.is_leader ?? false}
+            canManageMembers={group.is_leader ?? false}
           />
 
           <Pagination

@@ -50,10 +50,19 @@ class StartingPoint:
 
 def _attrs(source: Any) -> dict[str, Any]:
     """Every effective-config column a source has, plus the theme blob."""
-    from app.api.sales_flow.schemas import EFFECTIVE_CONFIG_FIELDS  # noqa: PLC0415
+    from app.api.popup.models import Popups  # noqa: PLC0415
+    from app.api.sales_flow.schemas import (  # noqa: PLC0415
+        EFFECTIVE_CONFIG_FIELDS,
+        SIMPLEFI_PRICING_FIELDS,
+    )
 
     names = (*EFFECTIVE_CONFIG_FIELDS, "theme_config")
-    return {name: getattr(source, name, None) for name in names}
+    values = {name: getattr(source, name, None) for name in names}
+    if isinstance(source, Popups):
+        # New flows inherit live popup pricing instead of freezing a copy.
+        for name in SIMPLEFI_PRICING_FIELDS:
+            values[name] = None
+    return values
 
 
 # What a popup's first flow is called, by what it does. A buyer sees this name
