@@ -49,6 +49,7 @@ import {
 } from "@/components/forms/DirectoryFieldsEditor"
 import { PopupHomeEditor } from "@/components/forms/PopupHomeEditor"
 import {
+  DEFAULT_POPUP_SIDEBAR_CONFIG,
   type PopupSidebarConfig,
   PopupSidebarEditor,
 } from "@/components/forms/PopupSidebarEditor"
@@ -371,17 +372,21 @@ export function PopupForm({
           value.show_attendee_directory,
         directory_fields: value.directory_fields,
         group_private_events_enabled: value.group_private_events_enabled,
-        ...(isEdit && canCustomizeSidebar
+        ...(canCustomizeSidebar
           ? {
-              sidebar_config: sidebarConfig
-                ? {
-                    sections: sidebarConfig.sections.filter(
-                      (section) =>
-                        section.kind !== "external" ||
-                        (section.links?.length ?? 0) > 0,
-                    ),
-                  }
-                : null,
+              sidebar_config: isEdit
+                ? sidebarConfig
+                  ? {
+                      ...sidebarConfig,
+                      layout: sidebarConfig.layout.filter(
+                        (block) =>
+                          block.type !== "section" ||
+                          block.items.length > 0 ||
+                          block.links.length > 0,
+                      ),
+                    }
+                  : null
+                : (sidebarConfig ?? DEFAULT_POPUP_SIDEBAR_CONFIG),
             }
           : {}),
       }
