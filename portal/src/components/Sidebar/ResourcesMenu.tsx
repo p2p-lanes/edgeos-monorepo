@@ -36,7 +36,8 @@ const ResourceItem: React.FC<{
   level?: number
   onNavigate: (path: string) => void
   pathname: string
-}> = ({ resource, level = 0, onNavigate, pathname }) => {
+  hiddenItems?: string[]
+}> = ({ resource, level = 0, onNavigate, pathname, hiddenItems = [] }) => {
   const { t } = useTranslation()
 
   const isActive = resource.path === pathname
@@ -64,15 +65,29 @@ const ResourceItem: React.FC<{
 
       {resource.children && (
         <SidebarMenuSub>
-          {resource.children.map((child) => (
-            <ResourceItem
-              key={child.name}
-              resource={child}
-              level={level + 1}
-              onNavigate={onNavigate}
-              pathname={pathname}
-            />
-          ))}
+          {resource.children
+            .filter(
+              (child) =>
+                !hiddenItems.some((key) =>
+                  key === "tracks"
+                    ? child.path?.endsWith("/events/tracks")
+                    : key === "venues"
+                      ? child.path?.endsWith("/events/venues")
+                      : key === "agentic_access"
+                        ? child.path?.endsWith("/portal/agentic-access")
+                        : false,
+                ),
+            )
+            .map((child) => (
+              <ResourceItem
+                key={child.name}
+                resource={child}
+                level={level + 1}
+                onNavigate={onNavigate}
+                pathname={pathname}
+                hiddenItems={hiddenItems}
+              />
+            ))}
         </SidebarMenuSub>
       )}
     </SidebarMenuItem>
@@ -85,12 +100,18 @@ const ResourcesMenu = () => {
   const city = useCityProvider().getCity()
   const sidebarConfig = city?.sidebar_config as
     | {
-        sections?: {
-          id: string
-          kind: "commerce" | "checkouts" | "community" | "external"
-          title?: string
-          links?: { id: string; label: string; url: string }[]
-        }[]
+        layout?: (
+          | {
+              id: string
+              type: "section"
+              title?: string
+              group?: "commerce" | "checkouts" | "community"
+              items: string[]
+              links?: { id: string; label: string; url: string }[]
+            }
+          | { id: string; type: "item"; resource: string }
+        )[]
+        hidden_items?: string[]
       }
     | null
     | undefined
@@ -105,19 +126,23 @@ const ResourcesMenu = () => {
     [router],
   )
 
-  const configuredSections = sidebarConfig?.sections
-    ? [
-        ...sidebarConfig.sections,
-        ...resourceGroups
-          .filter(
-            (group) =>
-              !sidebarConfig.sections?.some(
-                (section) => section.kind === group,
-              ),
-          )
-          .map((group) => ({ id: group, kind: group })),
-      ]
-    : null
+  const menuItemKey = (resource: Resource): string | undefined => {
+    if (resource.group === "checkouts") return "checkouts"
+    const names: Record<string, string> = {
+      [t("sidebar.home")]: "home",
+      [t("sidebar.application")]: "application",
+      [t("sidebar.overview")]: "application",
+      [t("sidebar.passes")]: "passes",
+      [t("sidebar.orders")]: "orders",
+      [t("sidebar.events")]: "events",
+      [t("sidebar.attendee_directory")]: "directory",
+      [t("sidebar.referrals")]: "referrals",
+    }
+    return names[resource.name]
+  }
+
+  const hiddenItems = sidebarConfig?.hidden_items ?? []
+  const configuredLayout = sidebarConfig?.layout
 
   const renderResourceSection = (group: ResourceGroup) => {
     const groupResources = resources.filter(
@@ -145,13 +170,11 @@ const ResourcesMenu = () => {
                 resource={resource}
                 onNavigate={handleNavigate}
                 pathname={pathname}
+                hiddenItems={hiddenItems}
               />
             ))}
             {group === "community" && (
-              <>
-                <Separator className="my-4" />
-                <GroupsResources onNavigate={handleNavigate} />
-              </>
+              <GroupsResources onNavigate={handleNavigate} />
             )}
           </SidebarMenu>
         </SidebarGroupContent>
@@ -159,17 +182,47 @@ const ResourcesMenu = () => {
     )
   }
 
-  const renderExternalSection = (section: {
+  const renderResource = (resourceKey: string, keyPrefix: string) => {
+    if (resourceKey === "groups") {
+      return [
+        <GroupsResources
+          key={`${keyPrefix}-groups`}
+          onNavigate={handleNavigate}
+        />,
+      ]
+    }
+    return resources
+      .filter(
+        (resource) =>
+          resource.status !== "hidden" && menuItemKey(resource) === resourceKey,
+      )
+      .map((resource) => (
+        <ResourceItem
+          key={`${keyPrefix}-${resource.path ?? resource.name}`}
+          resource={resource}
+          onNavigate={handleNavigate}
+          pathname={pathname}
+          hiddenItems={hiddenItems}
+        />
+      ))
+  }
+
+  const renderConfiguredSection = (section: {
     id: string
     title?: string
+    group?: ResourceGroup
+    items: string[]
     links?: { id: string; label: string; url: string }[]
   }) => {
+    const children = section.items.flatMap((key) =>
+      renderResource(key, section.id),
+    )
     const links = (section.links ?? []).filter(
       (link) =>
         link.url.trim() !== "" &&
         !/^(javascript|data|vbscript):/i.test(link.url.trim()),
     )
-    if (links.length === 0) return null
+    if (children.length === 0 && links.length === 0) return null
     const labelId = `portal-navigation-${section.id}`
     return (
       <SidebarGroup key={section.id} aria-labelledby={labelId}>
@@ -178,11 +231,13 @@ const ResourcesMenu = () => {
             id={labelId}
             className="px-2 text-[11px] font-semibold tracking-[0.08em] text-sidebar-foreground/60 uppercase"
           >
-            {section.title}
+            {section.title?.trim() ||
+              (section.group ? t(`sidebar.${section.group}`) : "Section")}
           </h2>
         </SidebarGroupLabel>
         <SidebarGroupContent className="pt-1">
           <SidebarMenu>
+            {children}
             {links.map((link) => (
               <SidebarMenuItem key={link.id}>
                 <SidebarMenuButton asChild tooltip={link.label}>
@@ -198,16 +253,36 @@ const ResourcesMenu = () => {
     )
   }
 
+  const renderStandaloneResource = (block: {
+    id: string
+    resource: string
+  }) => {
+    const children = renderResource(block.resource, block.id)
+    if (children.length === 0) return null
+    return (
+      <SidebarGroup key={block.id}>
+        <SidebarGroupContent className="pt-1">
+          <SidebarMenu>{children}</SidebarMenu>
+        </SidebarGroupContent>
+      </SidebarGroup>
+    )
+  }
+
+  const hasVisibleNavigation = configuredLayout
+    ? configuredLayout.length > 0
+    : resources.some((resource) => resource.status !== "hidden")
+
   return (
     <SidebarContent>
       <nav aria-label={t("sidebar.navigation")}>
-        {configuredSections
-          ? configuredSections.map((section) =>
-              section.kind === "external"
-                ? renderExternalSection(section)
-                : renderResourceSection(section.kind),
+        {configuredLayout
+          ? configuredLayout.map((block) =>
+              block.type === "section"
+                ? renderConfiguredSection(block)
+                : renderStandaloneResource(block),
             )
-          : resourceGroups.map(renderResourceSection)}
+          : resourceGroups.map((group) => renderResourceSection(group))}
+        {hasVisibleNavigation && <Separator className="my-4" />}
       </nav>
     </SidebarContent>
   )
