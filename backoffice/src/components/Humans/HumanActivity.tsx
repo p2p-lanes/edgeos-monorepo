@@ -1,4 +1,5 @@
 import { useQuery } from "@tanstack/react-query"
+import { Link } from "@tanstack/react-router"
 import { Plus } from "lucide-react"
 import { useState } from "react"
 
@@ -14,6 +15,7 @@ const ACTOR_KINDS = new Set<HumanActivityItem["kind"]>([
   "note.added",
   "rating.changed",
   "comment.added",
+  "application.comment_added",
 ])
 
 /** Colour the timeline dot by event kind (rating dots match their flag). */
@@ -38,6 +40,7 @@ function dotClass(item: HumanActivityItem): string {
     case "application.accepted":
       return "bg-info"
     case "comment.added":
+    case "application.comment_added":
       return "bg-chart-3"
     default:
       return "bg-muted-foreground"
@@ -46,8 +49,9 @@ function dotClass(item: HumanActivityItem): string {
 
 /**
  * Full activity timeline for a single human (newest first): applications,
- * purchases, tickets and manual notes, aggregated on the backend. Admins can
- * add a manual past-dated note via the header button.
+ * purchases, tickets, manual notes and comments (on the human and on their
+ * applications), aggregated on the backend. Admins can add a manual
+ * past-dated note via the header button.
  */
 export function HumanActivity({ humanId }: { humanId: string }) {
   const { isAdmin } = useAuth()
@@ -93,6 +97,21 @@ export function HumanActivity({ humanId }: { humanId: string }) {
                   className={`absolute -left-[5px] top-4 h-2.5 w-2.5 rounded-full border-2 border-background ${dotClass(item)}`}
                 />
                 <p>{describeHumanActivity(item)}</p>
+                {item.kind === "application.comment_added" &&
+                  item.application_id && (
+                    <p className="text-xs text-muted-foreground">
+                      Comment on{" "}
+                      <Link
+                        to="/applications/$id"
+                        params={{ id: item.application_id }}
+                        className="underline underline-offset-2 hover:text-foreground"
+                      >
+                        {item.popup_label
+                          ? `${item.popup_label} application`
+                          : "application"}
+                      </Link>
+                    </p>
+                  )}
                 <p className="text-xs text-muted-foreground">
                   {ACTOR_KINDS.has(item.kind) && actor ? `${actor} · ` : ""}
                   {new Date(item.occurred_at).toLocaleString()}

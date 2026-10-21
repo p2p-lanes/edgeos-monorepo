@@ -9256,8 +9256,9 @@ export class HumansService {
      * Aggregate a human's full activity timeline (admin-only).
      *
      * Built on read from applications, payments, attendees, manual notes, rating
-     * changes and comments. Every source, comments included, is now tenant-scoped
-     * by RLS on the TenantSession.
+     * changes, human comments and the review comments left on the human's
+     * applications. Every source, comments included, is now tenant-scoped by RLS
+     * on the TenantSession.
      * @param data The data for the request.
      * @param data.humanId
      * @param data.skip Number of items to skip

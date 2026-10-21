@@ -164,6 +164,45 @@ describe("CheckoutPageClient", () => {
     expect(screen.getByText("runtime:festival-2026")).toBeTruthy()
   })
 
+  it("shows the flow's coming-soon copy instead of the checkout while sales are held", () => {
+    mockUseCheckoutRuntime.mockReturnValue({
+      data: {
+        ...runtimeData,
+        checkout_config: {
+          ticket_sales_status: "coming_soon",
+          coming_soon_title: "Tickets drop in May",
+          coming_soon_message: null,
+        },
+      },
+      isLoading: false,
+      isError: false,
+    })
+
+    render(<CheckoutPageClient popupSlug="festival-2026" flowSlug="checkout" />)
+
+    expect(
+      screen.getByRole("heading", { name: "Tickets drop in May" }),
+    ).toBeTruthy()
+    expect(screen.getByText("ticketSales.coming_soon_description")).toBeTruthy()
+    expect(screen.queryByText("runtime:festival-2026")).toBeNull()
+  })
+
+  it("renders the checkout when the flow's sales are open", () => {
+    mockUseCheckoutRuntime.mockReturnValue({
+      data: {
+        ...runtimeData,
+        checkout_config: { ticket_sales_status: "open" },
+      },
+      isLoading: false,
+      isError: false,
+    })
+
+    render(<CheckoutPageClient popupSlug="festival-2026" flowSlug="checkout" />)
+
+    expect(screen.getByText("runtime:festival-2026")).toBeTruthy()
+    expect(screen.queryByText("ticketSales.coming_soon_title")).toBeNull()
+  })
+
   it("redirects upsale checkouts to the portal shop", async () => {
     mockUseCheckoutRuntime.mockReturnValue({
       data: {

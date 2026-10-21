@@ -197,10 +197,8 @@ function NewPortalEventForm({
     setDateStr,
     timeStr,
     setTimeStr,
-    durationValue,
-    setDurationValue,
-    durationUnit,
-    setDurationUnit,
+    durationDraft,
+    setDurationDraft,
     startIso,
     endIso,
     durationMinutes,
@@ -626,12 +624,10 @@ function NewPortalEventForm({
           popupWindowLabel={popupWindowLabel}
           timeStr={timeStr}
           onTimeChange={setTimeStr}
-          durationValue={durationValue}
-          durationUnit={durationUnit}
-          onDurationChange={(next) => {
-            setDurationValue(next.value)
-            setDurationUnit(next.unit)
-          }}
+          durationDraft={durationDraft}
+          onDurationChange={setDurationDraft}
+          startIso={startIso}
+          timeZone={displayTz}
           venueId={realVenueId}
           withinOpenHours={withinOpenHours}
           availability={availability}

@@ -53,6 +53,8 @@ export function describeHumanActivity(item: HumanActivityItem): string {
       return `Changed rating to ${ratingLabel(item.rating)}`
     case "comment.added":
       return item.note ?? "Commented"
+    case "application.comment_added":
+      return item.note ?? "Commented on an application"
     case "credit.granted": {
       const amt = item.amount != null ? ` +${item.amount}` : ""
       return withPopup(`Credit granted${amt}`, item)

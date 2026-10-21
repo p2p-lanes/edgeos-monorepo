@@ -7,7 +7,7 @@ import { DatePicker } from "@/components/ui/date-picker"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { cn } from "@/lib/utils"
-import type { DurationUnit } from "../lib/useEventScheduling"
+import type { DurationDraft } from "../lib/eventDuration"
 import { DurationPicker } from "./DurationPicker"
 
 interface EventScheduleFieldsProps {
@@ -23,9 +23,12 @@ interface EventScheduleFieldsProps {
   onTimeChange: (next: string) => void
 
   // Duration
-  durationValue: number
-  durationUnit: DurationUnit
-  onDurationChange: (next: { value: number; unit: DurationUnit }) => void
+  durationDraft: DurationDraft
+  onDurationChange: (next: DurationDraft) => void
+  /** Event start (UTC ISO) for the live "Ends at" line under the duration. */
+  startIso: string
+  /** Event timezone the start time is entered in. */
+  timeZone: string
 
   // Validation / state
   venueId: string
@@ -53,9 +56,10 @@ export function EventScheduleFields({
   popupWindowLabel,
   timeStr,
   onTimeChange,
-  durationValue,
-  durationUnit,
+  durationDraft,
   onDurationChange,
+  startIso,
+  timeZone,
   venueId,
   withinOpenHours,
   availability,
@@ -161,9 +165,10 @@ export function EventScheduleFields({
         <div className="space-y-2">
           <Label>{t("events.form.duration_label")}</Label>
           <DurationPicker
-            value={durationValue}
-            unit={durationUnit}
+            draft={durationDraft}
             onChange={onDurationChange}
+            startIso={startIso}
+            timeZone={timeZone}
             disabled={disabled}
           />
         </div>

@@ -11,6 +11,7 @@ import {
 import Image from "next/image"
 import { type ReactNode, useEffect, useMemo, useRef, useState } from "react"
 import { useTranslation } from "react-i18next"
+import { ProductInfoNote } from "@/components/checkout-flow/shared/ProductInfoNote"
 import { Button } from "@/components/ui/button"
 import ExpandableDescription from "@/components/ui/ExpandableDescription"
 import QuantitySelector, {
@@ -363,11 +364,19 @@ function CompactCard({
       </div>
 
       <div className="flex-1 min-w-0">
-        <ExpandableDescription
-          text={product.name}
-          clamp={2}
-          className="font-medium text-sm text-pass-title leading-tight"
-        />
+        <div className="flex items-start gap-1.5">
+          <div className="min-w-0">
+            <ExpandableDescription
+              text={product.name}
+              clamp={2}
+              className="font-medium text-sm text-pass-title leading-tight"
+            />
+          </div>
+          <ProductInfoNote
+            note={product.info_note}
+            productName={product.name}
+          />
+        </div>
         {pricePerDay && (
           <p className="text-xs text-pass-text">
             {formatCurrency(product.price)}/night
@@ -638,9 +647,16 @@ function GridCard({
       </div>
 
       <div className={cn("p-3", horizontal && "sm:flex-1 sm:self-center")}>
-        <p className="font-semibold text-pass-title text-sm leading-tight">
-          {product.name}
-        </p>
+        <div className="flex items-start gap-1.5">
+          <p className="font-semibold text-pass-title text-sm leading-tight">
+            {product.name}
+          </p>
+          <ProductInfoNote
+            note={product.info_note}
+            productName={product.name}
+            className="-mt-0.5"
+          />
+        </div>
         {product.description && (
           <ExpandableDescription
             text={product.description}
@@ -835,11 +851,19 @@ function DefaultSectionCard({
                   </div>
                 )}
                 <div className="min-w-0">
-                  <ExpandableDescription
-                    text={product.name}
-                    clamp={2}
-                    className="font-medium text-pass-title text-sm leading-tight"
-                  />
+                  <div className="flex items-start gap-1.5">
+                    <div className="min-w-0">
+                      <ExpandableDescription
+                        text={product.name}
+                        clamp={2}
+                        className="font-medium text-pass-title text-sm leading-tight"
+                      />
+                    </div>
+                    <ProductInfoNote
+                      note={product.info_note}
+                      productName={product.name}
+                    />
+                  </div>
                   {pricePerDay && (
                     <p className="text-xs text-pass-text">
                       {formatCurrency(product.price)}/night
@@ -1025,11 +1049,19 @@ function ShowcaseSectionCard({
                 )}
 
                 <div className="flex-1 min-w-0">
-                  <ExpandableDescription
-                    text={product.name}
-                    clamp={2}
-                    className="font-semibold text-sm text-pass-title leading-tight"
-                  />
+                  <div className="flex items-start gap-1.5">
+                    <div className="min-w-0">
+                      <ExpandableDescription
+                        text={product.name}
+                        clamp={2}
+                        className="font-semibold text-sm text-pass-title leading-tight"
+                      />
+                    </div>
+                    <ProductInfoNote
+                      note={product.info_note}
+                      productName={product.name}
+                    />
+                  </div>
                   {product.description && (
                     <ExpandableDescription
                       text={product.description}

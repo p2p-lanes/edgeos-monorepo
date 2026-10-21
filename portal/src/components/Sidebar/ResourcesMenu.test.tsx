@@ -1,4 +1,4 @@
-import { render, screen, within } from "@testing-library/react"
+import { act, fireEvent, render, screen, within } from "@testing-library/react"
 import { useEffect } from "react"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 
@@ -90,9 +90,19 @@ let configuredSidebar: {
   hidden_items?: string[]
 } | null = null
 
+const navigation = vi.hoisted(() => ({
+  pathname: "/portal/summit/shop/attendee",
+  push: vi.fn(),
+  setOpenMobile: vi.fn(),
+}))
+
 vi.mock("next/navigation", () => ({
-  usePathname: () => "/portal/summit/shop/attendee",
-  useRouter: () => ({ push: vi.fn() }),
+  usePathname: () => navigation.pathname,
+  useRouter: () => ({ push: navigation.push }),
+}))
+
+vi.mock("@/lib/portal-telemetry", () => ({
+  trackPortalTelemetry: vi.fn(),
 }))
 
 vi.mock("react-i18next", () => ({
@@ -144,11 +154,20 @@ vi.mock("./StatusResource/ResourceMenuItem", () => ({
   default: ({
     resource,
     isActive,
+    onNavigate,
   }: {
     resource: { name: string; path: string }
     isActive: boolean
+    onNavigate: (path: string) => void
   }) => (
-    <a aria-current={isActive ? "page" : undefined} href={resource.path}>
+    <a
+      aria-current={isActive ? "page" : undefined}
+      href={resource.path}
+      onClick={(event) => {
+        event.preventDefault()
+        onNavigate(resource.path)
+      }}
+    >
       {resource.name}
     </a>
   ),
@@ -194,6 +213,7 @@ vi.mock("./SidebarComponents", () => ({
   SidebarMenuSub: ({ children }: { children: React.ReactNode }) => (
     <div>{children}</div>
   ),
+  useSidebar: () => ({ setOpenMobile: navigation.setOpenMobile }),
 }))
 
 import ResourcesMenu from "./ResourcesMenu"
@@ -202,6 +222,9 @@ describe("ResourcesMenu", () => {
   beforeEach(() => {
     includeCheckoutResources = true
     configuredSidebar = null
+    navigation.pathname = "/portal/summit/shop/attendee"
+    navigation.push.mockClear()
+    navigation.setOpenMobile.mockClear()
   })
 
   it("renders General, Commerce, and Community in order", () => {
@@ -379,6 +402,61 @@ describe("ResourcesMenu", () => {
         .closest("section")
         ?.getAttribute("aria-labelledby"),
     ).toBeNull()
+  })
+
+  it("closes the mobile sheet and navigates when an item is clicked", () => {
+    render(<ResourcesMenu />)
+
+    fireEvent.click(screen.getByRole("link", { name: "Passes" }))
+
+    expect(navigation.setOpenMobile).toHaveBeenCalledWith(false)
+    expect(navigation.push).toHaveBeenCalledWith("/portal/summit/passes")
+  })
+
+  it("closes the mobile sheet without navigating when the current page is clicked", () => {
+    render(<ResourcesMenu />)
+
+    fireEvent.click(screen.getByRole("link", { name: "Attendee" }))
+
+    expect(navigation.setOpenMobile).toHaveBeenCalledWith(false)
+    expect(navigation.push).not.toHaveBeenCalled()
+  })
+
+  it("closes the mobile sheet when the route changes from outside the sidebar", () => {
+    isMobile = true
+    const { Sidebar, SidebarProvider, useSidebar } = SidebarComponents
+
+    const OpenMobileSidebar = () => {
+      const { setOpenMobile } = useSidebar()
+
+      useEffect(() => {
+        setOpenMobile(true)
+      }, [setOpenMobile])
+
+      return (
+        <Sidebar>
+          <span>Portal content</span>
+        </Sidebar>
+      )
+    }
+
+    const { rerender } = render(
+      <SidebarProvider>
+        <OpenMobileSidebar />
+      </SidebarProvider>,
+    )
+    expect(screen.getByRole("dialog")).toBeTruthy()
+
+    navigation.pathname = "/portal/summit/passes"
+    act(() => {
+      rerender(
+        <SidebarProvider>
+          <OpenMobileSidebar />
+        </SidebarProvider>,
+      )
+    })
+
+    expect(screen.queryByRole("dialog")).toBeNull()
   })
 
   it("uses the localized name for the mobile navigation sheet", () => {

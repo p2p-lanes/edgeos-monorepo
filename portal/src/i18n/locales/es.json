@@ -104,6 +104,10 @@
     "estimated_total": "Total estimado",
     "definitive_total": "Total"
   },
+  "ticketSales": {
+    "coming_soon_title": "Entradas muy pronto",
+    "coming_soon_description": "La venta de entradas para este evento todavía no está abierta. Vuelve a consultar pronto."
+  },
   "orders": {
     "show_unit_qr_label": "Ver QR de {{product}}, unidad {{number}}",
     "unit_qr_title": "{{product}} · QR {{number}}",
@@ -290,6 +294,7 @@
     "sold_out": "Agotado",
     "sale_upcoming": "Próximamente",
     "sale_ended": "Finalizado",
+    "product_info_note_label": "Más información sobre {{name}}",
     "buyer_hero_title": "¡Estás a un paso!",
     "buyer_hero_subtitle": "Necesitamos un par de datos para reservar tu lugar.",
     "buyer_hero_trust": "Tu privacidad nos es importante. No compartimos tus datos con terceros.",
@@ -374,7 +379,8 @@
       "confirm_edit": "Confirmar edición",
       "pay_and_confirm_edit": "Pagar y confirmar edición",
       "continue_to": "Continuar a {{step}}",
-      "review": "Revisar"
+      "review": "Revisar",
+      "select_ticket": "Seleccioná un ticket para continuar"
     },
     "step_short": {
       "passes": "Pases",
@@ -999,7 +1005,17 @@
     "update_member": "Actualizar miembro",
     "send_invitation": "Enviar invitación",
     "updating": "Actualizando...",
-    "sending": "Enviando..."
+    "sending": "Enviando...",
+    "organization": "Organización",
+    "role": "Rol",
+    "pass_holder": "Con pase",
+    "edit": "Editar",
+    "remove": "Quitar",
+    "remove_member": "Quitar miembro",
+    "member_has_active_ticket": "Este miembro ya tiene un ticket activo.",
+    "toggle_member_details": "Mostrar u ocultar detalles de {{name}}",
+    "expand": "Expandir",
+    "collapse": "Contraer"
   },
   "referrals": {
     "title": "Referidos",
@@ -1378,6 +1394,15 @@
       "duration_label": "Duración",
       "minutes": "Minutos",
       "hours": "Horas",
+      "duration_presets_label": "Duraciones frecuentes",
+      "duration_preset_minutes": "{{minutes}} min",
+      "duration_preset_hours": "{{hours}} h",
+      "duration_preset_hours_minutes": "{{hours}} h {{minutes}} min",
+      "duration_ends_at": "Finaliza a las {{time}}",
+      "duration_ends_at_on_date": "Finaliza el {{date}} a las {{time}}",
+      "duration_error_required": "Ingresá una duración.",
+      "duration_error_invalid": "Ingresá una duración válida en horas y minutos.",
+      "duration_error_not_positive": "La duración debe ser mayor que 0.",
       "no_venue_open_hours": "El lugar no abre este día (revisá horarios semanales o excepciones).",
       "start_time_outside_venue_hours": "La hora de inicio queda fuera del horario del lugar.",
       "start_time_conflict": "Ya hay un evento en ese horario.",

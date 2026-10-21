@@ -17,6 +17,7 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarMenuSub,
+  useSidebar,
 } from "./SidebarComponents"
 import ResourceMenuItem from "./StatusResource/ResourceMenuItem"
 
@@ -117,13 +118,18 @@ const ResourcesMenu = () => {
     | undefined
   const router = useRouter()
   const pathname = usePathname()
+  const { setOpenMobile } = useSidebar()
 
+  // Every sidebar click closes the mobile sheet, including one on the page
+  // already open; only an actual route change is pushed and tracked.
   const handleNavigate = useCallback(
     (path: string) => {
+      setOpenMobile(false)
+      if (path === pathname) return
       trackPortalTelemetry("portal_navigation")
       router.push(path)
     },
-    [router],
+    [router, pathname, setOpenMobile],
   )
 
   const menuItemKey = (resource: Resource): string | undefined => {

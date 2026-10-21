@@ -29,6 +29,7 @@ const MULTILINE_FIELDS = new Set([
   "description",
   "welcome_message",
   "help_text",
+  "info_note",
 ])
 
 interface TranslationManagerProps {

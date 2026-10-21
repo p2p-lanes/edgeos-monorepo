@@ -2,6 +2,7 @@
 
 import { Check, Plus, ShoppingBag } from "lucide-react"
 import Image from "next/image"
+import { ProductInfoNote } from "@/components/checkout-flow/shared/ProductInfoNote"
 import { Button } from "@/components/ui/button"
 import ExpandableDescription from "@/components/ui/ExpandableDescription"
 import QuantitySelector, {
@@ -140,9 +141,15 @@ function MerchDefaultItem({
           )}
         </div>
         <div className="flex-1 min-w-0">
-          <h3 className="font-medium text-foreground text-sm">
-            {product.name}
-          </h3>
+          <div className="flex items-center gap-1.5">
+            <h3 className="font-medium text-foreground text-sm">
+              {product.name}
+            </h3>
+            <ProductInfoNote
+              note={product.info_note}
+              productName={product.name}
+            />
+          </div>
           {product.description && (
             <ExpandableDescription
               text={product.description}
@@ -208,9 +215,15 @@ function MerchDefaultItem({
             )}
           </div>
           <div className="flex-1 min-w-0">
-            <h3 className="font-semibold text-foreground text-sm mb-0.5">
-              {product.name}
-            </h3>
+            <div className="mb-0.5 flex items-center gap-1.5">
+              <h3 className="font-semibold text-foreground text-sm">
+                {product.name}
+              </h3>
+              <ProductInfoNote
+                note={product.info_note}
+                productName={product.name}
+              />
+            </div>
             {product.description && (
               <ExpandableDescription
                 text={product.description}
@@ -318,9 +331,16 @@ function MerchGrid({ products, getQuantity, onQuantityChange }: CardListProps) {
                 )}
               </div>
               <div className="p-3">
-                <p className="font-semibold text-foreground text-sm leading-tight">
-                  {product.name}
-                </p>
+                <div className="flex items-start gap-1.5">
+                  <p className="font-semibold text-foreground text-sm leading-tight">
+                    {product.name}
+                  </p>
+                  <ProductInfoNote
+                    note={product.info_note}
+                    productName={product.name}
+                    className="-mt-0.5"
+                  />
+                </div>
                 {product.description && (
                   <ExpandableDescription
                     text={product.description}
@@ -424,9 +444,15 @@ function MerchCompact({
             </div>
 
             <div className="relative flex-1 min-w-0 text-left">
-              <p className="font-semibold text-sm text-pass-title truncate leading-tight">
-                {product.name}
-              </p>
+              <div className="flex min-w-0 items-center gap-1.5">
+                <p className="min-w-0 font-semibold text-sm text-pass-title truncate leading-tight">
+                  {product.name}
+                </p>
+                <ProductInfoNote
+                  note={product.info_note}
+                  productName={product.name}
+                />
+              </div>
               <div className="mt-0.5 flex items-center gap-1.5">
                 {hasDiscount && product.compare_price != null && !hasQty && (
                   <span className="text-[11px] text-pass-text line-through">

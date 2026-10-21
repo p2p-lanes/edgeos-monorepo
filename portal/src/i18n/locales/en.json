@@ -104,6 +104,10 @@
     "estimated_total": "Estimated total",
     "definitive_total": "Total"
   },
+  "ticketSales": {
+    "coming_soon_title": "Tickets coming soon",
+    "coming_soon_description": "Ticket sales for this event haven't opened yet. Please check back soon."
+  },
   "orders": {
     "show_unit_qr_label": "View QR for {{product}}, unit {{number}}",
     "unit_qr_title": "{{product}} · QR {{number}}",
@@ -290,6 +294,7 @@
     "sold_out": "Sold out",
     "sale_upcoming": "Upcoming",
     "sale_ended": "Ended",
+    "product_info_note_label": "More information about {{name}}",
     "buyer_hero_title": "You're one step away!",
     "buyer_hero_subtitle": "We need a couple of details to reserve your spot.",
     "buyer_hero_trust": "Your privacy matters. We don't share your data with third parties.",
@@ -374,7 +379,8 @@
       "confirm_edit": "Confirm Edit",
       "pay_and_confirm_edit": "Pay & Confirm Edit",
       "continue_to": "Continue to {{step}}",
-      "review": "Review"
+      "review": "Review",
+      "select_ticket": "Select a ticket to continue"
     },
     "step_short": {
       "passes": "Passes",
@@ -1001,7 +1007,17 @@
     "update_member": "Update member",
     "send_invitation": "Send invitation",
     "updating": "Updating...",
-    "sending": "Sending..."
+    "sending": "Sending...",
+    "organization": "Organization",
+    "role": "Role",
+    "pass_holder": "Pass holder",
+    "edit": "Edit",
+    "remove": "Remove",
+    "remove_member": "Remove member",
+    "member_has_active_ticket": "This member already has an active ticket.",
+    "toggle_member_details": "Toggle details for {{name}}",
+    "expand": "Expand",
+    "collapse": "Collapse"
   },
   "referrals": {
     "title": "Referrals",
@@ -1380,6 +1396,15 @@
       "duration_label": "Duration",
       "minutes": "Minutes",
       "hours": "Hours",
+      "duration_presets_label": "Common durations",
+      "duration_preset_minutes": "{{minutes}} min",
+      "duration_preset_hours": "{{hours}} h",
+      "duration_preset_hours_minutes": "{{hours}} h {{minutes}} min",
+      "duration_ends_at": "Ends at {{time}}",
+      "duration_ends_at_on_date": "Ends at {{time}} on {{date}}",
+      "duration_error_required": "Enter a duration.",
+      "duration_error_invalid": "Enter a valid duration in hours and minutes.",
+      "duration_error_not_positive": "Duration must be greater than 0.",
       "no_venue_open_hours": "Venue has no open hours on this day (check weekly hours or exceptions).",
       "start_time_outside_venue_hours": "Start time falls outside the venue's open hours.",
       "start_time_conflict": "There is already an event at this time.",

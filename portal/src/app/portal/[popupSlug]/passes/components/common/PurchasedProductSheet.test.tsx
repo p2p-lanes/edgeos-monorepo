@@ -86,7 +86,7 @@ describe("PurchasedProductSheet", () => {
     expect(screen.getByText("Hotel Arcadia")).toBeTruthy()
     expect(screen.getByText("Avenida melian 2487")).toBeTruthy()
     expect(screen.getByText("Alice Johnson")).toBeTruthy()
-    expect(screen.getByText("$495")).toBeTruthy()
+    expect(screen.getByText("$495.00")).toBeTruthy()
     expect(screen.queryByTestId("qr-payload")).toBeNull()
   })
 })

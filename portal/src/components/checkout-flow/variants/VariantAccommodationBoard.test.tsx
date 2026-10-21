@@ -343,7 +343,7 @@ describe("the three layouts", () => {
     for (const layout of ["rows", "cards", "sheet"]) {
       const view = renderStep({ layout })
       expect(await screen.findByText("Garden Studio")).toBeTruthy()
-      expect(screen.getAllByText("$290").length).toBeGreaterThan(0)
+      expect(screen.getAllByText("$290.00").length).toBeGreaterThan(0)
       // The card is the control in all three: no layout has a button that
       // books the room, and none of them books it by being read about.
       expect(screen.getByRole("radio").getAttribute("aria-checked")).toBe(
@@ -551,7 +551,7 @@ describe("once a room is chosen", () => {
     renderStep()
 
     expect(await screen.findByText("Your room")).toBeTruthy()
-    expect(screen.getByText("$290")).toBeTruthy()
+    expect(screen.getByText("$290.00")).toBeTruthy()
     expect(screen.getByText(/2 nights · 1 guest/)).toBeTruthy()
   })
 

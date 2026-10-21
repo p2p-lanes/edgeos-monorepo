@@ -1,6 +1,7 @@
 import { AnimatePresence, motion } from "framer-motion"
 import { ChevronDown, Pencil, Trash2, User } from "lucide-react"
 import { useState } from "react"
+import { useTranslation } from "react-i18next"
 import type { GroupMemberPublic } from "@/client"
 import { Button } from "@/components/ui/button"
 import {
@@ -16,13 +17,33 @@ import DetailItem from "./DetailItem"
 interface MemberItemProps {
   member: GroupMemberPublic
   onMemberUpdated?: () => void
-  isLeader?: boolean
+  /** Whether the viewer leads the group and may edit or remove members. */
+  canManageMembers?: boolean
 }
 
-const MemberItem = ({ member, onMemberUpdated, isLeader }: MemberItemProps) => {
+const MemberItem = ({
+  member,
+  onMemberUpdated,
+  canManageMembers,
+}: MemberItemProps) => {
+  const { t } = useTranslation()
   const [isExpanded, setIsExpanded] = useState(false)
   const [isEditModalOpen, setIsEditModalOpen] = useState(false)
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false)
+
+  const fullName = `${member.first_name} ${member.last_name}`
+  const isPassHolder = (member.products?.length ?? 0) > 0
+
+  // Email is always shown; the rest only when the member filled them in.
+  const optionalDetails = [
+    { label: t("groups.gender"), value: member.gender },
+    { label: t("groups.telegram"), value: member.telegram },
+    { label: t("groups.organization"), value: member.organization },
+    { label: t("groups.role"), value: member.role },
+  ].filter(
+    (detail): detail is { label: string; value: string } =>
+      !!detail.value?.trim(),
+  )
 
   const handleEditClick = (e: React.MouseEvent) => {
     e.stopPropagation() // Prevent expand/collapse when clicking edit
@@ -66,22 +87,26 @@ const MemberItem = ({ member, onMemberUpdated, isLeader }: MemberItemProps) => {
         type="button"
         className="w-full p-4 flex items-center justify-between cursor-pointer hover:bg-gray-50"
         onClick={() => setIsExpanded(!isExpanded)}
-        aria-label={`Toggle details for ${member.first_name} ${member.last_name}`}
+        aria-expanded={isExpanded}
+        aria-label={t("groups.toggle_member_details", { name: fullName })}
       >
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
           <User size={20} />
-          <span className="font-medium">
-            {member.first_name} {member.last_name}
-          </span>
-          {(member.products?.length ?? 0) > 0 && (
+          <span className="font-medium">{fullName}</span>
+          {member.is_leader && (
+            <span className="text-xs bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full">
+              {t("groups.role_leader")}
+            </span>
+          )}
+          {isPassHolder && (
             <span className="text-xs bg-green-100 text-green-800 px-2 py-0.5 rounded-full">
-              pass holder
+              {t("groups.pass_holder")}
             </span>
           )}
         </div>
         <motion.span
           className="text-gray-400 hover:text-gray-600 transition-all duration-300"
-          aria-label={isExpanded ? "Collapse" : "Expand"}
+          aria-label={isExpanded ? t("groups.collapse") : t("groups.expand")}
           initial={false}
           animate={{ rotate: isExpanded ? 180 : 0 }}
           transition={{ duration: 0.3, ease: "easeInOut" }}
@@ -101,40 +126,25 @@ const MemberItem = ({ member, onMemberUpdated, isLeader }: MemberItemProps) => {
           >
             <div className="px-6 pb-6 pt-2">
               <div className="grid grid-cols-2 gap-4">
-                {/* Left column with personal information */}
-                <div className="space-y-4">
-                  <DetailItem label="GENDER" value={member.gender || ""} />
-
-                  <div>
-                    <p className="text-xs text-gray-500 uppercase font-medium">
-                      mail
-                    </p>
-                    <p className="text-sm font-medium mt-1">{member.email}</p>
-                  </div>
-
-                  <DetailItem label="TELEGRAM" value={member.telegram || ""} />
-                </div>
-
-                {/* Right column with PASSES */}
-                <div className="space-y-4">
+                <DetailItem label={t("groups.email")} value={member.email} />
+                {optionalDetails.map((detail) => (
                   <DetailItem
-                    label="ORGANIZATION"
-                    value={member.organization || ""}
+                    key={detail.label}
+                    label={detail.label}
+                    value={detail.value}
                   />
-
-                  <DetailItem label="ROLE" value={member.role || ""} />
-                </div>
+                ))}
               </div>
 
               <div className="flex justify-end gap-3">
-                {isLeader && (
+                {canManageMembers && (
                   <>
                     <Button
                       variant={"outline"}
-                      aria-label="Edit member"
+                      aria-label={t("groups.edit_member")}
                       onClick={handleEditClick}
                     >
-                      <Pencil size={16} className="mr-2" /> Edit
+                      <Pencil size={16} className="mr-2" /> {t("groups.edit")}
                     </Button>
                     <TooltipProvider delayDuration={100}>
                       <Tooltip>
@@ -142,21 +152,22 @@ const MemberItem = ({ member, onMemberUpdated, isLeader }: MemberItemProps) => {
                           <div className="inline-block">
                             <Button
                               variant={"outline"}
-                              aria-label="Remove member"
+                              aria-label={t("groups.remove_member")}
                               className="text-red-500 border-red-500 hover:bg-red-500 hover:text-white"
                               onClick={handleDeleteClick}
-                              disabled={(member.products?.length ?? 0) > 0}
+                              disabled={isPassHolder}
                             >
-                              <Trash2 size={16} className="mr-2" /> Remove
+                              <Trash2 size={16} className="mr-2" />{" "}
+                              {t("groups.remove")}
                             </Button>
                           </div>
                         </TooltipTrigger>
-                        {(member.products?.length ?? 0) > 0 && (
+                        {isPassHolder && (
                           <TooltipContent
                             side="top"
                             className="bg-gray-800 text-white px-3 py-2 rounded shadow-lg z-50"
                           >
-                            <p>This member already has an active ticket.</p>
+                            <p>{t("groups.member_has_active_ticket")}</p>
                           </TooltipContent>
                         )}
                       </Tooltip>

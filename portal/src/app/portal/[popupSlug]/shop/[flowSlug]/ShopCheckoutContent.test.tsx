@@ -9,7 +9,15 @@ import { ShopCheckoutContent } from "./ShopCheckoutContent"
 const replace = vi.fn()
 const applicationCheckoutProps = vi.hoisted(() => vi.fn())
 type Flow = Pick<SalesFlowPortalPublic, "id" | "slug" | "name"> &
-  Partial<Pick<SalesFlowPortalPublic, "theme_config">>
+  Partial<
+    Pick<
+      SalesFlowPortalPublic,
+      | "theme_config"
+      | "ticket_sales_status"
+      | "coming_soon_title"
+      | "coming_soon_message"
+    >
+  >
 const mocks = vi.hoisted(() => ({
   application: [] as Flow[],
   direct: [] as Flow[],
@@ -252,6 +260,88 @@ describe("ShopCheckoutContent", () => {
 
     expect(screen.getByText("shop.approval_required_title")).toBeTruthy()
     expect(screen.queryByText("checkout:attendee")).toBeNull()
+  })
+
+  it("shows an accepted applicant the organiser's coming-soon copy instead of the checkout", () => {
+    mocks.application = [
+      {
+        id: "application-1",
+        slug: "attendee",
+        name: "Attendee",
+        ticket_sales_status: "coming_soon",
+        coming_soon_title: "Tickets drop in May",
+        coming_soon_message: "Hang tight.",
+      },
+    ]
+
+    render(
+      <ShopCheckoutContent
+        popupId="popup-1"
+        popupSlug="summer-camp"
+        flowSlug="attendee"
+      />,
+    )
+
+    expect(
+      screen.getByRole("heading", { name: "Tickets drop in May" }),
+    ).toBeTruthy()
+    expect(screen.getByText("Hang tight.")).toBeTruthy()
+    expect(
+      screen
+        .getByRole("link", { name: "shop.back_to_passes" })
+        .getAttribute("href"),
+    ).toBe("/portal/summer-camp/passes?flow=attendee")
+    expect(applicationCheckoutProps).not.toHaveBeenCalled()
+  })
+
+  it("falls back to the translated coming-soon copy when the organiser wrote none", () => {
+    mocks.application = [
+      {
+        id: "application-1",
+        slug: "attendee",
+        name: "Attendee",
+        ticket_sales_status: "coming_soon",
+        coming_soon_title: null,
+        coming_soon_message: "  ",
+      },
+    ]
+
+    render(
+      <ShopCheckoutContent
+        popupId="popup-1"
+        popupSlug="summer-camp"
+        flowSlug="attendee"
+      />,
+    )
+
+    expect(
+      screen.getByRole("heading", { name: "ticketSales.coming_soon_title" }),
+    ).toBeTruthy()
+    expect(screen.getByText("ticketSales.coming_soon_description")).toBeTruthy()
+    expect(applicationCheckoutProps).not.toHaveBeenCalled()
+  })
+
+  it("still asks for approval first while sales are coming soon", () => {
+    mocks.applicationStatus = "in review"
+    mocks.application = [
+      {
+        id: "application-1",
+        slug: "attendee",
+        name: "Attendee",
+        ticket_sales_status: "coming_soon",
+      },
+    ]
+
+    render(
+      <ShopCheckoutContent
+        popupId="popup-1"
+        popupSlug="summer-camp"
+        flowSlug="attendee"
+      />,
+    )
+
+    expect(screen.getByText("shop.approval_required_title")).toBeTruthy()
+    expect(screen.queryByText("ticketSales.coming_soon_title")).toBeNull()
   })
 
   it("allows a ticket holder without an application to use the primary application flow", () => {

@@ -151,6 +151,23 @@ describe("AmanitaCatalogSection", () => {
     expect(setRowQuantity).toHaveBeenCalledWith("", product1, 1)
   })
 
+  it("reveals a product's info note without touching its quantity", () => {
+    product1.info_note = "A passport will be requested."
+    render(<AmanitaCatalogSection stepConfig={stepConfig} />)
+
+    fireEvent.click(
+      screen.getByLabelText("checkout.product_info_note_label:Full Pass"),
+    )
+
+    expect(screen.getByText("A passport will be requested.")).toBeTruthy()
+    expect(setRowQuantity).not.toHaveBeenCalled()
+    expect(toggleRow).not.toHaveBeenCalled()
+    // Only the product that has a note gets the icon.
+    expect(
+      screen.queryByLabelText("checkout.product_info_note_label:Day Pass"),
+    ).toBeNull()
+  })
+
   it('disables the "+" control on a disabled row', () => {
     render(<AmanitaCatalogSection stepConfig={stepConfig} />)
     const plusButton = screen.getByLabelText(

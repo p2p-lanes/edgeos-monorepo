@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation"
 import { useEffect } from "react"
 import { useTranslation } from "react-i18next"
 import CheckoutPageClient from "@/app/checkout/[popupSlug]/CheckoutPageClient"
+import { TicketSalesComingSoon } from "@/components/checkout-flow/TicketSalesComingSoon"
 import { Loader } from "@/components/ui/Loader"
 import { useHumanPopupAccess } from "@/hooks/useHumanPopupAccess"
 import { usePortalDirectSalesFlows } from "@/hooks/usePortalDirectSalesFlows"
@@ -99,6 +100,18 @@ export function ShopCheckoutContent({
           {t("shop.approval_required_cta")}
         </Link>
       </section>
+    )
+  }
+
+  // Accepted, but the organiser has not opened sales on this way in yet. The
+  // backend refuses the purchase anyway; this shows their message instead.
+  if (applicationFlow?.ticket_sales_status === "coming_soon") {
+    return (
+      <TicketSalesComingSoon
+        title={applicationFlow.coming_soon_title}
+        message={applicationFlow.coming_soon_message}
+        backHref={`/portal/${popupSlug}/passes?flow=${applicationFlow.slug}`}
+      />
     )
   }
 

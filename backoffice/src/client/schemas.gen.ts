@@ -11612,6 +11612,17 @@ export const CheckoutRuntimeProductSchema = {
             ],
             title: 'Description'
         },
+        info_note: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Info Note'
+        },
         price: {
             type: 'string',
             pattern: '^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$',
@@ -18793,6 +18804,18 @@ export const HumanActivityItemSchema = {
             ],
             title: 'Popup Label'
         },
+        application_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Application Id'
+        },
         note: {
             anyOf: [
                 {
@@ -18938,7 +18961,7 @@ timestamp the feed sorts by.`
 
 export const HumanActivityKindSchema = {
     type: 'string',
-    enum: ['application.submitted', 'application.accepted', 'payment.completed', 'ticket.added', 'note.added', 'rating.changed', 'comment.added', 'credit.granted', 'credit.applied', 'credit.restored', 'passes.edited'],
+    enum: ['application.submitted', 'application.accepted', 'payment.completed', 'ticket.added', 'note.added', 'rating.changed', 'comment.added', 'application.comment_added', 'credit.granted', 'credit.applied', 'credit.restored', 'passes.edited'],
     title: 'HumanActivityKind',
     description: 'The kind of event a timeline item represents.'
 } as const;
@@ -27838,6 +27861,18 @@ export const ProductBatchItemSchema = {
             ],
             title: 'Description'
         },
+        info_note: {
+            anyOf: [
+                {
+                    type: 'string',
+                    maxLength: 500
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Info Note'
+        },
         image_url: {
             anyOf: [
                 {
@@ -28012,6 +28047,18 @@ export const ProductBatchResultSchema = {
                 }
             ],
             title: 'Description'
+        },
+        info_note: {
+            anyOf: [
+                {
+                    type: 'string',
+                    maxLength: 500
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Info Note'
         },
         image_url: {
             anyOf: [
@@ -28281,6 +28328,18 @@ export const ProductCreateSchema = {
             ],
             title: 'Description'
         },
+        info_note: {
+            anyOf: [
+                {
+                    type: 'string',
+                    maxLength: 500
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Info Note'
+        },
         image_url: {
             anyOf: [
                 {
@@ -28513,6 +28572,18 @@ export const ProductPublicSchema = {
                 }
             ],
             title: 'Description'
+        },
+        info_note: {
+            anyOf: [
+                {
+                    type: 'string',
+                    maxLength: 500
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Info Note'
         },
         image_url: {
             anyOf: [
@@ -28753,6 +28824,18 @@ export const ProductUpdateSchema = {
             ],
             title: 'Description'
         },
+        info_note: {
+            anyOf: [
+                {
+                    type: 'string',
+                    maxLength: 500
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Info Note'
+        },
         image_url: {
             anyOf: [
                 {
@@ -28969,6 +29052,18 @@ export const ProductWithQuantitySchema = {
                 }
             ],
             title: 'Description'
+        },
+        info_note: {
+            anyOf: [
+                {
+                    type: 'string',
+                    maxLength: 500
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Info Note'
         },
         image_url: {
             anyOf: [
@@ -30042,6 +30137,32 @@ export const SalesFlowApplicationEntryPublicSchema = {
                 }
             ]
         },
+        ticket_sales_status: {
+            '$ref': '#/components/schemas/SalesFlowTicketSalesStatus',
+            default: 'open'
+        },
+        coming_soon_title: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Coming Soon Title'
+        },
+        coming_soon_message: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Coming Soon Message'
+        },
         requires_application_fee: {
             type: 'boolean',
             title: 'Requires Application Fee'
@@ -30130,6 +30251,32 @@ export const SalesFlowCheckoutConfigSchema = {
                 }
             ],
             title: 'Contribution Description'
+        },
+        ticket_sales_status: {
+            '$ref': '#/components/schemas/SalesFlowTicketSalesStatus',
+            default: 'open'
+        },
+        coming_soon_title: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Coming Soon Title'
+        },
+        coming_soon_message: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Coming Soon Message'
         }
     },
     type: 'object',
@@ -30744,6 +30891,32 @@ export const SalesFlowPortalPublicSchema = {
                     type: 'null'
                 }
             ]
+        },
+        ticket_sales_status: {
+            '$ref': '#/components/schemas/SalesFlowTicketSalesStatus',
+            default: 'open'
+        },
+        coming_soon_title: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Coming Soon Title'
+        },
+        coming_soon_message: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Coming Soon Message'
         }
     },
     type: 'object',
@@ -30972,6 +31145,32 @@ export const SalesFlowPublicSchema = {
                 }
             ],
             title: 'Status'
+        },
+        ticket_sales_status: {
+            '$ref': '#/components/schemas/SalesFlowTicketSalesStatus',
+            default: 'open'
+        },
+        coming_soon_title: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Coming Soon Title'
+        },
+        coming_soon_message: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Coming Soon Message'
         },
         restriction_rule: {
             anyOf: [
@@ -31539,6 +31738,19 @@ NULL is the normal state and means the flow follows the gathering. It is
 also how a closed flow is reopened.`
 } as const;
 
+export const SalesFlowTicketSalesStatusSchema = {
+    type: 'string',
+    enum: ['open', 'coming_soon'],
+    title: 'SalesFlowTicketSalesStatus',
+    description: `Whether this way in is selling yet.
+
+Separate from \`status\` on purpose. A closed flow is out of circulation:
+it takes no applications and nobody reaches it. A flow whose sales are
+\`coming_soon\` keeps taking applications and accepting people, who then
+see the flow's coming-soon message instead of a checkout until the
+organiser opens sales. Every purchase path refuses while it is not open.`
+} as const;
+
 export const SalesFlowTypeSchema = {
     type: 'string',
     enum: ['application', 'direct', 'upsale'],
@@ -31557,6 +31769,40 @@ export const SalesFlowUpdateSchema = {
                     type: 'null'
                 }
             ]
+        },
+        ticket_sales_status: {
+            anyOf: [
+                {
+                    '$ref': '#/components/schemas/SalesFlowTicketSalesStatus'
+                },
+                {
+                    type: 'null'
+                }
+            ]
+        },
+        coming_soon_title: {
+            anyOf: [
+                {
+                    type: 'string',
+                    maxLength: 200
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Coming Soon Title'
+        },
+        coming_soon_message: {
+            anyOf: [
+                {
+                    type: 'string',
+                    maxLength: 2000
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Coming Soon Message'
         },
         type: {
             anyOf: [

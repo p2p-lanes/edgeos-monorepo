@@ -2,8 +2,14 @@
 
 import { localTzNaiveToUtc } from "@edgeos/shared-events"
 import { useMemo, useState } from "react"
+import {
+  type DurationDraft,
+  type DurationError,
+  draftFromMinutes,
+  parseDurationDraft,
+} from "./eventDuration"
 
-export type DurationUnit = "minutes" | "hours"
+const DEFAULT_DURATION_MINUTES = 60
 
 /** "YYYY-MM-DD" of today in the given TZ. */
 export function todayInTz(tz: string): string {
@@ -69,24 +75,15 @@ export interface UseEventSchedulingResult {
   setDateStr: (next: string) => void
   timeStr: string
   setTimeStr: (next: string) => void
-  durationValue: number
-  setDurationValue: (next: number) => void
-  durationUnit: DurationUnit
-  setDurationUnit: (next: DurationUnit) => void
+  /** Raw Hours / Minutes input text. */
+  durationDraft: DurationDraft
+  setDurationDraft: (next: DurationDraft) => void
   startIso: string
+  /** Empty while the start or the duration is invalid. */
   endIso: string
-  durationMinutes: number
-}
-
-function pickInitialDuration(initial?: number): {
-  value: number
-  unit: DurationUnit
-} {
-  const minutes = Math.max(1, Math.round(initial ?? 60))
-  if (minutes >= 60 && minutes % 60 === 0) {
-    return { value: minutes / 60, unit: "hours" }
-  }
-  return { value: minutes, unit: "minutes" }
+  /** Total duration in minutes, or null while the draft is invalid. */
+  durationMinutes: number | null
+  durationError: DurationError | null
 }
 
 /**
@@ -114,18 +111,15 @@ export function useEventScheduling(
     d.setHours(d.getHours() + 2)
     return formatHhmmInTz(d, displayTz)
   })
-  const initialDuration = pickInitialDuration(initialDurationMinutes)
-  const [durationValue, setDurationValue] = useState<number>(
-    () => initialDuration.value,
-  )
-  const [durationUnit, setDurationUnit] = useState<DurationUnit>(
-    () => initialDuration.unit,
+  const [durationDraft, setDurationDraft] = useState<DurationDraft>(() =>
+    draftFromMinutes(initialDurationMinutes ?? DEFAULT_DURATION_MINUTES),
   )
 
-  const durationMinutes = Math.max(
-    1,
-    Math.round(durationUnit === "hours" ? durationValue * 60 : durationValue),
-  )
+  // Invalid input stays invalid (null + an error code) instead of being
+  // clamped to 1 minute, so the form can show why it can't be submitted.
+  const parsedDuration = parseDurationDraft(durationDraft)
+  const durationMinutes = parsedDuration.ok ? parsedDuration.minutes : null
+  const durationError = parsedDuration.ok ? null : parsedDuration.error
 
   const startIso = useMemo(() => {
     if (!dateStr || !timeStr) return ""
@@ -134,7 +128,7 @@ export function useEventScheduling(
   }, [dateStr, timeStr, displayTz])
 
   const endIso = useMemo(() => {
-    if (!startIso) return ""
+    if (!startIso || durationMinutes == null) return ""
     const start = Date.parse(startIso)
     if (Number.isNaN(start)) return ""
     return new Date(start + durationMinutes * 60_000).toISOString()
@@ -145,12 +139,11 @@ export function useEventScheduling(
     setDateStr,
     timeStr,
     setTimeStr,
-    durationValue,
-    setDurationValue,
-    durationUnit,
-    setDurationUnit,
+    durationDraft,
+    setDurationDraft,
     startIso,
     endIso,
     durationMinutes,
+    durationError,
   }
 }

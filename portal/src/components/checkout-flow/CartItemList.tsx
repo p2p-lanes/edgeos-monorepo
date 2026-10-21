@@ -13,9 +13,40 @@ import {
   X,
 } from "lucide-react"
 import { useTranslation } from "react-i18next"
+import { chargedLineAmount } from "@/hooks/checkout/useCartSummary"
 import { resolveStepIcon } from "@/lib/checkoutStepIcons"
 import { useCheckout } from "@/providers/checkoutProvider"
 import { formatCheckoutDate, formatCurrency } from "@/types/checkout"
+
+/**
+ * A cart line's price as charged, with its full price struck through beside
+ * it when a discount lowered it (the same treatment the product rows give a
+ * discounted price). Lines used to show only the full price while the total
+ * was discounted, so the drawer never added up.
+ */
+function LinePrice({
+  amount,
+  product,
+  discountPercent,
+}: {
+  amount: number
+  product?: { discountable?: boolean | null } | null
+  discountPercent: number
+}) {
+  const charged = chargedLineAmount(amount, product, discountPercent)
+  return (
+    <span className="flex items-baseline gap-1.5 whitespace-nowrap">
+      {charged < amount && (
+        <span className="text-xs text-muted-foreground line-through">
+          {formatCurrency(amount)}
+        </span>
+      )}
+      <span className="text-sm font-medium text-foreground">
+        {formatCurrency(charged)}
+      </span>
+    </span>
+  )
+}
 
 export default function CartItemList({
   showServiceFee = true,
@@ -42,6 +73,7 @@ export default function CartItemList({
     stepConfigs,
     flowConfig,
   } = useCheckout()
+  const discountPercent = summary.discountPercent
 
   // Group dynamic items by their originating step so the drawer renders one
   // section per step type ("Housing", "Parking", …) with the matching icon,
@@ -113,9 +145,14 @@ export default function CartItemList({
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
-                  <span className="text-sm font-medium text-foreground">
-                    {formatCurrency(pass.originalPrice ?? pass.price)}
-                  </span>
+                  {/* From the full price, like the summary: `pass.price` is
+                      already discounted, and the total is computed from
+                      `originalPrice` with the discount applied once. */}
+                  <LinePrice
+                    amount={pass.originalPrice ?? pass.price}
+                    product={pass.product}
+                    discountPercent={discountPercent}
+                  />
                   <button
                     type="button"
                     onClick={() =>
@@ -161,9 +198,10 @@ export default function CartItemList({
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
-                  <span className="text-sm font-medium text-foreground">
-                    {formatCurrency(item.totalPrice)}
-                  </span>
+                  <LinePrice
+                    amount={item.totalPrice}
+                    discountPercent={discountPercent}
+                  />
                   <button
                     type="button"
                     onClick={() =>
@@ -212,9 +250,11 @@ export default function CartItemList({
               </div>
             </div>
             <div className="flex items-center gap-2">
-              <span className="text-sm font-medium text-foreground">
-                {formatCurrency(cart.housing.totalPrice)}
-              </span>
+              <LinePrice
+                amount={cart.housing.totalPrice}
+                product={cart.housing.product}
+                discountPercent={discountPercent}
+              />
               <button
                 type="button"
                 onClick={clearHousing}
@@ -253,9 +293,11 @@ export default function CartItemList({
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
-                  <span className="text-sm font-medium text-foreground">
-                    {formatCurrency(item.totalPrice)}
-                  </span>
+                  <LinePrice
+                    amount={item.totalPrice}
+                    product={item.product}
+                    discountPercent={discountPercent}
+                  />
                   <button
                     type="button"
                     onClick={() => updateMerchQuantity(item.productId, 0)}
@@ -324,9 +366,11 @@ export default function CartItemList({
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
-                  <span className="text-sm font-medium text-foreground">
-                    {formatCurrency(mp.product.price)}
-                  </span>
+                  <LinePrice
+                    amount={mp.product.price}
+                    product={mp.product}
+                    discountPercent={discountPercent}
+                  />
                   <button
                     type="button"
                     onClick={() => removeMealPlan(mp.attendeeId, mp.productId)}
@@ -368,9 +412,13 @@ export default function CartItemList({
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
-                  <span className="text-sm font-medium text-foreground">
-                    {formatCurrency(item.price * item.quantity)}
-                  </span>
+                  {/* `item.price` is already the line total (unit price ×
+                      quantity), which is what the summary sums. */}
+                  <LinePrice
+                    amount={item.price}
+                    product={item.product}
+                    discountPercent={discountPercent}
+                  />
                   <button
                     type="button"
                     onClick={() =>

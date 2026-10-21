@@ -188,6 +188,21 @@ describe("EventForm unsaved changes (create)", () => {
     await waitFor(() => expect(mocks.blockerOptions?.disabled).toBe(false))
     expect(mocks.blockerOptions?.shouldBlockFn()).toBe(true)
   })
+
+  it("blocks leaving after a duration-only change", async () => {
+    const user = userEvent.setup()
+    render(<EventForm popupTimezone="UTC" onSuccess={vi.fn()} />, {
+      wrapper: Wrapper,
+    })
+
+    await screen.findByText(/2030/)
+    expect(mocks.blockerOptions?.disabled).toBe(true)
+
+    await user.click(screen.getByRole("button", { name: "2 h" }))
+
+    await waitFor(() => expect(mocks.blockerOptions?.disabled).toBe(false))
+    expect(mocks.blockerOptions?.shouldBlockFn()).toBe(true)
+  })
 })
 
 const recurringEvent: EventPublic = {
@@ -249,6 +264,66 @@ describe("EventForm atomic recurrence updates", () => {
       }),
     })
     expect(EventsService.setRecurrence).not.toHaveBeenCalled()
+  })
+
+  it("saves a quick-picked duration as the new end time", async () => {
+    const user = userEvent.setup()
+    const onSuccess = vi.fn()
+    render(
+      <EventForm
+        defaultValues={recurringEvent}
+        popupTimezone="Asia/Kolkata"
+        onSuccess={onSuccess}
+      />,
+      { wrapper: Wrapper },
+    )
+    // Seeded from the stored 30-minute range; 12:30 IST + 30 min.
+    expect(
+      screen
+        .getByRole("button", { name: "30 min" })
+        .getAttribute("aria-pressed"),
+    ).toBe("true")
+    expect(screen.getByText("Ends at 13:00")).toBeTruthy()
+
+    await user.click(screen.getByRole("button", { name: "1 h 30 min" }))
+    expect(screen.getByText("Ends at 14:00")).toBeTruthy()
+    await user.click(screen.getByRole("button", { name: "Publish Event" }))
+
+    await waitFor(() => expect(onSuccess).toHaveBeenCalledOnce())
+    expect(EventsService.updateEvent).toHaveBeenCalledWith({
+      eventId: recurringEvent.id,
+      requestBody: expect.objectContaining({
+        start_time: "2030-01-14T07:00:00.000Z",
+        end_time: "2030-01-14T08:30:00.000Z",
+      }),
+    })
+  })
+
+  it("refuses to save a zero duration", async () => {
+    const user = userEvent.setup()
+    render(
+      <EventForm
+        defaultValues={recurringEvent}
+        popupTimezone="Asia/Kolkata"
+        onSuccess={vi.fn()}
+      />,
+      { wrapper: Wrapper },
+    )
+    fireEvent.change(screen.getByLabelText("Minutes"), {
+      target: { value: "0" },
+    })
+    expect(screen.getByRole("alert").textContent).toBe(
+      "Duration must be greater than 0.",
+    )
+
+    await user.click(screen.getByRole("button", { name: "Publish Event" }))
+
+    await waitFor(() =>
+      expect(mocks.showErrorToast).toHaveBeenCalledWith(
+        "Duration must be greater than 0.",
+      ),
+    )
+    expect(EventsService.updateEvent).not.toHaveBeenCalled()
   })
 
   it("omits unchanged recurrence to preserve stored EXDATEs", async () => {

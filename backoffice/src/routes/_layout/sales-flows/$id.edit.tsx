@@ -11,6 +11,7 @@ import { SalesFlowUrlCard } from "@/components/forms/SalesFlowUrlCard"
 import { FlowClosureCard } from "@/components/SalesFlows/FlowClosureCard"
 import { FlowSectionLinks } from "@/components/SalesFlows/FlowSectionLinks"
 import { FlowStandingCard } from "@/components/SalesFlows/FlowStandingCard"
+import { FlowTicketSalesCard } from "@/components/SalesFlows/FlowTicketSalesCard"
 import { RenameSalesFlowDialog } from "@/components/SalesFlows/RenameSalesFlowDialog"
 import { InlineSection } from "@/components/ui/inline-form"
 import { Separator } from "@/components/ui/separator"
@@ -65,6 +66,8 @@ function EditSalesFlowContent({ flowId }: { flowId: string }) {
       ) : (
         <FlowStandingCard popupId={salesFlow.popup_id} flowId={flowId} />
       )}
+
+      <FlowTicketSalesCard key={salesFlow.id} flow={salesFlow} />
 
       {/*
         What it sells comes before how it behaves, and the order is not
