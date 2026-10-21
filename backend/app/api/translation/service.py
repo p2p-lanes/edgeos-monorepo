@@ -7,7 +7,7 @@ from app.api.translation.models import Translations
 
 TRANSLATABLE_FIELDS: dict[str, list[str]] = {
     "popup": ["name", "tagline", "location"],
-    "product": ["name", "description"],
+    "product": ["name", "description", "info_note"],
     "group": ["name", "description", "welcome_message"],
     "form_field": ["label", "placeholder", "help_text", "options"],
     "form_section": ["label", "description"],

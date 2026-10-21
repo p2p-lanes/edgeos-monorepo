@@ -86,11 +86,6 @@ class ApplicationBase(SQLModel):
     # Popup-specific fields
     referral: str | None = Field(default=None, nullable=True, max_length=255)
 
-    info_not_shared: list[str] = Field(
-        default_factory=list,
-        sa_column=Column(ARRAY(String), nullable=False, server_default="{}"),
-    )
-
     # Status and review
     status: str = Field(default=ApplicationStatus.DRAFT.value, index=True)
 
@@ -206,7 +201,6 @@ class ApplicationPortalPublic(BaseModel):
     referral_id: uuid.UUID | None = None
     referred_by_name: str | None = None
     access_sources: list[ApplicationAccessSource] = PydanticField(default_factory=list)
-    info_not_shared: list[str] = []
     status: str
     custom_fields: dict = {}
     custom_fields_schema: dict | None = None
@@ -337,7 +331,6 @@ class ApplicationCreate(BaseModel):
 
     # Application-specific fields
     referral: str | None = None
-    info_not_shared: list[str] | None = None
     custom_fields: dict | None = None
     status: UserSettableStatus | None = None
     human_id: uuid.UUID | None = None
@@ -384,7 +377,6 @@ class ApplicationUpdate(BaseModel):
 
     # Application-specific fields
     referral: str | None = None
-    info_not_shared: list[str] | None = None
     custom_fields: dict | None = None
     status: UserSettableStatus | None = None
     group_id: uuid.UUID | None = None
@@ -416,7 +408,6 @@ class ApplicationAdminCreate(BaseModel):
 
     # Application-specific fields
     referral: str | None = None
-    info_not_shared: list[str] | None = None
     custom_fields: dict | None = None
     status: ApplicationStatus = ApplicationStatus.DRAFT
     group_id: uuid.UUID | None = None
@@ -882,6 +873,10 @@ class AttendeesDirectoryEntry(BaseModel):
     # Attendee category key (main/spouse/kid/...) so the UI can badge companions
     category: str | None = None
 
+    # Configurable popup fields, masked with the same per-human preferences as
+    # the standard compatibility properties above.
+    fields: list[dict[str, str | None]] = []
+
     # Participation
     participation: list[DirectoryProduct] = []
 
@@ -890,3 +885,9 @@ class AttendeesDirectoryEntry(BaseModel):
     associated_attendees: list[AssociatedAttendee] = []
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class DirectoryValuesUpdate(BaseModel):
+    values: dict[str, str]
+
+    model_config = ConfigDict(extra="forbid")

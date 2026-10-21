@@ -11,6 +11,7 @@ from app.api.human.crud import humans_crud
 from app.api.human.models import Humans
 from app.api.popup.models import Popups
 from app.api.tenant.models import Tenants
+from tests._flow_helpers import application_flow_id
 
 
 def _human(db: Session, tenant: Tenants, first_name: str) -> Humans:
@@ -151,3 +152,72 @@ def test_profile_event_stats_use_checkins_and_human_host_only(
 
     creator_stats = humans_crud.get_profile_stats(db, creator_only.id)
     assert creator_stats.events_hosted == 0
+
+
+def test_active_ticket_check_is_scoped_to_popup_and_ignores_revoked_units(
+    db: Session, tenant_a: Tenants
+) -> None:
+    from app.api.attendee.models import AttendeeProducts, Attendees
+    from app.api.attendee_category.crud import attendee_categories_crud
+    from app.api.product.models import Products
+    from app.api.product.schemas import CATEGORY_TICKET, TicketDuration
+
+    popup = Popups(
+        tenant_id=tenant_a.id,
+        name="Ticket profile popup",
+        slug=f"profile-ticket-{uuid.uuid4().hex[:8]}",
+    )
+    other_popup = Popups(
+        tenant_id=tenant_a.id,
+        name="Other popup",
+        slug=f"other-ticket-{uuid.uuid4().hex[:8]}",
+    )
+    human = _human(db, tenant_a, "Ticket owner")
+    db.add_all([popup, other_popup])
+    db.flush()
+    flow_id = application_flow_id(db, popup.id)
+    category = attendee_categories_crud.get_primary_for_flow(db, flow_id)
+    assert category is not None
+    category.directory_eligible = True
+    product = Products(
+        tenant_id=tenant_a.id,
+        popup_id=popup.id,
+        name="Pass",
+        slug=f"pass-{uuid.uuid4().hex[:8]}",
+        price=0,
+        category=CATEGORY_TICKET,
+        duration_type=TicketDuration.FULL,
+    )
+    db.add_all([category, product])
+    db.flush()
+    attendee = Attendees(
+        tenant_id=tenant_a.id,
+        popup_id=popup.id,
+        human_id=human.id,
+        category_id=category.id,
+        name="Ticket owner",
+        email=human.email,
+    )
+    db.add(attendee)
+    db.commit()
+
+    assert humans_crud.has_active_ticket(db, human.id, popup.id) is False
+    assert humans_crud.has_active_ticket(db, human.id, other_popup.id) is False
+
+    ticket = AttendeeProducts(
+        tenant_id=tenant_a.id,
+        attendee_id=attendee.id,
+        product_id=product.id,
+        check_in_code=uuid.uuid4().hex[:10].upper(),
+        product_category_snapshot=CATEGORY_TICKET,
+    )
+    db.add(ticket)
+    db.commit()
+
+    assert humans_crud.has_active_ticket(db, human.id, popup.id) is True
+    assert humans_crud.has_active_ticket(db, human.id, other_popup.id) is False
+
+    ticket.revoked_at = datetime.now(UTC)
+    db.add(ticket)
+    db.commit()
+    assert humans_crud.has_active_ticket(db, human.id, popup.id) is False

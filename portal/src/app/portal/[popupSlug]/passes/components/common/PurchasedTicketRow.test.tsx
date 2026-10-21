@@ -62,7 +62,7 @@ describe("PurchasedTicketRow", () => {
 
     expect(screen.getByText("Classic Double")).toBeTruthy()
     expect(screen.getByText("201")).toBeTruthy()
-    expect(screen.getByText("$495")).toBeTruthy()
+    expect(screen.getByText("$495.00")).toBeTruthy()
     expect(screen.getByText(/Hotel Arcadia/)).toBeTruthy()
     // The address belongs to the detail sheet, not the list.
     expect(screen.queryByText("Avenida melian 2487")).toBeNull()

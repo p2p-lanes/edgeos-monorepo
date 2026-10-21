@@ -666,7 +666,6 @@ export type ApplicationAdminCreate = {
     age?: (string | null);
     residence?: (string | null);
     referral?: (string | null);
-    info_not_shared?: (Array<(string)> | null);
     custom_fields?: ({
     [key: string]: unknown;
 } | null);
@@ -710,7 +709,6 @@ export type ApplicationCreate = {
     age?: (string | null);
     residence?: (string | null);
     referral?: (string | null);
-    info_not_shared?: (Array<(string)> | null);
     custom_fields?: ({
     [key: string]: unknown;
 } | null);
@@ -777,7 +775,6 @@ export type ApplicationPortalPublic = {
     referral_id?: (string | null);
     referred_by_name?: (string | null);
     access_sources?: Array<ApplicationAccessSource>;
-    info_not_shared?: Array<(string)>;
     status: string;
     custom_fields?: {
         [key: string]: unknown;
@@ -817,7 +814,6 @@ export type ApplicationPublic = {
     referral_id?: (string | null);
     referred_by_name?: (string | null);
     access_sources?: Array<ApplicationAccessSource>;
-    info_not_shared?: Array<(string)>;
     status: string;
     custom_fields?: {
         [key: string]: unknown;
@@ -942,7 +938,6 @@ export type ApplicationUpdate = {
     age?: (string | null);
     residence?: (string | null);
     referral?: (string | null);
-    info_not_shared?: (Array<(string)> | null);
     custom_fields?: ({
     [key: string]: unknown;
 } | null);
@@ -1124,6 +1119,7 @@ export type AttendeeCategoryCreate = {
     popup_id: string;
     key: string;
     sort_order?: number;
+    directory_eligible?: (boolean | null);
     max_per_application?: (number | null);
     required_fields?: Array<{
         [key: string]: unknown;
@@ -1143,6 +1139,7 @@ export type AttendeeCategoryPublic = {
     sales_flow_id: string;
     key: string;
     is_primary?: boolean;
+    directory_eligible?: boolean;
     sort_order?: number;
     max_per_application?: (number | null);
     required_fields?: Array<{
@@ -1164,6 +1161,7 @@ export type AttendeeCategoryPublic = {
  */
 export type AttendeeCategoryUpdate = {
     sort_order?: (number | null);
+    directory_eligible?: (boolean | null);
     max_per_application?: (number | null);
     required_fields?: (Array<{
     [key: string]: unknown;
@@ -1365,6 +1363,9 @@ export type AttendeesDirectoryEntry = {
     gender?: (string | null);
     picture_url?: (string | null);
     category?: (string | null);
+    fields?: Array<{
+        [key: string]: (string | null);
+    }>;
     participation?: Array<DirectoryProduct>;
     associated_attendees?: Array<AssociatedAttendee>;
 };
@@ -2493,6 +2494,7 @@ export type CheckoutRuntimeProduct = {
     name: string;
     slug: string;
     description?: (string | null);
+    info_note?: (string | null);
     price: string;
     compare_price?: (string | null);
     image_url?: (string | null);
@@ -2733,6 +2735,12 @@ export type DirectoryProduct = {
     slug: string;
     category?: (string | null);
     duration_type?: (string | null);
+};
+
+export type DirectoryValuesUpdate = {
+    values: {
+        [key: string]: (string);
+    };
 };
 
 /**
@@ -3989,6 +3997,7 @@ export type HumanActivityItem = {
     occurred_at: string;
     popup_id?: (string | null);
     popup_label?: (string | null);
+    application_id?: (string | null);
     note?: (string | null);
     amount?: (string | null);
     currency?: (string | null);
@@ -4006,7 +4015,7 @@ export type HumanActivityItem = {
 /**
  * The kind of event a timeline item represents.
  */
-export type HumanActivityKind = 'application.submitted' | 'application.accepted' | 'payment.completed' | 'ticket.added' | 'note.added' | 'rating.changed' | 'comment.added' | 'credit.granted' | 'credit.applied' | 'credit.restored' | 'passes.edited';
+export type HumanActivityKind = 'application.submitted' | 'application.accepted' | 'payment.completed' | 'ticket.added' | 'note.added' | 'rating.changed' | 'comment.added' | 'application.comment_added' | 'credit.granted' | 'credit.applied' | 'credit.restored' | 'passes.edited';
 
 /**
  * One purchased line in a `payment.completed` item (snapshot at purchase).
@@ -4057,6 +4066,20 @@ export type HumanCreate = {
     age?: (string | null);
     residence?: (string | null);
     picture_url?: (string | null);
+};
+
+export type HumanDirectorySettingsPublic = {
+    popup_id: string;
+    listed: boolean;
+    shared_fields: Array<(string)>;
+    available_fields: Array<{
+        [key: string]: unknown;
+    }>;
+};
+
+export type HumanDirectorySettingsUpdate = {
+    listed: boolean;
+    shared_fields: Array<(string)>;
 };
 
 /**
@@ -5239,6 +5262,10 @@ export type PopupAdmin = {
     blog_url?: (string | null);
     twitter_url?: (string | null);
     simplefi_api_key?: (string | null);
+    simplefi_card_adjustment_pct?: (string | null);
+    simplefi_crypto_adjustment_pct?: (string | null);
+    simplefi_pay_in_full_adjustment_pct?: (string | null);
+    simplefi_installments_adjustment_pct?: (string | null);
     simplefi_success_behavior?: SimpleFiSuccessBehavior;
     terms_and_conditions_url?: (string | null);
     open_checkout_success_url?: (string | null);
@@ -5272,6 +5299,9 @@ export type PopupAdmin = {
     checkin_pass_lead_days?: (number | null);
     accommodation_min_stay?: number;
     show_attendee_directory?: boolean;
+    directory_fields?: Array<{
+        [key: string]: unknown;
+    }>;
     badges_enabled?: boolean;
     edit_passes_enabled?: boolean;
     invites_enabled?: boolean;
@@ -5347,6 +5377,10 @@ export type PopupCreate = {
     blog_url?: (string | null);
     twitter_url?: (string | null);
     simplefi_api_key?: (string | null);
+    simplefi_card_adjustment_pct?: (number | string | null);
+    simplefi_crypto_adjustment_pct?: (number | string | null);
+    simplefi_pay_in_full_adjustment_pct?: (number | string | null);
+    simplefi_installments_adjustment_pct?: (number | string | null);
     simplefi_success_behavior?: SimpleFiSuccessBehavior;
     terms_and_conditions_url?: (string | null);
     open_checkout_success_url?: (string | null);
@@ -5467,6 +5501,9 @@ export type PopupPublic = {
     events_enabled?: boolean;
     accommodation_min_stay?: number;
     show_attendee_directory?: boolean;
+    directory_fields?: Array<{
+        [key: string]: unknown;
+    }>;
     badges_enabled?: boolean;
     edit_passes_enabled?: boolean;
     invites_enabled?: boolean;
@@ -5541,6 +5578,10 @@ export type PopupUpdate = {
     blog_url?: (string | null);
     twitter_url?: (string | null);
     simplefi_api_key?: (string | null);
+    simplefi_card_adjustment_pct?: (number | string | null);
+    simplefi_crypto_adjustment_pct?: (number | string | null);
+    simplefi_pay_in_full_adjustment_pct?: (number | string | null);
+    simplefi_installments_adjustment_pct?: (number | string | null);
     simplefi_success_behavior?: (SimpleFiSuccessBehavior | null);
     terms_and_conditions_url?: (string | null);
     open_checkout_success_url?: (string | null);
@@ -5571,6 +5612,9 @@ export type PopupUpdate = {
     events_enabled?: (boolean | null);
     self_check_in_enabled?: (boolean | null);
     show_attendee_directory?: (boolean | null);
+    directory_fields?: (Array<{
+    [key: string]: unknown;
+}> | null);
     badges_enabled?: (boolean | null);
     edit_passes_enabled?: (boolean | null);
     installments_enabled?: (boolean | null);
@@ -5703,6 +5747,7 @@ export type ProductBatchItem = {
     price: (number | string);
     compare_price?: (number | string | null);
     description?: (string | null);
+    info_note?: (string | null);
     image_url?: (string | null);
     images?: Array<(string)>;
     category?: string;
@@ -5730,6 +5775,7 @@ export type ProductBatchResult = {
     price: string;
     compare_price?: (string | null);
     description?: (string | null);
+    info_note?: (string | null);
     image_url?: (string | null);
     images?: Array<(string)>;
     category?: string;
@@ -5774,6 +5820,7 @@ export type ProductCreate = {
     price: (number | string);
     compare_price?: (number | string | null);
     description?: (string | null);
+    info_note?: (string | null);
     image_url?: (string | null);
     images?: Array<(string)>;
     category?: string;
@@ -5818,6 +5865,7 @@ export type ProductPublic = {
     price: string;
     compare_price?: (string | null);
     description?: (string | null);
+    info_note?: (string | null);
     image_url?: (string | null);
     images?: Array<(string)>;
     category?: string;
@@ -5854,6 +5902,7 @@ export type ProductUpdate = {
     price?: (number | string | null);
     compare_price?: (number | string | null);
     description?: (string | null);
+    info_note?: (string | null);
     image_url?: (string | null);
     images?: (Array<(string)> | null);
     category?: (string | null);
@@ -5881,6 +5930,7 @@ export type ProductWithQuantity = {
     price: string;
     compare_price?: (string | null);
     description?: (string | null);
+    info_note?: (string | null);
     image_url?: (string | null);
     images?: Array<(string)>;
     category?: string;
@@ -6117,6 +6167,9 @@ export type SalesFlowApplicationEntryPublic = {
     type: SalesFlowType;
     price_summary?: (SalesFlowPriceSummary | null);
     theme_config?: (SalesFlowPortalThemeConfig | null);
+    ticket_sales_status?: SalesFlowTicketSalesStatus;
+    coming_soon_title?: (string | null);
+    coming_soon_message?: (string | null);
     requires_application_fee: boolean;
     application_fee_amount: (string | null);
     application_layout: ApplicationLayout;
@@ -6144,6 +6197,9 @@ export type SalesFlowCheckoutConfig = {
     contribution_percentage?: (string | null);
     contribution_label?: (string | null);
     contribution_description?: (string | null);
+    ticket_sales_status?: SalesFlowTicketSalesStatus;
+    coming_soon_title?: (string | null);
+    coming_soon_message?: (string | null);
 };
 
 /**
@@ -6186,6 +6242,10 @@ export type SalesFlowCreate = {
     open_checkout_cancel_url?: (string | null);
     open_checkout_signing_secret?: (string | null);
     simplefi_api_key?: (string | null);
+    simplefi_card_adjustment_pct?: (number | string | null);
+    simplefi_crypto_adjustment_pct?: (number | string | null);
+    simplefi_pay_in_full_adjustment_pct?: (number | string | null);
+    simplefi_installments_adjustment_pct?: (number | string | null);
     abandoned_cart_delay_days?: (number | null);
     abandoned_cart_repeat_days?: (number | null);
     abandoned_cart_max_count?: (number | null);
@@ -6231,6 +6291,9 @@ export type SalesFlowPortalPublic = {
     type: SalesFlowType;
     price_summary?: (SalesFlowPriceSummary | null);
     theme_config?: (SalesFlowPortalThemeConfig | null);
+    ticket_sales_status?: SalesFlowTicketSalesStatus;
+    coming_soon_title?: (string | null);
+    coming_soon_message?: (string | null);
 };
 
 /**
@@ -6303,6 +6366,9 @@ export type SalesFlowPublic = {
     reviewers_mode?: SalesFlowReviewersMode;
     identity_mode?: SalesFlowIdentityMode;
     status?: (string | null);
+    ticket_sales_status?: SalesFlowTicketSalesStatus;
+    coming_soon_title?: (string | null);
+    coming_soon_message?: (string | null);
     restriction_rule?: ({
     [key: string]: unknown;
 } | null);
@@ -6335,6 +6401,10 @@ export type SalesFlowPublic = {
     open_checkout_cancel_url?: (string | null);
     open_checkout_signing_secret?: (string | null);
     simplefi_api_key?: (string | null);
+    simplefi_card_adjustment_pct?: (string | null);
+    simplefi_crypto_adjustment_pct?: (string | null);
+    simplefi_pay_in_full_adjustment_pct?: (string | null);
+    simplefi_installments_adjustment_pct?: (string | null);
     abandoned_cart_delay_days?: (number | null);
     abandoned_cart_repeat_days?: (number | null);
     abandoned_cart_max_count?: (number | null);
@@ -6386,6 +6456,17 @@ export type SalesFlowReviewersMode = 'inherit' | 'override';
 export type SalesFlowStatus = 'closed';
 
 /**
+ * Whether this way in is selling yet.
+ *
+ * Separate from `status` on purpose. A closed flow is out of circulation:
+ * it takes no applications and nobody reaches it. A flow whose sales are
+ * `coming_soon` keeps taking applications and accepting people, who then
+ * see the flow's coming-soon message instead of a checkout until the
+ * organiser opens sales. Every purchase path refuses while it is not open.
+ */
+export type SalesFlowTicketSalesStatus = 'open' | 'coming_soon';
+
+/**
  * Sale model of a flow. Mirrors PopupBase.sale_type plus 'upsale'.
  */
 export type SalesFlowType = 'application' | 'direct' | 'upsale';
@@ -6395,6 +6476,9 @@ export type SalesFlowType = 'application' | 'direct' | 'upsale';
  */
 export type SalesFlowUpdate = {
     status?: (SalesFlowStatus | null);
+    ticket_sales_status?: (SalesFlowTicketSalesStatus | null);
+    coming_soon_title?: (string | null);
+    coming_soon_message?: (string | null);
     type?: (SalesFlowType | null);
     slug?: (string | null);
     name?: (string | null);
@@ -6429,6 +6513,10 @@ export type SalesFlowUpdate = {
     open_checkout_cancel_url?: (string | null);
     open_checkout_signing_secret?: (string | null);
     simplefi_api_key?: (string | null);
+    simplefi_card_adjustment_pct?: (number | string | null);
+    simplefi_crypto_adjustment_pct?: (number | string | null);
+    simplefi_pay_in_full_adjustment_pct?: (number | string | null);
+    simplefi_installments_adjustment_pct?: (number | string | null);
     abandoned_cart_delay_days?: (number | null);
     abandoned_cart_repeat_days?: (number | null);
     abandoned_cart_max_count?: (number | null);
@@ -8028,6 +8116,23 @@ export type ApplicationsListAttendeesDirectoryData = {
 };
 
 export type ApplicationsListAttendeesDirectoryResponse = (ListModel_AttendeesDirectoryEntry_);
+
+export type ApplicationsUpdateMyDirectoryValuesData = {
+    popupId: string;
+    requestBody: DirectoryValuesUpdate;
+};
+
+export type ApplicationsUpdateMyDirectoryValuesResponse = ({
+    [key: string]: (string);
+});
+
+export type ApplicationsGetMyDirectoryValuesData = {
+    popupId: string;
+};
+
+export type ApplicationsGetMyDirectoryValuesResponse = ({
+    [key: string]: (string);
+});
 
 export type ApplicationsExportAttendeesDirectoryCsvData = {
     popupId: string;
@@ -10118,7 +10223,26 @@ export type HumansUpdateCurrentHumanData = {
 
 export type HumansUpdateCurrentHumanResponse = (HumanSelfPublic);
 
+export type HumansHasCurrentHumanActiveTicketData = {
+    popupId: string;
+};
+
+export type HumansHasCurrentHumanActiveTicketResponse = (boolean);
+
 export type HumansGetCurrentHumanProfileStatsResponse = (HumanProfileStats);
+
+export type HumansGetMyDirectorySettingsData = {
+    popupId: string;
+};
+
+export type HumansGetMyDirectorySettingsResponse = (HumanDirectorySettingsPublic);
+
+export type HumansUpdateMyDirectorySettingsData = {
+    popupId: string;
+    requestBody: HumanDirectorySettingsUpdate;
+};
+
+export type HumansUpdateMyDirectorySettingsResponse = (HumanDirectorySettingsPublic);
 
 export type HumansGetMyPublicProfileResponse = (PublicProfileSettings);
 

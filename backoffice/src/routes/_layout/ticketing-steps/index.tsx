@@ -25,6 +25,7 @@ import {
 } from "@/client"
 import { WorkspaceAlert } from "@/components/Common/WorkspaceAlert"
 import { FlowScopeBar } from "@/components/SalesFlows/FlowScopeBar"
+import { FlowTicketSalesCard } from "@/components/SalesFlows/FlowTicketSalesCard"
 import { NewStepPanel } from "@/components/ticketing-step-builder/NewStepPanel"
 import { StepCanvas } from "@/components/ticketing-step-builder/StepCanvas"
 import { StepDetailPanel } from "@/components/ticketing-step-builder/StepDetailPanel"
@@ -145,6 +146,7 @@ function TicketingStepsContent({ popupId }: { popupId: string }) {
   )
   const {
     flows,
+    activeFlow,
     activeFlowId,
     isLoading: flowsLoading,
   } = useFlowScope(popupId, flowParam, adoptFlow)
@@ -282,6 +284,12 @@ function TicketingStepsContent({ popupId }: { popupId: string }) {
           />
         }
       />
+
+      {/* Whether this flow sells yet. Lives with its steps because holding
+          sales replaces the whole journey below with a coming-soon screen. */}
+      {activeFlow && (
+        <FlowTicketSalesCard key={activeFlow.id} flow={activeFlow} />
+      )}
 
       <div className="flex flex-col gap-6 md:flex-row md:items-start">
         {/* Journey rail */}

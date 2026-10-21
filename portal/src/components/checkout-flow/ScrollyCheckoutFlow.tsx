@@ -21,6 +21,7 @@ import SnapSection from "./SnapSection"
 import ConfirmStep from "./steps/ConfirmStep"
 import OpenCheckoutBuyerStep from "./steps/OpenCheckoutBuyerStep"
 import PassSelectionSection from "./steps/PassSelectionSection"
+import { TicketSalesComingSoon } from "./TicketSalesComingSoon"
 
 interface ScrollyCheckoutFlowProps {
   onPaymentComplete?: () => void
@@ -46,6 +47,7 @@ function ScrollyCheckoutFlowInner({
     stepConfigs,
     isInitialLoading,
     previewMode,
+    flowConfig,
     flowConfigError,
     markStepVisited,
   } = useCheckout()
@@ -476,6 +478,15 @@ function ScrollyCheckoutFlowInner({
   }
 
   if (flowConfigError) return <CheckoutConfigError />
+
+  if (flowConfig?.ticket_sales_status === "coming_soon") {
+    return (
+      <TicketSalesComingSoon
+        title={flowConfig.coming_soon_title}
+        message={flowConfig.coming_soon_message}
+      />
+    )
+  }
 
   const lastSectionId = allSections[allSections.length - 1]?.id
 

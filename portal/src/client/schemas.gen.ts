@@ -3319,20 +3319,6 @@ export const ApplicationAdminCreateSchema = {
             ],
             title: 'Referral'
         },
-        info_not_shared: {
-            anyOf: [
-                {
-                    items: {
-                        type: 'string'
-                    },
-                    type: 'array'
-                },
-                {
-                    type: 'null'
-                }
-            ],
-            title: 'Info Not Shared'
-        },
         custom_fields: {
             anyOf: [
                 {
@@ -3563,20 +3549,6 @@ export const ApplicationCreateSchema = {
                 }
             ],
             title: 'Referral'
-        },
-        info_not_shared: {
-            anyOf: [
-                {
-                    items: {
-                        type: 'string'
-                    },
-                    type: 'array'
-                },
-                {
-                    type: 'null'
-                }
-            ],
-            title: 'Info Not Shared'
         },
         custom_fields: {
             anyOf: [
@@ -3878,14 +3850,6 @@ export const ApplicationPortalPublicSchema = {
             type: 'array',
             title: 'Access Sources'
         },
-        info_not_shared: {
-            items: {
-                type: 'string'
-            },
-            type: 'array',
-            title: 'Info Not Shared',
-            default: []
-        },
         status: {
             type: 'string',
             title: 'Status'
@@ -4156,14 +4120,6 @@ export const ApplicationPublicSchema = {
             },
             type: 'array',
             title: 'Access Sources'
-        },
-        info_not_shared: {
-            items: {
-                type: 'string'
-            },
-            type: 'array',
-            title: 'Info Not Shared',
-            default: []
         },
         status: {
             type: 'string',
@@ -4779,20 +4735,6 @@ export const ApplicationUpdateSchema = {
                 }
             ],
             title: 'Referral'
-        },
-        info_not_shared: {
-            anyOf: [
-                {
-                    items: {
-                        type: 'string'
-                    },
-                    type: 'array'
-                },
-                {
-                    type: 'null'
-                }
-            ],
-            title: 'Info Not Shared'
         },
         custom_fields: {
             anyOf: [
@@ -5526,6 +5468,17 @@ export const AttendeeCategoryCreateSchema = {
             title: 'Sort Order',
             default: 0
         },
+        directory_eligible: {
+            anyOf: [
+                {
+                    type: 'boolean'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Directory Eligible'
+        },
         max_per_application: {
             anyOf: [
                 {
@@ -5588,6 +5541,11 @@ export const AttendeeCategoryPublicSchema = {
         is_primary: {
             type: 'boolean',
             title: 'Is Primary',
+            default: false
+        },
+        directory_eligible: {
+            type: 'boolean',
+            title: 'Directory Eligible',
             default: false
         },
         sort_order: {
@@ -5676,6 +5634,17 @@ export const AttendeeCategoryUpdateSchema = {
                 }
             ],
             title: 'Sort Order'
+        },
+        directory_eligible: {
+            anyOf: [
+                {
+                    type: 'boolean'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Directory Eligible'
         },
         max_per_application: {
             anyOf: [
@@ -7297,6 +7266,24 @@ export const AttendeesDirectoryEntrySchema = {
                 }
             ],
             title: 'Category'
+        },
+        fields: {
+            items: {
+                additionalProperties: {
+                    anyOf: [
+                        {
+                            type: 'string'
+                        },
+                        {
+                            type: 'null'
+                        }
+                    ]
+                },
+                type: 'object'
+            },
+            type: 'array',
+            title: 'Fields',
+            default: []
         },
         participation: {
             items: {
@@ -11625,6 +11612,17 @@ export const CheckoutRuntimeProductSchema = {
             ],
             title: 'Description'
         },
+        info_note: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Info Note'
+        },
         price: {
             type: 'string',
             pattern: '^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$',
@@ -12614,6 +12612,22 @@ export const DirectoryProductSchema = {
     required: ['id', 'name', 'slug'],
     title: 'DirectoryProduct',
     description: 'Minimal product info for directory participation display.'
+} as const;
+
+export const DirectoryValuesUpdateSchema = {
+    properties: {
+        values: {
+            additionalProperties: {
+                type: 'string'
+            },
+            type: 'object',
+            title: 'Values'
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    required: ['values'],
+    title: 'DirectoryValuesUpdate'
 } as const;
 
 export const DistributionSchema = {
@@ -18790,6 +18804,18 @@ export const HumanActivityItemSchema = {
             ],
             title: 'Popup Label'
         },
+        application_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Application Id'
+        },
         note: {
             anyOf: [
                 {
@@ -18935,7 +18961,7 @@ timestamp the feed sorts by.`
 
 export const HumanActivityKindSchema = {
     type: 'string',
-    enum: ['application.submitted', 'application.accepted', 'payment.completed', 'ticket.added', 'note.added', 'rating.changed', 'comment.added', 'credit.granted', 'credit.applied', 'credit.restored', 'passes.edited'],
+    enum: ['application.submitted', 'application.accepted', 'payment.completed', 'ticket.added', 'note.added', 'rating.changed', 'comment.added', 'application.comment_added', 'credit.granted', 'credit.applied', 'credit.restored', 'passes.edited'],
     title: 'HumanActivityKind',
     description: 'The kind of event a timeline item represents.'
 } as const;
@@ -19191,6 +19217,58 @@ export const HumanCreateSchema = {
     required: ['email'],
     title: 'HumanCreate',
     description: 'Human schema for creation.'
+} as const;
+
+export const HumanDirectorySettingsPublicSchema = {
+    properties: {
+        popup_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Popup Id'
+        },
+        listed: {
+            type: 'boolean',
+            title: 'Listed'
+        },
+        shared_fields: {
+            items: {
+                type: 'string'
+            },
+            type: 'array',
+            title: 'Shared Fields'
+        },
+        available_fields: {
+            items: {
+                additionalProperties: true,
+                type: 'object'
+            },
+            type: 'array',
+            title: 'Available Fields'
+        }
+    },
+    type: 'object',
+    required: ['popup_id', 'listed', 'shared_fields', 'available_fields'],
+    title: 'HumanDirectorySettingsPublic'
+} as const;
+
+export const HumanDirectorySettingsUpdateSchema = {
+    properties: {
+        listed: {
+            type: 'boolean',
+            title: 'Listed'
+        },
+        shared_fields: {
+            items: {
+                type: 'string'
+            },
+            type: 'array',
+            title: 'Shared Fields'
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    required: ['listed', 'shared_fields'],
+    title: 'HumanDirectorySettingsUpdate'
 } as const;
 
 export const HumanEnrichmentFactCreateSchema = {
@@ -24572,6 +24650,54 @@ export const PopupAdminSchema = {
             ],
             title: 'Simplefi Api Key'
         },
+        simplefi_card_adjustment_pct: {
+            anyOf: [
+                {
+                    type: 'string',
+                    pattern: '^(?!^[-+.]*$)[+-]?0*(?:\\d{0,3}|(?=[\\d.]{1,6}0*$)\\d{0,3}\\.\\d{0,2}0*$)'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Simplefi Card Adjustment Pct'
+        },
+        simplefi_crypto_adjustment_pct: {
+            anyOf: [
+                {
+                    type: 'string',
+                    pattern: '^(?!^[-+.]*$)[+-]?0*(?:\\d{0,3}|(?=[\\d.]{1,6}0*$)\\d{0,3}\\.\\d{0,2}0*$)'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Simplefi Crypto Adjustment Pct'
+        },
+        simplefi_pay_in_full_adjustment_pct: {
+            anyOf: [
+                {
+                    type: 'string',
+                    pattern: '^(?!^[-+.]*$)[+-]?0*(?:\\d{0,3}|(?=[\\d.]{1,6}0*$)\\d{0,3}\\.\\d{0,2}0*$)'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Simplefi Pay In Full Adjustment Pct'
+        },
+        simplefi_installments_adjustment_pct: {
+            anyOf: [
+                {
+                    type: 'string',
+                    pattern: '^(?!^[-+.]*$)[+-]?0*(?:\\d{0,3}|(?=[\\d.]{1,6}0*$)\\d{0,3}\\.\\d{0,2}0*$)'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Simplefi Installments Adjustment Pct'
+        },
         simplefi_success_behavior: {
             '$ref': '#/components/schemas/SimpleFiSuccessBehavior',
             default: 'manual'
@@ -24820,6 +24946,14 @@ export const PopupAdminSchema = {
             type: 'boolean',
             title: 'Show Attendee Directory',
             default: false
+        },
+        directory_fields: {
+            items: {
+                additionalProperties: true,
+                type: 'object'
+            },
+            type: 'array',
+            title: 'Directory Fields'
         },
         badges_enabled: {
             type: 'boolean',
@@ -25349,6 +25483,74 @@ export const PopupCreateSchema = {
                 }
             ],
             title: 'Simplefi Api Key'
+        },
+        simplefi_card_adjustment_pct: {
+            anyOf: [
+                {
+                    type: 'number',
+                    maximum: 100,
+                    minimum: -99
+                },
+                {
+                    type: 'string',
+                    pattern: '^(?!^[-+.]*$)[+-]?0*(?:\\d{0,3}|(?=[\\d.]{1,6}0*$)\\d{0,3}\\.\\d{0,2}0*$)'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Simplefi Card Adjustment Pct'
+        },
+        simplefi_crypto_adjustment_pct: {
+            anyOf: [
+                {
+                    type: 'number',
+                    maximum: 100,
+                    minimum: -99
+                },
+                {
+                    type: 'string',
+                    pattern: '^(?!^[-+.]*$)[+-]?0*(?:\\d{0,3}|(?=[\\d.]{1,6}0*$)\\d{0,3}\\.\\d{0,2}0*$)'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Simplefi Crypto Adjustment Pct'
+        },
+        simplefi_pay_in_full_adjustment_pct: {
+            anyOf: [
+                {
+                    type: 'number',
+                    maximum: 100,
+                    minimum: -99
+                },
+                {
+                    type: 'string',
+                    pattern: '^(?!^[-+.]*$)[+-]?0*(?:\\d{0,3}|(?=[\\d.]{1,6}0*$)\\d{0,3}\\.\\d{0,2}0*$)'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Simplefi Pay In Full Adjustment Pct'
+        },
+        simplefi_installments_adjustment_pct: {
+            anyOf: [
+                {
+                    type: 'number',
+                    maximum: 100,
+                    minimum: -99
+                },
+                {
+                    type: 'string',
+                    pattern: '^(?!^[-+.]*$)[+-]?0*(?:\\d{0,3}|(?=[\\d.]{1,6}0*$)\\d{0,3}\\.\\d{0,2}0*$)'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Simplefi Installments Adjustment Pct'
         },
         simplefi_success_behavior: {
             '$ref': '#/components/schemas/SimpleFiSuccessBehavior',
@@ -26205,6 +26407,15 @@ export const PopupPublicSchema = {
             title: 'Show Attendee Directory',
             default: false
         },
+        directory_fields: {
+            items: {
+                additionalProperties: true,
+                type: 'object'
+            },
+            type: 'array',
+            title: 'Directory Fields',
+            default: []
+        },
         badges_enabled: {
             type: 'boolean',
             title: 'Badges Enabled',
@@ -26666,6 +26877,74 @@ export const PopupUpdateSchema = {
             ],
             title: 'Simplefi Api Key'
         },
+        simplefi_card_adjustment_pct: {
+            anyOf: [
+                {
+                    type: 'number',
+                    maximum: 100,
+                    minimum: -99
+                },
+                {
+                    type: 'string',
+                    pattern: '^(?!^[-+.]*$)[+-]?0*(?:\\d{0,3}|(?=[\\d.]{1,6}0*$)\\d{0,3}\\.\\d{0,2}0*$)'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Simplefi Card Adjustment Pct'
+        },
+        simplefi_crypto_adjustment_pct: {
+            anyOf: [
+                {
+                    type: 'number',
+                    maximum: 100,
+                    minimum: -99
+                },
+                {
+                    type: 'string',
+                    pattern: '^(?!^[-+.]*$)[+-]?0*(?:\\d{0,3}|(?=[\\d.]{1,6}0*$)\\d{0,3}\\.\\d{0,2}0*$)'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Simplefi Crypto Adjustment Pct'
+        },
+        simplefi_pay_in_full_adjustment_pct: {
+            anyOf: [
+                {
+                    type: 'number',
+                    maximum: 100,
+                    minimum: -99
+                },
+                {
+                    type: 'string',
+                    pattern: '^(?!^[-+.]*$)[+-]?0*(?:\\d{0,3}|(?=[\\d.]{1,6}0*$)\\d{0,3}\\.\\d{0,2}0*$)'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Simplefi Pay In Full Adjustment Pct'
+        },
+        simplefi_installments_adjustment_pct: {
+            anyOf: [
+                {
+                    type: 'number',
+                    maximum: 100,
+                    minimum: -99
+                },
+                {
+                    type: 'string',
+                    pattern: '^(?!^[-+.]*$)[+-]?0*(?:\\d{0,3}|(?=[\\d.]{1,6}0*$)\\d{0,3}\\.\\d{0,2}0*$)'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Simplefi Installments Adjustment Pct'
+        },
         simplefi_success_behavior: {
             anyOf: [
                 {
@@ -26967,6 +27246,21 @@ export const PopupUpdateSchema = {
                 }
             ],
             title: 'Show Attendee Directory'
+        },
+        directory_fields: {
+            anyOf: [
+                {
+                    items: {
+                        additionalProperties: true,
+                        type: 'object'
+                    },
+                    type: 'array'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Directory Fields'
         },
         badges_enabled: {
             anyOf: [
@@ -27567,6 +27861,18 @@ export const ProductBatchItemSchema = {
             ],
             title: 'Description'
         },
+        info_note: {
+            anyOf: [
+                {
+                    type: 'string',
+                    maxLength: 500
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Info Note'
+        },
         image_url: {
             anyOf: [
                 {
@@ -27741,6 +28047,18 @@ export const ProductBatchResultSchema = {
                 }
             ],
             title: 'Description'
+        },
+        info_note: {
+            anyOf: [
+                {
+                    type: 'string',
+                    maxLength: 500
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Info Note'
         },
         image_url: {
             anyOf: [
@@ -28010,6 +28328,18 @@ export const ProductCreateSchema = {
             ],
             title: 'Description'
         },
+        info_note: {
+            anyOf: [
+                {
+                    type: 'string',
+                    maxLength: 500
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Info Note'
+        },
         image_url: {
             anyOf: [
                 {
@@ -28242,6 +28572,18 @@ export const ProductPublicSchema = {
                 }
             ],
             title: 'Description'
+        },
+        info_note: {
+            anyOf: [
+                {
+                    type: 'string',
+                    maxLength: 500
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Info Note'
         },
         image_url: {
             anyOf: [
@@ -28482,6 +28824,18 @@ export const ProductUpdateSchema = {
             ],
             title: 'Description'
         },
+        info_note: {
+            anyOf: [
+                {
+                    type: 'string',
+                    maxLength: 500
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Info Note'
+        },
         image_url: {
             anyOf: [
                 {
@@ -28698,6 +29052,18 @@ export const ProductWithQuantitySchema = {
                 }
             ],
             title: 'Description'
+        },
+        info_note: {
+            anyOf: [
+                {
+                    type: 'string',
+                    maxLength: 500
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Info Note'
         },
         image_url: {
             anyOf: [
@@ -29771,6 +30137,32 @@ export const SalesFlowApplicationEntryPublicSchema = {
                 }
             ]
         },
+        ticket_sales_status: {
+            '$ref': '#/components/schemas/SalesFlowTicketSalesStatus',
+            default: 'open'
+        },
+        coming_soon_title: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Coming Soon Title'
+        },
+        coming_soon_message: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Coming Soon Message'
+        },
         requires_application_fee: {
             type: 'boolean',
             title: 'Requires Application Fee'
@@ -29859,6 +30251,32 @@ export const SalesFlowCheckoutConfigSchema = {
                 }
             ],
             title: 'Contribution Description'
+        },
+        ticket_sales_status: {
+            '$ref': '#/components/schemas/SalesFlowTicketSalesStatus',
+            default: 'open'
+        },
+        coming_soon_title: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Coming Soon Title'
+        },
+        coming_soon_message: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Coming Soon Message'
         }
     },
     type: 'object',
@@ -30226,6 +30644,74 @@ export const SalesFlowCreateSchema = {
             ],
             title: 'Simplefi Api Key'
         },
+        simplefi_card_adjustment_pct: {
+            anyOf: [
+                {
+                    type: 'number',
+                    maximum: 100,
+                    minimum: -99
+                },
+                {
+                    type: 'string',
+                    pattern: '^(?!^[-+.]*$)[+-]?0*(?:\\d{0,3}|(?=[\\d.]{1,6}0*$)\\d{0,3}\\.\\d{0,2}0*$)'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Simplefi Card Adjustment Pct'
+        },
+        simplefi_crypto_adjustment_pct: {
+            anyOf: [
+                {
+                    type: 'number',
+                    maximum: 100,
+                    minimum: -99
+                },
+                {
+                    type: 'string',
+                    pattern: '^(?!^[-+.]*$)[+-]?0*(?:\\d{0,3}|(?=[\\d.]{1,6}0*$)\\d{0,3}\\.\\d{0,2}0*$)'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Simplefi Crypto Adjustment Pct'
+        },
+        simplefi_pay_in_full_adjustment_pct: {
+            anyOf: [
+                {
+                    type: 'number',
+                    maximum: 100,
+                    minimum: -99
+                },
+                {
+                    type: 'string',
+                    pattern: '^(?!^[-+.]*$)[+-]?0*(?:\\d{0,3}|(?=[\\d.]{1,6}0*$)\\d{0,3}\\.\\d{0,2}0*$)'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Simplefi Pay In Full Adjustment Pct'
+        },
+        simplefi_installments_adjustment_pct: {
+            anyOf: [
+                {
+                    type: 'number',
+                    maximum: 100,
+                    minimum: -99
+                },
+                {
+                    type: 'string',
+                    pattern: '^(?!^[-+.]*$)[+-]?0*(?:\\d{0,3}|(?=[\\d.]{1,6}0*$)\\d{0,3}\\.\\d{0,2}0*$)'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Simplefi Installments Adjustment Pct'
+        },
         abandoned_cart_delay_days: {
             anyOf: [
                 {
@@ -30405,6 +30891,32 @@ export const SalesFlowPortalPublicSchema = {
                     type: 'null'
                 }
             ]
+        },
+        ticket_sales_status: {
+            '$ref': '#/components/schemas/SalesFlowTicketSalesStatus',
+            default: 'open'
+        },
+        coming_soon_title: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Coming Soon Title'
+        },
+        coming_soon_message: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Coming Soon Message'
         }
     },
     type: 'object',
@@ -30633,6 +31145,32 @@ export const SalesFlowPublicSchema = {
                 }
             ],
             title: 'Status'
+        },
+        ticket_sales_status: {
+            '$ref': '#/components/schemas/SalesFlowTicketSalesStatus',
+            default: 'open'
+        },
+        coming_soon_title: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Coming Soon Title'
+        },
+        coming_soon_message: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Coming Soon Message'
         },
         restriction_rule: {
             anyOf: [
@@ -30946,6 +31484,54 @@ export const SalesFlowPublicSchema = {
             ],
             title: 'Simplefi Api Key'
         },
+        simplefi_card_adjustment_pct: {
+            anyOf: [
+                {
+                    type: 'string',
+                    pattern: '^(?!^[-+.]*$)[+-]?0*(?:\\d{0,3}|(?=[\\d.]{1,6}0*$)\\d{0,3}\\.\\d{0,2}0*$)'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Simplefi Card Adjustment Pct'
+        },
+        simplefi_crypto_adjustment_pct: {
+            anyOf: [
+                {
+                    type: 'string',
+                    pattern: '^(?!^[-+.]*$)[+-]?0*(?:\\d{0,3}|(?=[\\d.]{1,6}0*$)\\d{0,3}\\.\\d{0,2}0*$)'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Simplefi Crypto Adjustment Pct'
+        },
+        simplefi_pay_in_full_adjustment_pct: {
+            anyOf: [
+                {
+                    type: 'string',
+                    pattern: '^(?!^[-+.]*$)[+-]?0*(?:\\d{0,3}|(?=[\\d.]{1,6}0*$)\\d{0,3}\\.\\d{0,2}0*$)'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Simplefi Pay In Full Adjustment Pct'
+        },
+        simplefi_installments_adjustment_pct: {
+            anyOf: [
+                {
+                    type: 'string',
+                    pattern: '^(?!^[-+.]*$)[+-]?0*(?:\\d{0,3}|(?=[\\d.]{1,6}0*$)\\d{0,3}\\.\\d{0,2}0*$)'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Simplefi Installments Adjustment Pct'
+        },
         abandoned_cart_delay_days: {
             anyOf: [
                 {
@@ -31152,6 +31738,19 @@ NULL is the normal state and means the flow follows the gathering. It is
 also how a closed flow is reopened.`
 } as const;
 
+export const SalesFlowTicketSalesStatusSchema = {
+    type: 'string',
+    enum: ['open', 'coming_soon'],
+    title: 'SalesFlowTicketSalesStatus',
+    description: `Whether this way in is selling yet.
+
+Separate from \`status\` on purpose. A closed flow is out of circulation:
+it takes no applications and nobody reaches it. A flow whose sales are
+\`coming_soon\` keeps taking applications and accepting people, who then
+see the flow's coming-soon message instead of a checkout until the
+organiser opens sales. Every purchase path refuses while it is not open.`
+} as const;
+
 export const SalesFlowTypeSchema = {
     type: 'string',
     enum: ['application', 'direct', 'upsale'],
@@ -31170,6 +31769,40 @@ export const SalesFlowUpdateSchema = {
                     type: 'null'
                 }
             ]
+        },
+        ticket_sales_status: {
+            anyOf: [
+                {
+                    '$ref': '#/components/schemas/SalesFlowTicketSalesStatus'
+                },
+                {
+                    type: 'null'
+                }
+            ]
+        },
+        coming_soon_title: {
+            anyOf: [
+                {
+                    type: 'string',
+                    maxLength: 200
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Coming Soon Title'
+        },
+        coming_soon_message: {
+            anyOf: [
+                {
+                    type: 'string',
+                    maxLength: 2000
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Coming Soon Message'
         },
         type: {
             anyOf: [
@@ -31551,6 +32184,74 @@ export const SalesFlowUpdateSchema = {
                 }
             ],
             title: 'Simplefi Api Key'
+        },
+        simplefi_card_adjustment_pct: {
+            anyOf: [
+                {
+                    type: 'number',
+                    maximum: 100,
+                    minimum: -99
+                },
+                {
+                    type: 'string',
+                    pattern: '^(?!^[-+.]*$)[+-]?0*(?:\\d{0,3}|(?=[\\d.]{1,6}0*$)\\d{0,3}\\.\\d{0,2}0*$)'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Simplefi Card Adjustment Pct'
+        },
+        simplefi_crypto_adjustment_pct: {
+            anyOf: [
+                {
+                    type: 'number',
+                    maximum: 100,
+                    minimum: -99
+                },
+                {
+                    type: 'string',
+                    pattern: '^(?!^[-+.]*$)[+-]?0*(?:\\d{0,3}|(?=[\\d.]{1,6}0*$)\\d{0,3}\\.\\d{0,2}0*$)'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Simplefi Crypto Adjustment Pct'
+        },
+        simplefi_pay_in_full_adjustment_pct: {
+            anyOf: [
+                {
+                    type: 'number',
+                    maximum: 100,
+                    minimum: -99
+                },
+                {
+                    type: 'string',
+                    pattern: '^(?!^[-+.]*$)[+-]?0*(?:\\d{0,3}|(?=[\\d.]{1,6}0*$)\\d{0,3}\\.\\d{0,2}0*$)'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Simplefi Pay In Full Adjustment Pct'
+        },
+        simplefi_installments_adjustment_pct: {
+            anyOf: [
+                {
+                    type: 'number',
+                    maximum: 100,
+                    minimum: -99
+                },
+                {
+                    type: 'string',
+                    pattern: '^(?!^[-+.]*$)[+-]?0*(?:\\d{0,3}|(?=[\\d.]{1,6}0*$)\\d{0,3}\\.\\d{0,2}0*$)'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Simplefi Installments Adjustment Pct'
         },
         abandoned_cart_delay_days: {
             anyOf: [

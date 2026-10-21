@@ -57,6 +57,9 @@
     "buy_tickets": "购买门票"
   },
   "portal": {
+    "complete_profile_title": "完善个人资料",
+    "complete_profile_reminder": "请填写您的名字和姓氏以补充基本信息。",
+    "complete_profile_action": "完善个人资料",
     "no_active_popups": "暂无活动",
     "no_active_popups_description": "目前没有可用的活动。请稍后再来查看。",
     "no_profile": "没有可用的个人资料数据。",
@@ -86,6 +89,10 @@
     "back_to_passes": "返回门票",
     "estimated_total": "预估总额",
     "definitive_total": "总额"
+  },
+  "ticketSales": {
+    "coming_soon_title": "门票即将开售",
+    "coming_soon_description": "本活动的门票尚未开售，请稍后再来查看。"
   },
   "orders": {
     "show_unit_qr_label": "查看{{product}}第{{number}}件的二维码",
@@ -201,6 +208,7 @@
     "save_draft": "保存草稿",
     "gender_male": "男",
     "gender_female": "女",
+    "gender_non_binary": "非二元性别",
     "gender_specify_own": "自行填写性别",
     "gender_prefer_not": "不愿透露"
   },
@@ -270,6 +278,7 @@
     "sold_out": "已售罄",
     "sale_upcoming": "即将开售",
     "sale_ended": "已结束",
+    "product_info_note_label": "关于 {{name}} 的更多信息",
     "buyer_hero_title": "就差一步！",
     "buyer_hero_subtitle": "我们需要几条信息来保留您的位置。",
     "buyer_hero_trust": "您的隐私很重要。我们不会与第三方共享您的数据。",
@@ -354,7 +363,8 @@
       "confirm_edit": "确认编辑",
       "pay_and_confirm_edit": "支付并确认编辑",
       "continue_to": "继续到 {{step}}",
-      "review": "审核"
+      "review": "审核",
+      "select_ticket": "选择门票以继续"
     },
     "step_short": {
       "passes": "通行证",
@@ -628,6 +638,8 @@
     "privacy_button": "共享设置",
     "privacy_title": "选择要共享的信息",
     "privacy_description": "选择其他参与者可以在名录中看到哪些信息。",
+    "directory_listed": "在此名录中显示我的资料",
+    "share_field": "分享{{field}}",
     "privacy_save": "保存设置",
     "privacy_saved": "共享设置已保存。",
     "privacy_error": "无法保存共享设置。",
@@ -693,6 +705,12 @@
     "header_subtitle": "管理您在 {{tenant}} 的体验和历史",
     "invoices": "发票",
     "edit_profile": "编辑资料",
+    "basic_information": "基本信息",
+    "basic_information_description": "完善个人资料需要填写名字和姓氏。",
+    "name_required_hint": "请填写名字和姓氏后保存个人资料。",
+    "additional_details": "补充信息",
+    "select_option": "请选择",
+    "not_specified": "未填写",
     "age": "年龄",
     "residence": "居住地",
     "hide_linked_emails": "隐藏关联邮箱",
@@ -857,7 +875,17 @@
     "update_member": "更新成员",
     "send_invitation": "发送邀请",
     "updating": "更新中...",
-    "sending": "发送中..."
+    "sending": "发送中...",
+    "organization": "组织",
+    "role": "角色",
+    "pass_holder": "持有通行证",
+    "edit": "编辑",
+    "remove": "移除",
+    "remove_member": "移除成员",
+    "member_has_active_ticket": "该成员已有有效门票。",
+    "toggle_member_details": "展开或收起 {{name}} 的详情",
+    "expand": "展开",
+    "collapse": "收起"
   },
   "referrals": {
     "title": "Referrals",
@@ -1204,6 +1232,15 @@
       "duration_label": "时长",
       "minutes": "分钟",
       "hours": "小时",
+      "duration_presets_label": "常用时长",
+      "duration_preset_minutes": "{{minutes}} 分钟",
+      "duration_preset_hours": "{{hours}} 小时",
+      "duration_preset_hours_minutes": "{{hours}} 小时 {{minutes}} 分钟",
+      "duration_ends_at": "结束时间 {{time}}",
+      "duration_ends_at_on_date": "结束时间 {{date}} {{time}}",
+      "duration_error_required": "请输入时长。",
+      "duration_error_invalid": "请输入有效的小时数和分钟数。",
+      "duration_error_not_positive": "时长必须大于 0。",
       "no_venue_open_hours": "场地当天无营业时间(请检查周计划或例外)。",
       "start_time_outside_venue_hours": "开始时间不在场地营业时间内。",
       "start_time_conflict": "该时间已有其他活动。",

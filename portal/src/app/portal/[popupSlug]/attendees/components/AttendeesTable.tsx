@@ -11,7 +11,7 @@ import type { AttendeeDirectory } from "@/types/Attendee"
 import GiveableBadgesBanner from "./GiveableBadgesBanner"
 import PaginationControls from "./Pagination"
 import AttendeeCell from "./Table/Cells/AttendeeCell"
-import CommonCell from "./Table/Cells/CommonCell"
+import CellControl from "./Table/Cells/CellControl"
 import Header from "./Table/Header"
 import "./Table/Cells/styles.css"
 
@@ -49,6 +49,14 @@ const AttendeesTable = ({
     !!profile?.email &&
     attendee.email?.toLowerCase() === profile.email.toLowerCase()
   const [recipient, setRecipient] = useState<AttendeeDirectory | null>(null)
+  const fields = attendees[0]?.fields?.filter(
+    (field) => field.id !== "first_name" && field.id !== "last_name",
+  ) ?? [
+    { id: "email", label: "Email", value: null },
+    { id: "telegram", label: "Telegram", value: null },
+    { id: "role", label: "Role", value: null },
+    { id: "organization", label: "Organization", value: null },
+  ]
 
   if (attendees.length === 0 && !loading) {
     return (
@@ -64,7 +72,7 @@ const AttendeesTable = ({
     <div className="flex flex-col w-full mt-4">
       <GiveableBadgesBanner issuable={issuable} />
       <Table>
-        <Header showBadges={canGive} />
+        <Header fields={fields} showBadges={canGive} />
         <TableBody>
           {loading ? (
             <TableRow>
@@ -81,22 +89,24 @@ const AttendeesTable = ({
                 className="group border-b border-border hover:bg-muted bg-card sticky z-10 left-0"
               >
                 <AttendeeCell attendee={attendee} />
-                <CommonCell value={attendee.email ?? ""} />
-                <CommonCell value={attendee.telegram ?? ""} />
-                <CommonCell
-                  value={
-                    attendee.role && attendee.role?.length > 60
-                      ? `${attendee.role.slice(0, 60)}...`
-                      : (attendee.role ?? "")
-                  }
-                />
-                <CommonCell
-                  value={
-                    attendee.organization && attendee.organization?.length > 80
-                      ? `${attendee.organization.slice(0, 80)}...`
-                      : (attendee.organization ?? "")
-                  }
-                />
+                {fields.map((field) => {
+                  const value =
+                    attendee.fields?.find((item) => item.id === field.id)
+                      ?.value ?? ""
+                  const maxLength = field.id === "organization" ? 80 : 60
+                  return (
+                    <TableCell
+                      key={field.id}
+                      className="px-4 py-2 text-sm text-foreground border-b border-border"
+                    >
+                      <CellControl value={value}>
+                        {value.length > maxLength
+                          ? `${value.slice(0, maxLength)}...`
+                          : value}
+                      </CellControl>
+                    </TableCell>
+                  )
+                })}
                 {canGive && (
                   // Pinned to the right edge so it stays reachable while the
                   // other columns scroll sideways.

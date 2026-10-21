@@ -35,6 +35,11 @@ ALLOWED_KEYS = {
     "contribution_percentage",
     "contribution_label",
     "contribution_description",
+    # Whether the door sells yet; the checkout shows the coming-soon copy
+    # instead of products while it does not.
+    "ticket_sales_status",
+    "coming_soon_title",
+    "coming_soon_message",
 }
 
 

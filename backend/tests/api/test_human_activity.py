@@ -315,6 +315,118 @@ class TestHumanActivityComments:
         assert not any(i["kind"] == "comment.added" for i in results_after)
 
 
+def _make_application(db: Session, tenant: Tenants, popup: Popups, human: Humans):
+    application = Applications(
+        sales_flow_id=application_flow_id(db, popup.id),
+        id=uuid.uuid4(),
+        tenant_id=tenant.id,
+        popup_id=popup.id,
+        human_id=human.id,
+        status="in review",
+        submitted_at=datetime(2023, 1, 1, tzinfo=UTC),
+        created_at=datetime(2023, 1, 1, tzinfo=UTC),
+    )
+    db.add(application)
+    db.commit()
+    db.refresh(application)
+    return application
+
+
+class TestHumanActivityApplicationComments:
+    def test_application_comment_appears_with_context_and_soft_delete_hides(
+        self,
+        client: TestClient,
+        db: Session,
+        tenant_a: Tenants,
+        popup_tenant_a: Popups,
+        admin_token_tenant_a: str,
+    ) -> None:
+        human = _make_human(db, tenant_a)
+        application = _make_application(db, tenant_a, popup_tenant_a, human)
+
+        created = client.post(
+            f"/api/v1/applications/{application.id}/comments",
+            headers=_auth(admin_token_tenant_a),
+            json={"body": "Rejected: incomplete project description"},
+        )
+        assert created.status_code == 201
+        comment_id = created.json()["id"]
+
+        body = client.get(
+            f"/api/v1/humans/{human.id}/activity", headers=_auth(admin_token_tenant_a)
+        ).json()
+        results = body["results"]
+        # Submitted (2023) + the comment (now), newest first.
+        assert [i["kind"] for i in results] == [
+            "application.comment_added",
+            "application.submitted",
+        ]
+        assert body["paging"]["total"] == 2
+
+        item = results[0]
+        assert item["id"] == f"application-comment:{comment_id}"
+        assert item["note"] == "Rejected: incomplete project description"
+        assert item["application_id"] == str(application.id)
+        assert item["popup_id"] == str(popup_tenant_a.id)
+        assert item["popup_label"] == popup_tenant_a.name
+        assert item["actor_name"] or item["actor_email"]
+        # Application-derived items carry the application for linking too.
+        assert results[1]["application_id"] == str(application.id)
+
+        # A human comment stays its own kind, distinct from application ones.
+        client.post(
+            f"/api/v1/humans/{human.id}/comments",
+            headers=_auth(admin_token_tenant_a),
+            json={"body": "Human-level note"},
+        )
+        kinds = [
+            i["kind"]
+            for i in client.get(
+                f"/api/v1/humans/{human.id}/activity",
+                headers=_auth(admin_token_tenant_a),
+            ).json()["results"]
+        ]
+        assert kinds.count("comment.added") == 1
+        assert kinds.count("application.comment_added") == 1
+
+        # Soft-deleting the application comment drops it from the timeline.
+        deleted = client.delete(
+            f"/api/v1/applications/{application.id}/comments/{comment_id}",
+            headers=_auth(admin_token_tenant_a),
+        )
+        assert deleted.status_code == 204
+
+        results_after = client.get(
+            f"/api/v1/humans/{human.id}/activity", headers=_auth(admin_token_tenant_a)
+        ).json()["results"]
+        assert not any(i["kind"] == "application.comment_added" for i in results_after)
+
+    def test_comments_on_other_humans_applications_are_excluded(
+        self,
+        client: TestClient,
+        db: Session,
+        tenant_a: Tenants,
+        popup_tenant_a: Popups,
+        admin_token_tenant_a: str,
+    ) -> None:
+        human = _make_human(db, tenant_a)
+        other = _make_human(db, tenant_a)
+        _make_application(db, tenant_a, popup_tenant_a, human)
+        other_application = _make_application(db, tenant_a, popup_tenant_a, other)
+
+        created = client.post(
+            f"/api/v1/applications/{other_application.id}/comments",
+            headers=_auth(admin_token_tenant_a),
+            json={"body": "About someone else"},
+        )
+        assert created.status_code == 201
+
+        results = client.get(
+            f"/api/v1/humans/{human.id}/activity", headers=_auth(admin_token_tenant_a)
+        ).json()["results"]
+        assert not any(i["kind"] == "application.comment_added" for i in results)
+
+
 class TestHumanActivityIsolationAndPermissions:
     def test_other_tenant_human_not_returned(
         self,

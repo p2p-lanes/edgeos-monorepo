@@ -2,16 +2,18 @@ import uuid
 from datetime import datetime
 from decimal import Decimal
 from enum import StrEnum
-from typing import Any, Literal, TypedDict
+from typing import Annotated, Any, Literal, TypedDict
 
 from pydantic import (
+    AfterValidator,
     BaseModel,
     ConfigDict,
     TypeAdapter,
     field_validator,
     model_validator,
 )
-from sqlalchemy import Boolean, Column, Integer, Numeric
+from pydantic import Field as PydanticField
+from sqlalchemy import Boolean, Column, Integer, Numeric, Text
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlmodel import Field, SQLModel, String
 
@@ -66,6 +68,41 @@ class SalesFlowStatus(StrEnum):
     """
 
     closed = "closed"
+
+
+class SalesFlowTicketSalesStatus(StrEnum):
+    """Whether this way in is selling yet.
+
+    Separate from `status` on purpose. A closed flow is out of circulation:
+    it takes no applications and nobody reaches it. A flow whose sales are
+    `coming_soon` keeps taking applications and accepting people, who then
+    see the flow's coming-soon message instead of a checkout until the
+    organiser opens sales. Every purchase path refuses while it is not open.
+    """
+
+    open = "open"
+    coming_soon = "coming_soon"
+
+
+# What the coming-soon screen may hold: a heading and a short paragraph.
+COMING_SOON_TITLE_MAX_LENGTH = 200
+COMING_SOON_MESSAGE_MAX_LENGTH = 2000
+
+
+def _blank_to_none(value: str | None) -> str | None:
+    return (value or "").strip() or None
+
+
+ComingSoonTitle = Annotated[
+    str | None,
+    PydanticField(max_length=COMING_SOON_TITLE_MAX_LENGTH),
+    AfterValidator(_blank_to_none),
+]
+ComingSoonMessage = Annotated[
+    str | None,
+    PydanticField(max_length=COMING_SOON_MESSAGE_MAX_LENGTH),
+    AfterValidator(_blank_to_none),
+]
 
 
 class SalesFlowIdentityMode(StrEnum):
@@ -150,6 +187,21 @@ class SalesFlowBase(SQLModel):
     # other way to stop it selling. ---
     status: str | None = Field(default=None, nullable=True)
 
+    # --- Class C: flow-only. Whether this way in sells yet; see
+    # `SalesFlowTicketSalesStatus`. Existing and new flows are open. The two
+    # texts are what an accepted buyer reads while it is `coming_soon`; NULL
+    # means the portal's own translated default. ---
+    ticket_sales_status: SalesFlowTicketSalesStatus = Field(
+        default=SalesFlowTicketSalesStatus.open,
+        sa_column=Column(String, nullable=False, server_default="open"),
+    )
+    coming_soon_title: str | None = Field(
+        default=None, sa_column=Column(String, nullable=True)
+    )
+    coming_soon_message: str | None = Field(
+        default=None, sa_column=Column(Text, nullable=True)
+    )
+
     # --- Class C: flow-only. NULL = restrictions feature off (design D5/D6,
     # G3 checkpoint 12.8 CONFIRMED 2026-08-04). Closed AND/OR predicate tree
     # over {form_answer, human_profile_field, has_product} — see
@@ -216,6 +268,38 @@ class SalesFlowBase(SQLModel):
     # NULL inherits the popup's SimpleFi account; a value routes this flow's
     # new payments and payment operations through its own account.
     simplefi_api_key: str | None = Field(default=None, nullable=True)
+    simplefi_card_adjustment_pct: Decimal | None = Field(
+        default=None,
+        ge=-99,
+        le=100,
+        max_digits=5,
+        decimal_places=2,
+        sa_column=Column(Numeric(5, 2), nullable=True),
+    )
+    simplefi_crypto_adjustment_pct: Decimal | None = Field(
+        default=None,
+        ge=-99,
+        le=100,
+        max_digits=5,
+        decimal_places=2,
+        sa_column=Column(Numeric(5, 2), nullable=True),
+    )
+    simplefi_pay_in_full_adjustment_pct: Decimal | None = Field(
+        default=None,
+        ge=-99,
+        le=100,
+        max_digits=5,
+        decimal_places=2,
+        sa_column=Column(Numeric(5, 2), nullable=True),
+    )
+    simplefi_installments_adjustment_pct: Decimal | None = Field(
+        default=None,
+        ge=-99,
+        le=100,
+        max_digits=5,
+        decimal_places=2,
+        sa_column=Column(Numeric(5, 2), nullable=True),
+    )
     abandoned_cart_delay_days: int | None = Field(default=None, nullable=True)
     abandoned_cart_repeat_days: int | None = Field(default=None, nullable=True)
     abandoned_cart_max_count: int | None = Field(default=None, nullable=True)
@@ -269,6 +353,18 @@ class SalesFlowCreate(BaseModel):
     open_checkout_cancel_url: str | None = None
     open_checkout_signing_secret: str | None = None
     simplefi_api_key: str | None = None
+    simplefi_card_adjustment_pct: Decimal | None = Field(
+        default=None, ge=-99, le=100, max_digits=5, decimal_places=2
+    )
+    simplefi_crypto_adjustment_pct: Decimal | None = Field(
+        default=None, ge=-99, le=100, max_digits=5, decimal_places=2
+    )
+    simplefi_pay_in_full_adjustment_pct: Decimal | None = Field(
+        default=None, ge=-99, le=100, max_digits=5, decimal_places=2
+    )
+    simplefi_installments_adjustment_pct: Decimal | None = Field(
+        default=None, ge=-99, le=100, max_digits=5, decimal_places=2
+    )
     abandoned_cart_delay_days: int | None = None
     abandoned_cart_repeat_days: int | None = None
     abandoned_cart_max_count: int | None = None
@@ -317,6 +413,11 @@ class SalesFlowUpdate(BaseModel):
     # circulation. `SalesFlowStatus` has one member on purpose — see its
     # docstring for why "active" must never be settable here.
     status: SalesFlowStatus | None = None
+    # Omitted leaves it alone; it can be switched but never cleared.
+    ticket_sales_status: SalesFlowTicketSalesStatus | None = None
+    # `null` or blank goes back to the portal's translated default.
+    coming_soon_title: ComingSoonTitle = None
+    coming_soon_message: ComingSoonMessage = None
     type: SalesFlowType | None = None
     slug: str | None = None
     name: str | None = None
@@ -351,6 +452,18 @@ class SalesFlowUpdate(BaseModel):
     open_checkout_cancel_url: str | None = None
     open_checkout_signing_secret: str | None = None
     simplefi_api_key: str | None = None
+    simplefi_card_adjustment_pct: Decimal | None = Field(
+        default=None, ge=-99, le=100, max_digits=5, decimal_places=2
+    )
+    simplefi_crypto_adjustment_pct: Decimal | None = Field(
+        default=None, ge=-99, le=100, max_digits=5, decimal_places=2
+    )
+    simplefi_pay_in_full_adjustment_pct: Decimal | None = Field(
+        default=None, ge=-99, le=100, max_digits=5, decimal_places=2
+    )
+    simplefi_installments_adjustment_pct: Decimal | None = Field(
+        default=None, ge=-99, le=100, max_digits=5, decimal_places=2
+    )
     abandoned_cart_delay_days: int | None = None
     abandoned_cart_repeat_days: int | None = None
     abandoned_cart_max_count: int | None = None
@@ -377,6 +490,15 @@ class SalesFlowUpdate(BaseModel):
             return v
         parse_restriction_rule(v)  # raises ValueError -> 422 on any bad shape
         return v
+
+    @model_validator(mode="after")
+    def reject_cleared_ticket_sales_status(self) -> "SalesFlowUpdate":
+        if (
+            "ticket_sales_status" in self.model_fields_set
+            and self.ticket_sales_status is None
+        ):
+            raise ValueError("ticket_sales_status cannot be null")
+        return self
 
 
 class SalesFlowPublic(SalesFlowBase):
@@ -482,6 +604,11 @@ class SalesFlowPortalPublic(BaseModel):
     # Presentation data is projected through a nested allowlist so arbitrary
     # persisted JSON and internal flow configuration never reach a buyer.
     theme_config: SalesFlowPortalThemeConfig | None = None
+    # Whether this way in sells yet, and what an accepted buyer reads while
+    # it does not. Written by the organiser for buyers, so safe to publish.
+    ticket_sales_status: SalesFlowTicketSalesStatus = SalesFlowTicketSalesStatus.open
+    coming_soon_title: str | None = None
+    coming_soon_message: str | None = None
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -516,6 +643,11 @@ class SalesFlowCheckoutConfig(BaseModel):
     contribution_percentage: Decimal | None = None
     contribution_label: str | None = None
     contribution_description: str | None = None
+    # While `coming_soon` the checkout shows the message instead of products,
+    # and every purchase path refuses.
+    ticket_sales_status: SalesFlowTicketSalesStatus = SalesFlowTicketSalesStatus.open
+    coming_soon_title: str | None = None
+    coming_soon_message: str | None = None
 
 
 class SalesFlowReadiness(BaseModel):
@@ -536,11 +668,21 @@ class SalesFlowReadiness(BaseModel):
     warnings: list[str]
 
 
-# Class B (inheritable override) column names — must exactly match both
-# SalesFlowBase and PopupBase field names (same names by construction, see
-# design D1/D2). Single source of truth for `build_effective_config`
-# (sales_flow/resolver.py) and its NULL-matrix unit tests.
+# Flow-owned configuration, shared by copying, the settings editor and
+# build_effective_config. Some fields originated on popups; SimpleFI pricing
+# inherits from the popup when a flow value is null.
+SIMPLEFI_PRICING_FIELDS: tuple[str, ...] = (
+    "simplefi_card_adjustment_pct",
+    "simplefi_crypto_adjustment_pct",
+    "simplefi_pay_in_full_adjustment_pct",
+    "simplefi_installments_adjustment_pct",
+)
+
 EFFECTIVE_CONFIG_FIELDS: tuple[str, ...] = (
+    "simplefi_card_adjustment_pct",
+    "simplefi_crypto_adjustment_pct",
+    "simplefi_pay_in_full_adjustment_pct",
+    "simplefi_installments_adjustment_pct",
     "application_layout",
     "requires_application_fee",
     "application_fee_amount",
@@ -686,6 +828,18 @@ class EffectiveFlowConfig(BaseModel):
     this slice is actually chartered to deliver.
     """
 
+    simplefi_card_adjustment_pct: Decimal | None = Field(
+        default=None, ge=-99, le=100, max_digits=5, decimal_places=2
+    )
+    simplefi_crypto_adjustment_pct: Decimal | None = Field(
+        default=None, ge=-99, le=100, max_digits=5, decimal_places=2
+    )
+    simplefi_pay_in_full_adjustment_pct: Decimal | None = Field(
+        default=None, ge=-99, le=100, max_digits=5, decimal_places=2
+    )
+    simplefi_installments_adjustment_pct: Decimal | None = Field(
+        default=None, ge=-99, le=100, max_digits=5, decimal_places=2
+    )
     application_layout: ApplicationLayout | None = None
     requires_application_fee: bool | None = None
     application_fee_amount: Decimal | None = None

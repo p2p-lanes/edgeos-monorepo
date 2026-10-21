@@ -85,8 +85,19 @@ def test_backfill_marks_events_with_check_ins_and_logs_them():
             connection.execute(
                 text(
                     "ALTER TABLE popups "
+                    "ADD COLUMN simplefi_card_adjustment_pct NUMERIC(5,2), "
+                    "ADD COLUMN simplefi_crypto_adjustment_pct NUMERIC(5,2), "
+                    "ADD COLUMN simplefi_pay_in_full_adjustment_pct NUMERIC(5,2), "
+                    "ADD COLUMN simplefi_installments_adjustment_pct NUMERIC(5,2), "
                     "ADD COLUMN badges_enabled BOOLEAN NOT NULL DEFAULT false, "
-                    "ADD COLUMN sidebar_config JSONB"
+                    "ADD COLUMN sidebar_config JSONB, "
+                    "ADD COLUMN directory_fields JSONB NOT NULL DEFAULT '[]'"
+                )
+            )
+            connection.execute(
+                text(
+                    "ALTER TABLE attendee_categories "
+                    "ADD COLUMN directory_eligible BOOLEAN NOT NULL DEFAULT false"
                 )
             )
 

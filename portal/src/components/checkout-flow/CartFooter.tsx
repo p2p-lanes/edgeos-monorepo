@@ -101,6 +101,10 @@ export default function CartFooter({
     isConfirmStep && !!popup?.terms_and_conditions_url && !termsAccepted
   const hasItems =
     summary.itemCount > 0 || hasAnyCartItems || (isEditing && hasEditChanges)
+  // Paying for an empty cart has nothing to validate or submit, so the CTA is
+  // disabled and says what is missing rather than offering "Claim Pass" (what
+  // a $0 total resolves to). Edits keep their own labels and click-through.
+  const isEmptyCartPay = isConfirmStep && !isEditing && !hasItems
 
   // Focus the first invalid field within a given step's section after
   // React re-renders the inline errors (so the right input has
@@ -204,12 +208,12 @@ export default function CartFooter({
   }
 
   // New gating model — "enabled by default; click runs validation".
-  // The button renders disabled in only two states where it truly has
-  // no work to do: a submit in flight, or the terms-acceptance gate on
-  // the confirm step. Everywhere else the click triggers validation and
-  // either jumps to the failing step + raises the toast on failure, or
-  // advances / pays on success.
-  const isHardDisabled = isSubmitting || requiresTerms
+  // The button renders disabled in only three states where it truly has
+  // no work to do: a submit in flight, the terms-acceptance gate on the
+  // confirm step, or paying for an empty cart. Everywhere else the click
+  // triggers validation and either jumps to the failing step + raises the
+  // toast on failure, or advances / pays on success.
+  const isHardDisabled = isSubmitting || requiresTerms || isEmptyCartPay
 
   // CTA label resolution. Named "Continuar a <Step>" is the desktop
   // default; on narrow viewports or long labels we fall back to the
@@ -227,9 +231,11 @@ export default function CartFooter({
           : nextSectionLabel
         : t("common.continue")
     : isConfirmStep
-      ? summary.grandTotal === 0
-        ? t("checkout.actions.claim_pass")
-        : t("checkout.actions.pay")
+      ? isEmptyCartPay
+        ? t("checkout.actions.select_ticket")
+        : summary.grandTotal === 0
+          ? t("checkout.actions.claim_pass")
+          : t("checkout.actions.pay")
       : nextSectionLabel
         ? longNextLabel
           ? t("common.continue")

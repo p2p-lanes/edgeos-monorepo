@@ -26,6 +26,8 @@ from app.api.human.schemas import (
     HumanCommentPublic,
     HumanCommentUpdate,
     HumanCreate,
+    HumanDirectorySettingsPublic,
+    HumanDirectorySettingsUpdate,
     HumanEnrichmentFactCreate,
     HumanEnrichmentFactPublic,
     HumanPortalPublic,
@@ -173,6 +175,20 @@ async def get_current_human_info(
 
 
 @router.get(
+    "/me/popups/{popup_id}/has-active-ticket",
+    response_model=bool,
+    summary="Check whether you have an active ticket for a popup",
+    dependencies=[needs("portal:profile:read")],
+)
+async def has_current_human_active_ticket(
+    popup_id: uuid.UUID,
+    current_human: CurrentHuman,
+    db: HumanTenantSession,
+) -> bool:
+    return crud.has_active_ticket(db, current_human.id, popup_id)
+
+
+@router.get(
     "/me/profile-stats",
     response_model=HumanProfileStats,
     summary="Get your profile stats",
@@ -208,6 +224,75 @@ async def update_current_human(
 
     updated = crud.update(db, human, human_in)
     return HumanSelfPublic.model_validate(updated)
+
+
+@router.get(
+    "/me/directory/{popup_id}",
+    response_model=HumanDirectorySettingsPublic,
+    summary="Get your directory privacy settings for a popup",
+    dependencies=[needs("portal:profile:read")],
+)
+async def get_my_directory_settings(
+    popup_id: uuid.UUID,
+    current_human: CurrentHuman,
+    db: HumanTenantSession,
+) -> HumanDirectorySettingsPublic:
+    human = crud.get(db, current_human.id)
+    if not human:
+        raise HTTPException(status_code=404, detail="Human not found")
+    try:
+        settings = crud.get_directory_settings(db, human, popup_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    from app.api.application.directory import directory_fields_for_popup
+    from app.api.popup.models import Popups
+
+    popup = db.get(Popups, popup_id)
+    return HumanDirectorySettingsPublic(
+        popup_id=popup_id,
+        listed=settings.listed,
+        shared_fields=settings.shared_fields,
+        available_fields=[
+            field
+            for field in (directory_fields_for_popup(popup) if popup else [])
+            if isinstance(field, dict) and field.get("shareable", True)
+        ],
+    )
+
+
+@router.put(
+    "/me/directory/{popup_id}",
+    response_model=HumanDirectorySettingsPublic,
+    summary="Update your directory privacy settings for a popup",
+    dependencies=[needs("portal:profile:write")],
+)
+async def update_my_directory_settings(
+    popup_id: uuid.UUID,
+    data: HumanDirectorySettingsUpdate,
+    current_human: CurrentHuman,
+    db: HumanTenantSession,
+) -> HumanDirectorySettingsPublic:
+    human = crud.get(db, current_human.id)
+    if not human:
+        raise HTTPException(status_code=404, detail="Human not found")
+    try:
+        settings = crud.update_directory_settings(db, human, popup_id, data)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    from app.api.application.directory import directory_fields_for_popup
+    from app.api.popup.models import Popups
+
+    popup = db.get(Popups, popup_id)
+    return HumanDirectorySettingsPublic(
+        popup_id=popup_id,
+        listed=settings.listed,
+        shared_fields=settings.shared_fields,
+        available_fields=[
+            field
+            for field in (directory_fields_for_popup(popup) if popup else [])
+            if isinstance(field, dict) and field.get("shareable", True)
+        ],
+    )
 
 
 def _ensure_public_profile_token(db, human) -> str:
@@ -344,9 +429,9 @@ async def search_humans_portal(
 
     Used by the event-creation Displayed-host field to let a creator pick a
     host. Scoped to humans who actually attend ``popup_id`` (accepted
-    application with a ticket-holding main/spouse attendee) AND who have not
-    hidden their name via ``info_not_shared`` for that popup. RLS scopes to the
-    caller's tenant; the slim response schema omits email.
+    application with a ticket-holding main/spouse attendee) AND who share both
+    name fields in their popup directory settings. RLS scopes to the caller's
+    tenant; the slim response schema omits email.
     """
     from app.api.application.crud import applications_crud
 
@@ -517,8 +602,9 @@ async def get_human_activity(
     """Aggregate a human's full activity timeline (admin-only).
 
     Built on read from applications, payments, attendees, manual notes, rating
-    changes and comments. Every source, comments included, is now tenant-scoped
-    by RLS on the TenantSession.
+    changes, human comments and the review comments left on the human's
+    applications. Every source, comments included, is now tenant-scoped by RLS
+    on the TenantSession.
     """
     if not crud.get(db, human_id):
         raise HTTPException(

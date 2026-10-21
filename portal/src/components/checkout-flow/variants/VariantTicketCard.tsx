@@ -4,6 +4,7 @@ import { Check, CreditCard, Plus, ShoppingBag } from "lucide-react"
 import Image from "next/image"
 import type { CSSProperties } from "react"
 import { useTranslation } from "react-i18next"
+import { ProductInfoNote } from "@/components/checkout-flow/shared/ProductInfoNote"
 import {
   TicketRecipientControls,
   useTicketRecipientContext,
@@ -230,6 +231,10 @@ function PassSystemProductRow({
             <h4 className="font-medium text-foreground text-sm line-clamp-2">
               {product.name}
             </h4>
+            <ProductInfoNote
+              note={product.info_note}
+              productName={product.name}
+            />
             <SaleStateBadge state={row.saleState} />
           </div>
           {product.description && (
@@ -422,6 +427,10 @@ function OpenCheckoutProductRow({
             <h4 className="font-medium text-foreground text-sm line-clamp-2">
               {product.name}
             </h4>
+            <ProductInfoNote
+              note={product.info_note}
+              productName={product.name}
+            />
             <SaleStateBadge state={row.saleState} />
           </div>
           {product.description && (

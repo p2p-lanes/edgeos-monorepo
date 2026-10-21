@@ -6,6 +6,7 @@ import { useEffect, useState } from "react"
 import { useTranslation } from "react-i18next"
 import { ApiError, type CheckoutRuntimeResponse } from "@/client"
 import { OpenCheckoutRuntime } from "@/components/checkout-flow/OpenCheckoutRuntime"
+import { TicketSalesComingSoon } from "@/components/checkout-flow/TicketSalesComingSoon"
 import { Button } from "@/components/ui/button"
 import { Loader } from "@/components/ui/Loader"
 import useAuth from "@/hooks/useAuth"
@@ -157,20 +158,31 @@ export default function CheckoutPageClient({
     )
   }
 
+  const checkoutConfig = runtime.checkout_config
+
   return (
     <ThemeProvider
       config={runtime.theme_config as ThemeConfig | null}
       scope="local"
     >
       <CheckoutShell popup={runtime.popup}>
-        <OpenCheckoutRuntime
-          runtime={runtime}
-          popupSlug={popupSlug}
-          flowSlug={runtime.selected_flow.slug}
-          prefilledBuyer={prefilledBuyer}
-          showQuoteStatus={showQuoteStatus}
-          returnContext={returnContext}
-        />
+        {/* Sales on this way in are held as "coming soon": the organiser's
+            message instead of products. Every purchase path refuses too. */}
+        {checkoutConfig?.ticket_sales_status === "coming_soon" ? (
+          <TicketSalesComingSoon
+            title={checkoutConfig.coming_soon_title}
+            message={checkoutConfig.coming_soon_message}
+          />
+        ) : (
+          <OpenCheckoutRuntime
+            runtime={runtime}
+            popupSlug={popupSlug}
+            flowSlug={runtime.selected_flow.slug}
+            prefilledBuyer={prefilledBuyer}
+            showQuoteStatus={showQuoteStatus}
+            returnContext={returnContext}
+          />
+        )}
       </CheckoutShell>
     </ThemeProvider>
   )

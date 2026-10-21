@@ -189,6 +189,37 @@ describe("useResources permission readiness", () => {
     ).toBe("active")
   })
 
+  it("lists Venues and Agentic access under Events but never Tracks", () => {
+    state.access = "allowed"
+    const eventChildren = () => {
+      const { result } = renderHook(() => useResources())
+      return result.current.resources
+        .find((resource) => resource.name === "sidebar.events")
+        ?.children?.map((resource) => resource.name)
+    }
+
+    // Default (applications) branch.
+    expect(eventChildren()).toEqual([
+      "sidebar.venues",
+      "sidebar.agentic_access",
+    ])
+
+    // Companion branch.
+    state.participation = { type: "companion", application_status: "accepted" }
+    expect(eventChildren()).toEqual([
+      "sidebar.venues",
+      "sidebar.agentic_access",
+    ])
+
+    // Nobody-applies branch.
+    state.participation = null
+    state.city!.takes_applications = false
+    expect(eventChildren()).toEqual([
+      "sidebar.venues",
+      "sidebar.agentic_access",
+    ])
+  })
+
   it("waits for the existing access query when the popup has ended", () => {
     state.city!.status = "ended"
     state.access = "loading"

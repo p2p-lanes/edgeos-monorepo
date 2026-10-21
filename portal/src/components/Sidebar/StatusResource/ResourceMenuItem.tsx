@@ -25,7 +25,7 @@ const ResourceMenuItem = ({
   const { status } = resource
 
   const handleClick = () => {
-    if (status === "active" && resource.path && !isActive) {
+    if (status === "active" && resource.path) {
       onNavigate(resource.path)
     }
   }

@@ -76,6 +76,9 @@ interface ProductFormProps {
   onSuccess: () => void
 }
 
+// Mirrors PRODUCT_INFO_NOTE_MAX_LENGTH in backend/app/api/product/schemas.py.
+const PRODUCT_INFO_NOTE_MAX_LENGTH = 500
+
 const PRODUCT_CATEGORIES: {
   value: ProductCategory
   label: string
@@ -199,6 +202,7 @@ export function ProductForm({ defaultValues, onSuccess }: ProductFormProps) {
       price: defaultValues?.price?.toString() ?? "",
       compare_price: defaultValues?.compare_price?.toString() ?? "",
       description: defaultValues?.description ?? "",
+      info_note: defaultValues?.info_note ?? "",
       image_url: defaultValues?.image_url ?? "",
       images: defaultValues?.images ?? [],
       category: (defaultValues?.category ?? "ticket") as ProductCategory,
@@ -254,6 +258,7 @@ export function ProductForm({ defaultValues, onSuccess }: ProductFormProps) {
           price: effectivePrice,
           compare_price: effectiveComparePrice,
           description: value.description || null,
+          info_note: value.info_note.trim() || null,
           image_url: value.image_url || null,
           images: housingImages,
           category: value.category,
@@ -280,6 +285,7 @@ export function ProductForm({ defaultValues, onSuccess }: ProductFormProps) {
           price: effectivePrice,
           compare_price: effectiveComparePrice ?? undefined,
           description: value.description || undefined,
+          info_note: value.info_note.trim() || undefined,
           image_url: value.image_url || undefined,
           images: housingImages,
           category: value.category,
@@ -452,6 +458,35 @@ export function ProductForm({ defaultValues, onSuccess }: ProductFormProps) {
                     onChange={(e) => field.handleChange(e.target.value)}
                     disabled={readOnly}
                   />
+                </div>
+              )}
+            </form.Field>
+
+            {/* Info note: revealed behind an info icon next to the product
+            name at checkout. Empty means no icon. */}
+            <form.Field name="info_note">
+              {(field) => (
+                <div className="space-y-2">
+                  <label
+                    htmlFor="info_note"
+                    className="block px-1 text-xs font-medium uppercase tracking-wider text-muted-foreground"
+                  >
+                    Info note
+                  </label>
+                  <Textarea
+                    id="info_note"
+                    placeholder="A passport will be requested for this product."
+                    rows={2}
+                    maxLength={PRODUCT_INFO_NOTE_MAX_LENGTH}
+                    value={field.state.value}
+                    onBlur={field.handleBlur}
+                    onChange={(e) => field.handleChange(e.target.value)}
+                    disabled={readOnly}
+                  />
+                  <p className="px-1 text-xs text-muted-foreground">
+                    Shown behind an info icon next to the product name at
+                    checkout. Leave empty for no icon.
+                  </p>
                 </div>
               )}
             </form.Field>
@@ -947,10 +982,11 @@ export function ProductForm({ defaultValues, onSuccess }: ProductFormProps) {
                   <TranslationManager
                     entityType="product"
                     entityId={defaultValues!.id}
-                    translatableFields={["name", "description"]}
+                    translatableFields={["name", "description", "info_note"]}
                     sourceData={{
                       name: defaultValues!.name,
                       description: defaultValues!.description,
+                      info_note: defaultValues!.info_note,
                     }}
                     supportedLanguages={popupData!.supported_languages!}
                     defaultLanguage={popupData!.default_language!}

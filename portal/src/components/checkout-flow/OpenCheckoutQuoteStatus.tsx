@@ -2,6 +2,7 @@
 
 import { useTranslation } from "react-i18next"
 import { useOpenCheckoutQuote } from "@/hooks/checkout/useOpenCheckoutQuote"
+import { formatCurrency } from "@/types/checkout"
 
 export function OpenCheckoutQuoteStatus({
   popupSlug,
@@ -15,10 +16,7 @@ export function OpenCheckoutQuoteStatus({
 
   if (!quote) return null
 
-  const amount = new Intl.NumberFormat(undefined, {
-    style: "currency",
-    currency: quote.currency,
-  }).format(Number(quote.total))
+  const amount = formatCurrency(Number(quote.total), quote.currency)
   const label =
     quote.kind === "definitive"
       ? t("shop.definitive_total")

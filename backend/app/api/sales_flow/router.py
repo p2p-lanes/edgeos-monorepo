@@ -54,6 +54,9 @@ def _portal_flow_public(db: Session, flow: SalesFlows) -> SalesFlowPortalPublic:
         type=flow.type,
         price_summary=crud.sales_flows_crud.resolve_portal_price_summary(db, flow),
         theme_config=parse_portal_theme_config(flow.theme_config),
+        ticket_sales_status=flow.ticket_sales_status,
+        coming_soon_title=flow.coming_soon_title,
+        coming_soon_message=flow.coming_soon_message,
     )
 
 

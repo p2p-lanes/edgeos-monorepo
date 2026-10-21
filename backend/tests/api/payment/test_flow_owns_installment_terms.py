@@ -163,6 +163,10 @@ class TestInstallmentTerms:
         flow = _set_terms(
             db,
             _default_flow(db, popup),
+            simplefi_card_adjustment_pct=Decimal("0"),
+            simplefi_crypto_adjustment_pct=Decimal("-2.5"),
+            simplefi_pay_in_full_adjustment_pct=Decimal("-10"),
+            simplefi_installments_adjustment_pct=Decimal("5"),
             installments_enabled=True,
             installments_max=6,
             installments_deadline=_deadline(6),
@@ -175,6 +179,8 @@ class TestInstallmentTerms:
 
         kwargs = _buy(db, application, product, attendee)
 
+        assert kwargs["pricing"] == {"card": 0, "crypto": -2.5}
+        assert kwargs["payment_mode_pricing"] == {"pay_in_full": -10, "installments": 5}
         assert kwargs["max_installments"] == 6
         assert kwargs["installment_interval"] == "month"
 
@@ -275,3 +281,70 @@ class TestInstallmentTerms:
 
         assert kwargs["installment_interval"] == "month"
         assert kwargs["installment_interval_count"] == 1
+
+
+def test_application_fee_uses_flow_pricing(db: Session, tenant_a: Tenants):
+    popup = _popup(db, tenant_a)
+    flow = _set_terms(
+        db,
+        _default_flow(db, popup),
+        requires_application_fee=True,
+        application_fee_amount=Decimal("25"),
+        simplefi_card_adjustment_pct=Decimal("-3"),
+        simplefi_crypto_adjustment_pct=Decimal("0"),
+    )
+    human = _human(db, tenant_a)
+    application, _ = _application_with_attendee(db, popup, human, flow)
+    application.status = ApplicationStatus.PENDING_FEE.value
+    db.add(application)
+    db.commit()
+    with patch("app.services.simplefi.get_simplefi_client") as mock_client:
+        create = mock_client.return_value.create_payment
+        create.return_value = SimpleNamespace(
+            id=f"pr_{uuid.uuid4().hex}",
+            status="pending",
+            checkout_url="https://sf.test/pay",
+            is_installment_plan=False,
+        )
+        payments_crud.create_fee_payment(db, application, popup)
+    assert create.call_args.kwargs["pricing"] == {"card": -3, "crypto": 0}
+
+
+def test_plan_inherits_popup_pricing_and_explicit_zero_overrides(
+    db: Session, tenant_a: Tenants
+):
+    popup = _popup(
+        db,
+        tenant_a,
+        simplefi_card_adjustment_pct=Decimal("3"),
+        simplefi_crypto_adjustment_pct=Decimal("-2"),
+        simplefi_pay_in_full_adjustment_pct=Decimal("-5"),
+        simplefi_installments_adjustment_pct=Decimal("8"),
+    )
+    flow = _set_terms(
+        db,
+        _default_flow(db, popup),
+        installments_enabled=True,
+        installments_max=3,
+        installments_deadline=_deadline(6),
+    )
+    product = _ticket(db, popup, price="100")
+    application, attendee = _application_with_attendee(
+        db, popup, _human(db, tenant_a), flow
+    )
+    kwargs = _buy(db, application, product, attendee)
+    assert kwargs["pricing"] == {"card": 3, "crypto": -2}
+    assert kwargs["payment_mode_pricing"] == {"pay_in_full": -5, "installments": 8}
+
+    _set_terms(
+        db,
+        flow,
+        simplefi_card_adjustment_pct=Decimal("0"),
+        simplefi_installments_adjustment_pct=Decimal("0"),
+    )
+    application, attendee = _application_with_attendee(
+        db, popup, _human(db, tenant_a), flow
+    )
+    kwargs = _buy(db, application, product, attendee)
+    assert kwargs["pricing"] == {"card": 0, "crypto": -2}
+    assert kwargs["payment_mode_pricing"] == {"pay_in_full": -5, "installments": 0}

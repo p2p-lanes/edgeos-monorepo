@@ -5,7 +5,8 @@ import { useEffect, useRef, useState } from "react"
 import { useTranslation } from "react-i18next"
 import { toast } from "sonner"
 import type { ApplicationPortalPublic } from "@/client"
-import { ApplicationsService } from "@/client"
+import { ApplicationsService, PaymentsService } from "@/client"
+import { trackGAApplicationFeePurchase } from "@/lib/google-analytics"
 import { queryKeys } from "@/lib/query-keys"
 
 const MAX_POLL_ATTEMPTS = 20
@@ -35,6 +36,22 @@ export function useFeePaymentConfirmation(
     enabled: isPolling,
   })
 
+  const { data: feePayments } = useQuery({
+    queryKey: [
+      ...queryKeys.payments.all,
+      "application-fee-return",
+      application.id,
+    ],
+    queryFn: async () => {
+      const result = await PaymentsService.listMyPayments({
+        applicationId: application.id,
+      })
+      return result.results
+    },
+    refetchInterval: isPolling ? 3_000 : false,
+    enabled: isReturnFromCheckout,
+  })
+
   // React to poll results — stop polling when fee is resolved
   useEffect(() => {
     if (!isPolling || !polledApps) return
@@ -46,6 +63,13 @@ export function useFeePaymentConfirmation(
       setIsPolling(false)
       setPaymentConfirmed(true)
       queryClient.invalidateQueries({ queryKey: queryKeys.applications.mine() })
+      queryClient.invalidateQueries({
+        queryKey: [
+          ...queryKeys.payments.all,
+          "application-fee-return",
+          application.id,
+        ],
+      })
       toast.success(t("application.fee.confirmation_toast"))
       return
     }
@@ -55,6 +79,19 @@ export function useFeePaymentConfirmation(
       toast.error(t("application.fee.confirmation_error"))
     }
   }, [polledApps, isPolling, application.id, queryClient, t])
+
+  useEffect(() => {
+    if (!isReturnFromCheckout || !feePayments) return
+    const approvedFee = feePayments.find(
+      (payment) =>
+        payment.application_id === application.id &&
+        payment.payment_type === "application_fee" &&
+        payment.status === "approved",
+    )
+    if (approvedFee) {
+      trackGAApplicationFeePurchase({ payment: approvedFee })
+    }
+  }, [application.id, feePayments, isReturnFromCheckout])
 
   return { isPolling, paymentConfirmed }
 }
