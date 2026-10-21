@@ -28,6 +28,8 @@ interface ConfigFieldRowProps {
   value: string
   onValueChange: (value: string) => void
   readOnly?: boolean
+  /** Effective popup default for a pricing field. */
+  inheritedValue?: string
   /** Whether a secret is already stored. Its value is never loaded. */
   isConfigured?: boolean
 }
@@ -35,10 +37,8 @@ interface ConfigFieldRowProps {
 /**
  * A plain setting on a sales flow.
  *
- * It replaces the three-state inherit/override control this used to be.
- * Since sdd/sales-flows-rediseno slice 7 a flow owns these columns, so
- * there is no second place the value could come from and nothing to
- * decide beyond the value itself.
+ * Pricing fields inherit popup defaults when blank. An explicit value,
+ * including zero, overrides that default. Other settings remain flow-owned.
  */
 export function ConfigFieldRow({
   fieldKey,
@@ -50,6 +50,7 @@ export function ConfigFieldRow({
   onValueChange,
   readOnly = false,
   isConfigured = false,
+  inheritedValue,
 }: ConfigFieldRowProps) {
   const controlId = `flow-config-${fieldKey}`
 
@@ -59,6 +60,12 @@ export function ConfigFieldRow({
         <label htmlFor={controlId} className="text-sm font-medium">
           {label}
         </label>
+        {kind === "percentage" && (
+          <p className="text-xs text-muted-foreground">
+            Popup: {inheritedValue ?? "0"}%.{" "}
+            {value === "" ? "Inherited" : "Overridden"}
+          </p>
+        )}
         {description && (
           <p className="text-xs text-muted-foreground">{description}</p>
         )}
@@ -81,12 +88,25 @@ export function ConfigFieldRow({
             step={kind === "number" ? "1" : "0.01"}
             min={kind === "percentage" ? -99 : undefined}
             max={kind === "percentage" ? 100 : undefined}
-            placeholder={kind === "percentage" ? "0" : undefined}
+            placeholder={
+              kind === "percentage"
+                ? `Inherit ${inheritedValue ?? "0"}%`
+                : undefined
+            }
             value={value}
             onChange={(e) => onValueChange(e.target.value)}
             disabled={readOnly}
-            className="w-28 text-sm"
+            className={kind === "percentage" ? "w-36 text-sm" : "w-28 text-sm"}
           />
+        )}
+        {kind === "percentage" && value !== "" && !readOnly && (
+          <button
+            type="button"
+            className="text-xs underline"
+            onClick={() => onValueChange("")}
+          >
+            Use popup value
+          </button>
         )}
         {kind === "date" && (
           <Input

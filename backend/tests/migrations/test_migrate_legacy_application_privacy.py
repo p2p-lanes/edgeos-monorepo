@@ -87,7 +87,16 @@ def test_legacy_privacy_choices_move_to_popup_directory_settings():
                         },
                     ],
                 )
-                session.add(popup)
+                popups_table = Table("popups", MetaData(), autoload_with=connection)
+                session.execute(
+                    popups_table.insert().values(
+                        **{
+                            key: value
+                            for key, value in popup.model_dump().items()
+                            if key in popups_table.c
+                        }
+                    )
+                )
                 session.flush()
                 # Seed the historical schema without querying newer ORM columns.
                 flow = SalesFlows(
@@ -98,9 +107,7 @@ def test_legacy_privacy_choices_move_to_popup_directory_settings():
                     name="Default",
                     is_default=True,
                 )
-                flows_table = Table(
-                    "sales_flows", MetaData(), autoload_with=connection
-                )
+                flows_table = Table("sales_flows", MetaData(), autoload_with=connection)
                 session.execute(
                     flows_table.insert().values(
                         **{

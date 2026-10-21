@@ -49,7 +49,7 @@ export const CONFIG_SECTIONS: {
   {
     title: "Payment Pricing",
     description:
-      "Percentages from -99 to 100. Positive adds a surcharge; negative gives a discount. Blank or 0 means no adjustment. Payment timing applies before card or crypto pricing.",
+      "Percentages from -99 to 100. Positive adds a surcharge; negative gives a discount. Blank inherits the popup value; 0 overrides it with no adjustment. Payment timing applies before card or crypto pricing.",
     fields: [
       {
         key: "simplefi_card_adjustment_pct",

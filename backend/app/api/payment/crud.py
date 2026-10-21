@@ -1505,7 +1505,7 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
                 payment.insurance_amount = amounts.insurance_amount
                 payment.amount += amounts.insurance_amount
 
-            flow_fees = build_effective_config(target_flow) if target_flow else None
+            flow_fees = build_effective_config(target_flow, popup)
             if (
                 flow_fees
                 and flow_fees.contribution_enabled

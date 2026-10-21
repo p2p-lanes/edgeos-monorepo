@@ -299,6 +299,23 @@ export function PopupForm({
       twitter_url: defaultValues?.twitter_url ?? "",
       terms_and_conditions_url: defaultValues?.terms_and_conditions_url ?? "",
       simplefi_api_key: defaultValues?.simplefi_api_key ?? "",
+      simplefi_card_adjustment_pct:
+        defaultValues?.simplefi_card_adjustment_pct == null
+          ? ""
+          : String(defaultValues.simplefi_card_adjustment_pct),
+      simplefi_crypto_adjustment_pct:
+        defaultValues?.simplefi_crypto_adjustment_pct == null
+          ? ""
+          : String(defaultValues.simplefi_crypto_adjustment_pct),
+      simplefi_pay_in_full_adjustment_pct:
+        defaultValues?.simplefi_pay_in_full_adjustment_pct == null
+          ? ""
+          : String(defaultValues.simplefi_pay_in_full_adjustment_pct),
+      simplefi_installments_adjustment_pct:
+        defaultValues?.simplefi_installments_adjustment_pct == null
+          ? ""
+          : String(defaultValues.simplefi_installments_adjustment_pct),
+
       simplefi_success_behavior: (defaultValues?.simplefi_success_behavior ??
         "manual") as SimpleFiSuccessBehavior,
       invoice_company_name: defaultValues?.invoice_company_name ?? "",
@@ -353,6 +370,23 @@ export function PopupForm({
         twitter_url: value.twitter_url || null,
         terms_and_conditions_url: value.terms_and_conditions_url || null,
         simplefi_api_key: value.simplefi_api_key || null,
+        simplefi_card_adjustment_pct:
+          value.simplefi_card_adjustment_pct === ""
+            ? null
+            : Number(value.simplefi_card_adjustment_pct),
+        simplefi_crypto_adjustment_pct:
+          value.simplefi_crypto_adjustment_pct === ""
+            ? null
+            : Number(value.simplefi_crypto_adjustment_pct),
+        simplefi_pay_in_full_adjustment_pct:
+          value.simplefi_pay_in_full_adjustment_pct === ""
+            ? null
+            : Number(value.simplefi_pay_in_full_adjustment_pct),
+        simplefi_installments_adjustment_pct:
+          value.simplefi_installments_adjustment_pct === ""
+            ? null
+            : Number(value.simplefi_installments_adjustment_pct),
+
         simplefi_success_behavior: value.simplefi_success_behavior,
         invoice_company_name: value.invoice_company_name || null,
         invoice_company_address: value.invoice_company_address || null,
@@ -854,6 +888,92 @@ export function PopupForm({
               </InlineSection>
             </div>
 
+            <Separator />
+
+            <InlineSection title="Payment Pricing">
+              <p className="text-sm text-muted-foreground">
+                Default adjustments for this popup. Blank or 0 means no
+                adjustment. Sales flows can override each value. Percentages
+                from -99 to 100; positive adds a surcharge and negative gives a
+                discount.
+              </p>
+              <form.Field name="simplefi_card_adjustment_pct">
+                {(field) => (
+                  <InlineRow label="Card adjustment (%)">
+                    <Input
+                      id="popup-config-simplefi_card_adjustment_pct"
+                      aria-label="Card adjustment (%)"
+                      type="number"
+                      min={-99}
+                      max={100}
+                      step="0.01"
+                      placeholder="0"
+                      value={field.state.value}
+                      onChange={(e) => field.handleChange(e.target.value)}
+                      disabled={readOnly}
+                      className="w-28"
+                    />
+                  </InlineRow>
+                )}
+              </form.Field>
+              <form.Field name="simplefi_crypto_adjustment_pct">
+                {(field) => (
+                  <InlineRow label="Crypto adjustment (%)">
+                    <Input
+                      id="popup-config-simplefi_crypto_adjustment_pct"
+                      aria-label="Crypto adjustment (%)"
+                      type="number"
+                      min={-99}
+                      max={100}
+                      step="0.01"
+                      placeholder="0"
+                      value={field.state.value}
+                      onChange={(e) => field.handleChange(e.target.value)}
+                      disabled={readOnly}
+                      className="w-28"
+                    />
+                  </InlineRow>
+                )}
+              </form.Field>
+              <form.Field name="simplefi_pay_in_full_adjustment_pct">
+                {(field) => (
+                  <InlineRow label="Pay in full adjustment (%)">
+                    <Input
+                      id="popup-config-simplefi_pay_in_full_adjustment_pct"
+                      aria-label="Pay in full adjustment (%)"
+                      type="number"
+                      min={-99}
+                      max={100}
+                      step="0.01"
+                      placeholder="0"
+                      value={field.state.value}
+                      onChange={(e) => field.handleChange(e.target.value)}
+                      disabled={readOnly}
+                      className="w-28"
+                    />
+                  </InlineRow>
+                )}
+              </form.Field>
+              <form.Field name="simplefi_installments_adjustment_pct">
+                {(field) => (
+                  <InlineRow label="Installments adjustment (%)">
+                    <Input
+                      id="popup-config-simplefi_installments_adjustment_pct"
+                      aria-label="Installments adjustment (%)"
+                      type="number"
+                      min={-99}
+                      max={100}
+                      step="0.01"
+                      placeholder="0"
+                      value={field.state.value}
+                      onChange={(e) => field.handleChange(e.target.value)}
+                      disabled={readOnly}
+                      className="w-28"
+                    />
+                  </InlineRow>
+                )}
+              </form.Field>
+            </InlineSection>
             <Separator />
 
             {/* Integrations */}
