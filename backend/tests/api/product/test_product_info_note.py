@@ -140,11 +140,20 @@ class TestAdminEditsTheNote:
 
 class TestThePortalReadsIt:
     def test_the_portal_listing_returns_it_translated(
-        self, client: TestClient, db: Session, tenant_a: Tenants, popup_tenant_a
+        self, client: TestClient, db: Session, tenant_a: Tenants
     ) -> None:
+        # A popup of its own: the shared fixture popup collects products from
+        # the whole session and this one can fall past the first page.
+        popup = Popups(
+            name="Info Note Popup",
+            slug=f"info-note-{uuid.uuid4().hex[:8]}",
+            tenant_id=tenant_a.id,
+        )
+        db.add(popup)
+        db.flush()
         product = Products(
             tenant_id=tenant_a.id,
-            popup_id=popup_tenant_a.id,
+            popup_id=popup.id,
             name="Passport Pass",
             slug=f"passport-{uuid.uuid4().hex[:8]}",
             price=Decimal("10.00"),
@@ -177,7 +186,7 @@ class TestThePortalReadsIt:
             if language:
                 headers["Accept-Language"] = language
             resp = client.get(
-                f"/api/v1/products/portal/products?popup_id={popup_tenant_a.id}",
+                f"/api/v1/products/portal/products?popup_id={popup.id}",
                 headers=headers,
             )
             assert resp.status_code == 200, resp.text
