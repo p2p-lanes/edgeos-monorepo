@@ -308,3 +308,43 @@ def test_application_fee_uses_flow_pricing(db: Session, tenant_a: Tenants):
         )
         payments_crud.create_fee_payment(db, application, popup)
     assert create.call_args.kwargs["pricing"] == {"card": -3, "crypto": 0}
+
+
+def test_plan_inherits_popup_pricing_and_explicit_zero_overrides(
+    db: Session, tenant_a: Tenants
+):
+    popup = _popup(
+        db,
+        tenant_a,
+        simplefi_card_adjustment_pct=Decimal("3"),
+        simplefi_crypto_adjustment_pct=Decimal("-2"),
+        simplefi_pay_in_full_adjustment_pct=Decimal("-5"),
+        simplefi_installments_adjustment_pct=Decimal("8"),
+    )
+    flow = _set_terms(
+        db,
+        _default_flow(db, popup),
+        installments_enabled=True,
+        installments_max=3,
+        installments_deadline=_deadline(6),
+    )
+    product = _ticket(db, popup, price="100")
+    application, attendee = _application_with_attendee(
+        db, popup, _human(db, tenant_a), flow
+    )
+    kwargs = _buy(db, application, product, attendee)
+    assert kwargs["pricing"] == {"card": 3, "crypto": -2}
+    assert kwargs["payment_mode_pricing"] == {"pay_in_full": -5, "installments": 8}
+
+    _set_terms(
+        db,
+        flow,
+        simplefi_card_adjustment_pct=Decimal("0"),
+        simplefi_installments_adjustment_pct=Decimal("0"),
+    )
+    application, attendee = _application_with_attendee(
+        db, popup, _human(db, tenant_a), flow
+    )
+    kwargs = _buy(db, application, product, attendee)
+    assert kwargs["pricing"] == {"card": 0, "crypto": -2}
+    assert kwargs["payment_mode_pricing"] == {"pay_in_full": -5, "installments": 0}

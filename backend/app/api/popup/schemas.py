@@ -284,6 +284,38 @@ class PopupBase(SQLModel):
     blog_url: str | None = None
     twitter_url: str | None = None
     simplefi_api_key: str | None = None
+    simplefi_card_adjustment_pct: Decimal | None = Field(
+        default=None,
+        ge=-99,
+        le=100,
+        max_digits=5,
+        decimal_places=2,
+        sa_column=Column(Numeric(5, 2), nullable=True),
+    )
+    simplefi_crypto_adjustment_pct: Decimal | None = Field(
+        default=None,
+        ge=-99,
+        le=100,
+        max_digits=5,
+        decimal_places=2,
+        sa_column=Column(Numeric(5, 2), nullable=True),
+    )
+    simplefi_pay_in_full_adjustment_pct: Decimal | None = Field(
+        default=None,
+        ge=-99,
+        le=100,
+        max_digits=5,
+        decimal_places=2,
+        sa_column=Column(Numeric(5, 2), nullable=True),
+    )
+    simplefi_installments_adjustment_pct: Decimal | None = Field(
+        default=None,
+        ge=-99,
+        le=100,
+        max_digits=5,
+        decimal_places=2,
+        sa_column=Column(Numeric(5, 2), nullable=True),
+    )
     # Forwarded to SimpleFi as redirect_urls.success_behavior on every payment
     # created for this popup. Manual (SimpleFi's default) keeps the buyer on
     # SimpleFi's checkout until they click through to the success URL.
@@ -478,6 +510,18 @@ class PopupCreate(SQLModel):
     blog_url: str | None = None
     twitter_url: str | None = None
     simplefi_api_key: str | None = None
+    simplefi_card_adjustment_pct: Decimal | None = Field(
+        default=None, ge=-99, le=100, max_digits=5, decimal_places=2
+    )
+    simplefi_crypto_adjustment_pct: Decimal | None = Field(
+        default=None, ge=-99, le=100, max_digits=5, decimal_places=2
+    )
+    simplefi_pay_in_full_adjustment_pct: Decimal | None = Field(
+        default=None, ge=-99, le=100, max_digits=5, decimal_places=2
+    )
+    simplefi_installments_adjustment_pct: Decimal | None = Field(
+        default=None, ge=-99, le=100, max_digits=5, decimal_places=2
+    )
     simplefi_success_behavior: SimpleFiSuccessBehavior = SimpleFiSuccessBehavior.manual
     terms_and_conditions_url: str | None = None
     open_checkout_success_url: str | None = None
@@ -608,6 +652,18 @@ class PopupUpdate(SQLModel):
     blog_url: str | None = None
     twitter_url: str | None = None
     simplefi_api_key: str | None = None
+    simplefi_card_adjustment_pct: Decimal | None = Field(
+        default=None, ge=-99, le=100, max_digits=5, decimal_places=2
+    )
+    simplefi_crypto_adjustment_pct: Decimal | None = Field(
+        default=None, ge=-99, le=100, max_digits=5, decimal_places=2
+    )
+    simplefi_pay_in_full_adjustment_pct: Decimal | None = Field(
+        default=None, ge=-99, le=100, max_digits=5, decimal_places=2
+    )
+    simplefi_installments_adjustment_pct: Decimal | None = Field(
+        default=None, ge=-99, le=100, max_digits=5, decimal_places=2
+    )
     simplefi_success_behavior: SimpleFiSuccessBehavior | None = None
     terms_and_conditions_url: str | None = None
     open_checkout_success_url: str | None = None

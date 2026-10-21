@@ -231,9 +231,9 @@ describe("a secret the form never loads", () => {
   })
 })
 
-it("treats blank payment pricing as zero", () => {
+it("distinguishes inherited pricing from explicit zero", () => {
   expect(say("Payment Pricing", { simplefi_card_adjustment_pct: "" })).toBe(
-    "No payment adjustments (0%)",
+    "Uses popup pricing",
   )
   expect(
     say("Payment Pricing", {
@@ -241,5 +241,5 @@ it("treats blank payment pricing as zero", () => {
       simplefi_crypto_adjustment_pct: "-2.5",
       simplefi_installments_adjustment_pct: "5",
     }),
-  ).toBe("Crypto -2.5% · Installments +5%")
+  ).toBe("Card 0% · Crypto -2.5% · Installments +5%")
 })

@@ -594,7 +594,14 @@ class SalesFlowReadiness(BaseModel):
 
 # Flow-owned configuration, shared by copying, the settings editor and
 # build_effective_config. Some fields originated on popups; SimpleFI pricing
-# exists only on flows and null means a zero adjustment.
+# inherits from the popup when a flow value is null.
+SIMPLEFI_PRICING_FIELDS: tuple[str, ...] = (
+    "simplefi_card_adjustment_pct",
+    "simplefi_crypto_adjustment_pct",
+    "simplefi_pay_in_full_adjustment_pct",
+    "simplefi_installments_adjustment_pct",
+)
+
 EFFECTIVE_CONFIG_FIELDS: tuple[str, ...] = (
     "simplefi_card_adjustment_pct",
     "simplefi_crypto_adjustment_pct",

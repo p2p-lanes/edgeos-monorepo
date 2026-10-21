@@ -69,11 +69,11 @@ const SUMMARIES: Record<string, (v: ConfigValues) => SectionSummary> = {
       ["pay_in_full", "Pay in full"],
       ["installments", "Installments"],
     ].flatMap(([key, label]) => {
-      const value = num(v[`simplefi_${key}_adjustment_pct`]) ?? 0
-      return value === 0 ? [] : [`${label} ${value > 0 ? "+" : ""}${value}%`]
+      const value = num(v[`simplefi_${key}_adjustment_pct`])
+      return value === null ? [] : [`${label} ${value > 0 ? "+" : ""}${value}%`]
     })
     return {
-      answer: parts.length ? parts.join(" · ") : "No payment adjustments (0%)",
+      answer: parts.length ? parts.join(" · ") : "Uses popup pricing",
       active: parts.length > 0,
     }
   },

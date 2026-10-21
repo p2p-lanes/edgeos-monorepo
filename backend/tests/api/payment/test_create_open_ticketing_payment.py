@@ -1070,3 +1070,42 @@ def test_create_open_ticketing_payment_rejects_invalid_coupon(
     assert (
         db.exec(select(Payments).where(Payments.popup_id == popup.id)).first() is None
     )
+
+
+@pytest.mark.parametrize(
+    "override,expected", [(None, 3), (Decimal("0"), 0), (Decimal("-4"), -4)]
+)
+def test_direct_payment_inherits_popup_pricing(
+    db: Session, tenant_a: Tenants, override, expected
+):
+    popup = _make_popup(db, tenant_a, slug_prefix="pricing-inheritance")
+    popup.simplefi_card_adjustment_pct = Decimal("3")
+    popup.simplefi_crypto_adjustment_pct = Decimal("-2")
+    db.add(popup)
+    product = _make_product(db, popup, name="GA", price="100.00")
+    flow = db.get(SalesFlows, default_flow_id(db, popup.id))
+    flow.simplefi_card_adjustment_pct = override
+    flow.simplefi_crypto_adjustment_pct = None
+    db.add(flow)
+    db.commit()
+    obj = _purchase_create(
+        email=f"{uuid.uuid4().hex}@example.com",
+        first_name="Test",
+        last_name="Inheritance",
+        products=[(product, 1)],
+        form_data={},
+    )
+    with patch("app.services.simplefi.get_simplefi_client") as client:
+        client.return_value.create_payment.return_value = SimpleNamespace(
+            id=f"sf_{uuid.uuid4().hex}",
+            status="pending",
+            checkout_url="https://simplefi.test/checkout",
+            is_installment_plan=False,
+        )
+        payments_crud.create_open_ticketing_payment(
+            db, obj=obj, popup=popup, tenant=tenant_a, flow_slug=flow.slug
+        )
+    assert client.return_value.create_payment.call_args.kwargs["pricing"] == {
+        "card": expected,
+        "crypto": -2,
+    }
