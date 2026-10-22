@@ -53,6 +53,7 @@ import {
   parseRestrictionRuleToDrafts,
 } from "@/lib/salesFlowRestrictionRule"
 import { summarizeSection } from "@/lib/salesFlowSectionSummary"
+import { normalizeSimpleFiApiKey } from "@/lib/simplefi"
 import { createErrorHandler } from "@/utils"
 
 function rawToInput(
@@ -229,7 +230,12 @@ export function SalesFlowForm({
           (field) => field.kind !== "secret" || value.config[field.key] !== "",
         ).map((field) => [
           field.key,
-          parseDraftValue(field.kind, value.config[field.key]),
+          parseDraftValue(
+            field.kind,
+            field.key === "simplefi_api_key"
+              ? normalizeSimpleFiApiKey(value.config[field.key])
+              : value.config[field.key],
+          ),
         ]),
       )
       const basePayload = {
