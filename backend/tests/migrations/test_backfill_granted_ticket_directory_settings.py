@@ -181,4 +181,19 @@ def test_backfill_only_eligible_tickets_without_existing_settings():
                 assert total == 1
                 assert [human.id for human in humans] == [people["Granted"].id]
 
+                # Reapplying the backfill must respect a later opt-out.
+                settings[people["Granted"].id].listed = False
+                session.add(settings[people["Granted"].id])
+                session.commit()
+                command.downgrade(config, PREVIOUS_REVISION)
+                command.upgrade(config, REVISION)
+                session.expire_all()
+                restored = session.exec(
+                    select(HumanDirectorySettings).where(
+                        HumanDirectorySettings.human_id == people["Granted"].id,
+                        HumanDirectorySettings.popup_id == popup.id,
+                    )
+                ).one()
+                assert restored.listed is False
+
         engine.dispose()
