@@ -81,43 +81,51 @@ def handle_rls_violation(_: Request, exc: ProgrammingError) -> JSONResponse:
 
 
 @application.exception_handler(IntegrityError)
-def handle_integrity_error(_: Request, exc: IntegrityError) -> JSONResponse:
+def handle_integrity_error(request: Request, exc: IntegrityError) -> JSONResponse:
     error_msg = str(exc.orig) if exc.orig else str(exc)
+    sqlstate = getattr(exc.orig, "sqlstate", None)
+    diagnostics = getattr(exc.orig, "diag", None)
     if (
-        "row-level security" in error_msg.lower()
+        sqlstate == "42501"
+        or "row-level security" in error_msg.lower()
         or "insufficient_privilege" in error_msg.lower()
     ):
-        logger.warning(f"RLS policy violation: {error_msg}")
-        return JSONResponse(
-            status_code=status.HTTP_403_FORBIDDEN,
-            content={"detail": "Access denied by security policy"},
-        )
-    pgcode = getattr(exc.orig, "pgcode", None)
-    # Unique constraint violation (23505)
-    if pgcode == "23505":
-        logger.warning(f"Unique constraint violation: {error_msg}")
-        return JSONResponse(
-            status_code=status.HTTP_409_CONFLICT,
-            content={"detail": "A record with this data already exists"},
-        )
-    # Foreign key violation (23503) — referenced record doesn't exist
-    if pgcode == "23503":
-        logger.warning(f"Foreign key violation: {error_msg}")
-        return JSONResponse(
-            status_code=status.HTTP_404_NOT_FOUND,
-            content={"detail": "Referenced record not found"},
-        )
-    # Check constraint violation (23514) — invalid field value
-    if pgcode == "23514":
-        logger.warning(f"Check constraint violation: {error_msg}")
-        return JSONResponse(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            content={"detail": "Invalid field value"},
-        )
-    logger.error(f"Integrity error: {error_msg}")
+        response_status = status.HTTP_403_FORBIDDEN
+        detail = "Access denied by security policy"
+        category = "security_policy"
+    elif sqlstate == "23505":
+        response_status = status.HTTP_409_CONFLICT
+        detail = "A record with this data already exists"
+        category = "unique_constraint"
+    elif sqlstate == "23503":
+        response_status = status.HTTP_404_NOT_FOUND
+        detail = "Referenced record not found"
+        category = "foreign_key"
+    elif sqlstate == "23514":
+        response_status = status.HTTP_422_UNPROCESSABLE_ENTITY
+        detail = "Invalid field value"
+        category = "check_constraint"
+    else:
+        response_status = status.HTTP_400_BAD_REQUEST
+        detail = "Data integrity error"
+        category = "other"
+
+    # The driver diagnostics identify the failed constraint without logging the
+    # statement, parameters, or PostgreSQL DETAIL (which may contain user data).
+    logger.log(
+        "ERROR" if category == "other" else "WARNING",
+        "Integrity error category={} sqlstate={} schema={} table={} constraint={} method={} path={}",
+        category,
+        sqlstate or "-",
+        getattr(diagnostics, "schema_name", None) or "-",
+        getattr(diagnostics, "table_name", None) or "-",
+        getattr(diagnostics, "constraint_name", None) or "-",
+        request.method,
+        request.url.path,
+    )
     return JSONResponse(
-        status_code=status.HTTP_400_BAD_REQUEST,
-        content={"detail": "Data integrity error"},
+        status_code=response_status,
+        content={"detail": detail},
     )
 
 
