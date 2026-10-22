@@ -140,10 +140,7 @@ const HeaderBar = () => {
   }
 
   const pathSegments = pathname.split("/").filter(Boolean).slice(2)
-  const fallbackSegments =
-    city?.takes_applications === false ? ["checkout"] : ["application"]
-  const pathsToDisplay =
-    pathSegments.length > 0 ? pathSegments : fallbackSegments
+  const pathsToDisplay = pathSegments.length > 0 ? pathSegments : ["home"]
 
   const { nameMapping, isLoading } = useBreadcrumbNameMapping(
     pathSegments,

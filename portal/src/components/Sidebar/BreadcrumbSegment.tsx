@@ -17,6 +17,7 @@ interface BreadcrumbSegmentProps {
 }
 
 const KNOWN_SEGMENTS: Record<string, string> = {
+  home: "sidebar.home",
   application: "breadcrumbs.application",
   overview: "sidebar.overview",
   passes: "breadcrumbs.passes",
