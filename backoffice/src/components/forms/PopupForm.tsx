@@ -88,6 +88,7 @@ import {
   UnsavedChangesDialog,
   useDirtyBlocker,
 } from "@/hooks/useUnsavedChanges"
+import { normalizeSimpleFiApiKey } from "@/lib/simplefi"
 import { createErrorHandler } from "@/utils"
 
 interface PopupFormProps {
@@ -369,7 +370,8 @@ export function PopupForm({
         blog_url: value.blog_url || null,
         twitter_url: value.twitter_url || null,
         terms_and_conditions_url: value.terms_and_conditions_url || null,
-        simplefi_api_key: value.simplefi_api_key || null,
+        simplefi_api_key:
+          normalizeSimpleFiApiKey(value.simplefi_api_key) || null,
         simplefi_card_adjustment_pct:
           value.simplefi_card_adjustment_pct === ""
             ? null
@@ -983,7 +985,7 @@ export function PopupForm({
                   <InlineRow
                     icon={<Key className="h-4 w-4 text-muted-foreground" />}
                     label="SimpleFi"
-                    description="Payment integration API key"
+                    description="Payment integration API key. Paste with or without the Bearer prefix."
                   >
                     <PasswordInput
                       id="simplefi_api_key"

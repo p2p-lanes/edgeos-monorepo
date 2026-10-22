@@ -41,7 +41,7 @@ export const CONFIG_SECTIONS: {
         key: "simplefi_api_key",
         label: "SimpleFi API Key",
         description:
-          "Overrides the popup's SimpleFi account for purchases and payment operations through this flow.",
+          "Overrides the popup's SimpleFi account for purchases and payment operations through this flow. Paste with or without the Bearer prefix.",
         kind: "secret",
       },
     ],
