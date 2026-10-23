@@ -2154,6 +2154,10 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
             selectinload(Payments.products_snapshot)  # ty: ignore[invalid-argument-type]
             .selectinload(PaymentProducts.attendee)  # ty: ignore[invalid-argument-type]
             .selectinload(Attendees.human),  # ty: ignore[invalid-argument-type]
+            selectinload(Payments.products_snapshot).selectinload(  # ty: ignore[invalid-argument-type]
+                PaymentProducts.recipient  # ty: ignore[invalid-argument-type]
+            ),
+            selectinload(Payments.recipients),  # ty: ignore[invalid-argument-type]
             selectinload(Payments.application).selectinload(  # ty: ignore[invalid-argument-type]
                 Applications.human  # ty: ignore[invalid-argument-type]
             ),
@@ -2193,6 +2197,10 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
             selectinload(Payments.products_snapshot)  # ty: ignore[invalid-argument-type]
             .selectinload(PaymentProducts.attendee)  # ty: ignore[invalid-argument-type]
             .selectinload(Attendees.human),  # ty: ignore[invalid-argument-type]
+            selectinload(Payments.products_snapshot).selectinload(  # ty: ignore[invalid-argument-type]
+                PaymentProducts.recipient  # ty: ignore[invalid-argument-type]
+            ),
+            selectinload(Payments.recipients),  # ty: ignore[invalid-argument-type]
             selectinload(Payments.application).selectinload(  # ty: ignore[invalid-argument-type]
                 Applications.human  # ty: ignore[invalid-argument-type]
             ),
