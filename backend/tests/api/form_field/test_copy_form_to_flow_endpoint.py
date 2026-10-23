@@ -7,6 +7,7 @@ in a later slice (14)."). The backoffice confirm-dialog action calls this.
 import uuid
 from io import StringIO
 
+import pytest
 from fastapi.testclient import TestClient
 from loguru import logger
 from sqlmodel import Session, select
@@ -78,6 +79,47 @@ def _seed_default_flow_field(
 
 
 class TestCopyFormToFlowEndpoint:
+    @pytest.mark.parametrize("implicit_source", [False, True])
+    def test_self_copy_is_rejected_without_mutation_or_audit(
+        self,
+        client: TestClient,
+        admin_token_tenant_a: str,
+        db: Session,
+        implicit_source: bool,
+    ) -> None:
+        popup_id = _create_popup_via_api(client, admin_token_tenant_a)
+        target_id = default_flow_id(db, uuid.UUID(popup_id))
+        sections_before, total_before = form_sections_crud.find_by_flow(
+            db, target_id, limit=None
+        )
+        assert any(section.protected for section in sections_before)
+        section_state_before = [
+            (section.id, section.protected) for section in sections_before
+        ]
+
+        resp = client.post(
+            f"/api/v1/form-fields/copy-to-flow/{target_id}",
+            headers=_headers(admin_token_tenant_a),
+            json={"source_flow_id": None if implicit_source else str(target_id)},
+        )
+
+        assert resp.status_code == 422, resp.text
+        assert (
+            resp.json()["detail"] == "Source and target sales flows must be different"
+        )
+        sections, total = form_sections_crud.find_by_flow(db, target_id, limit=None)
+        assert total == total_before
+        assert [(section.id, section.protected) for section in sections] == (
+            section_state_before
+        )
+        audit_rows = db.exec(
+            select(AuditLog).where(
+                AuditLog.action == "form.copied_to_flow",
+                AuditLog.entity_id == target_id,
+            )
+        ).all()
+        assert audit_rows == []
+
     def test_omitted_source_copies_the_default_flows_form(
         self,
         client: TestClient,
@@ -328,3 +370,99 @@ class TestCopyFormToFlowEndpoint:
         assert target_fields[0].section_id == target_sections[0].id
         assert target_configs[0].section_id == target_sections[0].id
         assert target_sections[0].id != section.id
+
+    def test_copy_replaces_protected_target_and_preserves_source_protection(
+        self,
+        client: TestClient,
+        admin_token_tenant_a: str,
+        db: Session,
+        tenant_a: Tenants,
+    ) -> None:
+        popup_id = _create_popup_via_api(client, admin_token_tenant_a)
+        popup_uuid = uuid.UUID(popup_id)
+        source = _make_flow(db, tenant_a, popup_id, slug="source-protected")
+        target = _make_flow(db, tenant_a, popup_id, slug="target-protected")
+
+        source_section = FormSections(
+            tenant_id=tenant_a.id,
+            popup_id=popup_uuid,
+            sales_flow_id=source.id,
+            label="New Personal Information",
+            order=0,
+            protected=True,
+        )
+        target_section = FormSections(
+            tenant_id=tenant_a.id,
+            popup_id=popup_uuid,
+            sales_flow_id=target.id,
+            label="Old Personal Information",
+            order=0,
+            protected=True,
+        )
+        db.add_all([source_section, target_section])
+        db.flush()
+        db.add_all(
+            [
+                BaseFieldConfigs(
+                    tenant_id=tenant_a.id,
+                    popup_id=popup_uuid,
+                    sales_flow_id=source.id,
+                    field_name="phone",
+                    section_id=source_section.id,
+                    label="New Phone",
+                ),
+                BaseFieldConfigs(
+                    tenant_id=tenant_a.id,
+                    popup_id=popup_uuid,
+                    sales_flow_id=target.id,
+                    field_name="phone",
+                    section_id=target_section.id,
+                    label="Old Phone",
+                ),
+                FormFields(
+                    tenant_id=tenant_a.id,
+                    popup_id=popup_uuid,
+                    sales_flow_id=source.id,
+                    name="new_field",
+                    label="New field",
+                    field_type="text",
+                    section_id=source_section.id,
+                ),
+                FormFields(
+                    tenant_id=tenant_a.id,
+                    popup_id=popup_uuid,
+                    sales_flow_id=target.id,
+                    name="old_field",
+                    label="Old field",
+                    field_type="text",
+                    section_id=target_section.id,
+                ),
+            ]
+        )
+        db.commit()
+
+        for _ in range(2):
+            resp = client.post(
+                f"/api/v1/form-fields/copy-to-flow/{target.id}",
+                headers=_headers(admin_token_tenant_a),
+                json={"source_flow_id": str(source.id)},
+            )
+            assert resp.status_code == 200, resp.text
+            assert resp.json() == {"sections": 1, "base_fields": 1, "fields": 1}
+
+            sections, section_count = form_sections_crud.find_by_flow(
+                db, target.id, limit=None
+            )
+            fields, field_count = form_fields_crud.find_by_flow(
+                db, target.id, limit=1000
+            )
+            configs = base_field_configs_crud.find_by_flow(db, target.id)
+            assert section_count == field_count == len(configs) == 1
+            assert sections[0].id not in {target_section.id, source_section.id}
+            assert sections[0].label == "New Personal Information"
+            assert sections[0].protected is True
+            assert fields[0].name == "new_field"
+            assert fields[0].section_id == sections[0].id
+            assert configs[0].label == "New Phone"
+            assert configs[0].section_id == sections[0].id
+            assert db.get(FormSections, source_section.id).protected is True

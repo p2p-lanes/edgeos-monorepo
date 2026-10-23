@@ -696,6 +696,15 @@ class FormFieldsCRUD(BaseCRUD[FormFields, FormFieldCreate, FormFieldUpdate]):
         existing_sections, _ = form_sections_crud.find_by_flow(
             session, target_flow_id, limit=None
         )
+        # The database guard prevents deleting protected sections directly.
+        # A confirmed replacement can remove them by clearing the marker
+        # first, within this same transaction; the copied source keeps its
+        # own protection markers below.
+        for section in existing_sections:
+            if section.protected:
+                section.protected = False
+                session.add(section)
+        session.flush()
         for row in (*existing_fields, *existing_configs, *existing_sections):
             session.delete(row)
         session.flush()
