@@ -1,10 +1,13 @@
 import uuid
+from unittest.mock import patch
 
 import pytest
 from fastapi.testclient import TestClient
-from sqlmodel import Session
+from sqlmodel import Session, select
 
+from app.api.form_section.models import FormSections
 from app.api.popup.models import Popups
+from app.api.sales_flow.models import SalesFlows
 from app.api.shared.enums import UserRole
 from app.api.tenant.models import Tenants
 from app.api.user.models import Users
@@ -222,6 +225,107 @@ class TestSalesFlowCreate:
 
 
 class TestSalesFlowUpdate:
+    def test_enabling_scholarships_creates_one_flow_section(
+        self,
+        client: TestClient,
+        admin_token_tenant_a: str,
+        popup_tenant_a: Popups,
+        db: Session,
+    ) -> None:
+        created = client.post(
+            "/api/v1/sales-flows",
+            headers={"Authorization": f"Bearer {admin_token_tenant_a}"},
+            json=_create_payload(popup_tenant_a.id),
+        )
+        assert created.status_code == 201, created.text
+        flow_id = uuid.UUID(created.json()["id"])
+
+        enabled = client.patch(
+            f"/api/v1/sales-flows/{flow_id}",
+            headers={"Authorization": f"Bearer {admin_token_tenant_a}"},
+            json={"allows_scholarship": True},
+        )
+        assert enabled.status_code == 200, enabled.text
+        assert enabled.json()["allows_scholarship"] is True
+
+        sections = db.exec(
+            select(FormSections).where(
+                FormSections.sales_flow_id == flow_id,
+                FormSections.kind == "scholarship",
+            )
+        ).all()
+        assert len(sections) == 1
+        assert sections[0].protected is True
+
+    def test_patch_repairs_missing_scholarship_section_once(
+        self,
+        client: TestClient,
+        admin_token_tenant_a: str,
+        popup_tenant_a: Popups,
+        db: Session,
+    ) -> None:
+        created = client.post(
+            "/api/v1/sales-flows",
+            headers={"Authorization": f"Bearer {admin_token_tenant_a}"},
+            json=_create_payload(popup_tenant_a.id),
+        )
+        assert created.status_code == 201, created.text
+        flow_id = uuid.UUID(created.json()["id"])
+
+        # Reproduce the state left by the old PATCH after its import failed.
+        flow = db.get(SalesFlows, flow_id)
+        assert flow is not None
+        flow.allows_scholarship = True
+        db.add(flow)
+        db.commit()
+
+        for name in ("First rename", "Second rename"):
+            response = client.patch(
+                f"/api/v1/sales-flows/{flow_id}",
+                headers={"Authorization": f"Bearer {admin_token_tenant_a}"},
+                json={"name": name},
+            )
+            assert response.status_code == 200, response.text
+
+        sections = db.exec(
+            select(FormSections).where(
+                FormSections.sales_flow_id == flow_id,
+                FormSections.kind == "scholarship",
+            )
+        ).all()
+        assert len(sections) == 1
+
+    def test_scholarship_section_failure_rolls_back_flag(
+        self,
+        client: TestClient,
+        admin_token_tenant_a: str,
+        popup_tenant_a: Popups,
+        db: Session,
+    ) -> None:
+        created = client.post(
+            "/api/v1/sales-flows",
+            headers={"Authorization": f"Bearer {admin_token_tenant_a}"},
+            json=_create_payload(popup_tenant_a.id),
+        )
+        assert created.status_code == 201, created.text
+        flow_id = uuid.UUID(created.json()["id"])
+
+        with (
+            patch(
+                "app.api.sales_flow.router._ensure_scholarship_section",
+                side_effect=RuntimeError("section creation failed"),
+            ),
+            pytest.raises(RuntimeError, match="section creation failed"),
+        ):
+            client.patch(
+                f"/api/v1/sales-flows/{flow_id}",
+                headers={"Authorization": f"Bearer {admin_token_tenant_a}"},
+                json={"allows_scholarship": True},
+            )
+
+        db.expire_all()
+        assert db.get(SalesFlows, flow_id).allows_scholarship is not True
+
     def test_default_can_be_unset_without_replacement(
         self,
         client: TestClient,

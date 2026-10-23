@@ -9927,6 +9927,7 @@ export type FormFieldsCreateFormFieldResponse = (FormFieldPublic);
 
 export type FormFieldsListAvailableBaseFieldsData = {
     popupId: string;
+    salesFlowId?: (string | null);
     xTenantId?: (string | null);
 };
 
@@ -9935,6 +9936,7 @@ export type FormFieldsListAvailableBaseFieldsResponse = (Array<CatalogField>);
 export type FormFieldsCreateBaseFieldConfigData = {
     fieldName: string;
     popupId: string;
+    salesFlowId?: (string | null);
     xTenantId?: (string | null);
 };
 
