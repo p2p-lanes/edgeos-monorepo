@@ -155,11 +155,12 @@ async def list_available_base_fields(
     popup_id: uuid.UUID,
     db: AdminOrApiKeySession_FormsRead,
     _: AdminOrApiKey_FormsRead,
+    sales_flow_id: uuid.UUID | None = None,
 ) -> list[CatalogField]:
-    """List catalog base fields that are not yet configured for this popup.
+    """List catalog base fields not yet configured for the selected flow.
 
     Filters out fields already configured, non-removable elementals, and
-    fields disabled by the popup's feature flags.
+    fields disabled by the selected flow's feature flags.
     """
     from app.api.popup.crud import popups_crud
     from app.api.sales_flow.resolver import config_for  # noqa: PLC0415
@@ -171,12 +172,11 @@ async def list_available_base_fields(
             detail="Popup not found",
         )
 
+    flow_id = _resolve_schema_flow_id(db, popup_id, sales_flow_id)
     configured = {
-        c.field_name for c in base_field_configs_crud.find_by_popup(db, popup_id)
+        c.field_name for c in base_field_configs_crud.find_by_flow(db, flow_id)
     }
-    # This catalog is popup-scoped and names no flow, so it answers for the
-    # default one — the same flow its create endpoint writes into.
-    catalog_config = config_for(db, sales_flow_id=None, popup_id=popup_id)
+    catalog_config = config_for(db, sales_flow_id=flow_id, popup_id=popup_id)
 
     available: list[CatalogField] = []
     for field_name, definition in BASE_FIELD_DEFINITIONS.items():
@@ -212,8 +212,9 @@ async def create_base_field_config(
     field_name: str,
     db: AdminOrApiKeySession_FormsWrite,
     _current_user: AdminOrApiKey_FormsWrite,
+    sales_flow_id: uuid.UUID | None = None,
 ) -> FormFieldPublic:
-    """Add a catalog base field to a popup by creating its BaseFieldConfig."""
+    """Add a catalog base field to the selected flow."""
     from app.api.popup.crud import popups_crud
     from app.api.sales_flow.resolver import config_for  # noqa: PLC0415
 
@@ -231,8 +232,9 @@ async def create_base_field_config(
             detail=f"Field '{field_name}' is not in the catalog",
         )
 
+    flow_id = _resolve_schema_flow_id(db, popup_id, sales_flow_id)
     if not field_applies_to_flow(
-        field_name, config_for(db, sales_flow_id=None, popup_id=popup_id)
+        field_name, config_for(db, sales_flow_id=flow_id, popup_id=popup_id)
     ):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -242,7 +244,7 @@ async def create_base_field_config(
     existing = next(
         (
             c
-            for c in base_field_configs_crud.find_by_popup(db, popup_id)
+            for c in base_field_configs_crud.find_by_flow(db, flow_id)
             if c.field_name == field_name
         ),
         None,
@@ -250,7 +252,7 @@ async def create_base_field_config(
     if existing:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Field '{field_name}' is already configured for this popup",
+            detail=f"Field '{field_name}' is already configured for this flow",
         )
 
     # Resolve default section by key if present.
@@ -263,6 +265,7 @@ async def create_base_field_config(
 
         stmt = select(FormSections).where(
             FormSections.popup_id == popup_id,
+            FormSections.sales_flow_id == flow_id,
         )
         sections = db.exec(stmt).all()
         # Match by DEFAULT_SECTIONS label (seeded sections share the catalog label).
@@ -278,6 +281,7 @@ async def create_base_field_config(
     config = BaseFieldConfigs(
         tenant_id=popup.tenant_id,
         popup_id=popup_id,
+        sales_flow_id=flow_id,
         field_name=field_name,
         section_id=section_id,
         position=definition.get("default_position", 0),

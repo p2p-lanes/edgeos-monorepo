@@ -733,6 +733,7 @@ function FormBuilderContent({ popupId }: { popupId: string }) {
             variant="outline"
             size="sm"
             onClick={() => setCatalogOpen(true)}
+            disabled={!activeFlow}
             className="gap-2"
           >
             <Sparkles className="h-4 w-4" />
@@ -867,11 +868,14 @@ function FormBuilderContent({ popupId }: { popupId: string }) {
         </div>
       )}
 
-      <CatalogDialog
-        popupId={popupId}
-        open={catalogOpen}
-        onOpenChange={setCatalogOpen}
-      />
+      {activeFlow && (
+        <CatalogDialog
+          popupId={popupId}
+          salesFlowId={activeFlow.id}
+          open={catalogOpen}
+          onOpenChange={setCatalogOpen}
+        />
+      )}
     </div>
   )
 }

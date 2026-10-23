@@ -22,12 +22,14 @@ const SECTION_LABELS: Record<string, string> = {
 
 interface CatalogDialogProps {
   popupId: string
+  salesFlowId: string
   open: boolean
   onOpenChange: (open: boolean) => void
 }
 
 export function CatalogDialog({
   popupId,
+  salesFlowId,
   open,
   onOpenChange,
 }: CatalogDialogProps) {
@@ -35,18 +37,23 @@ export function CatalogDialog({
   const { showSuccessToast, showErrorToast } = useCustomToast()
 
   const { data, isLoading } = useQuery({
-    queryKey: ["form-fields", popupId, "catalog"],
-    queryFn: () => FormFieldsService.listAvailableBaseFields({ popupId }),
+    queryKey: ["form-fields", popupId, salesFlowId, "catalog"],
+    queryFn: () =>
+      FormFieldsService.listAvailableBaseFields({ popupId, salesFlowId }),
     enabled: open,
   })
 
   const addMutation = useMutation({
     mutationFn: (fieldName: string) =>
-      FormFieldsService.createBaseFieldConfig({ popupId, fieldName }),
+      FormFieldsService.createBaseFieldConfig({
+        popupId,
+        salesFlowId,
+        fieldName,
+      }),
     onSuccess: (_created, fieldName) => {
       const label =
         data?.find((f) => f.field_name === fieldName)?.label ?? fieldName
-      showSuccessToast(`"${label}" added to the gathering`)
+      showSuccessToast(`"${label}" added to this flow`)
       queryClient.invalidateQueries({ queryKey: ["form-fields"] })
     },
     onError: createErrorHandler(showErrorToast),
@@ -79,7 +86,7 @@ export function CatalogDialog({
           <DialogTitle>Add a predefined field</DialogTitle>
           <DialogDescription>
             These fields come from the base catalog. Click one to add it to this
-            popup.
+            flow.
           </DialogDescription>
         </DialogHeader>
 
@@ -91,7 +98,7 @@ export function CatalogDialog({
           </div>
         ) : grouped.length === 0 ? (
           <p className="text-sm text-muted-foreground py-4">
-            Every available field is already in this popup.
+            Every available field is already in this flow.
           </p>
         ) : (
           <div className="max-h-[60vh] space-y-4 overflow-y-auto py-2">
