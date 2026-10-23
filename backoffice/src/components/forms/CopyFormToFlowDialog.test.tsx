@@ -17,9 +17,6 @@ vi.mock("@/client", () => ({
   FormFieldsService: {
     copyFormToFlow: vi.fn(),
   },
-  SalesFlowsService: {
-    listSalesFlows: vi.fn(),
-  },
 }))
 
 vi.mock("@/hooks/useCustomToast", () => ({
@@ -29,10 +26,9 @@ vi.mock("@/hooks/useCustomToast", () => ({
   }),
 }))
 
-import { FormFieldsService, SalesFlowsService } from "@/client"
+import { FormFieldsService, type SalesFlowPublic } from "@/client"
 import { CopyFormToFlowDialog } from "./CopyFormToFlowDialog"
 
-const mockListSalesFlows = vi.mocked(SalesFlowsService.listSalesFlows)
 const mockCopyFormToFlow = vi.mocked(FormFieldsService.copyFormToFlow)
 const refetchTargetFields = vi.fn()
 const refetchTargetSections = vi.fn()
@@ -67,23 +63,21 @@ function ActiveTargetQueries() {
 }
 
 describe("CopyFormToFlowDialog", () => {
+  const flows = [
+    { id: "flow-2", name: "Application Flow", type: "application" },
+    { id: "flow-3", name: "Upsale Flow", type: "upsale" },
+    {
+      id: "flow-1",
+      name: "Attendee",
+      type: "application",
+      is_default: true,
+    },
+  ] as SalesFlowPublic[]
+
   beforeEach(() => {
     vi.clearAllMocks()
     refetchTargetFields.mockResolvedValue("fresh fields")
     refetchTargetSections.mockResolvedValue("fresh sections")
-    mockListSalesFlows.mockResolvedValue({
-      results: [
-        { id: "flow-2", name: "Application Flow", type: "application" },
-        { id: "flow-3", name: "Upsale Flow", type: "upsale" },
-        {
-          id: "flow-1",
-          name: "Attendee",
-          type: "application",
-          is_default: true,
-        },
-      ],
-      paging: { limit: 100, offset: 0, total: 2 },
-    } as never)
     mockCopyFormToFlow.mockResolvedValue({
       sections: 1,
       base_fields: 2,
@@ -98,6 +92,7 @@ describe("CopyFormToFlowDialog", () => {
           popupId="popup-1"
           targetFlowId="flow-1"
           targetFlowType="application"
+          flows={flows}
         />
       </Wrapper>,
     )
@@ -106,12 +101,31 @@ describe("CopyFormToFlowDialog", () => {
     )
     await userEvent.click(screen.getByRole("combobox"))
 
-    expect(await screen.findByText("Application Flow")).toBeInTheDocument()
+    expect(
+      await screen.findByRole("option", { name: "Application Flow" }),
+    ).toBeInTheDocument()
     expect(screen.queryByText("Upsale Flow")).not.toBeInTheDocument()
     expect(screen.queryByText("Attendee")).not.toBeInTheDocument()
   })
 
-  it("defaults to the event's shared form and copies on confirm", async () => {
+  it("does not offer copy when the only flow is the target", () => {
+    render(
+      <Wrapper>
+        <CopyFormToFlowDialog
+          popupId="popup-1"
+          targetFlowId="flow-1"
+          targetFlowType="application"
+          flows={[flows[2]]}
+        />
+      </Wrapper>,
+    )
+    expect(
+      screen.queryByRole("button", { name: /copy form from/i }),
+    ).not.toBeInTheDocument()
+    expect(mockCopyFormToFlow).not.toHaveBeenCalled()
+  })
+
+  it("copies from another flow and invalidates target queries", async () => {
     const queryClient = makeQueryClient()
     render(
       <QueryClientProvider client={queryClient}>
@@ -120,6 +134,7 @@ describe("CopyFormToFlowDialog", () => {
           popupId="popup-1"
           targetFlowId="flow-1"
           targetFlowType="application"
+          flows={flows}
         />
       </QueryClientProvider>,
     )
@@ -133,9 +148,33 @@ describe("CopyFormToFlowDialog", () => {
 
     expect(mockCopyFormToFlow).toHaveBeenCalledWith({
       targetFlowId: "flow-1",
-      requestBody: { source_flow_id: null },
+      requestBody: { source_flow_id: "flow-2" },
     })
     await waitFor(() => expect(refetchTargetFields).toHaveBeenCalledOnce())
     expect(refetchTargetSections).toHaveBeenCalledOnce()
+  })
+
+  it("labels a distinct default flow as primary and allows copying from it", async () => {
+    render(
+      <Wrapper>
+        <CopyFormToFlowDialog
+          popupId="popup-1"
+          targetFlowId="flow-2"
+          targetFlowType="application"
+          flows={flows}
+        />
+      </Wrapper>,
+    )
+    await userEvent.click(
+      screen.getByRole("button", { name: /copy form from/i }),
+    )
+    expect(screen.getByRole("combobox")).toHaveTextContent(
+      "Attendee (primary flow)",
+    )
+    await userEvent.click(screen.getByRole("button", { name: /^copy$/i }))
+    expect(mockCopyFormToFlow).toHaveBeenCalledWith({
+      targetFlowId: "flow-2",
+      requestBody: { source_flow_id: "flow-1" },
+    })
   })
 })

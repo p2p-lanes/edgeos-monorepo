@@ -743,6 +743,7 @@ function FormBuilderContent({ popupId }: { popupId: string }) {
               popupId={popupId}
               targetFlowId={activeFlow.id}
               targetFlowType={activeFlow.type}
+              flows={flows}
             />
           )}
         </div>

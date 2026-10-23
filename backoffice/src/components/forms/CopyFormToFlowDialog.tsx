@@ -1,9 +1,9 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
+import { useMutation, useQueryClient } from "@tanstack/react-query"
 import { Copy } from "lucide-react"
-import { useEffect, useState } from "react"
+import { useState } from "react"
 import {
   FormFieldsService,
-  SalesFlowsService,
+  type SalesFlowPublic,
   type SalesFlowType,
 } from "@/client"
 import { Button } from "@/components/ui/button"
@@ -25,22 +25,20 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import useCustomToast from "@/hooks/useCustomToast"
-import { salesFlowsQueryKey } from "@/lib/salesFlowQueries"
 import { createErrorHandler } from "@/utils"
-
-const SHARED_TIER_VALUE = "__shared__"
 
 interface CopyFormToFlowDialogProps {
   popupId: string
   targetFlowId: string
   targetFlowType: SalesFlowType
+  flows: SalesFlowPublic[]
 }
 
 /**
  * sdd/sales-flows task 14.4: backoffice UI for the copy-form-to-flow action
  * (backend built in slice 6, exposed over HTTP in task 14.1). Copies
- * sections + base field configs + custom fields from a source (the
- * popup-shared tier, or a sibling flow's own rows) into this flow as
+ * sections + base field configs + custom fields from another flow
+ * into this flow as
  * independent rows — the target ends up owning its own copy; editing
  * either afterward never affects the other.
  */
@@ -48,41 +46,28 @@ export function CopyFormToFlowDialog({
   popupId,
   targetFlowId,
   targetFlowType,
+  flows,
 }: CopyFormToFlowDialogProps) {
   const [open, setOpen] = useState(false)
-  const [sourceFlowId, setSourceFlowId] = useState<string>(SHARED_TIER_VALUE)
+  const [sourceFlowId, setSourceFlowId] = useState<string>("")
   const { showSuccessToast, showErrorToast } = useCustomToast()
   const queryClient = useQueryClient()
 
-  const { data: flows } = useQuery({
-    queryKey: salesFlowsQueryKey(popupId),
-    queryFn: () => SalesFlowsService.listSalesFlows({ popupId }),
-    enabled: open,
-  })
-
-  const defaultFlow = (flows?.results ?? []).find(
-    (flow) => flow.is_default && flow.type === targetFlowType,
+  const otherFlows = flows.filter(
+    (flow) => flow.id !== targetFlowId && flow.type === targetFlowType,
   )
-  const otherFlows = (flows?.results ?? []).filter(
-    (flow) =>
-      flow.id !== targetFlowId &&
-      flow.id !== defaultFlow?.id &&
-      flow.type === targetFlowType,
+  const selectedSourceFlowId = otherFlows.some(
+    (flow) => flow.id === sourceFlowId,
   )
-
-  useEffect(() => {
-    if (!flows) return
-    if (defaultFlow || sourceFlowId !== SHARED_TIER_VALUE) return
-    setSourceFlowId(otherFlows[0]?.id ?? "")
-  }, [defaultFlow, flows, otherFlows, sourceFlowId])
+    ? sourceFlowId
+    : otherFlows[0]?.id
 
   const copyMutation = useMutation({
     mutationFn: () =>
       FormFieldsService.copyFormToFlow({
         targetFlowId,
         requestBody: {
-          source_flow_id:
-            sourceFlowId === SHARED_TIER_VALUE ? null : sourceFlowId,
+          source_flow_id: selectedSourceFlowId,
         },
       }),
     onSuccess: (result) => {
@@ -100,6 +85,8 @@ export function CopyFormToFlowDialog({
     onError: createErrorHandler(showErrorToast),
   })
 
+  if (!selectedSourceFlowId) return null
+
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
@@ -116,19 +103,15 @@ export function CopyFormToFlowDialog({
             selected source. Editing either afterward never affects the other.
           </DialogDescription>
         </DialogHeader>
-        <Select value={sourceFlowId} onValueChange={setSourceFlowId}>
+        <Select value={selectedSourceFlowId} onValueChange={setSourceFlowId}>
           <SelectTrigger>
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            {defaultFlow && (
-              <SelectItem value={SHARED_TIER_VALUE}>
-                Event's shared form
-              </SelectItem>
-            )}
             {otherFlows.map((flow) => (
               <SelectItem key={flow.id} value={flow.id}>
                 {flow.name}
+                {flow.is_default ? " (primary flow)" : ""}
               </SelectItem>
             ))}
           </SelectContent>
@@ -143,10 +126,7 @@ export function CopyFormToFlowDialog({
           </Button>
           <LoadingButton
             loading={copyMutation.isPending}
-            disabled={
-              !sourceFlowId ||
-              (sourceFlowId === SHARED_TIER_VALUE && !defaultFlow)
-            }
+            disabled={!selectedSourceFlowId}
             onClick={() => copyMutation.mutate()}
           >
             Copy

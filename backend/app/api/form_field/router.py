@@ -635,6 +635,11 @@ async def copy_form_to_flow(
     source_flow_id = _resolve_schema_flow_id(
         db, target_flow.popup_id, body.source_flow_id
     )
+    if source_flow_id == target_flow.id:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Source and target sales flows must be different",
+        )
     source_flow = sales_flows_crud.get(db, source_flow_id)
     if source_flow is None or source_flow.type != target_flow.type:
         raise HTTPException(
