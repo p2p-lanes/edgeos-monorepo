@@ -440,6 +440,8 @@ class TestCopyFormToFlowEndpoint:
             ]
         )
         db.commit()
+        source_section_id = source_section.id
+        target_section_id = target_section.id
 
         for _ in range(2):
             resp = client.post(
@@ -458,11 +460,11 @@ class TestCopyFormToFlowEndpoint:
             )
             configs = base_field_configs_crud.find_by_flow(db, target.id)
             assert section_count == field_count == len(configs) == 1
-            assert sections[0].id not in {target_section.id, source_section.id}
+            assert sections[0].id not in {target_section_id, source_section_id}
             assert sections[0].label == "New Personal Information"
             assert sections[0].protected is True
             assert fields[0].name == "new_field"
             assert fields[0].section_id == sections[0].id
             assert configs[0].label == "New Phone"
             assert configs[0].section_id == sections[0].id
-            assert db.get(FormSections, source_section.id).protected is True
+            assert db.get(FormSections, source_section_id).protected is True
