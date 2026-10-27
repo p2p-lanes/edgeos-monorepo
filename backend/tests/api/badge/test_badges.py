@@ -452,7 +452,7 @@ def test_public_profile_shows_only_safe_fields(
         headers=_human_headers(human),
     )
     assert enabled.status_code == 200
-    assert enabled.json() == {"enabled": True, "token": token}
+    assert enabled.json() == {"enabled": True, "token": token, "username": None}
 
     resp = client.get(
         f"/api/v1/humans/public/profiles/{token}",
@@ -463,6 +463,7 @@ def test_public_profile_shows_only_safe_fields(
     assert body == {
         "display_name": "Grace H.",
         "picture_url": "https://cdn.test/grace.png",
+        "username": None,
         "badges": [
             {
                 "name": "Mentor",

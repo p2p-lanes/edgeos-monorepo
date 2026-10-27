@@ -1,7 +1,8 @@
 "use client"
 
-// Side-effect import: /u/[token] renders outside the portal <Providers>
-// tree, so i18next is not otherwise initialized (same as not-found.tsx).
+// Side-effect import: /u/[token] and /[username] render outside the portal
+// <Providers> tree, so i18next is not otherwise initialized (same as
+// not-found.tsx).
 import "@/i18n/config"
 
 import { UserRound } from "lucide-react"
@@ -9,16 +10,23 @@ import Image from "next/image"
 import { useTranslation } from "react-i18next"
 import type { PublicProfile } from "@/client"
 import { BadgeTile } from "@/components/badges/BadgeTile"
+import {
+  GiveProfileBadge,
+  type ProfileHandle,
+} from "@/components/badges/GiveProfileBadge"
 import { imageOptimization } from "@/lib/image-optimization"
 
 interface PublicProfileViewProps {
   profile: PublicProfile
+  // How this page was reached, so a visitor can give a badge back through it.
+  handle: ProfileHandle
   tenantName: string
   tenantLogoUrl?: string | null
 }
 
 export function PublicProfileView({
   profile,
+  handle,
   tenantName,
   tenantLogoUrl,
 }: PublicProfileViewProps) {
@@ -66,6 +74,7 @@ export function PublicProfileView({
                 count: profile.badges.length,
               })}
             </p>
+            <GiveProfileBadge handle={handle} recipientName={name} />
           </div>
 
           {profile.badges.length > 0 ? (

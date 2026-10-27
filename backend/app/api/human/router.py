@@ -295,6 +295,14 @@ async def update_my_directory_settings(
     )
 
 
+def _profile_settings(human) -> PublicProfileSettings:
+    return PublicProfileSettings(
+        enabled=human.public_profile_enabled,
+        token=human.public_profile_token,
+        username=human.username,
+    )
+
+
 def _ensure_public_profile_token(db, human) -> str:
     """Return the human's share token, minting one on first use."""
     if not human.public_profile_token:
@@ -320,14 +328,14 @@ async def get_my_public_profile(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Human not found"
         )
-    token = _ensure_public_profile_token(db, human)
-    return PublicProfileSettings(enabled=human.public_profile_enabled, token=token)
+    _ensure_public_profile_token(db, human)
+    return _profile_settings(human)
 
 
 @router.patch(
     "/me/public-profile",
     response_model=PublicProfileSettings,
-    summary="Turn your public profile link on or off",
+    summary="Turn your public profile link on or off, or set its username",
     dependencies=[needs("portal:profile:write")],
 )
 async def update_my_public_profile(
@@ -335,17 +343,50 @@ async def update_my_public_profile(
     current_human: CurrentHuman,
     db: HumanTenantSession,
 ) -> PublicProfileSettings:
+    """Partial update. ``username`` sets the readable alias of the profile
+    (portal.<tenant>/<username>); ``null`` removes it. 422 for a malformed or
+    reserved username, 409 when a person or a popup already uses it."""
+    from sqlalchemy.exc import IntegrityError
+
+    from app.api.human.public_profile import (
+        UsernameError,
+        is_popup_slug,
+        normalize_username,
+    )
+
     human = crud.get(db, current_human.id)
     if not human:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Human not found"
         )
-    human.public_profile_enabled = body.enabled
+    if body.enabled is not None:
+        human.public_profile_enabled = body.enabled
+    if "username" in body.model_fields_set:
+        username = None
+        if body.username:
+            try:
+                username = normalize_username(body.username)
+            except UsernameError as exc:
+                raise HTTPException(
+                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)
+                ) from exc
+            if is_popup_slug(db, human.tenant_id, username):
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail="That username is taken",
+                )
+        human.username = username
     db.add(human)
-    db.commit()
+    try:
+        db.commit()
+    except IntegrityError as exc:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT, detail="That username is taken"
+        ) from exc
     db.refresh(human)
-    token = _ensure_public_profile_token(db, human)
-    return PublicProfileSettings(enabled=human.public_profile_enabled, token=token)
+    _ensure_public_profile_token(db, human)
+    return _profile_settings(human)
 
 
 @router.post(
@@ -368,9 +409,7 @@ async def regenerate_my_public_profile(
     db.add(human)
     db.commit()
     db.refresh(human)
-    return PublicProfileSettings(
-        enabled=human.public_profile_enabled, token=human.public_profile_token
-    )
+    return _profile_settings(human)
 
 
 @router.get(
@@ -394,19 +433,46 @@ async def get_public_profile(
     regenerated, disabled and sibling-tenant tokens all get the same opaque
     404 so the route can't be used to probe for people.
     """
-    from sqlmodel import select
+    from app.api.human.public_profile import find_shared_profile
 
+    return _public_profile(db, find_shared_profile(db, tenant.id, token=token))
+
+
+@router.get(
+    "/public/profiles/by-username/{username}",
+    response_model=PublicProfile,
+    dependencies=[
+        Depends(
+            RateLimit(limit=120, window_sec=60, key_prefix="rl:human-public-profile")
+        ),
+    ],
+)
+async def get_public_profile_by_username(
+    username: str,
+    db: SessionDep,
+    tenant: PublicTenant,
+) -> PublicProfile:
+    """The same profile card, behind its readable alias.
+
+    Same opaque 404 as the token route, also for a name a popup slug holds:
+    the popup owns that path.
+    """
+    from app.api.human.public_profile import find_shared_profile
+
+    return _public_profile(db, find_shared_profile(db, tenant.id, username=username))
+
+
+def _public_profile(db, human) -> PublicProfile:
     from app.api.badge.crud import public_profile_badges
-    from app.api.human.models import Humans
 
-    human = db.exec(select(Humans).where(Humans.public_profile_token == token)).first()
-    if not human or human.tenant_id != tenant.id or not human.public_profile_enabled:
+    if human is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Profile not found"
         )
     return PublicProfile(
         display_name=public_display_name(human.first_name, human.last_name),
         picture_url=human.picture_url,
+        username=human.username,
         badges=public_profile_badges(db, human),
     )
 

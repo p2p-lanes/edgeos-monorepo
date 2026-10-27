@@ -22,6 +22,7 @@ class Humans(HumanBase, table=True):
     __table_args__ = (
         UniqueConstraint("email", "tenant_id", name="uq_human_email_tenant_id"),
         UniqueConstraint("public_profile_token", name="uq_humans_public_profile_token"),
+        UniqueConstraint("tenant_id", "username", name="uq_humans_tenant_username"),
     )
 
     id: uuid.UUID = Field(
@@ -41,6 +42,12 @@ class Humans(HumanBase, table=True):
     public_profile_enabled: bool = Field(
         default=False,
         sa_column=Column(Boolean, nullable=False, server_default="false"),
+    )
+    # Readable alias of the same profile (portal.<tenant>/<username>). Stored
+    # lowercased; resolves only while the profile is shared.
+    username: str | None = Field(
+        default=None,
+        sa_column=Column(String(30), nullable=True),
     )
 
     tenant: "Tenants" = Relationship(back_populates="humans")

@@ -47,6 +47,17 @@ export const queryKeys = {
       attendeeId
         ? (["profile", "issuable-badges", popupId, attendeeId] as const)
         : (["profile", "issuable-badges", popupId] as const),
+    // What the viewer may give the owner of a public profile, outside popups.
+    profileIssuable: (handle: {
+      username?: string | null
+      token?: string | null
+    }) =>
+      [
+        "profile",
+        "profile-issuable",
+        handle.username ?? "",
+        handle.token ?? "",
+      ] as const,
   },
   formSchema: {
     // `salesFlowId` (sdd/sales-flows D6 URL scheme, task 9.4) is part of the

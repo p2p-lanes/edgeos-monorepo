@@ -26,6 +26,7 @@ from app.api.badge.schemas import (
     BadgeBulkAwardCreate,
     BadgeBulkAwardResult,
     BadgeCreate,
+    BadgeHolder,
     BadgeImageUpsert,
     BadgeIssuerPolicyCreate,
     BadgeIssuerPolicyHuman,
@@ -48,9 +49,11 @@ from app.api.badge.schemas import (
     IssuableBadge,
     MyBadge,
     PortalBadgeAwardCreate,
+    ProfileBadgeAwardCreate,
     SentBadgeAward,
 )
 from app.api.human.models import Humans
+from app.api.human.privacy import public_display_name
 from app.api.shared.enums import UserRole
 from app.api.shared.response import ListModel, PaginationLimit, PaginationSkip, Paging
 from app.core.dependencies.users import (
@@ -381,15 +384,36 @@ async def give_badge_as_human(
     recipient = db.get(Humans, attendee.human_id)
     if not recipient or not eligible[attendee.human_id].allowed:
         raise _not_found("Attendee")
+    return _give_as_human(
+        db,
+        issuer_id=current_human.id,
+        badge=badge,
+        recipient=recipient,
+        popup_id=body.popup_id,
+        message=body.message,
+        recipient_name=recipient.full_name,
+    )
 
+
+def _give_as_human(
+    db: Session,
+    *,
+    issuer_id: uuid.UUID,
+    badge: Badges,
+    recipient: Humans,
+    popup_id: uuid.UUID | None,
+    message: str | None,
+    recipient_name: str | None,
+) -> SentBadgeAward:
+    """Peer award with the portal's error mapping (403, 429, 409)."""
     try:
         award = policies.award_as_human(
             db,
-            issuer_id=current_human.id,
+            issuer_id=issuer_id,
             badge=badge,
             recipient=recipient,
-            popup_id=body.popup_id,
-            message=body.message,
+            popup_id=popup_id,
+            message=message,
         )
     except policies.BadgeForbiddenError as exc:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(exc))
@@ -409,7 +433,7 @@ async def give_badge_as_human(
     return SentBadgeAward(
         id=award.id,
         badge=crud.to_badge_summary(award.badge, resolver),
-        recipient_name=recipient.full_name,
+        recipient_name=recipient_name,
         popup_id=award.popup_id,
         message=award.message,
         awarded_at=award.awarded_at,
@@ -428,6 +452,120 @@ async def list_sent_badges(
     popup_id: uuid.UUID | None = None,
 ) -> list[SentBadgeAward]:
     return crud.list_sent(db, current_human.id, popup_id)
+
+
+@router.get(
+    "/portal/holders",
+    response_model=ListModel[BadgeHolder],
+    summary="List who holds which badge",
+    dependencies=[needs("portal:badges:read")],
+)
+async def list_badge_holders(
+    _: CurrentHuman,
+    db: HumanTenantSession,
+    badge_id: uuid.UUID | None = None,
+    badge_slug: str | None = None,
+    human_id: uuid.UUID | None = None,
+    username: str | None = None,
+    skip: PaginationSkip = 0,
+    limit: PaginationLimit = 100,
+) -> ListModel[BadgeHolder]:
+    """People of the community and their badges, for apps such as Rolodex.
+
+    Lists only people who share their public profile, with what that page
+    shows plus their id; never email or award messages. Filter by badge (id
+    or slug) to get its holders, or by person (id or username) to get their
+    badges. An unknown badge slug returns an empty page.
+    """
+    if badge_slug:
+        found = db.exec(select(Badges.id).where(Badges.slug == badge_slug)).first()
+        if found is None or (badge_id and found != badge_id):
+            return ListModel[BadgeHolder](
+                results=[], paging=Paging(offset=skip, limit=limit, total=0)
+            )
+        badge_id = found
+    holders, total = crud.list_holders(
+        db,
+        badge_id=badge_id,
+        human_id=human_id,
+        username=username,
+        skip=skip,
+        limit=limit,
+    )
+    return ListModel[BadgeHolder](
+        results=holders, paging=Paging(offset=skip, limit=limit, total=total)
+    )
+
+
+def _profile_recipient(
+    db: Session, tenant_id: uuid.UUID, username: str | None, token: str | None
+) -> Humans:
+    from app.api.human.public_profile import find_shared_profile
+
+    human = find_shared_profile(db, tenant_id, token=token, username=username)
+    if human is None:
+        raise _not_found("Profile")
+    return human
+
+
+@router.get(
+    "/portal/profile-issuable",
+    response_model=list[IssuableBadge],
+    summary="List the badges you can give someone from their profile",
+    dependencies=[needs("portal:profile:read")],
+)
+async def list_profile_issuable_badges(
+    current_human: CurrentHuman,
+    db: HumanTenantSession,
+    username: str | None = None,
+    token: str | None = None,
+) -> list[IssuableBadge]:
+    """What the caller may give the owner of a public profile (by username or
+    share token), outside any popup: only policies without a popup apply.
+    Empty on the caller's own profile."""
+    if bool(username) == bool(token):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Pass either username or token",
+        )
+    recipient = _profile_recipient(db, current_human.tenant_id, username, token)
+    if recipient.id == current_human.id:
+        return []
+    return policies.issuable_badges(db, current_human.id, None, recipient.id)
+
+
+@router.post(
+    "/portal/profile-awards",
+    response_model=SentBadgeAward,
+    status_code=status.HTTP_201_CREATED,
+    summary="Give a badge to someone from their profile",
+    dependencies=[needs("portal:badges:write")],
+)
+async def give_badge_from_profile(
+    body: ProfileBadgeAwardCreate,
+    current_human: CurrentHuman,
+    db: HumanTenantSession,
+) -> SentBadgeAward:
+    """Give a badge (a gold star, say) to the owner of a shared profile.
+
+    Only policies without a popup apply, and their day and week allowances
+    follow UTC. 404 for a profile that isn't shared, 403 when no policy lets
+    you give this badge, 429 when your allowance for it is used up.
+    """
+    recipient = _profile_recipient(
+        db, current_human.tenant_id, body.username, body.token
+    )
+    badge = _get_badge_or_404(db, body.badge_id)
+    return _give_as_human(
+        db,
+        issuer_id=current_human.id,
+        badge=badge,
+        recipient=recipient,
+        popup_id=None,
+        message=body.message,
+        # What their profile shows, not the full name a directory may share.
+        recipient_name=public_display_name(recipient.first_name, recipient.last_name),
+    )
 
 
 # ---------------------------------------------------------------------------

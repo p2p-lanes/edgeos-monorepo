@@ -133,8 +133,11 @@ const AttendeesTable = ({
         <SendBadgeDialog
           open={!!recipient}
           onOpenChange={(open) => !open && setRecipient(null)}
-          popupId={popupId}
-          attendeeId={recipient.id}
+          recipient={{
+            kind: "attendee",
+            popupId,
+            attendeeId: recipient.id,
+          }}
           recipientName={
             [recipient.first_name, recipient.last_name]
               .filter(Boolean)

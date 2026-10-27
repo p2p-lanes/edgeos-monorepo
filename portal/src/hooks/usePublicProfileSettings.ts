@@ -5,7 +5,7 @@ import { HumansService, type PublicProfileSettings } from "@/client"
 import { useIsAuthenticated } from "@/hooks/useIsAuthenticated"
 import { queryKeys } from "@/lib/query-keys"
 
-/** The caller's public profile share link and its visibility setting. */
+/** The caller's public profile share link, its alias and its visibility. */
 const usePublicProfileSettings = () => {
   const isAuthenticated = useIsAuthenticated()
   const queryClient = useQueryClient()
@@ -25,10 +25,18 @@ const usePublicProfileSettings = () => {
     onSuccess: store,
   })
 
+  // `null` removes the alias; the backend lowercases and validates it.
+  const setUsername = useMutation({
+    mutationFn: (username: string | null) =>
+      HumansService.updateMyPublicProfile({ requestBody: { username } }),
+    onSuccess: store,
+  })
+
   return {
     settings: query.data ?? null,
     isLoading: query.isLoading,
     setEnabled,
+    setUsername,
   }
 }
 

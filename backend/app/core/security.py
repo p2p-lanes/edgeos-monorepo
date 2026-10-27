@@ -33,6 +33,7 @@ HumanScope = Literal[
     "portal:payments:write",
     "portal:directory:read",
     "portal:api_keys:manage",
+    "portal:badges:read",
     "portal:badges:write",
 ]
 
@@ -91,6 +92,8 @@ THIRD_PARTY_TOKEN_SCOPES_MAX: tuple[HumanScope, ...] = (
     "portal:payments:read",
     "portal:directory:read",
     "portal:api_keys:manage",
+    # Who holds which badge, for community apps such as Rolodex and Skylight.
+    "portal:badges:read",
 )
 # Note: RSVP write capability is delivered through the api-key surface (the
 # `rsvp:write` ApiKeyScope in THIRD_PARTY_API_KEY_SCOPES_MAX). The agent

@@ -886,7 +886,14 @@
       "link_copied": "Enlace copiado",
       "link_copy_failed": "No se pudo copiar el enlace",
       "link_enable_description": "Activa un enlace público para compartir tu nombre, foto e insignias. Tu email sigue siendo privado.",
-      "link_update_failed": "No se pudo actualizar el enlace. Inténtalo de nuevo."
+      "link_update_failed": "No se pudo actualizar el enlace. Inténtalo de nuevo.",
+      "username_label": "Tu enlace",
+      "username_placeholder": "tu-nombre",
+      "username_save": "Guardar",
+      "username_saved": "Nombre del enlace guardado",
+      "username_hint": "De 3 a 30 letras minúsculas, números, - o _. Déjalo vacío para usar el enlace aleatorio.",
+      "username_taken": "Ese nombre ya está en uso. Prueba con otro.",
+      "username_invalid": "Usa de 3 a 30 letras minúsculas, números, - o _, empezando y terminando con una letra o un número."
     }
   },
   "sidebar": {
@@ -1619,7 +1626,9 @@
     "anonymous": "Miembro de la comunidad",
     "badge_count_one": "{{count}} insignia",
     "badge_count_other": "{{count}} insignias",
-    "no_badges": "Todavía no tiene insignias."
+    "no_badges": "Todavía no tiene insignias.",
+    "give": "Dar una insignia",
+    "give_named": "Dar {{badge}}"
   },
   "form_responses": {
     "view": "Ver respuestas",

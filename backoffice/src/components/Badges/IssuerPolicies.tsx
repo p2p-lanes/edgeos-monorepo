@@ -400,6 +400,13 @@ function PolicyDialog({
                 ))}
               </SelectContent>
             </Select>
+            {!needsPopup && !popupId && (
+              <p className="text-xs text-muted-foreground">
+                With any gathering, people can also give these badges from each
+                other's public profile. Daily and weekly allowances there reset
+                at midnight UTC.
+              </p>
+            )}
           </div>
 
           <div className="space-y-2">

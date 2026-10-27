@@ -757,7 +757,14 @@
       "link_copied": "Hlekkur afritaður",
       "link_copy_failed": "Ekki tókst að afrita hlekkinn",
       "link_enable_description": "Virkjaðu opinberan hlekk til að deila nafni þínu, mynd og merkjum. Netfangið þitt er áfram einkamál.",
-      "link_update_failed": "Ekki tókst að uppfæra deilingu. Reyndu aftur."
+      "link_update_failed": "Ekki tókst að uppfæra deilingu. Reyndu aftur.",
+      "username_label": "Hlekkurinn þinn",
+      "username_placeholder": "nafnid-thitt",
+      "username_save": "Vista",
+      "username_saved": "Nafn hlekks vistað",
+      "username_hint": "3 til 30 lágstafir, tölustafir, - eða _. Skildu reitinn eftir auðan til að nota handahófskennda hlekkinn.",
+      "username_taken": "Þetta nafn er frátekið. Prófaðu annað.",
+      "username_invalid": "Notaðu 3 til 30 lágstafi, tölustafi, - eða _, sem byrja og enda á staf eða tölustaf."
     }
   },
   "sidebar": {
@@ -1449,6 +1456,8 @@
     "anonymous": "Meðlimur samfélagsins",
     "badge_count_one": "{{count}} merki",
     "badge_count_other": "{{count}} merki",
-    "no_badges": "Engin merki enn."
+    "no_badges": "Engin merki enn.",
+    "give": "Gefa merki",
+    "give_named": "Gefa {{badge}}"
   }
 }

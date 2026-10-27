@@ -36,7 +36,8 @@ def test_backfill_preserves_buyers_existing_categories_and_ambiguous_history(
         connection.execute(
             text(
                 "ALTER TABLE humans ADD COLUMN public_profile_token VARCHAR(64), "
-                "ADD COLUMN public_profile_enabled BOOLEAN NOT NULL DEFAULT true"
+                "ADD COLUMN public_profile_enabled BOOLEAN NOT NULL DEFAULT true, "
+                "ADD COLUMN username VARCHAR(30)"
             )
         )
         connection.execute(

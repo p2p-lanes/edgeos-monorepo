@@ -23,13 +23,63 @@ import { imageOptimization } from "@/lib/image-optimization"
 import { queryKeys } from "@/lib/query-keys"
 import { cn } from "@/lib/utils"
 
+/**
+ * Who receives the badge: an attendee found in a popup's directory, or the
+ * owner of a public profile (by username or share token), outside any popup.
+ */
+export type BadgeRecipient =
+  | { kind: "attendee"; popupId: string; attendeeId: string }
+  | { kind: "profile"; username?: string | null; token?: string | null }
+
 interface SendBadgeDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
-  popupId: string
-  attendeeId: string
+  recipient: BadgeRecipient
   recipientName: string
   issuable: IssuableBadge[]
+  onSent?: () => void
+}
+
+function optionsQueryKey(recipient: BadgeRecipient) {
+  return recipient.kind === "attendee"
+    ? queryKeys.profile.issuableBadges(recipient.popupId, recipient.attendeeId)
+    : queryKeys.profile.profileIssuable(recipient)
+}
+
+function fetchOptions(recipient: BadgeRecipient) {
+  return recipient.kind === "attendee"
+    ? BadgesService.listIssuableBadges({
+        popupId: recipient.popupId,
+        attendeeId: recipient.attendeeId,
+      })
+    : BadgesService.listProfileIssuableBadges({
+        username: recipient.username,
+        token: recipient.token,
+      })
+}
+
+function sendAward(
+  recipient: BadgeRecipient,
+  badgeId: string,
+  message: string | null,
+) {
+  return recipient.kind === "attendee"
+    ? BadgesService.giveBadgeAsHuman({
+        requestBody: {
+          badge_id: badgeId,
+          popup_id: recipient.popupId,
+          attendee_id: recipient.attendeeId,
+          message,
+        },
+      })
+    : BadgesService.giveBadgeFromProfile({
+        requestBody: {
+          badge_id: badgeId,
+          username: recipient.username,
+          token: recipient.token,
+          message,
+        },
+      })
 }
 
 // Past this many badges the picker gets a search box.
@@ -56,25 +106,25 @@ function AllowanceNote({ item }: { item: IssuableBadge }) {
   return <>{t("attendees.badges.back_at", { when })}</>
 }
 
-/** Pick one of your giveable badges and send it to an attendee. */
+/** Pick one of your giveable badges and send it to someone. */
 export function SendBadgeDialog({
   open,
   onOpenChange,
-  popupId,
-  attendeeId,
+  recipient,
   recipientName,
   issuable,
+  onSent,
 }: SendBadgeDialogProps) {
   const { t } = useTranslation()
   const queryClient = useQueryClient()
   const [badgeId, setBadgeId] = useState<string | null>(null)
   const [message, setMessage] = useState("")
   const [search, setSearch] = useState("")
-  // Same list, now flagging the badges this attendee already holds. The
-  // directory's copy shows meanwhile so the dialog opens instantly.
+  // Same list, now flagging the badges this person already holds. The
+  // caller's copy shows meanwhile so the dialog opens instantly.
   const { data: options = issuable } = useQuery({
-    queryKey: queryKeys.profile.issuableBadges(popupId, attendeeId),
-    queryFn: () => BadgesService.listIssuableBadges({ popupId, attendeeId }),
+    queryKey: optionsQueryKey(recipient),
+    queryFn: () => fetchOptions(recipient),
     placeholderData: issuable,
     enabled: open,
   })
@@ -96,20 +146,14 @@ export function SendBadgeDialog({
 
   const send = useMutation({
     mutationFn: () =>
-      BadgesService.giveBadgeAsHuman({
-        requestBody: {
-          badge_id: selectedId as string,
-          popup_id: popupId,
-          attendee_id: attendeeId,
-          message: message.trim() || null,
-        },
-      }),
+      sendAward(recipient, selectedId as string, message.trim() || null),
     onSuccess: () => {
       toast.success(t("attendees.badges.sent", { name: recipientName }))
       setBadgeId(null)
       setMessage("")
       setSearch("")
       onOpenChange(false)
+      onSent?.()
     },
     onError: (error) => {
       const status = error instanceof ApiError ? error.status : 0
@@ -123,7 +167,10 @@ export function SendBadgeDialog({
     },
     onSettled: () =>
       queryClient.invalidateQueries({
-        queryKey: queryKeys.profile.issuableBadges(popupId),
+        queryKey:
+          recipient.kind === "attendee"
+            ? queryKeys.profile.issuableBadges(recipient.popupId)
+            : queryKeys.profile.profileIssuable(recipient),
       }),
   })
 

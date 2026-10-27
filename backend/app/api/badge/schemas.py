@@ -366,16 +366,48 @@ class PublicProfile(BaseModel):
 
     display_name: str | None = None
     picture_url: str | None = None
+    # The readable alias (portal.<tenant>/<username>), when the person set one.
+    username: str | None = None
     badges: list[PublicProfileBadge]
 
 
 class PublicProfileSettings(BaseModel):
     enabled: bool
     token: str
+    username: str | None = None
 
 
 class PublicProfileSettingsUpdate(BaseModel):
-    enabled: bool
+    """Partial update: omitted fields keep their value, ``username: null``
+    removes the alias."""
+
+    enabled: bool | None = None
+    username: str | None = Field(default=None, max_length=64)
+
+
+# ---------------------------------------------------------------------------
+# Holders (third-party read: who holds which badge)
+# ---------------------------------------------------------------------------
+
+
+class BadgeHolderBadge(BaseModel):
+    badge: BadgeSummary
+    count: int
+    last_awarded_at: datetime
+
+
+class BadgeHolder(BaseModel):
+    """A person with a shared profile and the badges they hold.
+
+    Carries what the public profile already shows, plus the human id so an
+    integration can match the people it knows. Never add contact fields.
+    """
+
+    human_id: uuid.UUID
+    username: str | None = None
+    display_name: str | None = None
+    picture_url: str | None = None
+    badges: list[BadgeHolderBadge]
 
 
 # ---------------------------------------------------------------------------
@@ -568,6 +600,27 @@ class PortalBadgeAwardCreate(BaseModel):
     message: str | None = Field(default=None, max_length=500)
 
     model_config = ConfigDict(str_strip_whitespace=True)
+
+
+class ProfileBadgeAwardCreate(BaseModel):
+    """Give a badge from someone's public profile, outside any popup.
+
+    The recipient is addressed like the page they were found on: by username
+    or by share token, exactly one of them.
+    """
+
+    badge_id: uuid.UUID
+    username: str | None = Field(default=None, max_length=64)
+    token: str | None = Field(default=None, max_length=64)
+    message: str | None = Field(default=None, max_length=500)
+
+    model_config = ConfigDict(str_strip_whitespace=True)
+
+    @model_validator(mode="after")
+    def _one_recipient(self) -> "ProfileBadgeAwardCreate":
+        if bool(self.username) == bool(self.token):
+            raise ValueError("Pass either username or token")
+        return self
 
 
 class SentBadgeAward(BaseModel):

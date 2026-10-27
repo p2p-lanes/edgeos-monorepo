@@ -10,13 +10,16 @@ import {
 } from "@testing-library/react"
 import { toast } from "sonner"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
+import { ApiError } from "@/client"
 import BadgesSection from "./BadgesSection"
 
 const state = vi.hoisted(() => ({
   enabled: false,
   pending: false,
   mobile: false,
+  username: null as string | null,
   mutate: vi.fn(),
+  saveUsername: vi.fn(),
   copy: vi.fn(),
 }))
 
@@ -30,8 +33,13 @@ vi.mock("@/hooks/useIsMobile", () => ({
 
 vi.mock("@/hooks/usePublicProfileSettings", () => ({
   default: () => ({
-    settings: { enabled: state.enabled, token: "fixture-public-link" },
+    settings: {
+      enabled: state.enabled,
+      token: "fixture-public-link",
+      username: state.username,
+    },
     setEnabled: { isPending: state.pending, mutate: state.mutate },
+    setUsername: { isPending: false, mutate: state.saveUsername },
   }),
 }))
 
@@ -44,7 +52,9 @@ beforeEach(() => {
   state.enabled = false
   state.pending = false
   state.mobile = false
+  state.username = null
   state.mutate.mockReset()
+  state.saveUsername.mockReset()
   state.copy.mockReset().mockResolvedValue(undefined)
   Object.defineProperty(navigator, "clipboard", {
     configurable: true,
@@ -199,5 +209,59 @@ describe.each([
       )
     })
     expect(state.mutate).not.toHaveBeenCalled()
+  })
+})
+
+describe("BadgesSection username alias", () => {
+  it("copies the readable alias instead of the token once one is set", async () => {
+    state.enabled = true
+    state.username = "ada"
+    render(<BadgesSection />)
+    const panel = openSharing()
+    fireEvent.click(panel.getByRole("button", { name: "Copy link" }))
+
+    await waitFor(() => {
+      expect(state.copy).toHaveBeenCalledWith(`${window.location.origin}/ada`)
+    })
+  })
+
+  it("hides the alias field until sharing is on", () => {
+    render(<BadgesSection />)
+    const panel = openSharing()
+    expect(panel.queryByLabelText("Your link")).toBeNull()
+  })
+
+  it("saves a lowercased alias and an empty one as null", () => {
+    state.enabled = true
+    render(<BadgesSection />)
+    const panel = openSharing()
+    const input = panel.getByLabelText("Your link")
+    const save = panel.getByRole("button", { name: "Save" })
+    expect(save.hasAttribute("disabled")).toBe(true)
+
+    fireEvent.change(input, { target: { value: " Ada " } })
+    fireEvent.click(save)
+    expect(state.saveUsername).toHaveBeenCalledWith("ada", expect.any(Object))
+  })
+
+  it("explains a taken alias inline", async () => {
+    state.enabled = true
+    state.username = "ada"
+    render(<BadgesSection />)
+    const panel = openSharing()
+    fireEvent.change(panel.getByLabelText("Your link"), {
+      target: { value: "bob" },
+    })
+    fireEvent.click(panel.getByRole("button", { name: "Save" }))
+    const conflict = new ApiError(
+      { method: "PATCH", url: "" },
+      { url: "", ok: false, status: 409, statusText: "Conflict", body: {} },
+      "Conflict",
+    )
+    state.saveUsername.mock.calls[0][1].onError(conflict)
+
+    expect(
+      await panel.findByText("That name is taken. Try another one."),
+    ).toBeTruthy()
   })
 })

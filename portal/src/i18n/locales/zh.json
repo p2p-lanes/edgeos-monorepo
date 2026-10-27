@@ -760,7 +760,14 @@
       "link_copied": "链接已复制",
       "link_copy_failed": "无法复制链接",
       "link_enable_description": "启用公开链接，分享你的名字、照片和徽章。你的邮箱仍然保密。",
-      "link_update_failed": "无法更新分享设置，请重试。"
+      "link_update_failed": "无法更新分享设置，请重试。",
+      "username_label": "你的链接",
+      "username_placeholder": "your-name",
+      "username_save": "保存",
+      "username_saved": "链接名称已保存",
+      "username_hint": "3 到 30 个小写字母、数字、- 或 _。留空则使用随机链接。",
+      "username_taken": "该名称已被使用，请换一个。",
+      "username_invalid": "请使用 3 到 30 个小写字母、数字、- 或 _，并以字母或数字开头和结尾。"
     }
   },
   "sidebar": {
@@ -1451,6 +1458,8 @@
     "anonymous": "社区成员",
     "badge_count_one": "{{count}} 枚徽章",
     "badge_count_other": "{{count}} 枚徽章",
-    "no_badges": "还没有徽章。"
+    "no_badges": "还没有徽章。",
+    "give": "送徽章",
+    "give_named": "送{{badge}}"
   }
 }

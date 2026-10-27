@@ -9,6 +9,8 @@ from app.api.badge.models import BadgeAwards, BadgeImages, Badges, BadgeStyles
 from app.api.badge.schemas import (
     BadgeAwardPublic,
     BadgeAwardRecipient,
+    BadgeHolder,
+    BadgeHolderBadge,
     BadgeImagePublic,
     BadgeIssuerType,
     BadgePublic,
@@ -19,6 +21,7 @@ from app.api.badge.schemas import (
     SentBadgeAward,
 )
 from app.api.human.models import Humans
+from app.api.human.privacy import public_display_name
 from app.utils.utils import slugify
 
 
@@ -463,6 +466,83 @@ def public_profile_badges(db: Session, human: Humans) -> list[PublicProfileBadge
         )
         for items in grouped.values()
     ]
+
+
+def list_holders(
+    db: Session,
+    *,
+    badge_id: uuid.UUID | None = None,
+    human_id: uuid.UUID | None = None,
+    username: str | None = None,
+    skip: int = 0,
+    limit: int = 100,
+) -> tuple[list[BadgeHolder], int]:
+    """People holding badges, most recently awarded first.
+
+    Only people who share their public profile are listed, with what that
+    page shows. With ``badge_id`` it lists that badge's holders and each
+    holder carries only that badge; otherwise each carries all of theirs.
+    """
+    active = col(BadgeAwards.revoked_at).is_(None)
+    latest = select(
+        BadgeAwards.recipient_human_id,
+        func.max(BadgeAwards.awarded_at).label("last_awarded_at"),
+    ).where(active)
+    if badge_id:
+        latest = latest.where(BadgeAwards.badge_id == badge_id)
+    latest = latest.group_by(col(BadgeAwards.recipient_human_id)).subquery()
+
+    statement = (
+        select(Humans)
+        .join(latest, latest.c.recipient_human_id == Humans.id)
+        .where(col(Humans.public_profile_enabled).is_(True))
+    )
+    if human_id:
+        statement = statement.where(Humans.id == human_id)
+    if username:
+        statement = statement.where(Humans.username == username.strip().lower())
+    total = db.exec(select(func.count()).select_from(statement.subquery())).one()
+    humans = list(
+        db.exec(
+            statement.order_by(latest.c.last_awarded_at.desc(), col(Humans.id))
+            .offset(skip)
+            .limit(limit)
+        ).all()
+    )
+    if not humans:
+        return [], total
+
+    awards_statement = select(BadgeAwards).where(
+        active, col(BadgeAwards.recipient_human_id).in_([h.id for h in humans])
+    )
+    if badge_id:
+        awards_statement = awards_statement.where(BadgeAwards.badge_id == badge_id)
+    grouped: dict[uuid.UUID, dict[uuid.UUID, list[BadgeAwards]]] = defaultdict(
+        lambda: defaultdict(list)
+    )
+    for award in db.exec(
+        awards_statement.order_by(col(BadgeAwards.awarded_at).desc())
+    ).unique():
+        grouped[award.recipient_human_id][award.badge_id].append(award)
+
+    resolver = ImageResolver(list_styles(db))
+    return [
+        BadgeHolder(
+            human_id=human.id,
+            username=human.username,
+            display_name=public_display_name(human.first_name, human.last_name),
+            picture_url=human.picture_url,
+            badges=[
+                BadgeHolderBadge(
+                    badge=to_badge_summary(items[0].badge, resolver),
+                    count=len(items),
+                    last_awarded_at=items[0].awarded_at,
+                )
+                for items in grouped[human.id].values()
+            ],
+        )
+        for human in humans
+    ], total
 
 
 def list_sent(

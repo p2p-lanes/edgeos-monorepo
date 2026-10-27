@@ -10,10 +10,16 @@ import { type ReactNode, useState } from "react"
 import { ApiError } from "@/client"
 import { getAuthRedirectPath } from "@/lib/safe-return-to"
 
-function handleApiError(error: Error) {
+/**
+ * A stale session drops the token and sends the person to log in. Queries
+ * that only enrich a public page (meta `optionalAuth`) just drop the token,
+ * so an anonymous visitor keeps reading the page.
+ */
+function handleApiError(error: Error, optionalAuth = false) {
   if (error instanceof ApiError && error.status === 401) {
     if (typeof window !== "undefined") {
       localStorage.removeItem("token")
+      if (optionalAuth) return
       const { pathname, search, hash } = window.location
       const isPublicRoute =
         pathname.startsWith("/checkout") ||
@@ -41,8 +47,13 @@ function makeQueryClient() {
         },
       },
     },
-    queryCache: new QueryCache({ onError: handleApiError }),
-    mutationCache: new MutationCache({ onError: handleApiError }),
+    queryCache: new QueryCache({
+      onError: (error, query) =>
+        handleApiError(error, query.meta?.optionalAuth === true),
+    }),
+    mutationCache: new MutationCache({
+      onError: (error) => handleApiError(error),
+    }),
   })
 }
 

@@ -1680,6 +1680,26 @@ export type BadgeCreate = {
     recipients?: Array<BadgeNewRecipient>;
 };
 
+/**
+ * A person with a shared profile and the badges they hold.
+ *
+ * Carries what the public profile already shows, plus the human id so an
+ * integration can match the people it knows. Never add contact fields.
+ */
+export type BadgeHolder = {
+    human_id: string;
+    username?: (string | null);
+    display_name?: (string | null);
+    picture_url?: (string | null);
+    badges: Array<BadgeHolderBadge>;
+};
+
+export type BadgeHolderBadge = {
+    badge: BadgeSummary;
+    count: number;
+    last_awarded_at: string;
+};
+
 export type BadgeImageIn = {
     style_id: string;
     image_url: string;
@@ -4508,6 +4528,11 @@ export type ListModel_BadgeAwardPublic_ = {
     paging: Paging;
 };
 
+export type ListModel_BadgeHolder_ = {
+    results: Array<BadgeHolder>;
+    paging: Paging;
+};
+
 export type ListModel_BadgePublic_ = {
     results: Array<BadgePublic>;
     paging: Paging;
@@ -5953,6 +5978,19 @@ export type ProductWithQuantity = {
 };
 
 /**
+ * Give a badge from someone's public profile, outside any popup.
+ *
+ * The recipient is addressed like the page they were found on: by username
+ * or by share token, exactly one of them.
+ */
+export type ProfileBadgeAwardCreate = {
+    badge_id: string;
+    username?: (string | null);
+    token?: (string | null);
+    message?: (string | null);
+};
+
+/**
  * A room type as the buyer sees it.
  *
  * No units: how many rooms exist, and which one a guest lands in, is the
@@ -6013,6 +6051,7 @@ export type PublicAccommodationProperty = {
 export type PublicProfile = {
     display_name?: (string | null);
     picture_url?: (string | null);
+    username?: (string | null);
     badges: Array<PublicProfileBadge>;
 };
 
@@ -6026,10 +6065,16 @@ export type PublicProfileBadge = {
 export type PublicProfileSettings = {
     enabled: boolean;
     token: string;
+    username?: (string | null);
 };
 
+/**
+ * Partial update: omitted fields keep their value, ``username: null``
+ * removes the alias.
+ */
 export type PublicProfileSettingsUpdate = {
-    enabled: boolean;
+    enabled?: (boolean | null);
+    username?: (string | null);
 };
 
 export type PublishableKeyCreate = {
@@ -7004,7 +7049,7 @@ export type ThirdPartyAppCreate = {
     sso_start_url?: (string | null);
     sso_redirect_uri?: (string | null);
     name: string;
-    allowed_token_scopes?: Array<('portal:*' | 'portal:profile:read' | 'portal:profile:write' | 'portal:applications:read' | 'portal:applications:write' | 'portal:attendees:write' | 'portal:payments:read' | 'portal:payments:write' | 'portal:directory:read' | 'portal:api_keys:manage' | 'portal:badges:write')>;
+    allowed_token_scopes?: Array<('portal:*' | 'portal:profile:read' | 'portal:profile:write' | 'portal:applications:read' | 'portal:applications:write' | 'portal:attendees:write' | 'portal:payments:read' | 'portal:payments:write' | 'portal:directory:read' | 'portal:api_keys:manage' | 'portal:badges:read' | 'portal:badges:write')>;
     allowed_api_key_scopes?: Array<('events:read' | 'events:write' | 'rsvp:write' | 'venues:read' | 'venues:write' | 'applications:read' | 'applications:write' | 'attendees:read' | 'attendees:write' | 'humans:read' | 'humans:write' | 'groups:read' | 'groups:write' | 'products:read' | 'products:write' | 'accommodations:read' | 'accommodations:write' | 'coupons:read' | 'coupons:write' | 'forms:read' | 'forms:write' | 'payments:read' | 'tracks:read' | 'tracks:write' | 'ticketing_steps:read' | 'ticketing_steps:write' | 'translations:read' | 'translations:write' | 'badges:read' | 'badges:write')>;
 };
 
@@ -7061,7 +7106,7 @@ export type ThirdPartyAppUpdate = {
     sso_start_url?: (string | null);
     sso_redirect_uri?: (string | null);
     name?: (string | null);
-    allowed_token_scopes?: (Array<('portal:*' | 'portal:profile:read' | 'portal:profile:write' | 'portal:applications:read' | 'portal:applications:write' | 'portal:attendees:write' | 'portal:payments:read' | 'portal:payments:write' | 'portal:directory:read' | 'portal:api_keys:manage' | 'portal:badges:write')> | null);
+    allowed_token_scopes?: (Array<('portal:*' | 'portal:profile:read' | 'portal:profile:write' | 'portal:applications:read' | 'portal:applications:write' | 'portal:attendees:write' | 'portal:payments:read' | 'portal:payments:write' | 'portal:directory:read' | 'portal:api_keys:manage' | 'portal:badges:read' | 'portal:badges:write')> | null);
     allowed_api_key_scopes?: (Array<('events:read' | 'events:write' | 'rsvp:write' | 'venues:read' | 'venues:write' | 'applications:read' | 'applications:write' | 'attendees:read' | 'attendees:write' | 'humans:read' | 'humans:write' | 'groups:read' | 'groups:write' | 'products:read' | 'products:write' | 'accommodations:read' | 'accommodations:write' | 'coupons:read' | 'coupons:write' | 'forms:read' | 'forms:write' | 'payments:read' | 'tracks:read' | 'tracks:write' | 'ticketing_steps:read' | 'ticketing_steps:write' | 'translations:read' | 'translations:write' | 'badges:read' | 'badges:write')> | null);
 };
 
@@ -8548,6 +8593,36 @@ export type BadgesListSentBadgesData = {
 };
 
 export type BadgesListSentBadgesResponse = (Array<SentBadgeAward>);
+
+export type BadgesListBadgeHoldersData = {
+    badgeId?: (string | null);
+    badgeSlug?: (string | null);
+    humanId?: (string | null);
+    /**
+     * Maximum number of items to return
+     */
+    limit?: number;
+    /**
+     * Number of items to skip
+     */
+    skip?: number;
+    username?: (string | null);
+};
+
+export type BadgesListBadgeHoldersResponse = (ListModel_BadgeHolder_);
+
+export type BadgesListProfileIssuableBadgesData = {
+    token?: (string | null);
+    username?: (string | null);
+};
+
+export type BadgesListProfileIssuableBadgesResponse = (Array<IssuableBadge>);
+
+export type BadgesGiveBadgeFromProfileData = {
+    requestBody: ProfileBadgeAwardCreate;
+};
+
+export type BadgesGiveBadgeFromProfileResponse = (SentBadgeAward);
 
 export type BadgesListBadgesData = {
     category?: (string | null);
@@ -10261,6 +10336,14 @@ export type HumansGetPublicProfileData = {
 };
 
 export type HumansGetPublicProfileResponse = (PublicProfile);
+
+export type HumansGetPublicProfileByUsernameData = {
+    username: string;
+    xEdgeOsPublishableKey?: (string | null);
+    xTenantId?: (string | null);
+};
+
+export type HumansGetPublicProfileByUsernameResponse = (PublicProfile);
 
 export type HumansSearchHumansPortalData = {
     /**

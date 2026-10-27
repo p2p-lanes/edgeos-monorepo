@@ -5,6 +5,10 @@ issuer (``allowance_quantity`` per ``allowance_window``). When several active
 policies cover the same badge for the same person, the one with the most
 allowance left is used, and the award records it so that later counts stay
 per policy.
+
+Giving from someone's public profile happens outside any popup: only the
+policies without a popup apply there, and their day and week windows follow
+UTC since there is no popup timezone to read.
 """
 
 import uuid
@@ -39,8 +43,11 @@ class AllowanceExhaustedError(Exception):
         super().__init__("No more of this badge to give for now")
 
 
-def popup_timezone(db: Session, popup_id: uuid.UUID) -> ZoneInfo:
+def popup_timezone(db: Session, popup_id: uuid.UUID | None) -> ZoneInfo:
     from app.api.event_settings.crud import event_settings_crud
+
+    if popup_id is None:
+        return ZoneInfo("UTC")
 
     settings = event_settings_crud.get_by_popup_id(db, popup_id)
     try:
@@ -109,16 +116,20 @@ def remaining(
 def policies_for(
     db: Session,
     issuer_id: uuid.UUID,
-    popup_id: uuid.UUID,
+    popup_id: uuid.UUID | None,
     badge_id: uuid.UUID | None = None,
 ) -> list[BadgeIssuerPolicies]:
-    """Active policies whose audience includes the issuer in this popup."""
+    """Active policies whose audience includes the issuer in this popup.
+
+    With no popup (giving from a profile), only policies without one count.
+    """
     from app.api.event_participant.crud import event_participants_crud
 
+    scope = col(BadgeIssuerPolicies.popup_id).is_(None)
+    if popup_id is not None:
+        scope = scope | (BadgeIssuerPolicies.popup_id == popup_id)
     statement = select(BadgeIssuerPolicies).where(
-        col(BadgeIssuerPolicies.is_active).is_(True),
-        (col(BadgeIssuerPolicies.popup_id).is_(None))
-        | (BadgeIssuerPolicies.popup_id == popup_id),
+        col(BadgeIssuerPolicies.is_active).is_(True), scope
     )
     if badge_id is not None:
         statement = statement.join(
@@ -136,6 +147,9 @@ def policies_for(
             if any(h.id == issuer_id for h in policy.humans):
                 out.append(policy)
         elif audience == BadgeAudienceType.POPUP_ATTENDEES:
+            # Always popup-bound, so never reached without a popup.
+            if popup_id is None:
+                continue
             if attendee is None:
                 eligibility = event_participants_crud.eligibility_by_human(
                     db, popup_id, {issuer_id}
@@ -166,10 +180,12 @@ def _better(
 def issuable_badges(
     db: Session,
     issuer_id: uuid.UUID,
-    popup_id: uuid.UUID,
+    popup_id: uuid.UUID | None,
     recipient_id: uuid.UUID | None = None,
 ) -> list[IssuableBadge]:
     """Every badge the issuer may give in the popup, with its best allowance.
+
+    ``popup_id=None`` lists what they may give outside any popup.
 
     Exhausted badges are listed too (remaining 0) so the portal can say when
     they come back instead of silently hiding them. With ``recipient_id``,
@@ -235,10 +251,12 @@ def award_as_human(
     issuer_id: uuid.UUID,
     badge: Badges,
     recipient: Humans,
-    popup_id: uuid.UUID,
+    popup_id: uuid.UUID | None,
     message: str | None,
 ) -> BadgeAwards:
     """Give ``badge`` from one human to another under the issuer's policies.
+
+    ``popup_id=None`` gives it outside any popup (from a public profile).
 
     Concurrency: the issuer's ``humans`` row is locked for the rest of the
     transaction, so two simultaneous sends from the same person are counted

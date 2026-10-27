@@ -887,7 +887,14 @@
       "link_copied": "Link copied",
       "link_copy_failed": "Could not copy the link",
       "link_enable_description": "Activate a public link to share your name, photo and badges. Your email stays private.",
-      "link_update_failed": "Could not update sharing. Please try again."
+      "link_update_failed": "Could not update sharing. Please try again.",
+      "username_label": "Your link",
+      "username_placeholder": "your-name",
+      "username_save": "Save",
+      "username_saved": "Link name saved",
+      "username_hint": "3 to 30 lowercase letters, numbers, - or _. Leave it empty to use the random link.",
+      "username_taken": "That name is taken. Try another one.",
+      "username_invalid": "Use 3 to 30 lowercase letters, numbers, - or _, starting and ending with a letter or number."
     }
   },
   "sidebar": {
@@ -1643,7 +1650,9 @@
     "anonymous": "Community member",
     "badge_count_one": "{{count}} badge",
     "badge_count_other": "{{count}} badges",
-    "no_badges": "No badges yet."
+    "no_badges": "No badges yet.",
+    "give": "Give a badge",
+    "give_named": "Give {{badge}}"
   },
   "form_responses": {
     "view": "View responses",

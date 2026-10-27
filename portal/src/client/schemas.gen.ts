@@ -8014,6 +8014,83 @@ export const BadgeCreateSchema = {
     title: 'BadgeCreate'
 } as const;
 
+export const BadgeHolderSchema = {
+    properties: {
+        human_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Human Id'
+        },
+        username: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Username'
+        },
+        display_name: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Display Name'
+        },
+        picture_url: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Picture Url'
+        },
+        badges: {
+            items: {
+                '$ref': '#/components/schemas/BadgeHolderBadge'
+            },
+            type: 'array',
+            title: 'Badges'
+        }
+    },
+    type: 'object',
+    required: ['human_id', 'badges'],
+    title: 'BadgeHolder',
+    description: `A person with a shared profile and the badges they hold.
+
+Carries what the public profile already shows, plus the human id so an
+integration can match the people it knows. Never add contact fields.`
+} as const;
+
+export const BadgeHolderBadgeSchema = {
+    properties: {
+        badge: {
+            '$ref': '#/components/schemas/BadgeSummary'
+        },
+        count: {
+            type: 'integer',
+            title: 'Count'
+        },
+        last_awarded_at: {
+            type: 'string',
+            format: 'date-time',
+            title: 'Last Awarded At'
+        }
+    },
+    type: 'object',
+    required: ['badge', 'count', 'last_awarded_at'],
+    title: 'BadgeHolderBadge'
+} as const;
+
 export const BadgeImageInSchema = {
     properties: {
         style_id: {
@@ -21091,6 +21168,24 @@ export const ListModel_BadgeAwardPublic_Schema = {
     title: 'ListModel[BadgeAwardPublic]'
 } as const;
 
+export const ListModel_BadgeHolder_Schema = {
+    properties: {
+        results: {
+            items: {
+                '$ref': '#/components/schemas/BadgeHolder'
+            },
+            type: 'array',
+            title: 'Results'
+        },
+        paging: {
+            '$ref': '#/components/schemas/Paging'
+        }
+    },
+    type: 'object',
+    required: ['results', 'paging'],
+    title: 'ListModel[BadgeHolder]'
+} as const;
+
 export const ListModel_BadgePublic_Schema = {
     properties: {
         results: {
@@ -29225,6 +29320,59 @@ export const ProductWithQuantitySchema = {
     description: 'Product with quantity for attendee products.'
 } as const;
 
+export const ProfileBadgeAwardCreateSchema = {
+    properties: {
+        badge_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Badge Id'
+        },
+        username: {
+            anyOf: [
+                {
+                    type: 'string',
+                    maxLength: 64
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Username'
+        },
+        token: {
+            anyOf: [
+                {
+                    type: 'string',
+                    maxLength: 64
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Token'
+        },
+        message: {
+            anyOf: [
+                {
+                    type: 'string',
+                    maxLength: 500
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Message'
+        }
+    },
+    type: 'object',
+    required: ['badge_id'],
+    title: 'ProfileBadgeAwardCreate',
+    description: `Give a badge from someone's public profile, outside any popup.
+
+The recipient is addressed like the page they were found on: by username
+or by share token, exactly one of them.`
+} as const;
+
 export const PublicAccommodationSchema = {
     properties: {
         id: {
@@ -29454,6 +29602,17 @@ export const PublicProfileSchema = {
             ],
             title: 'Picture Url'
         },
+        username: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Username'
+        },
         badges: {
             items: {
                 '$ref': '#/components/schemas/PublicProfileBadge'
@@ -29515,6 +29674,17 @@ export const PublicProfileSettingsSchema = {
         token: {
             type: 'string',
             title: 'Token'
+        },
+        username: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Username'
         }
     },
     type: 'object',
@@ -29525,13 +29695,33 @@ export const PublicProfileSettingsSchema = {
 export const PublicProfileSettingsUpdateSchema = {
     properties: {
         enabled: {
-            type: 'boolean',
+            anyOf: [
+                {
+                    type: 'boolean'
+                },
+                {
+                    type: 'null'
+                }
+            ],
             title: 'Enabled'
+        },
+        username: {
+            anyOf: [
+                {
+                    type: 'string',
+                    maxLength: 64
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Username'
         }
     },
     type: 'object',
-    required: ['enabled'],
-    title: 'PublicProfileSettingsUpdate'
+    title: 'PublicProfileSettingsUpdate',
+    description: `Partial update: omitted fields keep their value, \`\`username: null\`\`
+removes the alias.`
 } as const;
 
 export const PublishPermissionSchema = {
@@ -34864,7 +35054,7 @@ export const ThirdPartyAppCreateSchema = {
         allowed_token_scopes: {
             items: {
                 type: 'string',
-                enum: ['portal:*', 'portal:profile:read', 'portal:profile:write', 'portal:applications:read', 'portal:applications:write', 'portal:attendees:write', 'portal:payments:read', 'portal:payments:write', 'portal:directory:read', 'portal:api_keys:manage', 'portal:badges:write']
+                enum: ['portal:*', 'portal:profile:read', 'portal:profile:write', 'portal:applications:read', 'portal:applications:write', 'portal:attendees:write', 'portal:payments:read', 'portal:payments:write', 'portal:directory:read', 'portal:api_keys:manage', 'portal:badges:read', 'portal:badges:write']
             },
             type: 'array',
             title: 'Allowed Token Scopes'
@@ -35138,7 +35328,7 @@ export const ThirdPartyAppUpdateSchema = {
                 {
                     items: {
                         type: 'string',
-                        enum: ['portal:*', 'portal:profile:read', 'portal:profile:write', 'portal:applications:read', 'portal:applications:write', 'portal:attendees:write', 'portal:payments:read', 'portal:payments:write', 'portal:directory:read', 'portal:api_keys:manage', 'portal:badges:write']
+                        enum: ['portal:*', 'portal:profile:read', 'portal:profile:write', 'portal:applications:read', 'portal:applications:write', 'portal:attendees:write', 'portal:payments:read', 'portal:payments:write', 'portal:directory:read', 'portal:api_keys:manage', 'portal:badges:read', 'portal:badges:write']
                     },
                     type: 'array'
                 },

@@ -4,6 +4,7 @@ import { Copy, Link, Loader2, Share2 } from "lucide-react"
 import { useId, useState } from "react"
 import { useTranslation } from "react-i18next"
 import { toast } from "sonner"
+import { ApiError, type PublicProfileSettings } from "@/client"
 import { BadgeTile } from "@/components/badges/BadgeTile"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
@@ -15,6 +16,8 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
 import {
   Popover,
   PopoverContent,
@@ -23,6 +26,101 @@ import {
 import { useIsMobile } from "@/hooks/useIsMobile"
 import useMyBadges from "@/hooks/useMyBadges"
 import usePublicProfileSettings from "@/hooks/usePublicProfileSettings"
+
+/** The shareable URL: the readable alias when set, else the opaque token. */
+function profileUrl(settings: PublicProfileSettings) {
+  const path = settings.username
+    ? `/${settings.username}`
+    : `/u/${settings.token}`
+  return `${window.location.origin}${path}`
+}
+
+function UsernameField({ settings }: { settings: PublicProfileSettings }) {
+  const { t } = useTranslation()
+  const { setUsername } = usePublicProfileSettings()
+  const inputId = useId()
+  const [draft, setDraft] = useState(settings.username ?? "")
+  const [error, setError] = useState<string | null>(null)
+  const value = draft.trim().toLowerCase()
+  const changed = value !== (settings.username ?? "")
+
+  const save = () => {
+    setError(null)
+    setUsername.mutate(value || null, {
+      onSuccess: (saved) => {
+        setDraft(saved.username ?? "")
+        toast.success(t("profile.badges.username_saved"))
+      },
+      onError: (err) => {
+        const status = err instanceof ApiError ? err.status : 0
+        setError(
+          t(
+            status === 409
+              ? "profile.badges.username_taken"
+              : status === 422
+                ? "profile.badges.username_invalid"
+                : "profile.badges.link_update_failed",
+          ),
+        )
+      },
+    })
+  }
+
+  return (
+    <form
+      className="space-y-1.5"
+      onSubmit={(event) => {
+        event.preventDefault()
+        if (changed) save()
+      }}
+    >
+      <Label htmlFor={inputId}>{t("profile.badges.username_label")}</Label>
+      <div className="flex gap-2">
+        <div className="flex min-w-0 flex-1 items-center rounded-md border bg-background pl-3 text-sm focus-within:ring-2 focus-within:ring-ring">
+          <span className="shrink-0 text-muted-foreground">
+            {window.location.host}/
+          </span>
+          <Input
+            id={inputId}
+            value={draft}
+            onChange={(event) => setDraft(event.target.value)}
+            maxLength={30}
+            autoCapitalize="none"
+            autoCorrect="off"
+            spellCheck={false}
+            placeholder={t("profile.badges.username_placeholder")}
+            aria-invalid={error ? true : undefined}
+            aria-describedby={`${inputId}-hint`}
+            className="h-9 min-w-0 border-0 px-0 shadow-none focus-visible:ring-0"
+          />
+        </div>
+        <Button
+          type="submit"
+          size="sm"
+          variant="outline"
+          className="h-9 shrink-0"
+          disabled={!changed || setUsername.isPending}
+        >
+          {setUsername.isPending ? (
+            <Loader2
+              aria-hidden="true"
+              className="animate-spin motion-reduce:animate-none"
+            />
+          ) : null}
+          {t("profile.badges.username_save")}
+        </Button>
+      </div>
+      <p
+        id={`${inputId}-hint`}
+        className={
+          error ? "text-xs text-destructive" : "text-xs text-muted-foreground"
+        }
+      >
+        {error ?? t("profile.badges.username_hint")}
+      </p>
+    </form>
+  )
+}
 
 function PublicProfileLink() {
   const { t } = useTranslation()
@@ -34,9 +132,7 @@ function PublicProfileLink() {
 
   const copy = async () => {
     try {
-      await navigator.clipboard.writeText(
-        `${window.location.origin}/u/${settings.token}`,
-      )
+      await navigator.clipboard.writeText(profileUrl(settings))
       toast.success(t("profile.badges.link_copied"))
       setOpen(false)
     } catch {
@@ -63,38 +159,41 @@ function PublicProfileLink() {
       : "profile.badges.link_enable_description",
   )
   const actions = (
-    <div className="space-y-1">
-      <Button
-        className="w-full"
-        disabled={setEnabled.isPending}
-        onClick={settings.enabled ? copy : () => changeSharing(true)}
-      >
-        {setEnabled.isPending ? (
-          <Loader2
-            aria-hidden="true"
-            className="animate-spin motion-reduce:animate-none"
-          />
-        ) : settings.enabled ? (
-          <Copy aria-hidden="true" />
-        ) : (
-          <Link aria-hidden="true" />
-        )}
-        {t(
-          settings.enabled
-            ? "profile.badges.link_copy"
-            : "profile.badges.link_activate",
-        )}
-      </Button>
-      {settings.enabled && (
+    <div className="space-y-3">
+      {settings.enabled && <UsernameField settings={settings} />}
+      <div className="space-y-1">
         <Button
-          variant="ghost"
-          className="w-full text-muted-foreground"
+          className="w-full"
           disabled={setEnabled.isPending}
-          onClick={() => changeSharing(false)}
+          onClick={settings.enabled ? copy : () => changeSharing(true)}
         >
-          {t("profile.badges.link_deactivate")}
+          {setEnabled.isPending ? (
+            <Loader2
+              aria-hidden="true"
+              className="animate-spin motion-reduce:animate-none"
+            />
+          ) : settings.enabled ? (
+            <Copy aria-hidden="true" />
+          ) : (
+            <Link aria-hidden="true" />
+          )}
+          {t(
+            settings.enabled
+              ? "profile.badges.link_copy"
+              : "profile.badges.link_activate",
+          )}
         </Button>
-      )}
+        {settings.enabled && (
+          <Button
+            variant="ghost"
+            className="w-full text-muted-foreground"
+            disabled={setEnabled.isPending}
+            onClick={() => changeSharing(false)}
+          >
+            {t("profile.badges.link_deactivate")}
+          </Button>
+        )}
+      </div>
     </div>
   )
 
