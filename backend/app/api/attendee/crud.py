@@ -1676,9 +1676,33 @@ class AttendeesCRUD(BaseCRUD[Attendees, AttendeeCreate, AttendeeUpdate]):
         ticket_id: uuid.UUID,
         actor: AuditActor | None = None,
     ) -> None:
-        """Revoke one paymentless unit and restore its stock exactly once."""
+        """Revoke one unit and restore its stock exactly once.
+
+        Paid units are revoked one at a time: the payment and its other units
+        are left as they are. ``stock_released_at`` records the returned unit
+        so a later cancellation of the payment does not restore it again and
+        an approval replay does not reactivate it.
+        """
+        from app.api.payment.models import Payments
+        from app.api.payment.schemas import PaymentStatus
         from app.api.product.crud import products_crud
         from app.api.product.models import Products
+
+        # Lock the payment before its unit, the same order cancellation and
+        # approval use, so a concurrent cancel cannot restore this unit twice.
+        payment_id = session.exec(
+            select(AttendeeProducts.payment_id).where(AttendeeProducts.id == ticket_id)
+        ).first()
+        payment = (
+            session.exec(
+                select(Payments)
+                .where(Payments.id == payment_id)
+                .with_for_update()
+                .execution_options(populate_existing=True)
+            ).first()
+            if payment_id is not None
+            else None
+        )
 
         ticket = session.exec(
             select(AttendeeProducts)
@@ -1691,18 +1715,23 @@ class AttendeesCRUD(BaseCRUD[Attendees, AttendeeCreate, AttendeeUpdate]):
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Ticket not found",
             )
-        if ticket.payment_id is not None:
-            raise HTTPException(
-                status_code=status.HTTP_409_CONFLICT,
-                detail="Paid product units can only be revoked by cancelling their payment",
-            )
 
         if ticket.revoked_at is not None:
             session.commit()
             return
 
-        products_crud.restore_total_stock(session, ticket.product_id, 1)
-        ticket.revoked_at = datetime.now(UTC)
+        # A cancelled, expired or rejected payment already returned its whole
+        # quantity, so only a unit still holding inventory restores it here.
+        holds_stock = ticket.payment_id is None or (
+            payment is not None
+            and payment.status
+            in (PaymentStatus.PENDING.value, PaymentStatus.APPROVED.value)
+        )
+        now = datetime.now(UTC)
+        if holds_stock and ticket.stock_released_at is None:
+            products_crud.restore_total_stock(session, ticket.product_id, 1)
+            ticket.stock_released_at = now
+        ticket.revoked_at = now
         session.add(ticket)
 
         if actor is not None:
@@ -1718,6 +1747,9 @@ class AttendeesCRUD(BaseCRUD[Attendees, AttendeeCreate, AttendeeUpdate]):
                         "ticket_id": str(ticket.id),
                         "product_id": str(ticket.product_id),
                         "product_name": product.name if product else None,
+                        "payment_id": (
+                            str(ticket.payment_id) if ticket.payment_id else None
+                        ),
                     },
                 )
 
