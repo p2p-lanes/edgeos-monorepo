@@ -793,7 +793,7 @@
   },
   "api_keys": {
     "title": "API lyklar",
-    "description": "Persónulegir aðgangsteknar sem starfa fyrir þína hönd. Notaðu þá með aðstoðarmönnum eða skriptum til að nálgast Viðburða API.",
+    "description": "Persónulegir aðgangsteknar sem starfa fyrir þína hönd. Notaðu þá með aðstoðarmönnum eða skriptum til að nálgast Viðburða- og Þátttakendaskrár API.",
     "new_key": "Nýr lykill",
     "empty": "Þú átt enga API lykla enn. Búðu til einn til að byrja.",
     "load_failed": "Mistókst að hlaða API lyklum.",
@@ -837,6 +837,10 @@
       "venues_write": {
         "label": "Sýsla með eigin staði",
         "description": "Búa til, breyta og eyða stöðum sem þú átt."
+      },
+      "directory_read": {
+        "label": "Lesa þátttakendaskrána",
+        "description": "Birta lista yfir þátttakendur, aðeins með því sem hver og einn valdi að deila."
       }
     }
   },
@@ -993,10 +997,6 @@
       "back_to_events": "Til baka á viðburði",
       "no_open_hours": "Engir opnunartímar",
       "in_timezone_time": "á tíma {{timezone}}"
-    },
-    "api_access": {
-      "unavailable_heading": "Ekki í boði fyrir þennan viðburð",
-      "unavailable_message": "API lyklar og viðburða API skjöl eru hluti af viðburðamódúlnum, sem er ekki virkur fyrir þennan viðburð."
     },
     "list": {
       "heading": "Viðburðir",
@@ -1450,5 +1450,9 @@
     "badge_count_one": "{{count}} merki",
     "badge_count_other": "{{count}} merki",
     "no_badges": "Engin merki enn."
+  },
+  "agentic_access": {
+    "unavailable_heading": "Ekki í boði fyrir þennan viðburð",
+    "unavailable_message": "API lyklar virka með viðburðadagatalinu og þátttakendaskránni, og hvorugt er virkt fyrir þennan viðburð."
   }
 }

@@ -50,6 +50,24 @@ export function buildDirectoryResource({
   }
 }
 
+// API keys reach both the events module and the attendee directory, so the
+// entry sits beside them rather than under either one.
+export function buildAgenticAccessResource({
+  t,
+  visible,
+}: {
+  t: (key: string, opts?: Record<string, unknown>) => string
+  visible: boolean
+}): Resource {
+  return {
+    name: t("sidebar.agentic_access", { defaultValue: "Agentic access" }),
+    icon: OpenClaw,
+    status: visible ? "active" : "hidden",
+    path: "/portal/agentic-access",
+    group: "community",
+  }
+}
+
 const useResources = () => {
   const { t } = useTranslation()
   const { getCity, popupsLoaded } = useCityProvider()
@@ -216,18 +234,15 @@ const useResources = () => {
                   status: "active" as const,
                   path: `/portal/${city.slug}/events/venues`,
                 },
-                {
-                  name: t("sidebar.agentic_access", {
-                    defaultValue: "Agentic access",
-                  }),
-                  icon: OpenClaw,
-                  status: "active" as const,
-                  path: "/portal/agentic-access",
-                },
               ],
             },
           ]
         : []),
+      // Nobody applies, so there is no directory: only events can open it.
+      buildAgenticAccessResource({
+        t,
+        visible: hasPopupAccess && eventsEnabled,
+      }),
     ]
 
     return { resources, doorName: null, permissionsLoading }
@@ -279,14 +294,6 @@ const useResources = () => {
             status: companionEventsVisible ? "active" : "hidden",
             path: `/portal/${city?.slug}/events/venues${flowQuery}`,
           },
-          {
-            name: t("sidebar.agentic_access", {
-              defaultValue: "Agentic access",
-            }),
-            icon: OpenClaw,
-            status: companionEventsVisible ? "active" : "hidden",
-            path: "/portal/agentic-access",
-          },
         ],
       },
       buildDirectoryResource({
@@ -294,6 +301,10 @@ const useResources = () => {
         slug: city.slug,
         hasAcceptedParticipation: hasPopupAccess,
         attendeeDirectoryEnabled,
+      }),
+      buildAgenticAccessResource({
+        t,
+        visible: hasPopupAccess && (eventsEnabled || attendeeDirectoryEnabled),
       }),
     ]
 
@@ -346,14 +357,12 @@ const useResources = () => {
           status: hasPopupAccess && eventsEnabled ? "active" : "hidden",
           path: `/portal/${city?.slug}/events/venues${flowQuery}`,
         },
-        {
-          name: t("sidebar.agentic_access", { defaultValue: "Agentic access" }),
-          icon: OpenClaw,
-          status: hasPopupAccess && eventsEnabled ? "active" : "hidden",
-          path: "/portal/agentic-access",
-        },
       ],
     },
+    buildAgenticAccessResource({
+      t,
+      visible: hasPopupAccess && (eventsEnabled || attendeeDirectoryEnabled),
+    }),
     {
       name: t("sidebar.referrals"),
       icon: Link2,

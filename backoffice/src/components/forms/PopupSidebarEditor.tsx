@@ -17,6 +17,7 @@ export type SidebarResourceKey =
   | "checkouts"
   | "directory"
   | "events"
+  | "agentic_access"
   | "referrals"
   | "groups"
 
@@ -54,6 +55,7 @@ export const SIDEBAR_RESOURCE_OPTIONS: {
   { key: "checkouts", label: "Checkout options" },
   { key: "directory", label: "Directory" },
   { key: "events", label: "Event calendar" },
+  { key: "agentic_access", label: "Agentic access" },
   { key: "referrals", label: "Referrals" },
   { key: "groups", label: "Groups" },
 ]
@@ -61,7 +63,6 @@ export const SIDEBAR_RESOURCE_OPTIONS: {
 const EVENT_SUBITEMS = [
   { key: "tracks", label: "Tracks" },
   { key: "venues", label: "Venues" },
-  { key: "agentic_access", label: "Agentic access" },
 ] as const
 
 const defaultBlock = (
@@ -97,6 +98,7 @@ export const DEFAULT_POPUP_SIDEBAR_CONFIG: PopupSidebarConfig = {
     defaultBlock("community", "community", [
       "directory",
       "events",
+      "agentic_access",
       "referrals",
       "groups",
     ]),

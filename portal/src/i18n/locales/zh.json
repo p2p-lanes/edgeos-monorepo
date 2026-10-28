@@ -796,7 +796,7 @@
   },
   "api_keys": {
     "title": "API 密钥",
-    "description": "代表你执行操作的个人访问令牌。可与代理或脚本一起使用以访问活动 API。",
+    "description": "代表你执行操作的个人访问令牌。可与代理或脚本一起使用以访问活动和名录 API。",
     "new_key": "新建密钥",
     "empty": "你还没有 API 密钥。创建一个以开始。",
     "load_failed": "加载 API 密钥失败。",
@@ -840,6 +840,10 @@
       "venues_write": {
         "label": "管理自己的场地",
         "description": "创建、编辑和删除你拥有的场地。"
+      },
+      "directory_read": {
+        "label": "读取参与者名录",
+        "description": "列出参与者名录，仅显示每位参与者选择分享的信息。"
       }
     }
   },
@@ -996,10 +1000,6 @@
       "back_to_events": "返回活动列表",
       "no_open_hours": "无营业时间",
       "in_timezone_time": "{{timezone}} 时间"
-    },
-    "api_access": {
-      "unavailable_heading": "此 popup 不可用",
-      "unavailable_message": "API 密钥和活动 API 文档属于活动模块，此 popup 未启用该模块。"
     },
     "list": {
       "heading": "活动",
@@ -1452,5 +1452,9 @@
     "badge_count_one": "{{count}} 枚徽章",
     "badge_count_other": "{{count}} 枚徽章",
     "no_badges": "还没有徽章。"
+  },
+  "agentic_access": {
+    "unavailable_heading": "此 popup 不可用",
+    "unavailable_message": "API 密钥适用于活动日历和参与者名录，此 popup 均未启用。"
   }
 }

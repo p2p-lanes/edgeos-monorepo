@@ -217,7 +217,7 @@ class TestApiKeyPolicy:
         )
 
         assert resp.status_code == 403, resp.text
-        assert "restricted to approved event automation routes" in resp.json()["detail"]
+        assert "restricted to approved automation routes" in resp.json()["detail"]
 
     def test_pat_event_respects_event_settings_approval(
         self,
@@ -403,9 +403,7 @@ class TestApiKeyPolicy:
         )
 
         assert resp.status_code == 403, resp.text
-        assert (
-            resp.json()["detail"] == "API keys are not available for this account."
-        )
+        assert resp.json()["detail"] == "API keys are not available for this account."
 
     def test_write_scope_api_key_defaults_expiry_when_omitted(
         self,
@@ -930,3 +928,127 @@ class TestApiKeyPolicy:
             headers=_pat_auth(raw_key),
         )
         assert denied.status_code == 401, denied.text
+
+
+def _make_directory_popup(db: Session, tenant: Tenants) -> Popups:
+    popup = _make_popup(db, tenant)
+    popup.show_attendee_directory = True
+    db.add(popup)
+    db.commit()
+    # The directory only exists where people apply.
+    application_flow_id(db, popup.id)
+    db.refresh(popup)
+    return popup
+
+
+class TestDirectoryApiKeyScope:
+    def test_directory_scope_can_list_directory(
+        self,
+        client: TestClient,
+        db: Session,
+        tenant_a: Tenants,
+    ) -> None:
+        popup = _make_directory_popup(db, tenant_a)
+        human = _make_human(db, tenant_a)
+        raw_key = _make_pat(db, tenant_a, human, popup, scopes=["directory:read"])
+
+        resp = client.get(
+            f"/api/v1/applications/my/directory/{popup.id}",
+            headers=_pat_auth(raw_key),
+        )
+
+        assert resp.status_code == 200, resp.text
+        assert "results" in resp.json()
+
+    def test_events_scope_cannot_list_directory(
+        self,
+        client: TestClient,
+        db: Session,
+        tenant_a: Tenants,
+    ) -> None:
+        popup = _make_directory_popup(db, tenant_a)
+        human = _make_human(db, tenant_a)
+        raw_key = _make_pat(db, tenant_a, human, popup, scopes=["events:read"])
+
+        resp = client.get(
+            f"/api/v1/applications/my/directory/{popup.id}",
+            headers=_pat_auth(raw_key),
+        )
+
+        assert resp.status_code == 403, resp.text
+        assert "directory:read" in resp.json()["detail"]
+
+    def test_directory_scope_is_bound_to_key_popup(
+        self,
+        client: TestClient,
+        db: Session,
+        tenant_a: Tenants,
+    ) -> None:
+        popup = _make_directory_popup(db, tenant_a)
+        other_popup = _make_directory_popup(db, tenant_a)
+        human = _make_human(db, tenant_a)
+        raw_key = _make_pat(db, tenant_a, human, popup, scopes=["directory:read"])
+
+        resp = client.get(
+            f"/api/v1/applications/my/directory/{other_popup.id}",
+            headers=_pat_auth(raw_key),
+        )
+
+        assert resp.status_code == 403, resp.text
+        assert "does not have access to this popup" in resp.json()["detail"]
+
+    def test_directory_scope_respects_disabled_directory(
+        self,
+        client: TestClient,
+        db: Session,
+        tenant_a: Tenants,
+    ) -> None:
+        popup = _make_popup(db, tenant_a)
+        application_flow_id(db, popup.id)
+        human = _make_human(db, tenant_a)
+        raw_key = _make_pat(db, tenant_a, human, popup, scopes=["directory:read"])
+
+        resp = client.get(
+            f"/api/v1/applications/my/directory/{popup.id}",
+            headers=_pat_auth(raw_key),
+        )
+
+        assert resp.status_code == 404, resp.text
+
+    @pytest.mark.parametrize("suffix", ["csv", "profile-data"])
+    def test_directory_scope_does_not_open_sibling_routes(
+        self,
+        client: TestClient,
+        db: Session,
+        tenant_a: Tenants,
+        suffix: str,
+    ) -> None:
+        popup = _make_directory_popup(db, tenant_a)
+        human = _make_human(db, tenant_a)
+        raw_key = _make_pat(db, tenant_a, human, popup, scopes=["directory:read"])
+
+        resp = client.get(
+            f"/api/v1/applications/my/directory/{popup.id}/{suffix}",
+            headers=_pat_auth(raw_key),
+        )
+
+        assert resp.status_code == 403, resp.text
+        assert "restricted to approved automation routes" in resp.json()["detail"]
+
+
+@pytest.mark.parametrize(
+    ("route", "exact", "path", "expected"),
+    [
+        ("/api/v1/x/{id}", True, "/api/v1/x/abc", True),
+        ("/api/v1/x/{id}", True, "/api/v1/x/abc/csv", False),
+        ("/api/v1/x/{id}", True, "/api/v1/x/", False),
+        ("/api/v1/x/{id}", False, "/api/v1/x/abc/csv", True),
+        ("/api/v1/x/{id}", True, "/api/v1/y/abc", False),
+        ("/api/v1/x", True, "/api/v1/x", True),
+        ("/api/v1/x/", False, "/api/v1/x/abc", True),
+    ],
+)
+def test_pat_route_matches(route: str, exact: bool, path: str, expected: bool) -> None:
+    from app.core.security import pat_route_matches
+
+    assert pat_route_matches(route, exact, path) is expected
