@@ -286,7 +286,9 @@ async def list_applications(
             db, human_id=human_id, skip=skip, limit=limit
         )
     else:
-        applications, total = crud.applications_crud.find(db, skip=skip, limit=limit)
+        applications, total = crud.applications_crud.find_for_listing(
+            db, skip=skip, limit=limit
+        )
 
     review_decisions = (
         application_reviews_crud.get_decisions_by_reviewer_for_applications(
