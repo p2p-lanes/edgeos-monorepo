@@ -70,6 +70,7 @@ ApiKeyScope = Literal[
     "translations:write",
     "badges:read",
     "badges:write",
+    "directory:read",
 ]
 
 # Union used for TokenPayload.scopes — accepts both universes.
@@ -197,7 +198,10 @@ class TokenPayload(BaseModel):
 
 
 # Each entry: (route, exact_match, scopes_any_of). The api key must carry at
-# least one of `scopes_any_of` for the route to be accessible.
+# least one of `scopes_any_of` for the route to be accessible. A `{param}`
+# segment in `route` matches any single non-empty path segment (see
+# pat_route_matches), so a template can whitelist one route without opening
+# its siblings the way a plain prefix would.
 _PAT_ROUTE_POLICIES: dict[
     str, tuple[tuple[str, bool, tuple[ApiKeyScope, ...]], ...]
 ] = {
@@ -210,6 +214,8 @@ _PAT_ROUTE_POLICIES: dict[
         ("/api/v1/tracks/portal/tracks", False, ("events:read",)),
         ("/api/v1/popups/portal/list", True, ("events:read",)),
         ("/api/v1/popups/portal/", False, ("events:read",)),
+        # Listing only: the CSV export and profile-data siblings stay closed.
+        ("/api/v1/applications/my/directory/{popup_id}", True, ("directory:read",)),
     ),
     "POST": (
         ("/api/v1/events/portal/events", True, ("events:write",)),
@@ -233,12 +239,31 @@ _PAT_ROUTE_POLICIES: dict[
 }
 
 
+def pat_route_matches(route: str, exact: bool, path: str) -> bool:
+    """Return whether ``path`` is covered by a _PAT_ROUTE_POLICIES ``route``."""
+    if "{" not in route:
+        return path == route if exact else path.startswith(route)
+    route_parts = route.split("/")
+    path_parts = path.split("/")
+    if len(path_parts) < len(route_parts):
+        return False
+    if exact and len(path_parts) != len(route_parts):
+        return False
+    for route_part, path_part in zip(route_parts, path_parts, strict=False):
+        if route_part.startswith("{") and route_part.endswith("}"):
+            if not path_part:
+                return False
+        elif route_part != path_part:
+            return False
+    return True
+
+
 def _required_scopes_for_pat(method: str, path: str) -> tuple[ApiKeyScope, ...] | None:
     """Return the tuple of any-of scopes the route requires, or None if the
     route is not in the PAT whitelist."""
     allowed_routes = _PAT_ROUTE_POLICIES.get(method, ())
     for route, exact, scopes in allowed_routes:
-        if path == route if exact else path.startswith(route):
+        if pat_route_matches(route, exact, path):
             return scopes
     return None
 
@@ -261,7 +286,7 @@ def _enforce_api_key_policy(request: Request, payload: TokenPayload) -> None:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail=(
-                "API keys are restricted to approved event automation routes. "
+                "API keys are restricted to approved automation routes. "
                 "Sign in with the portal session for broader access."
             ),
         )
