@@ -10,6 +10,7 @@ export type ApiKeyScope =
   | "events:write"
   | "rsvp:write"
   | "venues:write"
+  | "directory:read"
 export type ApiKeyCreateBody = ApiKeyCreate
 export type { ApiKeyCreated, ApiKeyPublic }
 

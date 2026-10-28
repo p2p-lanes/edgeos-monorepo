@@ -68,4 +68,17 @@ describe("PopupSidebarEditor", () => {
     await user.click(tracks)
     expect(tracks).not.toBeChecked()
   })
+
+  it("lists Agentic access as its own menu option, not an Events toggle", () => {
+    render(<SidebarEditorHarness />)
+
+    expect(
+      screen.queryByRole("checkbox", { name: "Agentic access" }),
+    ).toBeNull()
+    expect(
+      screen.getByRole("button", {
+        name: "Remove Agentic access from section",
+      }),
+    ).toBeTruthy()
+  })
 })
