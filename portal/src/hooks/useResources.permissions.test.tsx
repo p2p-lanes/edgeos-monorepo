@@ -14,6 +14,7 @@ const state = vi.hoisted(() => ({
     status: string
     takes_applications: boolean
     show_attendee_directory: boolean
+    events_enabled?: boolean
   },
   popupsLoaded: true,
   applicationsLoading: false,
@@ -92,6 +93,10 @@ const directoryStatus = (
 ) =>
   resources.find((resource) => resource.path === "/portal/india/attendees")
     ?.status
+
+const agenticAccess = (
+  resources: ReturnType<typeof useResources>["resources"],
+) => resources.find((resource) => resource.path === "/portal/agentic-access")
 
 describe("useResources permission readiness", () => {
   it("waits for popup configuration before making an access decision", () => {
@@ -177,47 +182,56 @@ describe("useResources permission readiness", () => {
     state.access = "allowed"
 
     const { result } = renderHook(() => useResources())
-    const events = result.current.resources.find(
-      (resource) => resource.name === "sidebar.events",
-    )
 
-    expect(events?.status).toBe("active")
-    expect(
-      events?.children?.find(
-        (resource) => resource.path === "/portal/agentic-access",
-      )?.status,
-    ).toBe("active")
+    expect(agenticAccess(result.current.resources)?.status).toBe("active")
   })
 
-  it("lists Venues and Agentic access under Events but never Tracks", () => {
+  it("lists Venues under Events and Agentic access as its own item", () => {
     state.access = "allowed"
-    const eventChildren = () => {
+    const sidebar = () => {
       const { result } = renderHook(() => useResources())
-      return result.current.resources
-        .find((resource) => resource.name === "sidebar.events")
-        ?.children?.map((resource) => resource.name)
+      return {
+        eventChildren: result.current.resources
+          .find((resource) => resource.name === "sidebar.events")
+          ?.children?.map((resource) => resource.name),
+        agentic: agenticAccess(result.current.resources),
+      }
     }
 
     // Default (applications) branch.
-    expect(eventChildren()).toEqual([
-      "sidebar.venues",
-      "sidebar.agentic_access",
-    ])
+    expect(sidebar().eventChildren).toEqual(["sidebar.venues"])
+    expect(sidebar().agentic?.group).toBe("community")
 
     // Companion branch.
     state.participation = { type: "companion", application_status: "accepted" }
-    expect(eventChildren()).toEqual([
-      "sidebar.venues",
-      "sidebar.agentic_access",
-    ])
+    expect(sidebar().eventChildren).toEqual(["sidebar.venues"])
+    expect(sidebar().agentic?.status).toBe("active")
 
     // Nobody-applies branch.
     state.participation = null
     state.city!.takes_applications = false
-    expect(eventChildren()).toEqual([
-      "sidebar.venues",
-      "sidebar.agentic_access",
-    ])
+    expect(sidebar().eventChildren).toEqual(["sidebar.venues"])
+    expect(sidebar().agentic?.status).toBe("active")
+  })
+
+  it("shows Agentic access with only the attendee directory enabled", () => {
+    state.access = "allowed"
+    state.city!.events_enabled = false
+    state.city!.show_attendee_directory = true
+
+    const { result } = renderHook(() => useResources())
+
+    expect(agenticAccess(result.current.resources)?.status).toBe("active")
+  })
+
+  it("hides Agentic access when neither events nor the directory is enabled", () => {
+    state.access = "allowed"
+    state.city!.events_enabled = false
+    state.city!.show_attendee_directory = false
+
+    const { result } = renderHook(() => useResources())
+
+    expect(agenticAccess(result.current.resources)?.status).toBe("hidden")
   })
 
   it("waits for the existing access query when the popup has ended", () => {

@@ -926,7 +926,7 @@
   },
   "api_keys": {
     "title": "API Keys",
-    "description": "Tokens personales que actúan en tu nombre. Usalos con agentes o scripts para acceder a la API de Eventos.",
+    "description": "Tokens personales que actúan en tu nombre. Usalos con agentes o scripts para acceder a las APIs de Eventos y del Directorio.",
     "new_key": "Nueva key",
     "empty": "Todavía no tenés API keys. Creá una para empezar.",
     "load_failed": "Error al cargar las API keys.",
@@ -970,6 +970,10 @@
       "venues_write": {
         "label": "Gestionar tus venues",
         "description": "Crear, editar y eliminar los venues que te pertenecen."
+      },
+      "directory_read": {
+        "label": "Leer el directorio de asistentes",
+        "description": "Listar el directorio de asistentes, mostrando solo lo que cada persona eligió compartir."
       }
     }
   },
@@ -1126,10 +1130,6 @@
       "back_to_events": "Volver a eventos",
       "no_open_hours": "Sin horarios de apertura",
       "in_timezone_time": "en horario de {{timezone}}"
-    },
-    "api_access": {
-      "unavailable_heading": "No disponible para este popup",
-      "unavailable_message": "Las API keys y la documentación de la API de eventos forman parte del módulo de eventos, que no está habilitado para este popup."
     },
     "list": {
       "heading": "Eventos",
@@ -1637,5 +1637,9 @@
     "saved": "Respuestas actualizadas.",
     "save_error": "No se pudieron guardar las respuestas. Intentá nuevamente.",
     "history": "Historial de respuestas"
+  },
+  "agentic_access": {
+    "unavailable_heading": "No disponible para este popup",
+    "unavailable_message": "Las API keys funcionan con el calendario de eventos y el directorio de asistentes, y ninguno está habilitado para este popup."
   }
 }

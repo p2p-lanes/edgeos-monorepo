@@ -55,6 +55,7 @@ from app.api.attendee.schemas import (
     AttendeeUpdate,
     AttendeeWithTickets,
 )
+from app.api.popup.guards import CallerToken, ensure_api_key_popup
 from app.api.shared.enums import UserRole
 from app.api.shared.response import ListModel, PaginationLimit, PaginationSkip, Paging
 from app.core.dependencies.users import (
@@ -286,7 +287,9 @@ async def list_applications(
             db, human_id=human_id, skip=skip, limit=limit
         )
     else:
-        applications, total = crud.applications_crud.find(db, skip=skip, limit=limit)
+        applications, total = crud.applications_crud.find_for_listing(
+            db, skip=skip, limit=limit
+        )
 
     review_decisions = (
         application_reviews_crud.get_decisions_by_reviewer_for_applications(
@@ -1606,6 +1609,7 @@ async def list_attendees_directory(
     popup_id: uuid.UUID,
     db: HumanTenantSession,
     _: CurrentHuman,
+    token_payload: CallerToken,
     skip: PaginationSkip = 0,
     limit: PaginationLimit = 100,
     q: str | None = None,
@@ -1621,6 +1625,7 @@ async def list_attendees_directory(
     in the response but do not determine portal row visibility. The default
     listing and CSV export do not apply the empty-row filter.
     """
+    ensure_api_key_popup(token_payload, popup_id)
     _ensure_attendee_directory_enabled(db, popup_id)
 
     attendees, total = crud.applications_crud.find_directory(

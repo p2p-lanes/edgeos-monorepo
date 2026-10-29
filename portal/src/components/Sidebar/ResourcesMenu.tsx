@@ -74,9 +74,7 @@ const ResourceItem: React.FC<{
                     ? child.path?.endsWith("/events/tracks")
                     : key === "venues"
                       ? child.path?.endsWith("/events/venues")
-                      : key === "agentic_access"
-                        ? child.path?.endsWith("/portal/agentic-access")
-                        : false,
+                      : false,
                 ),
             )
             .map((child) => (
@@ -141,6 +139,8 @@ const ResourcesMenu = () => {
       [t("sidebar.passes")]: "passes",
       [t("sidebar.orders")]: "orders",
       [t("sidebar.events")]: "events",
+      [t("sidebar.agentic_access", { defaultValue: "Agentic access" })]:
+        "agentic_access",
       [t("sidebar.attendee_directory")]: "directory",
       [t("sidebar.referrals")]: "referrals",
     }
