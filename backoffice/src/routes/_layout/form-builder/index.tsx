@@ -862,7 +862,7 @@ function FormBuilderContent({ popupId }: { popupId: string }) {
         updateFieldMutation.isPending ||
         createSectionMutation.isPending ||
         updateSectionMutation.isPending) && (
-        <div className="fixed bottom-4 right-4 flex items-center gap-2 rounded-lg border bg-background px-3 py-2 shadow-lg text-sm text-muted-foreground">
+        <div className="fixed bottom-4 right-[calc(1rem+var(--ai-panel-width,0px))] flex items-center gap-2 rounded-lg border bg-background px-3 py-2 shadow-lg text-sm text-muted-foreground">
           <Loader2 className="h-3.5 w-3.5 animate-spin" />
           Saving...
         </div>
