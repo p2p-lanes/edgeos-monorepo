@@ -75,6 +75,15 @@ function activityItem(part: GenericToolPart, index: number): ActivityItem {
     }
   }
 
+  if (part.type === "tool-searchBackofficeGuides") {
+    return {
+      id: part.toolCallId ?? `guides-${index}`,
+      label: complete ? "Checked usage guides" : "Checking usage guides",
+      state,
+      kind: "search",
+    }
+  }
+
   const operation = outputOperation(part)
   if (operation) {
     const isRead = operation.method === "GET"

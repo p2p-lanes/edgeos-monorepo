@@ -64,6 +64,23 @@ Server-owned workflow skills live under `ai-service/skills/*/SKILL.md`. Relevant
 skills are loaded into the prompt per user request and are also returned by
 operation discovery. Skills teach domain workflows; they never grant permissions.
 
+## Backoffice usage guides
+
+`ai-service/guides/` teaches the assistant how to use the backoffice UI by hand
+("where are the applications?", "how do I grant a ticket?"):
+
+- `navigation.md` is the always-on map of sidebar sections, routes, roles and
+  the capabilities that do not exist in the UI.
+- Every other `*.md` file is one guide with `name`, `description`, `triggers`,
+  `routes` and `roles` frontmatter. Confident matches are injected into the
+  prompt, and the model can fetch more with the `searchBackofficeGuides` tool.
+
+Guides are written in English with exact UI labels; the assistant replies in the
+user's language. `src/guides.test.ts` fails when a guide references a route that
+no longer exists in `backoffice/src/routeTree.gen.ts`, or when a sidebar item is
+missing from the navigation map. Update the guides whenever a backoffice screen
+changes.
+
 ## Environment
 
 | Variable | Required | Default |
