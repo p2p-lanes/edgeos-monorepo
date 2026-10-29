@@ -102,6 +102,14 @@ function compactMessages(messages: UIMessage[]) {
           },
         }
       }
+      if (part.type === "tool-searchBackofficeGuides") {
+        return {
+          ...part,
+          output: {
+            guides: Array.isArray(record.guides) ? record.guides.length : 0,
+          },
+        }
+      }
       if (part.type === "tool-searchOperations") {
         const count = Array.isArray(record.operations)
           ? record.operations.length
