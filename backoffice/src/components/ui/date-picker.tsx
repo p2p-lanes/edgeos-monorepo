@@ -1,7 +1,7 @@
 "use client"
 
 import { format } from "date-fns"
-import { CalendarIcon } from "lucide-react"
+import { CalendarIcon, X } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { Calendar } from "@/components/ui/calendar"
@@ -31,6 +31,8 @@ interface DatePickerProps {
   className?: string
   id?: string
   defaultMonth?: Date
+  /** Shows a button that resets the value to "" so a saved date can be removed. */
+  clearable?: boolean
 }
 
 /**
@@ -47,6 +49,7 @@ export function DatePicker({
   className,
   id,
   defaultMonth,
+  clearable,
 }: DatePickerProps) {
   // Parse YYYY-MM-DD or ISO string to Date object
   const parseDate = (val: string): Date | undefined => {
@@ -78,7 +81,7 @@ export function DatePicker({
       ? (d) => disabledDays(d) || closedDays(d)
       : (disabledDays ?? closedDays)
 
-  return (
+  const picker = (
     <Popover>
       <PopoverTrigger asChild>
         <Button
@@ -116,5 +119,28 @@ export function DatePicker({
         />
       </PopoverContent>
     </Popover>
+  )
+
+  if (!clearable) return picker
+
+  // Keep the wrapper mounted whether or not a date is set, so picking the
+  // first date does not remount (and close) the popover.
+  return (
+    <div className="flex items-center gap-1">
+      {picker}
+      {date && !disabled && (
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon-sm"
+          className="shrink-0 text-muted-foreground"
+          onClick={() => onChange("")}
+          aria-label="Clear date"
+          title="Clear date"
+        >
+          <X className="h-4 w-4" />
+        </Button>
+      )}
+    </div>
   )
 }
