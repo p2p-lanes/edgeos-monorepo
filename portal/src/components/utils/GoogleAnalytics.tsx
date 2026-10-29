@@ -20,8 +20,10 @@ function ensureGtag(measurementId: string) {
 
   window.dataLayer = window.dataLayer || []
   if (!window.gtag) {
-    window.gtag = (...args: unknown[]) => {
-      window.dataLayer?.push(args)
+    window.gtag = function () {
+      // gtag.js expects the Arguments object in dataLayer, not a rest-parameter array.
+      // biome-ignore lint/complexity/noArguments: Required by the gtag.js queue format.
+      window.dataLayer?.push(arguments)
     }
     window.gtag("js", new Date())
   }

@@ -928,7 +928,7 @@
   },
   "api_keys": {
     "title": "API Keys",
-    "description": "Personal access tokens that act on your behalf. Use them with agents or scripts to access the Events API.",
+    "description": "Personal access tokens that act on your behalf. Use them with agents or scripts to access the Events and Directory APIs.",
     "new_key": "New key",
     "empty": "You don't have any API keys yet. Create one to get started.",
     "load_failed": "Failed to load API keys.",
@@ -972,6 +972,10 @@
       "venues_write": {
         "label": "Manage own venues",
         "description": "Create, edit, and delete venues you own."
+      },
+      "directory_read": {
+        "label": "Read the attendee directory",
+        "description": "List the attendees directory, showing only what each attendee chose to share."
       }
     }
   },
@@ -1128,10 +1132,6 @@
       "back_to_events": "Back to events",
       "no_open_hours": "No open hours",
       "in_timezone_time": "in {{timezone}} time"
-    },
-    "api_access": {
-      "unavailable_heading": "Not available for this popup",
-      "unavailable_message": "API keys and the events API docs are part of the events module, which isn't enabled for this popup."
     },
     "list": {
       "heading": "Events",
@@ -1661,5 +1661,9 @@
     "saved": "Responses updated.",
     "save_error": "Could not save your responses. Please try again.",
     "history": "Response history"
+  },
+  "agentic_access": {
+    "unavailable_heading": "Not available for this popup",
+    "unavailable_message": "API keys work with the event calendar and the attendee directory, and neither is enabled for this popup."
   }
 }

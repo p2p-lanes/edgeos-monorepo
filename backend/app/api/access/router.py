@@ -30,6 +30,7 @@ from app.core.security import (  # noqa: E402
     _PAT_ROUTE_POLICIES,
     THIRD_PARTY_API_KEY_SCOPES_MAX,
     TokenPayload,
+    pat_route_matches,
 )
 
 router = APIRouter(prefix="/third-party-apps", tags=["third-party-discovery"])
@@ -276,7 +277,7 @@ def _path_accessible(
     for pm, exact_match, prefix in prefix_rules:
         if pm != m:
             continue
-        if path == prefix if exact_match else path.startswith(prefix):
+        if pat_route_matches(prefix, exact_match, path):
             return True
     return False
 
