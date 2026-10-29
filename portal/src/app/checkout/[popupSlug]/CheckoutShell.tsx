@@ -9,7 +9,11 @@ import { getCheckoutBackground } from "@/lib/background-image"
 
 /** Page chrome around the checkout: the popup's configured background and the
  *  collapsed sidebar the flow renders inside. Shared by the buyer-facing page
- *  and the backoffice preview so both sit on the same canvas. */
+ *  and the backoffice preview so both sit on the same canvas.
+ *
+ *  `--checkout-chrome-top` is the height of any host chrome stacked above the
+ *  checkout (the Portal's mobile sidebar bar). It is unset everywhere else, so
+ *  the scroller stays a full viewport tall instead of overflowing its host. */
 export function CheckoutShell({
   popup,
   children,
@@ -30,7 +34,7 @@ export function CheckoutShell({
         } as React.CSSProperties
       }
     >
-      <main className="relative isolate h-svh overflow-y-auto bg-background no-scrollbar">
+      <main className="relative isolate h-[calc(100svh_-_var(--checkout-chrome-top,0px))] overflow-y-auto bg-background no-scrollbar">
         <div className="relative min-h-full">
           {background.type === "image" && (
             <CheckoutBackgroundImage url={background.url} position="absolute" />

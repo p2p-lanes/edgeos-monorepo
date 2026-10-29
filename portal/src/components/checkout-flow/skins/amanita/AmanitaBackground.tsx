@@ -16,16 +16,23 @@ import { Stars } from "./Stars"
  * decorative, full-bleed, art-directed background image.
  *
  * `pointer-events-none` is load-bearing, not tidying: the checkout scrolls in
- * `CheckoutPageClient`'s `main.h-svh.overflow-y-auto`, but a fixed element's
+ * `CheckoutShell`'s `main.overflow-y-auto`, but a fixed element's
  * scroll chain starts at the viewport, not at the overflow ancestor it happens
  * to sit in — and the document itself doesn't scroll. Hit-testable, this layer
  * swallows the wheel everywhere it isn't covered by the content column, so the
  * page only scrolls with the cursor over the cards. The sibling non-amanita
  * backgrounds dodge this by painting at `-z-10`, behind the scroller's own box.
+ *
+ * The top edge follows `--checkout-chrome-top` so the layer starts below host
+ * chrome stacked above the checkout (the Portal's mobile sidebar bar) instead
+ * of painting over it.
  */
 export function AmanitaBackground() {
   return (
-    <div aria-hidden className="pointer-events-none fixed inset-0 z-0">
+    <div
+      aria-hidden
+      className="pointer-events-none fixed inset-x-0 top-[var(--checkout-chrome-top,0px)] bottom-0 z-0"
+    >
       <picture>
         <source
           media="(max-width: 767px)"
