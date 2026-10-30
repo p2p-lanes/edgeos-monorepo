@@ -35,7 +35,10 @@ Notes:
 
 ## Conventions
 - Branch from `dev`; PRs target `dev`, never `main`. Required CI must pass before merging.
+- Branches: `type/short-slug`, same types as commits, plus the Linear id when there is one
+  (`fix/sim-139-portal-header-visibility`). Don't use Linear's suggested branch name.
 - Commits: `type(scope): summary` (`feat`, `fix`, `test`, `refactor`, `docs`…).
+- Everything in the repo is in English: branch names, commits, PR titles and bodies, code and comments.
 - Formatting and lint: Biome for TS (backoffice, portal, ai-service), Ruff for Python.
 - Enforce permissions and business rules in the backend; UI gating is only cosmetic.
 - Tenant scoping is mandatory in every query and endpoint.
