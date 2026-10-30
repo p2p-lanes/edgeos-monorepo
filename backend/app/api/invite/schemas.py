@@ -174,6 +174,9 @@ class AttendeeSharingStatus(BaseModel):
     can_share: bool
     # The flow a same-popup link would land people in, when sharing is allowed.
     sales_flow_id: uuid.UUID | None = None
+    # Its name, given only when the popup has more than one open way in: with
+    # a single door the popup's name already says where the link goes.
+    flow_name: str | None = None
 
 
 class CrossPopupReferralTarget(BaseModel):

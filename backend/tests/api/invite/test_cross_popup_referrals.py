@@ -557,6 +557,42 @@ class TestSharingStatus:
 
         assert self._ask(client, human, popup) is False
 
+    def _flow_name(self, client: TestClient, human: Humans, popup: Popups):
+        resp = client.get(
+            self.SHARING,
+            params={"popup_id": str(popup.id)},
+            headers=_auth(_human_token(human)),
+        )
+        assert resp.status_code == 200, resp.json()
+        return resp.json()["flow_name"]
+
+    def test_names_the_flow_only_when_the_popup_has_several(
+        self, client: TestClient, db: Session, tenant_a: Tenants
+    ) -> None:
+        """A single way in needs no name; with two, the screen has to say
+        which one the link opens."""
+        human = _make_human(db, tenant_a)
+        popup = _source(db, tenant_a, human)
+
+        assert self._flow_name(client, human, popup) is None
+
+        secondary = _secondary(db, popup)
+        default_name = self._flow_name(client, human, popup)
+        assert default_name is not None
+        assert default_name != secondary.name
+
+    def test_a_closed_flow_does_not_count_as_another_way_in(
+        self, client: TestClient, db: Session, tenant_a: Tenants
+    ) -> None:
+        human = _make_human(db, tenant_a)
+        popup = _source(db, tenant_a, human)
+        secondary = _secondary(db, popup)
+        secondary.status = "closed"
+        db.add(secondary)
+        db.commit()
+
+        assert self._flow_name(client, human, popup) is None
+
     def test_false_for_a_red_flagged_attendee(
         self, client: TestClient, db: Session, tenant_a: Tenants
     ) -> None:

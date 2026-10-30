@@ -1380,6 +1380,7 @@ export type AttendeesDirectoryEntry = {
 export type AttendeeSharingStatus = {
     can_share: boolean;
     sales_flow_id?: (string | null);
+    flow_name?: (string | null);
 };
 
 /**
