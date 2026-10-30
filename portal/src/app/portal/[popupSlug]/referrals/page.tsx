@@ -2,7 +2,7 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { Copy, Link2, Loader2, Trash2 } from "lucide-react"
-import { useState } from "react"
+import { type ComponentProps, useState } from "react"
 import { useTranslation } from "react-i18next"
 import { toast } from "sonner"
 import { ApiError, InvitesService } from "@/client"
@@ -59,6 +59,7 @@ function ReferralRow({
     },
   })
 
+  const host = typeof window !== "undefined" ? window.location.host : ""
   const referralUrl =
     typeof window !== "undefined"
       ? `${window.location.origin}/r/${referral.token}`
@@ -70,9 +71,23 @@ function ReferralRow({
     })
   }
 
+  // Only what the attendee needs to know before sharing: how much of the
+  // link is left, and a discount or expiry when there is one.
   const discount = Number(referral.discount_percentage)
-  const discountLabel =
-    discount > 0 ? `${discount}%` : t("referrals.preview_no_discount")
+  const details = [
+    referral.max_uses != null
+      ? t("referrals.uses_of", {
+          used: referral.current_uses,
+          max: referral.max_uses,
+        })
+      : t("referrals.uses_count", { count: referral.current_uses }),
+    discount > 0 &&
+      t("referrals.preview_discount_value", { percent: discount }),
+    referral.expires_at &&
+      t("referrals.expires_on", {
+        date: new Date(referral.expires_at).toLocaleDateString(),
+      }),
+  ].filter(Boolean)
 
   return (
     <div className="flex items-center justify-between rounded-lg border bg-card px-4 py-3 gap-4">
@@ -80,24 +95,14 @@ function ReferralRow({
         <Link2 className="h-4 w-4 text-muted-foreground shrink-0" />
         <div className="min-w-0">
           <p className="text-sm font-medium truncate">
-            {referral.token}
+            {host}/r/{referral.token}
             {referral.is_disabled && (
               <span className="ml-2 rounded bg-destructive/10 px-1.5 py-0.5 text-xs font-medium text-destructive">
                 {t("referrals.disabled_badge")}
               </span>
             )}
           </p>
-          <p className="text-xs text-muted-foreground">
-            {t("referrals.discount_label")}: {discountLabel} &middot;{" "}
-            {t("referrals.uses_label")}:{" "}
-            {referral.max_uses != null
-              ? `${referral.current_uses}/${referral.max_uses}`
-              : referral.current_uses}{" "}
-            &middot; {t("referrals.expires_label")}:{" "}
-            {referral.expires_at
-              ? new Date(referral.expires_at).toLocaleDateString()
-              : t("referrals.no_expiry")}
-          </p>
+          <p className="text-xs text-muted-foreground">{details.join(" · ")}</p>
         </div>
       </div>
       <div className="flex items-center gap-2 shrink-0">
@@ -180,6 +185,74 @@ function ReferralRow({
   )
 }
 
+/**
+ * One place a link can take people: an event, and the flow when the event
+ * has several. Offers to create the link until there is one, then shows it.
+ */
+function DestinationRow({
+  eventName,
+  flowName,
+  link,
+  creating,
+  disabled,
+  onCreate,
+  onRefresh,
+}: {
+  eventName: string
+  flowName?: string | null
+  link?: ComponentProps<typeof ReferralRow>["referral"] | null
+  creating: boolean
+  disabled: boolean
+  onCreate: () => void
+  onRefresh: () => void
+}) {
+  const { t } = useTranslation()
+  return (
+    <div className="space-y-2">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
+        <p className="min-w-0 text-base leading-snug sm:flex-1">
+          <span
+            className={
+              flowName
+                ? "font-medium text-muted-foreground"
+                : "font-semibold text-foreground"
+            }
+          >
+            {eventName}
+          </span>
+          {flowName && (
+            <>
+              {" "}
+              <span
+                className="mx-1 text-muted-foreground/60"
+                aria-hidden="true"
+              >
+                ·
+              </span>{" "}
+              <span className="font-semibold text-foreground">{flowName}</span>
+            </>
+          )}
+        </p>
+        {!link && (
+          <Button
+            size="sm"
+            variant="outline"
+            className="self-end sm:self-auto"
+            onClick={onCreate}
+            disabled={disabled}
+          >
+            {creating ? (
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            ) : null}
+            {t("referrals.create_link")}
+          </Button>
+        )}
+      </div>
+      {link && <ReferralRow referral={link} onRefresh={onRefresh} />}
+    </div>
+  )
+}
+
 function apiErrorDetail(err: unknown): string | null {
   return err instanceof ApiError &&
     err.body &&
@@ -248,7 +321,7 @@ function CrossPopupReferrals({
   }
 
   return (
-    <section className="space-y-3 pt-4">
+    <section className="space-y-3">
       <div>
         <h2 className="text-lg font-semibold tracking-tight">
           {t("referrals.cross_title")}
@@ -258,62 +331,25 @@ function CrossPopupReferrals({
         </p>
       </div>
       <div className="space-y-3">
-        {targets.map((target) => {
-          const showFlowName = (flowsByPopup.get(target.popup_id) ?? 0) > 1
-          return (
-            <div key={target.sales_flow_id} className="space-y-2">
-              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
-                <p className="min-w-0 text-base leading-snug sm:flex-1">
-                  <span
-                    className={
-                      showFlowName
-                        ? "font-medium text-muted-foreground"
-                        : "font-semibold text-foreground"
-                    }
-                  >
-                    {target.name}
-                  </span>
-                  {showFlowName && (
-                    <>
-                      {" "}
-                      <span
-                        className="mx-1 text-muted-foreground/60"
-                        aria-hidden="true"
-                      >
-                        ·
-                      </span>{" "}
-                      <span className="font-semibold text-foreground">
-                        {target.flow_name}
-                      </span>
-                    </>
-                  )}
-                </p>
-                {!target.link && (
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="self-end sm:self-auto"
-                    onClick={() => createMutation.mutate(target)}
-                    disabled={createMutation.isPending}
-                  >
-                    {createMutation.isPending &&
-                    createMutation.variables?.sales_flow_id ===
-                      target.sales_flow_id ? (
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    ) : null}
-                    {t("referrals.cross_create")}
-                  </Button>
-                )}
-              </div>
-              {target.link && (
-                <ReferralRow
-                  referral={target.link}
-                  onRefresh={() => queryClient.invalidateQueries({ queryKey })}
-                />
-              )}
-            </div>
-          )
-        })}
+        {targets.map((target) => (
+          <DestinationRow
+            key={target.sales_flow_id}
+            eventName={target.name}
+            flowName={
+              (flowsByPopup.get(target.popup_id) ?? 0) > 1
+                ? target.flow_name
+                : null
+            }
+            link={target.link}
+            creating={
+              createMutation.isPending &&
+              createMutation.variables?.sales_flow_id === target.sales_flow_id
+            }
+            disabled={createMutation.isPending}
+            onCreate={() => createMutation.mutate(target)}
+            onRefresh={() => queryClient.invalidateQueries({ queryKey })}
+          />
+        ))}
       </div>
     </section>
   )
@@ -395,70 +431,48 @@ const ReferralsPage = () => {
   }
 
   const referrals = data?.results ?? []
-  // One link per destination flow. A link into another flow of this popup
-  // must not hide Create for the way in this attendee can share.
-  const hasReferral = referrals.some(
+  const refreshMine = () =>
+    queryClient.invalidateQueries({
+      queryKey: ["referrals", "mine", city?.id ?? ""],
+    })
+  // One link per destination flow. The way in this attendee can share is
+  // the destination; a link of theirs into another flow of this popup is
+  // still theirs to copy or delete, so it is listed under it.
+  const ownLink = referrals.find(
     (ref) => ref.sales_flow_id === sharing?.sales_flow_id,
   )
+  const otherLinks = referrals.filter((ref) => ref !== ownLink)
 
   return (
-    <div className="max-w-2xl mx-auto p-6 space-y-6">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
-        <div className="min-w-0">
-          <h1 className="text-2xl font-semibold tracking-tight">
-            {t("referrals.title")}
-          </h1>
-          <p className="text-sm text-muted-foreground mt-1">
-            {t("referrals.description")}
-          </p>
-        </div>
-        {!hasReferral && (
-          <Button
-            className="self-start sm:shrink-0 sm:self-auto"
-            onClick={() => createMutation.mutate()}
-            disabled={createMutation.isPending}
-          >
-            {createMutation.isPending ? (
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            ) : null}
-            {createMutation.isPending
-              ? t("referrals.creating")
-              : t("referrals.create_referral")}
-          </Button>
-        )}
+    <div className="max-w-2xl mx-auto p-6 space-y-8">
+      <div>
+        <h1 className="text-2xl font-semibold tracking-tight">
+          {t("referrals.title")}
+        </h1>
+        <p className="text-sm text-muted-foreground mt-1">
+          {t("referrals.description")}
+        </p>
       </div>
 
       {isLoading ? (
-        <div className="flex justify-center py-10">
+        <div className="flex justify-center py-6">
           <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
         </div>
-      ) : referrals.length === 0 ? (
-        <div className="rounded-lg border border-dashed p-8 text-center">
-          <p className="text-sm text-muted-foreground">
-            {t("referrals.no_referrals")}
-          </p>
-        </div>
       ) : (
-        <>
-          {hasReferral && (
-            <p className="text-sm text-muted-foreground">
-              {t("referrals.one_link_notice")}
-            </p>
-          )}
-          <div className="space-y-2">
-            {referrals.map((ref) => (
-              <ReferralRow
-                key={ref.id}
-                referral={ref}
-                onRefresh={() =>
-                  queryClient.invalidateQueries({
-                    queryKey: ["referrals", "mine", city?.id ?? ""],
-                  })
-                }
-              />
-            ))}
-          </div>
-        </>
+        <div className="space-y-3">
+          <DestinationRow
+            eventName={city?.name ?? ""}
+            flowName={sharing?.flow_name}
+            link={ownLink}
+            creating={createMutation.isPending}
+            disabled={createMutation.isPending}
+            onCreate={() => createMutation.mutate()}
+            onRefresh={refreshMine}
+          />
+          {otherLinks.map((ref) => (
+            <ReferralRow key={ref.id} referral={ref} onRefresh={refreshMine} />
+          ))}
+        </div>
       )}
 
       {city?.id && <CrossPopupReferrals sourcePopupId={city.id} />}
