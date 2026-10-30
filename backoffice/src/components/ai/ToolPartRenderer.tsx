@@ -1,7 +1,8 @@
+import { useRouter } from "@tanstack/react-router"
 import type { UIMessage } from "ai"
 import { Check, Copy, RotateCcw, ThumbsDown, ThumbsUp } from "lucide-react"
 import { useState } from "react"
-import ReactMarkdown from "react-markdown"
+import ReactMarkdown, { type Components } from "react-markdown"
 import remarkGfm from "remark-gfm"
 import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
@@ -12,10 +13,49 @@ import { OperationExecutionTool } from "./OperationExecutionTool"
 import { ExpiredPreparedFileTool } from "./ToolShell"
 import { type GenericToolPart, isExpiredPreparedFileMarker } from "./tool-types"
 
-function AssistantText({ text }: { text: string }) {
+export function isInternalHref(href: string | undefined): href is string {
+  return Boolean(href?.startsWith("/") && !href.startsWith("//"))
+}
+
+function AssistantText({
+  text,
+  onNavigate,
+}: {
+  text: string
+  onNavigate: () => void
+}) {
+  const router = useRouter()
+  const components: Components = {
+    // Backoffice routes from guides navigate in-app so the panel and the
+    // conversation stay open; anything else opens in a new tab.
+    a: ({ href, children }) => {
+      if (isInternalHref(href)) {
+        return (
+          <a
+            href={href}
+            onClick={(event) => {
+              if (event.metaKey || event.ctrlKey || event.shiftKey) return
+              event.preventDefault()
+              router.history.push(href)
+              onNavigate()
+            }}
+          >
+            {children}
+          </a>
+        )
+      }
+      return (
+        <a href={href} target="_blank" rel="noopener noreferrer">
+          {children}
+        </a>
+      )
+    },
+  }
   return (
     <div className="space-y-2 text-sm leading-6 text-foreground [&_a]:text-primary [&_a]:underline [&_li]:ml-4 [&_li]:list-disc [&_ol_li]:list-decimal [&_p]:my-1.5 [&_strong]:font-semibold">
-      <ReactMarkdown remarkPlugins={[remarkGfm]}>{text}</ReactMarkdown>
+      <ReactMarkdown remarkPlugins={[remarkGfm]} components={components}>
+        {text}
+      </ReactMarkdown>
     </div>
   )
 }
@@ -177,6 +217,7 @@ export function MessageParts({
             <AssistantText
               key={`${message.id}-text-${index}`}
               text={part.text}
+              onNavigate={onNavigate}
             />
           )
         }

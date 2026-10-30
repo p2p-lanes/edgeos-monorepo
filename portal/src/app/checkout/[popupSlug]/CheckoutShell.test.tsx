@@ -44,7 +44,10 @@ function expectIsolatedCanvas(main: HTMLElement) {
   expect(main.classList).toContain("relative")
   expect(main.classList).toContain("isolate")
   expect(main.classList).toContain("bg-background")
-  expect(main.classList).toContain("h-svh")
+  // Full viewport minus any host chrome above it (unset = 0, i.e. 100svh).
+  expect(main.classList).toContain(
+    "h-[calc(100svh_-_var(--checkout-chrome-top,0px))]",
+  )
   expect(main.classList).toContain("overflow-y-auto")
   const canvas = screen.getByTestId("checkout-content").parentElement
   expect(canvas?.classList).toContain("relative")

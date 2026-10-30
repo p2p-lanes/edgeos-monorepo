@@ -21,7 +21,16 @@ import {
   X,
   XCircle,
 } from "lucide-react"
-import { Suspense, useCallback, useEffect, useMemo, useState } from "react"
+import {
+  type CSSProperties,
+  type ReactNode,
+  Suspense,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react"
 import { createPortal } from "react-dom"
 
 import {
@@ -1134,6 +1143,53 @@ function EventsTableContent({
   )
 }
 
+/**
+ * Pins the toolbar under the app top bar (h-16) so search + filters stay
+ * reachable while scrolling a long list. The toolbar's real height (it wraps
+ * onto more rows on narrow screens) is measured and exposed to the children as
+ * `--events-sticky-top`, so nested sticky headers freeze flush beneath it.
+ */
+function StickyToolbarLayout({
+  toolbar,
+  children,
+}: {
+  toolbar: ReactNode
+  children: ReactNode
+}) {
+  const toolbarRef = useRef<HTMLDivElement>(null)
+  const [toolbarHeight, setToolbarHeight] = useState(0)
+
+  useEffect(() => {
+    const el = toolbarRef.current
+    if (!el) return
+    const observer = new ResizeObserver(() => {
+      setToolbarHeight(el.getBoundingClientRect().height)
+    })
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [])
+
+  return (
+    <div
+      className="space-y-3"
+      style={
+        {
+          "--events-sticky-top": `calc(4rem + ${toolbarHeight}px)`,
+        } as CSSProperties
+      }
+    >
+      {/* Frosted white background covers the cards passing beneath. */}
+      <div
+        ref={toolbarRef}
+        className="sticky top-16 z-10 -mx-6 border-b bg-background/95 px-6 py-3 backdrop-blur supports-[backdrop-filter]:bg-background/80 md:-mx-8 md:px-8"
+      >
+        {toolbar}
+      </div>
+      {children}
+    </div>
+  )
+}
+
 function CalendarDayToolbar({
   popupId,
   status,
@@ -1390,11 +1446,8 @@ function EventsPage() {
               <EventsTableContent onRowClick={handleRowClick} />
             )}
             {view === "list" && (
-              <div className="space-y-3">
-                {/* Keep the search + filters pinned under the app top bar
-                    (h-16) so they stay reachable while scrolling a long list.
-                    Frosted white background covers the cards passing beneath. */}
-                <div className="sticky top-16 z-10 -mx-6 border-b bg-background/95 px-6 py-3 backdrop-blur supports-[backdrop-filter]:bg-background/80 md:-mx-8 md:px-8">
+              <StickyToolbarLayout
+                toolbar={
                   <CalendarDayToolbar
                     popupId={selectedPopupId}
                     status={searchParams.status}
@@ -1404,7 +1457,8 @@ function EventsPage() {
                     setVenueId={setVenueIdGlobal}
                     setSearch={setSearchGlobal}
                   />
-                </div>
+                }
+              >
                 <EventsListView
                   popupId={selectedPopupId}
                   status={searchParams.status}
@@ -1414,7 +1468,7 @@ function EventsPage() {
                   popupEnd={popupEnd}
                   onEventClick={handleRowClick}
                 />
-              </div>
+              </StickyToolbarLayout>
             )}
             {view === "calendar" && (
               <div className="space-y-3">

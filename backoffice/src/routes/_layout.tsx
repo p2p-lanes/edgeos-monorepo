@@ -343,7 +343,9 @@ function Layout() {
             {isOperatorOrAbove && <AIAssistant />}
           </div>
         </header>
-        <div className="flex-1 p-6 md:p-8">
+        {/* Named container: wide pages size themselves with 100cqw so they
+            track the real content width (sidebar state, docked assistant). */}
+        <div className="@container/main flex-1 p-6 md:p-8">
           <div className="mx-auto max-w-7xl">
             <Outlet />
           </div>
