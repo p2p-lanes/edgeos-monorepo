@@ -5,10 +5,11 @@ from typing import Annotated
 
 from fastapi import APIRouter, HTTPException, Query, status
 from fastapi.responses import Response
+from sqlalchemy.orm import selectinload
 from sqlmodel import select
 
 from app.api.attendee import crud
-from app.api.attendee.models import AttendeeProducts
+from app.api.attendee.models import AttendeeProducts, Attendees
 from app.api.attendee.schemas import (
     AttendeeCreate,
     AttendeeListItem,
@@ -587,6 +588,12 @@ async def list_attendees(
             limit=limit,
             search=search,
             search_fields=["name", "email"],
+            load_options=(
+                selectinload(Attendees.attendee_products).selectinload(  # type: ignore[arg-type]
+                    AttendeeProducts.product  # type: ignore[arg-type]
+                ),
+                selectinload(Attendees.category_ref),  # type: ignore[arg-type]
+            ),
         )
 
     results = []

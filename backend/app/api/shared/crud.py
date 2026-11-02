@@ -32,6 +32,7 @@ class BaseCRUD[
         search_fields: list[str] | None = None,
         sort_by: str | None = None,
         sort_order: str = "desc",
+        load_options: tuple[Any, ...] = (),
         **filters: Any,
     ) -> tuple[list[ModelType], int]:
         statement = select(self.model)
@@ -56,6 +57,8 @@ class BaseCRUD[
 
         statement = self._apply_sorting(statement, sort_by, sort_order)
 
+        if load_options:
+            statement = statement.options(*load_options)
         statement = statement.offset(skip).limit(limit)
         results = list(session.exec(statement).all())
 
