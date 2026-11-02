@@ -98,9 +98,12 @@ export const EMPTY_CART: CartState = {
   current_step: null,
 }
 
-export function useCart(popupId: string | null, salesFlowId?: string | null) {
-  const isAuthenticated = useIsAuthenticated()
-  return useQuery({
+/** The saved cart of one door. Omitting the flow means the popup's default. */
+export function cartQueryOptions(
+  popupId: string | null,
+  salesFlowId?: string | null,
+) {
+  return {
     queryKey: queryKeys.cart.byPopup(popupId ?? "", salesFlowId),
     queryFn: async (): Promise<CartState> => {
       const result = await request<CartPublic | null>(OpenAPI, {
@@ -111,8 +114,15 @@ export function useCart(popupId: string | null, salesFlowId?: string | null) {
       })
       return result?.items ?? EMPTY_CART
     },
-    enabled: !!popupId && isAuthenticated,
     staleTime: 30_000,
+  }
+}
+
+export function useCart(popupId: string | null, salesFlowId?: string | null) {
+  const isAuthenticated = useIsAuthenticated()
+  return useQuery({
+    ...cartQueryOptions(popupId, salesFlowId),
+    enabled: !!popupId && isAuthenticated,
   })
 }
 

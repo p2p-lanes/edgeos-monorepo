@@ -11,6 +11,7 @@ interface ResourceMenuItemProps {
   onNavigate: (path: string) => void
   isGroup?: boolean
   isActive?: boolean
+  cartCount?: number
 }
 
 const ResourceMenuItem = ({
@@ -20,6 +21,7 @@ const ResourceMenuItem = ({
   onNavigate,
   isGroup = false,
   isActive = false,
+  cartCount = 0,
 }: ResourceMenuItemProps) => {
   const { t } = useTranslation()
   const { status } = resource
@@ -59,7 +61,14 @@ const ResourceMenuItem = ({
       disabled={isDisabled}
       isActive={isActive}
       aria-current={isActive ? "page" : undefined}
-      aria-label={resource.name}
+      aria-label={
+        cartCount > 0
+          ? t("sidebar.cart_items_aria", {
+              name: resource.name,
+              count: cartCount,
+            })
+          : resource.name
+      }
       onClick={handleClick}
       className={cn(isGroup ? "py-2" : "py-5", level > 0 && "pl-6")}
     >
@@ -67,6 +76,19 @@ const ResourceMenuItem = ({
       <span className="group-data-[collapsible=icon]:hidden">
         {resource.name}
       </span>
+      {cartCount > 0 && (
+        <span
+          className={cn(
+            "ml-auto flex h-5 min-w-5 shrink-0 items-center justify-center rounded-full px-1 text-xs font-medium tabular-nums group-data-[collapsible=icon]:hidden",
+            // The active entry is already filled with the primary color.
+            isActive
+              ? "bg-sidebar-primary-foreground text-sidebar-primary"
+              : "bg-sidebar-primary text-sidebar-primary-foreground",
+          )}
+        >
+          {cartCount}
+        </span>
+      )}
       {status === "soon" && (
         <span className="ml-auto rounded-md bg-muted px-1.5 py-0.5 text-xs text-muted-foreground group-data-[collapsible=icon]:hidden">
           {t("sidebar.soon_badge")}
