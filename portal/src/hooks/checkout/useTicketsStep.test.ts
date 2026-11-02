@@ -19,6 +19,14 @@ let mockDynamicItems: Record<string, SelectedDynamicItem[]> = {}
 // ---------------------------------------------------------------------------
 
 const mockToggleProduct = vi.fn()
+const mockTogglePass = vi.fn(
+  (attendeeId, productId, quantity, scope, visible) => {
+    const product = mockAttendeePasses
+      .find((a) => a.id === attendeeId)
+      ?.products.find((p) => p.id === productId)
+    mockToggleProduct(attendeeId, { ...product, quantity }, scope, visible)
+  },
+)
 const mockToggleEditing = vi.fn()
 const mockAddDynamicItem = vi.fn()
 const mockRemoveDynamicItem = vi.fn()
@@ -41,6 +49,7 @@ vi.mock("@/providers/passesProvider", () => ({
 
 vi.mock("@/providers/checkoutProvider", () => ({
   useCheckout: () => ({
+    togglePass: mockTogglePass,
     editCredit: mockEditCredit,
     isEditing: mockIsEditing,
     editPassesEnabled: true,
@@ -353,6 +362,13 @@ describe("S1-D: toggleRow routes to passesProvider.toggleProduct with correct at
     const [attendeeId, product] = mockToggleProduct.mock.calls[0]
     expect(attendeeId).toBe("a")
     expect(product.id).toBe("p-week")
+    expect(mockTogglePass).toHaveBeenCalledWith(
+      "a",
+      "p-week",
+      pWeek.quantity,
+      ["p-week"],
+      ["p-week"],
+    )
   })
 
   it("passes exclusivityScopeIds and attendeeVisibleProductIds from the section context", () => {

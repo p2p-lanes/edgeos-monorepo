@@ -230,6 +230,10 @@ class OpenTicketingPurchaseCreate(BaseModel):
     insurance: bool = False
     fbc: str | None = Field(default=None, max_length=512)
     fbp: str | None = Field(default=None, max_length=512)
+    ga_client_id: str | None = Field(
+        default=None, max_length=128, pattern=r"^[A-Za-z0-9._-]+$"
+    )
+    ga_session_id: str | None = Field(default=None, max_length=20, pattern=r"^\d+$")
     # Active checkout language (from the entry URL ?lang=), used to build the
     # locale-aware success redirect. Falls back to the popup default when absent.
     locale: str | None = Field(default=None, max_length=8)

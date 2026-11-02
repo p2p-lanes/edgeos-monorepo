@@ -60,6 +60,7 @@ from app.api.translation.service import parse_accept_language
 from app.core.dependencies.tenants import PublicTenant
 from app.core.dependencies.users import OptionalHuman, SessionDep
 from app.core.rate_limit import RateLimit
+from app.services.ga4_mp import enqueue_purchase_event as enqueue_ga4_purchase_event
 from app.services.meta_capi import (
     enqueue_initiate_checkout_event,
     enqueue_purchase_event,
@@ -114,6 +115,18 @@ def _enqueue_checkout_purchase_event(
     except Exception:
         logger.exception(
             "Failed to queue Meta CAPI Purchase event payment_id={}",
+            getattr(payment, "id", ""),
+        )
+    try:
+        enqueue_ga4_purchase_event(
+            background_tasks,
+            tenant=tenant,
+            payment=payment,
+            popup=popup,
+        )
+    except Exception:
+        logger.exception(
+            "Failed to queue GA4 Purchase event payment_id={}",
             getattr(payment, "id", ""),
         )
 
@@ -358,7 +371,11 @@ async def purchase_open_ticketing(
             request,
             fbc=request_in.fbc,
             fbp=request_in.fbp,
-        ),
+        )
+        | {
+            "ga_client_id": request_in.ga_client_id,
+            "ga_session_id": request_in.ga_session_id,
+        },
         flow_slug=flow_slug,
         current_human=current_human,
     )

@@ -1,5 +1,6 @@
 import { act, renderHook } from "@testing-library/react"
 import { beforeEach, describe, expect, it, vi } from "vitest"
+import { ApiError } from "@/client"
 import {
   type BuyerIdentity,
   buildBuyerIdentity,
@@ -22,10 +23,16 @@ const purchaseOpenTicketing = vi.hoisted(() =>
 const createMyPayment = vi.hoisted(() =>
   vi.fn().mockResolvedValue({ status: "created" }),
 )
+const paymentToasts = vi.hoisted(() => ({ success: vi.fn(), error: vi.fn() }))
+vi.mock("sonner", () => ({ toast: paymentToasts }))
 const telemetry = vi.hoisted(() => ({ trackPortalTelemetry: vi.fn() }))
 const queryClient = vi.hoisted(() => ({ invalidateQueries: vi.fn() }))
 const routerReplace = vi.hoisted(() => vi.fn())
 const navigateBrowser = vi.hoisted(() => vi.fn())
+const getGABrowserIds = vi.hoisted(() =>
+  vi.fn().mockResolvedValue({ ga_client_id: "123.456", ga_session_id: "789" }),
+)
+const trackGABeginCheckout = vi.hoisted(() => vi.fn().mockReturnValue(true))
 
 vi.mock("@/client", () => ({
   ApiError: class ApiError extends Error {},
@@ -49,7 +56,16 @@ vi.mock("@/lib/browser-navigation", () => ({ navigateBrowser }))
 vi.mock("@/lib/attribution", () => ({
   getAttribution: () => ({}),
 }))
-vi.mock("@/lib/google-analytics", () => ({ trackGAPurchase: vi.fn() }))
+vi.mock("@/lib/google-analytics", () => ({
+  trackGABeginCheckout,
+  trackGAPurchase: vi.fn(),
+  getGABrowserIds,
+}))
+vi.mock("@/providers/tenantProvider", () => ({
+  useTenant: () => ({
+    tenant: { ga_tracking_enabled: true, ga_measurement_id: "G-TEST123" },
+  }),
+}))
 vi.mock("@/lib/portal-telemetry", () => telemetry)
 vi.mock("@/lib/meta-pixel", () => ({
   getMetaAttribution: () => ({}),
@@ -109,14 +125,18 @@ function renderPaymentSubmit(
     buyerIdentity?: BuyerIdentity
     buyerData?: Parameters<typeof usePaymentSubmit>[0]["buyerData"]
     checkoutMode?: "pass_system" | "simple_quantity"
+    previewMode?: boolean
   } = {},
 ) {
   const submitMode = options.submitMode ?? "open-ticketing"
+  const paymentCompleteRef = { current: false }
   return renderHook(() =>
     usePaymentSubmit({
       applicationId: submitMode === "application" ? "application-1" : undefined,
       popupId: "popup-1",
       popupSlug: "festival-2026",
+      popupCurrency: "USD",
+      catalogProducts: [product],
       salesFlowSlug,
       appCredit: 0,
       checkoutMode: options.checkoutMode ?? "pass_system",
@@ -138,7 +158,7 @@ function renderPaymentSubmit(
       setCurrentStep: vi.fn(),
       setPromoError: vi.fn(),
       clearPromoCode: vi.fn(),
-      paymentCompleteRef: { current: false },
+      paymentCompleteRef,
       submitMode,
       returnContext: options.returnContext,
       buyerData: options.buyerData ?? {
@@ -148,6 +168,7 @@ function renderPaymentSubmit(
         formData: {},
       },
       editPassesEnabled: false,
+      previewMode: options.previewMode,
     }),
   )
 }
@@ -156,10 +177,87 @@ describe("usePaymentSubmit public purchase payload", () => {
   beforeEach(() => {
     purchaseOpenTicketing.mockClear()
     createMyPayment.mockClear()
+    paymentToasts.success.mockClear()
+    paymentToasts.error.mockClear()
     telemetry.trackPortalTelemetry.mockClear()
     queryClient.invalidateQueries.mockClear()
     routerReplace.mockClear()
     navigateBrowser.mockClear()
+    trackGABeginCheckout.mockClear()
+    getGABrowserIds.mockClear()
+  })
+
+  it.each([
+    "application",
+    "open-ticketing",
+  ] as const)("tracks checkout before waiting for GA IDs or submitting %s", async (submitMode) => {
+    const hook = renderPaymentSubmit("primary", { submitMode })
+    await act(async () => {
+      await hook.result.current.submitPayment()
+    })
+    expect(trackGABeginCheckout).toHaveBeenCalledOnce()
+    expect(trackGABeginCheckout).toHaveBeenCalledWith(
+      expect.objectContaining({
+        popup: expect.objectContaining({ id: "popup-1", currency: "USD" }),
+        items: expect.arrayContaining([
+          expect.objectContaining({ product_id: "product-1", quantity: 2 }),
+        ]),
+      }),
+    )
+    expect(trackGABeginCheckout.mock.invocationCallOrder[0]).toBeLessThan(
+      getGABrowserIds.mock.invocationCallOrder[0],
+    )
+  })
+
+  it("does not repeat checkout-start for a failed attempt retried with the same cart", async () => {
+    purchaseOpenTicketing.mockRejectedValueOnce(new Error("offline"))
+    const hook = renderPaymentSubmit("primary")
+    await act(async () => {
+      await hook.result.current.submitPayment()
+    })
+    hook.rerender()
+    await act(async () => {
+      await hook.result.current.submitPayment()
+    })
+    expect(purchaseOpenTicketing).toHaveBeenCalledTimes(2)
+    expect(trackGABeginCheckout).toHaveBeenCalledOnce()
+  })
+
+  it("does not track invalid or preview checkout", async () => {
+    const preview = renderPaymentSubmit("primary", { previewMode: true })
+    await act(async () => {
+      await preview.result.current.submitPayment()
+    })
+    preview.unmount()
+    const empty = renderPaymentSubmit("primary", { passes: [] })
+    await act(async () => {
+      await empty.result.current.submitPayment()
+    })
+    expect(trackGABeginCheckout).not.toHaveBeenCalled()
+  })
+
+  it("includes GA4 browser identifiers in both purchase request paths", async () => {
+    const direct = renderPaymentSubmit("direct-sale")
+    await act(async () => {
+      await direct.result.current.submitPayment()
+    })
+    expect(purchaseOpenTicketing.mock.calls[0]?.[0].requestBody).toMatchObject({
+      ga_client_id: "123.456",
+      ga_session_id: "789",
+    })
+    direct.unmount()
+
+    const application = renderPaymentSubmit("application", {
+      submitMode: "application",
+    })
+    await act(async () => {
+      await application.result.current.submitPayment()
+    })
+    expect(createMyPayment.mock.calls[0]?.[0].requestBody).toMatchObject({
+      ga_client_id: "123.456",
+      ga_session_id: "789",
+    })
+    expect(getGABrowserIds).toHaveBeenCalledWith("G-TEST123")
   })
 
   it("sends the shared backend contract for a simple-quantity ticket and merch order", async () => {
@@ -678,5 +776,46 @@ describe("usePaymentSubmit public purchase payload", () => {
     expect(telemetry.trackPortalTelemetry).toHaveBeenCalledWith(
       "checkout_failed",
     )
+  })
+})
+
+describe("completed Portal payment presentation", () => {
+  it("does not turn a completed purchase into an error or automatic navigation", async () => {
+    paymentToasts.success.mockClear()
+    paymentToasts.error.mockClear()
+    telemetry.trackPortalTelemetry.mockClear()
+    navigateBrowser.mockClear()
+    const error = Object.assign(
+      new ApiError({} as never, {} as never, "completed"),
+      {
+        body: {
+          detail: {
+            code: "previous_payment_completed",
+            redirect_url: "https://example.com/success",
+          },
+        },
+      },
+    )
+    createMyPayment.mockRejectedValueOnce(error)
+    const h = renderPaymentSubmit("application", {
+      submitMode: "application",
+      returnContext: "portal",
+    })
+    await act(async () => {
+      expect(await h.result.current.submitPayment()).toEqual({ success: true })
+    })
+    expect(paymentToasts.success).toHaveBeenCalledWith(
+      "portalThankYou.confirmed_notice",
+    )
+    expect(paymentToasts.error).not.toHaveBeenCalled()
+    expect(navigateBrowser).not.toHaveBeenCalled()
+    expect(telemetry.trackPortalTelemetry).not.toHaveBeenCalledWith(
+      "checkout_failed",
+    )
+    const calls = createMyPayment.mock.calls.length
+    await act(async () => {
+      await h.result.current.submitPayment()
+    })
+    expect(createMyPayment.mock.calls).toHaveLength(calls)
   })
 })

@@ -210,7 +210,6 @@ export function useTicketsStep({
 }: UseTicketsStepArgs): TicketsStepView {
   const {
     attendeePasses,
-    toggleProduct,
     isEditing: passesIsEditing,
     toggleEditing,
   } = usePassesProvider()
@@ -223,6 +222,7 @@ export function useTicketsStep({
     removeDynamicItem,
     updateDynamicQuantity,
     checkoutMode,
+    togglePass,
   } = useCheckout()
 
   const { getCity } = useCityProvider()
@@ -277,7 +277,13 @@ export function useTicketsStep({
           g.products.map((p) => p.id),
         )
 
-        toggleProduct(attendeeId, product, scopeIds, attendeeVisibleProductIds)
+        togglePass(
+          attendeeId,
+          product.id,
+          product.quantity,
+          scopeIds,
+          attendeeVisibleProductIds,
+        )
         return
       }
 
@@ -301,7 +307,7 @@ export function useTicketsStep({
       checkoutMode,
       attendeePasses,
       parsedSections,
-      toggleProduct,
+      togglePass,
       cart,
       stepType,
       addDynamicItem,
@@ -324,9 +330,10 @@ export function useTicketsStep({
           g.products.map((p) => p.id),
         )
 
-        toggleProduct(
+        togglePass(
           attendeeId,
-          { ...product, quantity: qty },
+          product.id,
+          qty,
           scopeIds,
           attendeeVisibleProductIds,
         )
@@ -358,7 +365,7 @@ export function useTicketsStep({
       checkoutMode,
       attendeePasses,
       parsedSections,
-      toggleProduct,
+      togglePass,
       cart,
       stepType,
       addDynamicItem,

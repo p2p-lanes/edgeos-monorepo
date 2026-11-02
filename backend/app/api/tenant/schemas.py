@@ -139,6 +139,7 @@ class TenantUpdate(SQLModel):
     meta_capi_access_token: str | None = Field(default=None, exclude=True)
     ga_tracking_enabled: bool | None = None
     ga_measurement_id: str | None = Field(default=None, max_length=64)
+    ga_mp_api_secret: str | None = Field(default=None, exclude=True)
     help_enabled: bool | None = None
     help_email: EmailStr | None = None
     smtp_host: str | None = Field(default=None, max_length=255)
@@ -243,6 +244,7 @@ class TenantPublic(TenantBase):
     id: uuid.UUID
     custom_domain_active: bool  # required, no default — forces non-optional in OpenAPI
     meta_capi_configured: bool = False
+    ga_mp_configured: bool = False
     # Trial lifecycle (backoffice surfaces a banner / expiry countdown)
     is_trial: bool = False
     trial_expires_at: datetime | None = None

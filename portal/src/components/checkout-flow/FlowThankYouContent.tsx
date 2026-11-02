@@ -1,6 +1,6 @@
 "use client"
 
-import { CheckCircle, Home, Ticket } from "lucide-react"
+import { CheckCircle, Clock, Home, Ticket } from "lucide-react"
 import Image from "next/image"
 import { useParams, useRouter, useSearchParams } from "next/navigation"
 import { type CSSProperties, useMemo } from "react"
@@ -12,6 +12,7 @@ import {
   type ThankYouTheme,
 } from "@/app/checkout/[popupSlug]/thank-you/orderData"
 import { Button } from "@/components/ui/button"
+import { usePaymentReturnConfirmation } from "@/hooks/checkout/usePaymentReturnConfirmation"
 import { imageOptimization } from "@/lib/image-optimization"
 import { useTenant } from "@/providers/tenantProvider"
 import FaviconOverride from "./FaviconOverride"
@@ -21,6 +22,29 @@ type FlowThankYouContentProps = {
 }
 
 export function FlowThankYouContent({ context }: FlowThankYouContentProps) {
+  return context === "portal" ? (
+    <PortalThankYouContent />
+  ) : (
+    <ThankYouContent context="direct" />
+  )
+}
+
+function PortalThankYouContent() {
+  const params = useParams<{ popupSlug: string }>()
+  const searchParams = useSearchParams()
+  const confirmation = usePaymentReturnConfirmation(
+    searchParams.get("payment_id"),
+    params.popupSlug,
+  )
+  return <ThankYouContent context="portal" confirmation={confirmation} />
+}
+
+function ThankYouContent({
+  context,
+  confirmation,
+}: FlowThankYouContentProps & {
+  confirmation?: ReturnType<typeof usePaymentReturnConfirmation>
+}) {
   const { t } = useTranslation()
   const router = useRouter()
   const params = useParams<{ popupSlug: string }>()
@@ -45,20 +69,25 @@ export function FlowThankYouContent({ context }: FlowThankYouContentProps) {
     currency: order?.currency,
     order_id: order?.order_id,
   }
-  const title = theme?.title
-    ? interpolate(theme.title, vars)
-    : t(
-        context === "portal"
-          ? "portalThankYou.title"
-          : "openCheckout.thank_you_title",
-      )
-  const description = theme?.description
-    ? interpolate(theme.description, vars)
-    : t(
-        context === "portal"
-          ? "portalThankYou.description"
-          : "openCheckout.thank_you_description",
-      )
+  const confirmed = !confirmation || confirmation.state === "approved"
+  const title = !confirmed
+    ? t(`portalThankYou.${confirmation.state}_title`)
+    : theme?.title
+      ? interpolate(theme.title, vars)
+      : t(
+          context === "portal"
+            ? "portalThankYou.title"
+            : "openCheckout.thank_you_title",
+        )
+  const description = !confirmed
+    ? t(`portalThankYou.${confirmation.state}_description`)
+    : theme?.description
+      ? interpolate(theme.description, vars)
+      : t(
+          context === "portal"
+            ? "portalThankYou.description"
+            : "openCheckout.thank_you_description",
+        )
   const background = theme?.background
   const outerStyle: CSSProperties =
     !background?.image_url && background?.color
@@ -105,16 +134,39 @@ export function FlowThankYouContent({ context }: FlowThankYouContentProps) {
       >
         {(theme?.icon?.show ?? true) && (
           <div
-            className="mx-auto mb-4 flex size-16 items-center justify-center rounded-full bg-emerald-100 text-emerald-600"
+            className={`mx-auto mb-4 flex size-16 items-center justify-center rounded-full ${confirmed ? "bg-emerald-100 text-emerald-600" : "bg-muted text-muted-foreground"}`}
             style={theme?.icon?.color ? { color: theme.icon.color } : {}}
           >
-            <CheckCircle className="size-9" aria-hidden="true" />
+            {confirmed ? (
+              <CheckCircle className="size-9" aria-hidden="true" />
+            ) : (
+              <Clock className="size-9" aria-hidden="true" />
+            )}
           </div>
         )}
         <h1 className="text-3xl font-semibold tracking-tight">{title}</h1>
-        <p className="mx-auto mt-3 max-w-lg text-sm text-muted-foreground">
+        <p
+          className="mx-auto mt-3 max-w-lg text-sm text-muted-foreground"
+          aria-live="polite"
+        >
           {description}
         </p>
+
+        {confirmation && !confirmed && (
+          <div className="mt-4">
+            {confirmation.state !== "checking" && (
+              <Button
+                variant="outline"
+                disabled={confirmation.isFetching}
+                onClick={() => {
+                  void confirmation.retry()
+                }}
+              >
+                {t("portalThankYou.retry")}
+              </Button>
+            )}
+          </div>
+        )}
 
         {showSummary && (
           <div className="mt-6 rounded-xl border bg-background/50 p-4 text-left text-sm">

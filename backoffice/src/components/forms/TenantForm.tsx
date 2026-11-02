@@ -176,6 +176,7 @@ export function TenantForm({ defaultValues, onSuccess }: TenantFormProps) {
       meta_capi_access_token: "",
       ga_tracking_enabled: defaultValues?.ga_tracking_enabled ?? false,
       ga_measurement_id: defaultValues?.ga_measurement_id ?? "",
+      ga_mp_api_secret: "",
       help_enabled: defaultValues?.help_enabled ?? false,
       help_email: defaultValues?.help_email ?? "",
       smtp_host: defaultValues?.smtp_host ?? "",
@@ -218,6 +219,9 @@ export function TenantForm({ defaultValues, onSuccess }: TenantFormProps) {
         }
         if (value.meta_capi_access_token) {
           updateData.meta_capi_access_token = value.meta_capi_access_token
+        }
+        if (value.ga_mp_api_secret) {
+          updateData.ga_mp_api_secret = value.ga_mp_api_secret
         }
         if (smtpHost && value.smtp_password) {
           updateData.smtp_password = value.smtp_password
@@ -504,6 +508,39 @@ export function TenantForm({ defaultValues, onSuccess }: TenantFormProps) {
               </div>
             )}
           </form.Field>
+          {isEdit && (
+            <form.Field name="ga_mp_api_secret">
+              {(field) => (
+                <InlineRow
+                  icon={<Lock className="h-4 w-4 text-muted-foreground" />}
+                  label="Measurement Protocol API Secret"
+                  description={
+                    defaultValues?.ga_mp_configured
+                      ? "A secret is configured. Enter a new secret only to replace it."
+                      : "Optional server-side Google Analytics secret. Stored encrypted."
+                  }
+                >
+                  <div className="flex items-center gap-2">
+                    <Input
+                      placeholder={
+                        defaultValues?.ga_mp_configured
+                          ? "Configured"
+                          : "Paste API secret"
+                      }
+                      type="password"
+                      value={field.state.value}
+                      onBlur={field.handleBlur}
+                      onChange={(e) => field.handleChange(e.target.value)}
+                      className="max-w-xs text-sm"
+                    />
+                    {defaultValues?.ga_mp_configured && (
+                      <Badge variant="outline">Configured</Badge>
+                    )}
+                  </div>
+                </InlineRow>
+              )}
+            </form.Field>
+          )}
         </InlineSection>
 
         <Separator />

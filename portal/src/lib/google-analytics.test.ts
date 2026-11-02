@@ -1,11 +1,119 @@
 import { afterEach, describe, expect, it, vi } from "vitest"
 import type { PaymentPortalPublic } from "@/client"
 import {
+  getGABrowserIds,
   trackGAApplicationEvent,
   trackGAApplicationFeePurchase,
+  trackGABeginCheckout,
   trackGACheckoutStep,
   trackGAPurchase,
 } from "./google-analytics"
+
+describe("trackGABeginCheckout", () => {
+  afterEach(() => {
+    delete (window as Window & { gtag?: unknown }).gtag
+  })
+
+  it("does not let a broken GA tag interrupt checkout", () => {
+    ;(window as Window & { gtag?: unknown }).gtag = () => {
+      throw new Error("unavailable")
+    }
+    expect(
+      trackGABeginCheckout({
+        popup: { id: "popup", slug: "summit" },
+        items: [{ product_id: "ticket", quantity: 1 }],
+        products: [],
+      }),
+    ).toBe(false)
+  })
+
+  it("reports actual selected quantities, prices and coupon", () => {
+    const gtag = vi.fn()
+    ;(window as Window & { gtag?: unknown }).gtag = gtag
+    trackGABeginCheckout({
+      popup: { id: "popup", slug: "summit", currency: "USD" },
+      items: [{ product_id: "ticket", quantity: 2 }],
+      products: [{ id: "ticket", name: "Pass", price: 15, category: "ticket" }],
+      coupon: "SAVE",
+    })
+    expect(gtag).toHaveBeenCalledWith(
+      "event",
+      "begin_checkout",
+      expect.objectContaining({
+        currency: "USD",
+        value: 30,
+        coupon: "SAVE",
+        items: [
+          {
+            item_id: "ticket",
+            item_name: "Pass",
+            item_category: "ticket",
+            price: 15,
+            quantity: 2,
+          },
+        ],
+      }),
+    )
+  })
+
+  it("does not invent prices or send an empty checkout", () => {
+    const gtag = vi.fn()
+    ;(window as Window & { gtag?: unknown }).gtag = gtag
+    trackGABeginCheckout({
+      popup: { id: "popup", slug: "summit", currency: "USD" },
+      items: [{ product_id: "unknown", quantity: 1 }],
+      products: [],
+    })
+    const payload = gtag.mock.calls[0][2]
+    expect(payload).not.toHaveProperty("value")
+    expect(payload.items[0]).not.toHaveProperty("price")
+    gtag.mockClear()
+    trackGABeginCheckout({
+      popup: { id: "popup", slug: "summit" },
+      items: [],
+      products: [],
+    })
+    expect(gtag).not.toHaveBeenCalled()
+  })
+})
+
+describe("getGABrowserIds", () => {
+  it("reads the browser-generated GA4 client and session identifiers", async () => {
+    const gtag = vi.fn((...args: unknown[]) => {
+      const callback = args[3] as (value: string) => void
+      callback(args[2] === "client_id" ? "123.456" : "789")
+    })
+    ;(window as Window & { gtag?: unknown }).gtag = gtag
+
+    await expect(getGABrowserIds("G-TEST123")).resolves.toEqual({
+      ga_client_id: "123.456",
+      ga_session_id: "789",
+    })
+    expect(gtag).toHaveBeenCalledWith(
+      "get",
+      "G-TEST123",
+      "client_id",
+      expect.any(Function),
+    )
+    delete (window as Window & { gtag?: unknown }).gtag
+  })
+
+  it("does not let unavailable or malformed GA identifiers block checkout", async () => {
+    ;(window as Window & { gtag?: unknown }).gtag = vi.fn(() => {
+      throw new Error("tag unavailable")
+    })
+    await expect(getGABrowserIds("G-TEST123")).resolves.toEqual({})
+
+    ;(window as Window & { gtag?: unknown }).gtag = vi.fn(
+      (...args: unknown[]) => {
+        const callback = args[3] as (value: string) => void
+        callback(args[2] === "client_id" ? "invalid client id" : "not numeric")
+      },
+    )
+    await expect(getGABrowserIds("G-TEST123")).resolves.toEqual({})
+    delete (window as Window & { gtag?: unknown }).gtag
+  })
+})
 
 describe("trackGAPurchase", () => {
   afterEach(() => {
