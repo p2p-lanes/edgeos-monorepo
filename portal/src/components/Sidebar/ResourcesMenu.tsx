@@ -1,6 +1,7 @@
 import { usePathname, useRouter } from "next/navigation"
 import { useCallback } from "react"
 import { useTranslation } from "react-i18next"
+import { useFlowCarts } from "@/hooks/useFlowCarts"
 import useResources from "@/hooks/useResources"
 import { trackPortalTelemetry } from "@/lib/portal-telemetry"
 import { useCityProvider } from "@/providers/cityProvider"
@@ -38,7 +39,15 @@ const ResourceItem: React.FC<{
   onNavigate: (path: string) => void
   pathname: string
   hiddenItems?: string[]
-}> = ({ resource, level = 0, onNavigate, pathname, hiddenItems = [] }) => {
+  cartCount?: number
+}> = ({
+  resource,
+  level = 0,
+  onNavigate,
+  pathname,
+  hiddenItems = [],
+  cartCount,
+}) => {
   const { t } = useTranslation()
 
   const isActive = resource.path === pathname
@@ -53,6 +62,7 @@ const ResourceItem: React.FC<{
             color={statusColor(resource.value as string)}
             onNavigate={onNavigate}
             isActive={isActive}
+            cartCount={cartCount}
           />
         </TooltipTrigger>
         <TooltipContent
@@ -96,6 +106,10 @@ const ResourceItem: React.FC<{
 const ResourcesMenu = () => {
   const { t } = useTranslation()
   const { resources, doorName } = useResources()
+  const flowCarts = useFlowCarts()
+  const cartCountFor = (resource: Resource) =>
+    flowCarts.find((flowCart) => flowCart.flowId === resource.salesFlowId)
+      ?.itemCount
   const city = useCityProvider().getCity()
   const sidebarConfig = city?.sidebar_config as
     | {
@@ -177,6 +191,7 @@ const ResourcesMenu = () => {
                 onNavigate={handleNavigate}
                 pathname={pathname}
                 hiddenItems={hiddenItems}
+                cartCount={cartCountFor(resource)}
               />
             ))}
             {group === "community" && (
@@ -209,6 +224,7 @@ const ResourcesMenu = () => {
           onNavigate={handleNavigate}
           pathname={pathname}
           hiddenItems={hiddenItems}
+          cartCount={cartCountFor(resource)}
         />
       ))
   }

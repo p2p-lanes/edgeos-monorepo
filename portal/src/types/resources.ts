@@ -17,4 +17,6 @@ export interface Resource {
   children?: Resource[]
   value?: string | number | React.ReactNode
   group?: ResourceGroup
+  /** Set on checkout entries: the sales flow this entry sells through. */
+  salesFlowId?: string
 }

@@ -36,6 +36,7 @@ const resources = [
     status: "active" as const,
     path: "/portal/summit/shop/attendee",
     group: "checkouts" as const,
+    salesFlowId: "attendee-flow",
   },
   {
     name: "Volunteer",
@@ -48,6 +49,7 @@ const resources = [
     status: "active" as const,
     path: "/portal/summit/shop/merch-store",
     group: "checkouts" as const,
+    salesFlowId: "merch-flow",
   },
   {
     name: "Attendee Directory",
@@ -90,6 +92,10 @@ let configuredSidebar: {
   hidden_items?: string[]
 } | null = null
 
+const flowCarts = vi.hoisted(() => ({
+  current: [] as Array<{ flowId: string; itemCount: number }>,
+}))
+
 const navigation = vi.hoisted(() => ({
   pathname: "/portal/summit/shop/attendee",
   push: vi.fn(),
@@ -127,6 +133,10 @@ vi.mock("react-i18next", () => ({
   }),
 }))
 
+vi.mock("@/hooks/useFlowCarts", () => ({
+  useFlowCarts: () => flowCarts.current,
+}))
+
 vi.mock("@/hooks/useResources", () => ({
   default: () => ({
     resources: includeCheckoutResources
@@ -155,13 +165,16 @@ vi.mock("./StatusResource/ResourceMenuItem", () => ({
     resource,
     isActive,
     onNavigate,
+    cartCount,
   }: {
     resource: { name: string; path: string }
     isActive: boolean
     onNavigate: (path: string) => void
+    cartCount?: number
   }) => (
     <a
       aria-current={isActive ? "page" : undefined}
+      data-cart-count={cartCount}
       href={resource.path}
       onClick={(event) => {
         event.preventDefault()
@@ -222,6 +235,7 @@ describe("ResourcesMenu", () => {
   beforeEach(() => {
     includeCheckoutResources = true
     configuredSidebar = null
+    flowCarts.current = []
     navigation.pathname = "/portal/summit/shop/attendee"
     navigation.push.mockClear()
     navigation.setOpenMobile.mockClear()
@@ -278,6 +292,23 @@ describe("ResourcesMenu", () => {
         .getByRole("link", { name: "Volunteer" })
         .getAttribute("aria-current"),
     ).toBeNull()
+  })
+
+  it("shows the pending cart count on the checkout that holds it", () => {
+    flowCarts.current = [
+      { flowId: "attendee-flow", itemCount: 0 },
+      { flowId: "merch-flow", itemCount: 2 },
+    ]
+    render(<ResourcesMenu />)
+
+    const cartCount = (name: string) =>
+      screen.getByRole("link", { name }).getAttribute("data-cart-count")
+
+    expect(cartCount("Merch Store")).toBe("2")
+    expect(cartCount("Attendee")).toBe("0")
+    // Entries without a flow never pick one up.
+    expect(cartCount("Passes")).toBeNull()
+    expect(cartCount("Volunteer")).toBeNull()
   })
 
   it("does not render an empty Commerce group", () => {

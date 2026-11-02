@@ -188,6 +188,7 @@ const useResources = () => {
     status: "active",
     path: `/portal/${city.slug}/shop/${flow.slug}`,
     group: "checkouts",
+    salesFlowId: flow.id,
   }))
 
   // Where nobody applies there is no application and no reviewer-controlled

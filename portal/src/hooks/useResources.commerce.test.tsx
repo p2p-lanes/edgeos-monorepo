@@ -235,6 +235,9 @@ describe("useResources Commerce navigation", () => {
       checkouts.find((resource) => resource.name === "Merch Store")?.path,
     ).toBe("/portal/summit/shop/merch-store")
     expect(
+      checkouts.find((resource) => resource.name === "Attendee")?.salesFlowId,
+    ).toBe("attendee-1")
+    expect(
       checkouts.find((resource) => resource.name === "Meal Plan")?.path,
     ).toBe("/portal/summit/shop/meal-plan")
     expect(

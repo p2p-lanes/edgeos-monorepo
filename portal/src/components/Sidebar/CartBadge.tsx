@@ -10,46 +10,104 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover"
-import { useCart, useClearCart } from "@/hooks/useCartApi"
+import { useClearCart } from "@/hooks/useCartApi"
+import { type FlowCart, useFlowCarts } from "@/hooks/useFlowCarts"
 import { cn } from "@/lib/utils"
-import { useCityProvider } from "@/providers/cityProvider"
 
-const CartBadge = () => {
+const FlowCartSection = ({
+  flowCart,
+  showName,
+  onNavigate,
+}: {
+  flowCart: FlowCart
+  showName: boolean
+  onNavigate: () => void
+}) => {
   const { t } = useTranslation()
-  const { getCity } = useCityProvider()
-  const city = getCity()
-  const cityId = city?.id ? String(city.id) : null
-  const { data: cart } = useCart(cityId)
-  const { mutate: clearCart, isPending } = useClearCart(cityId)
+  const { mutate: clearCart, isPending } = useClearCart(
+    flowCart.popupId,
+    flowCart.flowId,
+  )
   const [confirming, setConfirming] = useState(false)
-
-  const cartLines = cart?.lines ?? []
-  const passCount = cartLines.filter(
-    (line) => line.kind === "product" && line.step_type === "tickets",
-  ).length
-  const merchCount = cartLines.filter(
-    (line) => line.kind === "product" && line.step_type === "merch",
-  ).length
-  const hasHousing = cartLines.some(
-    (line) => line.kind === "date_range" || line.kind === "accommodation",
-  )
-  const hasPatron = cartLines.some((line) => line.kind === "custom_amount")
-  const itemCount = cartLines.reduce(
-    (count, line) => count + (line.kind === "product" ? line.quantity : 1),
-    0,
-  )
-
-  if (!itemCount || !city?.slug) return null
+  const { summary } = flowCart
 
   const lines = [
-    passCount > 0 && t("cartBadge.passes", { count: passCount }),
-    hasHousing && t("cartBadge.housing"),
-    merchCount > 0 && t("cartBadge.merch", { count: merchCount }),
-    hasPatron && t("cartBadge.patron"),
+    summary.passes > 0 && t("cartBadge.passes", { count: summary.passes }),
+    summary.hasHousing && t("cartBadge.housing"),
+    summary.merch > 0 && t("cartBadge.merch", { count: summary.merch }),
+    summary.hasPatron && t("cartBadge.patron"),
+    summary.otherItems > 0 &&
+      t("cartBadge.items", { count: summary.otherItems }),
   ].filter(Boolean) as string[]
 
   return (
-    <Popover onOpenChange={(open) => !open && setConfirming(false)}>
+    <section>
+      {showName && (
+        <h3 className="mb-1 text-sm font-medium text-foreground">
+          {flowCart.name}
+        </h3>
+      )}
+      <ul className="mb-3 space-y-1 text-sm text-muted-foreground">
+        {lines.map((line) => (
+          <li key={line}>{line}</li>
+        ))}
+      </ul>
+      <Link
+        href={flowCart.path}
+        onClick={onNavigate}
+        className={cn(buttonVariants({ size: "sm" }), "w-full")}
+      >
+        {t("cartBadge.go_to_checkout")}
+      </Link>
+      {confirming ? (
+        <div className="mt-2 flex gap-2">
+          <Button
+            type="button"
+            size="sm"
+            variant="ghost"
+            className="flex-1"
+            onClick={() => setConfirming(false)}
+          >
+            {t("common.cancel")}
+          </Button>
+          <Button
+            type="button"
+            size="sm"
+            variant="destructive"
+            className="flex-1"
+            disabled={isPending}
+            onClick={() => clearCart()}
+          >
+            {isPending ? t("cartBadge.clearing") : t("cartBadge.clear_confirm")}
+          </Button>
+        </div>
+      ) : (
+        <Button
+          type="button"
+          size="sm"
+          variant="ghost"
+          className="mt-2 w-full text-destructive hover:text-destructive"
+          onClick={() => setConfirming(true)}
+        >
+          {t("cartBadge.clear")}
+        </Button>
+      )}
+    </section>
+  )
+}
+
+const CartPopover = ({ flowCarts }: { flowCarts: FlowCart[] }) => {
+  const { t } = useTranslation()
+  // A link to the page already open navigates nowhere, so closing is what
+  // tells the buyer the click landed.
+  const [open, setOpen] = useState(false)
+  const itemCount = flowCarts.reduce(
+    (count, flowCart) => count + flowCart.itemCount,
+    0,
+  )
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
         <button
           type="button"
@@ -62,59 +120,35 @@ const CartBadge = () => {
           </span>
         </button>
       </PopoverTrigger>
-      <PopoverContent align="end" className="portal-chrome w-64 p-3">
+      <PopoverContent
+        align="end"
+        className="portal-chrome max-h-[70vh] w-64 overflow-y-auto p-3"
+      >
         <p className="mb-2 text-sm font-medium text-foreground">
           {t("cartBadge.title")}
         </p>
-        <ul className="mb-3 space-y-1 text-sm text-muted-foreground">
-          {lines.map((line) => (
-            <li key={line}>{line}</li>
+        <div className="divide-y divide-border [&>*:not(:first-child)]:mt-3 [&>*:not(:first-child)]:pt-3">
+          {flowCarts.map((flowCart) => (
+            <FlowCartSection
+              key={flowCart.flowId}
+              flowCart={flowCart}
+              showName={flowCarts.length > 1}
+              onNavigate={() => setOpen(false)}
+            />
           ))}
-        </ul>
-        <Link
-          href={`/portal/${city.slug}`}
-          className={cn(buttonVariants({ size: "sm" }), "w-full")}
-        >
-          {t("cartBadge.go_to_checkout")}
-        </Link>
-        {confirming ? (
-          <div className="mt-2 flex gap-2">
-            <Button
-              type="button"
-              size="sm"
-              variant="ghost"
-              className="flex-1"
-              onClick={() => setConfirming(false)}
-            >
-              {t("common.cancel")}
-            </Button>
-            <Button
-              type="button"
-              size="sm"
-              variant="destructive"
-              className="flex-1"
-              disabled={isPending}
-              onClick={() => clearCart()}
-            >
-              {isPending
-                ? t("cartBadge.clearing")
-                : t("cartBadge.clear_confirm")}
-            </Button>
-          </div>
-        ) : (
-          <Button
-            type="button"
-            size="sm"
-            variant="ghost"
-            className="mt-2 w-full text-destructive hover:text-destructive"
-            onClick={() => setConfirming(true)}
-          >
-            {t("cartBadge.clear")}
-          </Button>
-        )}
+        </div>
       </PopoverContent>
     </Popover>
   )
+}
+
+const CartBadge = () => {
+  const flowCarts = useFlowCarts().filter((flowCart) => flowCart.itemCount > 0)
+
+  // Unmounting the popover is what stops a later cart from opening it again.
+  if (flowCarts.length === 0) return null
+
+  return <CartPopover flowCarts={flowCarts} />
 }
 
 export default CartBadge
