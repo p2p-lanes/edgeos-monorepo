@@ -167,6 +167,14 @@ class Payments(PaymentBase, table=True):
         default=None,
         sa_column=Column(Text, nullable=True),
     )
+    ga_client_id: str | None = Field(
+        default=None,
+        sa_column=Column(String(128), nullable=True),
+    )
+    ga_session_id: str | None = Field(
+        default=None,
+        sa_column=Column(String(20), nullable=True),
+    )
 
     # Relationships
     tenant: "Tenants" = Relationship(back_populates="payments")

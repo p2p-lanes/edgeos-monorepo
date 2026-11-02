@@ -660,6 +660,14 @@
     "product_not_in_flow": "This product is not available through this flow."
   },
   "portalThankYou": {
+    "checking_title": "Confirming your payment",
+    "checking_description": "We are checking the payment provider. Please stay on this page.",
+    "pending_title": "Your payment is still being confirmed",
+    "pending_description": "We have not received confirmation yet. You can check again without making another payment.",
+    "unverified_title": "Payment not confirmed",
+    "unverified_description": "We could not verify this payment. You can try again or view your passes.",
+    "retry": "Check payment again",
+    "confirmed_notice": "Your payment is confirmed. You can view your passes.",
     "title": "Purchase completed",
     "description": "Your purchase is complete. Your passes are ready in the portal.",
     "passes_cta": "View my passes"

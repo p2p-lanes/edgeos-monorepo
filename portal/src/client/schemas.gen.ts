@@ -22363,6 +22363,32 @@ export const OpenTicketingPurchaseCreateSchema = {
             ],
             title: 'Fbp'
         },
+        ga_client_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    maxLength: 128,
+                    pattern: '^[A-Za-z0-9._-]+$'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Ga Client Id'
+        },
+        ga_session_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    maxLength: 20,
+                    pattern: '^\\d+$'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Ga Session Id'
+        },
         locale: {
             anyOf: [
                 {
@@ -22584,6 +22610,32 @@ export const PaymentCreateSchema = {
             enum: ['direct', 'portal'],
             title: 'Return Context',
             default: 'direct'
+        },
+        ga_client_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    maxLength: 128,
+                    pattern: '^[A-Za-z0-9._-]+$'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Ga Client Id'
+        },
+        ga_session_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    maxLength: 20,
+                    pattern: '^\\d+$'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Ga Session Id'
         }
     },
     additionalProperties: false,
@@ -34433,6 +34485,11 @@ export const TenantPublicSchema = {
             title: 'Meta Capi Configured',
             default: false
         },
+        ga_mp_configured: {
+            type: 'boolean',
+            title: 'Ga Mp Configured',
+            default: false
+        },
         is_trial: {
             type: 'boolean',
             title: 'Is Trial',
@@ -34732,6 +34789,17 @@ export const TenantUpdateSchema = {
                 }
             ],
             title: 'Ga Measurement Id'
+        },
+        ga_mp_api_secret: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Ga Mp Api Secret'
         },
         help_enabled: {
             anyOf: [

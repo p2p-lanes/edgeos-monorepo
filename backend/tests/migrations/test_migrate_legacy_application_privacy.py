@@ -1,6 +1,6 @@
 from alembic import command
 from alembic.config import Config
-from sqlalchemy import MetaData, Table
+from sqlalchemy import MetaData, Table, text
 from sqlmodel import Session, create_engine, select
 from testcontainers.postgres import PostgresContainer
 
@@ -42,6 +42,12 @@ def test_legacy_privacy_choices_move_to_popup_directory_settings():
             config = Config("alembic.ini")
             config.attributes["connection"] = connection
             command.upgrade(config, PREVIOUS_REVISION)
+            # Current tenant ORM includes the GA4 secret added after this revision.
+            connection.execute(
+                text(
+                    "ALTER TABLE tenants ADD COLUMN ga_mp_api_secret_encrypted VARCHAR"
+                )
+            )
 
             with Session(
                 bind=connection, join_transaction_mode="create_savepoint"

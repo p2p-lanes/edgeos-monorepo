@@ -153,6 +153,8 @@ export interface OpenTicketingPurchaseCreate {
   insurance?: boolean
   fbc?: string | null
   fbp?: string | null
+  ga_client_id?: string | null
+  ga_session_id?: string | null
   locale?: string | null
   attribution?: Attribution | null
   /** Cart continuity proof (signed cart id) — allows superseding a PENDING. */

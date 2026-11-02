@@ -28,6 +28,9 @@ vi.mock("@/client", () => ({
     listPortalAccommodations: vi.fn(),
   },
 }))
+vi.mock("@/providers/tenantProvider", () => ({
+  useTenant: () => ({ tenant: null }),
+}))
 
 function renderVariant(templateConfig?: Record<string, unknown> | null) {
   return render(

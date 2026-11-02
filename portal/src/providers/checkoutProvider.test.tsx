@@ -5,12 +5,16 @@
  */
 import { act, renderHook, waitFor } from "@testing-library/react"
 import type { ComponentProps, ReactNode } from "react"
-import { beforeEach, describe, expect, it, vi } from "vitest"
+import { StrictMode } from "react"
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
+import { CHECKOUT_MODE } from "@/checkout/popupCheckoutPolicy"
 import {
   CheckoutService,
   type SalesFlowCheckoutConfig,
   type TicketingStepPublic,
 } from "@/client"
+import { getProductStrategy } from "@/strategies/ProductStrategies"
+import type { AttendeePassState } from "@/types/Attendee"
 import type { ApplicationFormSchema } from "@/types/form-schema"
 import type { ProductsPass } from "@/types/Products"
 import { CheckoutProvider, useCheckout } from "./checkoutProvider"
@@ -27,6 +31,11 @@ const paymentSubmitSpy = vi.hoisted(() =>
 )
 const cityState = vi.hoisted(() => ({
   current: null as Record<string, unknown> | null,
+}))
+const passState = vi.hoisted(() => ({
+  attendees: [] as AttendeePassState[],
+  editing: false,
+  toggle: vi.fn(),
 }))
 const queryState = vi.hoisted(() => ({ loading: false, authenticated: false }))
 const flowConfigQuerySpy = vi.hoisted(() => vi.fn())
@@ -66,6 +75,9 @@ vi.mock("@/providers/applicationProvider", () => ({
     getRelevantApplication: () => null,
   }),
 }))
+vi.mock("@/providers/tenantProvider", () => ({
+  useTenant: () => ({ tenant: null }),
+}))
 vi.mock("@/providers/cityProvider", () => ({
   useCityProvider: () => ({
     getCity: () => cityState.current,
@@ -73,6 +85,9 @@ vi.mock("@/providers/cityProvider", () => ({
 }))
 
 beforeEach(() => {
+  passState.editing = false
+  passState.attendees = []
+  passState.toggle.mockReset()
   cityState.current = null
   queryState.loading = false
   queryState.authenticated = false
@@ -93,9 +108,9 @@ vi.mock("@/providers/discountProvider", () => ({
 }))
 vi.mock("@/providers/passesProvider", () => ({
   usePassesProvider: () => ({
-    attendeePasses: [],
-    toggleProduct: vi.fn(),
-    isEditing: false,
+    attendeePasses: passState.attendees,
+    toggleProduct: passState.toggle,
+    isEditing: passState.editing,
     toggleEditing: vi.fn(),
   }),
 }))
@@ -969,5 +984,338 @@ describe("checkoutProvider — preview mode", () => {
 
     // Blocked for an ordinary reason (empty cart), never the preview guard.
     expect(outcome!.error).not.toBe("preview")
+  })
+})
+
+describe("GA4 purchase journey", () => {
+  afterEach(() => {
+    delete (window as Window & { gtag?: unknown }).gtag
+  })
+
+  it("tracks actual pass-system additions and preserves selection scopes", () => {
+    const gtag = vi.fn()
+    ;(window as Window & { gtag?: unknown }).gtag = gtag
+    cityState.current = { id: "popup", slug: "summit", currency: "USD" }
+    const product = makeProduct({
+      id: "ticket",
+      category: "ticket",
+      duration_type: "day",
+      quantity: 0,
+      original_quantity: 0,
+      selected: false,
+      max_per_order: 10,
+    })
+    passState.attendees = [
+      {
+        id: "attendee",
+        category: "main",
+        products: [product],
+      } as AttendeePassState,
+    ]
+    const hook = renderHook(() => useCheckout(), {
+      wrapper: makeWrapper([], [product]),
+    })
+    const scope = [product.id]
+    act(() =>
+      hook.result.current.togglePass("attendee", product.id, 2, scope, scope),
+    )
+    const additions = gtag.mock.calls.filter(
+      (call) => call[1] === "add_to_cart",
+    )
+    expect(additions).toHaveLength(1)
+    expect(additions[0][2].items).toEqual([
+      expect.objectContaining({ item_id: "ticket", quantity: 2, price: 10 }),
+    ])
+    expect(passState.toggle).toHaveBeenCalledWith(
+      "attendee",
+      { ...product, quantity: 2 },
+      scope,
+      scope,
+    )
+    expect(
+      gtag.mock.calls.findIndex((call) => call[1] === "view_item"),
+    ).toBeLessThan(
+      gtag.mock.calls.findIndex((call) => call[1] === "add_to_cart"),
+    )
+  })
+
+  it("does not turn restored ticket selections into cart additions", () => {
+    const gtag = vi.fn()
+    ;(window as Window & { gtag?: unknown }).gtag = gtag
+    cityState.current = { id: "popup", slug: "summit", currency: "USD" }
+    const product = makeProduct({
+      id: "ticket",
+      category: "ticket",
+      duration_type: "day",
+      quantity: 2,
+      original_quantity: 0,
+      selected: true,
+    })
+    passState.attendees = [
+      {
+        id: "attendee",
+        category: "main",
+        products: [product],
+      } as AttendeePassState,
+    ]
+    const hook = renderHook(() => useCheckout(), {
+      wrapper: makeWrapper([], [product]),
+    })
+    hook.rerender()
+    act(() => hook.result.current.togglePass("attendee", product.id, 0))
+    expect(
+      gtag.mock.calls.filter((call) => call[1] === "add_to_cart"),
+    ).toHaveLength(0)
+    expect(passState.toggle).toHaveBeenCalledWith("attendee", {
+      ...product,
+      quantity: 0,
+    })
+  })
+
+  it.each([
+    "application",
+    "open-ticketing",
+  ] as const)("views the catalog once for %s", (submitMode) => {
+    const gtag = vi.fn()
+    ;(window as Window & { gtag?: unknown }).gtag = gtag
+    cityState.current = { id: "popup", slug: "summit", currency: "USD" }
+    const product = makeProduct({ id: "ticket", category: "ticket" })
+    const hook = renderHook(() => useCheckout(), {
+      wrapper: makeWrapper([], [product], { submitMode }),
+    })
+    hook.rerender()
+    expect(
+      gtag.mock.calls.filter((call) => call[1] === "view_item"),
+    ).toHaveLength(1)
+  })
+
+  it("never tracks catalog or cart in preview", () => {
+    const gtag = vi.fn()
+    ;(window as Window & { gtag?: unknown }).gtag = gtag
+    cityState.current = { id: "popup", slug: "summit", currency: "USD" }
+    const product = makeProduct({ id: "ticket", category: "ticket" })
+    const hook = renderHook(() => useCheckout(), {
+      wrapper: makeWrapper([], [product], { previewMode: true }),
+    })
+    act(() =>
+      hook.result.current.addDynamicItem("tickets", {
+        productId: product.id,
+        product,
+        quantity: 1,
+        price: 10,
+        stepType: "tickets",
+      }),
+    )
+    expect(gtag).not.toHaveBeenCalled()
+  })
+
+  it("does not duplicate user cart additions under StrictMode", () => {
+    const gtag = vi.fn()
+    ;(window as Window & { gtag?: unknown }).gtag = gtag
+    cityState.current = { id: "popup", slug: "summit", currency: "USD" }
+    const product = makeProduct({ id: "ticket", category: "ticket" })
+    const Base = makeWrapper([], [product])
+    const hook = renderHook(() => useCheckout(), {
+      wrapper: ({ children }) => (
+        <StrictMode>
+          <Base>{children}</Base>
+        </StrictMode>
+      ),
+    })
+    act(() =>
+      hook.result.current.addDynamicItem("tickets", {
+        productId: product.id,
+        product,
+        quantity: 1,
+        price: 10,
+        stepType: "tickets",
+      }),
+    )
+    act(() =>
+      hook.result.current.updateDynamicQuantity("tickets", product.id, 2),
+    )
+    const additions = gtag.mock.calls.filter(
+      (call) => call[1] === "add_to_cart",
+    )
+    expect(additions).toHaveLength(2)
+    expect(additions.map((call) => call[2].items[0].quantity)).toEqual([1, 1])
+    act(() =>
+      hook.result.current.updateDynamicQuantity("tickets", product.id, 0),
+    )
+    expect(
+      gtag.mock.calls.filter((call) => call[1] === "add_to_cart"),
+    ).toHaveLength(2)
+  })
+})
+
+describe("tracked selection strategy preservation", () => {
+  afterEach(() => {
+    delete (window as Window & { gtag?: unknown }).gtag
+  })
+  it.each([
+    false,
+    true,
+  ])("preserves owned day quantities and removals editing=%s", (editing) => {
+    passState.editing = editing
+    const p = makeProduct({
+      id: "day",
+      category: "ticket",
+      duration_type: "day",
+      quantity: 2,
+      original_quantity: 2,
+      selected: false,
+      purchased: false,
+      max_per_order: 10,
+    })
+    passState.attendees = [
+      { id: "a", category: "main", products: [p] } as AttendeePassState,
+    ]
+    cityState.current = { id: "popup", slug: "summit", currency: "USD" }
+    const ga = vi.fn()
+    ;(window as Window & { gtag?: unknown }).gtag = ga
+    passState.toggle.mockImplementation((id, product, scope, visible) => {
+      passState.attendees = getProductStrategy(
+        product,
+        editing,
+        CHECKOUT_MODE.PASS_SYSTEM,
+      ).handleSelection(
+        passState.attendees,
+        id,
+        product,
+        { discount_value: 0, discount_type: "percentage" },
+        scope,
+        visible,
+      )
+    })
+    const h = renderHook(() => useCheckout(), { wrapper: makeWrapper([], [p]) })
+    for (const qty of [3, 4, 2]) {
+      const before = structuredClone(passState.attendees)
+      const product = { ...before[0].products[0], quantity: qty }
+      const expected = getProductStrategy(
+        product,
+        editing,
+        CHECKOUT_MODE.PASS_SYSTEM,
+      ).handleSelection(
+        before,
+        "a",
+        product,
+        { discount_value: 0, discount_type: "percentage" },
+        ["day"],
+        ["day"],
+      )
+      act(() => h.result.current.togglePass("a", "day", qty, ["day"], ["day"]))
+      expect(passState.attendees).toEqual(expected)
+      h.rerender()
+    }
+    expect(h.result.current.cart.passes).toEqual([])
+    expect(
+      ga.mock.calls
+        .filter((c) => c[1] === "add_to_cart")
+        .map((c) => c[2].items[0].quantity),
+    ).toEqual([1, 1])
+  })
+  it("preserves visibility-scoped auto-promotion and untouched outside section", () => {
+    const products = [
+      makeProduct({
+        id: "w1",
+        category: "ticket",
+        duration_type: "week",
+        selected: true,
+        max_per_order: 1,
+      }),
+      makeProduct({
+        id: "w2",
+        category: "ticket",
+        duration_type: "week",
+        selected: false,
+        max_per_order: 1,
+      }),
+      makeProduct({
+        id: "m",
+        category: "ticket",
+        duration_type: "month",
+        selected: false,
+        max_per_order: 1,
+      }),
+      makeProduct({
+        id: "outside",
+        category: "ticket",
+        duration_type: "full",
+        selected: true,
+        max_per_order: 1,
+      }),
+    ]
+    passState.attendees = [
+      { id: "a", category: "main", products } as AttendeePassState,
+    ]
+    cityState.current = { id: "popup", slug: "summit", currency: "USD" }
+    const ga = vi.fn()
+    ;(window as Window & { gtag?: unknown }).gtag = ga
+    passState.toggle.mockImplementation((id, product, scope, visible) => {
+      passState.attendees = getProductStrategy(
+        product,
+        false,
+        CHECKOUT_MODE.PASS_SYSTEM,
+      ).handleSelection(
+        passState.attendees,
+        id,
+        product,
+        { discount_value: 0, discount_type: "percentage" },
+        scope,
+        visible,
+      )
+    })
+    const before = structuredClone(passState.attendees)
+    const expected = getProductStrategy(
+      products[1],
+      false,
+      CHECKOUT_MODE.PASS_SYSTEM,
+    ).handleSelection(
+      before,
+      "a",
+      products[1],
+      { discount_value: 0, discount_type: "percentage" },
+      ["w1", "w2"],
+      ["w1", "w2", "m"],
+    )
+    const h = renderHook(() => useCheckout(), {
+      wrapper: makeWrapper([], products),
+    })
+    act(() =>
+      h.result.current.togglePass(
+        "a",
+        "w2",
+        undefined,
+        ["w1", "w2"],
+        ["w1", "w2", "m"],
+      ),
+    )
+    expect(passState.attendees).toEqual(expected)
+    expect(
+      passState.attendees[0].products.find((p) => p.id === "outside"),
+    ).toEqual(products[3])
+    expect(
+      ga.mock.calls
+        .filter((c) => c[1] === "add_to_cart")
+        .map((c) => c[2].items[0].item_id),
+    ).toEqual(["m"])
+  })
+  it("retries catalog view at a real action when gtag becomes available", () => {
+    cityState.current = { id: "popup", slug: "summit", currency: "USD" }
+    delete (window as Window & { gtag?: unknown }).gtag
+    const p = makeProduct({ id: "ticket", category: "ticket" })
+    const h = renderHook(() => useCheckout(), { wrapper: makeWrapper([], [p]) })
+    const ga = vi.fn()
+    ;(window as Window & { gtag?: unknown }).gtag = ga
+    act(() =>
+      h.result.current.addDynamicItem("tickets", {
+        productId: p.id,
+        product: p,
+        quantity: 1,
+        price: 10,
+        stepType: "tickets",
+      }),
+    )
+    expect(ga.mock.calls.map((c) => c[1])).toEqual(["view_item", "add_to_cart"])
   })
 })

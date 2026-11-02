@@ -483,6 +483,7 @@ def test_purchase_pending_open_checkout_sends_initiate_checkout_capi(
 
     with (
         patch("app.services.meta_capi.send_prepared_purchase_event", capture_event),
+        patch("app.api.checkout.router.enqueue_ga4_purchase_event") as mock_ga_purchase,
         patch("app.services.simplefi.get_simplefi_client") as mock_get_client,
     ):
         mock_get_client.return_value.create_payment.return_value = SimpleNamespace(
@@ -521,6 +522,7 @@ def test_purchase_pending_open_checkout_sends_initiate_checkout_capi(
 
     assert response.status_code == 200, response.text
     assert response.json()["status"] == "pending"
+    mock_ga_purchase.assert_not_called()
     assert len(sent_events) == 1
     event = sent_events[0]
     payload_event = event.payload["data"][0]
@@ -565,6 +567,9 @@ def test_purchase_non_pending_open_checkout_does_not_send_initiate_checkout_capi
         meta_tracking_enabled=True,
         meta_pixel_id="123456789",
         meta_capi_access_token_encrypted=encrypt("test-token"),
+        ga_tracking_enabled=True,
+        ga_measurement_id="G-TEST123",
+        ga_mp_api_secret_encrypted=encrypt("test-ga-secret"),
     )
     db.add(tenant)
     db.flush()
@@ -580,6 +585,7 @@ def test_purchase_non_pending_open_checkout_does_not_send_initiate_checkout_capi
             "app.api.checkout.router.enqueue_initiate_checkout_event"
         ) as mock_initiate,
         patch("app.api.checkout.router.enqueue_purchase_event"),
+        patch("app.api.checkout.router.enqueue_ga4_purchase_event") as mock_ga_purchase,
         patch(
             "app.api.checkout.router._send_payment_confirmed_email",
             noop_send_confirmation,
@@ -610,6 +616,8 @@ def test_purchase_non_pending_open_checkout_does_not_send_initiate_checkout_capi
                     "last_name": "Buyer",
                     "form_data": {},
                 },
+                "ga_client_id": "123.456",
+                "ga_session_id": "789",
             },
             headers={"X-Tenant-Id": str(tenant.id)},
         )
@@ -618,6 +626,11 @@ def test_purchase_non_pending_open_checkout_does_not_send_initiate_checkout_capi
     assert response.json()["status"] == "approved"
     assert response.json()["checkout_url"] == "https://simplefi.test/checkout/approved"
     mock_initiate.assert_not_called()
+    mock_ga_purchase.assert_called_once()
+    payment = db.exec(select(Payments).where(Payments.popup_id == popup.id)).first()
+    assert payment is not None
+    assert payment.ga_client_id == "123.456"
+    assert payment.ga_session_id == "789"
 
 
 def test_purchase_initiate_checkout_capi_failure_does_not_block_response(

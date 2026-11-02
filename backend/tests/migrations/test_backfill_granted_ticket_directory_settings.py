@@ -5,6 +5,7 @@ from decimal import Decimal
 
 from alembic import command
 from alembic.config import Config
+from sqlalchemy import text
 from sqlmodel import Session, create_engine, select
 from testcontainers.postgres import PostgresContainer
 
@@ -29,6 +30,12 @@ def test_backfill_only_eligible_tickets_without_existing_settings():
             config = Config("alembic.ini")
             config.attributes["connection"] = connection
             command.upgrade(config, PREVIOUS_REVISION)
+            # Current tenant ORM includes the GA4 secret added after this revision.
+            connection.execute(
+                text(
+                    "ALTER TABLE tenants ADD COLUMN ga_mp_api_secret_encrypted VARCHAR"
+                )
+            )
 
             with Session(
                 bind=connection, join_transaction_mode="create_savepoint"

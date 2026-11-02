@@ -2,7 +2,13 @@
 
 import { useQueryClient } from "@tanstack/react-query"
 import { useRouter } from "next/navigation"
-import { type MutableRefObject, useCallback, useEffect, useState } from "react"
+import {
+  type MutableRefObject,
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+} from "react"
 import { useTranslation } from "react-i18next"
 import { toast } from "sonner"
 import type { CheckoutMode } from "@/checkout/popupCheckoutPolicy"
@@ -17,10 +23,15 @@ import { withCheckoutLocale } from "@/helpers/checkout"
 import { getAttribution } from "@/lib/attribution"
 import { navigateBrowser } from "@/lib/browser-navigation"
 import type { BuyerIdentity } from "@/lib/buyerIdentity"
-import { trackGAPurchase } from "@/lib/google-analytics"
+import {
+  getGABrowserIds,
+  trackGABeginCheckout,
+  trackGAPurchase,
+} from "@/lib/google-analytics"
 import { getMetaAttribution, trackMetaPurchase } from "@/lib/meta-pixel"
 import { trackPortalTelemetry } from "@/lib/portal-telemetry"
 import { queryKeys } from "@/lib/query-keys"
+import { useTenant } from "@/providers/tenantProvider"
 import type { AttendeePassState } from "@/types/Attendee"
 import type {
   CheckoutStep,
@@ -32,6 +43,7 @@ import type {
   SelectedPassItem,
   SelectedPatronItem,
 } from "@/types/checkout"
+import type { ProductsPass } from "@/types/Products"
 import { buildPaymentProducts } from "./buildPaymentProducts"
 import {
   dispatchPaymentError,
@@ -78,6 +90,8 @@ interface UsePaymentSubmitParams {
   } | null
   editPassesEnabled: boolean
   popupName?: string | null
+  popupCurrency?: string | null
+  catalogProducts?: ProductsPass[]
   /** Ref from useOpenCartPersistence exposing cartId and restoreToken for the
    *  continuity-proof gate. Must be provided for open-ticketing flows; ignored
    *  in application mode. */
@@ -178,14 +192,18 @@ export function usePaymentSubmit({
   buyerData,
   editPassesEnabled,
   popupName,
+  popupCurrency = null,
+  catalogProducts = [],
   openCartMetaRef = null,
   flushOpenCartSave = null,
   previewMode = false,
 }: UsePaymentSubmitParams) {
   const { t, i18n } = useTranslation()
   const queryClient = useQueryClient()
+  const { tenant } = useTenant()
   const router = useRouter()
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const trackedCheckoutRef = useRef<string | null>(null)
 
   // Reset isSubmitting when page is restored from bfcache
   useEffect(() => {
@@ -304,6 +322,60 @@ export function usePaymentSubmit({
         submitMode,
       })
 
+      if (popupId && popupSlug && productsToSend.length) {
+        const checkout = {
+          popup: {
+            id: popupId,
+            slug: popupSlug,
+            name: popupName,
+            currency: popupCurrency,
+          },
+          items: productsToSend,
+          products: [
+            ...catalogProducts,
+            ...selectedPasses.map((pass) => ({
+              ...pass.product,
+              price: pass.price / pass.quantity,
+            })),
+            ...Object.values(dynamicItems)
+              .flat()
+              .map((item) => ({
+                ...item.product,
+                price: item.price / item.quantity,
+              })),
+          ],
+          coupon: promoCodeValid ? promoCode : undefined,
+        }
+        const prices = new Map(
+          checkout.products.map((product) => [product.id, product.price]),
+        )
+        const key = JSON.stringify([
+          popupId,
+          salesFlowSlug,
+          popupCurrency,
+          checkout.items
+            .map((line) => ({
+              id: line.product_id,
+              quantity: line.quantity ?? 1,
+              price: prices.get(line.product_id),
+            }))
+            .sort(
+              (a, b) => a.id.localeCompare(b.id) || a.quantity - b.quantity,
+            ),
+          checkout.coupon,
+        ])
+        if (
+          trackedCheckoutRef.current !== key &&
+          trackGABeginCheckout(checkout)
+        ) {
+          trackedCheckoutRef.current = key
+        }
+      }
+
+      const gaBrowserIds = await getGABrowserIds(
+        tenant?.ga_tracking_enabled ? tenant.ga_measurement_id : null,
+      )
+
       const result =
         submitMode === "open-ticketing"
           ? await CheckoutService.purchaseOpenTicketing({
@@ -311,6 +383,7 @@ export function usePaymentSubmit({
               flowSlug: openFlowSlug!,
               requestBody: {
                 ...getMetaAttribution(),
+                ...gaBrowserIds,
                 locale: i18n.language,
                 return_context: returnContext,
                 ...(Object.keys(getAttribution()).length
@@ -343,6 +416,7 @@ export function usePaymentSubmit({
           : await PaymentsService.createMyPayment({
               requestBody: {
                 application_id: applicationId,
+                ...gaBrowserIds,
                 locale: i18n.language,
                 return_context: returnContext,
                 products: productsToSend,
@@ -460,9 +534,6 @@ export function usePaymentSubmit({
       setIsSubmitting(false)
       return { success: true }
     } catch (err: unknown) {
-      console.error("Payment failed:", err)
-      trackPortalTelemetry("checkout_failed")
-
       const apiBody =
         err instanceof ApiError
           ? (err.body as Record<string, unknown> | null)
@@ -480,10 +551,20 @@ export function usePaymentSubmit({
           code?: string
           redirect_url?: string
         }
-        const dispatch = dispatchPaymentError(detail, submitMode, popupSlug)
+        const dispatch = dispatchPaymentError(
+          detail,
+          submitMode,
+          popupSlug,
+          returnContext,
+        )
         if (dispatch !== null) {
           const msg = t(dispatch.messageKey)
-          toast.error(msg)
+          if (dispatch.tone === "success") toast.success(msg)
+          else {
+            console.error("Payment failed:", err)
+            trackPortalTelemetry("checkout_failed")
+            toast.error(msg)
+          }
           if (dispatch.blockResubmit) paymentCompleteRef.current = true
           if (dispatch.setPersistentError) setPromoError(msg)
           if (dispatch.navigate?.type === "href") {
@@ -492,9 +573,14 @@ export function usePaymentSubmit({
             router.push(dispatch.navigate.path)
           }
           setIsSubmitting(false)
-          return { success: false, error: msg }
+          return dispatch.tone === "success"
+            ? { success: true }
+            : { success: false, error: msg }
         }
       }
+
+      console.error("Payment failed:", err)
+      trackPortalTelemetry("checkout_failed")
 
       // String-detail branch: coupon error and generic fallback.
       const apiDetailStr =
@@ -554,6 +640,8 @@ export function usePaymentSubmit({
     submitMode,
     returnContext,
     popupName,
+    popupCurrency,
+    catalogProducts,
     router,
     editPassesEnabled,
     isSubmitting,
@@ -562,6 +650,8 @@ export function usePaymentSubmit({
     openCartMetaRef,
     flushOpenCartSave,
     previewMode,
+    tenant?.ga_tracking_enabled,
+    tenant?.ga_measurement_id,
   ])
 
   return { submitPayment, isSubmitting }

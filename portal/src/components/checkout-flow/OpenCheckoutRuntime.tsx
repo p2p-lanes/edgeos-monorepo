@@ -18,7 +18,6 @@ import { LanguageSwitcher } from "@/components/common/LanguageSwitcher"
 import { captureAttribution } from "@/lib/attribution"
 import { buyerFormDisplaySchema } from "@/lib/buyerFormDisplay"
 import { resolveCheckoutShell } from "@/lib/checkout-shell"
-import { trackGAViewItem } from "@/lib/google-analytics"
 import { trackMetaViewContent } from "@/lib/meta-pixel"
 import { trackPortalTelemetry } from "@/lib/portal-telemetry"
 import { queryKeys } from "@/lib/query-keys"
@@ -221,7 +220,6 @@ export function OpenCheckoutRuntime({
     if (trackedViewContentRef.current === popup.id) return
 
     trackMetaViewContent({ popup, products: runtime.products })
-    trackGAViewItem({ popup, products: runtime.products })
     trackPortalTelemetry("checkout_opened")
     trackedViewContentRef.current = popup.id
   }, [popup, runtime.products, previewMode])

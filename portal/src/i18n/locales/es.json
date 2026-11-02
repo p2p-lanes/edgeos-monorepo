@@ -660,6 +660,14 @@
     "product_not_in_flow": "Este producto no está disponible a través de este canal."
   },
   "portalThankYou": {
+    "checking_title": "Confirmando tu pago",
+    "checking_description": "Estamos consultando al proveedor de pagos. Permanece en esta página.",
+    "pending_title": "Tu pago todavía se está confirmando",
+    "pending_description": "Aún no recibimos la confirmación. Puedes volver a consultar sin realizar otro pago.",
+    "unverified_title": "Pago sin confirmar",
+    "unverified_description": "No pudimos verificar este pago. Puedes volver a consultar o ver tus pases.",
+    "retry": "Volver a consultar el pago",
+    "confirmed_notice": "Tu pago está confirmado. Puedes ver tus pases.",
     "title": "Compra completada",
     "description": "Tu compra se completó. Tus pases están disponibles en el portal.",
     "passes_cta": "Ver mis pases"

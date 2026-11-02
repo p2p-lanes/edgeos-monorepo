@@ -18,6 +18,12 @@ def test_settings_follow_popup_deletion_and_fk_downgrade_preserves_rows():
             config = Config("alembic.ini")
             config.attributes["connection"] = connection
             command.upgrade(config, "a9d3e7f2b6c4")
+            # Current tenant ORM includes the GA4 secret added after this revision.
+            connection.execute(
+                text(
+                    "ALTER TABLE tenants ADD COLUMN ga_mp_api_secret_encrypted VARCHAR"
+                )
+            )
             # The ORM model also includes columns introduced after this revision.
             connection.execute(
                 text(
