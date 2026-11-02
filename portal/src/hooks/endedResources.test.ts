@@ -56,16 +56,19 @@ describe("buildEndedResources", () => {
     expect(rs["sidebar.attendee_directory"]).toBe("active")
   })
 
-  it("lists Venues and Agentic access under Events but never Tracks", () => {
-    const events = buildEndedResources({
+  it("lists Venues under Events and Agentic access as its own item", () => {
+    const resources = buildEndedResources({
       t,
       city: city({}),
       participated: true,
-    }).find((resource) => resource.name === "sidebar.events")
+    })
+    const events = resources.find(
+      (resource) => resource.name === "sidebar.events",
+    )
     expect(events?.children?.map((resource) => resource.name)).toEqual([
       "sidebar.venues",
-      "sidebar.agentic_access",
     ])
+    expect(byName(resources)["sidebar.agentic_access"]).toBe("active")
   })
 
   it("hides events and directory for non-participants", () => {

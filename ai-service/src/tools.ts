@@ -1,6 +1,7 @@
 import { type ToolSet, tool } from "ai"
 import { z } from "zod"
 import { EdgeOSApiError, type EdgeOSContext, responseError } from "./context.js"
+import { formatGuide, type GuideRegistry } from "./guides.js"
 import type {
   EdgeOSOperationCatalog,
   OperationArguments,
@@ -99,11 +100,31 @@ export const searchOperationsInputSchema = z
   })
   .strict()
 
+export const searchBackofficeGuidesInputSchema = z
+  .object({
+    query: z
+      .string()
+      .trim()
+      .max(240)
+      .optional()
+      .describe(
+        "What the user wants to find or do in the backoffice UI, in English",
+      ),
+    guide: z
+      .string()
+      .trim()
+      .max(80)
+      .optional()
+      .describe("Exact guide name from an earlier search to read in full"),
+  })
+  .strict()
+
 export function createEdgeOSTools(
   catalog: EdgeOSOperationCatalog,
   context: EdgeOSContext,
   skills: SkillRegistry,
   backendUrl: string,
+  guides: GuideRegistry,
 ) {
   const exportHeaders = () => ({
     Authorization: context.authorization,
@@ -141,6 +162,35 @@ export function createEdgeOSTools(
   }
 
   return {
+    searchBackofficeGuides: tool({
+      description:
+        "Search the backoffice usage guides: where screens live, exact UI labels, step-by-step instructions, role and gathering requirements, and gotchas. Use it for every how/where/why-can't-I question about using the backoffice or for configuring what attendees see in the portal. Search with English terms; pass an exact guide name to read one in full.",
+      inputSchema: searchBackofficeGuidesInputSchema,
+      execute: async ({ query, guide }) => {
+        const exact = guide ? guides.get(guide) : undefined
+        const matches = exact
+          ? [exact]
+          : guides
+              .search(query || guide || "", {
+                pathname: context.pathname,
+                limit: 3,
+              })
+              .map((match) => match.guide)
+        return {
+          guides: matches.map((match) => ({
+            name: match.name,
+            routes: match.routes,
+            content: formatGuide(match),
+          })),
+          ...(matches.length === 0
+            ? {
+                note: "No guide matched. Use the navigation map, and if the capability is not there, say it can't be done from the backoffice.",
+              }
+            : {}),
+        }
+      },
+    }),
+
     searchOperations: tool({
       description:
         "Search or inspect the live server-owned EdgeOS operation catalog. Search by business intent first; results are compact. Then call this same tool with the exact returned operationId to inspect its complete path/query/body schema before execution. Never invent an operationId. Results include scope, risk, side effects, and relevant workflow skills. Search again with narrower English API terms when needed.",

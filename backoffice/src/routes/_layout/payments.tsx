@@ -1067,9 +1067,7 @@ function Payments() {
   return (
     <div
       className={`flex flex-col gap-6 ${
-        isContextReady
-          ? "relative left-1/2 w-[calc(100vw-18rem)] -translate-x-1/2"
-          : ""
+        isContextReady ? "relative left-1/2 w-[100cqw] -translate-x-1/2" : ""
       }`}
     >
       <div className="flex items-center justify-between">

@@ -23,6 +23,7 @@ import {
   responseError,
 } from "./context.js"
 import { BackendExecutionStore } from "./execution-store.js"
+import { GuideRegistry } from "./guides.js"
 import {
   EdgeOSOperationCatalog,
   type OperationArguments,
@@ -40,6 +41,8 @@ const operationCatalog = new EdgeOSOperationCatalog(
 )
 const skills = new SkillRegistry()
 const skillsReady = skills.load()
+const guides = new GuideRegistry()
+const guidesReady = guides.load()
 const model =
   config.provider === "openai"
     ? config.openaiApiKey
@@ -430,7 +433,7 @@ app.post(
     }
 
     try {
-      await skillsReady
+      await Promise.all([skillsReady, guidesReady])
       const context = await contextResolver.resolve(identity)
       const body = (await c.req.json()) as { messages?: unknown }
       if (
@@ -460,6 +463,7 @@ app.post(
         context,
         skills,
         config.backendUrl,
+        guides,
       )
       const modelMessages = await convertToModelMessages(messages, { tools })
       const deniedApprovalIds = deniedApprovalIdsSinceLastUser(modelMessages)
@@ -493,6 +497,13 @@ app.post(
           context,
           skills.relevantInstructions(userRequest),
           operationHints,
+          {
+            navigation: guides.navigationMap(),
+            relevant: guides.relevantInstructions(
+              conversationIntent || userRequest,
+              context.pathname,
+            ),
+          },
         ),
         messages: modelMessages,
         tools,

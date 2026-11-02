@@ -82,13 +82,14 @@ export function buildEndedResources({
           status: eventsStatus,
           path: `/portal/${city?.slug}/events/venues`,
         },
-        {
-          name: t("sidebar.agentic_access", { defaultValue: "Agentic access" }),
-          icon: OpenClaw,
-          status: eventsStatus,
-          path: "/portal/agentic-access",
-        },
       ],
+    },
+    {
+      name: t("sidebar.agentic_access", { defaultValue: "Agentic access" }),
+      icon: OpenClaw,
+      status: eventsVisible || directoryVisible ? "active" : "hidden",
+      path: "/portal/agentic-access",
+      group: "community",
     },
     {
       name: t("sidebar.referrals"),

@@ -928,7 +928,7 @@
   },
   "api_keys": {
     "title": "API Keys",
-    "description": "Personal access tokens that act on your behalf. Use them with agents or scripts to access the Events API.",
+    "description": "Personal access tokens that act on your behalf. Use them with agents or scripts to access the Events and Directory APIs.",
     "new_key": "New key",
     "empty": "You don't have any API keys yet. Create one to get started.",
     "load_failed": "Failed to load API keys.",
@@ -972,6 +972,10 @@
       "venues_write": {
         "label": "Manage own venues",
         "description": "Create, edit, and delete venues you own."
+      },
+      "directory_read": {
+        "label": "Read the attendee directory",
+        "description": "List the attendees directory, showing only what each attendee chose to share."
       }
     }
   },
@@ -1021,12 +1025,9 @@
     "collapse": "Collapse"
   },
   "referrals": {
-    "title": "Referrals",
-    "description": "Share your referral link and earn rewards when someone joins through it.",
+    "title": "Invite people",
+    "description": "Pick where your link takes people. Each destination has its own link.",
     "my_referrals": "My referral links",
-    "no_referrals": "You have no links into this event yet.",
-    "create_referral": "Create referral link",
-    "creating": "Creating...",
     "create_error": "Failed to create referral link. Please try again.",
     "delete_referral": "Delete",
     "delete_confirm_title": "Delete referral link?",
@@ -1037,10 +1038,6 @@
     "delete_used_explanation": "This link has already been used and can't be deleted.",
     "delete_success": "Referral link deleted.",
     "code_label": "Code",
-    "discount_label": "Discount",
-    "uses_label": "Uses",
-    "expires_label": "Expires",
-    "no_expiry": "No expiry",
     "unlimited_uses": "Unlimited",
     "copy_link": "Copy link",
     "link_copied": "Link copied to clipboard.",
@@ -1062,13 +1059,16 @@
     "preview_apply_button": "Apply now",
     "preview_login_required_title": "Sign in to apply",
     "preview_login_required_description": "You need to be signed in to apply via this referral link.",
-    "one_link_notice": "You already have a link for this way in. Share it to invite others.",
     "disabled_badge": "Disabled",
-    "cross_title": "Invite someone to another event",
-    "cross_description": "Share a link to one of our other events, even if you are not going yourself.",
-    "cross_create": "Create link",
+    "cross_title": "Other events",
+    "cross_description": "You can invite people to these even if you're not going.",
     "ended_description": "This event has ended. You can still invite people to our other events.",
-    "ended_no_targets": "There are no other events accepting links right now."
+    "ended_no_targets": "There are no other events accepting links right now.",
+    "create_link": "Create link",
+    "uses_of": "{{used}} of {{max}} uses",
+    "uses_count_one": "{{count}} use",
+    "uses_count_other": "{{count}} uses",
+    "expires_on": "Expires {{date}}"
   },
   "invite": {
     "loading": "Loading invite...",
@@ -1128,10 +1128,6 @@
       "back_to_events": "Back to events",
       "no_open_hours": "No open hours",
       "in_timezone_time": "in {{timezone}} time"
-    },
-    "api_access": {
-      "unavailable_heading": "Not available for this popup",
-      "unavailable_message": "API keys and the events API docs are part of the events module, which isn't enabled for this popup."
     },
     "list": {
       "heading": "Events",
@@ -1661,5 +1657,9 @@
     "saved": "Responses updated.",
     "save_error": "Could not save your responses. Please try again.",
     "history": "Response history"
+  },
+  "agentic_access": {
+    "unavailable_heading": "Not available for this popup",
+    "unavailable_message": "API keys work with the event calendar and the attendee directory, and neither is enabled for this popup."
   }
 }

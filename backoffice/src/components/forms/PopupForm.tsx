@@ -664,6 +664,7 @@ export function PopupForm({
                         value={field.state.value}
                         onChange={field.handleChange}
                         disabled={readOnly}
+                        clearable
                         placeholder="Select date"
                         className="w-auto"
                       />
@@ -715,6 +716,7 @@ export function PopupForm({
                               value={field.state.value}
                               onChange={field.handleChange}
                               disabled={readOnly}
+                              clearable
                               placeholder="Select date"
                               defaultMonth={startDateAsDate}
                               className="w-auto"

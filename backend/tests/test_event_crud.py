@@ -30,6 +30,7 @@ from __future__ import annotations
 import uuid
 from datetime import UTC, datetime, timedelta
 
+import pytest
 from fastapi.testclient import TestClient
 from sqlmodel import Session
 
@@ -159,8 +160,10 @@ class TestCreateEvent:
         body = resp.json()
         assert body["rrule"] == "FREQ=WEEKLY;INTERVAL=1;BYDAY=TU,TH;COUNT=4"
 
+    @pytest.mark.parametrize("closed_day", [1, 11])
     def test_create_recurring_event_warns_and_skips_closed_dates(
         self,
+        closed_day: int,
         client: TestClient,
         db: Session,
         tenant_a: Tenants,
@@ -176,8 +179,9 @@ class TestCreateEvent:
         db.add(venue)
         db.commit()
         db.refresh(venue)
-        start = datetime.now(UTC) + timedelta(days=3)
-        closed_start = start + timedelta(days=1)
+        # Cover both day widths without depending on the CI run date.
+        closed_start = datetime(2035, 11, closed_day, 13, tzinfo=UTC)
+        start = closed_start - timedelta(days=1)
         db.add(
             VenueExceptions(
                 tenant_id=tenant_a.id,
@@ -206,7 +210,7 @@ class TestCreateEvent:
         body = resp.json()
         assert body["rrule"] == "FREQ=DAILY;INTERVAL=1;COUNT=3"
         assert len(body["warnings"]) == 1
-        assert closed_start.strftime("%b %d") in body["warnings"][0]
+        assert f"Nov {closed_day} 13:00 UTC" in body["warnings"][0]
 
 
 # ---------------------------------------------------------------------------

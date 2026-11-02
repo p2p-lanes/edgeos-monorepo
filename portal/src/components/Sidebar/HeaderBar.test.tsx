@@ -34,8 +34,6 @@ vi.mock("@/components/MobilePopupSwitcher", () => ({
   MobilePopupSwitcher: () => null,
 }))
 
-vi.mock("@/hooks/useIsMobile", () => ({ useIsMobile: () => true }))
-
 vi.mock("@/providers/cityProvider", () => ({
   useCityProvider: () => ({
     getCity: () => ({ id: "popup-1", name: "Summit", slug: "summit" }),

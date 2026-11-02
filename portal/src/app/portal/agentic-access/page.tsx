@@ -6,9 +6,9 @@ import { useState } from "react"
 import { useTranslation } from "react-i18next"
 import { toast } from "sonner"
 import {
-  EventsApiAccessUnavailable,
-  useEventsApiAccess,
-} from "@/components/EventsApiAccessGate"
+  AgenticAccessUnavailable,
+  useAgenticAccess,
+} from "@/components/AgenticAccessGate"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Checkbox } from "@/components/ui/checkbox"
@@ -33,40 +33,58 @@ import { CopyAgentBrief } from "./CopyAgentBrief"
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? ""
 
-const DEFAULT_SCOPES: ApiKeyScope[] = ["events:read"]
+const briefPopup = (city: { id: string | number; name: string } | null) =>
+  city ? { id: String(city.id), name: city.name } : null
 
 const scopeKey = (scope: ApiKeyScope) => scope.replace(":", "_")
 
 const SCOPE_OPTIONS: Array<{
   value: ApiKeyScope
+  module: "events" | "directory"
   label: string
   description: string
 }> = [
   {
     value: "events:read",
+    module: "events",
     label: "Read events",
     description:
       "List events and read the context needed for event automation.",
   },
   {
     value: "events:write",
+    module: "events",
     label: "Create events",
     description: "Create and edit events on your behalf.",
   },
   {
     value: "rsvp:write",
+    module: "events",
     label: "RSVP to events",
     description: "Register or cancel attendance for events.",
   },
   {
     value: "venues:write",
+    module: "events",
     label: "Manage own venues",
     description: "Create, edit, and delete venues you own.",
+  },
+  {
+    value: "directory:read",
+    module: "directory",
+    label: "Read the attendee directory",
+    description:
+      "List the attendees directory, showing only what each attendee chose to share.",
   },
 ]
 
 type Method = "GET" | "POST" | "PATCH" | "DELETE"
-type Scope = "events:read" | "events:write" | "rsvp:write" | "venues:write"
+type Scope =
+  | "events:read"
+  | "events:write"
+  | "rsvp:write"
+  | "venues:write"
+  | "directory:read"
 
 interface EndpointProps {
   method: Method
@@ -101,30 +119,48 @@ const ERRORS: { code: string; meaning: string }[] = [
 ]
 
 export default function AgenticAccessPage() {
-  const { allowed } = useEventsApiAccess()
-  if (!allowed) return <EventsApiAccessUnavailable />
+  const { allowed, eventsEnabled, directoryEnabled } = useAgenticAccess()
+  if (!allowed) return <AgenticAccessUnavailable />
 
   return (
     <div className="flex-1 p-6 bg-background">
       <div className="max-w-4xl mx-auto space-y-10">
-        <ApiKeysSection />
+        <ApiKeysSection
+          eventsEnabled={eventsEnabled}
+          directoryEnabled={directoryEnabled}
+        />
         <div className="border-t" />
-        <ApiDocsSection />
+        <ApiDocsSection
+          eventsEnabled={eventsEnabled}
+          directoryEnabled={directoryEnabled}
+        />
       </div>
     </div>
   )
 }
 
-function ApiKeysSection() {
+interface ModuleProps {
+  eventsEnabled: boolean
+  directoryEnabled: boolean
+}
+
+function ApiKeysSection({ eventsEnabled, directoryEnabled }: ModuleProps) {
   const { t } = useTranslation()
   const { getCity } = useCityProvider()
   const city = getCity()
   // Keys are bound to the current popup. When it has ended (recap mode)
   // the backend rejects write scopes, so the dialog only offers read access.
+  // Scopes for a module the popup has turned off are not offered at all.
   const isPopupEnded = city?.status === "ended"
-  const scopeOptions = isPopupEnded
-    ? SCOPE_OPTIONS.filter((scope) => !scope.value.endsWith(":write"))
-    : SCOPE_OPTIONS
+  const scopeOptions = SCOPE_OPTIONS.filter(
+    (scope) =>
+      (scope.module === "events" ? eventsEnabled : directoryEnabled) &&
+      !(isPopupEnded && scope.value.endsWith(":write")),
+  )
+  // New keys start with the first read scope on offer.
+  const defaultScopes: ApiKeyScope[] = scopeOptions.length
+    ? [scopeOptions[0].value]
+    : []
   const {
     keys,
     isLoading,
@@ -138,16 +174,13 @@ function ApiKeysSection() {
   const [createOpen, setCreateOpen] = useState(false)
   const [newKeyName, setNewKeyName] = useState("")
   const [selectedScopes, setSelectedScopes] =
-    useState<ApiKeyScope[]>(DEFAULT_SCOPES)
+    useState<ApiKeyScope[]>(defaultScopes)
   const [createdKey, setCreatedKey] = useState<ApiKeyCreated | null>(null)
   const [copied, setCopied] = useState(false)
   const [pendingRevoke, setPendingRevoke] = useState<ApiKeyPublic | null>(null)
 
   const toggleScope = (scope: ApiKeyScope, checked: boolean) => {
     setSelectedScopes((current) => {
-      if (scope === "events:read" && !checked) {
-        return current
-      }
       if (checked) {
         return current.includes(scope) ? current : [...current, scope]
       }
@@ -174,7 +207,7 @@ function ApiKeysSection() {
       })
       setCreatedKey(created)
       setNewKeyName("")
-      setSelectedScopes(DEFAULT_SCOPES)
+      setSelectedScopes(defaultScopes)
       setCreateOpen(false)
     } catch {
       toast.error(
@@ -225,7 +258,7 @@ function ApiKeysSection() {
           <p className="text-sm text-muted-foreground mt-1">
             {t("api_keys.description", {
               defaultValue:
-                "Personal access tokens that act on your behalf. Use them with agents or scripts to access the Events API.",
+                "Personal access tokens that act on your behalf. Use them with agents or scripts to access the Events and Directory APIs.",
             })}
           </p>
         </div>
@@ -393,7 +426,6 @@ function ApiKeysSection() {
                     <Checkbox
                       id={checkboxId}
                       checked={checked}
-                      disabled={scope.value === "events:read"}
                       onCheckedChange={(value) =>
                         toggleScope(scope.value, value === true)
                       }
@@ -496,7 +528,11 @@ function ApiKeysSection() {
                       "Paste this brief into your agent so it knows how to use the token.",
                   })}
                 </p>
-                <CopyAgentBrief apiBase={API_BASE} />
+                <CopyAgentBrief
+                  apiBase={API_BASE}
+                  scopes={createdKey.scopes as ApiKeyScope[]}
+                  popup={briefPopup(city)}
+                />
               </div>
             </div>
           )}
@@ -545,20 +581,35 @@ function ApiKeysSection() {
   )
 }
 
-function ApiDocsSection() {
+function ApiDocsSection({ eventsEnabled, directoryEnabled }: ModuleProps) {
+  const { getCity } = useCityProvider()
+  const city = getCity()
+  const availableScopes = SCOPE_OPTIONS.filter((scope) =>
+    scope.module === "events" ? eventsEnabled : directoryEnabled,
+  ).map((scope) => scope.value)
+
   return (
     <div className="space-y-8">
       <header className="space-y-2">
-        <h2 className="text-3xl font-semibold">Events API</h2>
+        <h2 className="text-3xl font-semibold">Portal API</h2>
         <p className="text-muted-foreground">
-          Read events and RSVP on a user's behalf using a portal-issued personal
-          access token.
+          {eventsEnabled && directoryEnabled
+            ? "Read events, RSVP, and browse the attendee directory on a user's behalf using a portal-issued personal access token."
+            : eventsEnabled
+              ? "Read events and RSVP on a user's behalf using a portal-issued personal access token."
+              : "Browse the attendee directory on a user's behalf using a portal-issued personal access token."}
         </p>
       </header>
 
       <Section
         title="Quick start"
-        action={<CopyAgentBrief apiBase={API_BASE} />}
+        action={
+          <CopyAgentBrief
+            apiBase={API_BASE}
+            scopes={availableScopes}
+            popup={briefPopup(city)}
+          />
+        }
       >
         <div className="rounded-lg border bg-card divide-y text-sm">
           <Row label="API base">
@@ -581,13 +632,12 @@ function ApiDocsSection() {
             </a>
           </Row>
           <Row label="Scopes available">
-            <code className="font-mono text-xs">events:read</code>
-            <span className="text-muted-foreground">, </span>
-            <code className="font-mono text-xs">events:write</code>
-            <span className="text-muted-foreground">, </span>
-            <code className="font-mono text-xs">rsvp:write</code>
-            <span className="text-muted-foreground">, </span>
-            <code className="font-mono text-xs">venues:write</code>
+            {availableScopes.map((scope, index) => (
+              <span key={scope}>
+                {index > 0 && <span className="text-muted-foreground">, </span>}
+                <code className="font-mono text-xs">{scope}</code>
+              </span>
+            ))}
           </Row>
         </div>
       </Section>
@@ -603,13 +653,19 @@ function ApiDocsSection() {
           </li>
           <li>Times are ISO-8601 with timezone. UUIDs are RFC-4122.</li>
           <li>
-            Recurring events expand into virtual occurrences when{" "}
-            <code className="font-mono text-xs">start_after</code> is set. Pass
-            the occurrence's{" "}
-            <code className="font-mono text-xs">start_time</code> as{" "}
-            <code className="font-mono text-xs">occurrence_start</code> when
-            RSVPing to a single instance.
+            Keys are bound to the popup they were created for; requests for any
+            other popup return 403.
           </li>
+          {eventsEnabled && (
+            <li>
+              Recurring events expand into virtual occurrences when{" "}
+              <code className="font-mono text-xs">start_after</code> is set.
+              Pass the occurrence's{" "}
+              <code className="font-mono text-xs">start_time</code> as{" "}
+              <code className="font-mono text-xs">occurrence_start</code> when
+              RSVPing to a single instance.
+            </li>
+          )}
         </ul>
       </Section>
 
@@ -627,6 +683,42 @@ function ApiDocsSection() {
         </div>
       </Section>
 
+      {eventsEnabled && <EventsDocs />}
+      {directoryEnabled && <DirectoryDocs />}
+    </div>
+  )
+}
+
+function DirectoryDocs() {
+  return (
+    <Section title="Attendee directory" id="directory">
+      <Endpoint
+        method="GET"
+        path="/api/v1/applications/my/directory/{popup_id}"
+        scope="directory:read"
+        summary="List the popup's attendee directory. Each entry only carries the fields that attendee chose to share, exactly as in the portal's directory."
+        params={[
+          {
+            name: "q",
+            type: "string",
+            note: "matches shared names, emails and Telegram handles",
+          },
+          {
+            name: "hide_empty_rows",
+            type: "boolean",
+            note: "skip entries with nothing shared",
+          },
+          { name: "skip", type: "int" },
+          { name: "limit", type: "int", note: "default 100, max 1000" },
+        ]}
+      />
+    </Section>
+  )
+}
+
+function EventsDocs() {
+  return (
+    <>
       <Section title="Events" id="events">
         <Endpoint
           method="GET"
@@ -840,7 +932,7 @@ function ApiDocsSection() {
           summary="Delete a venue you own. Returns 409 if the venue still has non-cancelled events; remove or reassign them first."
         />
       </Section>
-    </div>
+    </>
   )
 }
 

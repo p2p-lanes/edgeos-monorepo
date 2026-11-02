@@ -21,7 +21,6 @@ Thumbs.db
 
 # Personal/local working files (not part of the project)
 docs-local/
-AGENTS.md
 CLAUDE.md
 tasks/*
 memory/

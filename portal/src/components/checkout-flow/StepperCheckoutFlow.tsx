@@ -72,7 +72,8 @@ const NAV_OUTER: Record<
     className: "sticky top-0 z-40 bg-checkout-navbar-bg backdrop-blur",
   },
   amanita: {
-    className: "pointer-events-none fixed inset-x-0 top-0 z-40",
+    className:
+      "pointer-events-none fixed inset-x-0 top-[var(--checkout-chrome-top,0px)] z-40",
     style: {
       background:
         "linear-gradient(180deg, rgba(1,15,22,0.92) 0%, rgba(1,15,22,0.72) 72%, rgba(1,15,22,0) 100%)",
@@ -86,7 +87,9 @@ const NAV_OUTER: Record<
  * `overflow-y-auto` scroller, and its full-bleed gradient would otherwise eat
  * the wheel across the whole top strip. `-auto` is put back on the inner
  * element so the pills stay clickable. The default skin's nav is `sticky` — it
- * scrolls with its container, so it never had the problem. */
+ * scrolls with its container, so it never had the problem. Being fixed, it also
+ * offsets by `--checkout-chrome-top` to sit below host chrome (see
+ * CheckoutShell). */
 const NAV_INNER: Record<CheckoutSkin, { className: string }> = {
   default: { className: "flex gap-2 overflow-x-auto px-4 py-3" },
   amanita: {

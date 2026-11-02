@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING, Any
 
 from fastapi import HTTPException, status
 from sqlalchemy import and_, case, desc, exists, false, nullslast, or_
-from sqlalchemy.orm import selectinload
+from sqlalchemy.orm import Load, selectinload
 from sqlalchemy.sql.elements import ColumnElement
 from sqlmodel import Session, col, func, select
 
@@ -360,6 +360,30 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
     def __init__(self) -> None:
         super().__init__(Applications)
 
+    @staticmethod
+    def _list_load_options() -> tuple[Load, ...]:
+        """Load the relationship graph consumed by application list responses."""
+        return (
+            selectinload(Applications.attendees)  # type: ignore[arg-type]
+            .selectinload(Attendees.attendee_products)  # type: ignore[arg-type]
+            .selectinload(AttendeeProducts.product),  # type: ignore[arg-type]
+            selectinload(Applications.attendees).selectinload(  # type: ignore[arg-type]
+                Attendees.category_ref  # type: ignore[arg-type]
+            ),
+            selectinload(Applications.human),  # type: ignore[arg-type]
+            selectinload(Applications.reviews),  # type: ignore[arg-type]
+        )
+
+    def find_for_listing(
+        self, session: Session, skip: int = 0, limit: int = 100
+    ) -> tuple[list[Applications], int]:
+        total = session.exec(select(func.count()).select_from(Applications)).one()
+        statement = select(Applications).options(*self._list_load_options())
+        # Match BaseCRUD.find default ordering and pagination.
+        statement = self._apply_sorting(statement, None, "desc")
+        results = session.exec(statement.offset(skip).limit(limit)).all()
+        return list(results), total
+
     def update_directory_values(
         self,
         session: Session,
@@ -576,15 +600,7 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
 
         # Eager load relationships to avoid N+1 queries
         statement = (
-            base_statement.options(
-                selectinload(Applications.attendees)  # type: ignore[arg-type]
-                .selectinload(Attendees.attendee_products)  # type: ignore[arg-type]
-                .selectinload(AttendeeProducts.product),  # type: ignore[arg-type]
-                selectinload(Applications.attendees).selectinload(  # type: ignore[arg-type]
-                    Attendees.category_ref  # type: ignore[arg-type]
-                ),
-                selectinload(Applications.human),  # type: ignore[arg-type]
-            )
+            base_statement.options(*self._list_load_options())
             .order_by(desc(Applications.created_at))  # type: ignore[arg-type]
             .offset(skip)
             .limit(limit)
@@ -691,16 +707,7 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
 
         # Eager load relationships to avoid N+1 queries
         statement = (
-            base_statement.options(
-                selectinload(Applications.attendees)  # type: ignore[arg-type]
-                .selectinload(Attendees.attendee_products)  # type: ignore[arg-type]
-                .selectinload(AttendeeProducts.product),  # type: ignore[arg-type]
-                selectinload(Applications.attendees).selectinload(  # type: ignore[arg-type]
-                    Attendees.category_ref  # type: ignore[arg-type]
-                ),
-                selectinload(Applications.human),  # type: ignore[arg-type]
-                selectinload(Applications.reviews),  # type: ignore[arg-type]
-            )
+            base_statement.options(*self._list_load_options())
             .order_by(desc(Applications.created_at))  # type: ignore[arg-type]
             .offset(skip)
             .limit(limit)

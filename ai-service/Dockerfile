@@ -19,6 +19,7 @@ COPY --from=build /app/ai-service/node_modules ./ai-service/node_modules
 COPY --from=build /app/ai-service/package.json ./ai-service/package.json
 COPY --from=build /app/ai-service/dist ./ai-service/dist
 COPY --from=build /app/ai-service/skills ./ai-service/skills
+COPY --from=build /app/ai-service/guides ./ai-service/guides
 
 USER node
 EXPOSE 3002

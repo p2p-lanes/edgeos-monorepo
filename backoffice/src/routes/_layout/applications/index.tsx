@@ -1906,7 +1906,7 @@ function Applications() {
         "flex flex-col gap-6",
         view === "wide" &&
           isContextReady &&
-          "relative left-1/2 w-[calc(100vw-18rem)] -translate-x-1/2",
+          "relative left-1/2 w-[100cqw] -translate-x-1/2",
       )}
     >
       <div className="flex items-center justify-between">

@@ -8002,12 +8002,13 @@ export class FormFieldsService {
 
     /**
      * List Available Base Fields
-     * List catalog base fields that are not yet configured for this popup.
+     * List catalog base fields not yet configured for the selected flow.
      *
      * Filters out fields already configured, non-removable elementals, and
-     * fields disabled by the popup's feature flags.
+     * fields disabled by the selected flow's feature flags.
      * @param data The data for the request.
      * @param data.popupId
+     * @param data.salesFlowId
      * @param data.xTenantId
      * @returns CatalogField Successful Response
      * @throws ApiError
@@ -8022,6 +8023,9 @@ export class FormFieldsService {
             headers: {
                 'X-Tenant-Id': data.xTenantId
             },
+            query: {
+                sales_flow_id: data.salesFlowId
+            },
             errors: {
                 422: 'Validation Error'
             }
@@ -8030,10 +8034,11 @@ export class FormFieldsService {
 
     /**
      * Create Base Field Config
-     * Add a catalog base field to a popup by creating its BaseFieldConfig.
+     * Add a catalog base field to the selected flow.
      * @param data The data for the request.
      * @param data.popupId
      * @param data.fieldName
+     * @param data.salesFlowId
      * @param data.xTenantId
      * @returns FormFieldPublic Successful Response
      * @throws ApiError
@@ -8048,6 +8053,9 @@ export class FormFieldsService {
             },
             headers: {
                 'X-Tenant-Id': data.xTenantId
+            },
+            query: {
+                sales_flow_id: data.salesFlowId
             },
             errors: {
                 422: 'Validation Error'

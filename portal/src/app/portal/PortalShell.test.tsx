@@ -148,4 +148,32 @@ describe("PortalShell", () => {
     expect(document.querySelector("header")).toBeNull()
     expectPortalBoundary(getByTestId)
   })
+
+  it("keeps a mobile sidebar trigger on checkout and makes room for it", () => {
+    pathname = "/portal/summit/shop/volunteers"
+
+    const { getByRole } = render(
+      <PortalShell>
+        <div>Checkout content</div>
+      </PortalShell>,
+    )
+
+    const bar = getByRole("button", { name: "Toggle sidebar" }).parentElement
+    expect(bar?.classList).toContain("lg:hidden")
+    expect(document.querySelector("#portal-scroll")?.classList).toContain(
+      "max-lg:[--checkout-chrome-top:3rem]",
+    )
+  })
+
+  it("leaves the chrome offset unset outside checkout", () => {
+    render(
+      <PortalShell>
+        <div>Payments content</div>
+      </PortalShell>,
+    )
+
+    expect(document.querySelector("#portal-scroll")?.className).not.toContain(
+      "--checkout-chrome-top",
+    )
+  })
 })
