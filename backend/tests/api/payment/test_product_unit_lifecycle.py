@@ -68,9 +68,6 @@ def test_cancel_replays_preserve_history_and_restore_commercial_quantity(
     )
     payments_crud.approve_payment(db, target.id)
     target_units = grants._line_units(db, target_line)
-    with pytest.raises(HTTPException) as exc_info:
-        attendees_crud.remove_product(db, attendee.id, target_units[1].id)
-    assert exc_info.value.status_code == 409
     scanned = _scan(db, popup_tenant_a, target_units[0])
     db.delete(target_units[2])  # A partial unit set must not reduce stock restoration.
     db.commit()
@@ -207,6 +204,101 @@ def test_manual_remove_revokes_once_and_preserves_scan_and_audit(
         ).one()
         == 1
     )
+
+
+def test_manual_remove_revokes_one_paid_unit_and_leaves_payment_untouched(
+    db: Session, tenant_a: Tenants, popup_tenant_a: Popups
+) -> None:
+    buyer, attendee = grants._attendee(db, tenant_a, popup_tenant_a)
+    product = grants._product(db, popup_tenant_a, stock=10)
+    payment, line = _pending_payment(db, popup_tenant_a, buyer, attendee, product, 3)
+    payments_crud.approve_payment(db, payment.id)
+    units = grants._line_units(db, line)
+    db.refresh(product)
+    assert product.total_stock_remaining == 7
+    actor = AuditActor(
+        type=AuditActorType.USER,
+        source=AuditSource.BACKOFFICE,
+        id=uuid.uuid4(),
+    )
+
+    attendees_crud.remove_product(db, attendee.id, units[1].id, actor=actor)
+    attendees_crud.remove_product(db, attendee.id, units[1].id, actor=actor)
+
+    db.expire_all()
+    revoked = db.get(AttendeeProducts, units[1].id)
+    assert revoked.revoked_at is not None
+    assert revoked.stock_released_at is not None
+    assert revoked.payment_id == payment.id
+    assert [
+        db.get(AttendeeProducts, unit.id).revoked_at for unit in (units[0], units[2])
+    ] == [None, None]
+    assert db.get(Payments, payment.id).status == PaymentStatus.APPROVED.value
+    assert db.get(PaymentProducts, line.id).quantity == 3
+    assert db.get(Products, product.id).total_stock_remaining == 8
+    logs = db.exec(
+        select(AuditLog).where(
+            AuditLog.entity_id == attendee.id,
+            AuditLog.action == AuditAction.TICKET_REMOVE,
+        )
+    ).all()
+    assert len(logs) == 1
+    assert logs[0].details["payment_id"] == str(payment.id)
+
+    # An approval replay must not hand the revoked unit back.
+    payments_crud.approve_payment(db, payment.id)
+    db.expire_all()
+    assert db.get(AttendeeProducts, units[1].id).revoked_at is not None
+    assert len(grants._line_units(db, line)) == 3
+    assert db.get(Products, product.id).total_stock_remaining == 8
+
+    # Cancelling the payment afterwards returns only the units still held.
+    payments_crud.update_status(db, payment.id, PaymentStatus.CANCELLED)
+    db.expire_all()
+    assert db.get(Products, product.id).total_stock_remaining == 10
+    assert all(unit.revoked_at is not None for unit in grants._line_units(db, line))
+
+
+def test_manual_remove_of_cancelled_payment_unit_does_not_restore_again(
+    db: Session, tenant_a: Tenants, popup_tenant_a: Popups
+) -> None:
+    buyer, attendee = grants._attendee(db, tenant_a, popup_tenant_a)
+    product = grants._product(db, popup_tenant_a, stock=4)
+    payment, line = _pending_payment(db, popup_tenant_a, buyer, attendee, product, 2)
+    payments_crud.approve_payment(db, payment.id)
+    payments_crud.update_status(db, payment.id, PaymentStatus.CANCELLED)
+    unit = grants._line_units(db, line)[0]
+    # A unit left active by older data must still not release stock twice.
+    unit.revoked_at = None
+    db.add(unit)
+    db.commit()
+
+    attendees_crud.remove_product(db, attendee.id, unit.id)
+
+    db.expire_all()
+    preserved = db.get(AttendeeProducts, unit.id)
+    assert preserved.revoked_at is not None
+    assert preserved.stock_released_at is None
+    assert db.get(Products, product.id).total_stock_remaining == 4
+
+
+def test_manual_remove_rejects_paid_unit_of_another_attendee(
+    db: Session, tenant_a: Tenants, popup_tenant_a: Popups
+) -> None:
+    buyer, attendee = grants._attendee(db, tenant_a, popup_tenant_a)
+    _, other = grants._attendee(db, tenant_a, popup_tenant_a)
+    product = grants._product(db, popup_tenant_a, stock=4)
+    payment, line = _pending_payment(db, popup_tenant_a, buyer, attendee, product, 1)
+    payments_crud.approve_payment(db, payment.id)
+    unit = grants._line_units(db, line)[0]
+
+    with pytest.raises(HTTPException) as exc_info:
+        attendees_crud.remove_product(db, other.id, unit.id)
+
+    assert exc_info.value.status_code == 404
+    db.expire_all()
+    assert db.get(AttendeeProducts, unit.id).revoked_at is None
+    assert db.get(Products, product.id).total_stock_remaining == 3
 
 
 def test_reconciliation_reactivates_expected_and_revokes_surplus_history(

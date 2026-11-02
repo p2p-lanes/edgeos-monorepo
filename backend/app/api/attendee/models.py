@@ -22,8 +22,9 @@ class AttendeeProducts(AttendeeProductsBase, table=True):
     """Link table for attendee products with quantity."""
 
     __tablename__ = "attendee_products"
-    # Set only when an edit-passes settlement releases this unit's inventory.
-    # Keep separate from revoked_at: legacy revocations did not release stock.
+    # Set when this unit's inventory is released: an edit-passes settlement or
+    # a manual backoffice revocation. Keep separate from revoked_at: legacy
+    # revocations did not release stock.
     stock_released_at: datetime | None = Field(
         default=None, sa_column=Column(DateTime(timezone=True), nullable=True)
     )

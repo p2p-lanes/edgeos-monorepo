@@ -2988,8 +2988,10 @@ export class AttendeesService {
      * Remove a ticket from an attendee
      * Remove a single ticket from an attendee (BO only).
      *
-     * Restores one unit of the product's stock to the pool. Returns the updated
-     * attendee so the panel can refresh.
+     * Works for granted and paid tickets alike. The ticket is revoked (kept for
+     * history) and one unit of the product's stock returns to the pool. A paid
+     * ticket's payment and its other tickets are left untouched; no refund is
+     * issued. Returns the updated attendee so the panel can refresh.
      * @param data The data for the request.
      * @param data.attendeeId
      * @param data.ticketId

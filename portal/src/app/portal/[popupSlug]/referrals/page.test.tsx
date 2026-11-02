@@ -13,6 +13,15 @@ const mocks = vi.hoisted(() => ({
   onlyOneFlow: false,
   noTargets: false,
   popupStatus: "active",
+  ownFlowName: null as string | null,
+  ownLink: null as null | {
+    id: string
+    token: string
+    discount_percentage: string
+    current_uses: number
+    max_uses?: number | null
+    sales_flow_id: string
+  },
 }))
 
 vi.mock("@tanstack/react-query", () => ({
@@ -20,12 +29,19 @@ vi.mock("@tanstack/react-query", () => ({
   useQuery: ({ queryKey }: { queryKey: string[] }) => {
     if (queryKey[1] === "sharing") {
       return {
-        data: { can_share: mocks.canShare, sales_flow_id: "source-flow" },
+        data: {
+          can_share: mocks.canShare,
+          sales_flow_id: "source-flow",
+          flow_name: mocks.ownFlowName,
+        },
         isLoading: false,
       }
     }
     if (queryKey[1] === "mine") {
-      return { data: { results: [] }, isLoading: false }
+      return {
+        data: { results: mocks.ownLink ? [mocks.ownLink] : [] },
+        isLoading: false,
+      }
     }
     if (mocks.noTargets) return { data: [], isLoading: false }
     return {
@@ -90,7 +106,10 @@ vi.mock("@tanstack/react-query", () => ({
   }),
 }))
 vi.mock("react-i18next", () => ({
-  useTranslation: () => ({ t: (key: string) => key }),
+  useTranslation: () => ({
+    t: (key: string, options?: Record<string, unknown>) =>
+      options ? `${key} ${JSON.stringify(options)}` : key,
+  }),
 }))
 vi.mock("@/components/ui/tooltip", () => ({
   Tooltip: ({ children }: { children: React.ReactNode }) => <>{children}</>,
@@ -103,7 +122,11 @@ vi.mock("@/components/ui/tooltip", () => ({
 }))
 vi.mock("@/providers/cityProvider", () => ({
   useCityProvider: () => ({
-    getCity: () => ({ id: "popup-a", status: mocks.popupStatus }),
+    getCity: () => ({
+      id: "popup-a",
+      name: "This gathering",
+      status: mocks.popupStatus,
+    }),
   }),
 }))
 vi.mock("sonner", () => ({
@@ -142,6 +165,8 @@ describe("cross-popup referrals page", () => {
     mocks.onlyOneFlow = false
     mocks.noTargets = false
     mocks.popupStatus = "active"
+    mocks.ownFlowName = null
+    mocks.ownLink = null
     mocks.createMyLink.mockReset()
     mocks.deleteMyLink.mockReset()
     mocks.toastError.mockReset()
@@ -158,7 +183,7 @@ describe("cross-popup referrals page", () => {
     expect(flowName.classList.contains("font-semibold")).toBe(true)
 
     fireEvent.click(
-      screen.getAllByRole("button", { name: "referrals.cross_create" })[1],
+      screen.getAllByRole("button", { name: "referrals.create_link" })[2],
     )
     expect(mocks.createMyLink).toHaveBeenCalledWith({
       requestBody: {
@@ -189,18 +214,59 @@ describe("cross-popup referrals page", () => {
     expect(screen.queryByText("General")).toBeNull()
   })
 
-  it("labels a cross-popup link with no discount correctly", () => {
+  it("shows a link as its URL and leaves out a discount it does not have", () => {
     mocks.hasCrossLink = true
     render(<ReferralsPage />)
-    expect(screen.getByText("volunteers-code")).toBeTruthy()
+    expect(screen.getByText(/\/r\/volunteers-code$/)).toBeTruthy()
+    expect(screen.getByText('referrals.uses_count {"count":0}')).toBeTruthy()
+    expect(screen.queryByText(/preview_discount_value/)).toBeNull()
+    expect(
+      screen.getAllByRole("button", { name: "referrals.create_link" }),
+    ).toHaveLength(2)
+  })
+
+  it("offers this event as a destination named like the others", () => {
+    render(<ReferralsPage />)
+    expect(screen.getByText("This gathering").parentElement?.textContent).toBe(
+      "This gathering",
+    )
+
+    fireEvent.click(
+      screen.getAllByRole("button", { name: "referrals.create_link" })[0],
+    )
+    expect(mocks.createMyLink).toHaveBeenCalledWith({
+      requestBody: { popup_id: "popup-a" },
+    })
+  })
+
+  it("names this event's flow when the backend says it has several", () => {
+    mocks.ownFlowName = "Builders"
+    render(<ReferralsPage />)
+    expect(screen.getByText("Builders").parentElement?.textContent).toContain(
+      "This gathering · Builders",
+    )
+  })
+
+  it("replaces Create with the link once this event has one", () => {
+    mocks.ownLink = {
+      id: "own",
+      token: "own-code",
+      discount_percentage: "15",
+      current_uses: 2,
+      max_uses: 10,
+      sales_flow_id: "source-flow",
+    }
+    render(<ReferralsPage />)
+    expect(screen.getByText(/\/r\/own-code$/)).toBeTruthy()
     expect(
       screen.getByText(
-        /referrals.discount_label: referrals.preview_no_discount/,
+        'referrals.uses_of {"used":2,"max":10} · referrals.preview_discount_value {"percent":15}',
       ),
     ).toBeTruthy()
+    // Only the two Tech-Summit-like destinations still offer Create.
     expect(
-      screen.getAllByRole("button", { name: "referrals.cross_create" }),
-    ).toHaveLength(1)
+      screen.getAllByRole("button", { name: "referrals.create_link" }),
+    ).toHaveLength(2)
   })
 
   it("disables deletion and explains why when a referral link has been used", () => {
@@ -269,12 +335,10 @@ describe("cross-popup referrals page", () => {
     render(<ReferralsPage />)
 
     expect(screen.getByText("referrals.ended_description")).toBeTruthy()
-    expect(
-      screen.queryByRole("button", { name: "referrals.create_referral" }),
-    ).toBeNull()
+    expect(screen.queryByText("This gathering")).toBeNull()
     expect(screen.getByText("Volunteers")).toBeTruthy()
     fireEvent.click(
-      screen.getAllByRole("button", { name: "referrals.cross_create" })[0],
+      screen.getAllByRole("button", { name: "referrals.create_link" })[0],
     )
     expect(mocks.createMyLink).toHaveBeenCalledWith({
       requestBody: {

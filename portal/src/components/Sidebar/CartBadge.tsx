@@ -18,7 +18,9 @@ const CartBadge = () => {
   const { t } = useTranslation()
   const { getCity } = useCityProvider()
   const city = getCity()
-  const cityId = city?.id ? String(city.id) : null
+  // Ended popups are read-only (the backend rejects cart writes), so a
+  // leftover cart could be neither checked out nor cleared: don't show it.
+  const cityId = city?.id && city.status !== "ended" ? String(city.id) : null
   const { data: cart } = useCart(cityId)
   const { mutate: clearCart, isPending } = useClearCart(cityId)
   const [confirming, setConfirming] = useState(false)

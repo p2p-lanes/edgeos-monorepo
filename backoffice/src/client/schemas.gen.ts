@@ -6507,6 +6507,17 @@ export const AttendeeSharingStatusSchema = {
                 }
             ],
             title: 'Sales Flow Id'
+        },
+        flow_name: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Flow Name'
         }
     },
     type: 'object',
