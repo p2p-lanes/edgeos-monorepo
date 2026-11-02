@@ -398,6 +398,9 @@ async def update_tenant(
         if "meta_capi_access_token" in tenant_in.model_fields_set:
             token = tenant_in.meta_capi_access_token
             tenant.meta_capi_access_token_encrypted = encrypt(token) if token else None
+        if "ga_mp_api_secret" in tenant_in.model_fields_set:
+            secret = tenant_in.ga_mp_api_secret
+            tenant.ga_mp_api_secret_encrypted = encrypt(secret) if secret else None
 
         smtp_password_in_payload = "smtp_password" in tenant_in.model_fields_set
         smtp_password_configured = _smtp_password_configured_after_payload(

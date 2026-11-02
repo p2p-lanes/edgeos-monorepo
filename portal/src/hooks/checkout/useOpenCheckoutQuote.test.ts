@@ -3,6 +3,9 @@ import { describe, expect, it, vi } from "vitest"
 vi.mock("@/client", () => ({
   CheckoutService: { previewOpenTicketing: vi.fn() },
 }))
+vi.mock("@/providers/tenantProvider", () => ({
+  useTenant: () => ({ tenant: null }),
+}))
 
 import {
   buildOpenCheckoutBuyer,

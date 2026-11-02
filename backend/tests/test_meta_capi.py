@@ -18,6 +18,19 @@ from app.utils.encryption import encrypt
 DUMMY_ACCESS_TOKEN = "DUMMY_META_ACCESS_TOKEN_FOR_TESTS"
 
 
+def test_fire_and_forget_without_loop_does_not_create_coroutine(monkeypatch) -> None:
+    calls = []
+
+    def prepare(*_args):
+        calls.append(True)
+
+    monkeypatch.setattr(meta_capi, "prepare_and_send_purchase_event", prepare)
+    meta_capi.fire_and_forget_purchase_event(
+        tenant=SimpleNamespace(), payment=SimpleNamespace(id="no-loop")
+    )
+    assert calls == []
+
+
 def test_prepare_purchase_event_skips_when_tenant_tracking_disabled() -> None:
     tenant = SimpleNamespace(
         meta_tracking_enabled=False,

@@ -404,6 +404,8 @@ def test_create_open_ticketing_payment_one_attendee_n_tickets(
                 "fbp": "fb.1.1710000000.browser",
                 "client_ip": "203.0.113.10",
                 "client_user_agent": "Mozilla/5.0 Test",
+                "ga_client_id": "123.456",
+                "ga_session_id": "789",
             },
         )
 
@@ -415,6 +417,8 @@ def test_create_open_ticketing_payment_one_attendee_n_tickets(
     assert payment.meta_fbp == "fb.1.1710000000.browser"
     assert payment.meta_client_ip == "203.0.113.10"
     assert payment.meta_client_user_agent == "Mozilla/5.0 Test"
+    assert payment.ga_client_id == "123.456"
+    assert payment.ga_session_id == "789"
 
     attendees = list(
         db.exec(select(Attendees).where(Attendees.popup_id == popup.id)).all()

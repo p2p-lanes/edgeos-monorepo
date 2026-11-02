@@ -272,9 +272,6 @@ def test_first_installment_sends_confirmation_after_commit(monkeypatch) -> None:
         "_send_payment_confirmed_email_best_effort",
         fake_send_email,
     )
-    monkeypatch.setattr(
-        payment_router_module, "_schedule_meta_capi_purchase", lambda _payment: None
-    )
 
     result = asyncio.run(
         _handle_installment_payment(
@@ -473,9 +470,6 @@ def test_completed_plan_still_confirms_when_it_approves_payment(monkeypatch) -> 
         payment_router_module,
         "_send_payment_confirmed_email_best_effort",
         fake_send_email,
-    )
-    monkeypatch.setattr(
-        payment_router_module, "_schedule_meta_capi_purchase", lambda _payment: None
     )
     db = FakeDBSession()
 

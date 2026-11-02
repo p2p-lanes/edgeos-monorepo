@@ -209,7 +209,7 @@ def fire_and_forget_purchase_event(
         return
 
     try:
-        asyncio.create_task(
+        asyncio.get_running_loop().create_task(
             prepare_and_send_purchase_event(
                 tenant_snapshot,
                 payment_snapshot,

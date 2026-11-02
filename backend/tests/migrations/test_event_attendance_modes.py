@@ -81,6 +81,12 @@ def test_backfill_marks_events_with_check_ins_and_logs_them():
             config = Config("alembic.ini")
             config.attributes["connection"] = connection
             command.upgrade(config, PREVIOUS_REVISION)
+            # Current tenant ORM includes the GA4 secret added after this revision.
+            connection.execute(
+                text(
+                    "ALTER TABLE tenants ADD COLUMN ga_mp_api_secret_encrypted VARCHAR"
+                )
+            )
             # The ORM model also includes columns introduced after this revision.
             connection.execute(
                 text(

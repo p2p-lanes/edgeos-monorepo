@@ -30,6 +30,10 @@ def test_backfill_preserves_buyers_existing_categories_and_ambiguous_history(
         config.attributes["connection"] = connection
         command.upgrade(config, migration.revision)
         command.downgrade(config, migration.down_revision)
+        # Current tenant ORM includes the GA4 secret added after this revision.
+        connection.execute(
+            text("ALTER TABLE tenants ADD COLUMN ga_mp_api_secret_encrypted VARCHAR")
+        )
         # This test intentionally runs at the migration's parent revision,
         # while the ORM model reflects later profile, badge, and
         # sidebar configuration fields.

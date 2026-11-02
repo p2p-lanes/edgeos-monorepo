@@ -25,6 +25,7 @@ export type NavigateAction =
 export type PaymentErrorDispatch = {
   /** i18n translation key — pass through t() before displaying */
   messageKey: string
+  tone?: "success"
   /** When true, set paymentCompleteRef.current = true to block resubmit */
   blockResubmit: boolean
   /** When true, surface via setPromoError (persistent banner) */
@@ -55,10 +56,20 @@ export function dispatchPaymentError(
   detail: { code?: string; redirect_url?: string },
   submitMode: "application" | "open-ticketing",
   popupSlug: string | null,
+  returnContext: "direct" | "portal" = "direct",
 ): PaymentErrorDispatch | null {
   const prefix = submitMode === "open-ticketing" ? "openCheckout" : "checkout"
 
   if (detail.code === "previous_payment_completed") {
+    if (returnContext === "portal") {
+      return {
+        messageKey: "portalThankYou.confirmed_notice",
+        tone: "success",
+        blockResubmit: true,
+        setPersistentError: false,
+        navigate: null,
+      }
+    }
     // Buyer already has a completed purchase.  Navigate when possible so they
     // can see it.  When no redirect_url is available (open-ticketing without a
     // configured external success URL) or when the slug is absent (edge case),

@@ -19,6 +19,12 @@ def test_backfill_adds_only_missing_settings_and_preserves_them_on_downgrade():
             config = Config("alembic.ini")
             config.attributes["connection"] = connection
             command.upgrade(config, PREVIOUS_REVISION)
+            # Current tenant ORM includes the GA4 secret added after this revision.
+            connection.execute(
+                text(
+                    "ALTER TABLE tenants ADD COLUMN ga_mp_api_secret_encrypted VARCHAR"
+                )
+            )
             # The ORM model also includes columns introduced after this revision.
             connection.execute(
                 text(

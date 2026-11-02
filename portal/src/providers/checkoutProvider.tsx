@@ -55,9 +55,10 @@ import { firstIncompleteStay } from "@/lib/accommodationForm"
 import { buyerFormValidationSchema } from "@/lib/buyerFormValidation"
 import { type BuyerIdentity, buildBuyerIdentity } from "@/lib/buyerIdentity"
 import { buildFormZodSchema } from "@/lib/form-schema-builder"
-import { trackGAAddToCart } from "@/lib/google-analytics"
+import { trackGAAddToCart, trackGAViewItem } from "@/lib/google-analytics"
 import { trackMetaAddToCart } from "@/lib/meta-pixel"
 import { queryKeys } from "@/lib/query-keys"
+import { getProductStrategy } from "@/strategies/ProductStrategies"
 import { isPassQuantityBased } from "@/strategies/passQuantityHelper"
 import type { AttendeePassState } from "@/types/Attendee"
 import {
@@ -66,6 +67,7 @@ import {
   type CheckoutCartSummary,
   type CheckoutRecipientPassState,
   type CheckoutStep,
+  canSelectRecipientProducts,
   type SelectedAccommodationItem,
   type SelectedDynamicItem,
   type SelectedPassItem,
@@ -76,6 +78,22 @@ import { useApplication } from "./applicationProvider"
 import { useCityProvider } from "./cityProvider"
 import { useDiscount } from "./discountProvider"
 import { usePassesProvider } from "./passesProvider"
+
+function selectedPassQuantity(
+  product: ProductsPass,
+  mode: CheckoutMode,
+  editing: boolean,
+) {
+  if (!product.selected || (editing && product.purchased)) return 0
+  const day = product.duration_type === "day"
+  if (mode === CHECKOUT_MODE.SIMPLE_QUANTITY) {
+    return supportsQuantitySelector(product.max_per_order) || day
+      ? (product.quantity ?? 1)
+      : 1
+  }
+  if (day) return (product.quantity ?? 1) - (product.original_quantity ?? 0)
+  return isPassQuantityBased(product) ? (product.quantity ?? 1) : 1
+}
 
 interface CheckoutContextValue {
   currentStep: CheckoutStep
@@ -122,6 +140,8 @@ interface CheckoutContextValue {
     attendeeId: string,
     productId: string,
     quantityOverride?: number,
+    exclusivityScopeIds?: string[],
+    attendeeVisibleProductIds?: string[],
   ) => void
   resetDayProduct: (attendeeId: string, productId: string) => void
   selectHousing: (productId: string, checkIn: string, checkOut: string) => void
@@ -397,6 +417,20 @@ export function CheckoutProvider({
   // another door's would charge the wrong one (sdd/sales-flows-rediseno).
   const application = getRelevantApplication(salesFlowId)
   const city = getCity()
+  const viewedCatalogRef = useRef<string | null>(null)
+  const trackCatalogView = useCallback(() => {
+    if (
+      previewMode ||
+      !city ||
+      !products.some((product) => product.is_active !== false)
+    )
+      return
+    const key = `${city.id}:${salesFlowId ?? salesFlowSlug ?? ""}`
+    if (viewedCatalogRef.current === key) return
+    if (trackGAViewItem({ popup: city, products }))
+      viewedCatalogRef.current = key
+  }, [city, products, previewMode, salesFlowId, salesFlowSlug])
+  useEffect(trackCatalogView, [trackCatalogView])
   const editPassesEnabled = city?.edit_passes_enabled ?? false
   // The stored credit balance applies unconditionally (R-FE-02, R-BE-03):
   // edit_passes_enabled gates only the edit-passes in-flow UI, not credit application.
@@ -702,17 +736,11 @@ export function CheckoutProvider({
     for (const attendee of attendeePasses) {
       for (const product of attendee.products) {
         if (product.selected && !(isEditing && product.purchased)) {
-          const isDayPass = product.duration_type === "day"
-          const quantity =
-            checkoutPolicy.checkoutMode === CHECKOUT_MODE.SIMPLE_QUANTITY
-              ? supportsQuantitySelector(product.max_per_order) || isDayPass
-                ? (product.quantity ?? 1)
-                : 1
-              : isDayPass
-                ? (product.quantity ?? 1) - (product.original_quantity ?? 0)
-                : isPassQuantityBased(product)
-                  ? (product.quantity ?? 1)
-                  : 1
+          const quantity = selectedPassQuantity(
+            product,
+            checkoutPolicy.checkoutMode,
+            isEditing,
+          )
 
           if (quantity > 0) {
             const recipientAttendee = attendee as CheckoutRecipientPassState
@@ -1109,10 +1137,12 @@ export function CheckoutProvider({
               detail,
               effectiveSubmitMode,
               slug,
+              returnContext,
             )
             if (dispatch !== null) {
               const msg = t(dispatch.messageKey)
-              toast.error(msg)
+              if (dispatch.tone === "success") toast.success(msg)
+              else toast.error(msg)
               if (dispatch.blockResubmit) paymentCompleteRef.current = true
               if (dispatch.navigate?.type === "href") {
                 window.location.href = dispatch.navigate.url
@@ -1514,22 +1544,26 @@ export function CheckoutProvider({
   // Dynamic item actions
   const addDynamicItem = useCallback(
     (stepType: string, item: SelectedDynamicItem) => {
+      const previousQuantity =
+        (dynamicItems[stepType] ?? []).find(
+          (entry) => entry.productId === item.productId,
+        )?.quantity ?? 0
+      if (!previewMode && item.quantity > previousQuantity && city) {
+        trackCatalogView()
+        trackMetaAddToCart({
+          popup: city,
+          product: item.product,
+          quantity: item.quantity - previousQuantity,
+        })
+        trackGAAddToCart({
+          popup: city,
+          product: item.product,
+          quantity: item.quantity - previousQuantity,
+        })
+      }
       setDynamicItems((prev) => {
         const existing = prev[stepType] ?? []
         const idx = existing.findIndex((i) => i.productId === item.productId)
-        const previousQuantity = idx >= 0 ? existing[idx].quantity : 0
-        if (item.quantity > previousQuantity && city) {
-          trackMetaAddToCart({
-            popup: city,
-            product: item.product,
-            quantity: item.quantity - previousQuantity,
-          })
-          trackGAAddToCart({
-            popup: city,
-            product: item.product,
-            quantity: item.quantity - previousQuantity,
-          })
-        }
         if (idx >= 0) {
           const updated = [...existing]
           updated[idx] = item
@@ -1538,7 +1572,7 @@ export function CheckoutProvider({
         return { ...prev, [stepType]: [...existing, item] }
       })
     },
-    [city],
+    [city, dynamicItems, previewMode, trackCatalogView],
   )
 
   const removeDynamicItem = useCallback(
@@ -1559,21 +1593,24 @@ export function CheckoutProvider({
         removeDynamicItem(stepType, productId)
         return
       }
+      const item = (dynamicItems[stepType] ?? []).find(
+        (entry) => entry.productId === productId,
+      )
+      if (!previewMode && item && qty > item.quantity && city) {
+        trackCatalogView()
+        trackMetaAddToCart({
+          popup: city,
+          product: item.product,
+          quantity: qty - item.quantity,
+        })
+        trackGAAddToCart({
+          popup: city,
+          product: item.product,
+          quantity: qty - item.quantity,
+        })
+      }
       setDynamicItems((prev) => {
         const existing = prev[stepType] ?? []
-        const item = existing.find((i) => i.productId === productId)
-        if (item && qty > item.quantity && city) {
-          trackMetaAddToCart({
-            popup: city,
-            product: item.product,
-            quantity: qty - item.quantity,
-          })
-          trackGAAddToCart({
-            popup: city,
-            product: item.product,
-            quantity: qty - item.quantity,
-          })
-        }
         return {
           ...prev,
           [stepType]: existing.map((i) =>
@@ -1584,7 +1621,7 @@ export function CheckoutProvider({
         }
       })
     },
-    [city, removeDynamicItem],
+    [city, dynamicItems, previewMode, trackCatalogView, removeDynamicItem],
   )
 
   // Navigation (wrap hook navigation to save cart and clear error)
@@ -1611,32 +1648,94 @@ export function CheckoutProvider({
 
   // Pass actions (delegate to passesProvider)
   const togglePass = useCallback(
-    (attendeeId: string, productId: string, quantityOverride?: number) => {
+    (
+      attendeeId: string,
+      productId: string,
+      quantityOverride?: number,
+      exclusivityScopeIds?: string[],
+      attendeeVisibleProductIds?: string[],
+    ) => {
       const attendee = attendeePasses.find((a) => a.id === attendeeId)
       const product = attendee?.products.find((p) => p.id === productId)
-      if (product) {
-        const currentQuantity = product.quantity ?? 0
-        const nextQuantity = quantityOverride ?? (currentQuantity > 0 ? 0 : 1)
-        if (nextQuantity > currentQuantity && city) {
-          trackMetaAddToCart({
-            popup: city,
-            product,
-            quantity: nextQuantity - currentQuantity,
-          })
-          trackGAAddToCart({
-            popup: city,
-            product,
-            quantity: nextQuantity - currentQuantity,
-          })
-        }
+      if (product && attendee) {
         const overridden =
           quantityOverride !== undefined
             ? { ...product, quantity: quantityOverride }
             : product
-        toggleProduct(attendeeId, overridden)
+        if (!previewMode && city && canSelectRecipientProducts(attendee)) {
+          // Reuse the selection strategy, including scope and auto-promotion,
+          // to report actual positive cart deltas without changing its state.
+          const next = getProductStrategy(
+            overridden,
+            isEditing,
+            checkoutPolicy.checkoutMode,
+          )
+            .handleSelection(
+              attendeePasses,
+              attendeeId,
+              overridden,
+              discountApplied,
+              exclusivityScopeIds,
+              attendeeVisibleProductIds,
+            )
+            .find((entry) => entry.id === attendeeId)
+          for (const selected of next?.products ?? []) {
+            const previous = attendee.products.find(
+              (entry) => entry.id === selected.id,
+            )
+            const delta =
+              selectedPassQuantity(
+                selected,
+                checkoutPolicy.checkoutMode,
+                isEditing,
+              ) -
+              (previous
+                ? selectedPassQuantity(
+                    previous,
+                    checkoutPolicy.checkoutMode,
+                    isEditing,
+                  )
+                : 0)
+            if (delta > 0) {
+              trackCatalogView()
+              trackMetaAddToCart({
+                popup: city,
+                product: selected,
+                quantity: delta,
+              })
+              trackGAAddToCart({
+                popup: city,
+                product: selected,
+                quantity: delta,
+              })
+            }
+          }
+        }
+        if (
+          exclusivityScopeIds !== undefined ||
+          attendeeVisibleProductIds !== undefined
+        ) {
+          toggleProduct(
+            attendeeId,
+            overridden,
+            exclusivityScopeIds,
+            attendeeVisibleProductIds,
+          )
+        } else {
+          toggleProduct(attendeeId, overridden)
+        }
       }
     },
-    [attendeePasses, city, toggleProduct],
+    [
+      attendeePasses,
+      city,
+      toggleProduct,
+      previewMode,
+      isEditing,
+      checkoutPolicy.checkoutMode,
+      discountApplied,
+      trackCatalogView,
+    ],
   )
 
   const resetDayProduct = useCallback(
@@ -1716,6 +1815,8 @@ export function CheckoutProvider({
     returnContext,
     editPassesEnabled,
     popupName: city?.name ?? null,
+    popupCurrency: city?.currency ?? null,
+    catalogProducts: products,
     openCartMetaRef,
     flushOpenCartSave: openCartEnabled ? flushOpenCartSave : null,
     previewMode,

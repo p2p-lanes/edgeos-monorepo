@@ -363,23 +363,6 @@ def _plan_payment_source(plan: SimpleFIInstallmentPlan) -> str | None:
     return None
 
 
-def _schedule_meta_capi_purchase(payment: Payments) -> None:
-    from loguru import logger
-
-    from app.services.meta_capi import fire_and_forget_purchase_event
-
-    try:
-        fire_and_forget_purchase_event(
-            tenant=payment.tenant,
-            payment=payment,
-            popup=payment.popup,
-        )
-    except Exception:
-        logger.exception(
-            "Failed to queue Meta CAPI Purchase event payment_id={}", payment.id
-        )
-
-
 def _installment_charged_amount(payment_request: SimpleFIPaymentRequest) -> Decimal:
     """Charged amount for a single installment's payment request.
 
@@ -817,6 +800,65 @@ async def get_my_payment_status(
     )
 
 
+@router.post(
+    "/my/{payment_id}/confirm",
+    response_model=PaymentStatusCheck,
+    dependencies=[needs("portal:payments:write")],
+)
+async def confirm_my_payment(
+    payment_id: uuid.UUID,
+    db: HumanTenantSession,
+    current_human: CurrentHuman,
+) -> PaymentStatusCheck:
+    """Confirm an owned one-shot pass payment on Portal return, without cancelling it.
+
+    Only a matching SimpleFI approved response can advance a pending payment.
+    Other local states, fees and installment plans retain their existing handling.
+    Provider failure leaves local state unchanged and is safe to retry.
+    """
+    from starlette.concurrency import run_in_threadpool
+
+    from app.api.sales_flow.models import SalesFlows
+    from app.services.simplefi import get_simplefi_client
+
+    payment = _get_portal_owned_payment_or_404(db, payment_id, current_human)
+    if (
+        payment.status == PaymentStatus.PENDING.value
+        and payment.source == PaymentSource.SIMPLEFI.value
+        and payment.payment_type == PaymentType.PASS_PURCHASE.value
+        and not payment.is_installment_plan
+        and payment.external_id
+    ):
+        flow = (
+            db.get(SalesFlows, payment.sales_flow_id) if payment.sales_flow_id else None
+        )
+        popup = payment.popup
+        api_key = (flow.simplefi_api_key if flow else None) or (
+            popup.simplefi_api_key if popup else None
+        )
+        if not api_key:
+            raise HTTPException(status_code=502, detail="Unable to confirm payment")
+        try:
+            remote = await run_in_threadpool(
+                get_simplefi_client(api_key).get_payment_request_status,
+                payment.external_id,
+            )
+            if remote.id != payment.external_id:
+                raise ValueError("Mismatched payment reference")
+        except Exception:
+            # Provider exceptions can contain credentials or private response data.
+            raise HTTPException(
+                status_code=502, detail="Unable to confirm payment"
+            ) from None
+        if remote.status.strip().lower() == PaymentStatus.APPROVED.value:
+            # Recheck after the provider request; no network call holds this lock.
+            db.refresh(payment, with_for_update=True)
+            if payment.status == PaymentStatus.PENDING.value:
+                payment = payments_crud.approve_payment(db, payment.id)
+                await _send_payment_confirmed_email_best_effort(payment, db_session=db)
+    return PaymentStatusCheck(id=payment.id, status=PaymentStatus(payment.status))
+
+
 @router.get(
     "/my/{application_id}",
     response_model=ListModel[PaymentPortalPublic],
@@ -1003,7 +1045,11 @@ async def create_my_payment(
     payment, _preview = payments_crud.create_payment(
         db,
         payment_in,
-        attribution=_extract_meta_attribution(request),
+        attribution=_extract_meta_attribution(request)
+        | {
+            "ga_client_id": payment_in.ga_client_id,
+            "ga_session_id": payment_in.ga_session_id,
+        },
         actor=actor_from_human(current_human),
     )
 
@@ -1180,7 +1226,6 @@ async def _handle_regular_payment(
                 rate=settlement_rate,
                 source=source,
             )
-            _schedule_meta_capi_purchase(payment)
             await _send_payment_confirmed_email_best_effort(payment, db_session=db)
         logger.info("Payment {} approved via SimpleFI webhook", payment.id)
     else:
@@ -1458,7 +1503,6 @@ async def _handle_installment_payment(
             source=source,
         )
         payment_approved = True
-        _schedule_meta_capi_purchase(payment)
         logger.info("First installment received - payment {} approved", payment.id)
 
     # Increment installments_paid
@@ -1531,7 +1575,6 @@ async def _handle_installment_plan_completed(
     )
     payment.installments_paid = installment_plan.paid_installments_count
     payment = payments_crud.approve_payment(db, payment.id)
-    _schedule_meta_capi_purchase(payment)
     await _send_payment_confirmed_email_best_effort(payment, db_session=db)
 
     return {"message": "Installment plan payment approved successfully"}
