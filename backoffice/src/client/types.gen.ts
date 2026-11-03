@@ -3784,6 +3784,9 @@ export type GroupCreate = {
     max_members?: (number | null);
     welcome_message?: (string | null);
     whitelisted_emails?: (Array<(string)> | null);
+    auto_approve_applications?: boolean;
+    express_checkout?: boolean;
+    enable_private_events?: boolean;
 };
 
 /**

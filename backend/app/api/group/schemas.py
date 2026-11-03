@@ -58,6 +58,9 @@ class GroupCreate(BaseModel):
     max_members: int | None = None
     welcome_message: str | None = None
     whitelisted_emails: list[str] | None = None  # List of email strings to whitelist
+    auto_approve_applications: bool = False
+    express_checkout: bool = False
+    enable_private_events: bool = False
 
     @field_validator("discount_percentage")
     @classmethod

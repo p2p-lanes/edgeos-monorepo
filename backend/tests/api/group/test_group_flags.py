@@ -401,6 +401,66 @@ class TestGroupAdminUpdateFlags:
         assert resp.json()["express_checkout"] is True
 
 
+class TestGroupCreateFlags:
+    """POST /groups persists the behaviour flags set at creation time."""
+
+    def test_create_persists_flags(
+        self,
+        client: TestClient,
+        db: Session,
+        tenant_a: Tenants,
+        admin_token_tenant_a: str,
+    ) -> None:
+        popup = _make_popup(db, tenant_a)
+
+        resp = client.post(
+            "/api/v1/groups",
+            json={
+                "popup_id": str(popup.id),
+                "name": f"Created Flags {uuid.uuid4().hex[:6]}",
+                "auto_approve_applications": True,
+                "express_checkout": True,
+                "enable_private_events": True,
+            },
+            headers={**_auth(admin_token_tenant_a), "X-Tenant-Id": str(tenant_a.id)},
+        )
+        assert resp.status_code == 201, resp.json()
+        body = resp.json()
+        assert body["auto_approve_applications"] is True
+        assert body["express_checkout"] is True
+        assert body["enable_private_events"] is True
+
+        group = db.get(Groups, uuid.UUID(body["id"]))
+        assert group is not None
+        db.refresh(group)
+        assert group.auto_approve_applications is True
+        assert group.express_checkout is True
+        assert group.enable_private_events is True
+
+    def test_create_defaults_flags_off(
+        self,
+        client: TestClient,
+        db: Session,
+        tenant_a: Tenants,
+        admin_token_tenant_a: str,
+    ) -> None:
+        popup = _make_popup(db, tenant_a)
+
+        resp = client.post(
+            "/api/v1/groups",
+            json={
+                "popup_id": str(popup.id),
+                "name": f"Default Flags {uuid.uuid4().hex[:6]}",
+            },
+            headers={**_auth(admin_token_tenant_a), "X-Tenant-Id": str(tenant_a.id)},
+        )
+        assert resp.status_code == 201, resp.json()
+        body = resp.json()
+        assert body["auto_approve_applications"] is False
+        assert body["express_checkout"] is False
+        assert body["enable_private_events"] is False
+
+
 # ---------------------------------------------------------------------------
 # T-gr-017: Popup feature-flag guards for invite/referral paths
 # ---------------------------------------------------------------------------
