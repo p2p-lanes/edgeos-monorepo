@@ -17937,6 +17937,21 @@ export const GroupCreateSchema = {
                 }
             ],
             title: 'Whitelisted Emails'
+        },
+        auto_approve_applications: {
+            type: 'boolean',
+            title: 'Auto Approve Applications',
+            default: false
+        },
+        express_checkout: {
+            type: 'boolean',
+            title: 'Express Checkout',
+            default: false
+        },
+        enable_private_events: {
+            type: 'boolean',
+            title: 'Enable Private Events',
+            default: false
         }
     },
     type: 'object',
