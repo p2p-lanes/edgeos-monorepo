@@ -143,10 +143,20 @@ const stripedPatternStyle = {
 
 export default function PassSelectionSection() {
   const { t } = useTranslation()
-  const { attendeePasses, toggleProduct, isEditing, toggleEditing } =
-    usePassesProvider()
-  const { editCredit, editPassesEnabled, checkoutMode, salesFlowId } =
-    useCheckout()
+  const { attendeePasses, isEditing, toggleEditing } = usePassesProvider()
+  const {
+    editCredit,
+    editPassesEnabled,
+    checkoutMode,
+    salesFlowId,
+    togglePass,
+  } = useCheckout()
+  const toggleProduct = (
+    attendeeId: string,
+    product: ProductsPass,
+    scope?: string[],
+    visible?: string[],
+  ) => togglePass(attendeeId, product.id, product.quantity, scope, visible)
   const { getRelevantApplication } = useApplication()
   const [focusedAttendeeId, setFocusedAttendeeId] = useState<string | null>(
     null,

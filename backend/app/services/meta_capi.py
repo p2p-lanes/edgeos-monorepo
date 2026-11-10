@@ -1,4 +1,3 @@
-import asyncio
 import hashlib
 import re
 import time
@@ -11,6 +10,7 @@ import httpx
 from loguru import logger
 
 from app.api.product.schemas import CATEGORY_TICKET
+from app.services.background_tasks import spawn
 from app.utils.encryption import decrypt
 
 META_GRAPH_API_VERSION = "v21.0"
@@ -209,12 +209,11 @@ def fire_and_forget_purchase_event(
         return
 
     try:
-        asyncio.create_task(
-            prepare_and_send_purchase_event(
-                tenant_snapshot,
-                payment_snapshot,
-                popup_snapshot,
-            )
+        spawn(
+            prepare_and_send_purchase_event,
+            tenant_snapshot,
+            payment_snapshot,
+            popup_snapshot,
         )
     except RuntimeError:
         logger.exception(

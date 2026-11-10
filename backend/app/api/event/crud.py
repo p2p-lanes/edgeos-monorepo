@@ -2,7 +2,7 @@ import uuid
 from collections.abc import Iterable
 from datetime import UTC, datetime, timedelta
 
-from sqlalchemy import asc, or_, text
+from sqlalchemy import asc, or_, text, tuple_
 from sqlmodel import Session, col, delete, func, select
 
 from app.api.event.models import EventHiddenByHuman, EventInvitations, Events
@@ -500,6 +500,59 @@ def _expand_rows_in_window(
                 continue
             override_keys.add((child.recurrence_master_id, _strip_tz(child.start_time)))
 
+    expansions: dict[uuid.UUID, tuple[list[datetime], timedelta]] = {}
+    closure_keys: set[tuple[uuid.UUID, uuid.UUID]] = set()
+    earliest: datetime | None = None
+    latest: datetime | None = None
+    for ev in rows:
+        if not ev.rrule:
+            continue
+        try:
+            rule = parse_rrule(ev.rrule)
+        except ValueError:
+            continue
+        if rule is None:
+            continue
+        duration = ev.end_time - ev.start_time
+        occurrences = expand(
+            dtstart=ev.start_time,
+            rule=rule,
+            window_start=window_start,
+            window_end=window_end,
+            exdates=list(ev.recurrence_exdates or []),
+            max_occurrences=max_occurrences,
+            timezone=ev.timezone,
+        )
+        expansions[ev.id] = (occurrences, duration)
+        if ev.venue_id is not None and occurrences:
+            closure_keys.add((ev.tenant_id, ev.venue_id))
+            starts_utc = [
+                start if start.tzinfo is not None else start.replace(tzinfo=UTC)
+                for start in occurrences
+            ]
+            first = min(starts_utc)
+            last = max(starts_utc) + duration
+            earliest = first if earliest is None else min(earliest, first)
+            latest = last if latest is None else max(latest, last)
+
+    closures_by_venue: dict[tuple[uuid.UUID, uuid.UUID], list[VenueExceptions]] = {}
+    if closure_keys and earliest is not None and latest is not None:
+        closures = session.exec(
+            select(VenueExceptions)
+            .where(
+                tuple_(VenueExceptions.tenant_id, VenueExceptions.venue_id).in_(
+                    closure_keys
+                )
+            )
+            .where(VenueExceptions.is_closed == True)  # noqa: E712
+            .where(VenueExceptions.start_datetime < latest)
+            .where(VenueExceptions.end_datetime > earliest)
+        ).all()
+        for closure in closures:
+            closures_by_venue.setdefault(
+                (closure.tenant_id, closure.venue_id), []
+            ).append(closure)
+
     for ev in rows:
         ev_in_window = _ts_in_window(ev.start_time, window_start, window_end)
         if not ev.rrule:
@@ -510,32 +563,16 @@ def _expand_rows_in_window(
         # Recurring master: only include the row itself if its own start
         # falls in the window — otherwise we'd show a stale "first instance"
         # marker for a series whose visible occurrences are all pseudo-rows.
-        try:
-            rule = parse_rrule(ev.rrule)
-        except ValueError:
-            # Skip expansion for unparseable rules — if the master was in
-            # window it's already been appended above; otherwise we
-            # intentionally emit nothing rather than silently guessing.
+        if ev.id not in expansions:
+            # Invalid rules intentionally emit no occurrences.
             continue
-        if rule is None:
-            continue
-
-        duration = ev.end_time - ev.start_time
-
-        occurrences = expand(
-            dtstart=ev.start_time,
-            rule=rule,
-            window_start=window_start,
-            window_end=window_end,
-            exdates=list(ev.recurrence_exdates or []),
-            max_occurrences=max_occurrences,
-            timezone=ev.timezone,
-        )
+        occurrences, duration = expansions[ev.id]
         closed_starts = closed_occurrence_starts(
             session,
             venue_id=ev.venue_id,
             starts=occurrences,
             duration=duration,
+            closures=closures_by_venue.get((ev.tenant_id, ev.venue_id), []),
         )
         if (ev_in_window or include_outside_window) and _strip_tz(
             ev.start_time
@@ -565,6 +602,7 @@ def closed_occurrence_starts(
     venue_id: uuid.UUID | None,
     starts: list[datetime],
     duration: timedelta,
+    closures: list[VenueExceptions] | None = None,
 ) -> set[datetime]:
     """Return recurrence starts whose event window overlaps a venue closure.
 
@@ -579,13 +617,14 @@ def closed_occurrence_starts(
     ]
     earliest = min(starts_utc)
     latest = max(starts_utc) + duration
-    closures = session.exec(
-        select(VenueExceptions)
-        .where(VenueExceptions.venue_id == venue_id)
-        .where(VenueExceptions.is_closed == True)  # noqa: E712
-        .where(VenueExceptions.start_datetime < latest)
-        .where(VenueExceptions.end_datetime > earliest)
-    ).all()
+    if closures is None:
+        closures = session.exec(
+            select(VenueExceptions)
+            .where(VenueExceptions.venue_id == venue_id)
+            .where(VenueExceptions.is_closed == True)  # noqa: E712
+            .where(VenueExceptions.start_datetime < latest)
+            .where(VenueExceptions.end_datetime > earliest)
+        ).all()
     return {
         _strip_tz(start)
         for start in starts_utc

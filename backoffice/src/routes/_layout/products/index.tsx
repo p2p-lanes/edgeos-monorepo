@@ -195,10 +195,17 @@ const columns: ColumnDef<ProductPublic>[] = [
             row.original.is_active ? "bg-success" : "bg-destructive",
           )}
         />
-        <span className="font-medium">{row.original.name}</span>
-        {isProductSoldOut(row.original) && (
-          <Badge variant="destructive">Sold out</Badge>
-        )}
+        <div className="flex min-w-0 flex-col leading-tight">
+          <div className="flex items-center gap-2">
+            <span className="font-medium">{row.original.name}</span>
+            {isProductSoldOut(row.original) && (
+              <Badge variant="destructive">Sold out</Badge>
+            )}
+          </div>
+          <span className="font-mono text-xs text-muted-foreground">
+            {row.original.slug}
+          </span>
+        </div>
       </div>
     ),
   },
@@ -393,7 +400,7 @@ function ProductsTableContent() {
     <DataTable
       columns={columns}
       data={products.results}
-      searchPlaceholder="Search by name..."
+      searchPlaceholder="Search by name or slug..."
       hiddenOnMobile={[
         "description",
         "category",

@@ -101,7 +101,7 @@ async def list_products(
             skip=skip,
             limit=limit,
             search=search,
-            search_fields=["name"],
+            search_fields=["name", "slug"],
             sort_by=sort_by,
             sort_order=sort_order,
         )
@@ -144,10 +144,14 @@ async def create_products_batch(
     for idx, item in enumerate(batch.products):
         try:
             with db.begin_nested():
-                base_slug = item.slug if item.slug else slugify(item.name)
-                slug = crud.products_crud.generate_unique_slug(
-                    db, base_slug, batch.popup_id
-                )
+                if item.slug:
+                    slug = crud.products_crud.resolve_explicit_slug(
+                        db, item.slug, batch.popup_id
+                    )
+                else:
+                    slug = crud.products_crud.generate_unique_slug(
+                        db, slugify(item.name), batch.popup_id
+                    )
 
                 product_data = crud.sale_dates_to_persistence(item.model_dump())
                 product_data["tenant_id"] = tenant_id
@@ -224,9 +228,15 @@ async def create_product(
 ) -> ProductPublic:
     """Create a new product."""
 
-    # Auto-generate unique slug from name if not provided
-    base_slug = product_in.slug if product_in.slug else slugify(product_in.name)
-    slug = crud.products_crud.generate_unique_slug(db, base_slug, product_in.popup_id)
+    # An explicit slug must be free; only a slug derived from the name is suffixed.
+    if product_in.slug and product_in.slug.strip():
+        slug = crud.products_crud.resolve_explicit_slug(
+            db, product_in.slug, product_in.popup_id
+        )
+    else:
+        slug = crud.products_crud.generate_unique_slug(
+            db, slugify(product_in.name), product_in.popup_id
+        )
 
     # Set tenant_id based on user role
     if current_user.role == UserRole.SUPERADMIN:
@@ -296,9 +306,10 @@ async def update_product(
         product_in.slug = crud.products_crud.generate_unique_slug(
             db, new_base_slug, product.popup_id
         )
-    elif product_in.slug and product_in.slug != product.slug:
-        product_in.slug = crud.products_crud.generate_unique_slug(
-            db, product_in.slug, product.popup_id
+    elif product_in.slug is not None and product_in.slug != product.slug:
+        # Explicit slugs are normalized but never silently suffixed.
+        product_in.slug = crud.products_crud.resolve_explicit_slug(
+            db, product_in.slug, product.popup_id, exclude_product_id=product.id
         )
 
     # CDN image ingestion: rewrite external image URLs to CDN before commit.

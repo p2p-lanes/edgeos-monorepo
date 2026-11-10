@@ -1420,6 +1420,8 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
                 meta_fbp=(attribution or {}).get("fbp"),
                 meta_client_ip=(attribution or {}).get("client_ip"),
                 meta_client_user_agent=(attribution or {}).get("client_user_agent"),
+                ga_client_id=(attribution or {}).get("ga_client_id"),
+                ga_session_id=(attribution or {}).get("ga_session_id"),
             )
             session.add(payment)
             session.flush()
@@ -3748,6 +3750,8 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
                 meta_fbp=(attribution or {}).get("fbp"),
                 meta_client_ip=(attribution or {}).get("client_ip"),
                 meta_client_user_agent=(attribution or {}).get("client_user_agent"),
+                ga_client_id=(attribution or {}).get("ga_client_id"),
+                ga_session_id=(attribution or {}).get("ga_session_id"),
             )
             session.add(payment)
             session.flush()
@@ -4060,6 +4064,8 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
             meta_fbp=(attribution or {}).get("fbp"),
             meta_client_ip=(attribution or {}).get("client_ip"),
             meta_client_user_agent=(attribution or {}).get("client_user_agent"),
+            ga_client_id=(attribution or {}).get("ga_client_id"),
+            ga_session_id=(attribution or {}).get("ga_session_id"),
         )
 
         session.add(payment)
@@ -4204,7 +4210,8 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
         """
         Approve a payment and add products to attendees.
 
-        This is called when payment is confirmed (e.g., webhook from payment provider).
+        Called by provider webhooks and return-time reconciliation. Only the
+        first committed approval schedules server-side Purchase notifications.
         All changes are committed atomically -- on failure, everything is rolled back.
         """
         payment = session.exec(
@@ -4283,6 +4290,20 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail="Failed to approve payment",
             )
+
+        if not was_approved:
+            # The row lock above determines the transition winner, including
+            # callers that preloaded stale PENDING state before another approval.
+            # Notify only after commit; tracking must never undo payment success.
+            try:
+                from app.services.purchase_events import schedule_purchase_events
+
+                schedule_purchase_events(payment)
+            except Exception:
+                logger.exception(
+                    "Failed to schedule Purchase notifications payment_id={}",
+                    payment.id,
+                )
 
         return payment
 

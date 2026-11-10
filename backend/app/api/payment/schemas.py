@@ -398,6 +398,12 @@ class PaymentCreate(BaseModel):
     insurance: bool = False
     locale: str | None = PydanticField(default=None, max_length=8)
     return_context: Literal["direct", "portal"] = "direct"
+    ga_client_id: str | None = PydanticField(
+        default=None, max_length=128, pattern=r"^[A-Za-z0-9._-]+$"
+    )
+    ga_session_id: str | None = PydanticField(
+        default=None, max_length=20, pattern=r"^\d+$"
+    )
 
     model_config = ConfigDict(extra="forbid")
 

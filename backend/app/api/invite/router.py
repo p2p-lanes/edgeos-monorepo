@@ -682,9 +682,18 @@ async def get_my_sharing_status(
     if current_human.red_flag:
         return AttendeeSharingStatus(can_share=False)
     denial, flow_id = _share_denial(db, current_human.id, popup.id)
+    if denial is not None:
+        return AttendeeSharingStatus(can_share=False)
+
+    from app.api.sales_flow.crud import sales_flows_crud
+
+    flows, _ = sales_flows_crud.find_by_popup(db, popup.id)
+    open_flows = [flow for flow in flows if flow.status is None]
+    flow = next((f for f in flows if f.id == flow_id), None)
     return AttendeeSharingStatus(
-        can_share=denial is None,
-        sales_flow_id=flow_id if denial is None else None,
+        can_share=True,
+        sales_flow_id=flow_id,
+        flow_name=flow.name if flow and len(open_flows) > 1 else None,
     )
 
 

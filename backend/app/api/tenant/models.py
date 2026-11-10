@@ -43,6 +43,10 @@ class Tenants(TenantBase, table=True):
         default=None,
         sa_column=Column(Text(), nullable=True),
     )
+    ga_mp_api_secret_encrypted: str | None = Field(
+        default=None,
+        sa_column=Column(Text(), nullable=True),
+    )
     smtp_host: str | None = Field(default=None, max_length=255)
     smtp_port: int | None = Field(default=587)
     smtp_user: str | None = Field(default=None, max_length=255)
@@ -69,6 +73,10 @@ class Tenants(TenantBase, table=True):
     @property
     def meta_capi_configured(self) -> bool:
         return bool(self.meta_capi_access_token_encrypted)
+
+    @property
+    def ga_mp_configured(self) -> bool:
+        return bool(self.ga_mp_api_secret_encrypted)
 
     @property
     def smtp_configured(self) -> bool:

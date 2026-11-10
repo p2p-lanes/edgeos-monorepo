@@ -1,12 +1,66 @@
 "use client"
 
-import type {
-  CheckoutRuntimeProduct,
-  PaymentPortalPublic,
-  PopupPublic,
-} from "@/client"
+import type { PaymentPortalPublic } from "@/client"
 
 type GtagWindow = Window & { gtag?: (...args: unknown[]) => void }
+
+export type GABrowserIds = {
+  ga_client_id?: string
+  ga_session_id?: string
+}
+
+function getGAField(
+  gtag: (...args: unknown[]) => void,
+  measurementId: string,
+  field: "client_id" | "session_id",
+): Promise<string | undefined> {
+  return new Promise((resolve) => {
+    const timeout = window.setTimeout(() => resolve(undefined), 300)
+    try {
+      gtag("get", measurementId, field, (value: unknown) => {
+        window.clearTimeout(timeout)
+        resolve(
+          typeof value === "string" || typeof value === "number"
+            ? String(value)
+            : undefined,
+        )
+      })
+    } catch {
+      window.clearTimeout(timeout)
+      resolve(undefined)
+    }
+  })
+}
+
+/** Capture GA's existing browser identity; never synthesize an unrelated ID. */
+export async function getGABrowserIds(
+  measurementId: string | null | undefined,
+): Promise<GABrowserIds> {
+  if (
+    typeof window === "undefined" ||
+    !measurementId ||
+    !/^G-[A-Z0-9]+$/i.test(measurementId)
+  ) {
+    return {}
+  }
+  const gtag = (window as GtagWindow).gtag
+  if (typeof gtag !== "function") return {}
+
+  const [clientId, sessionId] = await Promise.all([
+    getGAField(gtag, measurementId, "client_id"),
+    getGAField(gtag, measurementId, "session_id"),
+  ])
+  return {
+    ...(clientId &&
+      /^[A-Za-z0-9._-]{1,128}$/.test(clientId) && {
+        ga_client_id: clientId,
+      }),
+    ...(sessionId &&
+      /^\d{1,20}$/.test(sessionId) && {
+        ga_session_id: sessionId,
+      }),
+  }
+}
 
 type GAProduct = {
   id: string
@@ -14,6 +68,7 @@ type GAProduct = {
   price: number | string
   currency?: string | null
   category?: string | null
+  is_active?: boolean
 }
 
 type GAPopup = {
@@ -39,7 +94,7 @@ function getPopupParams(popup: GAPopup) {
   }
 }
 
-function getProductItems(products: CheckoutRuntimeProduct[]): GAItem[] {
+function getProductItems(products: GAProduct[]): GAItem[] {
   return products
     .filter((product) => product.is_active !== false)
     .map((product) => ({
@@ -54,24 +109,69 @@ export function trackGAEvent(
   eventName: string,
   params: Record<string, unknown>,
 ) {
-  if (typeof window === "undefined") return
+  if (typeof window === "undefined") return false
   const gtag = (window as GtagWindow).gtag
-  if (typeof gtag !== "function") return
+  if (typeof gtag !== "function") return false
 
-  gtag("event", eventName, params)
+  try {
+    gtag("event", eventName, params)
+    return true
+  } catch {
+    // Marketing integrations must never interrupt a cart or payment action.
+    return false
+  }
 }
 
 export function trackGAViewItem(params: {
-  popup: PopupPublic
-  products: CheckoutRuntimeProduct[]
+  popup: GAPopup
+  products: GAProduct[]
 }) {
   const items = getProductItems(params.products)
   const value = items.reduce((total, item) => total + item.price, 0)
 
-  trackGAEvent("view_item", {
+  return trackGAEvent("view_item", {
     ...getPopupParams(params.popup),
     currency: params.popup.currency,
     value,
+    items,
+  })
+}
+
+export function trackGABeginCheckout(params: {
+  popup: GAPopup
+  items: Array<{ product_id: string; quantity?: number }>
+  products: GAProduct[]
+  coupon?: string
+}) {
+  const catalog = new Map(
+    params.products.map((product) => [product.id, product]),
+  )
+  const items = params.items
+    .filter((line) => (line.quantity ?? 1) > 0)
+    .map((line) => {
+      const product = catalog.get(line.product_id)
+      const price = product ? Number(product.price) : undefined
+      return {
+        item_id: line.product_id,
+        quantity: line.quantity ?? 1,
+        ...(product?.name && { item_name: product.name }),
+        ...(product?.category && { item_category: product.category }),
+        ...(price !== undefined && Number.isFinite(price) && { price }),
+      }
+    })
+  if (!items.length) return false
+  const hasPrices = items.every((item) => item.price !== undefined)
+  return trackGAEvent("begin_checkout", {
+    ...getPopupParams(params.popup),
+    ...(params.popup.currency && { currency: params.popup.currency }),
+    ...(hasPrices &&
+      params.popup.currency && {
+        value: items.reduce(
+          (total, item) => total + (item.price ?? 0) * item.quantity,
+          0,
+        ),
+      }),
+    ...(params.coupon && { coupon: params.coupon }),
     items,
   })
 }

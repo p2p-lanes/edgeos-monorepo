@@ -6507,6 +6507,17 @@ export const AttendeeSharingStatusSchema = {
                 }
             ],
             title: 'Sales Flow Id'
+        },
+        flow_name: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Flow Name'
         }
     },
     type: 'object',
@@ -17926,6 +17937,21 @@ export const GroupCreateSchema = {
                 }
             ],
             title: 'Whitelisted Emails'
+        },
+        auto_approve_applications: {
+            type: 'boolean',
+            title: 'Auto Approve Applications',
+            default: false
+        },
+        express_checkout: {
+            type: 'boolean',
+            title: 'Express Checkout',
+            default: false
+        },
+        enable_private_events: {
+            type: 'boolean',
+            title: 'Enable Private Events',
+            default: false
         }
     },
     type: 'object',
@@ -22363,6 +22389,32 @@ export const OpenTicketingPurchaseCreateSchema = {
             ],
             title: 'Fbp'
         },
+        ga_client_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    maxLength: 128,
+                    pattern: '^[A-Za-z0-9._-]+$'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Ga Client Id'
+        },
+        ga_session_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    maxLength: 20,
+                    pattern: '^\\d+$'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Ga Session Id'
+        },
         locale: {
             anyOf: [
                 {
@@ -22584,6 +22636,32 @@ export const PaymentCreateSchema = {
             enum: ['direct', 'portal'],
             title: 'Return Context',
             default: 'direct'
+        },
+        ga_client_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    maxLength: 128,
+                    pattern: '^[A-Za-z0-9._-]+$'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Ga Client Id'
+        },
+        ga_session_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    maxLength: 20,
+                    pattern: '^\\d+$'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Ga Session Id'
         }
     },
     additionalProperties: false,
@@ -27808,12 +27886,14 @@ export const ProductBatchItemSchema = {
     properties: {
         name: {
             type: 'string',
+            maxLength: 255,
             title: 'Name'
         },
         slug: {
             anyOf: [
                 {
-                    type: 'string'
+                    type: 'string',
+                    maxLength: 255
                 },
                 {
                     type: 'null'
@@ -28275,12 +28355,14 @@ export const ProductCreateSchema = {
         },
         name: {
             type: 'string',
+            maxLength: 255,
             title: 'Name'
         },
         slug: {
             anyOf: [
                 {
-                    type: 'string'
+                    type: 'string',
+                    maxLength: 255
                 },
                 {
                     type: 'null'
@@ -28762,7 +28844,8 @@ export const ProductUpdateSchema = {
         name: {
             anyOf: [
                 {
-                    type: 'string'
+                    type: 'string',
+                    maxLength: 255
                 },
                 {
                     type: 'null'
@@ -28773,7 +28856,8 @@ export const ProductUpdateSchema = {
         slug: {
             anyOf: [
                 {
-                    type: 'string'
+                    type: 'string',
+                    maxLength: 255
                 },
                 {
                     type: 'null'
@@ -34433,6 +34517,11 @@ export const TenantPublicSchema = {
             title: 'Meta Capi Configured',
             default: false
         },
+        ga_mp_configured: {
+            type: 'boolean',
+            title: 'Ga Mp Configured',
+            default: false
+        },
         is_trial: {
             type: 'boolean',
             title: 'Is Trial',
@@ -34732,6 +34821,17 @@ export const TenantUpdateSchema = {
                 }
             ],
             title: 'Ga Measurement Id'
+        },
+        ga_mp_api_secret: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Ga Mp Api Secret'
         },
         help_enabled: {
             anyOf: [

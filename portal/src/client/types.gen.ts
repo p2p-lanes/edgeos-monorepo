@@ -1380,6 +1380,7 @@ export type AttendeesDirectoryEntry = {
 export type AttendeeSharingStatus = {
     can_share: boolean;
     sales_flow_id?: (string | null);
+    flow_name?: (string | null);
 };
 
 /**
@@ -3783,6 +3784,9 @@ export type GroupCreate = {
     max_members?: (number | null);
     welcome_message?: (string | null);
     whitelisted_emails?: (Array<(string)> | null);
+    auto_approve_applications?: boolean;
+    express_checkout?: boolean;
+    enable_private_events?: boolean;
 };
 
 /**
@@ -4832,6 +4836,8 @@ export type OpenTicketingPurchaseCreate = {
     insurance?: boolean;
     fbc?: (string | null);
     fbp?: (string | null);
+    ga_client_id?: (string | null);
+    ga_session_id?: (string | null);
     locale?: (string | null);
     return_context?: 'direct' | 'portal';
     attribution?: (Attribution | null);
@@ -4880,6 +4886,8 @@ export type PaymentCreate = {
     insurance?: boolean;
     locale?: (string | null);
     return_context?: 'direct' | 'portal';
+    ga_client_id?: (string | null);
+    ga_session_id?: (string | null);
 };
 
 export type PaymentFormResponsesPublic = {
@@ -6951,6 +6959,7 @@ export type TenantPublic = {
     help_email?: (string | null);
     id: string;
     meta_capi_configured?: boolean;
+    ga_mp_configured?: boolean;
     is_trial?: boolean;
     trial_expires_at?: (string | null);
     suspended_at?: (string | null);
@@ -6987,6 +6996,7 @@ export type TenantUpdate = {
     meta_capi_access_token?: (string | null);
     ga_tracking_enabled?: (boolean | null);
     ga_measurement_id?: (string | null);
+    ga_mp_api_secret?: (string | null);
     help_enabled?: (boolean | null);
     help_email?: (string | null);
     smtp_host?: (string | null);
@@ -10593,6 +10603,12 @@ export type PaymentsGetMyPaymentStatusData = {
 };
 
 export type PaymentsGetMyPaymentStatusResponse = (PaymentStatusCheck);
+
+export type PaymentsConfirmMyPaymentData = {
+    paymentId: string;
+};
+
+export type PaymentsConfirmMyPaymentResponse = (PaymentStatusCheck);
 
 export type PaymentsListMyPaymentsData = {
     applicationId: string;

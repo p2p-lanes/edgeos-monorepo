@@ -323,3 +323,26 @@ describe("dispatchPaymentError — unrecognised codes fall through", () => {
     expect(dispatchPaymentError({}, "application", "slug")).toBeNull()
   })
 })
+
+describe("Portal payment completion presentation", () => {
+  it.each([
+    "application",
+    "open-ticketing",
+  ] as const)("keeps %s confirmation positive and on the current page", (mode) => {
+    const result = dispatchPaymentError(
+      {
+        code: "previous_payment_completed",
+        redirect_url: "https://example.com/success",
+      },
+      mode,
+      "summit",
+      "portal",
+    )
+    expect(result).toMatchObject({
+      tone: "success",
+      blockResubmit: true,
+      setPersistentError: false,
+      navigate: null,
+    })
+  })
+})

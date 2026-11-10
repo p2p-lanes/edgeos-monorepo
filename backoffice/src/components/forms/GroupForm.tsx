@@ -174,6 +174,9 @@ export function GroupForm({
                 .map((e: string) => e.trim())
                 .filter(Boolean)
             : undefined,
+          auto_approve_applications: value.auto_approve_applications,
+          express_checkout: value.express_checkout,
+          enable_private_events: value.enable_private_events,
         })
       }
     },

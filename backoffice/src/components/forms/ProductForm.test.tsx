@@ -173,6 +173,64 @@ describe("ProductForm — ticket-as-first-class-entity (Phase 8.2)", () => {
     )
   })
 
+  it("shows the slug and keeps it when renaming a product", async () => {
+    const user = userEvent.setup()
+    render(<ProductForm defaultValues={editProduct()} onSuccess={vi.fn()} />, {
+      wrapper: makeWrapper(),
+    })
+    const slug = await screen.findByLabelText("Slug")
+    expect(slug).toHaveValue("existing-product")
+    await user.type(screen.getByPlaceholderText(/product name/i), " renamed")
+
+    await user.click(screen.getByRole("button", { name: /save changes/i }))
+
+    await waitFor(() => expect(mockUpdateProduct).toHaveBeenCalledOnce())
+    expect(mockUpdateProduct.mock.calls[0]?.[0].requestBody).toMatchObject({
+      name: "Existing product renamed",
+      slug: "existing-product",
+    })
+  })
+
+  it("submits an edited slug normalized", async () => {
+    const user = userEvent.setup()
+    render(<ProductForm defaultValues={editProduct()} onSuccess={vi.fn()} />, {
+      wrapper: makeWrapper(),
+    })
+    const slug = await screen.findByLabelText("Slug")
+    await user.clear(slug)
+    await user.type(slug, "Hoodie Black L")
+    await user.tab()
+    expect(slug).toHaveValue("hoodie-black-l")
+
+    await user.click(screen.getByRole("button", { name: /save changes/i }))
+
+    await waitFor(() => expect(mockUpdateProduct).toHaveBeenCalledOnce())
+    expect(mockUpdateProduct.mock.calls[0]?.[0].requestBody).toMatchObject({
+      slug: "hoodie-black-l",
+    })
+  })
+
+  it("omits the slug on create when left empty", async () => {
+    const user = userEvent.setup()
+    render(<ProductForm onSuccess={vi.fn()} />, { wrapper: makeWrapper() })
+    await user.type(
+      await screen.findByPlaceholderText(/product name/i),
+      "Size L",
+    )
+    expect(screen.getByLabelText("Slug")).toHaveAttribute(
+      "placeholder",
+      "size-l",
+    )
+    await user.type(screen.getByPlaceholderText("100.00"), "50")
+
+    await user.click(screen.getByRole("button", { name: /create product/i }))
+
+    await waitFor(() => expect(mockCreateProduct).toHaveBeenCalledOnce())
+    expect(
+      mockCreateProduct.mock.calls[0]?.[0].requestBody.slug,
+    ).toBeUndefined()
+  })
+
   it("creates a product with an info note", async () => {
     const user = userEvent.setup()
     render(<ProductForm onSuccess={vi.fn()} />, { wrapper: makeWrapper() })

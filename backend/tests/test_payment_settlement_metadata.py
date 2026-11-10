@@ -204,7 +204,9 @@ def test_build_payment_confirmed_context_populates_attendees_and_order_summary()
     assert context.attendees[1].products[0].quantity == 2
 
 
-def test_regular_payment_webhook_schedules_meta_capi_purchase(monkeypatch) -> None:
+def test_regular_payment_webhook_uses_approval_result_for_confirmation(
+    monkeypatch,
+) -> None:
     payload = SimpleFIWebhookPayload.model_validate(
         {
             "id": "evt-meta-1",
@@ -278,9 +280,6 @@ def test_regular_payment_webhook_schedules_meta_capi_purchase(monkeypatch) -> No
     async def fake_email(*_args: object, **_kwargs: object) -> None:
         calls["email"] = True
 
-    def fake_schedule(payment_arg: object) -> None:
-        calls["meta"] = payment_arg
-
     payment_router = importlib.import_module("app.api.payment.router")
     payment_notifications = importlib.import_module(
         "app.services.payment_notifications"
@@ -293,7 +292,6 @@ def test_regular_payment_webhook_schedules_meta_capi_purchase(monkeypatch) -> No
     monkeypatch.setattr(
         payment_notifications, "_send_payment_confirmed_email", fake_email
     )
-    monkeypatch.setattr(payment_router, "_schedule_meta_capi_purchase", fake_schedule)
 
     result = asyncio.run(
         _handle_regular_payment(payload, db=object(), webhook_cache=FakeWebhookCache())
@@ -302,10 +300,10 @@ def test_regular_payment_webhook_schedules_meta_capi_purchase(monkeypatch) -> No
     assert result == {"message": "Payment status updated successfully"}
     assert calls["external_id"] == "pr-meta-1"
     assert calls["email"] is True
-    assert calls["meta"] == approved_payment
+    assert calls["approved"][0] == approved_payment.id
 
 
-def test_regular_payment_webhook_schedules_meta_capi_when_email_fails(
+def test_regular_payment_webhook_keeps_approval_when_email_fails(
     monkeypatch,
 ) -> None:
     payload = SimpleFIWebhookPayload.model_validate(
@@ -355,6 +353,7 @@ def test_regular_payment_webhook_schedules_meta_capi_when_email_fails(
             return payment
 
         def approve_payment(self, *_args: object, **_kwargs: object) -> object:
+            calls["approved"] = approved_payment
             return approved_payment
 
         def update_status(self, *_args: object, **_kwargs: object) -> None:
@@ -367,9 +366,6 @@ def test_regular_payment_webhook_schedules_meta_capi_when_email_fails(
     async def failing_email(*_args: object, **_kwargs: object) -> None:
         raise RuntimeError("email unavailable")
 
-    def fake_schedule(payment_arg: object) -> None:
-        calls["meta"] = payment_arg
-
     payment_router = importlib.import_module("app.api.payment.router")
     payment_notifications = importlib.import_module(
         "app.services.payment_notifications"
@@ -378,14 +374,13 @@ def test_regular_payment_webhook_schedules_meta_capi_when_email_fails(
     monkeypatch.setattr(
         payment_notifications, "_send_payment_confirmed_email", failing_email
     )
-    monkeypatch.setattr(payment_router, "_schedule_meta_capi_purchase", fake_schedule)
 
     result = asyncio.run(
         _handle_regular_payment(payload, db=object(), webhook_cache=FakeWebhookCache())
     )
 
     assert result == {"message": "Payment status updated successfully"}
-    assert calls["meta"] == approved_payment
+    assert calls["approved"] == approved_payment
 
 
 def test_meta_attribution_ignores_malformed_browser_ids_and_bounds_user_agent() -> None:
