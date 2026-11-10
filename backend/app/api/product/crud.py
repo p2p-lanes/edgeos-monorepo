@@ -2,7 +2,7 @@ import uuid
 from datetime import UTC, datetime
 
 from fastapi import HTTPException, status
-from sqlalchemy import text
+from sqlalchemy import or_, text
 from sqlmodel import Session, col, select
 
 from app.api.product.models import Products
@@ -229,7 +229,12 @@ class ProductsCRUD(BaseCRUD[Products, ProductCreate, ProductUpdate]):
 
         if search:
             search_term = f"%{search}%"
-            statement = statement.where(col(Products.name).ilike(search_term))
+            statement = statement.where(
+                or_(
+                    col(Products.name).ilike(search_term),
+                    col(Products.slug).ilike(search_term),
+                )
+            )
 
         from sqlmodel import func
 

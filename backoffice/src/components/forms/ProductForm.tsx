@@ -7,6 +7,7 @@ import {
   Clock,
   DollarSign,
   Hash,
+  Link2,
   Plus,
   Power,
   QrCode,
@@ -74,6 +75,18 @@ import { createErrorHandler } from "@/utils"
 interface ProductFormProps {
   defaultValues?: ProductPublic
   onSuccess: () => void
+}
+
+// Mirrors app.utils.utils.slugify in the backend, which normalizes the slug
+// again on save. Used for the live preview and the create placeholder.
+export function slugifyProductName(text: string): string {
+  return text
+    .normalize("NFKD")
+    .replace(/[^\t\n\r -~]/g, "")
+    .toLowerCase()
+    .replace(/[^\w\s-]/g, "")
+    .replace(/[-\s]+/g, "-")
+    .replace(/^-+|-+$/g, "")
 }
 
 // Mirrors PRODUCT_INFO_NOTE_MAX_LENGTH in backend/app/api/product/schemas.py.
@@ -199,6 +212,7 @@ export function ProductForm({ defaultValues, onSuccess }: ProductFormProps) {
   const form = useForm({
     defaultValues: {
       name: defaultValues?.name ?? "",
+      slug: defaultValues?.slug ?? "",
       price: defaultValues?.price?.toString() ?? "",
       compare_price: defaultValues?.compare_price?.toString() ?? "",
       description: defaultValues?.description ?? "",
@@ -255,6 +269,8 @@ export function ProductForm({ defaultValues, onSuccess }: ProductFormProps) {
       if (isEdit) {
         const update: ProductUpdate = {
           name: value.name,
+          // Always sent, so renaming a product keeps its slug stable.
+          slug: slugifyProductName(value.slug),
           price: effectivePrice,
           compare_price: effectiveComparePrice,
           description: value.description || null,
@@ -282,6 +298,7 @@ export function ProductForm({ defaultValues, onSuccess }: ProductFormProps) {
         createMutation.mutate({
           popup_id: selectedPopupId,
           name: value.name,
+          slug: slugifyProductName(value.slug) || undefined,
           price: effectivePrice,
           compare_price: effectiveComparePrice ?? undefined,
           description: value.description || undefined,
@@ -440,6 +457,59 @@ export function ProductForm({ defaultValues, onSuccess }: ProductFormProps) {
                 )}
               </form.Field>
             </div>
+
+            {/* Slug: stable identifier used to match products in exports,
+            imports and integrations (e.g. "Size L" vs "Size L" in two
+            colors). Optional on create: generated from the name. */}
+            <form.Field
+              name="slug"
+              validators={{
+                onBlur: ({ value }) =>
+                  !readOnly && isEdit && !slugifyProductName(value)
+                    ? "Slug is required"
+                    : undefined,
+              }}
+            >
+              {(field) => (
+                <div>
+                  <InlineRow
+                    icon={<Link2 className="h-4 w-4 text-muted-foreground" />}
+                    label="Slug"
+                    description={
+                      isEdit
+                        ? "Unique identifier within this gathering. Shown in exports."
+                        : "Leave empty to generate it from the name."
+                    }
+                  >
+                    <form.Subscribe selector={(state) => state.values.name}>
+                      {(name) => (
+                        <Input
+                          id="product-slug"
+                          aria-label="Slug"
+                          placeholder={
+                            slugifyProductName(name) || "product-slug"
+                          }
+                          value={field.state.value}
+                          onBlur={(e) => {
+                            const normalized = slugifyProductName(
+                              e.target.value,
+                            )
+                            if (normalized !== e.target.value) {
+                              field.handleChange(normalized)
+                            }
+                            field.handleBlur()
+                          }}
+                          onChange={(e) => field.handleChange(e.target.value)}
+                          disabled={readOnly}
+                          className="w-56 font-mono text-sm"
+                        />
+                      )}
+                    </form.Subscribe>
+                  </InlineRow>
+                  <FieldError errors={field.state.meta.errors} />
+                </div>
+              )}
+            </form.Field>
 
             <Separator />
 

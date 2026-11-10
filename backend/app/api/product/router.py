@@ -101,7 +101,7 @@ async def list_products(
             skip=skip,
             limit=limit,
             search=search,
-            search_fields=["name"],
+            search_fields=["name", "slug"],
             sort_by=sort_by,
             sort_order=sort_order,
         )
@@ -225,7 +225,7 @@ async def create_product(
     """Create a new product."""
 
     # Auto-generate unique slug from name if not provided
-    base_slug = product_in.slug if product_in.slug else slugify(product_in.name)
+    base_slug = slugify(product_in.slug or "") or slugify(product_in.name)
     slug = crud.products_crud.generate_unique_slug(db, base_slug, product_in.popup_id)
 
     # Set tenant_id based on user role
@@ -296,10 +296,24 @@ async def update_product(
         product_in.slug = crud.products_crud.generate_unique_slug(
             db, new_base_slug, product.popup_id
         )
-    elif product_in.slug and product_in.slug != product.slug:
-        product_in.slug = crud.products_crud.generate_unique_slug(
-            db, product_in.slug, product.popup_id
-        )
+    elif product_in.slug is not None and product_in.slug != product.slug:
+        # An explicit slug is an admin-chosen identifier (used to match
+        # products in exports and integrations), so normalize it but never
+        # silently suffix it: a clash is reported instead.
+        normalized = slugify(product_in.slug)
+        if not normalized:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="Slug must contain at least one letter or number",
+            )
+        if normalized != product.slug:
+            existing = crud.products_crud.get_by_slug(db, normalized, product.popup_id)
+            if existing and existing.id != product.id:
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail=f"Slug '{normalized}' is already used by another product in this gathering",
+                )
+        product_in.slug = normalized
 
     # CDN image ingestion: rewrite external image URLs to CDN before commit.
     # Pattern B (async hook). Fail-open: any per-URL failure keeps the original URL.
