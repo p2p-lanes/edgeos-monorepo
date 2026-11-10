@@ -329,6 +329,38 @@ def _reviewer_group_scope_clause(group_value: str | None):
     return has_any_review.where(ApplicationReviews.reviewer_id == reviewer_id)
 
 
+def _normalize_search(search: str | None) -> str | None:
+    """Trim and collapse inner whitespace; blank searches become None."""
+    if search is None:
+        return None
+    return " ".join(search.split()) or None
+
+
+def _human_search_clause(search: str) -> ColumnElement[bool]:
+    """Case-insensitive match on a human's name parts, full name or email.
+
+    ``search`` must already be normalized (see ``_normalize_search``). Besides
+    each field on its own, the full name is matched in both "first last" and
+    "last first" order, like the attendee directory search, so "John Doe" and
+    "Doe John" both find John Doe. Stored names get the same whitespace
+    normalization so stray spaces in the data do not break the match.
+    """
+    search_term = f"%{search}%"
+
+    def _normalized_full_name(*parts: Any) -> ColumnElement[str]:
+        return func.regexp_replace(
+            func.trim(func.concat_ws(" ", *parts)), r"\s+", " ", "g"
+        )
+
+    return or_(
+        col(Humans.first_name).ilike(search_term),
+        col(Humans.last_name).ilike(search_term),
+        col(Humans.email).ilike(search_term),
+        _normalized_full_name(Humans.first_name, Humans.last_name).ilike(search_term),
+        _normalized_full_name(Humans.last_name, Humans.first_name).ilike(search_term),
+    )
+
+
 def _group_scope_clause(group_by: str, group_value: str | None):
     """Boolean clause selecting one bucket of a grouped view.
 
@@ -639,6 +671,8 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
         field set and no value the NULL bucket is selected.
         """
 
+        search = _normalize_search(search)
+
         # Each grouped-view scope becomes a plain WHERE clause; either may
         # require the Humans join.
         scope_clauses = []
@@ -675,14 +709,7 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
 
         # Apply text search if provided - search in human fields
         if search:
-            search_term = f"%{search}%"
-            base_statement = base_statement.where(
-                or_(
-                    col(Humans.first_name).ilike(search_term),
-                    col(Humans.last_name).ilike(search_term),
-                    col(Humans.email).ilike(search_term),
-                )
-            )
+            base_statement = base_statement.where(_human_search_clause(search))
 
         if filters is not None:
             filter_expression = build_application_filter_expression(
@@ -739,6 +766,7 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
         bucket of an outer grouped view, so a subgrouped view can count
         within each expanded parent group.
         """
+        search = _normalize_search(search)
         group_needs_human = False
         if group_by == GROUP_BY_REVIEWER_FIELD:
             bucket = col(ApplicationReviews.reviewer_id)
@@ -783,14 +811,7 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
             )
 
         if search:
-            search_term = f"%{search}%"
-            statement = statement.where(
-                or_(
-                    col(Humans.first_name).ilike(search_term),
-                    col(Humans.last_name).ilike(search_term),
-                    col(Humans.email).ilike(search_term),
-                )
-            )
+            statement = statement.where(_human_search_clause(search))
 
         if filters is not None:
             filter_expression = build_application_filter_expression(
