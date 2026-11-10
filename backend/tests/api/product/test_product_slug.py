@@ -140,10 +140,72 @@ def test_create_rejects_name_longer_than_column(
 def test_suffixed_slug_stays_within_column(
     client: TestClient, admin_token_tenant_a: str, popup_tenant_a: Popups
 ) -> None:
-    long_slug = f"{uuid.uuid4().hex}{'x' * 223}"
-    assert len(long_slug) == 255
-    first = _create(client, admin_token_tenant_a, popup_tenant_a.id, slug=long_slug)
-    second = _create(client, admin_token_tenant_a, popup_tenant_a.id, slug=long_slug)
-    assert first["slug"] == long_slug
-    assert second["slug"] != long_slug
+    # Slugs derived from the name are still suffixed on a clash.
+    long_name = f"{uuid.uuid4().hex}{'x' * 223}"
+    assert len(long_name) == 255
+    first = _create(client, admin_token_tenant_a, popup_tenant_a.id, name=long_name)
+    second = _create(client, admin_token_tenant_a, popup_tenant_a.id, name=long_name)
+    assert first["slug"] == long_name
+    assert second["slug"] != long_name
+    assert second["slug"].endswith("-1")
     assert len(second["slug"]) <= 255
+
+
+def test_create_rejects_explicit_slug_used_by_another_product(
+    client: TestClient, admin_token_tenant_a: str, popup_tenant_a: Popups
+) -> None:
+    first = _create(client, admin_token_tenant_a, popup_tenant_a.id)
+    response = client.post(
+        "/api/v1/products",
+        headers=_headers(admin_token_tenant_a),
+        json={
+            "popup_id": str(popup_tenant_a.id),
+            "name": f"Other Product {uuid.uuid4().hex[:8]}",
+            "price": "10.00",
+            "category": "merch",
+            # Different casing and spacing still normalize to the same slug.
+            "slug": f"  {first['slug'].upper()} ",
+        },
+    )
+    assert response.status_code == 409, response.text
+    assert first["slug"] in response.json()["detail"]
+
+
+def test_create_rejects_blank_explicit_slug(
+    client: TestClient, admin_token_tenant_a: str, popup_tenant_a: Popups
+) -> None:
+    response = client.post(
+        "/api/v1/products",
+        headers=_headers(admin_token_tenant_a),
+        json={
+            "popup_id": str(popup_tenant_a.id),
+            "name": f"Blank Slug {uuid.uuid4().hex[:8]}",
+            "price": "10.00",
+            "category": "merch",
+            "slug": "!!!",
+        },
+    )
+    assert response.status_code == 422, response.text
+
+
+def test_create_without_slug_suffixes_name_clash(
+    client: TestClient, admin_token_tenant_a: str, popup_tenant_a: Popups
+) -> None:
+    name = f"Same Name {uuid.uuid4().hex[:8]}"
+    first = _create(client, admin_token_tenant_a, popup_tenant_a.id, name=name)
+    second = _create(client, admin_token_tenant_a, popup_tenant_a.id, name=name)
+    assert second["slug"] == f"{first['slug']}-1"
+
+
+def test_slug_of_deleted_product_can_be_reused(
+    client: TestClient, admin_token_tenant_a: str, popup_tenant_a: Popups
+) -> None:
+    first = _create(client, admin_token_tenant_a, popup_tenant_a.id)
+    deleted = client.delete(
+        f"/api/v1/products/{first['id']}", headers=_headers(admin_token_tenant_a)
+    )
+    assert deleted.status_code in (200, 204), deleted.text
+    second = _create(
+        client, admin_token_tenant_a, popup_tenant_a.id, slug=first["slug"]
+    )
+    assert second["slug"] == first["slug"]
