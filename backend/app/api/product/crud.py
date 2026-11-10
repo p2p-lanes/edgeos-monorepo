@@ -8,6 +8,7 @@ from sqlmodel import Session, col, select
 from app.api.product.models import Products
 from app.api.product.sale_window import date_to_utc_instant
 from app.api.product.schemas import (
+    PRODUCT_SLUG_MAX_LENGTH,
     ProductCreate,
     ProductUpdate,
 )
@@ -188,12 +189,15 @@ class ProductsCRUD(BaseCRUD[Products, ProductCreate, ProductUpdate]):
         self, session: Session, base_slug: str, popup_id: uuid.UUID
     ) -> str:
         """Generate a unique slug within a popup by appending a numeric suffix if needed."""
+        base_slug = base_slug[:PRODUCT_SLUG_MAX_LENGTH].rstrip("-")
         if not self.get_by_slug(session, base_slug, popup_id):
             return base_slug
 
         counter = 1
         while True:
-            candidate = f"{base_slug}-{counter}"
+            suffix = f"-{counter}"
+            stem = base_slug[: PRODUCT_SLUG_MAX_LENGTH - len(suffix)].rstrip("-")
+            candidate = f"{stem}{suffix}"
             if not self.get_by_slug(session, candidate, popup_id):
                 return candidate
             counter += 1

@@ -111,3 +111,39 @@ def test_list_search_matches_slug(
     )
     assert response.status_code == 200, response.text
     assert [p["id"] for p in response.json()["results"]] == [product["id"]]
+
+
+def test_patch_rejects_slug_longer_than_column(
+    client: TestClient, admin_token_tenant_a: str, popup_tenant_a: Popups
+) -> None:
+    product = _create(client, admin_token_tenant_a, popup_tenant_a.id)
+    response = _patch(client, admin_token_tenant_a, product["id"], {"slug": "a" * 300})
+    assert response.status_code == 422, response.text
+
+
+def test_create_rejects_name_longer_than_column(
+    client: TestClient, admin_token_tenant_a: str, popup_tenant_a: Popups
+) -> None:
+    response = client.post(
+        "/api/v1/products",
+        headers=_headers(admin_token_tenant_a),
+        json={
+            "popup_id": str(popup_tenant_a.id),
+            "name": "n" * 300,
+            "price": "10.00",
+            "category": "merch",
+        },
+    )
+    assert response.status_code == 422, response.text
+
+
+def test_suffixed_slug_stays_within_column(
+    client: TestClient, admin_token_tenant_a: str, popup_tenant_a: Popups
+) -> None:
+    long_slug = f"{uuid.uuid4().hex}{'x' * 223}"
+    assert len(long_slug) == 255
+    first = _create(client, admin_token_tenant_a, popup_tenant_a.id, slug=long_slug)
+    second = _create(client, admin_token_tenant_a, popup_tenant_a.id, slug=long_slug)
+    assert first["slug"] == long_slug
+    assert second["slug"] != long_slug
+    assert len(second["slug"]) <= 255
