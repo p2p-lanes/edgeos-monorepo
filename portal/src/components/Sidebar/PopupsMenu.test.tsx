@@ -12,7 +12,7 @@ const providerState = vi.hoisted(() => ({
     name: string
     slug: string
     location: string
-    start_date: string
+    start_date: string | null
   } | null,
   popups: [
     { name: "Summit", slug: "summit", status: "active" },
@@ -165,5 +165,29 @@ describe("PopupsMenu", () => {
         .getAttribute("aria-current"),
     ).toBeNull()
     expect(screen.getByText("Ended")).toBeTruthy()
+  })
+
+  it("shows the gathering start date in the sidebar header", () => {
+    render(
+      <SidebarProvider>
+        <PopupsMenu />
+      </SidebarProvider>,
+    )
+
+    expect(screen.getByText("October 12, 2026")).toBeTruthy()
+  })
+
+  it("hides the date line instead of rendering Invalid Date when the gathering has no dates", () => {
+    if (providerState.city) providerState.city.start_date = null
+
+    const { container } = render(
+      <SidebarProvider>
+        <PopupsMenu />
+      </SidebarProvider>,
+    )
+
+    expect(screen.getByText("Buenos Aires")).toBeTruthy()
+    expect(container.textContent).not.toContain("Invalid Date")
+    expect(container.textContent).not.toMatch(/\d{4}/)
   })
 })

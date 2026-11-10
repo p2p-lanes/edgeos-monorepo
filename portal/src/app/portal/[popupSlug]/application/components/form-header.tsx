@@ -2,7 +2,7 @@
 
 import { CalendarDays, MapPin } from "lucide-react"
 import Image from "next/image"
-import { formatDate } from "@/helpers/dates"
+import { formatDateRange } from "@/helpers/dates"
 import { imageOptimization } from "@/lib/image-optimization"
 import { useCityProvider } from "@/providers/cityProvider"
 
@@ -18,8 +18,11 @@ export function FormHeader() {
 
   if (!city) return null
 
-  const startDate = formatDate(city.start_date ?? undefined, POPUP_DATE_FORMAT)
-  const endDate = formatDate(city.end_date ?? undefined, POPUP_DATE_FORMAT)
+  const dateRange = formatDateRange(
+    city.start_date,
+    city.end_date,
+    POPUP_DATE_FORMAT,
+  )
 
   return (
     <div className="flex flex-col md:flex-row gap-6">
@@ -52,10 +55,10 @@ export function FormHeader() {
             {city.location}
           </div>
         )}
-        {startDate && endDate && (
+        {dateRange && (
           <div className="flex items-center text-sm text-heading-secondary mb-4">
             <CalendarDays className="mr-2 h-4 w-4" />
-            {`${startDate} - ${endDate}`}
+            {dateRange}
           </div>
         )}
       </div>
