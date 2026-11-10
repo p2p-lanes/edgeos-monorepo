@@ -29,4 +29,5 @@ FROM public.ecr.aws/docker/library/nginx:1.28-alpine
 COPY --from=build-stage /app/backoffice/dist/ /usr/share/nginx/html
 
 COPY ./backoffice/nginx.conf /etc/nginx/conf.d/default.conf
+COPY ./backoffice/nginx-security-headers.conf /etc/nginx/snippets/security-headers.conf
 COPY ./backoffice/nginx-backend-not-found.conf /etc/nginx/extra-conf.d/backend-not-found.conf
