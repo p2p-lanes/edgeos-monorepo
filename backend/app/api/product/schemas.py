@@ -52,6 +52,11 @@ class TicketDuration(str, Enum):
     FULL = "full"
 
 
+# Both columns are VARCHAR(255); longer values must fail validation, not the DB.
+PRODUCT_NAME_MAX_LENGTH = 255
+PRODUCT_SLUG_MAX_LENGTH = 255
+
+
 class ProductBase(SQLModel):
     """Base product schema with fields shared across all product schemas."""
 
@@ -147,8 +152,8 @@ class ProductCreate(BaseModel):
     """Product schema for creation."""
 
     popup_id: uuid.UUID
-    name: str
-    slug: str | None = None
+    name: str = Field(max_length=PRODUCT_NAME_MAX_LENGTH)
+    slug: str | None = Field(default=None, max_length=PRODUCT_SLUG_MAX_LENGTH)
     price: Decimal = Field(ge=0)
     compare_price: Decimal | None = Field(default=None, ge=0)
     description: str | None = None
@@ -229,8 +234,8 @@ class ProductCreate(BaseModel):
 class ProductUpdate(BaseModel):
     """Product schema for updates."""
 
-    name: str | None = None
-    slug: str | None = None
+    name: str | None = Field(default=None, max_length=PRODUCT_NAME_MAX_LENGTH)
+    slug: str | None = Field(default=None, max_length=PRODUCT_SLUG_MAX_LENGTH)
     price: Decimal | None = Field(default=None, ge=0)
     compare_price: Decimal | None = Field(default=None, ge=0)
     description: str | None = None
@@ -298,8 +303,8 @@ class ProductSoldOutUpdate(BaseModel):
 class ProductBatchItem(BaseModel):
     """Single product in a batch import (popup_id is top-level)."""
 
-    name: str
-    slug: str | None = None
+    name: str = Field(max_length=PRODUCT_NAME_MAX_LENGTH)
+    slug: str | None = Field(default=None, max_length=PRODUCT_SLUG_MAX_LENGTH)
     price: Decimal = Field(ge=0)
     compare_price: Decimal | None = Field(default=None, ge=0)
     description: str | None = None

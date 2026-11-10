@@ -27886,12 +27886,14 @@ export const ProductBatchItemSchema = {
     properties: {
         name: {
             type: 'string',
+            maxLength: 255,
             title: 'Name'
         },
         slug: {
             anyOf: [
                 {
-                    type: 'string'
+                    type: 'string',
+                    maxLength: 255
                 },
                 {
                     type: 'null'
@@ -28353,12 +28355,14 @@ export const ProductCreateSchema = {
         },
         name: {
             type: 'string',
+            maxLength: 255,
             title: 'Name'
         },
         slug: {
             anyOf: [
                 {
-                    type: 'string'
+                    type: 'string',
+                    maxLength: 255
                 },
                 {
                     type: 'null'
@@ -28840,7 +28844,8 @@ export const ProductUpdateSchema = {
         name: {
             anyOf: [
                 {
-                    type: 'string'
+                    type: 'string',
+                    maxLength: 255
                 },
                 {
                     type: 'null'
@@ -28851,7 +28856,8 @@ export const ProductUpdateSchema = {
         slug: {
             anyOf: [
                 {
-                    type: 'string'
+                    type: 'string',
+                    maxLength: 255
                 },
                 {
                     type: 'null'
