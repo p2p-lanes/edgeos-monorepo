@@ -28,7 +28,24 @@ from sqlmodel import Session
 
 from app.core.config import settings
 from app.core.db import engine
+from app.services.background_tasks import drain
 from app.services.pending_payment_sweeper import sweep_pending_payments
+
+# Purchase notifications use a 5s HTTP timeout; leave room for decrypt and DNS.
+BACKGROUND_DRAIN_TIMEOUT_SECONDS = 15.0
+
+
+async def _sweep_and_drain(db: Session) -> dict:
+    try:
+        return await sweep_pending_payments(
+            db,
+            threshold_minutes=settings.PENDING_SWEEP_STALE_MINUTES,
+            batch_size=settings.PENDING_SWEEP_BATCH_SIZE,
+        )
+    finally:
+        # Approvals schedule Purchase notifications as tasks; asyncio.run
+        # cancels anything still pending once this coroutine returns.
+        await drain(BACKGROUND_DRAIN_TIMEOUT_SECONDS)
 
 
 def main() -> int:
@@ -39,13 +56,7 @@ def main() -> int:
         return 0
 
     with Session(engine) as db:
-        summary = asyncio.run(
-            sweep_pending_payments(
-                db,
-                threshold_minutes=settings.PENDING_SWEEP_STALE_MINUTES,
-                batch_size=settings.PENDING_SWEEP_BATCH_SIZE,
-            )
-        )
+        summary = asyncio.run(_sweep_and_drain(db))
 
     logger.info("sweeper: job finished summary={}", summary)
     return 1 if summary.get("failures") else 0
