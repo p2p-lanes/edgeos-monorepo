@@ -6,6 +6,11 @@ import type {
   HumanProfileStatsPopup,
   PopupPublic,
 } from "@/client"
+import {
+  compareOptionalDates,
+  formatDateRange,
+  toTimestamp,
+} from "@/helpers/dates"
 import { imageOptimization } from "@/lib/image-optimization"
 import { cn } from "@/lib/utils"
 import { useApplication } from "@/providers/applicationProvider"
@@ -49,14 +54,21 @@ function PopupThumb({
   )
 }
 
+const POPUP_HISTORY_DATE_FORMAT: Intl.DateTimeFormatOptions = {
+  year: "numeric",
+  month: "short",
+  day: "numeric",
+}
+
 interface PopupWithApplicationStatus {
   popup_name: string
-  start_date: string
-  end_date: string
+  start_date: string | null
+  end_date: string | null
   total_days: number
   location?: string | null
   image_url?: string | null
   application_status?: ApplicationStatus
+  popup_status?: PopupPublic["status"]
 }
 
 const PopupsHistory = ({ popups }: { popups: HumanProfileStatsPopup[] }) => {
@@ -65,14 +77,10 @@ const PopupsHistory = ({ popups }: { popups: HumanProfileStatsPopup[] }) => {
   const { getPopups } = useCityProvider()
   const allPopups = getPopups()
 
-  const formatDate = (dateString: string | null | undefined) => {
-    if (!dateString) return ""
-    return new Date(dateString).toLocaleDateString("en-US", {
-      year: "numeric",
-      month: "short",
-      day: "numeric",
-    })
-  }
+  const formatPopupDates = (
+    startDate: string | null | undefined,
+    endDate: string | null | undefined,
+  ) => formatDateRange(startDate, endDate, POPUP_HISTORY_DATE_FORMAT)
 
   const _getPopupStatus = (startDate: string, endDate: string) => {
     const now = new Date()
@@ -144,8 +152,9 @@ const PopupsHistory = ({ popups }: { popups: HumanProfileStatsPopup[] }) => {
 
       return {
         popup_name: popup.name,
-        start_date: popup.start_date ?? "",
-        end_date: popup.end_date ?? "",
+        start_date: popup.start_date ?? null,
+        end_date: popup.end_date ?? null,
+        popup_status: popup.status,
         total_days: 0,
         // LEGACY: location removed from API – review for deletion
         location: null,
@@ -154,23 +163,26 @@ const PopupsHistory = ({ popups }: { popups: HumanProfileStatsPopup[] }) => {
       } as PopupWithApplicationStatus
     })
     .filter((p): p is PopupWithApplicationStatus => p !== null)
-    .filter((popup) => new Date(popup.end_date) > new Date()) // Only show upcoming events
-    .sort(
-      (a, b) =>
-        new Date(b.start_date).getTime() - new Date(a.start_date).getTime(),
-    ) // Sort by most recent first
+    // Only show upcoming events. A gathering without an end date has not
+    // ended yet (dates TBA), unless the organizer explicitly ended it.
+    .filter((popup) => {
+      const endTime = toTimestamp(popup.end_date)
+      if (endTime === null) return popup.popup_status !== "ended"
+      return endTime > Date.now()
+    })
+    // Most recent first; gatherings without dates go last.
+    .sort((a, b) => compareOptionalDates(a.start_date, b.start_date, "desc"))
 
   const pastPopups = popups
-    .filter((popup) => popup.end_date && new Date(popup.end_date) < new Date())
+    .filter((popup) => {
+      const endTime = toTimestamp(popup.end_date)
+      return endTime !== null && endTime < Date.now()
+    })
     .filter(
       (popup, index, self) =>
         index === self.findIndex((t) => t.popup_name === popup.popup_name),
     )
-    .sort(
-      (a, b) =>
-        new Date(a.start_date ?? 0).getTime() -
-        new Date(b.start_date ?? 0).getTime(),
-    )
+    .sort((a, b) => compareOptionalDates(a.start_date, b.start_date))
 
   return (
     <Card className="p-6">
@@ -228,13 +240,14 @@ const PopupsHistory = ({ popups }: { popups: HumanProfileStatsPopup[] }) => {
                       </div>
                     )}
 
-                    <div className="flex items-center gap-1">
-                      <Calendar className="w-4 h-4 text-foreground" />
-                      <span className="text-sm">
-                        {formatDate(popup.start_date)} -{" "}
-                        {formatDate(popup.end_date)}
-                      </span>
-                    </div>
+                    {formatPopupDates(popup.start_date, popup.end_date) && (
+                      <div className="flex items-center gap-1">
+                        <Calendar className="w-4 h-4 text-foreground" />
+                        <span className="text-sm">
+                          {formatPopupDates(popup.start_date, popup.end_date)}
+                        </span>
+                      </div>
+                    )}
                   </div>
                 </div>
                 <div
@@ -280,13 +293,14 @@ const PopupsHistory = ({ popups }: { popups: HumanProfileStatsPopup[] }) => {
                         <span className="text-sm">{popup.location}</span>
                       </div>
 
-                      <div className="flex items-center gap-2">
-                        <Calendar className="w-4 h-4 text-foreground" />
-                        <span className="text-sm">
-                          {formatDate(popup.start_date)} -{" "}
-                          {formatDate(popup.end_date)}
-                        </span>
-                      </div>
+                      {formatPopupDates(popup.start_date, popup.end_date) && (
+                        <div className="flex items-center gap-2">
+                          <Calendar className="w-4 h-4 text-foreground" />
+                          <span className="text-sm">
+                            {formatPopupDates(popup.start_date, popup.end_date)}
+                          </span>
+                        </div>
+                      )}
 
                       <div className="flex items-center gap-2">
                         <Clock className="w-4 h-4 text-foreground" />
