@@ -1223,6 +1223,8 @@
       "replace_button": "替换",
       "cover_fallback_note": "留空则使用场地的主图作为封面。",
       "popup_window_hint": "本 pop-up 的活动必须在 {{window}} 之间。",
+      "popup_window_hint_from": "本 pop-up 的活动必须在 {{date}} 或之后。",
+      "popup_window_hint_until": "本 pop-up 的活动必须在 {{date}} 或之前。",
       "date_label": "日期",
       "start_time_label": "开始时间",
       "start_label": "开始",

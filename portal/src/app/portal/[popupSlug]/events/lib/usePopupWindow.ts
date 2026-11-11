@@ -7,16 +7,24 @@ interface UsePopupWindowOptions {
   endDate?: string | null
 }
 
+export interface PopupWindowHint {
+  key:
+    | "events.form.popup_window_hint"
+    | "events.form.popup_window_hint_from"
+    | "events.form.popup_window_hint_until"
+  values: { window: string } | { date: string }
+}
+
 export interface UsePopupWindowResult {
   popupStartKey: string | null
   popupEndKey: string | null
   isDateOutsidePopupWindow: (d: Date) => boolean
-  popupWindowLabel: string | null
+  popupWindowHint: PopupWindowHint | null
 }
 
 /**
  * Provides a date matcher constrained to the popup's [start_date, end_date]
- * window plus a human-readable label for hint copy. Mirrors the date-string
+ * window plus the translation key and values for the hint copy. Mirrors the date-string
  * comparison used elsewhere in the portal so we avoid tz-boundary off-by-ones
  * at the UI layer; the backend re-checks the full timestamp on submit.
  */
@@ -41,7 +49,7 @@ export function usePopupWindow(
     }
   }, [popupStartKey, popupEndKey])
 
-  const popupWindowLabel = useMemo(() => {
+  const popupWindowHint = useMemo((): PopupWindowHint | null => {
     if (!popupStartKey && !popupEndKey) return null
     const fmt = (key: string) =>
       new Intl.DateTimeFormat(undefined, {
@@ -50,15 +58,25 @@ export function usePopupWindow(
         year: "numeric",
       }).format(new Date(`${key}T00:00:00`))
     if (popupStartKey && popupEndKey)
-      return `${fmt(popupStartKey)} – ${fmt(popupEndKey)}`
-    if (popupStartKey) return `from ${fmt(popupStartKey)}`
-    return `until ${fmt(popupEndKey as string)}`
+      return {
+        key: "events.form.popup_window_hint",
+        values: { window: `${fmt(popupStartKey)} – ${fmt(popupEndKey)}` },
+      }
+    if (popupStartKey)
+      return {
+        key: "events.form.popup_window_hint_from",
+        values: { date: fmt(popupStartKey) },
+      }
+    return {
+      key: "events.form.popup_window_hint_until",
+      values: { date: fmt(popupEndKey as string) },
+    }
   }, [popupStartKey, popupEndKey])
 
   return {
     popupStartKey,
     popupEndKey,
     isDateOutsidePopupWindow,
-    popupWindowLabel,
+    popupWindowHint,
   }
 }

@@ -25,6 +25,7 @@ from app.api.popup.schemas import (
     PopupPublic,
     PopupStatus,
     PopupUpdate,
+    validate_popup_date_range,
 )
 from app.api.sales_flow.crud import default_flow_name
 from app.api.shared.enums import LandingMode, UserRole
@@ -408,6 +409,20 @@ async def update_popup(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Popup not found",
         )
+
+    # A PATCH may send only one side of the range, so check it against the
+    # value it leaves in place.
+    fields_set = popup_in.model_fields_set
+    try:
+        validate_popup_date_range(
+            popup_in.start_date if "start_date" in fields_set else popup.start_date,
+            popup_in.end_date if "end_date" in fields_set else popup.end_date,
+        )
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=str(exc),
+        ) from exc
 
     if popup_in.slug and popup_in.slug != popup.slug:
         existing = crud.get_by_slug(db, popup_in.slug)

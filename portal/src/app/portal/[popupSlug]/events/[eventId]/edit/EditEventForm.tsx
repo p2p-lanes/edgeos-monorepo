@@ -91,7 +91,7 @@ export function EditEventForm({
 
   const { data: settings } = usePortalEventSettings(popupId)
 
-  const { isDateOutsidePopupWindow, popupWindowLabel } = usePopupWindow({
+  const { isDateOutsidePopupWindow, popupWindowHint } = usePopupWindow({
     startDate: cityStartDate,
     endDate: cityEndDate,
   })
@@ -318,7 +318,7 @@ export function EditEventForm({
           onDateChange={setDateStr}
           isDateOutsidePopupWindow={isDateOutsidePopupWindow}
           isVenueClosedOnDay={isVenueClosedOnDay}
-          popupWindowLabel={popupWindowLabel}
+          popupWindowHint={popupWindowHint}
           timeStr={timeStr}
           onTimeChange={setTimeStr}
           durationDraft={durationDraft}
