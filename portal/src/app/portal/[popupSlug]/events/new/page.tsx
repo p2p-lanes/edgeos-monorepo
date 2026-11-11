@@ -168,7 +168,7 @@ function NewPortalEventForm({
     popupStartKey,
     popupEndKey,
     isDateOutsidePopupWindow,
-    popupWindowLabel,
+    popupWindowHint,
   } = usePopupWindow({
     startDate: city?.start_date,
     endDate: city?.end_date,
@@ -621,7 +621,7 @@ function NewPortalEventForm({
           onDateChange={setDateStr}
           isDateOutsidePopupWindow={isDateOutsidePopupWindow}
           isVenueClosedOnDay={isVenueClosedOnDay}
-          popupWindowLabel={popupWindowLabel}
+          popupWindowHint={popupWindowHint}
           timeStr={timeStr}
           onTimeChange={setTimeStr}
           durationDraft={durationDraft}

@@ -1396,6 +1396,8 @@
       "replace_button": "Replace",
       "cover_fallback_note": "Leave empty to fall back to the venue's main photo.",
       "popup_window_hint": "Events for this pop-up must fall within {{window}}.",
+      "popup_window_hint_from": "Events for this pop-up must be on or after {{date}}.",
+      "popup_window_hint_until": "Events for this pop-up must be on or before {{date}}.",
       "date_label": "Date",
       "start_time_label": "Start time",
       "start_label": "Start",

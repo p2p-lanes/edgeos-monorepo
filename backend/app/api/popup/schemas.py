@@ -1,6 +1,6 @@
 import re
 import uuid
-from datetime import datetime
+from datetime import UTC, datetime
 from decimal import Decimal
 from enum import StrEnum
 from typing import Self
@@ -20,6 +20,24 @@ from app.api.shared.enums import (
 )
 from app.core.config import settings
 from app.utils.utils import slugify
+
+
+def validate_popup_date_range(
+    start_date: datetime | None, end_date: datetime | None
+) -> None:
+    """Reject a popup whose end date comes before its start date.
+
+    Either side may be missing. Naive datetimes are treated as UTC so a stored
+    value can be compared with an incoming timezone-aware one.
+    """
+    if start_date is None or end_date is None:
+        return
+
+    def _aware(value: datetime) -> datetime:
+        return value if value.tzinfo else value.replace(tzinfo=UTC)
+
+    if _aware(end_date) < _aware(start_date):
+        raise ValueError("end_date cannot be before start_date")
 
 
 def validate_popup_insurance_config(enabled: bool, pct: "Decimal | None") -> None:
@@ -594,6 +612,7 @@ class PopupCreate(SQLModel):
             raise ValueError(
                 "application_fee_amount must be greater than 0 when requires_application_fee is True"
             )
+        validate_popup_date_range(self.start_date, self.end_date)
         validate_popup_insurance_config(
             self.insurance_enabled, self.insurance_percentage
         )
