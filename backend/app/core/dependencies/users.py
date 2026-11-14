@@ -1,3 +1,4 @@
+import threading
 import uuid
 from collections.abc import Generator
 from typing import TYPE_CHECKING, Annotated
@@ -24,12 +25,17 @@ if TYPE_CHECKING:
 
 # Cache authenticated users for 60 seconds to reduce DB round-trips
 # Key: user_id (UUID), Value: UserPublic
+# TTLCache is not thread-safe and this dependency runs in FastAPI's threadpool:
+# every access must hold _user_cache_lock, or concurrent expiry can corrupt the
+# cache and make every later insert raise KeyError in that worker.
 _user_cache: TTLCache[uuid.UUID, "UserPublic"] = TTLCache(maxsize=1000, ttl=60)
+_user_cache_lock = threading.Lock()
 
 
 def invalidate_user_cache(user_id: uuid.UUID) -> None:
     """Call this when a user is modified/deleted to invalidate their cache entry."""
-    _user_cache.pop(user_id, None)
+    with _user_cache_lock:
+        _user_cache.pop(user_id, None)
 
 
 def get_session() -> Generator[Session]:
@@ -66,8 +72,10 @@ def fetch_authenticated_user(
         )
 
     # Check cache first
-    if user_id in _user_cache:
-        return _user_cache[user_id]
+    with _user_cache_lock:
+        cached = _user_cache.get(user_id)
+    if cached is not None:
+        return cached
 
     user = db.exec(select(Users).where(Users.id == user_id)).first()
 
@@ -86,7 +94,8 @@ def fetch_authenticated_user(
         )
 
     user_public = UserPublic.model_validate(user)
-    _user_cache[user_id] = user_public
+    with _user_cache_lock:
+        _user_cache[user_id] = user_public
     return user_public
 
 
