@@ -58,8 +58,8 @@ EdgeOS provides a complete solution for managing events (called "popups"), atten
 ### 1. Clone and Start
 
 ```bash
-git clone <repository-url>
-cd EdgeOS
+git clone https://github.com/p2p-lanes/edgeos-monorepo.git
+cd edgeos-monorepo
 
 # Copy environment template (works out of the box for local dev)
 cp .env.example .env
