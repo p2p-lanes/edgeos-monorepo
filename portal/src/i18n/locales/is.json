@@ -1222,6 +1222,8 @@
       "replace_button": "Skipta út",
       "cover_fallback_note": "Skildu eftir autt til að nota aðalmynd staðarins.",
       "popup_window_hint": "Viðburðir fyrir þennan popup verða að falla innan {{window}}.",
+      "popup_window_hint_from": "Viðburðir fyrir þennan popup verða að vera {{date}} eða síðar.",
+      "popup_window_hint_until": "Viðburðir fyrir þennan popup verða að vera {{date}} eða fyrr.",
       "date_label": "Dagsetning",
       "start_time_label": "Upphafstími",
       "start_label": "Upphaf",

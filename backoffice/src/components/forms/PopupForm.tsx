@@ -689,6 +689,7 @@ export function PopupForm({
                     <form.Field
                       name="end_date"
                       validators={{
+                        onChangeListenTo: ["start_date"],
                         onChange: ({ value, fieldApi }) => {
                           if (readOnly || !value) return undefined
                           const startDateValue =

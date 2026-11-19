@@ -1394,6 +1394,8 @@
       "replace_button": "Reemplazar",
       "cover_fallback_note": "Dejá vacío para usar la foto principal del lugar.",
       "popup_window_hint": "Los eventos de este pop-up deben estar dentro de {{window}}.",
+      "popup_window_hint_from": "Los eventos de este pop-up deben ser a partir del {{date}}.",
+      "popup_window_hint_until": "Los eventos de este pop-up deben ser hasta el {{date}}.",
       "date_label": "Fecha",
       "start_time_label": "Hora de inicio",
       "start_label": "Inicio",
