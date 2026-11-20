@@ -8,6 +8,7 @@ import { toast } from "sonner"
 import type { ApplicationPortalPublic } from "@/client"
 import { ApplicationUnavailable } from "@/components/Portal/ApplicationUnavailable"
 import { Loader } from "@/components/ui/Loader"
+import { compareOptionalDates } from "@/helpers/dates"
 import { useApplicationEntryFlow } from "@/hooks/useApplicationEntryFlow"
 import { useApplicationSchema } from "@/hooks/useApplicationSchema"
 import { useApplicationsQuery } from "@/hooks/useGetApplications"
@@ -55,10 +56,8 @@ function useFormInitData(application: ApplicationPortalPublic | null) {
       )
 
     // Prefer one from the most recent popup
-    const sortedPopups = [...popups].sort(
-      (a, b) =>
-        new Date(b.end_date ?? "").getTime() -
-        new Date(a.end_date ?? "").getTime(),
+    const sortedPopups = [...popups].sort((a, b) =>
+      compareOptionalDates(a.end_date, b.end_date, "desc"),
     )
 
     for (const popup of sortedPopups) {

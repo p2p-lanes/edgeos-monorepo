@@ -2,16 +2,18 @@ import uuid
 from datetime import UTC, datetime
 
 from fastapi import HTTPException, status
-from sqlalchemy import text
+from sqlalchemy import or_, text
 from sqlmodel import Session, col, select
 
 from app.api.product.models import Products
 from app.api.product.sale_window import date_to_utc_instant
 from app.api.product.schemas import (
+    PRODUCT_SLUG_MAX_LENGTH,
     ProductCreate,
     ProductUpdate,
 )
 from app.api.shared.crud import BaseCRUD
+from app.utils.utils import slugify
 
 SORT_FIELDS = {"name", "price", "category", "is_active"}
 
@@ -188,15 +190,48 @@ class ProductsCRUD(BaseCRUD[Products, ProductCreate, ProductUpdate]):
         self, session: Session, base_slug: str, popup_id: uuid.UUID
     ) -> str:
         """Generate a unique slug within a popup by appending a numeric suffix if needed."""
+        base_slug = base_slug[:PRODUCT_SLUG_MAX_LENGTH].rstrip("-")
         if not self.get_by_slug(session, base_slug, popup_id):
             return base_slug
 
         counter = 1
         while True:
-            candidate = f"{base_slug}-{counter}"
+            suffix = f"-{counter}"
+            stem = base_slug[: PRODUCT_SLUG_MAX_LENGTH - len(suffix)].rstrip("-")
+            candidate = f"{stem}{suffix}"
             if not self.get_by_slug(session, candidate, popup_id):
                 return candidate
             counter += 1
+
+    def resolve_explicit_slug(
+        self,
+        session: Session,
+        raw_slug: str,
+        popup_id: uuid.UUID,
+        exclude_product_id: uuid.UUID | None = None,
+    ) -> str:
+        """Normalize an admin-chosen slug and make sure it is free in the popup.
+
+        Explicit slugs identify products in exports and integrations, so they
+        are never silently suffixed: an empty result is a 422 and a clash with
+        another live product is a 409.
+        """
+        normalized = slugify(raw_slug)[:PRODUCT_SLUG_MAX_LENGTH].rstrip("-")
+        if not normalized:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="Slug must contain at least one letter or number",
+            )
+        existing = self.get_by_slug(session, normalized, popup_id)
+        if existing and existing.id != exclude_product_id:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=(
+                    f"Slug '{normalized}' is already used by another product "
+                    "in this gathering"
+                ),
+            )
+        return normalized
 
     def find_by_popup(
         self,
@@ -229,7 +264,12 @@ class ProductsCRUD(BaseCRUD[Products, ProductCreate, ProductUpdate]):
 
         if search:
             search_term = f"%{search}%"
-            statement = statement.where(col(Products.name).ilike(search_term))
+            statement = statement.where(
+                or_(
+                    col(Products.name).ilike(search_term),
+                    col(Products.slug).ilike(search_term),
+                )
+            )
 
         from sqlmodel import func
 

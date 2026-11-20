@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { cn } from "@/lib/utils"
 import type { DurationDraft } from "../lib/eventDuration"
+import type { PopupWindowHint } from "../lib/usePopupWindow"
 import { DurationPicker } from "./DurationPicker"
 
 interface EventScheduleFieldsProps {
@@ -16,7 +17,7 @@ interface EventScheduleFieldsProps {
   onDateChange: (next: string) => void
   isDateOutsidePopupWindow?: (d: Date) => boolean
   isVenueClosedOnDay?: (d: Date) => boolean
-  popupWindowLabel: string | null
+  popupWindowHint: PopupWindowHint | null
 
   // Time
   timeStr: string
@@ -53,7 +54,7 @@ export function EventScheduleFields({
   onDateChange,
   isDateOutsidePopupWindow,
   isVenueClosedOnDay,
-  popupWindowLabel,
+  popupWindowHint,
   timeStr,
   onTimeChange,
   durationDraft,
@@ -98,9 +99,9 @@ export function EventScheduleFields({
               : undefined
           }
         />
-        {popupWindowLabel && (
+        {popupWindowHint && (
           <p className="text-xs text-muted-foreground">
-            {t("events.form.popup_window_hint", { window: popupWindowLabel })}
+            {t(popupWindowHint.key, popupWindowHint.values)}
           </p>
         )}
       </div>

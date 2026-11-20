@@ -1,8 +1,10 @@
-import { LogOut, Newspaper } from "lucide-react"
+import { ArrowLeft, LogOut, Newspaper } from "lucide-react"
+import Link from "next/link"
 import { useState } from "react"
 import { useTranslation } from "react-i18next"
 import InvoiceModal from "@/app/portal/[popupSlug]/passes/components/common/InvoiceModal"
 import useAuth from "@/hooks/useAuth"
+import { useHasNoPortalPopups } from "@/hooks/useHasNoPortalPopups"
 import { useCityProvider } from "@/providers/cityProvider"
 import { useTenant } from "@/providers/tenantProvider"
 import { SidebarTrigger } from "../Sidebar/SidebarComponents"
@@ -16,6 +18,8 @@ const HeaderProfile = () => {
   const { getCity } = useCityProvider()
   const city = getCity()
   const hasInvoiceFields = !!city?.invoice_company_name
+  // No popup means no sidebar, so this page needs its own way home.
+  const hasNoPopups = useHasNoPortalPopups()
 
   return (
     <div className="p-4 md:p-6 border-b border-border bg-card">
@@ -24,7 +28,20 @@ const HeaderProfile = () => {
           two-line title. The trigger and actions now align with the title
           line and the invoices button collapses to its icon. */}
       <div className="flex items-start gap-2 md:items-center md:gap-4">
-        <SidebarTrigger className="mt-0.5 shrink-0 md:mt-0 xl:hidden" />
+        {hasNoPopups ? (
+          <Button
+            asChild
+            variant="ghost"
+            size="icon"
+            className="mt-0.5 shrink-0 md:mt-0"
+          >
+            <Link href="/portal" aria-label={t("common.go_back_home")}>
+              <ArrowLeft className="size-4" />
+            </Link>
+          </Button>
+        ) : (
+          <SidebarTrigger className="mt-0.5 shrink-0 md:mt-0 xl:hidden" />
+        )}
         <div className="min-w-0 flex-1">
           <h1 className="text-2xl font-bold text-foreground">
             {t("profile.my_profile")}

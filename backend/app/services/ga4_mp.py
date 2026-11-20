@@ -1,6 +1,5 @@
 """Send confirmed ticket purchases to tenant GA4 web streams."""
 
-import asyncio
 import re
 from dataclasses import dataclass, field
 from decimal import Decimal
@@ -10,6 +9,7 @@ from typing import Any
 import httpx
 from loguru import logger
 
+from app.services.background_tasks import spawn
 from app.services.meta_capi import _contents, _custom_data, _has_ticket_product
 from app.utils.encryption import decrypt
 
@@ -139,9 +139,7 @@ def fire_and_forget_purchase_event(
     """Schedule delayed approvals without blocking payment settlement."""
     try:
         snapshots = _snapshots(tenant, payment, popup)
-        asyncio.get_running_loop().create_task(
-            prepare_and_send_purchase_event(*snapshots)
-        )
+        spawn(prepare_and_send_purchase_event, *snapshots)
     except Exception:
         logger.exception(
             "Failed to schedule GA4 Purchase payment_id={}", getattr(payment, "id", "")

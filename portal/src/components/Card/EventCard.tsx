@@ -7,7 +7,7 @@ import { useTranslation } from "react-i18next"
 import type { PopupPublic } from "@/client"
 import { ButtonAnimated } from "@/components/ui/button"
 import { CardAnimation, CardContent } from "@/components/ui/card"
-import { formatDate } from "@/helpers/dates"
+import { formatDateRange } from "@/helpers/dates"
 import { imageOptimization } from "@/lib/image-optimization"
 import { EventProgressBar, type EventStatus } from "./EventProgressBar"
 
@@ -114,14 +114,17 @@ function Location() {
 
 function DateRange() {
   const { popup } = useEventCard()
-  const start = formatDate(popup.start_date ?? undefined, POPUP_DATE_FORMAT)
-  const end = formatDate(popup.end_date ?? undefined, POPUP_DATE_FORMAT)
-  if (!start && !end) return null
+  const range = formatDateRange(
+    popup.start_date,
+    popup.end_date,
+    POPUP_DATE_FORMAT,
+  )
+  if (!range) return null
 
   return (
     <div className="flex items-center text-sm text-heading-secondary mb-4">
       <CalendarDays className="mr-2 h-4 w-4" />
-      {start} - {end}
+      {range}
     </div>
   )
 }
