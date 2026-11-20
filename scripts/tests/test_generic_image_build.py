@@ -1,6 +1,5 @@
 """Guard the hosted image workflow's build-only boundary."""
 
-import os
 from pathlib import Path
 import re
 import subprocess
@@ -54,9 +53,7 @@ class GenericImageBuildTest(unittest.TestCase):
             ("https://api.example.org", "dev.example.org:bad", 1),
             ("https://api.example.org", "dev.example.org", 0),
         )
-        with tempfile.TemporaryDirectory(
-            dir=os.environ.get("TMPDIR", "/tmp/opencode")
-        ) as directory:
+        with tempfile.TemporaryDirectory() as directory:
             for api, portal, expected in cases:
                 with self.subTest(api=api, portal=portal):
                     result = subprocess.run(
@@ -85,9 +82,7 @@ class GenericImageBuildTest(unittest.TestCase):
             "      - name: Refuse stale branch revision before publication\n", 1
         )[1].split("\n      - ", 1)[0]
         script = textwrap.dedent(step.split("        run: |\n", 1)[1])
-        with tempfile.TemporaryDirectory(
-            dir=os.environ.get("TMPDIR", "/tmp/opencode")
-        ) as directory:
+        with tempfile.TemporaryDirectory() as directory:
             gh = Path(directory) / "gh"
             gh.write_text("#!/bin/sh\nprintf '%s\\n' deadbeef\n")
             gh.chmod(0o700)
