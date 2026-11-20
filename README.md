@@ -497,6 +497,37 @@ For production file uploads, use a managed S3-compatible service:
 - Cloudflare R2
 - MinIO (self-hosted)
 
+## Image builds
+
+The same `Build images` workflow contains the checks, four image builds,
+publication and immutable-digest artifact for any authorized branch. A future
+environment can call it with `target_branch`, `api_url`, `portal_domain`, and
+`publish_enabled: true`; the caller must grant `contents: read` and
+`packages: write`. The frontend URLs are embedded at build time, so each
+environment gets its own images from the same build process. No production
+caller or production publication is configured.
+
+For now the workflow also responds to pushes on `dev`, but its three jobs
+are **skipped by default**. The repository Actions variable
+`EDGEOS_DEV_IMAGE_PUBLISH_ENABLED` must be set to exactly `true` before a
+subsequent `dev` push can publish backend, backoffice, portal, and AI service
+images to GHCR. Do not set it until the first publication is separately
+authorized and the image contents have been reviewed. Once enabled, every
+new `dev` push may publish images; the workflow never deploys them.
+
+Set the repository Actions variables `EDGEOS_DEV_API_URL` (an HTTPS API URL)
+and `EDGEOS_DEV_PORTAL_DOMAIN` (a public portal hostname) before enabling
+publication.
+The build refuses missing or localhost values because the frontend bundles
+these values into its output. The workflow checks the same revision with CI,
+verifies the selected branch head before each push, and uploads one
+`image-digests` artifact for the four immutable image digests.
+
+New GHCR packages start private. Public image pulls without credentials
+require an organization owner to change **each** package's visibility after
+review; GitHub warns that a public package cannot later become private.
+The workflow does not change package visibility.
+
 ## Production Deployment
 
 For production, you must properly configure the environment variables. The `.env.example` defaults are NOT suitable for production.
