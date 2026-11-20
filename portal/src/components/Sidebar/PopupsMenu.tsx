@@ -11,6 +11,7 @@ import { useCallback } from "react"
 import { useTranslation } from "react-i18next"
 import type { PopupPublic } from "@/client"
 import { Badge } from "@/components/ui/badge"
+import { formatDate } from "@/helpers/dates"
 import { imageOptimization } from "@/lib/image-optimization"
 import { cn } from "@/lib/utils"
 import { useCityProvider } from "@/providers/cityProvider"
@@ -31,10 +32,11 @@ const PopupsMenu = () => {
   const isCollapsed = state === "collapsed"
   const city = getCity()
   const popups = getPopups()
-  const cityDate = new Date(city?.start_date ?? "")?.toLocaleDateString(
-    "en-EN",
-    { day: "numeric", month: "long", year: "numeric" },
-  )
+  const cityDate = formatDate(city?.start_date, {
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  })
 
   const handleClickCity = useCallback(
     (popup: PopupPublic) => {
@@ -102,9 +104,11 @@ const PopupsMenu = () => {
                         <span className="text-xs text-nav-text-secondary">
                           {city.location}
                         </span>
-                        <span className="text-xs text-nav-text-secondary">
-                          {cityDate}
-                        </span>
+                        {cityDate && (
+                          <span className="text-xs text-nav-text-secondary">
+                            {cityDate}
+                          </span>
+                        )}
                       </div>
                     )}
                   </div>

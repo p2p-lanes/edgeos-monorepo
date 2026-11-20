@@ -11,6 +11,7 @@ the privileged main engine, mirroring app/api/check_in/router.py; tests patch
 ``app.services.trial_limits.engine`` to the testcontainer engine.
 """
 
+import threading
 import uuid
 
 from cachetools import TTLCache
@@ -24,13 +25,17 @@ TRIAL_ATTENDEE_CAP = 500
 
 # Trial status rarely changes; cache 60s to avoid a main-engine round-trip on
 # every attendee insert (same TTL as the authenticated-user cache).
+# TTLCache is not thread-safe: every access must hold _trial_flag_cache_lock.
 _trial_flag_cache: TTLCache[uuid.UUID, bool] = TTLCache(maxsize=1000, ttl=60)
+_trial_flag_cache_lock = threading.Lock()
 
 
 def _is_active_trial_tenant(tenant_id: uuid.UUID) -> bool:
     """True when the tenant is a trial (suspended or not). Fails open."""
-    if tenant_id in _trial_flag_cache:
-        return _trial_flag_cache[tenant_id]
+    with _trial_flag_cache_lock:
+        cached = _trial_flag_cache.get(tenant_id)
+    if cached is not None:
+        return cached
 
     from app.api.tenant.models import Tenants
 
@@ -49,7 +54,8 @@ def _is_active_trial_tenant(tenant_id: uuid.UUID) -> bool:
         return False
 
     result = bool(is_trial)
-    _trial_flag_cache[tenant_id] = result
+    with _trial_flag_cache_lock:
+        _trial_flag_cache[tenant_id] = result
     return result
 
 

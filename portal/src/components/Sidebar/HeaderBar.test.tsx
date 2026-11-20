@@ -3,6 +3,7 @@ import type { ReactNode } from "react"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 
 let pathname = "/portal/summit/shop/attendee"
+let hasNoPopups = false
 
 vi.mock("next/navigation", () => ({
   usePathname: () => pathname,
@@ -22,6 +23,7 @@ vi.mock("react-i18next", () => ({
         "sidebar.commerce": "Commerce",
         "breadcrumbs.passes": "Purchases",
         "breadcrumbs.buy": "Buy",
+        "profile.my_profile": "My Profile",
       })[key] ?? key,
   }),
 }))
@@ -40,6 +42,10 @@ vi.mock("@/providers/cityProvider", () => ({
   }),
 }))
 
+vi.mock("@/hooks/useHasNoPortalPopups", () => ({
+  useHasNoPortalPopups: () => hasNoPopups,
+}))
+
 vi.mock("./CartBadge", () => ({ default: () => null }))
 vi.mock("./hooks/useBreadcrumbNameMapping", () => ({
   default: () => ({ nameMapping: {}, isLoading: false }),
@@ -51,6 +57,7 @@ import HeaderBar from "./HeaderBar"
 describe("HeaderBar breadcrumbs", () => {
   beforeEach(() => {
     pathname = "/portal/summit/shop/attendee"
+    hasNoPopups = false
   })
 
   it("renders Commerce without a link when its aggregate route is absent", () => {
@@ -72,5 +79,17 @@ describe("HeaderBar breadcrumbs", () => {
     expect(
       screen.getByRole("link", { name: "Purchases" }).getAttribute("href"),
     ).toBe("/portal/summit/passes")
+  })
+
+  it("drops the breadcrumbs and links the profile when there is no popup", () => {
+    pathname = "/portal"
+    hasNoPopups = true
+
+    render(<HeaderBar />)
+
+    expect(screen.queryByRole("navigation")).toBeNull()
+    expect(
+      screen.getByRole("link", { name: "My Profile" }).getAttribute("href"),
+    ).toBe("/portal/profile")
   })
 })

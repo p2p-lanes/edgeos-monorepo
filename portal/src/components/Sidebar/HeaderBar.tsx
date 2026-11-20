@@ -1,8 +1,12 @@
-import { ChevronRight } from "lucide-react"
+import { ChevronRight, User } from "lucide-react"
+import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
 import { Fragment } from "react"
+import { useTranslation } from "react-i18next"
 import { LanguageSwitcher } from "@/components/common/LanguageSwitcher"
 import { MobilePopupSwitcher } from "@/components/MobilePopupSwitcher"
+import { Button } from "@/components/ui/button"
+import { useHasNoPortalPopups } from "@/hooks/useHasNoPortalPopups"
 import { useCityProvider } from "@/providers/cityProvider"
 import {
   Breadcrumb,
@@ -17,7 +21,9 @@ import useBreadcrumbNameMapping from "./hooks/useBreadcrumbNameMapping"
 import { SidebarTrigger } from "./SidebarComponents"
 
 const HeaderBar = () => {
+  const { t } = useTranslation()
   const { getCity } = useCityProvider()
+  const hasNoPopups = useHasNoPortalPopups()
   const pathname = usePathname()
   const city = getCity()
   const router = useRouter()
@@ -38,6 +44,22 @@ const HeaderBar = () => {
   // own level. Shop has no aggregate route, so it remains a label. Without a
   // city slug, all segments render as non-clickable labels.
   const base = city?.slug ? `/portal/${city.slug}` : null
+
+  // With no popup there is no sidebar to toggle and nothing to trail back
+  // to, so the header keeps only the language and the profile link.
+  if (hasNoPopups) {
+    return (
+      <header className="portal-chrome flex h-14 shrink-0 items-center justify-end gap-2 border-b bg-sidebar/95 px-3 text-nav-text backdrop-blur sm:px-6">
+        <LanguageSwitcher portalContentClassName="portal-chrome" />
+        <Button asChild variant="outline" size="sm">
+          <Link href="/portal/profile">
+            <User className="size-4" />
+            {t("profile.my_profile")}
+          </Link>
+        </Button>
+      </header>
+    )
+  }
 
   return (
     <header className="portal-chrome flex h-14 shrink-0 items-center gap-2 border-b bg-sidebar/95 px-3 text-nav-text backdrop-blur sm:gap-4 sm:px-6">
