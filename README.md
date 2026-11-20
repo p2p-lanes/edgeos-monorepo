@@ -497,9 +497,17 @@ For production file uploads, use a managed S3-compatible service:
 - Cloudflare R2
 - MinIO (self-hosted)
 
-## Manual dev image builds
+## Image builds
 
-The `Build images` workflow responds to pushes on `dev`, but its three jobs
+The same `Build images` workflow contains the checks, four image builds,
+publication and immutable-digest artifact for any authorized branch. A future
+environment can call it with `target_branch`, `api_url`, `portal_domain`, and
+`publish_enabled: true`; the caller must grant `contents: read` and
+`packages: write`. The frontend URLs are embedded at build time, so each
+environment gets its own images from the same build process. No production
+caller or production publication is configured.
+
+For now the workflow also responds to pushes on `dev`, but its three jobs
 are **skipped by default**. The repository Actions variable
 `EDGEOS_DEV_IMAGE_PUBLISH_ENABLED` must be set to exactly `true` before a
 subsequent `dev` push can publish backend, backoffice, portal, and AI service
@@ -512,7 +520,7 @@ and `EDGEOS_DEV_PORTAL_DOMAIN` (a public portal hostname) before enabling
 publication.
 The build refuses missing or localhost values because the frontend bundles
 these values into its output. The workflow checks the same revision with CI,
-verifies the current `dev` head before each push, and uploads one
+verifies the selected branch head before each push, and uploads one
 `image-digests` artifact for the four immutable image digests.
 
 New GHCR packages start private. Public image pulls without credentials
