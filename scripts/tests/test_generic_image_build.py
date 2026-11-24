@@ -130,10 +130,17 @@ class GenericImageBuildTest(unittest.TestCase):
             "      publish_enabled:\n        required: true\n        type: boolean",
             text,
         )
-        self.assertNotIn("workflow_dispatch", text)
+        self.assertIn("  workflow_dispatch:\n  workflow_call:", text)
         self.assertEqual(
             set(re.findall(r"^  ([\w-]+):\n", text, re.M)),
-            {"checks", "boundary", "build", "push", "workflow_call"},
+            {
+                "checks",
+                "boundary",
+                "build",
+                "push",
+                "workflow_call",
+                "workflow_dispatch",
+            },
         )
         self.assertEqual(
             text.count("vars.EDGEOS_DEV_IMAGE_PUBLISH_ENABLED == 'true'"), 3
@@ -178,7 +185,14 @@ class GenericImageBuildTest(unittest.TestCase):
         for service in SERVICES:
             self.assertIn(f"- id: {service}", text)
             self.assertIn(f"steps.publish-{service}.outputs.digest", text)
-            self.assertIn(f"-{service}:${{{{ github.sha }}}}", text)
+            self.assertIn(f"-{service}:${{{{ env.IMAGE_TAG }}}}", text)
+        self.assertIn(
+            "IMAGE_TAG: ${{ github.event_name == 'workflow_dispatch' && "
+            "inputs.target_branch == '' && "
+            "format('{0}-run-{1}-{2}', github.sha, github.run_id, github.run_attempt) || github.sha }}",
+            text,
+        )
+        self.assertEqual(text.count("-${SERVICE}:${IMAGE_TAG}"), 4)
         self.assertEqual(text.count("push: false"), 4)
         self.assertEqual(text.count("actions/upload-artifact@"), 1)
         self.assertIn("name: image-digests", text)

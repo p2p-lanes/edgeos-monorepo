@@ -3,6 +3,7 @@ name: Build images
 on:
   push:
     branches: [dev]
+  workflow_dispatch:
   workflow_call:
     inputs:
       target_branch:
@@ -72,6 +73,7 @@ jobs:
       TARGET_BRANCH: ${{ inputs.target_branch || 'dev' }}
       BUILD_API_URL: ${{ inputs.target_branch != '' && inputs.api_url || vars.EDGEOS_DEV_API_URL }}
       BUILD_PORTAL_DOMAIN: ${{ inputs.target_branch != '' && inputs.portal_domain || vars.EDGEOS_DEV_PORTAL_DOMAIN }}
+      IMAGE_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.target_branch == '' && format('{0}-run-{1}-{2}', github.sha, github.run_id, github.run_attempt) || github.sha }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -123,7 +125,7 @@ jobs:
           file: backend/Dockerfile
           push: false
           load: true
-          tags: ghcr.io/${{ github.repository }}-backend:${{ github.sha }}
+          tags: ghcr.io/${{ github.repository }}-backend:${{ env.IMAGE_TAG }}
           labels: org.opencontainers.image.source=https://github.com/${{ github.repository }}
           cache-from: type=gha,scope=backend
           cache-to: type=gha,mode=max,scope=backend
@@ -138,7 +140,7 @@ jobs:
         env:
           SERVICE: backend
         run: |
-          image="ghcr.io/${GITHUB_REPOSITORY}-${SERVICE}:${GITHUB_SHA}"
+          image="ghcr.io/${GITHUB_REPOSITORY}-${SERVICE}:${IMAGE_TAG}"
           result="$(docker push "$image")"
           digest="$(printf '%s\n' "$result" | sed -nE 's/.*digest: (sha256:[0-9a-f]{64}).*/\1/p' | tail -n 1)"
           [[ "$digest" =~ ^sha256:[0-9a-f]{64}$ ]] || exit 1
@@ -150,7 +152,7 @@ jobs:
           file: backoffice/Dockerfile
           push: false
           load: true
-          tags: ghcr.io/${{ github.repository }}-backoffice:${{ github.sha }}
+          tags: ghcr.io/${{ github.repository }}-backoffice:${{ env.IMAGE_TAG }}
           labels: org.opencontainers.image.source=https://github.com/${{ github.repository }}
           build-args: |
             VITE_API_URL=${{ env.BUILD_API_URL }}
@@ -168,7 +170,7 @@ jobs:
         env:
           SERVICE: backoffice
         run: |
-          image="ghcr.io/${GITHUB_REPOSITORY}-${SERVICE}:${GITHUB_SHA}"
+          image="ghcr.io/${GITHUB_REPOSITORY}-${SERVICE}:${IMAGE_TAG}"
           result="$(docker push "$image")"
           digest="$(printf '%s\n' "$result" | sed -nE 's/.*digest: (sha256:[0-9a-f]{64}).*/\1/p' | tail -n 1)"
           [[ "$digest" =~ ^sha256:[0-9a-f]{64}$ ]] || exit 1
@@ -180,7 +182,7 @@ jobs:
           file: portal/Dockerfile
           push: false
           load: true
-          tags: ghcr.io/${{ github.repository }}-portal:${{ github.sha }}
+          tags: ghcr.io/${{ github.repository }}-portal:${{ env.IMAGE_TAG }}
           labels: org.opencontainers.image.source=https://github.com/${{ github.repository }}
           build-args: NEXT_PUBLIC_API_URL=${{ env.BUILD_API_URL }}
           cache-from: type=gha,scope=portal
@@ -196,7 +198,7 @@ jobs:
         env:
           SERVICE: portal
         run: |
-          image="ghcr.io/${GITHUB_REPOSITORY}-${SERVICE}:${GITHUB_SHA}"
+          image="ghcr.io/${GITHUB_REPOSITORY}-${SERVICE}:${IMAGE_TAG}"
           result="$(docker push "$image")"
           digest="$(printf '%s\n' "$result" | sed -nE 's/.*digest: (sha256:[0-9a-f]{64}).*/\1/p' | tail -n 1)"
           [[ "$digest" =~ ^sha256:[0-9a-f]{64}$ ]] || exit 1
@@ -208,7 +210,7 @@ jobs:
           file: ai-service/Dockerfile
           push: false
           load: true
-          tags: ghcr.io/${{ github.repository }}-ai-service:${{ github.sha }}
+          tags: ghcr.io/${{ github.repository }}-ai-service:${{ env.IMAGE_TAG }}
           labels: org.opencontainers.image.source=https://github.com/${{ github.repository }}
           cache-from: type=gha,scope=ai-service
           cache-to: type=gha,mode=max,scope=ai-service
@@ -223,7 +225,7 @@ jobs:
         env:
           SERVICE: ai-service
         run: |
-          image="ghcr.io/${GITHUB_REPOSITORY}-${SERVICE}:${GITHUB_SHA}"
+          image="ghcr.io/${GITHUB_REPOSITORY}-${SERVICE}:${IMAGE_TAG}"
           result="$(docker push "$image")"
           digest="$(printf '%s\n' "$result" | sed -nE 's/.*digest: (sha256:[0-9a-f]{64}).*/\1/p' | tail -n 1)"
           [[ "$digest" =~ ^sha256:[0-9a-f]{64}$ ]] || exit 1
