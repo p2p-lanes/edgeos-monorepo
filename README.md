@@ -523,6 +523,13 @@ these values into its output. The workflow checks the same revision with CI,
 verifies the selected branch head before each push, and uploads one
 `image-digests` artifact for the four immutable image digests.
 
+To rebuild the current `dev` commit after changing a build variable, open
+**Actions → Build images → Run workflow**, select `dev` and run it. The
+workflow must be present on the default branch for GitHub to offer this
+button. The manual run uses the same publication switch and CI checks as a
+push to `dev`, but publishes run-specific tags so it does not replace existing
+commit tags. It does not deploy or enable production.
+
 New GHCR packages start private. Public image pulls without credentials
 require an organization owner to change **each** package's visibility after
 review; GitHub warns that a public package cannot later become private.
