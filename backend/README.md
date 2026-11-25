@@ -333,6 +333,16 @@ batches and cascades their refresh history. Consumed ancestors of a live grant
 must remain available for replay detection. Revoking a grant does not revoke
 separate personal/agent API keys; those keep their own lifecycle.
 
+## Public tenant database endpoint
+
+Set `TENANT_DB_PUBLIC_HOST` (for example, `db.edgeos.world`) only after the
+tenant PostgreSQL listener on port 5432 has been verified. This setting
+controls the host shown in tenant credentials and adds `sslmode=verify-full`
+to copied backoffice URLs. Client drivers must trust the database server's CA.
+The setting does not enable TLS on PostgreSQL, publish a port, or change the
+backend's internal `POSTGRES_SERVER`, `POSTGRES_PORT`, or `POSTGRES_SSL_MODE`.
+Leave it unset to preserve the existing credentials response and copied URL.
+
 ## Scheduled jobs
 
 Some features rely on a background job that runs on a recurring schedule.
