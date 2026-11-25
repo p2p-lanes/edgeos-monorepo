@@ -497,6 +497,41 @@ For production file uploads, use a managed S3-compatible service:
 - Cloudflare R2
 - MinIO (self-hosted)
 
+## Image builds
+
+The `Build images` workflow runs CI, builds and publishes four images, and
+uploads their immutable digests. The frontend URLs are embedded at build time,
+so each environment gets its own images from the same workflow.
+
+The workflow builds and publishes backend, backoffice, portal, and AI service
+images to GHCR on pushes to `dev`. The workflow never deploys them.
+
+Set the repository Actions variables `EDGEOS_DEV_API_URL` (an HTTPS API URL)
+and `EDGEOS_DEV_PORTAL_DOMAIN` (a public portal hostname) before enabling
+publication.
+The build refuses missing or localhost values because the frontend bundles
+these values into its output. The workflow checks the same revision with CI,
+verifies the selected branch head before each push, and uploads one
+`image-digests` artifact for the four immutable image digests.
+
+To rebuild the current `dev` commit after changing a build variable, open
+**Actions → Build images → Run workflow**, select `dev` and run it. The
+workflow must be present on the default branch for GitHub to offer this
+button. The manual run uses the same CI checks as a push to `dev`, but
+publishes run-specific tags so it does not replace existing
+commit tags. It does not deploy or enable production.
+
+Publishing a GitHub release triggers the production image build for the tagged
+commit. Publication requires that commit to match the head of `main`. You can
+also use **Run workflow** and select `main`. Both use `EDGEOS_PROD_API_URL` and
+`EDGEOS_PROD_PORTAL_DOMAIN`. A push to `main` alone does not publish images.
+This workflow does not deploy production.
+
+New GHCR packages start private. Public image pulls without credentials
+require an organization owner to change **each** package's visibility after
+review; GitHub warns that a public package cannot later become private.
+The workflow does not change package visibility.
+
 ## Production Deployment
 
 For production, you must properly configure the environment variables. The `.env.example` defaults are NOT suitable for production.
