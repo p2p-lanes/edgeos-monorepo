@@ -1,3 +1,5 @@
+from typing import Literal
+
 from pydantic import BaseModel
 
 from app.api.shared.enums import CredentialType
@@ -14,3 +16,4 @@ class TenantCredentialResponse(BaseModel):
     db_host: str
     db_port: int
     db_name: str
+    db_ssl_mode: Literal["verify-full"] | None = None

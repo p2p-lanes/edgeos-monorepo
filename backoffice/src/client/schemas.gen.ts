@@ -34353,6 +34353,18 @@ export const TenantCredentialResponseSchema = {
         db_name: {
             type: 'string',
             title: 'Db Name'
+        },
+        db_ssl_mode: {
+            anyOf: [
+                {
+                    type: 'string',
+                    const: 'verify-full'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Db Ssl Mode'
         }
     },
     type: 'object',

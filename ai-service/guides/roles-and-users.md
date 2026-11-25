@@ -18,6 +18,12 @@ roles: operator
 - "Viewer": "Read-only access". Forms become read-only and buttons turn into "Back".
 - "Check In Controller": "Scanner access only". For people who scan tickets at the door; read-only in the backoffice.
 
+**Direct database credentials:** Organization admins can see their own read-only
+credentials; only superadmins can see read/write credentials. If a public
+database endpoint is configured, the copied read-only PostgreSQL URL verifies
+the server's hostname over TLS. Configure the client to trust the database
+server's certificate authority.
+
 **Add a user:**
 1. Go to [Users](/admin) and click "+ Add User".
 2. Fill in "Full Name" and "Email".

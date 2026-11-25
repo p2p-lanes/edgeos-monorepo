@@ -6937,6 +6937,7 @@ export type TenantCredentialResponse = {
     db_host: string;
     db_port: number;
     db_name: string;
+    db_ssl_mode?: ("verify-full" | null);
 };
 
 export type TenantPublic = {
