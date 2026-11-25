@@ -499,21 +499,12 @@ For production file uploads, use a managed S3-compatible service:
 
 ## Image builds
 
-The same `Build images` workflow contains the checks, four image builds,
-publication and immutable-digest artifact for any authorized branch. A future
-environment can call it with `target_branch`, `api_url`, `portal_domain`, and
-`publish_enabled: true`; the caller must grant `contents: read` and
-`packages: write`. The frontend URLs are embedded at build time, so each
-environment gets its own images from the same build process. No production
-caller or production publication is configured.
+The `Build images` workflow runs CI, builds and publishes four images, and
+uploads their immutable digests. The frontend URLs are embedded at build time,
+so each environment gets its own images from the same workflow.
 
-For now the workflow also responds to pushes on `dev`, but its three jobs
-are **skipped by default**. The repository Actions variable
-`EDGEOS_DEV_IMAGE_PUBLISH_ENABLED` must be set to exactly `true` before a
-subsequent `dev` push can publish backend, backoffice, portal, and AI service
-images to GHCR. Do not set it until the first publication is separately
-authorized and the image contents have been reviewed. Once enabled, every
-new `dev` push may publish images; the workflow never deploys them.
+The workflow builds and publishes backend, backoffice, portal, and AI service
+images to GHCR on pushes to `dev`. The workflow never deploys them.
 
 Set the repository Actions variables `EDGEOS_DEV_API_URL` (an HTTPS API URL)
 and `EDGEOS_DEV_PORTAL_DOMAIN` (a public portal hostname) before enabling
@@ -526,9 +517,15 @@ verifies the selected branch head before each push, and uploads one
 To rebuild the current `dev` commit after changing a build variable, open
 **Actions → Build images → Run workflow**, select `dev` and run it. The
 workflow must be present on the default branch for GitHub to offer this
-button. The manual run uses the same publication switch and CI checks as a
-push to `dev`, but publishes run-specific tags so it does not replace existing
+button. The manual run uses the same CI checks as a push to `dev`, but
+publishes run-specific tags so it does not replace existing
 commit tags. It does not deploy or enable production.
+
+Publishing a GitHub release triggers the production image build for the tagged
+commit. Publication requires that commit to match the head of `main`. You can
+also use **Run workflow** and select `main`. Both use `EDGEOS_PROD_API_URL` and
+`EDGEOS_PROD_PORTAL_DOMAIN`. A push to `main` alone does not publish images.
+This workflow does not deploy production.
 
 New GHCR packages start private. Public image pulls without credentials
 require an organization owner to change **each** package's visibility after
