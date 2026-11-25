@@ -17,6 +17,7 @@ import { Button } from "@/components/ui/button"
 import { InlineRow, InlineSection } from "@/components/ui/inline-form"
 import { Input } from "@/components/ui/input"
 import { Skeleton } from "@/components/ui/skeleton"
+import { buildReadonlyConnectionString } from "./tenant-db-connection"
 
 interface TenantCredentialsSectionProps {
   tenantId: string
@@ -57,16 +58,6 @@ function CopyButton({ value }: { value: string }) {
       {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
     </Button>
   )
-}
-
-function buildReadonlyConnectionString(
-  _tenantId: string,
-  cred: CredentialInfo,
-  db: { db_host: string; db_port: number; db_name: string },
-) {
-  const user = encodeURIComponent(cred.db_username)
-  const password = encodeURIComponent(cred.db_password)
-  return `postgresql://${user}:${password}@${db.db_host}:${db.db_port}/${db.db_name}`
 }
 
 function CopyConnectionStringButton({ value }: { value: string }) {
@@ -229,20 +220,27 @@ export function TenantCredentialsSection({
                 {cred.credential_type === "readonly" && (
                   <div className="space-y-1 pl-11">
                     <CopyConnectionStringButton
-                      value={buildReadonlyConnectionString(
-                        tenantId,
-                        cred,
-                        data,
-                      )}
+                      value={buildReadonlyConnectionString(cred, data)}
                     />
                     <p className="text-xs text-muted-foreground">
                       Read-only PostgreSQL URL scoped to this organization.
                       Scope is enforced by the database, so the holder of this
-                      URL cannot read other organizations' data. Append{" "}
-                      <code className="rounded bg-muted px-1 py-0.5 text-[10px] font-mono">
-                        ?sslmode=require
-                      </code>{" "}
-                      if your environment requires TLS.
+                      URL cannot read other organizations' data.{" "}
+                      {data.db_ssl_mode === "verify-full" ? (
+                        <>
+                          TLS is required. Configure your client to trust the
+                          server's certificate authority and verify its
+                          hostname.
+                        </>
+                      ) : (
+                        <>
+                          Append{" "}
+                          <code className="rounded bg-muted px-1 py-0.5 text-[10px] font-mono">
+                            ?sslmode=require
+                          </code>{" "}
+                          if your environment requires TLS.
+                        </>
+                      )}
                     </p>
                   </div>
                 )}

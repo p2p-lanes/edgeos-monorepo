@@ -61,6 +61,15 @@ class Settings(BaseSettings):
     POSTGRES_PASSWORD: str = Field(...)
     POSTGRES_DB: str = ""
     POSTGRES_SSL_MODE: str = "require"
+    # Advertised to tenant clients only; never used by internal connections.
+    TENANT_DB_PUBLIC_HOST: str | None = Field(
+        default=None,
+        max_length=253,
+        pattern=(
+            r"^(?:[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\.)+"
+            r"[a-zA-Z](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?$"
+        ),
+    )
 
     @computed_field
     @property

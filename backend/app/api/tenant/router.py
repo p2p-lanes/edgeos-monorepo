@@ -564,6 +564,7 @@ async def send_smtp_test_email(
 @router.get(
     "/{tenant_id}/credentials",
     response_model=TenantCredentialResponse,
+    response_model_exclude_none=True,
 )
 async def get_credentials(
     tenant_id: uuid.UUID,
@@ -604,11 +605,13 @@ async def get_credentials(
             detail="Tenant has no credentials configured",
         )
 
+    public_host = settings.TENANT_DB_PUBLIC_HOST
     return TenantCredentialResponse(
         credentials=credential_infos,
-        db_host=settings.POSTGRES_SERVER,
-        db_port=settings.POSTGRES_PORT,
+        db_host=public_host or settings.POSTGRES_SERVER,
+        db_port=5432 if public_host else settings.POSTGRES_PORT,
         db_name=settings.POSTGRES_DB,
+        db_ssl_mode="verify-full" if public_host else None,
     )
 
 
