@@ -298,7 +298,7 @@ See the root `.env.example` for a complete list with defaults. Key variables:
 | `STORAGE_SECRET_KEY` | `minioadmin` | S3 secret key |
 | `STORAGE_BUCKET` | `edgeos` | S3 bucket name |
 | `REDIS_URL` | `redis://redis:6379` | Redis connection URL |
-| `SENTRY_DSN` | - | Sentry DSN for error tracking |
+| `SENTRY_DSN` | - | Sentry or GlitchTip DSN for error tracking (any environment; events are tagged with `ENVIRONMENT`) |
 | `THIRD_PARTY_ACCESS_TOKEN_EXPIRE_MINUTES` | `15` | SSO and third-party OTP JWT lifetime (1–60 minutes); old `SSO_ACCESS_TOKEN_EXPIRE_MINUTES` env name accepted as fallback |
 | `THIRD_PARTY_REFRESH_TOKEN_IDLE_DAYS` | `8` | Refresh inactivity window (1–30 days), capped at absolute grant expiry |
 | `THIRD_PARTY_GRANT_EXPIRE_DAYS` | `30` | Absolute third-party authorization lifetime (1–90 days), never extended by refresh |
