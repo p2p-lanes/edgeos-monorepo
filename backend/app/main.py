@@ -14,7 +14,7 @@ from starlette.middleware.gzip import GZipMiddleware
 
 import app.models  # noqa: F401 - Register all models with SQLAlchemy
 from app.api.router import api_router
-from app.core.config import Environment, settings
+from app.core.config import settings
 from app.core.logging import RequestContextMiddleware, configure_logging
 from app.core.rate_limit import RateLimitExceeded
 from app.utils.checkout_preview import CHECKOUT_PREVIEW_TOKEN_HEADER
@@ -26,7 +26,10 @@ def custom_generate_unique_id(route: APIRoute) -> str:
     return f"{route.tags[0]}-{route.name}"
 
 
-if settings.SENTRY_DSN and settings.ENVIRONMENT == Environment.PRODUCTION:
+# Error tracking runs in any environment that sets SENTRY_DSN (Sentry or
+# GlitchTip); events are tagged with ENVIRONMENT so dev and production can share
+# one project.
+if settings.SENTRY_DSN:
     sentry_sdk.init(
         dsn=str(settings.SENTRY_DSN),
         environment=settings.ENVIRONMENT.value,

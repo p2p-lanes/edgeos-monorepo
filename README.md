@@ -419,7 +419,7 @@ The `Dockerfile` in `portal/` handles the multi-stage build with dependency cach
 | Variable | Required | Default | Description |
 |----------|----------|---------|-------------|
 | `REDIS_URL` | No | `redis://redis:6379` | Redis connection URL |
-| `SENTRY_DSN` | No | - | Sentry DSN for error tracking |
+| `SENTRY_DSN` | No | - | Sentry or GlitchTip DSN for error tracking (any environment) |
 
 ### Docker Services (Development)
 
